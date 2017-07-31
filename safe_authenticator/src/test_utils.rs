@@ -23,9 +23,10 @@ use errors::AuthError;
 use futures::{Future, IntoFuture};
 use futures::future;
 use ipc::decode_ipc_msg;
+use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, utils};
+use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq, Permission};
@@ -182,6 +183,28 @@ pub fn try_access_container<S: Into<String>>(
     let app_id = app_id.into();
     run(authenticator, move |client| {
         access_container_entry(client, &ac_md_info, &app_id, app_keys).map(move |(_, entry)| entry)
+    })
+}
+
+/// Get the container entry from the user's root dir
+pub fn get_container_from_root(
+    authenticator: &Authenticator,
+    container: &str,
+) -> Result<MDataInfo, AuthError> {
+    let container = container.as_bytes().to_vec();
+
+    try_run(authenticator, move |client| {
+        let user_root = fry!(client.user_root_dir());
+        let container_key = fry!(user_root.enc_entry_key(&container));
+
+        client
+            .get_mdata_value(user_root.name, user_root.type_tag, container_key)
+            .map_err(AuthError::from)
+            .and_then(move |value| {
+                let raw_content = user_root.decrypt(&value.content)?;
+                deserialise::<MDataInfo>(&raw_content).map_err(AuthError::from)
+            })
+            .into_box()
     })
 }
 

@@ -23,8 +23,9 @@ use ffi::apps::*;
 use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
-use ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
+use ipc::{encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
 use maidsafe_utilities::serialisation::deserialise;
+use revocation;
 use routing::User;
 use safe_core::{CoreError, MDataInfo, mdata_info};
 use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
@@ -40,6 +41,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
                  rand_app, register_app, run, try_access_container, try_run};
+#[cfg(feature = "use-mock-routing")]
+use test_utils::get_container_from_root;
 use tiny_keccak::sha3_256;
 
 // Test creation and content of std dirs after account creation.
@@ -836,6 +839,175 @@ fn lists_of_registered_and_revoked_apps() {
     assert_eq!(revoked.len(), 0);
 }
 
+// Test operation recovery for app revocation
+//
+// 1. Create a test app and authenticate it.
+// 2. Grant access to some of the default containers (e.g. `_video`, `_documents`).
+// 3. Put several files with a known content in both containers (e.g. `_video/test.txt` and
+// `_documents/test2.txt`).
+// 4. Revoke the app access from the authenticator.
+// 5. After re-encryption of the `_document` container is done, simulate a network failure
+// for the `_video` container encryption step.
+// 6. Verify that the `_videos` container is still accessible using the previous encryption key.
+// 7. Verify that the `_documents` container is not accessible using the current key, but is
+// accessible using the new key.
+// 8. Check that the app's key is not listed in MaidManagers.
+// 9. Repeat step 1.4 (restart the revoke ooperation for the app) and don't interfere with the
+// re-encryption process this time. It should pass.
+// 10. Verify that both the second and first containers aren't accessible using previous keys.
+// 11. Verify that both the second and first containers are accesible using the new keys.
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn app_revocation_recovery() {
+    use safe_core::MockRouting;
+    use routing::{ClientError, Request, Response};
+    use safe_core::utils;
+
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let auth = unwrap!(Authenticator::create_acc(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+    ));
+
+    // Create a test app and authenticate it.
+    // Grant access to some of the default containers (e.g. `_video`, `_documents`).
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+    let app_id = auth_req.app.id.clone();
+    let auth_granted = unwrap!(register_app(&auth, &auth_req));
+
+    // Put several files with a known content in both containers
+    let mut ac_entries = access_container(&auth, app_id.clone(), auth_granted.clone());
+    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let (docs_md, _) = unwrap!(ac_entries.remove("_documents"));
+
+    unwrap!(create_file(
+        &auth,
+        videos_md.clone(),
+        "video.mp4",
+        vec![1; 10],
+    ));
+    unwrap!(create_file(&auth, docs_md.clone(), "test.doc", vec![2; 10]));
+
+    // After re-encryption of the first container (`_video`) is done, simulate a network failure
+    let docs_name = docs_md.name;
+
+    let user_root_md = run(&auth, move |client| {
+        client.user_root_dir().map_err(AuthError::from)
+    });
+    let user_root_name = user_root_md.name;
+
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        let mut fail_user_root_update = false;
+
+        routing.set_request_hook(move |req| {
+            match *req {
+                // Simulate a network failure for a second request to re-encrypt containers
+                // so that the _videos container should remain untouched
+                Request::MutateMDataEntries { name, msg_id, .. }
+                    if name == docs_name || (name == user_root_name && fail_user_root_update) => {
+                    fail_user_root_update = true;
+
+                    Some(Response::MutateMDataEntries {
+                        msg_id,
+                        res: Err(ClientError::LowBalance),
+                    })
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
+
+    // Revoke the app.
+    match try_revoke(&auth, &app_id) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Verify that the `_documents` container is still accessible using the previous key.
+    let _ = unwrap!(fetch_file(&auth, docs_md.clone(), "test.doc"));
+
+    // Verify that the `_videos` container is not accessible using the previous key,
+    // but is accessible using the new key.
+    match fetch_file(&auth, videos_md.clone(), "video.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // We'd need to get that new key from the root container though, as the access container
+    // entry for the app hasn't been updated at this point.
+    let mut reencrypted_videos_md = unwrap!(get_container_from_root(&auth, "_videos"));
+
+    // The container has been reencrypted now, swap the old enc info
+    reencrypted_videos_md.commit_new_enc_info();
+    let _ = unwrap!(fetch_file(
+        &auth,
+        reencrypted_videos_md.clone(),
+        "video.mp4",
+    ));
+
+    // Ensure that the app's key has been removed from MaidManagers
+    let auth_keys = run(&auth, move |client| {
+        client
+            .list_auth_keys_and_version()
+            .map(move |(auth_keys, _version)| auth_keys)
+            .map_err(AuthError::from)
+    });
+    assert!(!auth_keys.contains(&auth_granted.app_keys.sign_pk));
+
+    // Login and try to revoke the app again, now without interfering with responses
+    let auth = unwrap!(Authenticator::login(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+    ));
+
+    // App revocation should succeed
+    revoke(&auth, &app_id);
+
+    // Try to access both files using previous keys - they shouldn't be accessible
+    match fetch_file(&auth, docs_md.clone(), "test.doc") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+    match fetch_file(&auth, videos_md.clone(), "video.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Get the new encryption info from the user's root dir (as the access container has been
+    // removed now). Both containers should be accessible with the new keys without any extra
+    // effort
+    let ac_entries = try_access_container(&auth, app_id.clone(), auth_granted.clone());
+    assert!(ac_entries.is_none());
+
+    let reencrypted_docs_md = unwrap!(get_container_from_root(&auth, "_documents"));
+    let reencrypted_videos_md = unwrap!(get_container_from_root(&auth, "_videos"));
+
+    let _ = unwrap!(fetch_file(&auth, reencrypted_docs_md.clone(), "test.doc"));
+    let _ = unwrap!(fetch_file(
+        &auth,
+        reencrypted_videos_md.clone(),
+        "video.mp4",
+    ));
+}
+
 // Test operation recovery for app authentication
 //
 // 1. Create a test app and try to authenticate it (with `app_container` set to true).
@@ -1107,24 +1279,19 @@ fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize 
     })
 }
 
+fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String, AuthError> {
+    let app_id = app_id.to_string();
+
+    try_run(authenticator, move |client| {
+        revocation::revoke_app(client, &app_id)
+    })
+}
+
 fn revoke(authenticator: &Authenticator, app_id: &str) {
-    let base64_app_id = base64_encode(app_id.as_bytes());
-
-    let revoke_resp: String = unsafe {
-        let app_id = unwrap!(CString::new(app_id));
-        unwrap!(call_1(|ud, cb| {
-            auth_revoke_app(authenticator, app_id.as_ptr(), ud, cb)
-        }))
-    };
-
-    // Assert the callback is called with error-code 0 and FfiString contains
-    // "safe_<app-id-b64>:payload" where payload is b64 encoded IpcMsg::Revoked.
-    assert!(revoke_resp.starts_with(&format!("safe-{}", base64_app_id)));
-
-    match ipc::decode_msg(&revoke_resp) {
-        Ok(IpcMsg::Revoked { .. }) => (),
+    match try_revoke(authenticator, app_id) {
+        Ok(_) => (),
         x => panic!("Unexpected {:?}", x),
-    };
+    }
 }
 
 // Creates a containers request asking for "documents with permission to
