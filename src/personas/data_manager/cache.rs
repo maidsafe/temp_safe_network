@@ -18,11 +18,9 @@
 use super::STATUS_LOG_INTERVAL;
 use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::{self, Mutation};
-use GROUP_SIZE;
-use QUORUM;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{Authority, MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId,
-              MutableData, RoutingTable, Value, XorName};
+              MutableData, QUORUM_DENOMINATOR, QUORUM_NUMERATOR, RoutingTable, Value, XorName};
 use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
 use std::iter;
@@ -41,6 +39,8 @@ const MUTABLE_CHUNK_REQUEST_TIMEOUT_SECS: u64 = 60;
 const FRAGMENT_REQUEST_TIMEOUT_SECS: u64 = 60;
 
 pub struct Cache {
+    group_size: usize,
+
     /// Immutable data chunks we are no longer responsible for. These can be deleted
     /// from the chunk store.
     unneeded_immutable_chunks: UnneededChunks,
@@ -67,6 +67,21 @@ pub struct Cache {
 }
 
 impl Cache {
+    pub fn new(group_size: usize) -> Cache {
+        Cache {
+            group_size,
+            unneeded_immutable_chunks: UnneededChunks::new(),
+            fragment_holders: HashMap::default(),
+            fragment_index: HashMap::default(),
+            needed_mutable_chunks: HashSet::default(),
+            needed_mutable_chunk_request: None,
+            pending_writes: HashMap::default(),
+            logging_time: Instant::now(),
+            total_needed_fragments_count: 0,
+            requested_needed_fragments_count: 0,
+        }
+    }
+
     // Returns IDs of all chunks we need.
     pub fn needed_chunks(&self) -> HashSet<DataId> {
         self.fragment_index
@@ -129,6 +144,7 @@ impl Cache {
         src: XorName,
         msg_id: MessageId,
     ) {
+        let group_size = self.group_size;
         let done = self.needed_mutable_chunk_request.as_mut().map_or(
             false,
             |request| if request.data_id == data_id &&
@@ -136,7 +152,7 @@ impl Cache {
                     msg_id
             {
                 let _ = request.successes.insert(src);
-                request.did_accumulate()
+                request.successes.len() * QUORUM_DENOMINATOR > group_size * QUORUM_NUMERATOR
             } else {
                 false
             },
@@ -148,13 +164,14 @@ impl Cache {
     }
 
     pub fn handle_needed_mutable_chunk_failure(&mut self, src: XorName, msg_id: MessageId) {
+        let group_size = self.group_size;
         let done = self.needed_mutable_chunk_request.as_mut().map_or(
             false,
             |request| if request.msg_id ==
                 msg_id
             {
                 let _ = request.failures.insert(src);
-                !request.can_accumulate()
+                !request.can_accumulate(group_size)
             } else {
                 false
             },
@@ -305,11 +322,12 @@ impl Cache {
     pub fn prune_needed_fragments(&mut self, routing_table: &RoutingTable<XorName>) -> bool {
         let mut lost_holders = Vec::new();
         let mut result = false;
+        let group_size = self.group_size;
 
         for (holder_name, holder) in &mut self.fragment_holders {
             let (lost, retained) = holder.fragments.drain().partition(|fragment| {
                 routing_table
-                    .other_closest_names(fragment.name(), GROUP_SIZE)
+                    .other_closest_names(fragment.name(), group_size)
                     .map_or(true, |group| !group.contains(&holder_name))
             });
 
@@ -368,9 +386,10 @@ impl Cache {
 
     pub fn prune_unneeded_chunks(&mut self, routing_table: &RoutingTable<XorName>) -> u64 {
         let before = self.unneeded_immutable_chunks.len();
+        let group_size = self.group_size;
 
         self.unneeded_immutable_chunks.retain(|name| {
-            !routing_table.is_closest(name, GROUP_SIZE)
+            !routing_table.is_closest(name, group_size)
         });
 
         (before - self.unneeded_immutable_chunks.len()) as u64
@@ -605,21 +624,6 @@ impl Cache {
     }
 }
 
-impl Default for Cache {
-    fn default() -> Cache {
-        Cache {
-            unneeded_immutable_chunks: UnneededChunks::new(),
-            fragment_holders: HashMap::default(),
-            fragment_index: HashMap::default(),
-            needed_mutable_chunks: HashSet::default(),
-            needed_mutable_chunk_request: None,
-            pending_writes: HashMap::default(),
-            logging_time: Instant::now(),
-            total_needed_fragments_count: 0,
-            requested_needed_fragments_count: 0,
-        }
-    }
-}
 
 
 // A pending write to the chunk store. This is cached in memory until the group either reaches
@@ -853,13 +857,10 @@ impl ChunkRequest {
         self.timestamp.elapsed().as_secs() > MUTABLE_CHUNK_REQUEST_TIMEOUT_SECS
     }
 
-    fn can_accumulate(&self) -> bool {
-        // `GROUP_SIZE - 1` means everyone in the group except us.
-        GROUP_SIZE - 1 - self.failures.len() >= QUORUM
-    }
-
-    fn did_accumulate(&self) -> bool {
-        self.successes.len() >= QUORUM
+    fn can_accumulate(&self, group_size: usize) -> bool {
+        let failure_numerator = QUORUM_DENOMINATOR - QUORUM_NUMERATOR;
+        let failure_count = self.failures.len() + 1; // include us as a failure
+        failure_count * QUORUM_DENOMINATOR >= group_size * failure_numerator
     }
 }
 
@@ -958,7 +959,7 @@ mod tests {
     #[test]
     fn needed_fragments() {
         let mut rng = rand::thread_rng();
-        let mut cache = Cache::default();
+        let mut cache = Cache::new(8);
 
         let holder0 = rng.gen();
         let holder1 = rng.gen();
@@ -1019,7 +1020,7 @@ mod tests {
     #[test]
     fn needed_fragments_lifecycle() {
         let mut rng = rand::thread_rng();
-        let mut cache = Cache::default();
+        let mut cache = Cache::new(8);
 
         let fragment = FragmentInfo::ImmutableData(rng.gen());
         let holder0 = rng.gen();

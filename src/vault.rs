@@ -76,13 +76,19 @@ impl Vault {
         } else {
             builder.create()
         }?;
+        let group_size = routing_node.min_section_size();
 
         Ok(Vault {
             maid_manager: MaidManager::new(
+                group_size,
                 config.invite_key.map(sign::PublicKey),
                 disable_mutation_limit,
             ),
-            data_manager: DataManager::new(config.chunk_store_root, config.max_capacity)?,
+            data_manager: DataManager::new(
+                group_size,
+                config.chunk_store_root,
+                config.max_capacity,
+            )?,
             routing_node: routing_node,
         })
     }

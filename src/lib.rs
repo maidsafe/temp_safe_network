@@ -266,10 +266,5 @@ pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
 use routing::mock_crypto::rust_sodium;
 pub use vault::Vault;
 
-/// The number of nodes in groups managing data and user accounts.
-pub const GROUP_SIZE: usize = 8;
-/// The minimal number of nodes in group to reach consensus.
-pub const QUORUM: usize = GROUP_SIZE / 2 + 1;
-
 /// The type tag of invitations to create an account.
 pub const TYPE_TAG_INVITE: u64 = 8;

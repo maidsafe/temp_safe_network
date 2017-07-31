@@ -11,8 +11,6 @@ pub use self::cache::PENDING_WRITE_TIMEOUT_SECS;
 pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
 use self::mutable_data_cache::MutableDataCache;
 use self::mutation::{Mutation, MutationType};
-use GROUP_SIZE;
-use QUORUM;
 use accumulator::Accumulator;
 use authority::ClientManagerAuthority;
 use chunk_store::{Chunk, ChunkId, ChunkStore};
@@ -21,7 +19,8 @@ use chunk_store::Error as ChunkStoreError;
 use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
-              PermissionSet, RoutingTable, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+              PermissionSet, QUORUM_DENOMINATOR, QUORUM_NUMERATOR, RoutingTable,
+              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
@@ -70,6 +69,7 @@ impl ChunkId<DataId> for MutableDataId {
 }
 
 pub struct DataManager {
+    group_size: usize,
     chunk_store: ChunkStore<DataId>,
     chunk_refresh_accumulator: Accumulator<MutableDataId, XorName>,
     fragment_refresh_accumulator: Accumulator<FragmentInfo, XorName>,
@@ -86,18 +86,21 @@ pub struct DataManager {
 
 impl DataManager {
     pub fn new(
+        group_size: usize,
         chunk_store_root: Option<String>,
         capacity: Option<u64>,
     ) -> Result<DataManager, InternalError> {
+        let quorum = ((group_size * QUORUM_NUMERATOR) / QUORUM_DENOMINATOR) + 1;
         let chunk_store = ChunkStore::new(chunk_store_root, capacity)?;
         let accumulator_duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
 
         Ok(DataManager {
-            chunk_store: chunk_store,
-            chunk_refresh_accumulator: Accumulator::with_duration(QUORUM, accumulator_duration),
-            fragment_refresh_accumulator: Accumulator::with_duration(QUORUM, accumulator_duration),
-            cache: Default::default(),
-            mdata_cache: MutableDataCache::new(),
+            group_size,
+            chunk_store,
+            chunk_refresh_accumulator: Accumulator::with_duration(quorum, accumulator_duration),
+            fragment_refresh_accumulator: Accumulator::with_duration(quorum, accumulator_duration),
+            cache: Cache::new(group_size),
+            mdata_cache: MutableDataCache::new(group_size),
             immutable_data_count: 0,
             mutable_data_count: 0,
             client_get_requests: 0,
@@ -204,7 +207,7 @@ impl DataManager {
             refreshes,
         )?;
 
-        if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
+        if let Some(group) = routing_node.close_group(*data_id.name(), self.group_size) {
             for node in &group {
                 self.cache.register_needed_data_with_another_holder(
                     &data_id,
@@ -950,7 +953,7 @@ impl DataManager {
 
         for data_id in self.our_chunks() {
             // Only retain chunks for which we're still in the close group.
-            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
+            match routing_table.other_closest_names(data_id.name(), self.group_size) {
                 None => {
                     trace!("No longer a DM for {:?}", data_id);
 
@@ -1012,7 +1015,7 @@ impl DataManager {
 
         let mut refreshes = HashMap::default();
         for data_id in self.our_chunks() {
-            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
+            match routing_table.other_closest_names(data_id.name(), self.group_size) {
                 None => {
                     error!(
                         "Moved out of close group of {:?} in a NodeLost event.",
@@ -1021,10 +1024,10 @@ impl DataManager {
                 }
                 Some(close_group) => {
                     // If no new node joined the group due to this event, continue:
-                    // If the group has fewer than GROUP_SIZE elements, the lost node was not
+                    // If the group has fewer than `self.group_size` elements, the lost node was not
                     // replaced at all. Otherwise, if the group's last node is closer to the data
                     // than the lost node, the lost node was not in the group in the first place.
-                    if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
+                    if let Some(&outer_node) = close_group.get(self.group_size.saturating_sub(2)) {
                         if data_id.name().closer(node_name, outer_node) {
                             refreshes.entry(*outer_node).or_insert_with(Vec::new).push(
                                 Refresh::from_data_id(data_id),
@@ -1720,17 +1723,16 @@ impl Refresh {
 }
 
 fn close_to_address(routing_node: &mut RoutingNode, address: &XorName) -> bool {
-    routing_node.close_group(*address, GROUP_SIZE).is_some()
+    routing_node
+        .close_group(*address, routing_node.min_section_size())
+        .is_some()
 }
 
 // Is `name` in the close group of `group_name`?
 fn is_in_close_group(routing_node: &mut RoutingNode, group_name: &XorName, name: &XorName) -> bool {
-    routing_node.close_group(*group_name, GROUP_SIZE).map_or(
-        false,
-        |group| {
-            group.contains(name)
-        },
-    )
+    routing_node
+        .close_group(*group_name, routing_node.min_section_size())
+        .map_or(false, |group| group.contains(name))
 }
 
 fn recompute_idata_name(data: &ImmutableData) -> XorName {

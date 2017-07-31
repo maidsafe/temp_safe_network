@@ -22,7 +22,6 @@ pub mod test_client;
 /// Test full node
 pub mod test_node;
 
-use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::DataId;
@@ -72,7 +71,7 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
 }
 
 /// Checks that the given `nodes` store the expected number of copies of the given data.
-pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
+pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode], group_size: usize) {
     let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
         for data_idv in unwrap!(node.get_stored_ids_and_versions()) {
@@ -100,7 +99,7 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
         let mut expected_data_holders = nodes.iter().map(TestNode::name).sorted_by(|left, right| {
             data_id.name().cmp_distance(left, right)
         });
-        expected_data_holders.truncate(GROUP_SIZE);
+        expected_data_holders.truncate(group_size);
 
         if expected_data_holders != data_holders {
             panic!(

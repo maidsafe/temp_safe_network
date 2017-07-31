@@ -25,7 +25,7 @@ use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
-use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, GROUP_SIZE, TYPE_TAG_INVITE, test_utils};
+use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -36,7 +36,8 @@ const TEST_TAG: u64 = 123456;
 
 #[test]
 fn handle_put_without_account() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = TEST_NET_SIZE;
@@ -69,7 +70,8 @@ fn handle_put_without_account() {
 
 #[test]
 fn handle_put_with_account() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = TEST_NET_SIZE;
@@ -106,13 +108,13 @@ fn handle_put_with_account() {
         .count();
     assert_eq!(
         count,
-        GROUP_SIZE,
+        group_size,
         "client account count {} found on {} nodes",
         count,
         node_count
     );
 
-    mock_crust_detail::check_data(vec![Data::Immutable(data)], &nodes);
+    mock_crust_detail::check_data(vec![Data::Immutable(data)], &nodes, group_size);
 
     expected_mutations_done += 1;
     expected_mutations_available = DEFAULT_MAX_OPS_COUNT - expected_mutations_done;
@@ -126,7 +128,8 @@ fn handle_put_with_account() {
 
 #[test]
 fn put_oversized_data() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, TEST_NET_SIZE, None, true);
@@ -197,7 +200,8 @@ fn put_oversized_data() {
 
 #[test]
 fn create_account_twice() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = TEST_NET_SIZE;
@@ -303,9 +307,10 @@ fn create_account_twice() {
 #[test]
 fn invite() {
     let seed = None;
-    let node_count = GROUP_SIZE;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size;
+    let network = Network::new(group_size, seed);
     let admin_id = FullId::new();
     let vault_config = Config {
         invite_key: Some(admin_id.public_id().signing_public_key().0),
@@ -381,7 +386,8 @@ fn invite() {
 
 #[test]
 fn storing_till_client_account_full() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = 15;
@@ -417,7 +423,8 @@ fn account_balance_with_successful_mutations_with_churn() {
     let node_count = 15;
     let data_count = 4;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -441,7 +448,7 @@ fn account_balance_with_successful_mutations_with_churn() {
             mutation_count += 1;
         }
 
-        if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
+        if nodes.len() <= group_size + 2 || rng.gen() {
             let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
@@ -457,7 +464,7 @@ fn account_balance_with_successful_mutations_with_churn() {
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+        let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
         let node_count_stats: Vec<_> = sorted_nodes
             .into_iter()
             .map(|node| {
@@ -488,7 +495,8 @@ fn account_balance_with_failed_mutations_with_churn() {
     let node_count = 15;
     let chunks_per_iter = 4;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -521,7 +529,7 @@ fn account_balance_with_failed_mutations_with_churn() {
             }
         }
 
-        if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
+        if nodes.len() <= group_size + 2 || rng.gen() {
             let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
@@ -537,7 +545,7 @@ fn account_balance_with_failed_mutations_with_churn() {
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+        let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
         let node_count_stats: Vec<_> = sorted_nodes
             .into_iter()
             .map(|node| {
@@ -572,7 +580,8 @@ fn account_concurrent_keys_mutation() {
     let iterations = test_utils::iterations();
     let max_mutations = 4;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -663,7 +672,8 @@ fn account_concurrent_insert_key_put_data() {
     let node_count = TEST_NET_SIZE;
     let iterations = test_utils::iterations();
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -726,7 +736,7 @@ fn account_concurrent_insert_key_put_data() {
         }
     }
 
-    let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+    let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
     let node_count_stats: Vec<_> = sorted_nodes
         .into_iter()
         .map(|node| {
@@ -748,7 +758,8 @@ fn reusing_msg_ids() {
     let seed = None;
     let node_count = 8;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
 
@@ -829,9 +840,9 @@ fn reusing_msg_ids() {
 #[test]
 fn claiming_invitation_concurrently() {
     let seed = None;
-    let node_count = GROUP_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size;
+    let network = Network::new(group_size, seed);
     let admin_id = FullId::new();
     let vault_config = Config {
         invite_key: Some(admin_id.public_id().signing_public_key().0),

@@ -25,7 +25,7 @@ use routing::{Action, Authority, BootstrapConfig, ClientError, EntryAction, Entr
               Response, User};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
-use safe_vault::{GROUP_SIZE, PENDING_WRITE_TIMEOUT_SECS, test_utils};
+use safe_vault::{PENDING_WRITE_TIMEOUT_SECS, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
@@ -38,8 +38,8 @@ const TEST_NET_SIZE: usize = 20;
 fn immutable_data_normal_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
@@ -63,8 +63,8 @@ fn immutable_data_normal_flow() {
 fn immutable_data_error_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
@@ -98,8 +98,8 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     const DATA_COUNT: usize = 50;
     const DATA_PER_ITER: usize = 5;
     let node_count = TEST_NET_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, use_cache);
@@ -121,7 +121,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
             all_data.push(Data::Immutable(data));
         }
 
-        if nodes.len() <= GROUP_SIZE + 2 || !rng.gen_weighted_bool(4) {
+        if nodes.len() <= group_size + 2 || !rng.gen_weighted_bool(4) {
             let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, use_cache);
@@ -138,7 +138,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        mock_crust_detail::check_data(all_data.clone(), &nodes);
+        mock_crust_detail::check_data(all_data.clone(), &nodes, group_size);
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
 
@@ -160,8 +160,8 @@ fn mutable_data_normal_flow() {
     let node_count = TEST_NET_SIZE;
     let num_entries = 10;
     let num_entry_actions = 10;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
@@ -405,8 +405,8 @@ fn mutable_data_normal_flow() {
 fn mutable_data_error_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
@@ -693,8 +693,8 @@ fn mutable_data_parallel_mutations() {
     let client_count = 3;
     let data_count = 5;
     let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -831,6 +831,7 @@ fn mutable_data_parallel_mutations() {
         mock_crust_detail::check_data(
             all_data.iter().cloned().map(Data::Mutable).collect(),
             &nodes,
+            group_size,
         );
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
@@ -850,8 +851,8 @@ fn mutable_data_concurrent_mutations() {
     let node_count = TEST_NET_SIZE;
     let data_count = 5;
     let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -970,13 +971,14 @@ fn mutable_data_concurrent_mutations() {
         mock_crust_detail::check_data(
             all_data.iter().cloned().map(Data::Mutable).collect(),
             &nodes,
+            group_size,
         );
 
         FakeClock::advance_time(PENDING_WRITE_TIMEOUT_SECS * 1000 + 1);
         event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!(" Processed {} events.", event_count);
 
-        let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+        let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
         let node_count_stats: Vec<_> = sorted_nodes
             .into_iter()
             .map(|node| {
@@ -1009,10 +1011,10 @@ fn mutable_data_concurrent_mutations() {
 #[test]
 fn mutable_data_put_and_mutate() {
     let seed = None;
-    let node_count = GROUP_SIZE;
     let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -1111,6 +1113,7 @@ fn mutable_data_put_and_mutate() {
             .map(|(_, data)| Data::Mutable(data))
             .collect(),
         &nodes,
+        group_size,
     );
     mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
 }
@@ -1123,8 +1126,8 @@ fn no_permission_mutable_data_concurrent_mutations() {
     let node_count = TEST_NET_SIZE;
     let data_count = 5;
     let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -1254,6 +1257,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
         mock_crust_detail::check_data(
             all_data.iter().cloned().map(Data::Mutable).collect(),
             &nodes,
+            group_size,
         );
     }
 
@@ -1268,8 +1272,8 @@ fn mutable_data_operations_with_churn() {
     let node_count = TEST_NET_SIZE;
     let operation_count = 5;
     let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
@@ -1344,7 +1348,7 @@ fn mutable_data_operations_with_churn() {
         all_data.extend(new_data);
 
         // Churn
-        if nodes.len() <= GROUP_SIZE + 2 || rng.gen_range(0, 4) < 3 {
+        if nodes.len() <= group_size + 2 || rng.gen_range(0, 4) < 3 {
             // Add new node.
             let bootstrap_node_index = rng.gen_range(2, nodes.len());
             let bootstrap_node_name = nodes[bootstrap_node_index].name();
@@ -1375,6 +1379,7 @@ fn mutable_data_operations_with_churn() {
         mock_crust_detail::check_data(
             all_data.iter().cloned().map(Data::Mutable).collect(),
             &nodes,
+            group_size,
         );
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
@@ -1385,9 +1390,9 @@ fn mutable_data_operations_with_churn() {
 #[test]
 fn caching_with_data_not_close_to_proxy_node() {
     let seed = None;
-    let node_count = GROUP_SIZE + 2;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size + 2;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
@@ -1396,7 +1401,7 @@ fn caching_with_data_not_close_to_proxy_node() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let sent_data = gen_immutable_data_not_close_to(&nodes[1], &mut rng);
+    let sent_data = gen_immutable_data_not_close_to(&nodes[1], &mut rng, group_size);
     unwrap!(client.put_idata_response(sent_data.clone(), &mut nodes));
 
     // The first response is not yet cached, so it comes from a NAE manager authority.
@@ -1437,9 +1442,9 @@ fn caching_with_data_not_close_to_proxy_node() {
 #[test]
 fn caching_with_data_close_to_proxy_node() {
     let seed = None;
-    let node_count = GROUP_SIZE + 2;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size + 2;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
@@ -1448,7 +1453,7 @@ fn caching_with_data_close_to_proxy_node() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let sent_data = gen_immutable_data_close_to(&nodes[1], &mut rng);
+    let sent_data = gen_immutable_data_close_to(&nodes[1], &mut rng, group_size);
     unwrap!(client.put_idata_response(sent_data.clone(), &mut nodes));
 
     // Send two requests and verify the response is not cached in any of them
@@ -1485,19 +1490,27 @@ fn caching_with_data_close_to_proxy_node() {
     }
 }
 
-fn gen_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> ImmutableData {
+fn gen_immutable_data_close_to<R: Rng>(
+    node: &TestNode,
+    rng: &mut R,
+    group_size: usize,
+) -> ImmutableData {
     loop {
         let data = test_utils::gen_immutable_data(10, rng);
-        if node.routing_table().is_closest(data.name(), GROUP_SIZE) {
+        if node.routing_table().is_closest(data.name(), group_size) {
             return data;
         }
     }
 }
 
-fn gen_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> ImmutableData {
+fn gen_immutable_data_not_close_to<R: Rng>(
+    node: &TestNode,
+    rng: &mut R,
+    group_size: usize,
+) -> ImmutableData {
     loop {
         let data = test_utils::gen_immutable_data(10, rng);
-        if !node.routing_table().is_closest(data.name(), GROUP_SIZE) {
+        if !node.routing_table().is_closest(data.name(), group_size) {
             return data;
         }
     }

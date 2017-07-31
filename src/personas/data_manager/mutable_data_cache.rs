@@ -17,9 +17,8 @@
 
 use super::ACCUMULATOR_TIMEOUT_SECS;
 use super::data::{Data, MutableDataId};
-use QUORUM;
 use accumulator::Accumulator;
-use routing::{MutableData, Value, XorName};
+use routing::{MutableData, QUORUM_DENOMINATOR, QUORUM_NUMERATOR, Value, XorName};
 use std::time::Duration;
 use utils::{self, HashMap, Instant, SecureHash};
 
@@ -33,12 +32,13 @@ pub struct MutableDataCache {
 }
 
 impl MutableDataCache {
-    pub fn new() -> Self {
+    pub fn new(group_size: usize) -> Self {
+        let quorum = ((group_size * QUORUM_NUMERATOR) / QUORUM_DENOMINATOR) + 1;
         let duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
 
         MutableDataCache {
-            shell_accumulator: Accumulator::with_duration(QUORUM, duration),
-            entry_accumulator: Accumulator::with_duration(QUORUM, duration),
+            shell_accumulator: Accumulator::with_duration(quorum, duration),
+            entry_accumulator: Accumulator::with_duration(quorum, duration),
             entry_cache: Default::default(),
         }
     }

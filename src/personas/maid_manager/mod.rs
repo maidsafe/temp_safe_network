@@ -23,8 +23,6 @@ mod tests;
 use self::account::Account;
 pub use self::account::DEFAULT_MAX_OPS_COUNT;
 use self::message_id_accumulator::MessageIdAccumulator;
-use GROUP_SIZE;
-use QUORUM;
 use TYPE_TAG_INVITE;
 use authority::{ClientAuthority, ClientManagerAuthority};
 use error::InternalError;
@@ -54,6 +52,7 @@ const INVITE_CLAIMED_KEY: &'static [u8] = b"claimed";
 const INVITE_CLAIMED_VALUE: &'static [u8] = &[1];
 
 pub struct MaidManager {
+    group_size: usize,
     accounts: HashMap<XorName, Account>,
     data_ops_msg_id_accumulator: MessageIdAccumulator<(XorName, MessageId)>,
     request_cache: HashMap<MessageId, CachedRequest>,
@@ -65,11 +64,16 @@ pub struct MaidManager {
 }
 
 impl MaidManager {
-    pub fn new(invite_key: Option<sign::PublicKey>, disable_mutation_limit: bool) -> MaidManager {
+    pub fn new(
+        group_size: usize,
+        invite_key: Option<sign::PublicKey>,
+        disable_mutation_limit: bool,
+    ) -> MaidManager {
         MaidManager {
+            group_size,
             accounts: HashMap::default(),
             data_ops_msg_id_accumulator: MessageIdAccumulator::new(
-                QUORUM,
+                group_size,
                 Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS),
             ),
             request_cache: HashMap::default(),
@@ -707,7 +711,7 @@ impl MaidManager {
         // Remove all accounts which we are no longer responsible for.
         let accounts_to_delete: Vec<_> = self.accounts
             .keys()
-            .filter(|name| !routing_table.is_closest(*name, GROUP_SIZE))
+            .filter(|name| !routing_table.is_closest(*name, self.group_size))
             .cloned()
             .collect();
 
@@ -738,7 +742,7 @@ impl MaidManager {
 
         let mut account_list: Vec<(XorName, Account)> = Vec::new();
         for (name, account) in &self.accounts {
-            match routing_table.other_closest_names(name, GROUP_SIZE) {
+            match routing_table.other_closest_names(name, self.group_size) {
                 None => {
                     error!(
                         "Moved out of close group of {:?} in a NodeAdded event after prune.",
@@ -765,7 +769,7 @@ impl MaidManager {
     ) -> Result<(), InternalError> {
         let mut refresh_list: HashMap<XorName, Vec<(XorName, Account)>> = HashMap::default();
         for (name, account) in &self.accounts {
-            match routing_table.other_closest_names(name, GROUP_SIZE) {
+            match routing_table.other_closest_names(name, self.group_size) {
                 None => {
                     error!(
                         "Moved out of close group of {:?} in a NodeLost event.",
@@ -774,10 +778,10 @@ impl MaidManager {
                 }
                 Some(close_group) => {
                     // If no new node joined the group due to this event, continue:
-                    // If the group has fewer than GROUP_SIZE elements, the lost node was not
+                    // If the group has fewer than `self.group_size` elements, the lost node was not
                     // replaced at all. Otherwise, if the group's last node is closer to the data
                     // than the lost node, the lost node was not in the group in the first place.
-                    if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
+                    if let Some(&outer_node) = close_group.get(self.group_size.saturating_sub(2)) {
                         if name.closer(node_name, outer_node) {
                             refresh_list
                                 .entry(*outer_node)
@@ -1248,7 +1252,10 @@ impl MaidManager {
         routing_node: &RoutingNode,
         account_name: XorName,
     ) -> Option<&mut Account> {
-        if routing_node.close_group(account_name, GROUP_SIZE).is_none() {
+        if routing_node
+            .close_group(account_name, self.group_size)
+            .is_none()
+        {
             return None;
         }
 

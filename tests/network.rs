@@ -20,15 +20,15 @@
 
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-use routing::{BootstrapConfig, ImmutableData, MutableData};
+use routing::{BootstrapConfig, ImmutableData, MutableData, QUORUM_DENOMINATOR, QUORUM_NUMERATOR};
 use routing::mock_crust::Network;
-use safe_vault::{Config, GROUP_SIZE, QUORUM, test_utils};
+use safe_vault::{Config, test_utils};
 use safe_vault::mock_crust_detail::{poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 
 // Keeps storing data till network is full. Then keeps adding nodes till network can store a new
 // chunk again.
-// Among the GROUP_SIZE vauls of a chunk, the response to the client can be:
+// Among the GROUP_SIZE vaults of a chunk, the response to the client can be:
 // 1, Put succeed when majority of vaults are able to store the data.
 // 2, Put failed (NetworkFull) when majority of vaults don't have space to store the data.
 // 3, No response, when part of vaults have space but part of vaults don't, and none accumulates.
@@ -36,8 +36,9 @@ use safe_vault::mock_crust_detail::test_client::TestClient;
 fn fill_network() {
     let seed = None;
     let max_iterations = 100;
+    let group_size = 8;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let config = Config {
@@ -79,16 +80,16 @@ fn fill_network() {
         }
     }
 
-
+    let quorum = ((group_size * QUORUM_NUMERATOR) / QUORUM_DENOMINATOR) + 1;
     for i in 0..max_iterations {
         let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
         trace!("Adding node with bootstrap node {}.", index);
         test_node::add_node(&network, &mut nodes, index, true);
         let _ = poll::nodes_and_client(&mut nodes, &mut client);
 
-        // Because the original 8 nodes are all full, we need at least `QUORUM`
+        // Because the original 8 nodes are all full, we need at least `quorum`
         // new nodes before we have a chance of the network accepting the data.
-        if i < QUORUM - 1 {
+        if i < quorum - 1 {
             continue;
         }
 
