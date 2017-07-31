@@ -844,16 +844,16 @@ fn lists_of_registered_and_revoked_apps() {
 // 1. Create a test app and authenticate it.
 // 2. Grant access to some of the default containers (e.g. `_video`, `_documents`).
 // 3. Put several files with a known content in both containers (e.g. `_video/test.txt` and
-// `_documents/test2.txt`).
+//    `_documents/test2.txt`).
 // 4. Revoke the app access from the authenticator.
 // 5. After re-encryption of the `_document` container is done, simulate a network failure
-// for the `_video` container encryption step.
+//    for the `_video` container encryption step.
 // 6. Verify that the `_videos` container is still accessible using the previous encryption key.
 // 7. Verify that the `_documents` container is not accessible using the current key, but is
-// accessible using the new key.
+//    accessible using the new key.
 // 8. Check that the app's key is not listed in MaidManagers.
-// 9. Repeat step 1.4 (restart the revoke ooperation for the app) and don't interfere with the
-// re-encryption process this time. It should pass.
+// 9. Repeat step 1.4 (restart the revoke operation for the app) and don't interfere with the
+//    re-encryption process this time. It should pass.
 // 10. Verify that both the second and first containers aren't accessible using previous keys.
 // 11. Verify that both the second and first containers are accesible using the new keys.
 #[cfg(feature = "use-mock-routing")]
@@ -1013,28 +1013,28 @@ fn app_revocation_recovery() {
 // 1. Create a test app and try to authenticate it (with `app_container` set to true).
 //
 // 2. Simulate a network failure after the `mutate_mdata_entries` operation (relating to the
-// addition of the app to the user's config dir) - it should leave the app in the
-// `Revoked` state (as it is listen in the config root, but not in the access
-// container)
+//    addition of the app to the user's config dir) - it should leave the app in the
+//    `Revoked` state (as it is listen in the config root, but not in the access
+//    container)
 // 3. Try to authenticate the app again, it should continue without errors
 //
 // 4. Simulate a network failure after the `ins_auth_key` operation.
-// The authentication op should fail.
+//    The authentication op should fail.
 // 5. Try to authenticate the app again, it should continue without errors
 //
 // 6. Simulate a network failure for the `set_mdata_user_permissions` operation
-// (relating to the app's container - so that it will be created successfuly, but fail
-// at the permissions set stage).
+//    (relating to the app's container - so that it will be created successfuly, but fail
+//    at the permissions set stage).
 // 7. Try to authenticate the app again, it should continue without errors.
 //
 // 8. Simulate a network failure for the `mutate_mdata_entries` operation
-// (relating to update of the access container).
+//    (relating to update of the access container).
 // 9. Try to authenticate the app again, it should succeed now.
 //
 // 10. Check that the app's container has been created.
 // 11. Check that the app's container has required permissions.
 // 12. Check that the app's container is listed in the access container entry for
-// the app.
+//     the app.
 #[cfg(feature = "use-mock-routing")]
 #[test]
 fn app_authentication_recovery() {
@@ -1081,7 +1081,7 @@ fn app_authentication_recovery() {
     let app_id = auth_req.app.id.clone();
 
     // App authentication request should fail and leave the app in the
-    // `Revoked` state (as it is listen in the config root, but not in the access
+    // `Revoked` state (as it is listed in the config root, but not in the access
     // container)
     match register_app(&auth, &auth_req) {
         Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),

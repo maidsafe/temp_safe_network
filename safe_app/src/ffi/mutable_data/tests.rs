@@ -577,7 +577,7 @@ fn permissions_and_version() {
             .then(move |res| {
                 match res {
                     Ok(()) => panic!("It should fail with invalid successor"),
-                    Err(CoreError::RoutingClientError(ClientError::InvalidSuccessor)) => (),
+                    Err(CoreError::RoutingClientError(ClientError::InvalidSuccessor(..))) => (),
                     Err(x) => panic!("Expected ClientError::InvalidSuccessor. Got {:?}", x),
                 }
                 cl4.list_mdata_permissions(name, DIR_TAG)
