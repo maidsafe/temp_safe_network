@@ -59,9 +59,7 @@ macro_rules! ffi_error_code {
         let err_str = format!("{:?}", err);
         let err_code = err.error_code();
 
-        let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-        info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
-              decorator, err_code, err_str, decorator);
+        debug!("**ERRNO: {}** {}", err_code, err_str);
         err_code
     }}
 }
