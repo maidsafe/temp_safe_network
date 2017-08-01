@@ -199,6 +199,8 @@ fn put_oversized_data() {
     }
 
     // Larger than rate limiter per client capacity
+    // This makes `part_count` of each message part exceed `MAX_PARTs`.
+    // Hence the client will be banned and terminated.
     FakeClock::advance_time((CLIENT_CAPACITY * 1000 / RATE as u64) + 1);
     let data = test_utils::gen_immutable_data(CLIENT_CAPACITY as usize, &mut rng);
     match client.put_large_sized_idata(data, &mut nodes) {
