@@ -36,6 +36,9 @@ const RETRY_DELAY_MS: u64 = 800;
 
 macro_rules! assert_recv_response {
     ($client:expr, $resp:ident, $request_msg_id:expr) => {
+        assert_recv_response!($client, $resp, $request_msg_id, false)
+    };
+    ($client:expr, $resp:ident, $request_msg_id:expr, $is_oversized:expr) => {
         match $client.try_recv() {
             Ok(Event::Response { response: Response::$resp { res, msg_id }, .. }) => {
                 assert_eq!($request_msg_id, msg_id);
@@ -43,13 +46,26 @@ macro_rules! assert_recv_response {
             }
             Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
                 assert_eq!($request_msg_id, msg_id);
-                FakeClock::advance_time(RETRY_DELAY_MS);
-                Loop::Continue
+                if $is_oversized {
+                    let res = Err(ClientError::NetworkFull);
+                    Loop::Break(res)
+                } else {
+                    FakeClock::advance_time(RETRY_DELAY_MS);
+                    Loop::Continue
+                }
+            }
+            Ok(Event::Terminate) => {
+                if $is_oversized {
+                    let res = Err(ClientError::InvalidOperation);
+                    Loop::Break(res)
+                } else {
+                    panic!("Unexpected termination")
+                }
             }
             Ok(event) => panic!("Unexpected event: {:?}", event),
             Err(error) => panic!("Unexpected error: {:?}", error),
         }
-    }
+    };
 }
 
 /// Client for use in tests only
@@ -231,6 +247,20 @@ impl TestClient {
             self.put_idata_with_msg_id(data.clone(), msg_id);
             let _ = poll::nodes_and_client(nodes, self);
             assert_recv_response!(self, PutIData, msg_id)
+        })
+    }
+
+    /// Puts large sized immutable data
+    pub fn put_large_sized_idata(
+        &mut self,
+        data: ImmutableData,
+        nodes: &mut [TestNode],
+    ) -> Result<(), ClientError> {
+        loop_fn(|| {
+            let msg_id = MessageId::new();
+            self.put_idata_with_msg_id(data.clone(), msg_id);
+            let _ = poll::nodes_and_client(nodes, self);
+            assert_recv_response!(self, PutIData, msg_id, true)
         })
     }
 
