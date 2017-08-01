@@ -26,7 +26,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::mpsc;
 
 /// Client Errors
-#[cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
+#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 pub enum CoreError {
     /// Could not Serialise or Deserialise
     EncodeDecodeError(SerialisationError),
@@ -187,9 +187,11 @@ impl Display for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match *self {
             CoreError::EncodeDecodeError(ref error) => {
-                write!(formatter,
-                       "Error while serialising/deserialising: {}",
-                       error)
+                write!(
+                    formatter,
+                    "Error while serialising/deserialising: {}",
+                    error
+                )
             }
             CoreError::AsymmetricDecipherFailure => {
                 write!(formatter, "Asymmetric decryption failed")
@@ -201,8 +203,10 @@ impl Display for CoreError {
                 write!(formatter, "No such data found in local version cache")
             }
             CoreError::RootDirectoryExists => {
-                write!(formatter,
-                       "Cannot overwrite a root directory if it already exists")
+                write!(
+                    formatter,
+                    "Cannot overwrite a root directory if it already exists"
+                )
             }
             CoreError::RandomDataGenerationFailure => {
                 write!(formatter, "Unable to obtain generator for random data")
@@ -221,12 +225,16 @@ impl Display for CoreError {
                 write!(formatter, "Routing client error -> {}", error)
             }
             CoreError::UnsupportedSaltSizeForPwHash => {
-                write!(formatter,
-                       "Unable to pack into or operate with size of Salt")
+                write!(
+                    formatter,
+                    "Unable to pack into or operate with size of Salt"
+                )
             }
             CoreError::UnsuccessfulPwHash => {
-                write!(formatter,
-                       "Unable to complete computation for password hashing")
+                write!(
+                    formatter,
+                    "Unable to complete computation for password hashing"
+                )
             }
             CoreError::OperationAborted => write!(formatter, "Blocking operation was cancelled"),
             CoreError::MpidMessagingError(ref error) => {

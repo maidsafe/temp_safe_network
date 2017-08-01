@@ -23,7 +23,8 @@ use std::sync::mpsc::Receiver;
 
 /// Run the routing event loop - this will receive messages from routing.
 pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &NetworkTx)
-    where T: 'static
+where
+    T: 'static,
 {
     for it in routing_rx.iter() {
         trace!("Received Routing Event: {:?}", it);
@@ -50,8 +51,10 @@ pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &
                 break;
             }
             x => {
-                debug!("Routing Event {:?} is not handled in context of routing event loop.",
-                       x);
+                debug!(
+                    "Routing Event {:?} is not handled in context of routing event loop.",
+                    x
+                );
             }
         }
     }
@@ -59,53 +62,83 @@ pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &
 
 fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
     Ok(match res {
-           Response::ChangeMDataOwner { res, msg_id } |
-           Response::DelMDataUserPermissions { res, msg_id } |
-           Response::SetMDataUserPermissions { res, msg_id } |
-           Response::MutateMDataEntries { res, msg_id } |
-           Response::PutMData { res, msg_id } |
-           Response::PutIData { res, msg_id } |
-           Response::InsAuthKey { res, msg_id } |
-           Response::DelAuthKey { res, msg_id } => {
-               (msg_id, CoreEvent::Mutation(res.map_err(CoreError::from)))
-           }
-           Response::GetAccountInfo { res, msg_id } => {
-               (msg_id, CoreEvent::GetAccountInfo(res.map_err(CoreError::from)))
-           }
-           Response::GetIData { res, msg_id } => {
-               (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
-           }
-           Response::GetMData { res, msg_id } => {
-               (msg_id, CoreEvent::GetMData(res.map_err(CoreError::from)))
-           }
-           Response::GetMDataValue { res, msg_id } => {
-               (msg_id, CoreEvent::GetMDataValue(res.map_err(CoreError::from)))
-           }
-           Response::GetMDataVersion { res, msg_id } => {
-               (msg_id, CoreEvent::GetMDataVersion(res.map_err(CoreError::from)))
-           }
-           Response::GetMDataShell { res, msg_id } => {
-               (msg_id, CoreEvent::GetMDataShell(res.map_err(CoreError::from)))
-           }
-           Response::ListMDataEntries { res, msg_id } => {
-               (msg_id, CoreEvent::ListMDataEntries(res.map_err(CoreError::from)))
-           }
-           Response::ListMDataKeys { res, msg_id } => {
-               (msg_id, CoreEvent::ListMDataKeys(res.map_err(CoreError::from)))
-           }
-           Response::ListMDataValues { res, msg_id } => {
-               (msg_id, CoreEvent::ListMDataValues(res.map_err(CoreError::from)))
-           }
-           Response::ListMDataPermissions { res, msg_id } => {
-               (msg_id, CoreEvent::ListMDataPermissions(res.map_err(CoreError::from)))
-           }
-           Response::ListMDataUserPermissions { res, msg_id } => {
-               (msg_id, CoreEvent::ListMDataUserPermissions(res.map_err(CoreError::from)))
-           }
-           Response::ListAuthKeysAndVersion { res, msg_id } => {
-               (msg_id, CoreEvent::ListAuthKeysAndVersion(res.map_err(CoreError::from)))
-           }
-       })
+        Response::ChangeMDataOwner { res, msg_id } |
+        Response::DelMDataUserPermissions { res, msg_id } |
+        Response::SetMDataUserPermissions { res, msg_id } |
+        Response::MutateMDataEntries { res, msg_id } |
+        Response::PutMData { res, msg_id } |
+        Response::PutIData { res, msg_id } |
+        Response::InsAuthKey { res, msg_id } |
+        Response::DelAuthKey { res, msg_id } => {
+            (msg_id, CoreEvent::Mutation(res.map_err(CoreError::from)))
+        }
+        Response::GetAccountInfo { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::GetAccountInfo(res.map_err(CoreError::from)),
+            )
+        }
+        Response::GetIData { res, msg_id } => {
+            (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
+        }
+        Response::GetMData { res, msg_id } => {
+            (msg_id, CoreEvent::GetMData(res.map_err(CoreError::from)))
+        }
+        Response::GetMDataValue { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::GetMDataValue(res.map_err(CoreError::from)),
+            )
+        }
+        Response::GetMDataVersion { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::GetMDataVersion(res.map_err(CoreError::from)),
+            )
+        }
+        Response::GetMDataShell { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::GetMDataShell(res.map_err(CoreError::from)),
+            )
+        }
+        Response::ListMDataEntries { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::ListMDataEntries(res.map_err(CoreError::from)),
+            )
+        }
+        Response::ListMDataKeys { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::ListMDataKeys(res.map_err(CoreError::from)),
+            )
+        }
+        Response::ListMDataValues { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::ListMDataValues(res.map_err(CoreError::from)),
+            )
+        }
+        Response::ListMDataPermissions { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::ListMDataPermissions(res.map_err(CoreError::from)),
+            )
+        }
+        Response::ListMDataUserPermissions { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::ListMDataUserPermissions(res.map_err(CoreError::from)),
+            )
+        }
+        Response::ListAuthKeysAndVersion { res, msg_id } => {
+            (
+                msg_id,
+                CoreEvent::ListAuthKeysAndVersion(res.map_err(CoreError::from)),
+            )
+        }
+    })
 }
 
 /// Fire completion event to the core event loop. If the receiver in core event
@@ -114,9 +147,9 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
 /// successful.
 fn fire<T: 'static>(core_tx: &mut CoreMsgTx<T>, msg_id: MessageId, event: CoreEvent) -> bool {
     let msg = CoreMsg::new(move |client, _| {
-                               client.fire_hook(&msg_id, event);
-                               None
-                           });
+        client.fire_hook(&msg_id, event);
+        None
+    });
 
     core_tx.send(msg).is_ok()
 }

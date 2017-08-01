@@ -64,10 +64,11 @@ impl Vault {
     }
 
     // Authorise read (non-mutation) operation.
-    pub fn authorise_read(&self,
-                          dst: &Authority<XorName>,
-                          data_name: &XorName)
-                          -> Result<(), ClientError> {
+    pub fn authorise_read(
+        &self,
+        dst: &Authority<XorName>,
+        data_name: &XorName,
+    ) -> Result<(), ClientError> {
         match *dst {
             Authority::NaeManager(name) if name == *data_name => Ok(()),
             x => {
@@ -78,10 +79,11 @@ impl Vault {
     }
 
     // Authorise mutation operation.
-    pub fn authorise_mutation(&self,
-                              dst: &Authority<XorName>,
-                              sign_pk: &sign::PublicKey)
-                              -> Result<(), ClientError> {
+    pub fn authorise_mutation(
+        &self,
+        dst: &Authority<XorName>,
+        sign_pk: &sign::PublicKey,
+    ) -> Result<(), ClientError> {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
             x => {
@@ -283,12 +285,14 @@ mod locking {
 
     pub fn lock(vault: &Mutex<Vault>, write: bool) -> VaultGuard {
         // Create the file if it doesn't exist yet.
-        let mut file = unwrap!(OpenOptions::new()
-                                   .read(true)
-                                   .write(true)
-                                   .create(true)
-                                   .truncate(false)
-                                   .open(path()));
+        let mut file = unwrap!(
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(path())
+        );
 
         if write {
             unwrap!(file.lock_exclusive());
@@ -300,9 +304,11 @@ mod locking {
 
         let metadata = unwrap!(file.metadata());
         let mtime = unwrap!(metadata.modified());
-        let mtime_duration = mtime
-            .duration_since(vault.sync_time)
-            .unwrap_or(Duration::from_millis(1));
+        let mtime_duration = mtime.duration_since(vault.sync_time).unwrap_or(
+            Duration::from_millis(
+                1,
+            ),
+        );
 
         // Update vault only if it's not already synchronised
         if mtime_duration.as_secs() != 0 || mtime_duration.subsec_nanos() != 0 {

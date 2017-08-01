@@ -88,11 +88,13 @@ fn random_mutable_data<R: Rng>(type_tag: u64, public_key: &PublicKey, rng: &mut 
     let permissions = btree_map![];
     let data = btree_map![];
 
-    unwrap!(MutableData::new(rng.gen(),
-                             type_tag,
-                             permissions,
-                             data,
-                             btree_set![*public_key]))
+    unwrap!(MutableData::new(
+        rng.gen(),
+        type_tag,
+        permissions,
+        data,
+        btree_set![*public_key],
+    ))
 }
 
 enum Data {
@@ -110,14 +112,16 @@ fn main() {
     let immutable_data_count = unwrap!(args.flag_immutable);
     let mutable_data_count = unwrap!(args.flag_mutable);
     let mut rng = rand::XorShiftRng::from_seed(match args.flag_seed {
-                                                   Some(seed) => [0, 0, 0, seed],
-                                                   None => {
-                                                       [rand::random(),
-                                                        rand::random(),
-                                                        rand::random(),
-                                                        rand::random()]
-                                                   }
-                                               });
+        Some(seed) => [0, 0, 0, seed],
+        None => {
+            [
+                rand::random(),
+                rand::random(),
+                rand::random(),
+                rand::random(),
+            ]
+        }
+    });
 
     let el = unwrap!(Core::new());
     let el_h = el.handle();
@@ -134,17 +138,25 @@ fn main() {
     }
 
     let client = if args.flag_get_only {
-        unwrap!(Client::login(&secret_0, &secret_1, el_h, core_tx.clone(), net_tx))
+        unwrap!(Client::login(
+            &secret_0,
+            &secret_1,
+            el_h,
+            core_tx.clone(),
+            net_tx,
+        ))
     } else {
         println!("\n\tAccount Creation");
         println!("\t================");
         println!("\nTrying to create an account ...");
-        unwrap!(Client::registered(&secret_0,
-                                   &secret_1,
-                                   &invitation,
-                                   el_h,
-                                   core_tx.clone(),
-                                   net_tx))
+        unwrap!(Client::registered(
+            &secret_0,
+            &secret_1,
+            &invitation,
+            el_h,
+            core_tx.clone(),
+            net_tx,
+        ))
     };
     println!("Logged in successfully!");
     let public_key = unwrap!(client.public_signing_key());
@@ -165,16 +177,18 @@ fn main() {
             stored_data.push(Data::Mutable(mutable_data));
         }
 
-        let message = format!("Generated {} items ({} immutable, {} mutable)",
-                              stored_data.len(),
-                              immutable_data_count,
-                              mutable_data_count);
+        let message = format!(
+            "Generated {} items ({} immutable, {} mutable)",
+            stored_data.len(),
+            immutable_data_count,
+            mutable_data_count
+        );
         let underline = (0..message.len()).map(|_| "=").collect::<String>();
         println!("\n\t{}\n\t{}", message, underline);
 
         stream::iter(stored_data.into_iter().enumerate().map(Ok))
-            .fold((client.clone(), args, rng),
-                  |(client, args, rng), (i, data)| {
+            .fold((client.clone(), args, rng), |(client, args, rng),
+             (i, data)| {
                 let c2 = client.clone();
                 let c3 = client.clone();
                 let c4 = client.clone();
@@ -190,31 +204,30 @@ fn main() {
                                     println!("Put ImmutableData chunk #{}: {:?}", i, data.name());
 
                                     // Get the data
-                                    c3.get_idata(*data.name())
-                                        .map(move |retrieved_data| {
-                                                 assert_eq!(data, retrieved_data);
-                                                 retrieved_data
-                                             })
+                                    c3.get_idata(*data.name()).map(move |retrieved_data| {
+                                        assert_eq!(data, retrieved_data);
+                                        retrieved_data
+                                    })
                                 })
                                 .and_then(move |retrieved_data| {
-                                              println!("Retrieved ImmutableData chunk #{}: {:?}",
-                                                       i,
-                                                       retrieved_data.name());
-                                              Ok(retrieved_data)
-                                          })
+                                    println!(
+                                        "Retrieved ImmutableData chunk #{}: {:?}",
+                                        i,
+                                        retrieved_data.name()
+                                    );
+                                    Ok(retrieved_data)
+                                })
                                 .into_box()
                         };
 
                         fut.and_then(move |data| {
-                                // Get all the chunks again
-                                c4.get_idata(*data.name())
-                                    .map(move |retrieved_data| {
-                                             assert_eq!(data, retrieved_data);
-                                             println!("Retrieved chunk #{}: {:?}", i, data.name());
-                                             (args, rng)
-                                         })
+                            // Get all the chunks again
+                            c4.get_idata(*data.name()).map(move |retrieved_data| {
+                                assert_eq!(data, retrieved_data);
+                                println!("Retrieved chunk #{}: {:?}", i, data.name());
+                                (args, rng)
                             })
-                            .map(move |(args, rng)| (client, args, rng))
+                        }).map(move |(args, rng)| (client, args, rng))
                             .map_err(|e| println!("Error: {:?}", e))
                             .into_box()
                     }
@@ -228,38 +241,43 @@ fn main() {
                                     println!("Put MutableData chunk #{}: {:?}", i, data.name());
 
                                     // Get the data
-                                    c3.get_mdata_shell(*data.name(), data.tag())
-                                        .map(move |retrieved_data| {
-                                                 assert_eq!(data, retrieved_data);
-                                                 retrieved_data
-                                             })
+                                    c3.get_mdata_shell(*data.name(), data.tag()).map(
+                                        move |retrieved_data| {
+                                            assert_eq!(data, retrieved_data);
+                                            retrieved_data
+                                        },
+                                    )
                                 })
                                 .and_then(move |retrieved_data| {
-                                              println!("Retrieved MutableData chunk #{}: {:?}",
-                                                       i,
-                                                       retrieved_data.name());
-                                              Ok(retrieved_data)
-                                          })
+                                    println!(
+                                        "Retrieved MutableData chunk #{}: {:?}",
+                                        i,
+                                        retrieved_data.name()
+                                    );
+                                    Ok(retrieved_data)
+                                })
                                 .into_box()
                         };
 
                         // TODO(nbaksalyar): stress test mutate_mdata and get_mdata_value here
                         fut.and_then(move |data| {
-                                // Get all the chunks again
-                                c4.get_mdata_shell(*data.name(), data.tag())
-                                    .map(move |retrieved_data| {
-                                             assert_eq!(data, retrieved_data);
-                                             println!("Retrieved chunk #{}: {:?}", i, data.name());
-                                             (args, rng)
-                                         })
-                            })
-                            .map(move |(args, rng)| (client, args, rng))
+                            // Get all the chunks again
+                            c4.get_mdata_shell(*data.name(), data.tag()).map(
+                                move |retrieved_data| {
+                                    assert_eq!(data, retrieved_data);
+                                    println!("Retrieved chunk #{}: {:?}", i, data.name());
+                                    (args, rng)
+                                },
+                            )
+                        }).map(move |(args, rng)| (client, args, rng))
                             .map_err(|e| println!("Error: {:?}", e))
                             .into_box()
                     }
                 }
             })
-            .map(move |_| unwrap!(core_tx_clone.send(CoreMsg::build_terminator())))
+            .map(move |_| {
+                unwrap!(core_tx_clone.send(CoreMsg::build_terminator()))
+            })
             .into_box()
             .into()
     })));

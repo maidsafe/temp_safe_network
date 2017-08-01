@@ -33,7 +33,8 @@ pub fn sender_as_user_data<T>(tx: &Sender<T>) -> *mut c_void {
 
 /// Send through a `mpsc::Sender` pointed to by the user data pointer.
 pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
-    where T: Send
+where
+    T: Send,
 {
     let tx = user_data as *mut Sender<T>;
     unwrap!((*tx).send(value));
@@ -43,7 +44,8 @@ pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
 /// Use this if the callback accepts no arguments in addition to `user_data`
 /// and `error_code`.
 pub fn call_0<F>(f: F) -> Result<(), i32>
-    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, FfiResult))
+where
+    F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, FfiResult)),
 {
     let (tx, rx) = mpsc::channel::<i32>();
     f(sender_as_user_data(&tx), callback_0);
@@ -57,8 +59,9 @@ pub fn call_0<F>(f: F) -> Result<(), i32>
 /// Use this if the callback accepts one argument in addition to `user_data`
 /// and `error_code`.
 pub unsafe fn call_1<F, E: Debug, T>(f: F) -> Result<T, i32>
-    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, FfiResult, T::C)),
-          T: ReprC<Error = E>
+where
+    F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, FfiResult, T::C)),
+    T: ReprC<Error = E>,
 {
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<T, i32>>>();
     f(sender_as_user_data(&tx), callback_1::<E, T>);
@@ -70,12 +73,13 @@ pub unsafe fn call_1<F, E: Debug, T>(f: F) -> Result<T, i32>
 /// Use this if the callback accepts two arguments in addition to `user_data`
 /// and `error_code`.
 pub unsafe fn call_2<F, E0, E1, T0, T1>(f: F) -> Result<(T0, T1), i32>
-    where F: FnOnce(*mut c_void,
-                    extern "C" fn(*mut c_void, FfiResult, T0::C, T1::C)),
-          E0: Debug,
-          E1: Debug,
-          T0: ReprC<Error = E0>,
-          T1: ReprC<Error = E1>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(*mut c_void, FfiResult, T0::C, T1::C)),
+    E0: Debug,
+    E1: Debug,
+    T0: ReprC<Error = E0>,
+    T1: ReprC<Error = E1>,
 {
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<(T0, T1), i32>>>();
     f(sender_as_user_data(&tx), callback_2::<E0, E1, T0, T1>);
@@ -87,10 +91,11 @@ pub unsafe fn call_2<F, E0, E1, T0, T1>(f: F) -> Result<(T0, T1), i32>
 /// Use this if the callback accepts `*const T` and `usize` (length) arguments in addition
 /// to `user_data` and `error_code`.
 pub unsafe fn call_vec<F, E, T, U>(f: F) -> Result<Vec<T>, i32>
-    where F: FnOnce(*mut c_void,
-                    extern "C" fn(*mut c_void, FfiResult, T::C, usize)),
-          E: Debug,
-          T: ReprC<C = *const U, Error = E>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(*mut c_void, FfiResult, T::C, usize)),
+    E: Debug,
+    T: ReprC<C = *const U, Error = E>,
 {
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<Vec<T>, i32>>>();
 
@@ -101,8 +106,9 @@ pub unsafe fn call_vec<F, E, T, U>(f: F) -> Result<Vec<T>, i32>
 /// Call a FFI function and block until its callback gets called, then copy
 /// the byte array argument which was passed to `Vec<u8>` and return the result.
 pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
-    where F: FnOnce(*mut c_void,
-                    extern "C" fn(*mut c_void, FfiResult, *const u8, usize))
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(*mut c_void, FfiResult, *const u8, usize)),
 {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
     f(sender_as_user_data(&tx), callback_vec_u8);
@@ -114,8 +120,9 @@ extern "C" fn callback_0(user_data: *mut c_void, res: FfiResult) {
 }
 
 extern "C" fn callback_1<E, T>(user_data: *mut c_void, res: FfiResult, arg: T::C)
-    where E: Debug,
-          T: ReprC<Error = E>
+where
+    E: Debug,
+    T: ReprC<Error = E>,
 {
     unsafe {
         let result: Result<T, i32> = if res.error_code == 0 {
@@ -127,18 +134,23 @@ extern "C" fn callback_1<E, T>(user_data: *mut c_void, res: FfiResult, arg: T::C
     }
 }
 
-extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
-                                         res: FfiResult,
-                                         arg0: T0::C,
-                                         arg1: T1::C)
-    where E0: Debug,
-          E1: Debug,
-          T0: ReprC<Error = E0>,
-          T1: ReprC<Error = E1>
+extern "C" fn callback_2<E0, E1, T0, T1>(
+    user_data: *mut c_void,
+    res: FfiResult,
+    arg0: T0::C,
+    arg1: T1::C,
+) where
+    E0: Debug,
+    E1: Debug,
+    T0: ReprC<Error = E0>,
+    T1: ReprC<Error = E1>,
 {
     unsafe {
         let result: Result<(T0, T1), i32> = if res.error_code == 0 {
-            Ok((unwrap!(T0::clone_from_repr_c(arg0)), unwrap!(T1::clone_from_repr_c(arg1))))
+            Ok((
+                unwrap!(T0::clone_from_repr_c(arg0)),
+                unwrap!(T1::clone_from_repr_c(arg1)),
+            ))
         } else {
             Err(res.error_code)
         };
@@ -146,12 +158,14 @@ extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
     }
 }
 
-extern "C" fn callback_vec<E, T, U>(user_data: *mut c_void,
-                                    res: FfiResult,
-                                    array: *const U,
-                                    size: usize)
-    where E: Debug,
-          T: ReprC<C = *const U, Error = E>
+extern "C" fn callback_vec<E, T, U>(
+    user_data: *mut c_void,
+    res: FfiResult,
+    array: *const U,
+    size: usize,
+) where
+    E: Debug,
+    T: ReprC<C = *const U, Error = E>,
 {
     unsafe {
         let result: Result<Vec<T>, i32> = if res.error_code == 0 {

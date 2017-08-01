@@ -56,10 +56,11 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 /// Create random registered client and run it inside an event loop. Use this to
 /// create Client automatically and randomly,
 pub fn random_client<Run, I, T, E>(r: Run) -> T
-    where Run: FnOnce(&Client<()>) -> I + Send + 'static,
-          I: IntoFuture<Item = T, Error = E> + 'static,
-          T: Send + 'static,
-          E: Debug
+where
+    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = E> + 'static,
+    T: Send + 'static,
+    E: Debug,
 {
     let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
     random_client_with_net_obs(n, r)
@@ -68,22 +69,25 @@ pub fn random_client<Run, I, T, E>(r: Run) -> T
 /// Create random registered client and run it inside an event loop. Use this to
 /// create Client automatically and randomly,
 pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
-    where NetObs: FnMut(NetworkEvent) + 'static,
-          Run: FnOnce(&Client<()>) -> I + Send + 'static,
-          I: IntoFuture<Item = T, Error = E> + 'static,
-          T: Send + 'static,
-          E: Debug
+where
+    NetObs: FnMut(NetworkEvent) + 'static,
+    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = E> + 'static,
+    T: Send + 'static,
+    E: Debug,
 {
     let c = |el_h, core_tx, net_tx| {
         let acc_locator = unwrap!(utils::generate_random_string(10));
         let acc_password = unwrap!(utils::generate_random_string(10));
         let invitation = unwrap!(utils::generate_random_string(10));
-        Client::registered(&acc_locator,
-                           &acc_password,
-                           &invitation,
-                           el_h,
-                           core_tx,
-                           net_tx)
+        Client::registered(
+            &acc_locator,
+            &acc_password,
+            &invitation,
+            el_h,
+            core_tx,
+            net_tx,
+        )
     };
     setup_client_with_net_obs(c, n, r)
 }
@@ -93,11 +97,12 @@ pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
 /// unregistered or as a result of successful login. Use this to create Client
 /// manually,
 pub fn setup_client<Create, Run, I, T, E>(c: Create, r: Run) -> T
-    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
-          Run: FnOnce(&Client<()>) -> I + Send + 'static,
-          I: IntoFuture<Item = T, Error = E> + 'static,
-          T: Send + 'static,
-          E: Debug
+where
+    Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = E> + 'static,
+    T: Send + 'static,
+    E: Debug,
 {
     let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
     setup_client_with_net_obs(c, n, r)
@@ -107,16 +112,18 @@ pub fn setup_client<Create, Run, I, T, E>(c: Create, r: Run) -> T
 /// to supply credentials explicitly or when Client is to be constructed as
 /// unregistered or as a result of successful login. Use this to create Client
 /// manually,
-pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(c: Create,
-                                                               mut n: NetObs,
-                                                               r: Run)
-                                                               -> T
-    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
-          NetObs: FnMut(NetworkEvent) + 'static,
-          Run: FnOnce(&Client<()>) -> I + Send + 'static,
-          I: IntoFuture<Item = T, Error = E> + 'static,
-          T: Send + 'static,
-          E: Debug
+pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(
+    c: Create,
+    mut n: NetObs,
+    r: Run,
+) -> T
+where
+    Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+    NetObs: FnMut(NetworkEvent) + 'static,
+    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = E> + 'static,
+    T: Send + 'static,
+    E: Debug,
 {
     let el = unwrap!(Core::new());
     let el_h = el.handle();
@@ -125,9 +132,11 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(c: Create,
     let (net_tx, net_rx) = mpsc::unbounded();
     let client = unwrap!(c(el_h.clone(), core_tx.clone(), net_tx));
 
-    let net_fut = net_rx
-        .for_each(move |net_event| Ok(n(net_event)))
-        .map_err(|e| panic!("Network event stream error: {:?}", e));
+    let net_fut = net_rx.for_each(move |net_event| Ok(n(net_event))).map_err(
+        |e| {
+            panic!("Network event stream error: {:?}", e)
+        },
+    );
     el_h.spawn(net_fut);
 
     let core_tx_clone = core_tx.clone();

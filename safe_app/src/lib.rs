@@ -53,7 +53,7 @@ extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;
 extern crate rust_sodium;
-#[cfg(any(test, feature="testing"))]
+#[cfg(any(test, feature = "testing"))]
 extern crate safe_authenticator;
 #[macro_use]
 extern crate safe_core;
@@ -70,7 +70,7 @@ pub mod object_cache;
 
 mod errors;
 /// Utility functions to test apps functionality
-#[cfg(any(test, feature="testing"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 pub use self::errors::*;
@@ -90,7 +90,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
-#[cfg(feature="testing")]
+#[cfg(feature = "testing")]
 pub use test_utils::{test_create_app, test_create_app_with_access};
 use tokio_core::reactor::{Core, Handle};
 
@@ -113,10 +113,12 @@ pub struct App {
 
 impl App {
     /// Create unregistered app.
-    pub fn unregistered<N>(network_observer: N,
-                           config: Option<BootstrapConfig>)
-                           -> Result<Self, AppError>
-        where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
+    pub fn unregistered<N>(
+        network_observer: N,
+        config: Option<BootstrapConfig>,
+    ) -> Result<Self, AppError>
+    where
+        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
     {
         Self::new(network_observer, |el_h, core_tx, net_tx| {
             let client = Client::unregistered(el_h, core_tx, net_tx, config)?;
@@ -126,11 +128,13 @@ impl App {
     }
 
     /// Create registered app.
-    pub fn registered<N>(app_id: String,
-                         auth_granted: AuthGranted,
-                         network_observer: N)
-                         -> Result<Self, AppError>
-        where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
+    pub fn registered<N>(
+        app_id: String,
+        auth_granted: AuthGranted,
+        network_observer: N,
+    ) -> Result<Self, AppError>
+    where
+        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
     {
         let AuthGranted {
             app_keys: AppKeys {
@@ -153,21 +157,26 @@ impl App {
         };
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
-            let client = Client::from_keys(client_keys,
-                                           owner_key,
-                                           el_h,
-                                           core_tx,
-                                           net_tx,
-                                           bootstrap_config)?;
+            let client = Client::from_keys(
+                client_keys,
+                owner_key,
+                el_h,
+                core_tx,
+                net_tx,
+                bootstrap_config,
+            )?;
             let context = AppContext::registered(app_id, enc_key, access_container);
             Ok((client, context))
         })
     }
 
     fn new<N, F>(mut network_observer: N, setup: F) -> Result<Self, AppError>
-        where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
-              F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
-                        -> Result<(Client<AppContext>, AppContext), AppError> + Send + 'static
+    where
+        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
+               -> Result<(Client<AppContext>, AppContext), AppError>
+            + Send
+            + 'static,
     {
         let (tx, rx) = std_mpsc::sync_channel(0);
 
@@ -178,9 +187,11 @@ impl App {
             let (core_tx, core_rx) = futures_mpsc::unbounded();
             let (net_tx, net_rx) = futures_mpsc::unbounded();
 
-            el_h.spawn(net_rx
-                           .map(move |event| network_observer(Ok(event)))
-                           .for_each(|_| Ok(())));
+            el_h.spawn(
+                net_rx
+                    .map(move |event| network_observer(Ok(event)))
+                    .for_each(|_| Ok(())),
+            );
 
             let core_tx_clone = core_tx.clone();
 
@@ -193,15 +204,17 @@ impl App {
         let core_tx = rx.recv()??;
 
         Ok(App {
-               core_tx: Mutex::new(core_tx),
-               _core_joiner: joiner,
-           })
+            core_tx: Mutex::new(core_tx),
+            _core_joiner: joiner,
+        })
     }
 
     /// Send a message to app's event loop
     pub fn send<F>(&self, f: F) -> Result<(), AppError>
-        where F: FnOnce(&Client<AppContext>, &AppContext)
-                        -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
+    where
+        F: FnOnce(&Client<AppContext>, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
+            + Send
+            + 'static,
     {
         let msg = CoreMsg::new(f);
         let core_tx = unwrap!(self.core_tx.lock());
@@ -254,17 +267,18 @@ impl AppContext {
         AppContext::Unregistered(Rc::new(Unregistered { object_cache: ObjectCache::new() }))
     }
 
-    fn registered(app_id: String,
-                  sym_enc_key: secretbox::Key,
-                  access_container_info: AccessContInfo)
-                  -> Self {
+    fn registered(
+        app_id: String,
+        sym_enc_key: secretbox::Key,
+        access_container_info: AccessContInfo,
+    ) -> Self {
         AppContext::Registered(Rc::new(Registered {
-                                           object_cache: ObjectCache::new(),
-                                           app_id: app_id,
-                                           sym_enc_key: sym_enc_key,
-                                           access_container_info: access_container_info,
-                                           access_info: RefCell::new(HashMap::new()),
-                                       }))
+            object_cache: ObjectCache::new(),
+            app_id: app_id,
+            sym_enc_key: sym_enc_key,
+            access_container_info: access_container_info,
+            access_info: RefCell::new(HashMap::new()),
+        }))
     }
 
     /// Object cache
@@ -287,55 +301,58 @@ impl AppContext {
     }
 
     /// Fetch a list of container names that this app has access to
-    pub fn get_container_names(&self,
-                               client: &Client<AppContext>)
-                               -> Box<AppFuture<BTreeSet<String>>> {
+    pub fn get_container_names(
+        &self,
+        client: &Client<AppContext>,
+    ) -> Box<AppFuture<BTreeSet<String>>> {
         let reg = fry!(self.as_registered()).clone();
 
         fetch_access_info(reg.clone(), client)
             .map(move |_| {
-                     let access_info = reg.access_info.borrow();
-                     access_info.keys().cloned().collect()
-                 })
+                let access_info = reg.access_info.borrow();
+                access_info.keys().cloned().collect()
+            })
             .into_box()
     }
 
     /// Fetch mdata_info for the given container name.
-    pub fn get_container_mdata_info<T: Into<String>>(&self,
-                                                     client: &Client<AppContext>,
-                                                     name: T)
-                                                     -> Box<AppFuture<MDataInfo>> {
+    pub fn get_container_mdata_info<T: Into<String>>(
+        &self,
+        client: &Client<AppContext>,
+        name: T,
+    ) -> Box<AppFuture<MDataInfo>> {
         let reg = fry!(self.as_registered()).clone();
         let name = name.into();
 
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
-                          let access_info = reg.access_info.borrow();
-                          access_info
-                              .get(&name)
-                              .map(|&(ref mdata_info, _)| mdata_info.clone())
-                              .ok_or(AppError::NoSuchContainer)
-                      })
+                let access_info = reg.access_info.borrow();
+                access_info
+                    .get(&name)
+                    .map(|&(ref mdata_info, _)| mdata_info.clone())
+                    .ok_or(AppError::NoSuchContainer)
+            })
             .into_box()
     }
 
     /// Check the given permission for the given directory.
-    pub fn is_permitted<T: Into<String>>(&self,
-                                         client: &Client<AppContext>,
-                                         name: T,
-                                         permission: Permission)
-                                         -> Box<AppFuture<bool>> {
+    pub fn is_permitted<T: Into<String>>(
+        &self,
+        client: &Client<AppContext>,
+        name: T,
+        permission: Permission,
+    ) -> Box<AppFuture<bool>> {
         let reg = fry!(self.as_registered()).clone();
         let name = name.into();
 
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
-                          let access_info = reg.access_info.borrow();
-                          access_info
-                              .get(&name)
-                              .map(|&(_, ref permissions)| permissions.contains(&permission))
-                              .ok_or(AppError::NoSuchContainer)
-                      })
+                let access_info = reg.access_info.borrow();
+                access_info
+                    .get(&name)
+                    .map(|&(_, ref permissions)| permissions.contains(&permission))
+                    .ok_or(AppError::NoSuchContainer)
+            })
             .into_box()
     }
 
@@ -348,23 +365,27 @@ impl AppContext {
 }
 
 fn refresh_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Box<AppFuture<()>> {
-    let entry_key = fry!(access_container_enc_key(&context.app_id,
-                                                  &context.sym_enc_key,
-                                                  &context.access_container_info.nonce));
+    let entry_key = fry!(access_container_enc_key(
+        &context.app_id,
+        &context.sym_enc_key,
+        &context.access_container_info.nonce,
+    ));
 
     client
-        .get_mdata_value(context.access_container_info.id,
-                         context.access_container_info.tag,
-                         entry_key)
+        .get_mdata_value(
+            context.access_container_info.id,
+            context.access_container_info.tag,
+            entry_key,
+        )
         .map_err(AppError::from)
         .and_then(move |value| {
-                      let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
-                      let decoded = deserialise(&encoded)?;
+            let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
+            let decoded = deserialise(&encoded)?;
 
-                      *context.access_info.borrow_mut() = decoded;
+            *context.access_info.borrow_mut() = decoded;
 
-                      Ok(())
-                  })
+            Ok(())
+        })
         .into_box()
 }
 
@@ -387,9 +408,10 @@ mod tests {
     fn refresh_access_info() {
         // Shared container
         let mut container_permissions = HashMap::new();
-        let _ =
-            container_permissions.insert("_videos".to_string(),
-                                         btree_set![Permission::Read, Permission::Insert]);
+        let _ = container_permissions.insert(
+            "_videos".to_string(),
+            btree_set![Permission::Read, Permission::Insert],
+        );
 
         let app = create_app_with_access(container_permissions.clone());
 
@@ -397,16 +419,16 @@ mod tests {
             let reg = unwrap!(context.as_registered()).clone();
             assert!(reg.access_info.borrow().is_empty());
 
-            context
-                .refresh_access_info(client)
-                .then(move |result| {
-                          unwrap!(result);
-                          let access_info = reg.access_info.borrow();
-                          assert_eq!(unwrap!(access_info.get("_videos")).1,
-                                     *unwrap!(container_permissions.get("_videos")));
+            context.refresh_access_info(client).then(move |result| {
+                unwrap!(result);
+                let access_info = reg.access_info.borrow();
+                assert_eq!(
+                    unwrap!(access_info.get("_videos")).1,
+                    *unwrap!(container_permissions.get("_videos"))
+                );
 
-                          Ok(())
-                      })
+                Ok(())
+            })
         });
     }
 
@@ -421,12 +443,12 @@ mod tests {
         let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
-            context
-                .get_container_mdata_info(client, cont_name)
-                .then(move |res| {
-                          let _info = unwrap!(res);
-                          Ok(())
-                      })
+            context.get_container_mdata_info(client, cont_name).then(
+                move |res| {
+                    let _info = unwrap!(res);
+                    Ok(())
+                },
+            )
         });
     }
 
@@ -434,21 +456,19 @@ mod tests {
     fn get_container_names() {
         let mut container_permissions = HashMap::new();
         let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
-        let _ = container_permissions.insert("_downloads".to_string(),
-                                             btree_set![Permission::Read]);
+        let _ =
+            container_permissions.insert("_downloads".to_string(), btree_set![Permission::Read]);
 
         let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
-            context
-                .get_container_names(client)
-                .then(move |res| {
-                          let info = unwrap!(res);
-                          assert!(info.contains(&"_videos".to_string()));
-                          assert!(info.contains(&"_downloads".to_string()));
-                          assert_eq!(info.len(), 3); // third item is the app container
-                          Ok(())
-                      })
+            context.get_container_names(client).then(move |res| {
+                let info = unwrap!(res);
+                assert!(info.contains(&"_videos".to_string()));
+                assert!(info.contains(&"_downloads".to_string()));
+                assert_eq!(info.len(), 3); // third item is the app container
+                Ok(())
+            })
         });
     }
 
@@ -466,16 +486,16 @@ mod tests {
             let f1 = context
                 .is_permitted(client, cont_name.clone(), Permission::Read)
                 .then(move |res| {
-                          assert!(unwrap!(res));
-                          Ok(())
-                      });
+                    assert!(unwrap!(res));
+                    Ok(())
+                });
 
             let f2 = context
                 .is_permitted(client, cont_name.clone(), Permission::Insert)
                 .then(move |res| {
-                          assert!(!unwrap!(res));
-                          Ok(())
-                      });
+                    assert!(!unwrap!(res));
+                    Ok(())
+                });
 
             f1.join(f2).map(|_| ())
         });

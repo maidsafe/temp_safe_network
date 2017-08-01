@@ -35,24 +35,26 @@ pub fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<Use
 }
 
 // Insert the permissions into the object cache.
-pub fn insert_permissions(object_cache: &ObjectCache,
-                          permissions: BTreeMap<User, PermissionSet>)
-                          -> MDataPermissionsHandle {
+pub fn insert_permissions(
+    object_cache: &ObjectCache,
+    permissions: BTreeMap<User, PermissionSet>,
+) -> MDataPermissionsHandle {
     let permissions = permissions
         .into_iter()
         .map(|(user, permission_set)| {
-                 let permission_set_h = object_cache.insert_mdata_permission_set(permission_set);
-                 (user, permission_set_h)
-             })
+            let permission_set_h = object_cache.insert_mdata_permission_set(permission_set);
+            (user, permission_set_h)
+        })
         .collect();
 
     object_cache.insert_mdata_permissions(permissions)
 }
 
 // Retrieve permissions from the object cache.
-pub fn get_permissions(object_cache: &ObjectCache,
-                       handle: MDataPermissionsHandle)
-                       -> Result<BTreeMap<User, PermissionSet>, AppError> {
+pub fn get_permissions(
+    object_cache: &ObjectCache,
+    handle: MDataPermissionsHandle,
+) -> Result<BTreeMap<User, PermissionSet>, AppError> {
     let input = object_cache.get_mdata_permissions(handle)?.clone();
     let mut output = BTreeMap::new();
 

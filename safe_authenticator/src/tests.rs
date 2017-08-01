@@ -69,17 +69,19 @@ fn user_root_dir() {
     // Fetch all the dirs under user root dir and verify they are empty.
     let dirs: Vec<_> = entries
         .into_iter()
-        .map(|(_, value)| unwrap!(deserialise::<MDataInfo>(&value.content)))
+        .map(|(_, value)| {
+            unwrap!(deserialise::<MDataInfo>(&value.content))
+        })
         .collect();
 
     let dirs = run(&authenticator, move |client| {
         let fs: Vec<_> = dirs.into_iter()
             .map(|dir| {
-                     let f1 = client.list_mdata_entries(dir.name, dir.type_tag);
-                     let f2 = client.list_mdata_permissions(dir.name, dir.type_tag);
+                let f1 = client.list_mdata_entries(dir.name, dir.type_tag);
+                let f2 = client.list_mdata_permissions(dir.name, dir.type_tag);
 
-                     f1.join(f2).map_err(AuthError::from)
-                 })
+                f1.join(f2).map_err(AuthError::from)
+            })
             .collect();
 
         future::join_all(fs)
@@ -145,11 +147,13 @@ fn app_authentication_with_network_errors() {
         containers: create_containers_req(),
     };
 
-    let encoded_msg = unwrap!(ipc::encode_msg(&IpcMsg::Req {
-                                                   req_id: req_id,
-                                                   req: IpcReq::Auth(auth_req.clone()),
-                                               },
-                                              "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(
+        &IpcMsg::Req {
+            req_id: req_id,
+            req: IpcReq::Auth(auth_req.clone()),
+        },
+        "safe-auth",
+    ));
     match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
         IpcMsg::Req { req: IpcReq::Auth(..), .. } => (),
         x => panic!("Unexpected {:?}", x),
@@ -158,19 +162,21 @@ fn app_authentication_with_network_errors() {
     // Simulate network errors - these should not affect the
     // result in any way.
     unwrap!(authenticator.send(move |client| {
-                                   client.simulate_rate_limit_errors(30);
-                                   None
-                               }));
+        client.simulate_rate_limit_errors(30);
+        None
+    }));
 
     let encoded_auth_resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
             let auth_req = unwrap!(auth_req.into_repr_c());
-            encode_auth_resp(&authenticator,
-                             &auth_req,
-                             req_id,
-                             true, // is_granted
-                             ud,
-                             cb)
+            encode_auth_resp(
+                &authenticator,
+                &auth_req,
+                req_id,
+                true, // is_granted
+                ud,
+                cb,
+            )
         }))
     };
 
@@ -186,8 +192,9 @@ fn app_authentication_with_network_errors() {
     };
 
     // Check the app info is present in the config file.
-    let config = run(&authenticator,
-                     |client| get_config(client).map(|(_, config)| config));
+    let config = run(&authenticator, |client| {
+        get_config(client).map(|(_, config)| config)
+    });
 
     let app_config_key = sha3_256(app_id.as_bytes());
     let app_info = unwrap!(config.get(&app_config_key));
@@ -226,14 +233,14 @@ fn app_authentication() {
 
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
-    let (received_req_id, received_auth_req) = match unwrap!(decode_ipc_msg(&authenticator,
-                                                                            &encoded_msg)) {
-        IpcMsg::Req {
-            req_id,
-            req: IpcReq::Auth(req),
-        } => (req_id, req),
-        x => panic!("Unexpected {:?}", x),
-    };
+    let (received_req_id, received_auth_req) =
+        match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
+            IpcMsg::Req {
+                req_id,
+                req: IpcReq::Auth(req),
+            } => (req_id, req),
+            x => panic!("Unexpected {:?}", x),
+        };
 
     assert_eq!(received_req_id, req_id);
     assert_eq!(received_auth_req, auth_req);
@@ -241,17 +248,21 @@ fn app_authentication() {
     let encoded_auth_resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
             let auth_req = unwrap!(auth_req.into_repr_c());
-            encode_auth_resp(&authenticator,
-                             &auth_req,
-                             req_id,
-                             true, // is_granted
-                             ud,
-                             cb)
+            encode_auth_resp(
+                &authenticator,
+                &auth_req,
+                req_id,
+                true, // is_granted
+                ud,
+                cb,
+            )
         }))
     };
 
     let base64_app_id = base64_encode(app_id.as_bytes());
-    assert!(encoded_auth_resp.starts_with(&format!("safe-{}", base64_app_id)));
+    assert!(encoded_auth_resp.starts_with(
+        &format!("safe-{}", base64_app_id),
+    ));
 
     let auth_granted = match unwrap!(ipc::decode_msg(&encoded_auth_resp)) {
         IpcMsg::Resp {
@@ -265,12 +276,16 @@ fn app_authentication() {
     };
 
     let mut expected = create_containers_req();
-    let _ = expected.insert(format!("apps/{}", app_id),
-                            btree_set![Permission::Read,
-                                       Permission::Insert,
-                                       Permission::Update,
-                                       Permission::Delete,
-                                       Permission::ManagePermissions]);
+    let _ = expected.insert(
+        format!("apps/{}", app_id),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+            Permission::ManagePermissions,
+        ],
+    );
 
     let mut access_container =
         access_container(&authenticator, app_id.clone(), auth_granted.clone());
@@ -279,16 +294,19 @@ fn app_authentication() {
     let app_keys = auth_granted.app_keys;
     let app_sign_pk = app_keys.sign_pk;
 
-    compare_access_container_entries(&authenticator,
-                                     app_sign_pk,
-                                     access_container.clone(),
-                                     expected);
+    compare_access_container_entries(
+        &authenticator,
+        app_sign_pk,
+        access_container.clone(),
+        expected,
+    );
 
     let (app_dir_info, _) = unwrap!(access_container.remove(&format!("apps/{}", app_id)));
 
     // Check the app info is present in the config file.
-    let config = run(&authenticator,
-                     |client| get_config(client).map(|(_, config)| config));
+    let config = run(&authenticator, |client| {
+        get_config(client).map(|(_, config)| config)
+    });
 
     let app_config_key = sha3_256(app_id.as_bytes());
     let app_info = unwrap!(config.get(&app_config_key));
@@ -306,10 +324,10 @@ fn app_authentication() {
         client
             .get_mdata_value(user_root_dir.name, user_root_dir.type_tag, app_dir_key)
             .and_then(move |value| {
-                          let encoded = user_root_dir.decrypt(&value.content)?;
-                          let decoded = deserialise::<MDataInfo>(&encoded)?;
-                          Ok(decoded)
-                      })
+                let encoded = user_root_dir.decrypt(&value.content)?;
+                let decoded = deserialise::<MDataInfo>(&encoded)?;
+                Ok(decoded)
+            })
             .map_err(AuthError::from)
     });
 
@@ -338,10 +356,10 @@ fn unregistered_authentication() {
     let msg = IpcMsg::Req {
         req_id: ipc::gen_req_id(),
         req: IpcReq::Auth(AuthReq {
-                              app: unwrap!(rand_app()),
-                              app_container: true,
-                              containers: create_containers_req(),
-                          }),
+            app: unwrap!(rand_app()),
+            app_container: true,
+            containers: create_containers_req(),
+        }),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
@@ -370,11 +388,11 @@ fn unregistered_authentication() {
 
     let encoded_resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
-                           encode_unregistered_resp(req_id,
+            encode_unregistered_resp(req_id,
                                                     true, // is_granted
                                                     ud,
                                                     cb)
-                       }))
+        }))
     };
     let base64_app_id = base64_encode(b"unregistered");
     assert!(encoded_resp.starts_with(&format!("safe-{}", base64_app_id)));
@@ -434,12 +452,14 @@ fn authenticated_app_can_be_authenticated_again() {
     let _resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
             let auth_req = unwrap!(auth_req.clone().into_repr_c());
-            encode_auth_resp(&authenticator,
-                             &auth_req,
-                             req_id,
-                             true, // is_granted
-                             ud,
-                             cb)
+            encode_auth_resp(
+                &authenticator,
+                &auth_req,
+                req_id,
+                true, // is_granted
+                ud,
+                cb,
+            )
         }))
     };
 
@@ -466,9 +486,9 @@ fn containers_unknown_app() {
     let msg = IpcMsg::Req {
         req_id: req_id,
         req: IpcReq::Containers(ContainersReq {
-                                    app: unwrap!(rand_app()),
-                                    containers: create_containers_req(),
-                                }),
+            app: unwrap!(rand_app()),
+            containers: create_containers_req(),
+        }),
     };
 
     // Serialise the request as base64 payload in "safe-auth:payload"
@@ -519,18 +539,22 @@ fn containers_access_request() {
         // Call `encode_auth_resp` with is_granted = true
         unwrap!(call_1(|ud, cb| {
             let cont_req = unwrap!(cont_req.into_repr_c());
-            encode_containers_resp(&authenticator,
-                                   &cont_req,
-                                   req_id,
-                                   true, // is_granted
-                                   ud,
-                                   cb)
+            encode_containers_resp(
+                &authenticator,
+                &cont_req,
+                req_id,
+                true, // is_granted
+                ud,
+                cb,
+            )
         }))
     };
 
     // Check the string to contain "safe-<app-id-base64>:payload" where payload is
     // IpcMsg::Resp(IpcResp::Auth(Containers(Ok())))".
-    assert!(encoded_containers_resp.starts_with(&format!("safe-{}", base64_app_id)));
+    assert!(encoded_containers_resp.starts_with(
+        &format!("safe-{}", base64_app_id),
+    ));
 
     match ipc::decode_msg(&encoded_containers_resp) {
         Ok(IpcMsg::Resp { resp: IpcResp::Containers(Ok(())), .. }) => (),
@@ -573,18 +597,30 @@ fn app_revocation() {
     // Put one file by each app into a shared container.
     let mut ac_entries = access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
     let (videos_md1, _) = unwrap!(ac_entries.remove("_videos"));
-    unwrap!(create_file(&authenticator, videos_md1.clone(), "1.mp4", vec![1; 10]));
+    unwrap!(create_file(
+        &authenticator,
+        videos_md1.clone(),
+        "1.mp4",
+        vec![1; 10],
+    ));
 
     let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
     let (videos_md2, _) = unwrap!(ac_entries.remove("_videos"));
-    unwrap!(create_file(&authenticator, videos_md2.clone(), "2.mp4", vec![1; 10]));
+    unwrap!(create_file(
+        &authenticator,
+        videos_md2.clone(),
+        "2.mp4",
+        vec![1; 10],
+    ));
 
     let app_container_name = format!("apps/{}", app_id2.clone());
     let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container_name));
-    unwrap!(create_file(&authenticator,
-                        app_container_md.clone(),
-                        "3.mp4",
-                        vec![1; 10]));
+    unwrap!(create_file(
+        &authenticator,
+        app_container_md.clone(),
+        "3.mp4",
+        vec![1; 10],
+    ));
 
     // There should be 2 entries.
     assert_eq!(count_mdata_entries(&authenticator, videos_md1.clone()), 2);
@@ -610,12 +646,14 @@ fn app_revocation() {
     // Container permissions includes only the second app.
     let (name, tag) = (videos_md2.name, videos_md2.type_tag);
     let perms = run(&authenticator, move |client| {
-        client
-            .list_mdata_permissions(name, tag)
-            .map_err(From::from)
+        client.list_mdata_permissions(name, tag).map_err(From::from)
     });
-    assert!(!perms.contains_key(&User::Key(auth_granted1.app_keys.sign_pk)));
-    assert!(perms.contains_key(&User::Key(auth_granted2.app_keys.sign_pk)));
+    assert!(!perms.contains_key(
+        &User::Key(auth_granted1.app_keys.sign_pk),
+    ));
+    assert!(perms.contains_key(
+        &User::Key(auth_granted2.app_keys.sign_pk),
+    ));
 
     // The first app can no longer access the files.
     match fetch_file(&authenticator, videos_md1.clone(), "1.mp4") {
@@ -685,9 +723,15 @@ fn app_revocation() {
     let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
     let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container_name));
 
-    assert_eq!(count_mdata_entries(&authenticator, app_container_md.clone()),
-               2);
-    let _ = unwrap!(fetch_file(&authenticator, app_container_md.clone(), "3.mp4"));
+    assert_eq!(
+        count_mdata_entries(&authenticator, app_container_md.clone()),
+        2
+    );
+    let _ = unwrap!(fetch_file(
+        &authenticator,
+        app_container_md.clone(),
+        "3.mp4",
+    ));
 
     revoke(&authenticator, &app_id2);
 }
@@ -707,8 +751,9 @@ impl ReprC for RevokedAppId {
     type C = *const FfiAppExchangeInfo;
     type Error = StringError;
 
-    unsafe fn clone_from_repr_c(app_info: *const FfiAppExchangeInfo)
-                                -> Result<RevokedAppId, StringError> {
+    unsafe fn clone_from_repr_c(
+        app_info: *const FfiAppExchangeInfo,
+    ) -> Result<RevokedAppId, StringError> {
         Ok(RevokedAppId(from_c_str((*app_info).id)?))
     }
 }
@@ -718,8 +763,11 @@ fn lists_of_registered_and_revoked_apps() {
     let authenticator = create_account_and_login();
 
     // Initially, there are no registered or revoked apps.
-    let registered: Vec<RegisteredAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(
+            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
+        ))
+    };
 
     let revoked: Vec<RevokedAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
@@ -744,8 +792,11 @@ fn lists_of_registered_and_revoked_apps() {
     let _ = unwrap!(register_app(&authenticator, &auth_req2));
 
     // There are now two registered apps, but no revoked apps.
-    let registered: Vec<RegisteredAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(
+            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
+        ))
+    };
 
     let revoked: Vec<RevokedAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
@@ -757,8 +808,11 @@ fn lists_of_registered_and_revoked_apps() {
     revoke(&authenticator, &auth_req1.app.id);
 
     // There is now one registered and one revoked app.
-    let registered: Vec<RegisteredAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(
+            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
+        ))
+    };
 
     let revoked: Vec<RevokedAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
@@ -769,8 +823,11 @@ fn lists_of_registered_and_revoked_apps() {
     // Re-register the first app - now there must be 2 registered apps again
     let _ = unwrap!(register_app(&authenticator, &auth_req1));
 
-    let registered: Vec<RegisteredAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(
+            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
+        ))
+    };
     let revoked: Vec<RevokedAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
 
@@ -779,29 +836,33 @@ fn lists_of_registered_and_revoked_apps() {
 }
 
 // Create file in the given container, with the given name and content.
-fn create_file<T: Into<String>>(authenticator: &Authenticator,
-                                container_info: MDataInfo,
-                                name: T,
-                                content: Vec<u8>)
-                                -> Result<(), AuthError> {
+fn create_file<T: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: T,
+    content: Vec<u8>,
+) -> Result<(), AuthError> {
     let name = name.into();
     try_run(authenticator, |client| {
         let c2 = client.clone();
 
         file_helper::write(client.clone(), File::new(vec![]), Mode::Overwrite)
             .then(move |res| {
-                      let writer = unwrap!(res);
-                      writer.write(&content).and_then(move |_| writer.close())
-                  })
-            .then(move |file| file_helper::insert(c2, container_info, name, &unwrap!(file)))
+                let writer = unwrap!(res);
+                writer.write(&content).and_then(move |_| writer.close())
+            })
+            .then(move |file| {
+                file_helper::insert(c2, container_info, name, &unwrap!(file))
+            })
             .map_err(From::from)
     })
 }
 
-fn fetch_file<T: Into<String>>(authenticator: &Authenticator,
-                               container_info: MDataInfo,
-                               name: T)
-                               -> Result<File, AuthError> {
+fn fetch_file<T: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: T,
+) -> Result<File, AuthError> {
     let name = name.into();
     try_run(authenticator, |client| {
         file_helper::fetch(client.clone(), container_info, name)
@@ -824,7 +885,9 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
 
     let revoke_resp: String = unsafe {
         let app_id = unwrap!(CString::new(app_id));
-        unwrap!(call_1(|ud, cb| auth_revoke_app(authenticator, app_id.as_ptr(), ud, cb)))
+        unwrap!(call_1(|ud, cb| {
+            auth_revoke_app(authenticator, app_id.as_ptr(), ud, cb)
+        }))
     };
 
     // Assert the callback is called with error-code 0 and FfiString contains
@@ -842,21 +905,26 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
 fn create_containers_req() -> HashMap<String, BTreeSet<Permission>> {
     let mut containers = HashMap::new();
     let _ = containers.insert("_documents".to_owned(), btree_set![Permission::Insert]);
-    let _ = containers.insert("_videos".to_owned(),
-                              btree_set![Permission::Read,
-                                         Permission::Insert,
-                                         Permission::Update,
-                                         Permission::Delete,
-                                         Permission::ManagePermissions]);
+    let _ = containers.insert(
+        "_videos".to_owned(),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+            Permission::ManagePermissions,
+        ],
+    );
     containers
 }
 
 // Helper to decode IpcMsg.
 // TODO: there should be a public function with a signature like this, and the
 //       FFI function `ipc::decode_ipc_msg` should be only wrapper over it.
-fn decode_ipc_msg(authenticator: &Authenticator,
-                  msg: &str)
-                  -> Result<IpcMsg, (i32, Option<IpcMsg>)> {
+fn decode_ipc_msg(
+    authenticator: &Authenticator,
+    msg: &str,
+) -> Result<IpcMsg, (i32, Option<IpcMsg>)> {
     let (tx, rx) = mpsc::channel::<Result<IpcMsg, (i32, Option<IpcMsg>)>>();
 
     extern "C" fn auth_cb(user_data: *mut c_void, req_id: u32, req: *const FfiAuthReq) {
@@ -864,8 +932,10 @@ fn decode_ipc_msg(authenticator: &Authenticator,
             let req = match AuthReq::clone_from_repr_c(req) {
                 Ok(req) => req,
                 Err(_) => {
-                    return send_via_user_data(user_data,
-                                              Err::<IpcMsg, (i32, Option<IpcMsg>)>((-2, None)))
+                    return send_via_user_data(
+                        user_data,
+                        Err::<IpcMsg, (i32, Option<IpcMsg>)>((-2, None)),
+                    )
                 }
             };
 
@@ -878,15 +948,15 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
-    extern "C" fn containers_cb(user_data: *mut c_void,
-                                req_id: u32,
-                                req: *const FfiContainersReq) {
+    extern "C" fn containers_cb(user_data: *mut c_void, req_id: u32, req: *const FfiContainersReq) {
         unsafe {
             let req = match ContainersReq::clone_from_repr_c(req) {
                 Ok(req) => req,
                 Err(_) => {
-                    return send_via_user_data(user_data,
-                                              Err::<IpcMsg, (i32, Option<IpcMsg>)>((-2, None)))
+                    return send_via_user_data(
+                        user_data,
+                        Err::<IpcMsg, (i32, Option<IpcMsg>)>((-2, None)),
+                    )
                 }
             };
 
@@ -903,13 +973,15 @@ fn decode_ipc_msg(authenticator: &Authenticator,
 
     unsafe {
         use ipc::auth_decode_ipc_msg;
-        auth_decode_ipc_msg(authenticator,
-                            ffi_msg.as_ptr(),
-                            sender_as_user_data(&tx),
-                            auth_cb,
-                            containers_cb,
-                            unregistered_cb,
-                            err_cb);
+        auth_decode_ipc_msg(
+            authenticator,
+            ffi_msg.as_ptr(),
+            sender_as_user_data(&tx),
+            auth_cb,
+            containers_cb,
+            unregistered_cb,
+            err_cb,
+        );
     };
 
     match rx.recv_timeout(Duration::from_secs(15)) {
@@ -925,10 +997,12 @@ fn unregistered_decode_ipc_msg(msg: &str) -> Result<IpcMsg, (i32, Option<IpcMsg>
 
     unsafe {
         use ipc::auth_unregistered_decode_ipc_msg;
-        auth_unregistered_decode_ipc_msg(ffi_msg.as_ptr(),
-                                         sender_as_user_data(&tx),
-                                         unregistered_cb,
-                                         err_cb);
+        auth_unregistered_decode_ipc_msg(
+            ffi_msg.as_ptr(),
+            sender_as_user_data(&tx),
+            unregistered_cb,
+            err_cb,
+        );
     };
 
     match rx.recv_timeout(Duration::from_secs(15)) {

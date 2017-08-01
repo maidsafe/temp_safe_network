@@ -25,7 +25,9 @@ pub trait ReprC {
     type Error;
 
     /// Converts from a raw type into an owned type by cloning data
-    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> where Self: Sized;
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error>
+    where
+        Self: Sized;
 }
 
 impl ReprC for u64 {

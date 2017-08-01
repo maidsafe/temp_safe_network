@@ -39,15 +39,16 @@ pub fn gen_app_exchange_info() -> AppExchangeInfo {
 /// Run the given closure inside the app's event loop. The return value of
 /// the closure is returned immediately.
 pub fn run_now<F, R>(app: &App, f: F) -> R
-    where F: FnOnce(&Client<AppContext>, &AppContext) -> R + Send + 'static,
-          R: Send + 'static
+where
+    F: FnOnce(&Client<AppContext>, &AppContext) -> R + Send + 'static,
+    R: Send + 'static,
 {
     let (tx, rx) = mpsc::channel();
 
     unwrap!(app.send(move |client, context| {
-                         unwrap!(tx.send(f(client, context)));
-                         None
-                     }));
+        unwrap!(tx.send(f(client, context)));
+        None
+    }));
 
     unwrap!(rx.recv())
 }
@@ -56,9 +57,10 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
 /// return a future which will then be driven to completion and its result
 /// returned.
 pub fn run<F, I, T>(app: &App, f: F) -> T
-    where F: FnOnce(&Client<AppContext>, &AppContext) -> I + Send + 'static,
-          I: IntoFuture<Item = T, Error = AppError> + 'static,
-          T: Send + 'static
+where
+    F: FnOnce(&Client<AppContext>, &AppContext) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = AppError> + 'static,
+    T: Send + 'static,
 {
     let (tx, rx) = mpsc::channel();
 
@@ -66,9 +68,9 @@ pub fn run<F, I, T>(app: &App, f: F) -> T
         let future = f(client, app)
             .into_future()
             .then(move |result| {
-                      unwrap!(tx.send(result));
-                      Ok(())
-                  })
+                unwrap!(tx.send(result));
+                Ok(())
+            })
             .into_box();
 
         Some(future)
@@ -84,12 +86,14 @@ pub fn create_app() -> App {
     let app_info = gen_app_exchange_info();
     let app_id = app_info.id.clone();
 
-    let auth_granted = unwrap!(authenticator::register_app(&auth,
-                                                           &AuthReq {
-                                                                app: app_info,
-                                                                app_container: false,
-                                                                containers: HashMap::new(),
-                                                            }));
+    let auth_granted = unwrap!(authenticator::register_app(
+        &auth,
+        &AuthReq {
+            app: app_info,
+            app_container: false,
+            containers: HashMap::new(),
+        },
+    ));
 
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
@@ -103,12 +107,14 @@ pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>
     let app_info = gen_app_exchange_info();
     let app_id = app_info.id.clone();
 
-    let auth_granted = unwrap!(authenticator::register_app(&auth,
-                                                           &AuthReq {
-                                                                app: app_info,
-                                                                app_container: true,
-                                                                containers: access_info,
-                                                            }));
+    let auth_granted = unwrap!(authenticator::register_app(
+        &auth,
+        &AuthReq {
+            app: app_info,
+            app_container: true,
+            containers: access_info,
+        },
+    ));
 
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
@@ -116,25 +122,26 @@ pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>
 /// Creates a random app instance for testing
 #[no_mangle]
 #[allow(unsafe_code)]
-#[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
+#[cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
 pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
     catch_unwind_error_code(|| -> Result<(), AppError> {
-                                let app = create_app();
-                                unsafe {
-                                    *o_app = Box::into_raw(Box::new(app));
-                                }
-                                Ok(())
-                            })
+        let app = create_app();
+        unsafe {
+            *o_app = Box::into_raw(Box::new(app));
+        }
+        Ok(())
+    })
 }
 
 /// Create a random app instance for testing, with access to containers
 #[no_mangle]
 #[allow(unsafe_code)]
-#[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
-pub extern "C" fn test_create_app_with_access(access_info: *const ffi::ContainerPermissions,
-                                              access_info_len: usize,
-                                              o_app: *mut *mut App)
-                                              -> i32 {
+#[cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
+pub extern "C" fn test_create_app_with_access(
+    access_info: *const ffi::ContainerPermissions,
+    access_info_len: usize,
+    o_app: *mut *mut App,
+) -> i32 {
     catch_unwind_error_code(|| -> Result<(), AppError> {
         let containers = unsafe { containers_from_repr_c(access_info, access_info_len)? };
         let app = create_app_with_access(containers);

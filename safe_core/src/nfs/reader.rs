@@ -32,19 +32,20 @@ pub struct Reader<T> {
 
 impl<T: 'static> Reader<T> {
     /// Create a new instance of Reader
-    pub fn new(client: Client<T>,
-               storage: SelfEncryptionStorage<T>,
-               file: &File)
-               -> Box<NfsFuture<Reader<T>>> {
+    pub fn new(
+        client: Client<T>,
+        storage: SelfEncryptionStorage<T>,
+        file: &File,
+    ) -> Box<NfsFuture<Reader<T>>> {
         data_map::get(&client, file.data_map_name())
             .and_then(move |data_map| {
-                          let self_encryptor = SelfEncryptor::new(storage, data_map)?;
+                let self_encryptor = SelfEncryptor::new(storage, data_map)?;
 
-                          Ok(Reader {
-                                 client: client,
-                                 self_encryptor: self_encryptor,
-                             })
-                      })
+                Ok(Reader {
+                    client: client,
+                    self_encryptor: self_encryptor,
+                })
+            })
             .into_box()
     }
 
@@ -55,16 +56,20 @@ impl<T: 'static> Reader<T> {
 
     /// Read data from file/blob
     pub fn read(&self, position: u64, length: u64) -> Box<NfsFuture<Vec<u8>>> {
-        trace!("Reader reading from pos: {} and size: {}.",
-               position,
-               length);
+        trace!(
+            "Reader reading from pos: {} and size: {}.",
+            position,
+            length
+        );
 
         if (position + length) > self.size() {
             err!(NfsError::InvalidRange)
         } else {
-            debug!("Reading {len} bytes of data from file starting at offset of {pos} bytes ...",
-                   len = length,
-                   pos = position);
+            debug!(
+                "Reading {len} bytes of data from file starting at offset of {pos} bytes ...",
+                len = length,
+                pos = position
+            );
             self.self_encryptor
                 .read(position, length)
                 .map_err(From::from)

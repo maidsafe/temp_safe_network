@@ -41,11 +41,13 @@ pub fn put<T: 'static>(client: &Client<T>, data_map: &DataMap) -> Box<NfsFuture<
 
     future::result(serialise(&data_map))
         .map_err(From::from)
-        .and_then(move |encoded| immutable_data::create(&client, &encoded, None))
+        .and_then(move |encoded| {
+            immutable_data::create(&client, &encoded, None)
+        })
         .and_then(move |data| {
-                      let name = *data.name();
-                      client2.put_idata(data).map(move |_| name)
-                  })
+            let name = *data.name();
+            client2.put_idata(data).map(move |_| name)
+        })
         .map_err(From::from)
         .into_box()
 }

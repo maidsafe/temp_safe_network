@@ -22,8 +22,9 @@ use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
 
 fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
-    where F: FnOnce() -> Result<T, E>,
-          E: Debug + From<&'a str>
+where
+    F: FnOnce() -> Result<T, E>,
+    E: Debug + From<&'a str>,
 {
     match panic::catch_unwind(AssertUnwindSafe(f)) {
         Err(_) => Err(E::from("panic")),
@@ -33,26 +34,30 @@ fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
 
 /// Catch panics. On error return the error code.
 pub fn catch_unwind_error_code<'a, F, E>(f: F) -> i32
-    where F: FnOnce() -> Result<(), E>,
-          E: Debug + ErrorCode + From<&'a str>
+where
+    F: FnOnce() -> Result<(), E>,
+    E: Debug + ErrorCode + From<&'a str>,
 {
     ffi_result_code!(catch_unwind_result(f))
 }
 
 /// Catch panics. On error call the callback.
 pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
-    where U: Into<*mut c_void>,
-          C: Callback + Copy,
-          F: FnOnce() -> Result<(), E>,
-          E: Debug + Display + ErrorCode + From<&'a str>
+where
+    U: Into<*mut c_void>,
+    C: Callback + Copy,
+    F: FnOnce() -> Result<(), E>,
+    E: Debug + Display + ErrorCode + From<&'a str>,
 {
     if let Err(err) = catch_unwind_result(f) {
         let (error_code, description) = ffi_result!(Err::<(), E>(err));
-        cb.call(user_data.into(),
-                FfiResult {
-                    error_code,
-                    description: description.as_ptr(),
-                },
-                CallbackArgs::default());
+        cb.call(
+            user_data.into(),
+            FfiResult {
+                error_code,
+                description: description.as_ptr(),
+            },
+            CallbackArgs::default(),
+        );
     }
 }

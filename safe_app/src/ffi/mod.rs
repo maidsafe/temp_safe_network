@@ -57,15 +57,14 @@ mod helper;
 /// `o_cb` callback, while `network_cb_user_data` corresponds to the
 /// first parameter of `o_network_observer_cb`.
 #[no_mangle]
-pub unsafe extern "C" fn app_unregistered(bootstrap_config_ptr: *const u8,
-                                          bootstrap_config_len: usize,
-                                          network_cb_user_data: *mut c_void,
-                                          user_data: *mut c_void,
-                                          o_network_observer_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    FfiResult,
-                                                                                    i32),
-                                          o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App))
-{
+pub unsafe extern "C" fn app_unregistered(
+    bootstrap_config_ptr: *const u8,
+    bootstrap_config_len: usize,
+    network_cb_user_data: *mut c_void,
+    user_data: *mut c_void,
+    o_network_observer_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App),
+) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
         let network_cb_user_data = OpaqueCtx(network_cb_user_data);
@@ -73,17 +72,17 @@ pub unsafe extern "C" fn app_unregistered(bootstrap_config_ptr: *const u8,
         let config = if bootstrap_config_len == 0 || bootstrap_config_ptr.is_null() {
             None
         } else {
-            let config_serialised = slice::from_raw_parts(bootstrap_config_ptr,
-                                                          bootstrap_config_len);
+            let config_serialised =
+                slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
             Some(deserialise::<BootstrapConfig>(config_serialised)?)
         };
 
-        let app = App::unregistered(move |event| {
-                                        call_network_observer(event,
-                                                              network_cb_user_data.0,
-                                                              o_network_observer_cb)
-                                    },
-                                    config)?;
+        let app = App::unregistered(
+            move |event| {
+                call_network_observer(event, network_cb_user_data.0, o_network_observer_cb)
+            },
+            config,
+        )?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
@@ -96,14 +95,14 @@ pub unsafe extern "C" fn app_unregistered(bootstrap_config_ptr: *const u8,
 /// `o_cb` callback, while `network_cb_user_data` corresponds to the
 /// first parameter of `o_network_observer_cb`.
 #[no_mangle]
-pub unsafe extern "C" fn app_registered(app_id: *const c_char,
-                                        auth_granted: *const FfiAuthGranted,
-                                        network_cb_user_data: *mut c_void,
-                                        user_data: *mut c_void,
-                                        o_network_observer_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    FfiResult,
-                                                                                    i32),
-                                        o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App)) {
+pub unsafe extern "C" fn app_registered(
+    app_id: *const c_char,
+    auth_granted: *const FfiAuthGranted,
+    network_cb_user_data: *mut c_void,
+    user_data: *mut c_void,
+    o_network_observer_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App),
+) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
         let network_cb_user_data = OpaqueCtx(network_cb_user_data);
@@ -122,17 +121,21 @@ pub unsafe extern "C" fn app_registered(app_id: *const c_char,
 
 /// Try to restore a failed connection with the network.
 #[no_mangle]
-pub unsafe extern "C" fn app_reconnect(app: *mut App,
-                                       user_data: *mut c_void,
-                                       o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn app_reconnect(
+    app: *mut App,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     let user_data = OpaqueCtx(user_data);
     let res = (*app).send(move |client, _| {
-                              try_cb!(client.restart_routing().map_err(AppError::from),
-                                      user_data.0,
-                                      o_cb);
-                              o_cb(user_data.0, FFI_RESULT_OK);
-                              None
-                          });
+        try_cb!(
+            client.restart_routing().map_err(AppError::from),
+            user_data.0,
+            o_cb
+        );
+        o_cb(user_data.0, FFI_RESULT_OK);
+        None
+    });
     if let Err(..) = res {
         call_result_cb!(res, user_data, o_cb);
     }
@@ -140,25 +143,25 @@ pub unsafe extern "C" fn app_reconnect(app: *mut App,
 
 /// Get the account usage statistics.
 #[no_mangle]
-pub unsafe extern "C" fn app_account_info(app: *mut App,
-                                          user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void,
-                                                              FfiResult,
-                                                              *const FfiAccountInfo)) {
+pub unsafe extern "C" fn app_account_info(
+    app: *mut App,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAccountInfo),
+) {
     let user_data = OpaqueCtx(user_data);
     let res = (*app).send(move |client, _| {
         client
             .get_account_info()
             .map(move |acc_info| {
-                     let ffi_acc = FfiAccountInfo {
-                         mutations_done: acc_info.mutations_done,
-                         mutations_available: acc_info.mutations_available,
-                     };
-                     o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
-                 })
+                let ffi_acc = FfiAccountInfo {
+                    mutations_done: acc_info.mutations_done,
+                    mutations_available: acc_info.mutations_available,
+                };
+                o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
+            })
             .map_err(move |e| {
-                         call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
-                     })
+                call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
+            })
             .into_box()
             .into()
     });
@@ -176,9 +179,11 @@ pub unsafe extern "C" fn app_free(app: *mut App) {
     let _ = Box::from_raw(app);
 }
 
-unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
-                                user_data: *mut c_void,
-                                o_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32)) {
+unsafe fn call_network_observer(
+    event: Result<NetworkEvent, AppError>,
+    user_data: *mut c_void,
+    o_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32),
+) {
     match event {
         Ok(event) => o_cb(user_data, FFI_RESULT_OK, event.into()),
         res @ Err(..) => {
@@ -206,18 +211,20 @@ mod tests {
 
         unsafe {
             unwrap!((*app).send(move |client, _| {
-                                    client
-                                        .put_idata(ImmutableData::new(vec![1, 2, 3]))
-                                        .map_err(move |_| ())
-                                        .into_box()
-                                        .into()
-                                }));
+                client
+                    .put_idata(ImmutableData::new(vec![1, 2, 3]))
+                    .map_err(move |_| ())
+                    .into_box()
+                    .into()
+            }));
         }
 
         let stats: AccountInfo = unsafe { unwrap!(call_1(|ud, cb| app_account_info(app, ud, cb))) };
         assert_eq!(stats.mutations_done, orig_stats.mutations_done + 1);
-        assert_eq!(stats.mutations_available,
-                   orig_stats.mutations_available - 1);
+        assert_eq!(
+            stats.mutations_available,
+            orig_stats.mutations_available - 1
+        );
 
         unsafe { app_free(app) };
     }
@@ -241,20 +248,22 @@ mod tests {
 
             let app: *mut App = unsafe {
                 unwrap!(call_1(|ud, cb| {
-                                   app_unregistered(bootstrap_cfg.as_ptr(),
-                                                    bootstrap_cfg.len(),
-                                                    sender_as_user_data(&tx),
-                                                    ud,
-                                                    net_event_cb,
-                                                    cb)
-                               }))
+                    app_unregistered(
+                        bootstrap_cfg.as_ptr(),
+                        bootstrap_cfg.len(),
+                        sender_as_user_data(&tx),
+                        ud,
+                        net_event_cb,
+                        cb,
+                    )
+                }))
             };
 
             unsafe {
                 unwrap!((*app).send(move |client, _| {
-                                        client.simulate_network_disconnect();
-                                        None
-                                    }));
+                    client.simulate_network_disconnect();
+                    None
+                }));
             }
 
             let (error_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));

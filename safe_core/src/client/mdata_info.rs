@@ -38,10 +38,11 @@ pub struct MDataInfo {
 impl MDataInfo {
     /// Construct `MDataInfo` for private (encrypted) data with a
     /// provided private key.
-    pub fn new_private(name: XorName,
-                       type_tag: u64,
-                       enc_info: (secretbox::Key, Option<secretbox::Nonce>))
-                       -> Self {
+    pub fn new_private(
+        name: XorName,
+        type_tag: u64,
+        enc_info: (secretbox::Key, Option<secretbox::Nonce>),
+    ) -> Self {
         MDataInfo {
             name,
             type_tag,
@@ -78,7 +79,9 @@ impl MDataInfo {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
                     let mut pt = plain_text.to_vec();
                     pt.extend_from_slice(&dir_nonce[..]);
-                    unwrap!(secretbox::Nonce::from_slice(&sha3_256(&pt)[..secretbox::NONCEBYTES]))
+                    unwrap!(secretbox::Nonce::from_slice(
+                        &sha3_256(&pt)[..secretbox::NONCEBYTES],
+                    ))
                 }
                 None => secretbox::gen_nonce(),
             };
@@ -112,9 +115,10 @@ fn os_rng() -> Result<OsRng, CoreError> {
 }
 
 /// Encrypt the entries (both keys and values) using the `MDataInfo`.
-pub fn encrypt_entries(info: &MDataInfo,
-                       entries: &BTreeMap<Vec<u8>, Value>)
-                       -> Result<BTreeMap<Vec<u8>, Value>, CoreError> {
+pub fn encrypt_entries(
+    info: &MDataInfo,
+    entries: &BTreeMap<Vec<u8>, Value>,
+) -> Result<BTreeMap<Vec<u8>, Value>, CoreError> {
     let mut output = BTreeMap::new();
 
     for (key, value) in entries {
@@ -128,9 +132,10 @@ pub fn encrypt_entries(info: &MDataInfo,
 
 /// Encrypt entry actions using the `MDataInfo`. The effect of this is that the entries
 /// mutated by the encrypted actions will end up encrypted using the `MDataInfo`.
-pub fn encrypt_entry_actions(info: &MDataInfo,
-                             actions: &BTreeMap<Vec<u8>, EntryAction>)
-                             -> Result<BTreeMap<Vec<u8>, EntryAction>, CoreError> {
+pub fn encrypt_entry_actions(
+    info: &MDataInfo,
+    actions: &BTreeMap<Vec<u8>, EntryAction>,
+) -> Result<BTreeMap<Vec<u8>, EntryAction>, CoreError> {
     let mut output = BTreeMap::new();
 
     for (key, action) in actions {
@@ -148,9 +153,10 @@ pub fn encrypt_entry_actions(info: &MDataInfo,
 }
 
 /// Decrypt entries using the `MDataInfo`.
-pub fn decrypt_entries(info: &MDataInfo,
-                       entries: &BTreeMap<Vec<u8>, Value>)
-                       -> Result<BTreeMap<Vec<u8>, Value>, CoreError> {
+pub fn decrypt_entries(
+    info: &MDataInfo,
+    entries: &BTreeMap<Vec<u8>, Value>,
+) -> Result<BTreeMap<Vec<u8>, Value>, CoreError> {
     let mut output = BTreeMap::new();
 
     for (key, value) in entries {
@@ -164,9 +170,10 @@ pub fn decrypt_entries(info: &MDataInfo,
 }
 
 /// Decrypt all keys using the `MDataInfo`.
-pub fn decrypt_keys(info: &MDataInfo,
-                    keys: &BTreeSet<Vec<u8>>)
-                    -> Result<BTreeSet<Vec<u8>>, CoreError> {
+pub fn decrypt_keys(
+    info: &MDataInfo,
+    keys: &BTreeSet<Vec<u8>>,
+) -> Result<BTreeSet<Vec<u8>>, CoreError> {
     let mut output = BTreeSet::new();
 
     for key in keys {
@@ -189,16 +196,16 @@ pub fn decrypt_values(info: &MDataInfo, values: &[Value]) -> Result<Vec<Value>, 
 
 fn encrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
     Ok(Value {
-           content: info.enc_entry_value(&value.content)?,
-           entry_version: value.entry_version,
-       })
+        content: info.enc_entry_value(&value.content)?,
+        entry_version: value.entry_version,
+    })
 }
 
 fn decrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
     Ok(Value {
-           content: info.decrypt(&value.content)?,
-           entry_version: value.entry_version,
-       })
+        content: info.decrypt(&value.content)?,
+        entry_version: value.entry_version,
+    })
 }
 
 #[cfg(test)]
