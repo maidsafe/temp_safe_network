@@ -25,13 +25,15 @@ use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
 
 /// Insert the file into the directory.
-pub fn insert<S, T>(client: Client<T>,
-                    parent: MDataInfo,
-                    name: S,
-                    file: &File)
-                    -> Box<NfsFuture<()>>
-    where S: AsRef<str>,
-          T: 'static
+pub fn insert<S, T>(
+    client: Client<T>,
+    parent: MDataInfo,
+    name: S,
+    file: &File,
+) -> Box<NfsFuture<()>>
+where
+    S: AsRef<str>,
+    T: 'static,
 {
     let name = name.as_ref();
     trace!("Inserting file with name '{}'", name);
@@ -39,39 +41,42 @@ pub fn insert<S, T>(client: Client<T>,
     serialise(&file)
         .map_err(From::from)
         .and_then(|encoded| {
-                      let key = parent.enc_entry_key(name.as_bytes())?;
-                      let value = parent.enc_entry_value(&encoded)?;
+            let key = parent.enc_entry_key(name.as_bytes())?;
+            let value = parent.enc_entry_value(&encoded)?;
 
-                      Ok((key, value))
-                  })
+            Ok((key, value))
+        })
         .into_future()
         .and_then(move |(key, value)| {
-                      client.mutate_mdata_entries(parent.name,
-                                                  parent.type_tag,
-                                                  EntryActions::new().ins(key, value, 0).into())
-                  })
+            client.mutate_mdata_entries(
+                parent.name,
+                parent.type_tag,
+                EntryActions::new().ins(key, value, 0).into(),
+            )
+        })
         .map_err(From::from)
         .into_box()
 }
 
 /// Gets a file from the directory
 pub fn fetch<S, T>(client: Client<T>, parent: MDataInfo, name: S) -> Box<NfsFuture<(u64, File)>>
-    where S: AsRef<str>,
-          T: 'static
+where
+    S: AsRef<str>,
+    T: 'static,
 {
     parent
         .enc_entry_key(name.as_ref().as_bytes())
         .into_future()
         .and_then(move |key| {
-                      client
-                          .get_mdata_value(parent.name, parent.type_tag, key)
-                          .map(move |value| (value, parent))
-                  })
+            client
+                .get_mdata_value(parent.name, parent.type_tag, key)
+                .map(move |value| (value, parent))
+        })
         .and_then(move |(value, parent)| {
-                      let plaintext = parent.decrypt(&value.content)?;
-                      let file = deserialise(&plaintext)?;
-                      Ok((value.entry_version, file))
-                  })
+            let plaintext = parent.decrypt(&value.content)?;
+            let file = deserialise(&plaintext)?;
+            Ok((value.entry_version, file))
+        })
         .map_err(convert_error)
         .into_box()
 }
@@ -83,13 +88,15 @@ pub fn read<T: 'static>(client: Client<T>, file: &File) -> Box<NfsFuture<Reader<
 }
 
 /// Delete a file from the Directory
-pub fn delete<S, T>(client: &Client<T>,
-                    parent: &MDataInfo,
-                    name: S,
-                    version: u64)
-                    -> Box<NfsFuture<()>>
-    where S: AsRef<str>,
-          T: 'static
+pub fn delete<S, T>(
+    client: &Client<T>,
+    parent: &MDataInfo,
+    name: S,
+    version: u64,
+) -> Box<NfsFuture<()>>
+where
+    S: AsRef<str>,
+    T: 'static,
 {
     let name = name.as_ref();
     trace!("Deleting file with name {}.", name);
@@ -97,9 +104,11 @@ pub fn delete<S, T>(client: &Client<T>,
     let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
     client
-        .mutate_mdata_entries(parent.name,
-                              parent.type_tag,
-                              EntryActions::new().del(key, version).into())
+        .mutate_mdata_entries(
+            parent.name,
+            parent.type_tag,
+            EntryActions::new().del(key, version).into(),
+        )
         .map_err(convert_error)
         .into_box()
 }
@@ -107,14 +116,16 @@ pub fn delete<S, T>(client: &Client<T>,
 /// Updates the file.
 /// If `version` is 0, the current version is first retrieved from the network,
 /// and that version incremented by one is then used as the actual version.
-pub fn update<S, T>(client: Client<T>,
-                    parent: MDataInfo,
-                    name: S,
-                    file: &File,
-                    version: u64)
-                    -> Box<NfsFuture<()>>
-    where S: AsRef<str>,
-          T: 'static
+pub fn update<S, T>(
+    client: Client<T>,
+    parent: MDataInfo,
+    name: S,
+    file: &File,
+    version: u64,
+) -> Box<NfsFuture<()>>
+where
+    S: AsRef<str>,
+    T: 'static,
 {
     let name = name.as_ref();
     trace!("Updating file with name '{}'", name);
@@ -124,27 +135,27 @@ pub fn update<S, T>(client: Client<T>,
     serialise(&file)
         .map_err(From::from)
         .and_then(|encoded| {
-                      let key = parent.enc_entry_key(name.as_bytes())?;
-                      let content = parent.enc_entry_value(&encoded)?;
+            let key = parent.enc_entry_key(name.as_bytes())?;
+            let content = parent.enc_entry_value(&encoded)?;
 
-                      Ok((key, content))
-                  })
+            Ok((key, content))
+        })
         .into_future()
         .and_then(move |(key, content)| if version != 0 {
-                      ok!((key, content, version, parent))
-                  } else {
-                      client
-                          .get_mdata_value(parent.name, parent.type_tag, key.clone())
-                          .map(move |value| (key, content, value.entry_version + 1, parent))
-                          .into_box()
-                  })
+            ok!((key, content, version, parent))
+        } else {
+            client
+                .get_mdata_value(parent.name, parent.type_tag, key.clone())
+                .map(move |value| (key, content, value.entry_version + 1, parent))
+                .into_box()
+        })
         .and_then(move |(key, content, version, parent)| {
-                      client2.mutate_mdata_entries(parent.name,
-                                                   parent.type_tag,
-                                                   EntryActions::new()
-                                                       .update(key, content, version)
-                                                       .into())
-                  })
+            client2.mutate_mdata_entries(
+                parent.name,
+                parent.type_tag,
+                EntryActions::new().update(key, content, version).into(),
+            )
+        })
         .map_err(convert_error)
         .into_box()
 }
@@ -154,14 +165,17 @@ pub fn update<S, T>(client: Client<T>,
 /// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn write<T>(client: Client<T>, file: File, mode: Mode) -> Box<NfsFuture<Writer<T>>>
-    where T: 'static
+where
+    T: 'static,
 {
     trace!("Creating a writer for a file");
 
-    Writer::new(client.clone(),
-                SelfEncryptionStorage::new(client),
-                mode,
-                file)
+    Writer::new(
+        client.clone(),
+        SelfEncryptionStorage::new(client),
+        mode,
+        file,
+    )
 }
 
 // This is different from `impl From<CoreError> for NfsError`, because it maps
@@ -193,18 +207,18 @@ mod tests {
 
         file_helper::write(client.clone(), File::new(Vec::new()), Mode::Overwrite)
             .then(move |res| {
-                      let writer = unwrap!(res);
+                let writer = unwrap!(res);
 
-                      writer
-                          .write(&[0u8; ORIG_SIZE])
-                          .and_then(move |_| writer.close())
-                  })
+                writer.write(&[0u8; ORIG_SIZE]).and_then(
+                    move |_| writer.close(),
+                )
+            })
             .then(move |res| {
-                      let file = unwrap!(res);
+                let file = unwrap!(res);
 
-                      file_helper::insert(c2, user_root.clone(), "hello.txt", &file)
-                          .map(move |_| (user_root, file))
-                  })
+                file_helper::insert(c2, user_root.clone(), "hello.txt", &file)
+                    .map(move |_| (user_root, file))
+            })
             .into_box()
     }
 
@@ -215,18 +229,18 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                          let (_dir, file) = unwrap!(res);
-                          file_helper::read(c2, &file)
-                      })
+                    let (_dir, file) = unwrap!(res);
+                    file_helper::read(c2, &file)
+                })
                 .then(|res| {
-                          let reader = unwrap!(res);
-                          let size = reader.size();
-                          println!("reading {} bytes", size);
-                          reader.read(0, size)
-                      })
+                    let reader = unwrap!(res);
+                    let size = reader.size();
+                    println!("reading {} bytes", size);
+                    reader.read(0, size)
+                })
                 .map(move |data| {
-                         assert_eq!(data, vec![0u8; 100]);
-                     })
+                    assert_eq!(data, vec![0u8; 100]);
+                })
         });
     }
 
@@ -240,42 +254,39 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                          // Updating file - full rewrite
-                          let (dir, file) = unwrap!(res);
+                    // Updating file - full rewrite
+                    let (dir, file) = unwrap!(res);
 
-                          file_helper::write(c2, file, Mode::Overwrite).map(move |writer| {
-                                                                                (writer, dir)
-                                                                            })
-                      })
+                    file_helper::write(c2, file, Mode::Overwrite).map(move |writer| (writer, dir))
+                })
                 .then(move |res| {
-                          let (writer, dir) = unwrap!(res);
-                          writer
-                              .write(&[1u8; NEW_SIZE])
-                              .and_then(move |_| writer.close())
-                              .map(move |file| (file, dir))
-                      })
+                    let (writer, dir) = unwrap!(res);
+                    writer
+                        .write(&[1u8; NEW_SIZE])
+                        .and_then(move |_| writer.close())
+                        .map(move |file| (file, dir))
+                })
                 .then(move |res| {
-                          let (file, dir) = unwrap!(res);
-                          file_helper::update(c3, dir.clone(), "hello.txt", &file, 1)
-                              .map(move |_| dir)
-                      })
+                    let (file, dir) = unwrap!(res);
+                    file_helper::update(c3, dir.clone(), "hello.txt", &file, 1).map(move |_| dir)
+                })
                 .then(move |res| {
-                          let dir = unwrap!(res);
-                          file_helper::fetch(c4, dir, "hello.txt")
-                      })
+                    let dir = unwrap!(res);
+                    file_helper::fetch(c4, dir, "hello.txt")
+                })
                 .then(move |res| {
-                          let (_version, file) = unwrap!(res);
-                          file_helper::read(c5, &file)
-                      })
+                    let (_version, file) = unwrap!(res);
+                    file_helper::read(c5, &file)
+                })
                 .then(move |res| {
-                          let reader = unwrap!(res);
-                          let size = reader.size();
-                          println!("reading {} bytes", size);
-                          reader.read(0, size)
-                      })
+                    let reader = unwrap!(res);
+                    let size = reader.size();
+                    println!("reading {} bytes", size);
+                    reader.read(0, size)
+                })
                 .map(move |data| {
-                         assert_eq!(data, vec![1u8; 50]);
-                     })
+                    assert_eq!(data, vec![1u8; 50]);
+                })
         });
     }
 
@@ -287,32 +298,32 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                          let (_dir, file) = unwrap!(res);
+                    let (_dir, file) = unwrap!(res);
 
-                          // Update - should append (after S.E behaviour changed)
-                          file_helper::write(c2, file, Mode::Append)
-                      })
+                    // Update - should append (after S.E behaviour changed)
+                    file_helper::write(c2, file, Mode::Append)
+                })
                 .then(move |res| {
-                          let writer = unwrap!(res);
-                          writer
-                              .write(&[2u8; APPEND_SIZE])
-                              .and_then(move |_| writer.close())
-                      })
+                    let writer = unwrap!(res);
+                    writer.write(&[2u8; APPEND_SIZE]).and_then(
+                        move |_| writer.close(),
+                    )
+                })
                 .then(move |res| {
-                          let file = unwrap!(res);
-                          file_helper::read(c3, &file)
-                      })
+                    let file = unwrap!(res);
+                    file_helper::read(c3, &file)
+                })
                 .then(move |res| {
-                          let reader = unwrap!(res);
-                          let size = reader.size();
-                          println!("reading {} bytes", size);
-                          reader.read(0, size)
-                      })
+                    let reader = unwrap!(res);
+                    let size = reader.size();
+                    println!("reading {} bytes", size);
+                    reader.read(0, size)
+                })
                 .map(move |data| {
-                         assert_eq!(data.len(), ORIG_SIZE + APPEND_SIZE);
-                         assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
-                         assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
-                     })
+                    assert_eq!(data.len(), ORIG_SIZE + APPEND_SIZE);
+                    assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
+                    assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
+                })
         });
     }
 
@@ -324,17 +335,17 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                          let (dir, mut file) = unwrap!(res);
-                          file.set_user_metadata(vec![12u8; 10]);
-                          file_helper::update(c2, dir, "hello.txt", &file, 1)
-                      })
+                    let (dir, mut file) = unwrap!(res);
+                    file.set_user_metadata(vec![12u8; 10]);
+                    file_helper::update(c2, dir, "hello.txt", &file, 1)
+                })
                 .then(move |res| {
-                          assert!(res.is_ok());
-                          file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
-                      })
+                    assert!(res.is_ok());
+                    file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
+                })
                 .map(move |(_version, file)| {
-                         assert_eq!(*file.user_metadata(), [12u8; 10][..]);
-                     })
+                    assert_eq!(*file.user_metadata(), [12u8; 10][..]);
+                })
         });
     }
 
@@ -346,13 +357,13 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                          let (dir, _file) = unwrap!(res);
-                          file_helper::delete(&c2, &dir, "hello.txt", 1)
-                      })
+                    let (dir, _file) = unwrap!(res);
+                    file_helper::delete(&c2, &dir, "hello.txt", 1)
+                })
                 .then(move |res| {
-                          assert!(res.is_ok());
-                          file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
-                      })
+                    assert!(res.is_ok());
+                    file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
+                })
                 .then(move |res| -> Result<_, CoreError> {
                     match res {
                         Ok(_) => {

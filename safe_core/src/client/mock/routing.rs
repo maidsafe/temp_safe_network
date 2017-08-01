@@ -73,10 +73,11 @@ pub struct Routing {
 }
 
 impl Routing {
-    pub fn new(sender: Sender<Event>,
-               id: Option<FullId>,
-               _config: Option<BootstrapConfig>)
-               -> Result<Self, RoutingError> {
+    pub fn new(
+        sender: Sender<Event>,
+        id: Option<FullId>,
+        _config: Option<BootstrapConfig>,
+    ) -> Result<Self, RoutingError> {
         ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
@@ -91,20 +92,21 @@ impl Routing {
         };
 
         Ok(Routing {
-               sender: sender,
-               full_id: id.unwrap_or_else(FullId::new),
-               client_auth: client_auth,
-               max_ops_countdown: None,
-               timeout_simulation: false,
-               rate_limit_error_count: Cell::new(0),
-           })
+            sender: sender,
+            full_id: id.unwrap_or_else(FullId::new),
+            client_auth: client_auth,
+            max_ops_countdown: None,
+            timeout_simulation: false,
+            rate_limit_error_count: Cell::new(0),
+        })
     }
 
     /// Gets MAID account information.
-    pub fn get_account_info(&mut self,
-                            dst: Authority<XorName>,
-                            msg_id: MessageId)
-                            -> Result<(), InterfaceError> {
+    pub fn get_account_info(
+        &mut self,
+        dst: Authority<XorName>,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -124,23 +126,26 @@ impl Routing {
             }
         };
 
-        self.send_response(GET_ACCOUNT_INFO_DELAY_MS,
-                           dst,
-                           self.client_auth,
-                           Response::GetAccountInfo {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            GET_ACCOUNT_INFO_DELAY_MS,
+            dst,
+            self.client_auth,
+            Response::GetAccountInfo {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
 
         Ok(())
     }
 
     /// Puts ImmutableData to the network.
-    pub fn put_idata(&mut self,
-                     dst: Authority<XorName>,
-                     data: ImmutableData,
-                     msg_id: MessageId)
-                     -> Result<(), InterfaceError> {
+    pub fn put_idata(
+        &mut self,
+        dst: Authority<XorName>,
+        data: ImmutableData,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -166,22 +171,25 @@ impl Routing {
         };
 
         let nae_auth = Authority::NaeManager(data_name);
-        self.send_response(PUT_IDATA_DELAY_MS,
-                           nae_auth,
-                           self.client_auth,
-                           Response::PutIData {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            PUT_IDATA_DELAY_MS,
+            nae_auth,
+            self.client_auth,
+            Response::PutIData {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
         Ok(())
     }
 
     /// Fetches ImmutableData from the network by the given name.
-    pub fn get_idata(&mut self,
-                     dst: Authority<XorName>,
-                     name: XorName,
-                     msg_id: MessageId)
-                     -> Result<(), InterfaceError> {
+    pub fn get_idata(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -200,23 +208,26 @@ impl Routing {
         };
 
         let nae_auth = Authority::NaeManager(name);
-        self.send_response(GET_IDATA_DELAY_MS,
-                           nae_auth,
-                           self.client_auth,
-                           Response::GetIData {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            GET_IDATA_DELAY_MS,
+            nae_auth,
+            self.client_auth,
+            Response::GetIData {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
         Ok(())
     }
 
     /// Creates a new MutableData in the network.
-    pub fn put_mdata(&mut self,
-                     dst: Authority<XorName>,
-                     data: MutableData,
-                     msg_id: MessageId,
-                     _requester: sign::PublicKey)
-                     -> Result<(), InterfaceError> {
+    pub fn put_mdata(
+        &mut self,
+        dst: Authority<XorName>,
+        data: MutableData,
+        msg_id: MessageId,
+        _requester: sign::PublicKey,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -246,32 +257,35 @@ impl Routing {
                 .authorise_mutation(&dst, self.client_key())
                 .and_then(|_| self.verify_owner(&dst, data.owners()))
                 .and_then(|_| if vault.contains_data(&data_name) {
-                              Err(ClientError::DataExists)
-                          } else {
-                              vault.insert_data(data_name, Data::Mutable(data));
-                              Ok(())
-                          })
+                    Err(ClientError::DataExists)
+                } else {
+                    vault.insert_data(data_name, Data::Mutable(data));
+                    Ok(())
+                })
                 .map(|_| vault.commit_mutation(&dst))
         };
 
         let nae_auth = Authority::NaeManager(*data_name.name());
-        self.send_response(PUT_MDATA_DELAY_MS,
-                           nae_auth,
-                           self.client_auth,
-                           Response::PutMData {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            PUT_MDATA_DELAY_MS,
+            nae_auth,
+            self.client_auth,
+            Response::PutMData {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
         Ok(())
     }
 
     /// Fetches a latest version number.
-    pub fn get_mdata_version(&mut self,
-                             dst: Authority<XorName>,
-                             name: XorName,
-                             tag: u64,
-                             msg_id: MessageId)
-                             -> Result<(), InterfaceError> {
+    pub fn get_mdata_version(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -288,34 +302,38 @@ impl Routing {
     }
 
     /// Fetches a complete MutableData object.
-    pub fn get_mdata(&mut self,
-                     dst: Authority<XorName>,
-                     name: XorName,
-                     tag: u64,
-                     msg_id: MessageId)
-                     -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        msg_id,
-                        "get_mdata",
-                        GET_MDATA_DELAY_MS,
-                        Ok,
-                        |res| {
-                            Response::GetMData {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+    pub fn get_mdata(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            msg_id,
+            "get_mdata",
+            GET_MDATA_DELAY_MS,
+            Ok,
+            |res| {
+                Response::GetMData {
+                    res: res,
+                    msg_id: msg_id,
+                }
+            },
+        )
     }
 
     /// Fetches a shell of given MutableData.
-    pub fn get_mdata_shell(&mut self,
-                           dst: Authority<XorName>,
-                           name: XorName,
-                           tag: u64,
-                           msg_id: MessageId)
-                           -> Result<(), InterfaceError> {
+    pub fn get_mdata_shell(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -332,12 +350,13 @@ impl Routing {
     }
 
     /// Fetches a list of entries (keys + values).
-    pub fn list_mdata_entries(&mut self,
-                              dst: Authority<XorName>,
-                              name: XorName,
-                              tag: u64,
-                              msg_id: MessageId)
-                              -> Result<(), InterfaceError> {
+    pub fn list_mdata_entries(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -354,12 +373,13 @@ impl Routing {
     }
 
     /// Fetches a list of keys in MutableData.
-    pub fn list_mdata_keys(&mut self,
-                           dst: Authority<XorName>,
-                           name: XorName,
-                           tag: u64,
-                           msg_id: MessageId)
-                           -> Result<(), InterfaceError> {
+    pub fn list_mdata_keys(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -379,12 +399,13 @@ impl Routing {
     }
 
     /// Fetches a list of values in MutableData.
-    pub fn list_mdata_values(&mut self,
-                             dst: Authority<XorName>,
-                             name: XorName,
-                             tag: u64,
-                             msg_id: MessageId)
-                             -> Result<(), InterfaceError> {
+    pub fn list_mdata_values(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -404,13 +425,14 @@ impl Routing {
     }
 
     /// Fetches a single value from MutableData
-    pub fn get_mdata_value(&mut self,
-                           dst: Authority<XorName>,
-                           name: XorName,
-                           tag: u64,
-                           key: Vec<u8>,
-                           msg_id: MessageId)
-                           -> Result<(), InterfaceError> {
+    pub fn get_mdata_value(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        key: Vec<u8>,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -427,14 +449,15 @@ impl Routing {
     }
 
     /// Updates MutableData entries in bulk.
-    pub fn mutate_mdata_entries(&mut self,
-                                dst: Authority<XorName>,
-                                name: XorName,
-                                tag: u64,
-                                actions: BTreeMap<Vec<u8>, EntryAction>,
-                                msg_id: MessageId,
-                                requester: sign::PublicKey)
-                                -> Result<(), InterfaceError> {
+    pub fn mutate_mdata_entries(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        actions: BTreeMap<Vec<u8>, EntryAction>,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InterfaceError> {
         self.mutate_mdata(dst,
                           name,
                           tag,
@@ -452,12 +475,13 @@ impl Routing {
     }
 
     /// Fetches a complete list of permissions.
-    pub fn list_mdata_permissions(&mut self,
-                                  dst: Authority<XorName>,
-                                  name: XorName,
-                                  tag: u64,
-                                  msg_id: MessageId)
-                                  -> Result<(), InterfaceError> {
+    pub fn list_mdata_permissions(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -474,13 +498,14 @@ impl Routing {
     }
 
     /// Fetches a list of permissions for a particular User.
-    pub fn list_mdata_user_permissions(&mut self,
-                                       dst: Authority<XorName>,
-                                       name: XorName,
-                                       tag: u64,
-                                       user: User,
-                                       msg_id: MessageId)
-                                       -> Result<(), InterfaceError> {
+    pub fn list_mdata_user_permissions(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        user: User,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.read_mdata(dst,
                         name,
                         tag,
@@ -498,16 +523,17 @@ impl Routing {
 
     /// Updates or inserts a list of permissions for a particular User in the given
     /// MutableData.
-    pub fn set_mdata_user_permissions(&mut self,
-                                      dst: Authority<XorName>,
-                                      name: XorName,
-                                      tag: u64,
-                                      user: User,
-                                      permissions: PermissionSet,
-                                      version: u64,
-                                      msg_id: MessageId,
-                                      requester: sign::PublicKey)
-                                      -> Result<(), InterfaceError> {
+    pub fn set_mdata_user_permissions(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        user: User,
+        permissions: PermissionSet,
+        version: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InterfaceError> {
         self.mutate_mdata(dst,
                           name,
                           tag,
@@ -525,15 +551,16 @@ impl Routing {
     }
 
     /// Deletes a list of permissions for a particular User in the given MutableData.
-    pub fn del_mdata_user_permissions(&mut self,
-                                      dst: Authority<XorName>,
-                                      name: XorName,
-                                      tag: u64,
-                                      user: User,
-                                      version: u64,
-                                      msg_id: MessageId,
-                                      requester: sign::PublicKey)
-                                      -> Result<(), InterfaceError> {
+    pub fn del_mdata_user_permissions(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        user: User,
+        version: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InterfaceError> {
         self.mutate_mdata(dst,
                           name,
                           tag,
@@ -551,26 +578,29 @@ impl Routing {
     }
 
     /// Changes an owner of the given MutableData. Only the current owner can perform this action.
-    pub fn change_mdata_owner(&mut self,
-                              dst: Authority<XorName>,
-                              name: XorName,
-                              tag: u64,
-                              new_owners: BTreeSet<sign::PublicKey>,
-                              version: u64,
-                              msg_id: MessageId)
-                              -> Result<(), InterfaceError> {
+    pub fn change_mdata_owner(
+        &mut self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        new_owners: BTreeSet<sign::PublicKey>,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         let new_owners_len = new_owners.len();
         let new_owner = match new_owners.into_iter().next() {
             Some(owner) if new_owners_len == 1 => owner,
             Some(_) | None => {
                 // `new_owners` must have exactly 1 element.
-                self.send_response(CHANGE_MDATA_OWNER_DELAY_MS,
-                                   dst,
-                                   self.client_auth,
-                                   Response::ChangeMDataOwner {
-                                       res: Err(ClientError::InvalidOwners),
-                                       msg_id: msg_id,
-                                   });
+                self.send_response(
+                    CHANGE_MDATA_OWNER_DELAY_MS,
+                    dst,
+                    self.client_auth,
+                    Response::ChangeMDataOwner {
+                        res: Err(ClientError::InvalidOwners),
+                        msg_id: msg_id,
+                    },
+                );
                 return Ok(());
             }
         };
@@ -613,48 +643,52 @@ impl Routing {
     }
 
     /// Fetches a list of authorised keys and version in MaidManager
-    pub fn list_auth_keys_and_version(&mut self,
-                                      dst: Authority<XorName>,
-                                      msg_id: MessageId)
-                                      -> Result<(), InterfaceError> {
+    pub fn list_auth_keys_and_version(
+        &mut self,
+        dst: Authority<XorName>,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
-        let res = if let Err(err) =
-            self.verify_network_limits(msg_id, "list_auth_keys_and_version") {
-            Err(err)
-        } else {
-            let name = match dst {
-                Authority::ClientManager(name) => name,
-                x => panic!("Unexpected authority: {:?}", x),
+        let res =
+            if let Err(err) = self.verify_network_limits(msg_id, "list_auth_keys_and_version") {
+                Err(err)
+            } else {
+                let name = match dst {
+                    Authority::ClientManager(name) => name,
+                    x => panic!("Unexpected authority: {:?}", x),
+                };
+
+                let vault = lock_vault(false);
+                if let Some(account) = vault.get_account(&name) {
+                    Ok((account.auth_keys().clone(), account.version()))
+                } else {
+                    Err(ClientError::NoSuchAccount)
+                }
             };
 
-            let vault = lock_vault(false);
-            if let Some(account) = vault.get_account(&name) {
-                Ok((account.auth_keys().clone(), account.version()))
-            } else {
-                Err(ClientError::NoSuchAccount)
-            }
-        };
-
-        self.send_response(LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
-                           dst,
-                           self.client_auth,
-                           Response::ListAuthKeysAndVersion {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
+            dst,
+            self.client_auth,
+            Response::ListAuthKeysAndVersion {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
         Ok(())
     }
 
     /// Adds a new authorised key to MaidManager
-    pub fn ins_auth_key(&mut self,
-                        dst: Authority<XorName>,
-                        key: sign::PublicKey,
-                        version: u64,
-                        msg_id: MessageId)
-                        -> Result<(), InterfaceError> {
+    pub fn ins_auth_key(
+        &mut self,
+        dst: Authority<XorName>,
+        key: sign::PublicKey,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -676,23 +710,26 @@ impl Routing {
         };
 
 
-        self.send_response(INS_AUTH_KEY_DELAY_MS,
-                           dst,
-                           self.client_auth,
-                           Response::InsAuthKey {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            INS_AUTH_KEY_DELAY_MS,
+            dst,
+            self.client_auth,
+            Response::InsAuthKey {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
         Ok(())
     }
 
     /// Removes an authorised key from MaidManager
-    pub fn del_auth_key(&mut self,
-                        dst: Authority<XorName>,
-                        key: sign::PublicKey,
-                        version: u64,
-                        msg_id: MessageId)
-                        -> Result<(), InterfaceError> {
+    pub fn del_auth_key(
+        &mut self,
+        dst: Authority<XorName>,
+        key: sign::PublicKey,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -713,21 +750,25 @@ impl Routing {
             }
         };
 
-        self.send_response(DEL_AUTH_KEY_DELAY_MS,
-                           dst,
-                           self.client_auth,
-                           Response::DelAuthKey {
-                               res: res,
-                               msg_id: msg_id,
-                           });
+        self.send_response(
+            DEL_AUTH_KEY_DELAY_MS,
+            dst,
+            self.client_auth,
+            Response::DelAuthKey {
+                res: res,
+                msg_id: msg_id,
+            },
+        );
         Ok(())
     }
 
-    fn send_response(&self,
-                     delay_ms: u64,
-                     src: Authority<XorName>,
-                     dst: Authority<XorName>,
-                     response: Response) {
+    fn send_response(
+        &self,
+        delay_ms: u64,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        response: Response,
+    ) {
         let event = Event::Response {
             response: response,
             src: src,
@@ -758,46 +799,52 @@ impl Routing {
         }
     }
 
-    fn read_mdata<F, G, R>(&self,
-                           dst: Authority<XorName>,
-                           name: XorName,
-                           tag: u64,
-                           msg_id: MessageId,
-                           log_label: &str,
-                           delay_ms: u64,
-                           f: F,
-                           g: G)
-                           -> Result<(), InterfaceError>
-        where F: FnOnce(MutableData) -> Result<R, ClientError>,
-              G: FnOnce(Result<R, ClientError>) -> Response
+    fn read_mdata<F, G, R>(
+        &self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+        log_label: &str,
+        delay_ms: u64,
+        f: F,
+        g: G,
+    ) -> Result<(), InterfaceError>
+    where
+        F: FnOnce(MutableData) -> Result<R, ClientError>,
+        G: FnOnce(Result<R, ClientError>) -> Response,
     {
-        self.with_mdata(name,
-                        tag,
-                        msg_id,
-                        None,
-                        log_label,
-                        delay_ms,
-                        false,
-                        |data, vault| {
-                            vault.authorise_read(&dst, &name)?;
-                            f(data)
-                        },
-                        g)
+        self.with_mdata(
+            name,
+            tag,
+            msg_id,
+            None,
+            log_label,
+            delay_ms,
+            false,
+            |data, vault| {
+                vault.authorise_read(&dst, &name)?;
+                f(data)
+            },
+            g,
+        )
     }
 
-    fn mutate_mdata<F, G, R>(&self,
-                             dst: Authority<XorName>,
-                             name: XorName,
-                             tag: u64,
-                             msg_id: MessageId,
-                             requester: sign::PublicKey,
-                             log_label: &str,
-                             delay_ms: u64,
-                             f: F,
-                             g: G)
-                             -> Result<(), InterfaceError>
-        where F: FnOnce(&mut MutableData) -> Result<R, ClientError>,
-              G: FnOnce(Result<R, ClientError>) -> Response
+    fn mutate_mdata<F, G, R>(
+        &self,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+        log_label: &str,
+        delay_ms: u64,
+        f: F,
+        g: G,
+    ) -> Result<(), InterfaceError>
+    where
+        F: FnOnce(&mut MutableData) -> Result<R, ClientError>,
+        G: FnOnce(Result<R, ClientError>) -> Response,
     {
         let mutate = |mut data: MutableData, vault: &mut Vault| {
             vault.authorise_mutation(&dst, self.client_key())?;
@@ -809,30 +856,34 @@ impl Routing {
             Ok(output)
         };
 
-        self.with_mdata(name,
-                        tag,
-                        msg_id,
-                        Some(requester),
-                        log_label,
-                        delay_ms,
-                        true,
-                        mutate,
-                        g)
+        self.with_mdata(
+            name,
+            tag,
+            msg_id,
+            Some(requester),
+            log_label,
+            delay_ms,
+            true,
+            mutate,
+            g,
+        )
     }
 
-    fn with_mdata<F, G, R>(&self,
-                           name: XorName,
-                           tag: u64,
-                           msg_id: MessageId,
-                           requester: Option<sign::PublicKey>,
-                           log_label: &str,
-                           delay_ms: u64,
-                           write: bool,
-                           f: F,
-                           g: G)
-                           -> Result<(), InterfaceError>
-        where F: FnOnce(MutableData, &mut Vault) -> Result<R, ClientError>,
-              G: FnOnce(Result<R, ClientError>) -> Response
+    fn with_mdata<F, G, R>(
+        &self,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+        requester: Option<sign::PublicKey>,
+        log_label: &str,
+        delay_ms: u64,
+        write: bool,
+        f: F,
+        g: G,
+    ) -> Result<(), InterfaceError>
+    where
+        F: FnOnce(MutableData, &mut Vault) -> Result<R, ClientError>,
+        G: FnOnce(Result<R, ClientError>) -> Response,
     {
         if self.simulate_network_errors(msg_id) {
             return Ok(());
@@ -861,21 +912,20 @@ impl Routing {
         Ok(())
     }
 
-    fn verify_owner(&self,
-                    dst: &Authority<XorName>,
-                    owner_keys: &BTreeSet<sign::PublicKey>)
-                    -> Result<(), ClientError> {
+    fn verify_owner(
+        &self,
+        dst: &Authority<XorName>,
+        owner_keys: &BTreeSet<sign::PublicKey>,
+    ) -> Result<(), ClientError> {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
             _ => return Err(ClientError::InvalidOwners),
         };
 
-        let ok = owner_keys
-            .iter()
-            .any(|owner_key| {
-                     let owner_name = XorName(sha3_256(&owner_key.0));
-                     owner_name == dst_name
-                 });
+        let ok = owner_keys.iter().any(|owner_key| {
+            let owner_name = XorName(sha3_256(&owner_key.0));
+            owner_name == dst_name
+        });
 
         if ok {
             Ok(())
@@ -906,7 +956,9 @@ impl Routing {
 
         if self.network_limits_reached() {
             info!("Mock {}: {:?} {:?} [0]", op, client_name, msg_id);
-            Err(ClientError::NetworkOther("Max operations exhausted".to_string()))
+            Err(ClientError::NetworkOther(
+                "Max operations exhausted".to_string(),
+            ))
         } else {
             if let Some(count) = self.update_network_limits() {
                 info!("Mock {}: {:?} {:?} [{}]", op, client_name, msg_id, count);
@@ -917,19 +969,18 @@ impl Routing {
     }
 
     fn network_limits_reached(&self) -> bool {
-        self.max_ops_countdown
-            .as_ref()
-            .map_or(false, |count| count.get() == 0)
+        self.max_ops_countdown.as_ref().map_or(
+            false,
+            |count| count.get() == 0,
+        )
     }
 
     fn update_network_limits(&self) -> Option<u64> {
-        self.max_ops_countdown
-            .as_ref()
-            .map(|count| {
-                     let ops = count.get();
-                     count.set(ops - 1);
-                     ops
-                 })
+        self.max_ops_countdown.as_ref().map(|count| {
+            let ops = count.get();
+            count.set(ops - 1);
+            ops
+        })
     }
 
     fn simulate_network_errors(&self, msg_id: MessageId) -> bool {
@@ -938,8 +989,10 @@ impl Routing {
         }
 
         if self.rate_limit_error_count.get() > 0 {
-            self.rate_limit_error_count
-                .set(self.rate_limit_error_count.get() - 1);
+            self.rate_limit_error_count.set(
+                self.rate_limit_error_count
+                    .get() - 1,
+            );
             self.send_event(0, Event::ProxyRateLimitExceeded(msg_id));
             return true;
         }

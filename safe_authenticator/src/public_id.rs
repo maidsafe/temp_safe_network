@@ -28,9 +28,10 @@ const PUBLIC_ID_USER_ROOT_ENTRY_KEY: &'static [u8] = b"_publicId";
 const PUBLIC_ID_CONFIG_ROOT_ENTRY_KEY: &'static [u8] = b"public-id";
 
 /// Create mutable data for Public ID.
-pub fn create<S: Into<String>, T: 'static>(client: &Client<T>,
-                                           public_id: S)
-                                           -> Box<AuthFuture<()>> {
+pub fn create<S: Into<String>, T: 'static>(
+    client: &Client<T>,
+    public_id: S,
+) -> Box<AuthFuture<()>> {
     // TODO: This could be optimized by executing the operations in parallel.
     // The operations to parallelise are:
     //     1. Insert the Public ID mdata info into the user root.
@@ -127,28 +128,29 @@ pub fn get<T: 'static>(client: &Client<T>) -> Box<AuthFuture<String>> {
     client
         .config_root_dir()
         .and_then(|config_root_dir| {
-                      let key = config_root_dir
-                          .enc_entry_key(PUBLIC_ID_CONFIG_ROOT_ENTRY_KEY)?;
-                      Ok((config_root_dir, key))
-                  })
+            let key = config_root_dir.enc_entry_key(
+                PUBLIC_ID_CONFIG_ROOT_ENTRY_KEY,
+            )?;
+            Ok((config_root_dir, key))
+        })
         .map_err(AuthError::from)
         .into_future()
         .and_then(move |(config_root_dir, key)| {
             client
                 .get_mdata_value(config_root_dir.name, config_root_dir.type_tag, key)
                 .map_err(|err| match err {
-                             CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
-                                 AuthError::NoSuchPublicId
-                             }
-                             _ => AuthError::from(err),
-                         })
+                    CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
+                        AuthError::NoSuchPublicId
+                    }
+                    _ => AuthError::from(err),
+                })
                 .map(move |value| (config_root_dir, value))
         })
         .and_then(|(config_root_dir, value)| {
-                      let value = config_root_dir.decrypt(&value.content)?;
-                      let value = String::from_utf8(value)?;
+            let value = config_root_dir.decrypt(&value.content)?;
+            let value = String::from_utf8(value)?;
 
-                      Ok(value)
-                  })
+            Ok(value)
+        })
         .into_box()
 }

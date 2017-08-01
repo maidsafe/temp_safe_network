@@ -118,16 +118,21 @@ fn main() {
     let (core_tx, core_rx) = mpsc::unbounded();
     let (net_tx, net_rx) = mpsc::unbounded();
 
-    let net_fut = net_rx
-        .for_each(move |_net_event| Ok(()))
-        .map_err(|e| panic!("Network event stream error: {:?}", e));
+    let net_fut = net_rx.for_each(move |_net_event| Ok(())).map_err(|e| {
+        panic!("Network event stream error: {:?}", e)
+    });
     el_h.spawn(net_fut);
 
     let core_tx_clone = core_tx.clone();
 
     // Check a single invite
     if let Some(invite) = args.flag_check_invite {
-        let cl = unwrap!(Client::unregistered(el_h, core_tx.clone(), net_tx.clone(), None));
+        let cl = unwrap!(Client::unregistered(
+            el_h,
+            core_tx.clone(),
+            net_tx.clone(),
+            None,
+        ));
 
         unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
             let id = XorName(sha3_256(invite.as_bytes()));
@@ -162,14 +167,18 @@ fn main() {
     let flag_create = args.flag_create;
 
     let cl = unwrap!(if flag_create {
-                         println!("\nTrying to create an account \
-                                   using given seed from file...");
-                         Client::registered_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
-                     } else {
-                         println!("\nTrying to log into the created \
-                                   account using given seed from file...");
-                         Client::login_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
-                     });
+        println!(
+            "\nTrying to create an account \
+                                   using given seed from file..."
+        );
+        Client::registered_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
+    } else {
+        println!(
+            "\nTrying to log into the created \
+                                   account using given seed from file..."
+        );
+        Client::login_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
+    });
 
     unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
         println!("Success !");

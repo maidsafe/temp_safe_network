@@ -40,9 +40,11 @@ pub struct AuthGranted {
 impl Drop for AuthGranted {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(self.bootstrap_config_ptr,
-                                        self.bootstrap_config_len,
-                                        self.bootstrap_config_cap);
+            let _ = Vec::from_raw_parts(
+                self.bootstrap_config_ptr,
+                self.bootstrap_config_len,
+                self.bootstrap_config_cap,
+            );
         }
     }
 }

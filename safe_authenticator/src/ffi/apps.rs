@@ -49,19 +49,23 @@ pub struct RegisteredApp {
 impl Drop for RegisteredApp {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(self.containers as *mut ContainerPermissions,
-                                        self.containers_len,
-                                        self.containers_cap);
+            let _ = Vec::from_raw_parts(
+                self.containers as *mut ContainerPermissions,
+                self.containers_len,
+                self.containers_cap,
+            );
         }
     }
 }
 
 /// Removes a revoked app from the authenticator config
 #[no_mangle]
-pub unsafe extern "C" fn auth_rm_revoked_app(auth: *const Authenticator,
-                                             app_id: *const c_char,
-                                             user_data: *mut c_void,
-                                             o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn auth_rm_revoked_app(
+    auth: *const Authenticator,
+    app_id: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
 
     let user_data = OpaqueCtx(user_data);
 
@@ -77,31 +81,30 @@ pub unsafe extern "C" fn auth_rm_revoked_app(auth: *const Authenticator,
 
             get_config(client)
                 .and_then(move |(cfg_version, auth_cfg)| {
-                              app_state(&c2, &auth_cfg, app_id).map(move |app_state| {
-                                                                        (app_state,
-                                                                         auth_cfg,
-                                                                         cfg_version)
-                                                                    })
-                          })
+                    app_state(&c2, &auth_cfg, app_id).map(move |app_state| {
+                        (app_state, auth_cfg, cfg_version)
+                    })
+                })
                 .and_then(move |(app_state, auth_cfg, cfg_version)| match app_state {
-                              AppState::Revoked => Ok((auth_cfg, cfg_version)),
-                              AppState::Authenticated => Err(AuthError::from("App is not revoked")),
-                              AppState::NotAuthenticated => {
-                                  Err(AuthError::IpcError(IpcError::UnknownApp))
-                              }
-                          })
+                    AppState::Revoked => Ok((auth_cfg, cfg_version)),
+                    AppState::Authenticated => Err(AuthError::from("App is not revoked")),
+                    AppState::NotAuthenticated => Err(AuthError::IpcError(IpcError::UnknownApp)),
+                })
                 .and_then(move |(mut auth_cfg, cfg_version)| {
-                              let _app = fry!(auth_cfg.remove(&app_id_hash)
-                        .ok_or_else(|| AuthError::from("Logical error: app isn't found in \
-                                                        authenticator config")));
+                    let _app = fry!(auth_cfg.remove(&app_id_hash).ok_or_else(|| {
+                        AuthError::from(
+                            "Logical error: app isn't found in \
+                                                        authenticator config",
+                        )
+                    }));
 
-                              update_config(&c3, Some(cfg_version + 1), &auth_cfg)
-                          })
+                    update_config(&c3, Some(cfg_version + 1), &auth_cfg)
+                })
                 .and_then(move |_| remove_app_container(c4, &app_id2))
                 .then(move |res| {
-                          call_result_cb!(res, user_data, o_cb);
-                          Ok(())
-                      })
+                    call_result_cb!(res, user_data, o_cb);
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -109,62 +112,56 @@ pub unsafe extern "C" fn auth_rm_revoked_app(auth: *const Authenticator,
 }
 
 /// Get a list of apps revoked from authenticator
-pub unsafe extern "C" fn auth_revoked_apps(auth: *const Authenticator,
-                                           user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void,
-                                                               FfiResult,
-                                                               *const ffi::AppExchangeInfo,
-                                                               usize)) {
+pub unsafe extern "C" fn auth_revoked_apps(
+    auth: *const Authenticator,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::AppExchangeInfo, usize),
+) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
-        (*auth)
-            .send(move |client| {
-                let c2 = client.clone();
-                let c3 = client.clone();
+        (*auth).send(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-                get_config(client)
-                    .and_then(move |(_, auth_cfg)| {
-                                  access_container(&c2).map(move |access_container| {
-                                                                (access_container, auth_cfg)
-                                                            })
-                              })
-                    .and_then(move |(access_container, auth_cfg)| {
-                                  c3.list_mdata_entries(access_container.name,
-                                                        access_container.type_tag)
-                                      .map_err(From::from)
-                                      .map(move |entries| (access_container, entries, auth_cfg))
-                              })
-                    .and_then(move |(access_container, entries, auth_cfg)| {
-                        let mut apps = Vec::new();
+            get_config(client)
+                .and_then(move |(_, auth_cfg)| {
+                    access_container(&c2).map(move |access_container| (access_container, auth_cfg))
+                })
+                .and_then(move |(access_container, auth_cfg)| {
+                    c3.list_mdata_entries(access_container.name, access_container.type_tag)
+                        .map_err(From::from)
+                        .map(move |entries| (access_container, entries, auth_cfg))
+                })
+                .and_then(move |(access_container, entries, auth_cfg)| {
+                    let mut apps = Vec::new();
 
-                        for app in auth_cfg.values() {
-                            let nonce = access_container_nonce(&access_container)?;
-                            let key =
-                                access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
+                    for app in auth_cfg.values() {
+                        let nonce = access_container_nonce(&access_container)?;
+                        let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
-                            // If the app is not in the access container, or if the app entry has
-                            // been deleted (is empty), then it's revoked.
-                            let revoked = entries
-                                .get(&key)
-                                .map(|entry| entry.content.is_empty())
-                                .unwrap_or(true);
+                        // If the app is not in the access container, or if the app entry has
+                        // been deleted (is empty), then it's revoked.
+                        let revoked = entries
+                            .get(&key)
+                            .map(|entry| entry.content.is_empty())
+                            .unwrap_or(true);
 
-                            if revoked {
-                                apps.push(app.info.clone().into_repr_c()?);
-                            }
+                        if revoked {
+                            apps.push(app.info.clone().into_repr_c()?);
                         }
+                    }
 
-                        o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+                    o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
-                        Ok(())
-                    })
-                    .map_err(move |e| {
-                                 call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                             })
-                    .into_box()
-                    .into()
-            })?;
+                    Ok(())
+                })
+                .map_err(move |e| {
+                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })?;
 
         Ok(())
     })
@@ -172,87 +169,80 @@ pub unsafe extern "C" fn auth_revoked_apps(auth: *const Authenticator,
 
 /// Get a list of apps registered in authenticator
 #[no_mangle]
-pub unsafe extern "C" fn auth_registered_apps(auth: *const Authenticator,
-                                              user_data: *mut c_void,
-                                              o_cb: extern "C" fn(*mut c_void,
-                                                                  FfiResult,
-                                                                  *const RegisteredApp,
-                                                                  usize)) {
+pub unsafe extern "C" fn auth_registered_apps(
+    auth: *const Authenticator,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const RegisteredApp, usize),
+) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
-        (*auth)
-            .send(move |client| {
-                let c2 = client.clone();
-                let c3 = client.clone();
+        (*auth).send(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-                get_config(client)
-                    .and_then(move |(_, auth_cfg)| {
-                                  access_container(&c2).map(move |access_container| {
-                                                                (access_container, auth_cfg)
-                                                            })
-                              })
-                    .and_then(move |(access_container, auth_cfg)| {
-                                  c3.list_mdata_entries(access_container.name,
-                                                        access_container.type_tag)
-                                      .map_err(From::from)
-                                      .map(move |entries| (access_container, entries, auth_cfg))
-                              })
-                    .and_then(move |(access_container, entries, auth_cfg)| {
-                        let mut apps = Vec::new();
+            get_config(client)
+                .and_then(move |(_, auth_cfg)| {
+                    access_container(&c2).map(move |access_container| (access_container, auth_cfg))
+                })
+                .and_then(move |(access_container, auth_cfg)| {
+                    c3.list_mdata_entries(access_container.name, access_container.type_tag)
+                        .map_err(From::from)
+                        .map(move |entries| (access_container, entries, auth_cfg))
+                })
+                .and_then(move |(access_container, entries, auth_cfg)| {
+                    let mut apps = Vec::new();
 
-                        for app in auth_cfg.values() {
-                            let nonce = access_container_nonce(&access_container)?;
-                            let key =
-                                access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
+                    for app in auth_cfg.values() {
+                        let nonce = access_container_nonce(&access_container)?;
+                        let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
-                            // Empty entry means it has been deleted.
-                            let entry = match entries.get(&key) {
-                                Some(entry) if !entry.content.is_empty() => Some(entry),
-                                _ => None,
+                        // Empty entry means it has been deleted.
+                        let entry = match entries.get(&key) {
+                            Some(entry) if !entry.content.is_empty() => Some(entry),
+                            _ => None,
+                        };
+
+                        if let Some(entry) = entry {
+                            let plaintext = symmetric_decrypt(&entry.content, &app.keys.enc_key)?;
+                            let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
+
+                            let mut containers = Vec::new();
+
+                            for (key, (_, perms)) in app_access {
+                                let perms = perms.iter().cloned().collect::<Vec<_>>();
+                                let (access_ptr, len, cap) = vec_into_raw_parts(perms);
+
+                                containers.push(ContainerPermissions {
+                                    cont_name: CString::new(key)?.into_raw(),
+                                    access: access_ptr,
+                                    access_len: len,
+                                    access_cap: cap,
+                                });
+                            }
+
+                            let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
+                            let reg_app = RegisteredApp {
+                                app_info: app.info.clone().into_repr_c()?,
+                                containers: containers_ptr,
+                                containers_len: len,
+                                containers_cap: cap,
                             };
 
-                            if let Some(entry) = entry {
-                                let plaintext = symmetric_decrypt(&entry.content,
-                                                                  &app.keys.enc_key)?;
-                                let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
-
-                                let mut containers = Vec::new();
-
-                                for (key, (_, perms)) in app_access {
-                                    let perms = perms.iter().cloned().collect::<Vec<_>>();
-                                    let (access_ptr, len, cap) = vec_into_raw_parts(perms);
-
-                                    containers.push(ContainerPermissions {
-                                                        cont_name: CString::new(key)?.into_raw(),
-                                                        access: access_ptr,
-                                                        access_len: len,
-                                                        access_cap: cap,
-                                                    });
-                                }
-
-                                let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
-                                let reg_app = RegisteredApp {
-                                    app_info: app.info.clone().into_repr_c()?,
-                                    containers: containers_ptr,
-                                    containers_len: len,
-                                    containers_cap: cap,
-                                };
-
-                                apps.push(reg_app);
-                            }
+                            apps.push(reg_app);
                         }
+                    }
 
-                        o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+                    o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
-                        Ok(())
-                    })
-                    .map_err(move |e| {
-                                 call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                             })
-                    .into_box()
-                    .into()
-            })?;
+                    Ok(())
+                })
+                .map_err(move |e| {
+                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })?;
 
         Ok(())
     })

@@ -39,8 +39,13 @@ fn md_created_by_app_1() {
 
         let owners = btree_set![unwrap!(client.public_signing_key())];
         let name: XorName = rng.gen();
-        let mdata =
-            unwrap!(MutableData::new(name, DIR_TAG, BTreeMap::new(), BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(
+            name,
+            DIR_TAG,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            owners,
+        ));
         let cl2 = client.clone();
         client
             .put_mdata(mdata)
@@ -52,11 +57,13 @@ fn md_created_by_app_1() {
                 }
                 let mut owners = BTreeSet::new();
                 owners.insert(unwrap!(cl2.owner_key()));
-                let mdata = unwrap!(MutableData::new(name,
-                                                     DIR_TAG,
-                                                     BTreeMap::new(),
-                                                     BTreeMap::new(),
-                                                     owners));
+                let mdata = unwrap!(MutableData::new(
+                    name,
+                    DIR_TAG,
+                    BTreeMap::new(),
+                    BTreeMap::new(),
+                    owners,
+                ));
                 cl2.put_mdata(mdata)
             })
             .map_err(|e| panic!("{:?}", e))
@@ -79,21 +86,29 @@ fn md_created_by_app_2() {
         let sign_pk = unwrap!(client.public_signing_key());
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk),
-                                   PermissionSet::new().allow(Action::ManagePermissions));
+        let _ = permissions.insert(
+            User::Key(sign_pk),
+            PermissionSet::new().allow(Action::ManagePermissions),
+        );
 
         let owners = btree_set![unwrap!(client.owner_key())];
 
         let name: XorName = rng.gen();
-        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(
+            name,
+            DIR_TAG,
+            permissions,
+            BTreeMap::new(),
+            owners,
+        ));
         let name2 = name;
         let cl2 = client.clone();
         client
             .put_mdata(mdata)
             .then(move |res| {
-                      unwrap!(res);
-                      cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 1)
-                  })
+                unwrap!(res);
+                cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 1)
+            })
             .then(move |res| -> Result<_, ()> {
                 match res {
                     Ok(()) => panic!("It should fail"),
@@ -114,13 +129,13 @@ fn md_created_by_app_2() {
             client
                 .list_auth_keys_and_version()
                 .then(move |res| {
-                          let (_, version) = unwrap!(res);
-                          cl2.ins_auth_key(sign_pk, version + 1)
-                      })
+                    let (_, version) = unwrap!(res);
+                    cl2.ins_auth_key(sign_pk, version + 1)
+                })
                 .then(move |res| {
-                          unwrap!(res);
-                          cl3.change_mdata_owner(name, DIR_TAG, sign_pk, 1)
-                      })
+                    unwrap!(res);
+                    cl3.change_mdata_owner(name, DIR_TAG, sign_pk, 1)
+                })
                 .then(move |res| -> Result<(), ()> {
                     match res {
                         Ok(()) => panic!("It should fail"),
@@ -150,11 +165,13 @@ fn md_created_by_app_3() {
         unwrap!(app_sign_pk_tx.send(sign_pk));
         let name: XorName = unwrap!(name_rx.recv());
         let mut actions = BTreeMap::new();
-        let _ = actions.insert(vec![1, 2, 3, 4],
-                               EntryAction::Ins(Value {
-                                                    content: vec![2, 3, 5],
-                                                    entry_version: 1,
-                                                }));
+        let _ = actions.insert(
+            vec![1, 2, 3, 4],
+            EntryAction::Ins(Value {
+                content: vec![2, 3, 5],
+                entry_version: 1,
+            }),
+        );
         let cl2 = client.clone();
         let cl3 = client.clone();
         let name2 = name;
@@ -163,11 +180,13 @@ fn md_created_by_app_3() {
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![1, 2, 3, 4],
-                                       EntryAction::Update(Value {
-                                                               content: vec![2, 8, 5],
-                                                               entry_version: 2,
-                                                           }));
+                let _ = actions.insert(
+                    vec![1, 2, 3, 4],
+                    EntryAction::Update(Value {
+                        content: vec![2, 8, 5],
+                        entry_version: 2,
+                    }),
+                );
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
@@ -198,16 +217,23 @@ fn md_created_by_app_3() {
             let mut rng = unwrap!(OsRng::new());
 
             let mut permissions = BTreeMap::new();
-            let _ = permissions.insert(User::Key(app_sign_pk),
-                                       PermissionSet::new().allow(Action::Insert));
+            let _ = permissions.insert(
+                User::Key(app_sign_pk),
+                PermissionSet::new().allow(Action::Insert),
+            );
 
             let mut owners = BTreeSet::new();
             owners.insert(unwrap!(client.owner_key()));
 
             let name: XorName = rng.gen();
 
-            let mdata =
-                unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
+            let mdata = unwrap!(MutableData::new(
+                name,
+                DIR_TAG,
+                permissions,
+                BTreeMap::new(),
+                owners,
+            ));
             let cl2 = client.clone();
             let cl3 = client.clone();
 
@@ -244,11 +270,13 @@ fn md_created_by_app_4() {
         unwrap!(app_sign_pk_tx.send(sign_pk));
         let name: XorName = unwrap!(name_rx.recv());
         let mut actions = BTreeMap::new();
-        let _ = actions.insert(vec![1, 2, 3, 4],
-                               EntryAction::Ins(Value {
-                                                    content: vec![2, 3, 5],
-                                                    entry_version: 1,
-                                                }));
+        let _ = actions.insert(
+            vec![1, 2, 3, 4],
+            EntryAction::Ins(Value {
+                content: vec![2, 3, 5],
+                entry_version: 1,
+            }),
+        );
         let cl2 = client.clone();
         let cl3 = client.clone();
         let cl4 = client.clone();
@@ -326,16 +354,19 @@ fn md_created_by_app_4() {
             let mut rng = unwrap!(OsRng::new());
 
             let mut permissions = BTreeMap::new();
-            let _ =
-                permissions.insert(User::Key(app_sign_pk),
-                                   PermissionSet::new().allow(Action::ManagePermissions));
+            let _ = permissions.insert(
+                User::Key(app_sign_pk),
+                PermissionSet::new().allow(Action::ManagePermissions),
+            );
 
             let mut data = BTreeMap::new();
-            let _ = data.insert(vec![1, 8, 3, 4],
-                                Value {
-                                    content: vec![1],
-                                    entry_version: 1,
-                                });
+            let _ = data.insert(
+                vec![1, 8, 3, 4],
+                Value {
+                    content: vec![1],
+                    entry_version: 1,
+                },
+            );
 
             let mut owners = BTreeSet::new();
             owners.insert(unwrap!(client.owner_key()));
@@ -384,14 +415,22 @@ fn multiple_apps() {
 
         let mut permissions = BTreeMap::new();
         let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
-        let _ = permissions.insert(User::Key(sign_pk),
-                                   PermissionSet::new().allow(Action::ManagePermissions));
+        let _ = permissions.insert(
+            User::Key(sign_pk),
+            PermissionSet::new().allow(Action::ManagePermissions),
+        );
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(
+            name,
+            DIR_TAG,
+            permissions,
+            BTreeMap::new(),
+            owners,
+        ));
         let cl2 = client.clone();
         let cl3 = client.clone();
         let cl4 = client.clone();
@@ -400,36 +439,40 @@ fn multiple_apps() {
         client
             .put_mdata(mdata)
             .then(move |res| {
-                      unwrap!(res);
-                      unwrap!(name_tx.send(name));
-                      let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
-                      cl2.get_mdata_value(name, DIR_TAG, entry_key.clone())
-                          .map(move |v| (v, entry_key))
-                  })
+                unwrap!(res);
+                unwrap!(name_tx.send(name));
+                let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
+                cl2.get_mdata_value(name, DIR_TAG, entry_key.clone()).map(
+                    move |v| (v, entry_key),
+                )
+            })
             .then(move |res| {
                 let (value, entry_key) = unwrap!(res);
-                assert_eq!(value,
-                           Value {
-                               content: vec![8],
-                               entry_version: 1,
-                           });
+                assert_eq!(
+                    value,
+                    Value {
+                        content: vec![8],
+                        entry_version: 1,
+                    }
+                );
                 cl3.del_mdata_user_permissions(name2, DIR_TAG, User::Anyone, 1)
                     .map(move |()| entry_key)
             })
             .then(move |res| {
-                      let entry_key = unwrap!(res);
-                      unwrap!(mutate_again_tx.send(()));
-                      unwrap!(final_check_rx.recv());
-                      cl4.list_mdata_keys(name3, DIR_TAG)
-                          .map(move |x| (x, entry_key))
-                  })
+                let entry_key = unwrap!(res);
+                unwrap!(mutate_again_tx.send(()));
+                unwrap!(final_check_rx.recv());
+                cl4.list_mdata_keys(name3, DIR_TAG).map(
+                    move |x| (x, entry_key),
+                )
+            })
             .then(move |res| -> Result<_, ()> {
-                      let (keys, entry_key) = unwrap!(res);
-                      assert_eq!(keys.len(), 1);
-                      assert!(keys.contains(&entry_key));
-                      unwrap!(tx.send(()));
-                      Ok(())
-                  })
+                let (keys, entry_key) = unwrap!(res);
+                assert_eq!(keys.len(), 1);
+                assert!(keys.contains(&entry_key));
+                unwrap!(tx.send(()));
+                Ok(())
+            })
             .into_box()
             .into()
     }));
@@ -438,11 +481,13 @@ fn multiple_apps() {
         let entry_key = vec![1, 2, 3];
 
         let mut actions = BTreeMap::new();
-        let _ = actions.insert(entry_key.clone(),
-                               EntryAction::Ins(Value {
-                                                    content: vec![8],
-                                                    entry_version: 1,
-                                                }));
+        let _ = actions.insert(
+            entry_key.clone(),
+            EntryAction::Ins(Value {
+                content: vec![8],
+                entry_version: 1,
+            }),
+        );
 
         let cl2 = client.clone();
         client
@@ -453,11 +498,13 @@ fn multiple_apps() {
                 unwrap!(mutate_again_rx.recv());
 
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![2, 2, 2],
-                                       EntryAction::Ins(Value {
-                                                            content: vec![21],
-                                                            entry_version: 1,
-                                                        }));
+                let _ = actions.insert(
+                    vec![2, 2, 2],
+                    EntryAction::Ins(Value {
+                        content: vec![21],
+                        entry_version: 1,
+                    }),
+                );
 
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
@@ -494,14 +541,22 @@ fn permissions_and_version() {
         let (random_key, _) = sign::gen_keypair();
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk),
-                                   PermissionSet::new().allow(Action::ManagePermissions));
+        let _ = permissions.insert(
+            User::Key(sign_pk),
+            PermissionSet::new().allow(Action::ManagePermissions),
+        );
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(
+            name,
+            DIR_TAG,
+            permissions,
+            BTreeMap::new(),
+            owners,
+        ));
         let cl2 = client.clone();
         let cl3 = client.clone();
         let cl4 = client.clone();
@@ -516,69 +571,86 @@ fn permissions_and_version() {
                 cl2.set_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), permissions, 1)
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl3.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), 1)
-                  })
+                unwrap!(res);
+                cl3.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), 1)
+            })
             .then(move |res| {
-                      match res {
-                          Ok(()) => panic!("It should fail with invalid successor"),
-                          Err(CoreError::RoutingClientError(ClientError::InvalidSuccessor)) => (),
-                          Err(x) => panic!("Expected ClientError::InvalidSuccessor. Got {:?}", x),
-                      }
-                      cl4.list_mdata_permissions(name, DIR_TAG)
-                  })
+                match res {
+                    Ok(()) => panic!("It should fail with invalid successor"),
+                    Err(CoreError::RoutingClientError(ClientError::InvalidSuccessor)) => (),
+                    Err(x) => panic!("Expected ClientError::InvalidSuccessor. Got {:?}", x),
+                }
+                cl4.list_mdata_permissions(name, DIR_TAG)
+            })
             .then(move |res| {
                 let permissions = unwrap!(res);
                 assert_eq!(permissions.len(), 2);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::Insert),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::Update),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::Delete),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::ManagePermissions),
-                           Some(true));
-                assert_eq!(unwrap!(permissions.get(&User::Key(random_key)))
-                               .is_allowed(Action::Insert),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(random_key)))
-                               .is_allowed(Action::Update),
-                           Some(true));
-                assert_eq!(unwrap!(permissions.get(&User::Key(random_key)))
-                               .is_allowed(Action::Delete),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(random_key)))
-                               .is_allowed(Action::ManagePermissions),
-                           None);
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Insert),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Update),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Delete),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
+                        Action::ManagePermissions,
+                    ),
+                    Some(true)
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(random_key))).is_allowed(Action::Insert),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(random_key))).is_allowed(Action::Update),
+                    Some(true)
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(random_key))).is_allowed(Action::Delete),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(random_key)))
+                        .is_allowed(Action::ManagePermissions),
+                    None
+                );
                 cl5.get_mdata_version(name, DIR_TAG)
             })
             .then(move |res| {
-                      let v = unwrap!(res);
-                      assert_eq!(v, 1);
-                      cl6.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), v + 1)
-                  })
+                let v = unwrap!(res);
+                assert_eq!(v, 1);
+                cl6.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), v + 1)
+            })
             .then(move |res| {
-                      unwrap!(res);
-                      cl7.list_mdata_permissions(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl7.list_mdata_permissions(name, DIR_TAG)
+            })
             .map(move |permissions| {
                 assert_eq!(permissions.len(), 1);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::Insert),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::Update),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::Delete),
-                           None);
-                assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                               .is_allowed(Action::ManagePermissions),
-                           Some(true));
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Insert),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Update),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Delete),
+                    None
+                );
+                assert_eq!(
+                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
+                        Action::ManagePermissions,
+                    ),
+                    Some(true)
+                );
             })
             .map_err(|e| panic!("{:?}", e))
     });
@@ -599,14 +671,22 @@ fn permissions_crud() {
         let (random_key_b, _) = sign::gen_keypair();
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk),
-                                   PermissionSet::new().allow(Action::ManagePermissions));
+        let _ = permissions.insert(
+            User::Key(sign_pk),
+            PermissionSet::new().allow(Action::ManagePermissions),
+        );
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(
+            name,
+            DIR_TAG,
+            permissions,
+            BTreeMap::new(),
+            owners,
+        ));
 
         let cl2 = client.clone();
         let cl3 = client.clone();
@@ -621,188 +701,260 @@ fn permissions_crud() {
             .put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
-                let permissions = PermissionSet::new()
-                    .allow(Action::Insert)
-                    .allow(Action::Delete);
-                cl2.set_mdata_user_permissions(name,
-                                               DIR_TAG,
-                                               User::Key(random_key_a),
-                                               permissions,
-                                               1)
+                let permissions = PermissionSet::new().allow(Action::Insert).allow(
+                    Action::Delete,
+                );
+                cl2.set_mdata_user_permissions(
+                    name,
+                    DIR_TAG,
+                    User::Key(random_key_a),
+                    permissions,
+                    1,
+                )
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl3.list_mdata_permissions(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl3.list_mdata_permissions(name, DIR_TAG)
+            })
             .then(move |res| {
                 {
                     let permissions = unwrap!(res);
                     assert_eq!(permissions.len(), 2);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Insert),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Delete),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::ManagePermissions),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::Insert),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::Delete),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::ManagePermissions),
-                               None);
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Insert),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Delete),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
+                            Action::ManagePermissions,
+                        ),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::Insert),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::Delete),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::ManagePermissions),
+                        None
+                    );
                 }
 
                 let permissions = PermissionSet::new().deny(Action::Insert);
-                cl4.set_mdata_user_permissions(name,
-                                               DIR_TAG,
-                                               User::Key(random_key_b),
-                                               permissions,
-                                               2)
+                cl4.set_mdata_user_permissions(
+                    name,
+                    DIR_TAG,
+                    User::Key(random_key_b),
+                    permissions,
+                    2,
+                )
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl5.list_mdata_permissions(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl5.list_mdata_permissions(name, DIR_TAG)
+            })
             .then(move |res| {
                 {
                     let permissions = unwrap!(res);
                     assert_eq!(permissions.len(), 3);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Insert),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Delete),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::ManagePermissions),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::Insert),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::Delete),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_a)))
-                                   .is_allowed(Action::ManagePermissions),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Insert),
-                               Some(false));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Delete),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::ManagePermissions),
-                               None);
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Insert),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Delete),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
+                            Action::ManagePermissions,
+                        ),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::Insert),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::Delete),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_a)))
+                            .is_allowed(Action::ManagePermissions),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Insert),
+                        Some(false)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Delete),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::ManagePermissions),
+                        None
+                    );
                 }
 
                 let permissions = PermissionSet::new().deny(Action::Insert);
-                cl6.set_mdata_user_permissions(name,
-                                               DIR_TAG,
-                                               User::Key(random_key_b),
-                                               permissions,
-                                               3)
+                cl6.set_mdata_user_permissions(
+                    name,
+                    DIR_TAG,
+                    User::Key(random_key_b),
+                    permissions,
+                    3,
+                )
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl7.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key_a), 4)
-                  })
+                unwrap!(res);
+                cl7.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key_a), 4)
+            })
             .then(move |res| {
-                      unwrap!(res);
-                      cl8.list_mdata_permissions(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl8.list_mdata_permissions(name, DIR_TAG)
+            })
             .then(move |res| {
                 {
                     let permissions = unwrap!(res);
                     assert_eq!(permissions.len(), 2);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Insert),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Delete),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::ManagePermissions),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Insert),
-                               Some(false));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Delete),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::ManagePermissions),
-                               None);
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Insert),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Delete),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
+                            Action::ManagePermissions,
+                        ),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Insert),
+                        Some(false)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Delete),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::ManagePermissions),
+                        None
+                    );
                 }
 
-                let permissions = PermissionSet::new()
-                    .deny(Action::Insert)
-                    .deny(Action::Delete);
-                cl9.set_mdata_user_permissions(name,
-                                               DIR_TAG,
-                                               User::Key(random_key_b),
-                                               permissions,
-                                               5)
+                let permissions = PermissionSet::new().deny(Action::Insert).deny(
+                    Action::Delete,
+                );
+                cl9.set_mdata_user_permissions(
+                    name,
+                    DIR_TAG,
+                    User::Key(random_key_b),
+                    permissions,
+                    5,
+                )
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl10.list_mdata_permissions(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl10.list_mdata_permissions(name, DIR_TAG)
+            })
             .then(move |res| -> Result<_, ()> {
                 {
                     let permissions = unwrap!(res);
                     assert_eq!(permissions.len(), 2);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Insert),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::Delete),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
-                                   .is_allowed(Action::ManagePermissions),
-                               Some(true));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Insert),
-                               Some(false));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Update),
-                               None);
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::Delete),
-                               Some(false));
-                    assert_eq!(unwrap!(permissions.get(&User::Key(random_key_b)))
-                                   .is_allowed(Action::ManagePermissions),
-                               None);
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Insert),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(Action::Delete),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
+                            Action::ManagePermissions,
+                        ),
+                        Some(true)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Insert),
+                        Some(false)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Update),
+                        None
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::Delete),
+                        Some(false)
+                    );
+                    assert_eq!(
+                        unwrap!(permissions.get(&User::Key(random_key_b)))
+                            .is_allowed(Action::ManagePermissions),
+                        None
+                    );
                 }
 
                 Ok(())
@@ -824,23 +976,29 @@ fn entries_crud() {
         let sign_pk = unwrap!(client.public_signing_key());
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk),
-                                   PermissionSet::new()
-                                       .allow(Action::Insert)
-                                       .allow(Action::Update)
-                                       .allow(Action::Delete));
+        let _ = permissions.insert(
+            User::Key(sign_pk),
+            PermissionSet::new()
+                .allow(Action::Insert)
+                .allow(Action::Update)
+                .allow(Action::Delete),
+        );
 
         let mut data = BTreeMap::new();
-        let _ = data.insert(vec![0, 0, 1],
-                            Value {
-                                content: vec![1],
-                                entry_version: 1,
-                            });
-        let _ = data.insert(vec![0, 1, 0],
-                            Value {
-                                content: vec![2, 8],
-                                entry_version: 1,
-                            });
+        let _ = data.insert(
+            vec![0, 0, 1],
+            Value {
+                content: vec![1],
+                entry_version: 1,
+            },
+        );
+        let _ = data.insert(
+            vec![0, 1, 0],
+            Value {
+                content: vec![2, 8],
+                entry_version: 1,
+            },
+        );
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
@@ -857,82 +1015,104 @@ fn entries_crud() {
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![0, 1, 1],
-                                       EntryAction::Ins(Value {
-                                                            content: vec![2, 3, 17],
-                                                            entry_version: 1,
-                                                        }));
-                let _ = actions.insert(vec![0, 1, 0],
-                                       EntryAction::Update(Value {
-                                                               content: vec![2, 8, 64],
-                                                               entry_version: 2,
-                                                           }));
+                let _ = actions.insert(
+                    vec![0, 1, 1],
+                    EntryAction::Ins(Value {
+                        content: vec![2, 3, 17],
+                        entry_version: 1,
+                    }),
+                );
+                let _ = actions.insert(
+                    vec![0, 1, 0],
+                    EntryAction::Update(Value {
+                        content: vec![2, 8, 64],
+                        entry_version: 2,
+                    }),
+                );
                 let _ = actions.insert(vec![0, 0, 1], EntryAction::Del(2));
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl3.list_mdata_entries(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl3.list_mdata_entries(name, DIR_TAG)
+            })
             .then(move |res| {
                 let entries = unwrap!(res);
                 assert_eq!(entries.len(), 3);
-                assert_eq!(*unwrap!(entries.get(&vec![0, 0, 1])),
-                           Value {
-                               content: vec![],
-                               entry_version: 2,
-                           });
-                assert_eq!(*unwrap!(entries.get(&vec![0, 1, 0])),
-                           Value {
-                               content: vec![2, 8, 64],
-                               entry_version: 2,
-                           });
-                assert_eq!(*unwrap!(entries.get(&vec![0, 1, 1])),
-                           Value {
-                               content: vec![2, 3, 17],
-                               entry_version: 1,
-                           });
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![0, 0, 1])),
+                    Value {
+                        content: vec![],
+                        entry_version: 2,
+                    }
+                );
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![0, 1, 0])),
+                    Value {
+                        content: vec![2, 8, 64],
+                        entry_version: 2,
+                    }
+                );
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![0, 1, 1])),
+                    Value {
+                        content: vec![2, 3, 17],
+                        entry_version: 1,
+                    }
+                );
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![1, 0, 0],
-                                       EntryAction::Ins(Value {
-                                                            content: vec![4, 4, 4, 4],
-                                                            entry_version: 1,
-                                                        }));
-                let _ = actions.insert(vec![0, 1, 0],
-                                       EntryAction::Update(Value {
-                                                               content: vec![64, 8, 1],
-                                                               entry_version: 3,
-                                                           }));
+                let _ = actions.insert(
+                    vec![1, 0, 0],
+                    EntryAction::Ins(Value {
+                        content: vec![4, 4, 4, 4],
+                        entry_version: 1,
+                    }),
+                );
+                let _ = actions.insert(
+                    vec![0, 1, 0],
+                    EntryAction::Update(Value {
+                        content: vec![64, 8, 1],
+                        entry_version: 3,
+                    }),
+                );
                 let _ = actions.insert(vec![0, 1, 1], EntryAction::Del(2));
                 cl4.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
-                      unwrap!(res);
-                      cl5.list_mdata_entries(name, DIR_TAG)
-                  })
+                unwrap!(res);
+                cl5.list_mdata_entries(name, DIR_TAG)
+            })
             .then(|res| -> Result<_, ()> {
                 let entries = unwrap!(res);
                 assert_eq!(entries.len(), 4);
-                assert_eq!(*unwrap!(entries.get(&vec![0, 0, 1])),
-                           Value {
-                               content: vec![],
-                               entry_version: 2,
-                           });
-                assert_eq!(*unwrap!(entries.get(&vec![0, 1, 0])),
-                           Value {
-                               content: vec![64, 8, 1],
-                               entry_version: 3,
-                           });
-                assert_eq!(*unwrap!(entries.get(&vec![0, 1, 1])),
-                           Value {
-                               content: vec![],
-                               entry_version: 2,
-                           });
-                assert_eq!(*unwrap!(entries.get(&vec![1, 0, 0])),
-                           Value {
-                               content: vec![4, 4, 4, 4],
-                               entry_version: 1,
-                           });
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![0, 0, 1])),
+                    Value {
+                        content: vec![],
+                        entry_version: 2,
+                    }
+                );
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![0, 1, 0])),
+                    Value {
+                        content: vec![64, 8, 1],
+                        entry_version: 3,
+                    }
+                );
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![0, 1, 1])),
+                    Value {
+                        content: vec![],
+                        entry_version: 2,
+                    }
+                );
+                assert_eq!(
+                    *unwrap!(entries.get(&vec![1, 0, 0])),
+                    Value {
+                        content: vec![4, 4, 4, 4],
+                        entry_version: 1,
+                    }
+                );
                 Ok(())
             })
             .map_err(|e| panic!("{:?}", e))
@@ -964,12 +1144,8 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-                           mdata_permissions_set_allow(&app,
-                                                       perms_set_h,
-                                                       MDataAction::Insert,
-                                                       ud,
-                                                       cb)
-                       }))
+            mdata_permissions_set_allow(&app, perms_set_h, MDataAction::Insert, ud, cb)
+        }))
     };
 
     // Create permissions for anyone
@@ -978,21 +1154,29 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-                           mdata_permissions_insert(&app, perms_h, USER_ANYONE, perms_set_h, ud, cb)
-                       }))
+            mdata_permissions_insert(&app, perms_h, USER_ANYONE, perms_set_h, ud, cb)
+        }))
     };
 
     // Try to create an empty public MD
-    let md_info_pub_h: MDataInfoHandle =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(&app, 10000, ud, cb))) };
+    let md_info_pub_h: MDataInfoHandle = unsafe {
+        unwrap!(call_1(
+            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
+        ))
+    };
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+        }))
     };
 
     // Try to create a MD instance using the same name & type tag - it should fail.
-    let res =
-        unsafe { call_0(|ud, cb| mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)) };
+    let res = unsafe {
+        call_0(|ud, cb| {
+            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+        })
+    };
     match res {
         Err(_) => (),
         x => panic!("Failed test: unexpected {:?}, expected error", x),
@@ -1000,13 +1184,20 @@ fn entries_crud_ffi() {
 
     // Try to create a MD instance using the same name & a different type tag - it should pass.
     let (xor_name, _type_tag): ([u8; XOR_NAME_LEN], u64) = unsafe {
-        unwrap!(call_2(|ud, cb| mdata_info_extract_name_and_type_tag(&app, md_info_pub_h, ud, cb)))
+        unwrap!(call_2(|ud, cb| {
+            mdata_info_extract_name_and_type_tag(&app, md_info_pub_h, ud, cb)
+        }))
     };
-    let md_info_pub_2_h: MDataInfoHandle =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_new_public(&app, &xor_name, 10001, ud, cb))) };
+    let md_info_pub_2_h: MDataInfoHandle = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            mdata_info_new_public(&app, &xor_name, 10001, ud, cb)
+        }))
+    };
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_pub_2_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_put(&app, md_info_pub_2_h, perms_h, ENTRIES_EMPTY, ud, cb)
+        }))
     };
 
     // Try to add entries to a public MD
@@ -1015,19 +1206,23 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_entry_actions_insert(&app,
-                                       actions_h,
-                                       KEY.as_ptr(),
-                                       KEY.len(),
-                                       VALUE.as_ptr(),
-                                       VALUE.len(),
-                                       ud,
-                                       cb)
+            mdata_entry_actions_insert(
+                &app,
+                actions_h,
+                KEY.as_ptr(),
+                KEY.len(),
+                VALUE.as_ptr(),
+                VALUE.len(),
+                ud,
+                cb,
+            )
         }))
     };
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)
+        }))
     }
 
     // Retrieve added entry
@@ -1036,12 +1231,14 @@ fn entries_crud_ffi() {
         let ud = sender_as_user_data(&tx);
 
         unsafe {
-            mdata_get_value(&app,
-                            md_info_pub_h,
-                            KEY.as_ptr(),
-                            KEY.len(),
-                            ud,
-                            get_value_cb)
+            mdata_get_value(
+                &app,
+                md_info_pub_h,
+                KEY.as_ptr(),
+                KEY.len(),
+                ud,
+                get_value_cb,
+            )
         };
 
         let result = unwrap!(rx.recv());
@@ -1049,38 +1246,43 @@ fn entries_crud_ffi() {
     }
 
     // Check the version of a public MD
-    let ver: u64 =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_get_version(&app, md_info_pub_h, ud, cb))) };
+    let ver: u64 = unsafe {
+        unwrap!(call_1(
+            |ud, cb| mdata_get_version(&app, md_info_pub_h, ud, cb),
+        ))
+    };
     assert_eq!(ver, 0);
 
     // Try to create a private MD
-    let md_info_priv_h =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(&app, 10001, ud, cb))) };
+    let md_info_priv_h = unsafe {
+        unwrap!(call_1(
+            |ud, cb| mdata_info_random_private(&app, 10001, ud, cb),
+        ))
+    };
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_priv_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_put(&app, md_info_priv_h, perms_h, ENTRIES_EMPTY, ud, cb)
+        }))
     };
 
     // Try to add entries to a private MD
     let key_enc = unsafe {
         unwrap!(call_vec_u8(|ud, cb| {
-                                mdata_info_encrypt_entry_key(&app,
-                                                             md_info_priv_h,
-                                                             KEY.as_ptr(),
-                                                             KEY.len(),
-                                                             ud,
-                                                             cb)
-                            }))
+            mdata_info_encrypt_entry_key(&app, md_info_priv_h, KEY.as_ptr(), KEY.len(), ud, cb)
+        }))
     };
     let value_enc = unsafe {
         unwrap!(call_vec_u8(|ud, cb| {
-                                mdata_info_encrypt_entry_value(&app,
-                                                               md_info_priv_h,
-                                                               VALUE.as_ptr(),
-                                                               VALUE.len(),
-                                                               ud,
-                                                               cb)
-                            }))
+            mdata_info_encrypt_entry_value(
+                &app,
+                md_info_priv_h,
+                VALUE.as_ptr(),
+                VALUE.len(),
+                ud,
+                cb,
+            )
+        }))
     };
 
     let actions_priv_h: MDataEntryActionsHandle =
@@ -1088,30 +1290,39 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_entry_actions_insert(&app,
-                                       actions_priv_h,
-                                       key_enc.as_ptr(),
-                                       key_enc.len(),
-                                       value_enc.as_ptr(),
-                                       value_enc.len(),
-                                       ud,
-                                       cb)
+            mdata_entry_actions_insert(
+                &app,
+                actions_priv_h,
+                key_enc.as_ptr(),
+                key_enc.len(),
+                value_enc.as_ptr(),
+                value_enc.len(),
+                ud,
+                cb,
+            )
         }))
     };
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_mutate_entries(&app, md_info_priv_h, actions_priv_h, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_mutate_entries(&app, md_info_priv_h, actions_priv_h, ud, cb)
+        }))
     }
 
     // Try to fetch the serialised size of MD
     {
         let size: u64 = unsafe {
-            unwrap!(call_1(|ud, cb| mdata_serialised_size(&app, md_info_priv_h, ud, cb)))
+            unwrap!(call_1(
+                |ud, cb| mdata_serialised_size(&app, md_info_priv_h, ud, cb),
+            ))
         };
         assert!(size > 0);
 
-        let size: u64 =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_serialised_size(&app, md_info_pub_h, ud, cb))) };
+        let size: u64 = unsafe {
+            unwrap!(call_1(
+                |ud, cb| mdata_serialised_size(&app, md_info_pub_h, ud, cb),
+            ))
+        };
         assert!(size > 0);
     }
 
@@ -1121,12 +1332,14 @@ fn entries_crud_ffi() {
         let ud = sender_as_user_data(&tx);
 
         unsafe {
-            mdata_get_value(&app,
-                            md_info_priv_h,
-                            key_enc.as_ptr(),
-                            key_enc.len(),
-                            ud,
-                            get_value_cb)
+            mdata_get_value(
+                &app,
+                md_info_priv_h,
+                key_enc.as_ptr(),
+                key_enc.len(),
+                ud,
+                get_value_cb,
+            )
         };
 
         let result = unwrap!(rx.recv());
@@ -1135,32 +1348,39 @@ fn entries_crud_ffi() {
 
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                                    mdata_info_decrypt(&app,
-                                                       md_info_priv_h,
-                                                       got_value_enc.as_ptr(),
-                                                       got_value_enc.len(),
-                                                       ud,
-                                                       cb)
-                                }))
+                mdata_info_decrypt(
+                    &app,
+                    md_info_priv_h,
+                    got_value_enc.as_ptr(),
+                    got_value_enc.len(),
+                    ud,
+                    cb,
+                )
+            }))
         };
         assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
     }
 
     // Check mdata_list_entries
     {
-        let entries_list_h =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_entries(&app, md_info_priv_h, ud, cb))) };
+        let entries_list_h = unsafe {
+            unwrap!(call_1(
+                |ud, cb| mdata_list_entries(&app, md_info_priv_h, ud, cb),
+            ))
+        };
 
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
         let ud = sender_as_user_data(&tx);
 
         unsafe {
-            mdata_entries_get(&app,
-                              entries_list_h,
-                              key_enc.as_ptr(),
-                              key_enc.len(),
-                              ud,
-                              get_value_cb)
+            mdata_entries_get(
+                &app,
+                entries_list_h,
+                key_enc.as_ptr(),
+                key_enc.len(),
+                ud,
+                get_value_cb,
+            )
         };
 
         let result = unwrap!(rx.recv());
@@ -1169,23 +1389,32 @@ fn entries_crud_ffi() {
 
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                                    mdata_info_decrypt(&app,
-                                                       md_info_priv_h,
-                                                       got_value_enc.as_ptr(),
-                                                       got_value_enc.len(),
-                                                       ud,
-                                                       cb)
-                                }))
+                mdata_info_decrypt(
+                    &app,
+                    md_info_priv_h,
+                    got_value_enc.as_ptr(),
+                    got_value_enc.len(),
+                    ud,
+                    cb,
+                )
+            }))
         };
         assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
 
-        unsafe { unwrap!(call_0(|ud, cb| mdata_entries_free(&app, entries_list_h, ud, cb))) }
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| mdata_entries_free(&app, entries_list_h, ud, cb),
+            ))
+        }
     }
 
     // Check mdata_list_keys
     {
-        let keys_list_h =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, md_info_priv_h, ud, cb))) };
+        let keys_list_h = unsafe {
+            unwrap!(call_1(
+                |ud, cb| mdata_list_keys(&app, md_info_priv_h, ud, cb),
+            ))
+        };
 
         let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
         let ud = sender_as_user_data(&tx);
@@ -1200,13 +1429,15 @@ fn entries_crud_ffi() {
         if let Some(ref got_key_enc) = result[0] {
             let decrypted = unsafe {
                 unwrap!(call_vec_u8(|ud, cb| {
-                                        mdata_info_decrypt(&app,
-                                                           md_info_priv_h,
-                                                           got_key_enc.as_ptr(),
-                                                           got_key_enc.len(),
-                                                           ud,
-                                                           cb)
-                                    }))
+                    mdata_info_decrypt(
+                        &app,
+                        md_info_priv_h,
+                        got_key_enc.as_ptr(),
+                        got_key_enc.len(),
+                        ud,
+                        cb,
+                    )
+                }))
             };
             assert_eq!(&decrypted, &KEY, "decrypted invalid key");
         } else {
@@ -1216,8 +1447,11 @@ fn entries_crud_ffi() {
 
     // Check mdata_list_values
     {
-        let vals_list_h =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, md_info_priv_h, ud, cb))) };
+        let vals_list_h = unsafe {
+            unwrap!(call_1(
+                |ud, cb| mdata_list_values(&app, md_info_priv_h, ud, cb),
+            ))
+        };
 
         let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
         let ud = sender_as_user_data(&tx);
@@ -1232,13 +1466,15 @@ fn entries_crud_ffi() {
         if let Some(ref got_value_enc) = result[0] {
             let decrypted = unsafe {
                 unwrap!(call_vec_u8(|ud, cb| {
-                                        mdata_info_decrypt(&app,
-                                                           md_info_priv_h,
-                                                           got_value_enc.as_ptr(),
-                                                           got_value_enc.len(),
-                                                           ud,
-                                                           cb)
-                                    }))
+                    mdata_info_decrypt(
+                        &app,
+                        md_info_priv_h,
+                        got_value_enc.as_ptr(),
+                        got_value_enc.len(),
+                        ud,
+                        cb,
+                    )
+                }))
             };
             assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
         } else {
@@ -1246,11 +1482,13 @@ fn entries_crud_ffi() {
         }
     }
 
-    extern "C" fn get_value_cb(user_data: *mut c_void,
-                               res: FfiResult,
-                               val: *const u8,
-                               len: usize,
-                               _version: u64) {
+    extern "C" fn get_value_cb(
+        user_data: *mut c_void,
+        res: FfiResult,
+        val: *const u8,
+        len: usize,
+        _version: u64,
+    ) {
         let result: Result<Vec<u8>, i32> = if res.error_code == 0 {
             Ok(unsafe { vec_clone_from_raw_parts(val, len) })
         } else {
@@ -1261,10 +1499,7 @@ fn entries_crud_ffi() {
         }
     }
 
-    extern "C" fn iter_value_cb(user_data: *mut c_void,
-                                val: *const u8,
-                                len: usize,
-                                _version: u64) {
+    extern "C" fn iter_value_cb(user_data: *mut c_void, val: *const u8, len: usize, _version: u64) {
         let result: Option<Vec<u8>> = Some(unsafe { vec_clone_from_raw_parts(val, len) });
         unsafe {
             send_via_user_data(user_data, result);
@@ -1310,12 +1545,8 @@ fn entries_crud_ffi_with_network_errors() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-                           mdata_permissions_set_allow(&app,
-                                                       perms_set_h,
-                                                       MDataAction::Insert,
-                                                       ud,
-                                                       cb)
-                       }))
+            mdata_permissions_set_allow(&app, perms_set_h, MDataAction::Insert, ud, cb)
+        }))
     };
 
     // Create permissions for anyone
@@ -1324,22 +1555,27 @@ fn entries_crud_ffi_with_network_errors() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-                           mdata_permissions_insert(&app, perms_h, USER_ANYONE, perms_set_h, ud, cb)
-                       }))
+            mdata_permissions_insert(&app, perms_h, USER_ANYONE, perms_set_h, ud, cb)
+        }))
     };
 
     // Try to create an empty public MD
-    let md_info_pub_h: MDataInfoHandle =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(&app, 10000, ud, cb))) };
+    let md_info_pub_h: MDataInfoHandle = unsafe {
+        unwrap!(call_1(
+            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
+        ))
+    };
 
     // Simulate failing requests
     unwrap!(app.send(move |client, _| {
-                         client.simulate_rate_limit_errors(10);
-                         None
-                     }));
+        client.simulate_rate_limit_errors(10);
+        None
+    }));
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+        }))
     };
 
     // Try to add entries to a public MD
@@ -1348,55 +1584,63 @@ fn entries_crud_ffi_with_network_errors() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_entry_actions_insert(&app,
-                                       actions_h,
-                                       KEY.as_ptr(),
-                                       KEY.len(),
-                                       VALUE.as_ptr(),
-                                       VALUE.len(),
-                                       ud,
-                                       cb)
+            mdata_entry_actions_insert(
+                &app,
+                actions_h,
+                KEY.as_ptr(),
+                KEY.len(),
+                VALUE.as_ptr(),
+                VALUE.len(),
+                ud,
+                cb,
+            )
         }))
     };
 
     // Simulate failing requests
     unwrap!(app.send(move |client, _| {
-                         client.simulate_rate_limit_errors(30);
-                         None
-                     }));
+        client.simulate_rate_limit_errors(30);
+        None
+    }));
 
     unsafe {
-        unwrap!(call_0(|ud, cb| mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)))
+        unwrap!(call_0(|ud, cb| {
+            mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)
+        }))
     }
 
     // Retrieve added entry with network errors
     {
         unwrap!(app.send(move |client, _| {
-                             client.simulate_rate_limit_errors(50);
-                             None
-                         }));
+            client.simulate_rate_limit_errors(50);
+            None
+        }));
 
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
         let ud = sender_as_user_data(&tx);
 
         unsafe {
-            mdata_get_value(&app,
-                            md_info_pub_h,
-                            KEY.as_ptr(),
-                            KEY.len(),
-                            ud,
-                            get_value_cb)
+            mdata_get_value(
+                &app,
+                md_info_pub_h,
+                KEY.as_ptr(),
+                KEY.len(),
+                ud,
+                get_value_cb,
+            )
         };
 
         let result = unwrap!(rx.recv());
         assert_eq!(&unwrap!(result), &VALUE, "got back invalid value");
     }
 
-    extern "C" fn get_value_cb(user_data: *mut c_void,
-                               res: FfiResult,
-                               val: *const u8,
-                               len: usize,
-                               _version: u64) {
+    extern "C" fn get_value_cb(
+        user_data: *mut c_void,
+        res: FfiResult,
+        val: *const u8,
+        len: usize,
+        _version: u64,
+    ) {
         let result: Result<Vec<u8>, i32> = if res.error_code == 0 {
             Ok(unsafe { vec_clone_from_raw_parts(val, len) })
         } else {

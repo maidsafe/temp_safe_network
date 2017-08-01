@@ -8,8 +8,8 @@ os:
   - osx
 language: rust
 rust:
-  - 1.17.0
-  - nightly-2017-04-28
+  - 1.19.0
+  - nightly-2017-07-20
 sudo: false
 cache:
   cargo: true
@@ -17,35 +17,28 @@ cache:
 before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [ "${TRAVIS_RUST_VERSION}" = 1.17.0 ]; then
-      bash cargo_install.sh rustfmt 0.8.3;
+  - if [ "${TRAVIS_RUST_VERSION}" = 1.19.0 ]; then
+      bash cargo_install.sh rustfmt 0.9.0;
     elif [ "${TRAVIS_OS_NAME}" = linux ]; then
-      bash cargo_install.sh clippy 0.0.128;
+      bash cargo_install.sh clippy 0.0.144;
     fi
 script:
-  - if [ "${TRAVIS_RUST_VERSION}" = 1.17.0 ]; then
+  - if [ "${TRAVIS_RUST_VERSION}" = 1.19.0 ]; then
         (
             set -x;
             echo "--- Check format ---" &&
-            cd ffi_utils &&
-            cargo fmt -- --write-mode=diff &&
-            cd ../safe_core &&
-            cargo fmt -- --write-mode=diff &&
-            cd ../safe_app &&
-            cargo fmt -- --write-mode=diff &&
-            cd ../safe_authenticator &&
-            cargo fmt -- --write-mode=diff &&
+            cargo fmt --all -- --write-mode=diff &&
             echo "--- Test ffi_utils ---" &&
-            cd ../ffi_utils &&
+            cd ffi_utils &&
             cargo test  --verbose --release &&
             echo "--- Check compilation against actual routing ---" &&
             cd ../safe_core &&
-            cargo rustc --verbose --release &&
-            cargo rustc --verbose --features testing --release --profile test --lib -- -Zno-trans &&
+            cargo check --verbose --release &&
+            cargo check --verbose --features testing --release --lib --tests &&
             cd ../safe_app &&
-            cargo rustc --verbose --features testing --release --profile test --lib -- -Zno-trans &&
+            cargo check --verbose --features testing --release --lib --tests &&
             cd ../safe_authenticator &&
-            cargo rustc --verbose --features testing --release --profile test --lib -- -Zno-trans &&
+            cargo check --verbose --features testing --release --lib --tests &&
             echo "--- Test against mock ---" &&
             cd ../safe_core &&
             cargo test --verbose --release --features "$Features" &&

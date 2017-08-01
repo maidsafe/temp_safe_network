@@ -144,16 +144,22 @@ impl<T0: CallbackArgs, T1: CallbackArgs> CallbackArgs for (T0, T1) {
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> CallbackArgs for (T0, T1, T2) {
     fn default() -> Self {
-        (CallbackArgs::default(), CallbackArgs::default(), CallbackArgs::default())
+        (
+            CallbackArgs::default(),
+            CallbackArgs::default(),
+            CallbackArgs::default(),
+        )
     }
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> CallbackArgs
     for (T0, T1, T2, T3) {
     fn default() -> Self {
-        (CallbackArgs::default(),
-         CallbackArgs::default(),
-         CallbackArgs::default(),
-         CallbackArgs::default())
+        (
+            CallbackArgs::default(),
+            CallbackArgs::default(),
+            CallbackArgs::default(),
+            CallbackArgs::default(),
+        )
     }
 }

@@ -44,9 +44,11 @@ impl Drop for File {
     #[allow(unsafe_code)]
     fn drop(&mut self) {
         let _ = unsafe {
-            Vec::from_raw_parts(self.user_metadata_ptr,
-                                self.user_metadata_len,
-                                self.user_metadata_cap)
+            Vec::from_raw_parts(
+                self.user_metadata_ptr,
+                self.user_metadata_len,
+                self.user_metadata_cap,
+            )
         };
     }
 }

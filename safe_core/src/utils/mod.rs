@@ -18,7 +18,7 @@
 #[macro_use]
 mod futures;
 /// Common utility functions for writting test cases
-#[cfg(any(test, feature="testing"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 pub use self::futures::FutureExt;
@@ -36,7 +36,11 @@ macro_rules! btree_set {
             let _ = _set.insert($item);
         )*
         _set
-    }}
+    }};
+
+    ($($item:expr),*,) => {
+        btree_set![$($item),*]
+    };
 }
 
 #[macro_export]
@@ -47,7 +51,11 @@ macro_rules! btree_map {
             let _ = _map.insert($key, $value);
         )*
         _map
-    }}
+    }};
+
+    ($($key:expr => $value:expr),*,) => {
+        btree_map![$($key => $value),*]
+    };
 }
 
 #[derive(Serialize, Deserialize)]
@@ -57,10 +65,11 @@ struct SymmetricEnc {
 }
 
 /// Symmetric encryption
-pub fn symmetric_encrypt(plain_text: &[u8],
-                         secret_key: &secretbox::Key,
-                         nonce: Option<&secretbox::Nonce>)
-                         -> Result<Vec<u8>, CoreError> {
+pub fn symmetric_encrypt(
+    plain_text: &[u8],
+    secret_key: &secretbox::Key,
+    nonce: Option<&secretbox::Nonce>,
+) -> Result<Vec<u8>, CoreError> {
     let nonce = match nonce {
         Some(nonce) => *nonce,
         None => secretbox::gen_nonce(),
@@ -69,15 +78,16 @@ pub fn symmetric_encrypt(plain_text: &[u8],
     let cipher_text = secretbox::seal(plain_text, &nonce, secret_key);
 
     Ok(serialise(&SymmetricEnc {
-                      nonce: nonce.0,
-                      cipher_text,
-                  })?)
+        nonce: nonce.0,
+        cipher_text,
+    })?)
 }
 
 /// Symmetric decryption
-pub fn symmetric_decrypt(cipher_text: &[u8],
-                         secret_key: &secretbox::Key)
-                         -> Result<Vec<u8>, CoreError> {
+pub fn symmetric_decrypt(
+    cipher_text: &[u8],
+    secret_key: &secretbox::Key,
+) -> Result<Vec<u8>, CoreError> {
     let SymmetricEnc { nonce, cipher_text } = deserialise::<SymmetricEnc>(cipher_text)?;
     secretbox::open(&cipher_text, &secretbox::Nonce(nonce), secret_key)
         .map_err(|_| CoreError::SymmetricDecipherFailure)
@@ -85,23 +95,22 @@ pub fn symmetric_decrypt(cipher_text: &[u8],
 
 /// Generates a random string for specified size
 pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
-    let mut os_rng = ::rand::OsRng::new()
-        .map_err(|error| {
-                     error!("{:?}", error);
-                     CoreError::RandomDataGenerationFailure
-                 })?;
+    let mut os_rng = ::rand::OsRng::new().map_err(|error| {
+        error!("{:?}", error);
+        CoreError::RandomDataGenerationFailure
+    })?;
     Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
 }
 
 /// Generate a random vector of given length
 pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
-    where T: ::rand::Rand
+where
+    T: ::rand::Rand,
 {
-    let mut os_rng = ::rand::OsRng::new()
-        .map_err(|error| {
-                     error!("{:?}", error);
-                     CoreError::RandomDataGenerationFailure
-                 })?;
+    let mut os_rng = ::rand::OsRng::new().map_err(|error| {
+        error!("{:?}", error);
+        CoreError::RandomDataGenerationFailure
+    })?;
     Ok((0..length).map(|_| os_rng.gen()).collect())
 }
 
@@ -109,9 +118,7 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
 pub fn derive_secrets(acc_locator: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let Digest(locator_hash) = sha512::hash(acc_locator);
 
-    let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..])
-        .0
-        .to_owned();
+    let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..]).0.to_owned();
     let keyword = locator_hash.to_owned();
     let password = sha512::hash(acc_password).0.to_owned();
 

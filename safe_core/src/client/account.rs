@@ -57,8 +57,9 @@ impl Account {
     /// Credentials are passed through key-derivation-function first
     pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Self, CoreError> {
         let (key, nonce) = Self::generate_crypto_keys(password, pin)?;
-        let decrypted_self = secretbox::open(encrypted_self, &nonce, &key)
-            .map_err(|_| CoreError::SymmetricDecipherFailure)?;
+        let decrypted_self = secretbox::open(encrypted_self, &nonce, &key).map_err(|_| {
+            CoreError::SymmetricDecipherFailure
+        })?;
 
         Ok(deserialise(&decrypted_self)?)
     }
@@ -72,9 +73,10 @@ impl Account {
         Ok(id)
     }
 
-    fn generate_crypto_keys(password: &[u8],
-                            pin: &[u8])
-                            -> Result<(secretbox::Key, secretbox::Nonce), CoreError> {
+    fn generate_crypto_keys(
+        password: &[u8],
+        pin: &[u8],
+    ) -> Result<(secretbox::Key, secretbox::Nonce), CoreError> {
         let mut output = [0; secretbox::KEYBYTES + secretbox::NONCEBYTES];
         Self::derive_key(&mut output[..], password, pin)?;
 
@@ -99,13 +101,14 @@ impl Account {
             }
         }
 
-        pwhash::derive_key(output,
-                           input,
-                           &salt,
-                           pwhash::OPSLIMIT_INTERACTIVE,
-                           pwhash::MEMLIMIT_INTERACTIVE)
-                .map(|_| ())
-                .map_err(|_| CoreError::UnsuccessfulPwHash)
+        pwhash::derive_key(
+            output,
+            input,
+            &salt,
+            pwhash::OPSLIMIT_INTERACTIVE,
+            pwhash::MEMLIMIT_INTERACTIVE,
+        ).map(|_| ())
+            .map_err(|_| CoreError::UnsuccessfulPwHash)
     }
 }
 
@@ -165,20 +168,30 @@ mod tests {
 
         let user1_id1 = unwrap!(Account::generate_network_id(keyword1, b"0"));
         let user1_id2 = unwrap!(Account::generate_network_id(keyword1, b"1234"));
-        let user1_id3 = unwrap!(Account::generate_network_id(keyword1,
-                                                             u32::MAX.to_string().as_bytes()));
+        let user1_id3 = unwrap!(Account::generate_network_id(
+            keyword1,
+            u32::MAX.to_string().as_bytes(),
+        ));
 
         assert_ne!(user1_id1, user1_id2);
         assert_ne!(user1_id1, user1_id3);
         assert_ne!(user1_id2, user1_id3);
 
-        assert_eq!(user1_id1,
-                   unwrap!(Account::generate_network_id(keyword1, b"0")));
-        assert_eq!(user1_id2,
-                   unwrap!(Account::generate_network_id(keyword1, b"1234")));
-        assert_eq!(user1_id3,
-                   unwrap!(Account::generate_network_id(keyword1,
-                                                        u32::MAX.to_string().as_bytes())));
+        assert_eq!(
+            user1_id1,
+            unwrap!(Account::generate_network_id(keyword1, b"0"))
+        );
+        assert_eq!(
+            user1_id2,
+            unwrap!(Account::generate_network_id(keyword1, b"1234"))
+        );
+        assert_eq!(
+            user1_id3,
+            unwrap!(Account::generate_network_id(
+                keyword1,
+                u32::MAX.to_string().as_bytes(),
+            ))
+        );
 
         let keyword2 = b"user2";
         let user1_id = unwrap!(Account::generate_network_id(keyword1, b"248"));
@@ -194,8 +207,10 @@ mod tests {
 
         let keys1 = unwrap!(Account::generate_crypto_keys(password1, b"0"));
         let keys2 = unwrap!(Account::generate_crypto_keys(password1, b"1234"));
-        let keys3 = unwrap!(Account::generate_crypto_keys(password1,
-                                                          u32::MAX.to_string().as_bytes()));
+        let keys3 = unwrap!(Account::generate_crypto_keys(
+            password1,
+            u32::MAX.to_string().as_bytes(),
+        ));
         assert_ne!(keys1, keys2);
         assert_ne!(keys1, keys3);
         assert_ne!(keys2, keys3);

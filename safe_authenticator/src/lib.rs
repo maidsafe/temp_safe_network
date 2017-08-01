@@ -71,7 +71,7 @@ mod errors;
 mod access_container;
 
 /// Provides utilities to test the authenticator functionality
-#[cfg(any(test, feature="testing"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 #[cfg(test)]
 mod tests;
@@ -117,7 +117,8 @@ pub struct Authenticator {
 impl Authenticator {
     /// Send a message to the authenticator event loop
     pub fn send<F>(&self, f: F) -> Result<(), AuthError>
-        where F: FnOnce(&Client<()>) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
+    where
+        F: FnOnce(&Client<()>) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static,
     {
         let msg = CoreMsg::new(|client, _| f(client));
         let core_tx = unwrap!(self.core_tx.lock());
@@ -125,13 +126,15 @@ impl Authenticator {
     }
 
     /// Create a new account
-    pub fn create_acc<S, NetObs>(locator: S,
-                                 password: S,
-                                 invitation: S,
-                                 mut network_observer: NetObs)
-                                 -> Result<Self, AuthError>
-        where S: Into<String>,
-              NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static
+    pub fn create_acc<S, NetObs>(
+        locator: S,
+        password: S,
+        invitation: S,
+        mut network_observer: NetObs,
+    ) -> Result<Self, AuthError>
+    where
+        S: Into<String>,
+        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
     {
         let (tx, rx) = sync_channel(0);
 
@@ -152,13 +155,17 @@ impl Authenticator {
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(Client::registered(&locator,
-                                                    &password,
-                                                    &invitation,
-                                                    el_h,
-                                                    core_tx_clone,
-                                                    net_tx),
-                                 tx);
+            let client = try_tx!(
+                Client::registered(
+                    &locator,
+                    &password,
+                    &invitation,
+                    el_h,
+                    core_tx_clone,
+                    net_tx,
+                ),
+                tx
+            );
 
             let tx2 = tx.clone();
             let core_tx2 = core_tx.clone();
@@ -193,18 +200,20 @@ impl Authenticator {
         let core_tx = rx.recv()??;
 
         Ok(Authenticator {
-               core_tx: Mutex::new(core_tx),
-               _core_joiner: joiner,
-           })
+            core_tx: Mutex::new(core_tx),
+            _core_joiner: joiner,
+        })
     }
 
     /// Log in to an existing account
-    pub fn login<S, NetObs>(locator: S,
-                            password: S,
-                            mut network_observer: NetObs)
-                            -> Result<Self, AuthError>
-        where S: Into<String>,
-              NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static
+    pub fn login<S, NetObs>(
+        locator: S,
+        password: S,
+        mut network_observer: NetObs,
+    ) -> Result<Self, AuthError>
+    where
+        S: Into<String>,
+        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
     {
         let (tx, rx) = sync_channel(0);
 
@@ -224,8 +233,10 @@ impl Authenticator {
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(Client::login(&locator, &password, el_h, core_tx_clone, net_tx),
-                                 tx);
+            let client = try_tx!(
+                Client::login(&locator, &password, el_h, core_tx_clone, net_tx),
+                tx
+            );
 
             unwrap!(tx.send(Ok(core_tx)));
 
@@ -235,9 +246,9 @@ impl Authenticator {
         let core_tx = rx.recv()??;
 
         Ok(Authenticator {
-               core_tx: Mutex::new(core_tx),
-               _core_joiner: joiner,
-           })
+            core_tx: Mutex::new(core_tx),
+            _core_joiner: joiner,
+        })
     }
 }
 

@@ -27,7 +27,8 @@ use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 
 /// Retrieves the authenticator configuration file
 pub fn access_container<T>(client: &Client<T>) -> Box<AuthFuture<MDataInfo>>
-    where T: 'static
+where
+    T: 'static,
 {
     let parent = fry!(client.config_root_dir());
     let key = fry!(parent.enc_entry_key(b"access-container"));
@@ -36,15 +37,16 @@ pub fn access_container<T>(client: &Client<T>) -> Box<AuthFuture<MDataInfo>>
         .get_mdata_value(parent.name, parent.type_tag, key)
         .map_err(From::from)
         .and_then(move |val| {
-                      let content = parent.decrypt(&val.content)?;
-                      deserialise(&content).map_err(From::from)
-                  })
+            let content = parent.decrypt(&val.content)?;
+            deserialise(&content).map_err(From::from)
+        })
         .into_box()
 }
 
 /// Gets the nonce from the access container mdata info.
-pub fn access_container_nonce(access_container: &MDataInfo)
-                              -> Result<&secretbox::Nonce, AuthError> {
+pub fn access_container_nonce(
+    access_container: &MDataInfo,
+) -> Result<&secretbox::Nonce, AuthError> {
     if let Some((_, Some(ref nonce))) = access_container.enc_info {
         Ok(nonce)
     } else {
@@ -54,12 +56,14 @@ pub fn access_container_nonce(access_container: &MDataInfo)
 }
 
 /// Gets an access container entry
-pub fn access_container_entry<T>(client: &Client<T>,
-                                 access_container: &MDataInfo,
-                                 app_id: &str,
-                                 app_keys: AppKeys)
-                                 -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>>
-    where T: 'static
+pub fn access_container_entry<T>(
+    client: &Client<T>,
+    access_container: &MDataInfo,
+    app_id: &str,
+    app_keys: AppKeys,
+) -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>>
+where
+    T: 'static,
 {
     let nonce = fry!(access_container_nonce(access_container));
     let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
@@ -81,14 +85,16 @@ pub fn access_container_entry<T>(client: &Client<T>,
 }
 
 /// Adds a new entry to the authenticator access container
-pub fn put_access_container_entry<T>(client: &Client<T>,
-                                     access_container: &MDataInfo,
-                                     app_id: &str,
-                                     app_keys: &AppKeys,
-                                     permissions: &AccessContainerEntry,
-                                     version: Option<u64>)
-                                     -> Box<AuthFuture<()>>
-    where T: 'static
+pub fn put_access_container_entry<T>(
+    client: &Client<T>,
+    access_container: &MDataInfo,
+    app_id: &str,
+    app_keys: &AppKeys,
+    permissions: &AccessContainerEntry,
+    version: Option<u64>,
+) -> Box<AuthFuture<()>>
+where
+    T: 'static,
 {
     let nonce = fry!(access_container_nonce(access_container));
     let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
@@ -102,9 +108,11 @@ pub fn put_access_container_entry<T>(client: &Client<T>,
     };
 
     client
-        .mutate_mdata_entries(access_container.name,
-                              access_container.type_tag,
-                              actions.into())
+        .mutate_mdata_entries(
+            access_container.name,
+            access_container.type_tag,
+            actions.into(),
+        )
         .map_err(From::from)
         .into_box()
 }

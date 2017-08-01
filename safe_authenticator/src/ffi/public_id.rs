@@ -27,10 +27,12 @@ use std::ptr;
 
 /// Create Public ID.
 #[no_mangle]
-pub unsafe extern "C" fn auth_public_id_create(auth: *const Authenticator,
-                                               public_id: *const c_char,
-                                               user_data: *mut c_void,
-                                               o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn auth_public_id_create(
+    auth: *const Authenticator,
+    public_id: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let public_id = from_c_str(public_id)?;
@@ -39,11 +41,13 @@ pub unsafe extern "C" fn auth_public_id_create(auth: *const Authenticator,
             public_id::create(client, public_id)
                 .then(move |res| {
                     let (error_code, description) = ffi_result!(res);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
+                    o_cb(
+                        user_data.0,
+                        FfiResult {
+                            error_code,
+                            description: description.as_ptr(),
+                        },
+                    );
                     Ok(())
                 })
                 .into_box()
@@ -54,11 +58,11 @@ pub unsafe extern "C" fn auth_public_id_create(auth: *const Authenticator,
 
 /// Retrieve the Public ID.
 #[no_mangle]
-pub unsafe extern "C" fn auth_public_id(auth: *const Authenticator,
-                                        user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void,
-                                                            FfiResult,
-                                                            *const c_char)) {
+pub unsafe extern "C" fn auth_public_id(
+    auth: *const Authenticator,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const c_char),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -70,24 +74,28 @@ pub unsafe extern "C" fn auth_public_id(auth: *const Authenticator,
                         Err(e) => {
                             let e = AuthError::from(e);
                             let (error_code, description) = ffi_error!(e);
-                            return o_cb(user_data.0,
-                                        FfiResult {
-                                            error_code,
-                                            description: description.as_ptr(),
-                                        },
-                                        ptr::null());
+                            return o_cb(
+                                user_data.0,
+                                FfiResult {
+                                    error_code,
+                                    description: description.as_ptr(),
+                                },
+                                ptr::null(),
+                            );
                         }
                     };
                     o_cb(user_data.0, FFI_RESULT_OK, c_str.as_ptr());
                 })
                 .map_err(move |err| {
                     let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null())
+                    o_cb(
+                        user_data.0,
+                        FfiResult {
+                            error_code,
+                            description: description.as_ptr(),
+                        },
+                        ptr::null(),
+                    )
                 })
                 .into_box()
                 .into()
@@ -114,13 +122,15 @@ mod tests {
         // Create public id first time succeeds.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               auth_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
-                           }))
+                auth_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
+            }))
         }
 
         // Attempt to create already existing public id fails.
         let res = unsafe {
-            call_0(|ud, cb| auth_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb))
+            call_0(|ud, cb| {
+                auth_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
+            })
         };
 
         match res {
@@ -150,8 +160,8 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               auth_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
-                           }))
+                auth_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
+            }))
         }
 
         // Now retrieving it succeeds.

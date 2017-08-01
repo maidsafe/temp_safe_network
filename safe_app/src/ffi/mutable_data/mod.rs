@@ -51,55 +51,65 @@ pub static ENTRIES_EMPTY: u64 = 0;
 /// `entries_h` is a handle to entries for the mutable data.
 /// If `ENTRIES_EMPTY`, the entries will be empty.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_put(app: *const App,
-                                   info_h: MDataInfoHandle,
-                                   permissions_h: MDataPermissionsHandle,
-                                   entries_h: MDataEntriesHandle,
-                                   user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn mdata_put(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    permissions_h: MDataPermissionsHandle,
+    entries_h: MDataEntriesHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
             let owner_key = try_cb!(client.owner_key().map_err(AppError::from), user_data, o_cb);
 
             let permissions = if permissions_h != 0 {
-                try_cb!(helper::get_permissions(context.object_cache(), permissions_h),
-                        user_data,
-                        o_cb)
+                try_cb!(
+                    helper::get_permissions(context.object_cache(), permissions_h),
+                    user_data,
+                    o_cb
+                )
             } else {
                 Default::default()
             };
 
             let entries = if entries_h != 0 {
-                try_cb!(context.object_cache().get_mdata_entries(entries_h),
-                        user_data,
-                        o_cb)
-                        .clone()
+                try_cb!(
+                    context.object_cache().get_mdata_entries(entries_h),
+                    user_data,
+                    o_cb
+                ).clone()
             } else {
                 Default::default()
             };
 
-            let data = try_cb!(MutableData::new(info.name,
-                                                info.type_tag,
-                                                permissions,
-                                                entries,
-                                                btree_set![owner_key])
-                                       .map_err(CoreError::from)
-                                       .map_err(AppError::from),
-                               user_data,
-                               o_cb);
+            let data = try_cb!(
+                MutableData::new(
+                    info.name,
+                    info.type_tag,
+                    permissions,
+                    entries,
+                    btree_set![owner_key],
+                ).map_err(CoreError::from)
+                    .map_err(AppError::from),
+                user_data,
+                o_cb
+            );
 
             client
                 .put_mdata(data)
                 .map_err(AppError::from)
                 .then(move |result| {
-                          call_result_cb!(result, user_data, o_cb);
-                          Ok(())
-                      })
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -108,25 +118,27 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
 
 /// Get version of the mutable data.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_get_version(app: *const App,
-                                           info_h: MDataInfoHandle,
-                                           user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void, FfiResult, u64)) {
+pub unsafe extern "C" fn mdata_get_version(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_with_mdata_info(app,
-                             info_h,
-                             user_data,
-                             o_cb,
-                             |client, _, info| client.get_mdata_version(info.name, info.type_tag))
+        send_with_mdata_info(app, info_h, user_data, o_cb, |client, _, info| {
+            client.get_mdata_version(info.name, info.type_tag)
+        })
     })
 }
 
 /// Get size of serialised mutable data.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_serialised_size(app: *const App,
-                                               info_h: MDataInfoHandle,
-                                               user_data: *mut c_void,
-                                               o_cb: extern "C" fn(*mut c_void, FfiResult, u64)) {
+pub unsafe extern "C" fn mdata_serialised_size(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, |client, _, info| {
             client
@@ -148,40 +160,42 @@ pub unsafe extern "C" fn mdata_serialised_size(app: *const App,
 /// Please notice that if a value is fetched from a private `MutableData`,
 /// it's not automatically decrypted.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_get_value(app: *const App,
-                                         info_h: MDataInfoHandle,
-                                         key_ptr: *const u8,
-                                         key_len: usize,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void,
-                                                             FfiResult,
-                                                             *const u8,
-                                                             usize,
-                                                             u64)) {
+pub unsafe extern "C" fn mdata_get_value(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    key_ptr: *const u8,
+    key_len: usize,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize, u64),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let key = vec_clone_from_raw_parts(key_ptr, key_len);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
             let info = info.clone();
 
             client
                 .get_mdata_value(info.name, info.type_tag, key)
                 .and_then(move |value| Ok((value.content, value.entry_version)))
                 .map(move |(content, version)| {
-                         o_cb(user_data.0,
-                              FFI_RESULT_OK,
-                              content.as_safe_ptr(),
-                              content.len(),
-                              version);
-                     })
+                    o_cb(
+                        user_data.0,
+                        FFI_RESULT_OK,
+                        content.as_safe_ptr(),
+                        content.len(),
+                        version,
+                    );
+                })
                 .map_err(AppError::from)
                 .map_err(move |err| {
-                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                         })
+                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                })
                 .into_box()
                 .into()
         })
@@ -190,12 +204,12 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
 
 /// Get complete list of entries in the mutable data.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_list_entries(app: *const App,
-                                            info_h: MDataInfoHandle,
-                                            user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void,
-                                                                FfiResult,
-                                                                MDataEntriesHandle)) {
+pub unsafe extern "C" fn mdata_list_entries(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataEntriesHandle),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -204,19 +218,21 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
             client
                 .list_mdata_entries(info.name, info.type_tag)
                 .map_err(AppError::from)
-                .and_then(move |entries| Ok(context.object_cache().insert_mdata_entries(entries)))
+                .and_then(move |entries| {
+                    Ok(context.object_cache().insert_mdata_entries(entries))
+                })
         })
     })
 }
 
 /// Get list of keys in the mutable data.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_list_keys(app: *const App,
-                                         info_h: MDataInfoHandle,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void,
-                                                             FfiResult,
-                                                             MDataKeysHandle)) {
+pub unsafe extern "C" fn mdata_list_keys(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataKeysHandle),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -225,19 +241,21 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
             client
                 .list_mdata_keys(info.name, info.type_tag)
                 .map_err(AppError::from)
-                .and_then(move |keys| Ok(context.object_cache().insert_mdata_keys(keys)))
+                .and_then(move |keys| {
+                    Ok(context.object_cache().insert_mdata_keys(keys))
+                })
         })
     })
 }
 
 /// Get list of values in the mutable data.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_list_values(app: *const App,
-                                           info_h: MDataInfoHandle,
-                                           user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void,
-                                                               FfiResult,
-                                                               MDataValuesHandle)) {
+pub unsafe extern "C" fn mdata_list_values(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataValuesHandle),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -246,35 +264,43 @@ pub unsafe extern "C" fn mdata_list_values(app: *const App,
             client
                 .list_mdata_values(info.name, info.type_tag)
                 .map_err(AppError::from)
-                .and_then(move |values| Ok(context.object_cache().insert_mdata_values(values)))
+                .and_then(move |values| {
+                    Ok(context.object_cache().insert_mdata_values(values))
+                })
         })
     })
 }
 
 /// Mutate entries of the mutable data.
 #[no_mangle]
-pub unsafe fn mdata_mutate_entries(app: *const App,
-                                   info_h: MDataInfoHandle,
-                                   actions_h: MDataEntryActionsHandle,
-                                   user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe fn mdata_mutate_entries(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    actions_h: MDataEntryActionsHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
-            let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
-                                  user_data,
-                                  o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
+            let actions = try_cb!(
+                context.object_cache().get_mdata_entry_actions(actions_h),
+                user_data,
+                o_cb
+            );
             client
                 .mutate_mdata_entries(info.name, info.type_tag, actions.clone())
                 .map_err(AppError::from)
                 .then(move |result| {
-                          call_result_cb!(result, user_data, o_cb);
-                          Ok(())
-                      })
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -283,18 +309,20 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
 
 /// Get list of all permissions set on the mutable data
 #[no_mangle]
-pub unsafe fn mdata_list_permissions(app: *const App,
-                                     info_h: MDataInfoHandle,
-                                     user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void,
-                                                         FfiResult,
-                                                         MDataPermissionsHandle)) {
+pub unsafe fn mdata_list_permissions(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataPermissionsHandle),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
             client
                 .list_mdata_permissions(info.name, info.type_tag)
-                .map(move |perms| helper::insert_permissions(context.object_cache(), perms))
+                .map(move |perms| {
+                    helper::insert_permissions(context.object_cache(), perms)
+                })
         })
     })
 }
@@ -303,36 +331,40 @@ pub unsafe fn mdata_list_permissions(app: *const App,
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
 #[no_mangle]
-pub unsafe fn mdata_list_user_permissions(app: *const App,
-                                          info_h: MDataInfoHandle,
-                                          user_h: SignKeyHandle,
-                                          user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void,
-                                                              FfiResult,
-                                                              MDataPermissionSetHandle)) {
+pub unsafe fn mdata_list_user_permissions(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_h: SignKeyHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataPermissionSetHandle),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
-            let user = try_cb!(helper::get_user(context.object_cache(), user_h),
-                               user_data,
-                               o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
 
             let context = context.clone();
 
             client
                 .list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
-                         let handle = context.object_cache().insert_mdata_permission_set(set);
-                         o_cb(user_data.0, FFI_RESULT_OK, handle);
-                     })
+                    let handle = context.object_cache().insert_mdata_permission_set(set);
+                    o_cb(user_data.0, FFI_RESULT_OK, handle);
+                })
                 .map_err(AppError::from)
                 .map_err(move |err| {
-                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                         })
+                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                })
                 .into_box()
                 .into()
         })
@@ -343,36 +375,44 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
 #[no_mangle]
-pub unsafe fn mdata_set_user_permissions(app: *const App,
-                                         info_h: MDataInfoHandle,
-                                         user_h: SignKeyHandle,
-                                         permission_set_h: MDataPermissionSetHandle,
-                                         version: u64,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe fn mdata_set_user_permissions(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_h: SignKeyHandle,
+    permission_set_h: MDataPermissionSetHandle,
+    version: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
-            let user = try_cb!(helper::get_user(context.object_cache(), user_h),
-                               user_data,
-                               o_cb);
-            let permission_set = *try_cb!(context
-                                              .object_cache()
-                                              .get_mdata_permission_set(permission_set_h),
-                                          user_data,
-                                          o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
+            let permission_set = *try_cb!(
+                context.object_cache().get_mdata_permission_set(
+                    permission_set_h,
+                ),
+                user_data,
+                o_cb
+            );
 
             client
                 .set_mdata_user_permissions(info.name, info.type_tag, user, permission_set, version)
                 .map_err(AppError::from)
                 .then(move |result| {
-                          call_result_cb!(result, user_data, o_cb);
-                          Ok(())
-                      })
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -383,30 +423,36 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
 #[no_mangle]
-pub unsafe fn mdata_del_user_permissions(app: *const App,
-                                         info_h: MDataInfoHandle,
-                                         user_h: SignKeyHandle,
-                                         version: u64,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe fn mdata_del_user_permissions(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_h: SignKeyHandle,
+    version: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
-            let user = try_cb!(helper::get_user(context.object_cache(), user_h),
-                               user_data,
-                               o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
 
             client
                 .del_mdata_user_permissions(info.name, info.type_tag, user, version)
                 .map_err(AppError::from)
                 .then(move |result| {
-                          call_result_cb!(result, user_data, o_cb);
-                          Ok(())
-                      })
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -415,30 +461,36 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
 
 /// Change owner of the mutable data.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_change_owner(app: *const App,
-                                            info_h: MDataInfoHandle,
-                                            new_owner_h: SignKeyHandle,
-                                            version: u64,
-                                            user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn mdata_change_owner(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    new_owner_h: SignKeyHandle,
+    version: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                               user_data,
-                               o_cb);
-            let new_owner = *try_cb!(context.object_cache().get_sign_key(new_owner_h),
-                                     user_data,
-                                     o_cb);
+            let info = try_cb!(
+                context.object_cache().get_mdata_info(info_h),
+                user_data,
+                o_cb
+            );
+            let new_owner = *try_cb!(
+                context.object_cache().get_sign_key(new_owner_h),
+                user_data,
+                o_cb
+            );
 
             client
                 .change_mdata_owner(info.name, info.type_tag, new_owner, version)
                 .map_err(AppError::from)
                 .then(move |result| {
-                          call_result_cb!(result, user_data, o_cb);
-                          Ok(())
-                      })
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })

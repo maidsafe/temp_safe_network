@@ -36,12 +36,15 @@ pub fn create_dir<T: 'static>(client: &Client<T>, is_public: bool) -> Box<NfsFut
 
             let mut owners = BTreeSet::new();
             owners.insert(pub_key);
-            let dir_md = fry!(MutableData::new(dir.name,
-                                               dir.type_tag,
-                                               BTreeMap::new(),
-                                               BTreeMap::new(),
-                                               owners)
-                                      .map_err(CoreError::from));
+            let dir_md = fry!(
+                MutableData::new(
+                    dir.name,
+                    dir.type_tag,
+                    BTreeMap::new(),
+                    BTreeMap::new(),
+                    owners,
+                ).map_err(CoreError::from)
+            );
             client.put_mdata(dir_md)
                 .and_then(|()| Ok(dir))
                 .map_err(NfsError::from)
