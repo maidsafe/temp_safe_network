@@ -16,7 +16,6 @@
 // relating to use of the SAFE Network Software.
 
 use super::*;
-use QUORUM;
 use maidsafe_utilities::SeededRng;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use mock_routing::RequestWrapper;
@@ -28,7 +27,8 @@ use vault::Refresh as VaultRefresh;
 
 const CHUNK_STORE_CAPACITY: u64 = 1024 * 1024;
 const CHUNK_STORE_DIR: &'static str = "test_safe_vault_chunk_store";
-
+const GROUP_SIZE: usize = 8;
+const QUORUM: usize = 5;
 const TEST_TAG: u64 = 12345678;
 
 #[test]
@@ -817,9 +817,11 @@ fn mdata_parallel_mutations_limits() {
 
 fn create_data_manager() -> DataManager {
     let suffix: u64 = rand::random();
-    let dir = format!("{}_{}", CHUNK_STORE_DIR, suffix);
+    let dir = format!("{:?}/{}_{}", env::temp_dir(), CHUNK_STORE_DIR, suffix);
 
-    unwrap!(DataManager::new(env::temp_dir().join(dir), CHUNK_STORE_CAPACITY))
+    unwrap!(DataManager::new(GROUP_SIZE,
+                             Some(dir),
+                             Some(CHUNK_STORE_CAPACITY)))
 }
 
 // Create and setup all the objects necessary for churn-related tests.
