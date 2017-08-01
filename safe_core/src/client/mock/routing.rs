@@ -270,7 +270,7 @@ impl Routing {
             None
         };
         if let Some(response) = override_response {
-            self.send_response(GET_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
+            self.send_response(PUT_MDATA_DELAY_MS, nae_auth, self.client_auth, response);
             return Ok(());
         }
 
