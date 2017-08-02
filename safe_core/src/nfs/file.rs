@@ -123,8 +123,8 @@ impl ReprC for File {
     /// Convert to the native rust equivalent by cloning the internal data, preserving self.
     #[allow(unsafe_code)]
     unsafe fn clone_from_repr_c(repr_c: *const FfiFile) -> Result<File, NfsError> {
-        let user_metadata = slice::from_raw_parts((*repr_c).user_metadata_ptr,
-                                                  (*repr_c).user_metadata_len)
+        let user_metadata =
+            slice::from_raw_parts((*repr_c).user_metadata_ptr, (*repr_c).user_metadata_len)
                 .to_vec();
 
         let created = convert_date_time((*repr_c).created_sec, (*repr_c).created_nsec)?;
@@ -142,8 +142,11 @@ impl ReprC for File {
 
 #[inline]
 fn convert_date_time(sec: i64, nsec: u32) -> Result<DateTime<Utc>, NfsError> {
-    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec)
-        .ok_or_else(|| NfsError::Unexpected("Invalid date format".to_string()))?;
+    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec).ok_or_else(
+        || {
+            NfsError::Unexpected("Invalid date format".to_string())
+        },
+    )?;
     Ok(DateTime::<Utc>::from_utc(naive, Utc))
 }
 

@@ -41,11 +41,12 @@ pub struct Writer<T> {
 
 impl<T: 'static> Writer<T> {
     /// Create new instance of Writer
-    pub fn new(client: Client<T>,
-               storage: SelfEncryptionStorage<T>,
-               mode: Mode,
-               file: File)
-               -> Box<NfsFuture<Writer<T>>> {
+    pub fn new(
+        client: Client<T>,
+        storage: SelfEncryptionStorage<T>,
+        mode: Mode,
+        file: File,
+    ) -> Box<NfsFuture<Writer<T>>> {
         let fut = match mode {
             Mode::Append => {
                 data_map::get(&client, file.data_map_name())
@@ -56,23 +57,24 @@ impl<T: 'static> Writer<T> {
         };
         let client = client.clone();
         fut.and_then(move |data_map| {
-                          SequentialEncryptor::new(storage, data_map).map_err(From::from)
-                      })
-            .map(move |self_encryptor| {
-                     Writer {
-                         client,
-                         file,
-                         self_encryptor,
-                     }
-                 })
+            SequentialEncryptor::new(storage, data_map).map_err(From::from)
+        }).map(move |self_encryptor| {
+                Writer {
+                    client,
+                    file,
+                    self_encryptor,
+                }
+            })
             .map_err(From::from)
             .into_box()
     }
 
     /// Data of a file/blob can be written in smaller chunks
     pub fn write(&self, data: &[u8]) -> Box<NfsFuture<()>> {
-        trace!("Writer writing file data of size {} into self-encryptor.",
-               data.len());
+        trace!(
+            "Writer writing file data of size {} into self-encryptor.",
+            data.len()
+        );
         self.self_encryptor
             .write(data)
             .map_err(From::from)
@@ -94,11 +96,11 @@ impl<T: 'static> Writer<T> {
             .map_err(From::from)
             .and_then(move |(data_map, _)| data_map::put(&client, &data_map))
             .map(move |data_map_name| {
-                     file.set_data_map_name(data_map_name);
-                     file.set_modified_time(Utc::now());
-                     file.set_size(size);
-                     file
-                 })
+                file.set_data_map_name(data_map_name);
+                file.set_modified_time(Utc::now());
+                file.set_size(size);
+                file
+            })
             .into_box()
     }
 }

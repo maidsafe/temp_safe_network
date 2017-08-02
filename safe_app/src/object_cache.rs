@@ -165,34 +165,42 @@ macro_rules! impl_cache {
     }
 }
 
-impl_cache!(cipher_opt,
-            CipherOpt,
-            CipherOptHandle,
-            InvalidCipherOptHandle,
-            get_cipher_opt,
-            insert_cipher_opt,
-            remove_cipher_opt);
-impl_cache!(encrypt_key,
-            box_::PublicKey,
-            EncryptPubKeyHandle,
-            InvalidEncryptPubKeyHandle,
-            get_encrypt_key,
-            insert_encrypt_key,
-            remove_encrypt_key);
-impl_cache!(secret_key,
-            box_::SecretKey,
-            EncryptSecKeyHandle,
-            InvalidEncryptSecKeyHandle,
-            get_secret_key,
-            insert_secret_key,
-            remove_secret_key);
-impl_cache!(mdata_info,
-            MDataInfo,
-            MDataInfoHandle,
-            InvalidMDataInfoHandle,
-            get_mdata_info,
-            insert_mdata_info,
-            remove_mdata_info);
+impl_cache!(
+    cipher_opt,
+    CipherOpt,
+    CipherOptHandle,
+    InvalidCipherOptHandle,
+    get_cipher_opt,
+    insert_cipher_opt,
+    remove_cipher_opt
+);
+impl_cache!(
+    encrypt_key,
+    box_::PublicKey,
+    EncryptPubKeyHandle,
+    InvalidEncryptPubKeyHandle,
+    get_encrypt_key,
+    insert_encrypt_key,
+    remove_encrypt_key
+);
+impl_cache!(
+    secret_key,
+    box_::SecretKey,
+    EncryptSecKeyHandle,
+    InvalidEncryptSecKeyHandle,
+    get_secret_key,
+    insert_secret_key,
+    remove_secret_key
+);
+impl_cache!(
+    mdata_info,
+    MDataInfo,
+    MDataInfoHandle,
+    InvalidMDataInfoHandle,
+    get_mdata_info,
+    insert_mdata_info,
+    remove_mdata_info
+);
 impl_cache!(mdata_entries,
             BTreeMap<Vec<u8>, Value>,
             MDataEntriesHandle,

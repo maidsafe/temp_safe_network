@@ -29,13 +29,15 @@ use std::os::raw::c_void;
 // Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.
 // Use this if the lambda never returns future.
-pub unsafe fn send_sync<C, F>(app: *const App,
-                              user_data: *mut c_void,
-                              o_cb: C,
-                              f: F)
-                              -> Result<(), AppError>
-    where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&Client<AppContext>, &AppContext) -> Result<C::Args, AppError> + Send + 'static
+pub unsafe fn send_sync<C, F>(
+    app: *const App,
+    user_data: *mut c_void,
+    o_cb: C,
+    f: F,
+) -> Result<(), AppError>
+where
+    C: Callback + Copy + Send + 'static,
+    F: FnOnce(&Client<AppContext>, &AppContext) -> Result<C::Args, AppError> + Send + 'static,
 {
     let user_data = OpaqueCtx(user_data);
 
@@ -52,30 +54,34 @@ pub unsafe fn send_sync<C, F>(app: *const App,
 
 // Helper to reduce boilerplate when sending asynchronous operations to the app
 // event loop.
-pub unsafe fn send_with_mdata_info<C, F, U, E>(app: *const App,
-                                               info_h: MDataInfoHandle,
-                                               user_data: *mut c_void,
-                                               o_cb: C,
-                                               f: F)
-                                               -> Result<(), AppError>
-    where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&Client<AppContext>, &AppContext, &MDataInfo) -> U + Send + 'static,
-          U: Future<Item = C::Args, Error = E> + 'static,
-          E: Debug + 'static,
-          AppError: From<E>
+pub unsafe fn send_with_mdata_info<C, F, U, E>(
+    app: *const App,
+    info_h: MDataInfoHandle,
+    user_data: *mut c_void,
+    o_cb: C,
+    f: F,
+) -> Result<(), AppError>
+where
+    C: Callback + Copy + Send + 'static,
+    F: FnOnce(&Client<AppContext>, &AppContext, &MDataInfo) -> U + Send + 'static,
+    U: Future<Item = C::Args, Error = E> + 'static,
+    E: Debug + 'static,
+    AppError: From<E>,
 {
     let user_data = OpaqueCtx(user_data);
 
     (*app).send(move |client, context| {
-        let info = try_cb!(context.object_cache().get_mdata_info(info_h),
-                           user_data,
-                           o_cb);
+        let info = try_cb!(
+            context.object_cache().get_mdata_info(info_h),
+            user_data,
+            o_cb
+        );
         f(client, context, &*info)
             .map(move |args| o_cb.call(user_data.0, FFI_RESULT_OK, args))
             .map_err(AppError::from)
             .map_err(move |err| {
-                         call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                     })
+                call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+            })
             .into_box()
             .into()
     })

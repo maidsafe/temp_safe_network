@@ -45,32 +45,33 @@ pub static FILE_READ_TO_END: u64 = 0;
 
 /// Retrieve file with the given name, and its version, from the directory.
 #[no_mangle]
-pub unsafe extern "C" fn dir_fetch_file(app: *const App,
-                                        parent_h: MDataInfoHandle,
-                                        file_name: *const c_char,
-                                        user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void,
-                                                            FfiResult,
-                                                            *const File,
-                                                            u64)) {
+pub unsafe extern "C" fn dir_fetch_file(
+    app: *const App,
+    parent_h: MDataInfoHandle,
+    file_name: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File, u64),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let parent = try_cb!(context.object_cache().get_mdata_info(parent_h),
-                                 user_data.0,
-                                 o_cb);
+            let parent = try_cb!(
+                context.object_cache().get_mdata_info(parent_h),
+                user_data.0,
+                o_cb
+            );
 
             file_helper::fetch(client.clone(), parent.clone(), file_name)
                 .map(move |(version, file)| {
-                         let ffi_file = file.into_repr_c();
-                         o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
-                     })
+                    let ffi_file = file.into_repr_c();
+                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
+                })
                 .map_err(AppError::from)
                 .map_err(move |err| {
-                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                         })
+                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                })
                 .into_box()
                 .into()
         })
@@ -79,12 +80,14 @@ pub unsafe extern "C" fn dir_fetch_file(app: *const App,
 
 /// Insert the file into the parent directory.
 #[no_mangle]
-pub unsafe extern "C" fn dir_insert_file(app: *const App,
-                                         parent_h: MDataInfoHandle,
-                                         file_name: *const c_char,
-                                         file: *const File,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn dir_insert_file(
+    app: *const App,
+    parent_h: MDataInfoHandle,
+    file_name: *const c_char,
+    file: *const File,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
@@ -98,13 +101,15 @@ pub unsafe extern "C" fn dir_insert_file(app: *const App,
 /// Replace the file in the parent directory.
 /// If `version` is 0, the correct version is obtained automatically.
 #[no_mangle]
-pub unsafe extern "C" fn dir_update_file(app: *const App,
-                                         parent_h: MDataInfoHandle,
-                                         file_name: *const c_char,
-                                         file: *const File,
-                                         version: u64,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn dir_update_file(
+    app: *const App,
+    parent_h: MDataInfoHandle,
+    file_name: *const c_char,
+    file: *const File,
+    version: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
@@ -117,12 +122,14 @@ pub unsafe extern "C" fn dir_update_file(app: *const App,
 
 /// Delete the file in the parent directory.
 #[no_mangle]
-pub unsafe extern "C" fn dir_delete_file(app: *const App,
-                                         parent_h: MDataInfoHandle,
-                                         file_name: *const c_char,
-                                         version: u64,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn dir_delete_file(
+    app: *const App,
+    parent_h: MDataInfoHandle,
+    file_name: *const c_char,
+    version: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -133,11 +140,13 @@ pub unsafe extern "C" fn dir_delete_file(app: *const App,
 
 /// Open the file to read of write its contents
 #[no_mangle]
-pub unsafe extern "C" fn file_open(app: *const App,
-                                   file: *const File,
-                                   open_mode: u64,
-                                   user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle)) {
+pub unsafe extern "C" fn file_open(
+    app: *const App,
+    file: *const File,
+    open_mode: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let file = NativeFile::clone_from_repr_c(file)?;
@@ -171,13 +180,13 @@ pub unsafe extern "C" fn file_open(app: *const App,
             reader
                 .join(writer)
                 .map(move |(reader, writer)| {
-                         let file_ctx = FileContext { reader, writer };
-                         let file_h = context.object_cache().insert_file(file_ctx);
-                         o_cb(user_data.0, FFI_RESULT_OK, file_h);
-                     })
+                    let file_ctx = FileContext { reader, writer };
+                    let file_h = context.object_cache().insert_file(file_ctx);
+                    o_cb(user_data.0, FFI_RESULT_OK, file_h);
+                })
                 .map_err(move |err| {
-                             call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
-                         })
+                    call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
+                })
                 .into_box()
                 .into()
         })
@@ -186,10 +195,12 @@ pub unsafe extern "C" fn file_open(app: *const App,
 
 /// Get a size of file opened for read.
 #[no_mangle]
-pub unsafe extern "C" fn file_size(app: *const App,
-                                   file_h: FileContextHandle,
-                                   user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, FfiResult, u64)) {
+pub unsafe extern "C" fn file_size(
+    app: *const App,
+    file_h: FileContextHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -208,12 +219,14 @@ pub unsafe extern "C" fn file_size(app: *const App,
 
 /// Read data from file.
 #[no_mangle]
-pub unsafe extern "C" fn file_read(app: *const App,
-                                   file_h: FileContextHandle,
-                                   position: u64,
-                                   len: u64,
-                                   user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize)) {
+pub unsafe extern "C" fn file_read(
+    app: *const App,
+    file_h: FileContextHandle,
+    position: u64,
+    len: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -222,20 +235,20 @@ pub unsafe extern "C" fn file_read(app: *const App,
 
             if let Some(ref reader) = file_ctx.reader {
                 reader
-                    .read(position,
-                          if len == FILE_READ_TO_END {
-                              reader.size() - position
-                          } else {
-                              len
-                          })
+                    .read(
+                        position,
+                        if len == FILE_READ_TO_END {
+                            reader.size() - position
+                        } else {
+                            len
+                        },
+                    )
                     .map(move |data| {
-                             o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
-                         })
+                        o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
+                    })
                     .map_err(move |err| {
-                                 call_result_cb!(Err::<(), _>(AppError::from(err)),
-                                                 user_data,
-                                                 o_cb);
-                             })
+                        call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
+                    })
                     .into_box()
                     .into()
             } else {
@@ -248,12 +261,14 @@ pub unsafe extern "C" fn file_read(app: *const App,
 
 /// Write data to file in smaller chunks.
 #[no_mangle]
-pub unsafe extern "C" fn file_write(app: *const App,
-                                    file_h: FileContextHandle,
-                                    data: *const u8,
-                                    size: usize,
-                                    user_data: *mut c_void,
-                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn file_write(
+    app: *const App,
+    file_h: FileContextHandle,
+    data: *const u8,
+    size: usize,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let data = slice::from_raw_parts(data, size);
@@ -265,9 +280,9 @@ pub unsafe extern "C" fn file_write(app: *const App,
                 writer
                     .write(data)
                     .then(move |res| {
-                              call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
-                              Ok(())
-                          })
+                        call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                        Ok(())
+                    })
                     .into_box()
                     .into()
             } else {
@@ -281,10 +296,12 @@ pub unsafe extern "C" fn file_write(app: *const App,
 /// Close is invoked only after all the data is completely written. The
 /// file is saved only when `close` is invoked.
 #[no_mangle]
-pub unsafe extern "C" fn file_close(app: *const App,
-                                    file_h: FileContextHandle,
-                                    user_data: *mut c_void,
-                                    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File)) {
+pub unsafe extern "C" fn file_close(
+    app: *const App,
+    file_h: FileContextHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File),
+) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -294,12 +311,12 @@ pub unsafe extern "C" fn file_close(app: *const App,
             if let Some(writer) = file_ctx.writer {
                 writer
                     .close()
-                    .map(move |file| { o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c()); })
+                    .map(move |file| {
+                        o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c());
+                    })
                     .map_err(move |err| {
-                                 call_result_cb!(Err::<(), _>(AppError::from(err)),
-                                                 user_data,
-                                                 o_cb);
-                             })
+                        call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
+                    })
                     .into_box()
                     .into()
             } else {
@@ -328,20 +345,24 @@ mod tests {
     #[test]
     fn basics() {
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert("_videos".to_string(),
-                                             btree_set![Permission::Read,
-                                                        Permission::Insert,
-                                                        Permission::Update,
-                                                        Permission::Delete]);
+        let _ = container_permissions.insert(
+            "_videos".to_string(),
+            btree_set![
+                Permission::Read,
+                Permission::Insert,
+                Permission::Update,
+                Permission::Delete,
+            ],
+        );
 
         let app = create_app_with_access(container_permissions);
 
         let container_info_h = run(&app, move |client, context| {
             let context = context.clone();
 
-            context
-                .get_container_mdata_info(client, "_videos")
-                .map(move |info| context.object_cache().insert_mdata_info(info))
+            context.get_container_mdata_info(client, "_videos").map(
+                move |info| context.object_cache().insert_mdata_info(info),
+            )
         });
 
         let file_name0 = "file0.txt";
@@ -349,7 +370,9 @@ mod tests {
 
         // fetching non-existing file fails.
         let res: Result<(NativeFile, u64), i32> = unsafe {
-            call_2(|ud, cb| dir_fetch_file(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb))
+            call_2(|ud, cb| {
+                dir_fetch_file(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
+            })
         };
 
         match res {
@@ -365,26 +388,23 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               dir_insert_file(&app,
-                                               container_info_h,
-                                               ffi_file_name0.as_ptr(),
-                                               &ffi_file,
-                                               ud,
-                                               cb)
-                           }))
+                dir_insert_file(
+                    &app,
+                    container_info_h,
+                    ffi_file_name0.as_ptr(),
+                    &ffi_file,
+                    ud,
+                    cb,
+                )
+            }))
         }
 
         // Fetch it back.
-        let (retrieved_file, retrieved_version): (NativeFile, u64) =
-            unsafe {
-                unwrap!(call_2(|ud, cb| {
-                                   dir_fetch_file(&app,
-                                                  container_info_h,
-                                                  ffi_file_name0.as_ptr(),
-                                                  ud,
-                                                  cb)
-                               }))
-            };
+        let (retrieved_file, retrieved_version): (NativeFile, u64) = unsafe {
+            unwrap!(call_2(|ud, cb| {
+                dir_fetch_file(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
+            }))
+        };
         assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
         assert_eq!(retrieved_file.size(), 0);
         assert_eq!(retrieved_version, 0);
@@ -392,13 +412,8 @@ mod tests {
         // Delete file.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               dir_delete_file(&app,
-                                               container_info_h,
-                                               ffi_file_name0.as_ptr(),
-                                               1,
-                                               ud,
-                                               cb)
-                           }))
+                dir_delete_file(&app, container_info_h, ffi_file_name0.as_ptr(), 1, ud, cb)
+            }))
         }
     }
 
@@ -416,20 +431,24 @@ mod tests {
     #[test]
     fn open_file() {
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert("_videos".to_string(),
-                                             btree_set![Permission::Read,
-                                                        Permission::Insert,
-                                                        Permission::Update,
-                                                        Permission::Delete]);
+        let _ = container_permissions.insert(
+            "_videos".to_string(),
+            btree_set![
+                Permission::Read,
+                Permission::Insert,
+                Permission::Update,
+                Permission::Delete,
+            ],
+        );
 
         let app = create_app_with_access(container_permissions);
 
         let container_info_h = run(&app, move |client, context| {
             let context = context.clone();
 
-            context
-                .get_container_mdata_info(client, "_videos")
-                .map(move |info| context.object_cache().insert_mdata_info(info))
+            context.get_container_mdata_info(client, "_videos").map(
+                move |info| context.object_cache().insert_mdata_info(info),
+            )
         });
 
         // Create non-empty file.
@@ -442,38 +461,38 @@ mod tests {
         let content = b"hello world";
 
         let write_h = unsafe {
-            unwrap!(call_1(|ud, cb| file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)))
+            unwrap!(call_1(|ud, cb| {
+                file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)
+            }))
         };
 
         let written_file: NativeFile = unsafe {
             unwrap!(call_0(|ud, cb| {
-                               file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
-                           }));
+                file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
+            }));
             unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
         };
 
         // Insert file into container.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               dir_insert_file(&app,
-                                               container_info_h,
-                                               ffi_file_name1.as_ptr(),
-                                               &written_file.into_repr_c(),
-                                               ud,
-                                               cb)
-                           }))
+                dir_insert_file(
+                    &app,
+                    container_info_h,
+                    ffi_file_name1.as_ptr(),
+                    &written_file.into_repr_c(),
+                    ud,
+                    cb,
+                )
+            }))
         }
 
         // Fetch it back.
         let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                                   dir_fetch_file(&app,
-                                                  container_info_h,
-                                                  ffi_file_name1.as_ptr(),
-                                                  ud,
-                                                  cb)
-                               }))
+                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                }))
             }
         };
         assert_eq!(version, 0);
@@ -481,18 +500,20 @@ mod tests {
         // Read the content and append data
         let read_write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
-                               file_open(&app,
-                                         &file.into_repr_c(),
-                                         OPEN_MODE_READ | OPEN_MODE_APPEND,
-                                         ud,
-                                         cb)
-                           }))
+                file_open(
+                    &app,
+                    &file.into_repr_c(),
+                    OPEN_MODE_READ | OPEN_MODE_APPEND,
+                    ud,
+                    cb,
+                )
+            }))
         };
 
         let retrieved_content = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                                    file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
-                                }))
+                file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
+            }))
         };
         assert_eq!(retrieved_content, content);
 
@@ -500,26 +521,30 @@ mod tests {
 
         let written_file: NativeFile = unsafe {
             unwrap!(call_0(|ud, cb| {
-                               file_write(&app,
-                                          read_write_h,
-                                          append_content.as_ptr(),
-                                          append_content.len(),
-                                          ud,
-                                          cb)
-                           }));
+                file_write(
+                    &app,
+                    read_write_h,
+                    append_content.as_ptr(),
+                    append_content.len(),
+                    ud,
+                    cb,
+                )
+            }));
             unwrap!(call_1(|ud, cb| file_close(&app, read_write_h, ud, cb)))
         };
 
         // Update it in the dir
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                dir_update_file(&app,
-                                container_info_h,
-                                ffi_file_name1.as_ptr(),
-                                &written_file.into_repr_c(),
-                                1,
-                                ud,
-                                cb)
+                dir_update_file(
+                    &app,
+                    container_info_h,
+                    ffi_file_name1.as_ptr(),
+                    &written_file.into_repr_c(),
+                    1,
+                    ud,
+                    cb,
+                )
             }))
         }
 
@@ -527,22 +552,22 @@ mod tests {
         let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                                   dir_fetch_file(&app,
-                                                  container_info_h,
-                                                  ffi_file_name1.as_ptr(),
-                                                  ud,
-                                                  cb)
-                               }))
+                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                }))
             }
         };
         assert_eq!(version, 1);
 
         let read_h = unsafe {
-            unwrap!(call_1(|ud, cb| file_open(&app, &file.into_repr_c(), OPEN_MODE_READ, ud, cb)))
+            unwrap!(call_1(|ud, cb| {
+                file_open(&app, &file.into_repr_c(), OPEN_MODE_READ, ud, cb)
+            }))
         };
 
         let retrieved_content = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)))
+            unwrap!(call_vec_u8(|ud, cb| {
+                file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
+            }))
         };
         assert_eq!(retrieved_content, b"hello world appended");
 
@@ -561,20 +586,24 @@ mod tests {
     #[test]
     fn delete_then_open_file() {
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert("_videos".to_string(),
-                                             btree_set![Permission::Read,
-                                                        Permission::Insert,
-                                                        Permission::Update,
-                                                        Permission::Delete]);
+        let _ = container_permissions.insert(
+            "_videos".to_string(),
+            btree_set![
+                Permission::Read,
+                Permission::Insert,
+                Permission::Update,
+                Permission::Delete,
+            ],
+        );
 
         let app = create_app_with_access(container_permissions);
 
         let container_info_h = run(&app, move |client, context| {
             let context = context.clone();
 
-            context
-                .get_container_mdata_info(client, "_videos")
-                .map(move |info| context.object_cache().insert_mdata_info(info))
+            context.get_container_mdata_info(client, "_videos").map(
+                move |info| context.object_cache().insert_mdata_info(info),
+            )
         });
 
         // Create non-empty file.
@@ -587,43 +616,44 @@ mod tests {
         let content_original = b"hello world";
 
         let write_h = unsafe {
-            unwrap!(call_1(|ud, cb| file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)))
+            unwrap!(call_1(|ud, cb| {
+                file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)
+            }))
         };
 
         let written_file: NativeFile = unsafe {
             unwrap!(call_0(|ud, cb| {
-                               file_write(&app,
-                                          write_h,
-                                          content_original.as_ptr(),
-                                          content_original.len(),
-                                          ud,
-                                          cb)
-                           }));
+                file_write(
+                    &app,
+                    write_h,
+                    content_original.as_ptr(),
+                    content_original.len(),
+                    ud,
+                    cb,
+                )
+            }));
             unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
         };
 
         // Insert file into container.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               dir_insert_file(&app,
-                                               container_info_h,
-                                               ffi_file_name2.as_ptr(),
-                                               &written_file.into_repr_c(),
-                                               ud,
-                                               cb)
-                           }))
+                dir_insert_file(
+                    &app,
+                    container_info_h,
+                    ffi_file_name2.as_ptr(),
+                    &written_file.into_repr_c(),
+                    ud,
+                    cb,
+                )
+            }))
         }
 
         // Delete file.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               dir_delete_file(&app,
-                                               container_info_h,
-                                               ffi_file_name2.as_ptr(),
-                                               1,
-                                               ud,
-                                               cb)
-                           }))
+                dir_delete_file(&app, container_info_h, ffi_file_name2.as_ptr(), 1, ud, cb)
+            }))
         }
 
         // Create new non-empty file.
@@ -633,31 +663,37 @@ mod tests {
         let content_new = b"hello goodbye";
 
         let write_h = unsafe {
-            unwrap!(call_1(|ud, cb| file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)))
+            unwrap!(call_1(|ud, cb| {
+                file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)
+            }))
         };
 
         let new_file: NativeFile = unsafe {
             unwrap!(call_0(|ud, cb| {
-                               file_write(&app,
-                                          write_h,
-                                          content_new.as_ptr(),
-                                          content_new.len(),
-                                          ud,
-                                          cb)
-                           }));
+                file_write(
+                    &app,
+                    write_h,
+                    content_new.as_ptr(),
+                    content_new.len(),
+                    ud,
+                    cb,
+                )
+            }));
             unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
         };
 
         // Update file in container.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                dir_update_file(&app,
-                                container_info_h,
-                                ffi_file_name2.as_ptr(),
-                                &new_file.into_repr_c(),
-                                2,
-                                ud,
-                                cb)
+                dir_update_file(
+                    &app,
+                    container_info_h,
+                    ffi_file_name2.as_ptr(),
+                    &new_file.into_repr_c(),
+                    2,
+                    ud,
+                    cb,
+                )
             }))
         }
 
@@ -665,12 +701,8 @@ mod tests {
         let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                                   dir_fetch_file(&app,
-                                                  container_info_h,
-                                                  ffi_file_name2.as_ptr(),
-                                                  ud,
-                                                  cb)
-                               }))
+                    dir_fetch_file(&app, container_info_h, ffi_file_name2.as_ptr(), ud, cb)
+                }))
             }
         };
         assert_eq!(version, 2);
@@ -678,18 +710,20 @@ mod tests {
         // Read the content.
         let read_write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
-                               file_open(&app,
-                                         &file.into_repr_c(),
-                                         OPEN_MODE_READ | OPEN_MODE_APPEND,
-                                         ud,
-                                         cb)
-                           }))
+                file_open(
+                    &app,
+                    &file.into_repr_c(),
+                    OPEN_MODE_READ | OPEN_MODE_APPEND,
+                    ud,
+                    cb,
+                )
+            }))
         };
 
         let retrieved_content = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                                    file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
-                                }))
+                file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
+            }))
         };
         assert_eq!(retrieved_content, content_new);
     }

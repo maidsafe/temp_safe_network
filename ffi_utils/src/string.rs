@@ -29,10 +29,10 @@ impl ReprC for String {
 
     unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<String, StringError> {
         Ok(if c_repr.is_null() {
-               String::default()
-           } else {
-               from_c_str(c_repr)?
-           })
+            String::default()
+        } else {
+            from_c_str(c_repr)?
+        })
     }
 }
 

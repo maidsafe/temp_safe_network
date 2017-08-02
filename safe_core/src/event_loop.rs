@@ -42,13 +42,16 @@ impl<T> CoreMsg<T> {
     /// return value of the given closure is optionally a future, it will be
     /// registered in the event loop.
     pub fn new<F>(f: F) -> Self
-        where F: FnOnce(&Client<T>, &T) -> Option<TailFuture> + Send + 'static
+    where
+        F: FnOnce(&Client<T>, &T) -> Option<TailFuture> + Send + 'static,
     {
         let mut f = Some(f);
-        CoreMsg(Some(Box::new(move |client, context| -> Option<TailFuture> {
-                                  let f = unwrap!(f.take());
-                                  f(client, context)
-                              })))
+        CoreMsg(Some(
+            Box::new(move |client, context| -> Option<TailFuture> {
+                let f = unwrap!(f.take());
+                f(client, context)
+            }),
+        ))
     }
 
     /// Construct a new message which when processed by the event loop will

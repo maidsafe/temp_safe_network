@@ -107,7 +107,7 @@ mod codes {
 
 /// App error.
 #[derive(Debug)]
-#[cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
+#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 pub enum AppError {
     /// Error from safe_core.
     CoreError(CoreError),
@@ -169,9 +169,11 @@ impl Display for AppError {
             AppError::NoSuchContainer => write!(formatter, "Container not found"),
             AppError::InvalidCipherOptHandle => write!(formatter, "Invalid CipherOpt handle"),
             AppError::InvalidFileMode => {
-                write!(formatter,
-                       "Invalid file mode (e.g. trying to write when \
-                       file is opened for reading only)")
+                write!(
+                    formatter,
+                    "Invalid file mode (e.g. trying to write when \
+                       file is opened for reading only)"
+                )
             }
             AppError::InvalidEncryptPubKeyHandle => {
                 write!(formatter, "Invalid encrypt (box_) key handle")
@@ -199,11 +201,13 @@ impl Display for AppError {
                 write!(formatter, "Self-encryption error: {}", error)
             }
             AppError::InvalidSelfEncryptorReadOffsets => {
-                write!(formatter,
-                       "Invalid offsets (from-position \
+                write!(
+                    formatter,
+                    "Invalid offsets (from-position \
                         and length combination) provided for \
                         reading form SelfEncryptor. Would have \
-                        probably caused an overflow.")
+                        probably caused an overflow."
+                )
             }
             AppError::IoError(ref error) => write!(formatter, "I/O error: {}", error),
             AppError::Unexpected(ref error) => {

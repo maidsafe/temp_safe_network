@@ -33,7 +33,7 @@ pub use routing::BootstrapConfig;
 use std::u32;
 
 /// IPC message
-#[cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
+#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 #[derive(Serialize, Deserialize, Debug)]
 pub enum IpcMsg {
     /// Request

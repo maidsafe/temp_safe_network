@@ -36,15 +36,15 @@ use std::os::raw::{c_char, c_void};
 /// first parameter of the `o_cb` callback, while `network_cb_user_data` corresponds
 /// to the first parameter of the network events observer callback (`o_network_obs_cb`).
 #[no_mangle]
-pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
-                                    account_password: *const c_char,
-                                    invitation: *const c_char,
-                                    network_cb_user_data: *mut c_void,
-                                    user_data: *mut c_void,
-                                    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
-                                    o_cb: extern "C" fn(*mut c_void,
-                                                        FfiResult,
-                                                        *mut Authenticator)) {
+pub unsafe extern "C" fn create_acc(
+    account_locator: *const c_char,
+    account_password: *const c_char,
+    invitation: *const c_char,
+    network_cb_user_data: *mut c_void,
+    user_data: *mut c_void,
+    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
+) {
     let user_data = OpaqueCtx(user_data);
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
 
@@ -64,9 +64,11 @@ pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
                 }
             })?;
 
-        o_cb(user_data.0,
-             FFI_RESULT_OK,
-             Box::into_raw(Box::new(authenticator)));
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            Box::into_raw(Box::new(authenticator)),
+        );
 
         Ok(())
     })
@@ -78,12 +80,14 @@ pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
 /// first parameter of the `o_cb` callback, while `network_cb_user_data` corresponds
 /// to the first parameter of the network events observer callback (`o_network_obs_cb`).
 #[no_mangle]
-pub unsafe extern "C" fn login(account_locator: *const c_char,
-                               account_password: *const c_char,
-                               user_data: *mut c_void,
-                               network_cb_user_data: *mut c_void,
-                               o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
-                               o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator)) {
+pub unsafe extern "C" fn login(
+    account_locator: *const c_char,
+    account_password: *const c_char,
+    user_data: *mut c_void,
+    network_cb_user_data: *mut c_void,
+    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
+) {
     let user_data = OpaqueCtx(user_data);
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
 
@@ -93,19 +97,20 @@ pub unsafe extern "C" fn login(account_locator: *const c_char,
         let acc_locator = from_c_str(account_locator)?;
         let acc_password = from_c_str(account_password)?;
 
-        let authenticator =
-            Authenticator::login(acc_locator,
-                                 acc_password,
-                                 move |net_event| match net_event {
-                                     Ok(event) => {
-                                         o_network_obs_cb(network_cb_user_data.0, 0, event.into())
-                                     }
-                                     Err(()) => o_network_obs_cb(network_cb_user_data.0, -1, 0),
-                                 })?;
+        let authenticator = Authenticator::login(
+            acc_locator,
+            acc_password,
+            move |net_event| match net_event {
+                Ok(event) => o_network_obs_cb(network_cb_user_data.0, 0, event.into()),
+                Err(()) => o_network_obs_cb(network_cb_user_data.0, -1, 0),
+            },
+        )?;
 
-        o_cb(user_data.0,
-             FFI_RESULT_OK,
-             Box::into_raw(Box::new(authenticator)));
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            Box::into_raw(Box::new(authenticator)),
+        );
 
         Ok(())
     })
@@ -113,17 +118,21 @@ pub unsafe extern "C" fn login(account_locator: *const c_char,
 
 /// Try to restore a failed connection with the network.
 #[no_mangle]
-pub unsafe extern "C" fn auth_reconnect(auth: *mut Authenticator,
-                                        user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn auth_reconnect(
+    auth: *mut Authenticator,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
     let user_data = OpaqueCtx(user_data);
     let res = (*auth).send(move |client| {
-                               try_cb!(client.restart_routing().map_err(AuthError::from),
-                                       user_data.0,
-                                       o_cb);
-                               o_cb(user_data.0, FFI_RESULT_OK);
-                               None
-                           });
+        try_cb!(
+            client.restart_routing().map_err(AuthError::from),
+            user_data.0,
+            o_cb
+        );
+        o_cb(user_data.0, FFI_RESULT_OK);
+        None
+    });
     if let Err(..) = res {
         call_result_cb!(res, user_data, o_cb);
     }
@@ -131,25 +140,25 @@ pub unsafe extern "C" fn auth_reconnect(auth: *mut Authenticator,
 
 /// Get the account usage statistics.
 #[no_mangle]
-pub unsafe extern "C" fn auth_account_info(auth: *mut Authenticator,
-                                           user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void,
-                                                               FfiResult,
-                                                               *const FfiAccountInfo)) {
+pub unsafe extern "C" fn auth_account_info(
+    auth: *mut Authenticator,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAccountInfo),
+) {
     let user_data = OpaqueCtx(user_data);
     let res = (*auth).send(move |client| {
         client
             .get_account_info()
             .map(move |acc_info| {
-                     let ffi_acc = FfiAccountInfo {
-                         mutations_done: acc_info.mutations_done,
-                         mutations_available: acc_info.mutations_available,
-                     };
-                     o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
-                 })
+                let ffi_acc = FfiAccountInfo {
+                    mutations_done: acc_info.mutations_done,
+                    mutations_available: acc_info.mutations_available,
+                };
+                o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
+            })
             .map_err(move |e| {
-                         call_result_cb!(Err::<(), _>(AuthError::from(e)), user_data, o_cb);
-                     })
+                call_result_cb!(Err::<(), _>(AuthError::from(e)), user_data, o_cb);
+            })
             .into_box()
             .into()
     });
@@ -187,13 +196,15 @@ mod tests {
         {
             let auth_h: *mut Authenticator = unsafe {
                 unwrap!(call_1(|ud, cb| {
-                    create_acc(acc_locator.as_ptr(),
-                               acc_password.as_ptr(),
-                               invitation.as_ptr(),
-                               ud,
-                               ud,
-                               net_event_cb,
-                               cb)
+                    create_acc(
+                        acc_locator.as_ptr(),
+                        acc_password.as_ptr(),
+                        invitation.as_ptr(),
+                        ud,
+                        ud,
+                        net_event_cb,
+                        cb,
+                    )
                 }))
             };
             assert!(!auth_h.is_null());
@@ -203,13 +214,15 @@ mod tests {
         {
             let auth_h: *mut Authenticator = unsafe {
                 unwrap!(call_1(|ud, cb| {
-                                   login(acc_locator.as_ptr(),
-                                         acc_password.as_ptr(),
-                                         ud,
-                                         ud,
-                                         net_event_cb,
-                                         cb)
-                               }))
+                    login(
+                        acc_locator.as_ptr(),
+                        acc_password.as_ptr(),
+                        ud,
+                        ud,
+                        net_event_cb,
+                        cb,
+                    )
+                }))
             };
             assert!(!auth_h.is_null());
             unsafe { auth_free(auth_h) };
@@ -234,21 +247,23 @@ mod tests {
 
             let auth: *mut Authenticator = unsafe {
                 unwrap!(call_1(|ud, cb| {
-                    create_acc(acc_locator.as_ptr(),
-                               acc_password.as_ptr(),
-                               invitation.as_ptr(),
-                               sender_as_user_data(&tx),
-                               ud,
-                               net_event_cb,
-                               cb)
+                    create_acc(
+                        acc_locator.as_ptr(),
+                        acc_password.as_ptr(),
+                        invitation.as_ptr(),
+                        sender_as_user_data(&tx),
+                        ud,
+                        net_event_cb,
+                        cb,
+                    )
                 }))
             };
 
             unsafe {
                 unwrap!((*auth).send(move |client| {
-                                         client.simulate_network_disconnect();
-                                         None
-                                     }));
+                    client.simulate_network_disconnect();
+                    None
+                }));
             }
 
             let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
@@ -294,13 +309,15 @@ mod tests {
 
         let auth: *mut Authenticator = unsafe {
             unwrap!(call_1(|ud, cb| {
-                create_acc(acc_locator.as_ptr(),
-                           acc_password.as_ptr(),
-                           invitation.as_ptr(),
-                           ud,
-                           ud,
-                           net_event_cb,
-                           cb)
+                create_acc(
+                    acc_locator.as_ptr(),
+                    acc_password.as_ptr(),
+                    invitation.as_ptr(),
+                    ud,
+                    ud,
+                    net_event_cb,
+                    cb,
+                )
             }))
         };
 
@@ -310,19 +327,21 @@ mod tests {
 
         unsafe {
             unwrap!((*auth).send(move |client| {
-                                     client
-                                         .put_idata(ImmutableData::new(vec![1, 2, 3]))
-                                         .map_err(move |_| ())
-                                         .into_box()
-                                         .into()
-                                 }));
+                client
+                    .put_idata(ImmutableData::new(vec![1, 2, 3]))
+                    .map_err(move |_| ())
+                    .into_box()
+                    .into()
+            }));
         }
 
         let stats: AccountInfo =
             unsafe { unwrap!(call_1(|ud, cb| auth_account_info(auth, ud, cb))) };
         assert_eq!(stats.mutations_done, orig_stats.mutations_done + 1);
-        assert_eq!(stats.mutations_available,
-                   orig_stats.mutations_available - 1);
+        assert_eq!(
+            stats.mutations_available,
+            orig_stats.mutations_available - 1
+        );
 
         unsafe { auth_free(auth) };
     }

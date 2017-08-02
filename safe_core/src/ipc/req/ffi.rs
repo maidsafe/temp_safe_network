@@ -37,7 +37,8 @@ pub enum Permission {
 
 /// Transforms a `Permission` collection into `routing::PermissionSet`
 pub fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
-    where Iter: IntoIterator<Item = &'a Permission>
+where
+    Iter: IntoIterator<Item = &'a Permission>,
 {
     let mut ps = PermissionSet::new();
 
@@ -78,9 +79,11 @@ impl Drop for AuthReq {
     #[allow(unsafe_code)]
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(self.containers as *mut ContainerPermissions,
-                                        self.containers_len,
-                                        self.containers_cap);
+            let _ = Vec::from_raw_parts(
+                self.containers as *mut ContainerPermissions,
+                self.containers_len,
+                self.containers_cap,
+            );
         }
     }
 }
@@ -103,9 +106,11 @@ impl Drop for ContainersReq {
     #[allow(unsafe_code)]
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(self.containers as *mut ContainerPermissions,
-                                        self.containers_len,
-                                        self.containers_cap);
+            let _ = Vec::from_raw_parts(
+                self.containers as *mut ContainerPermissions,
+                self.containers_len,
+                self.containers_cap,
+            );
         }
     }
 }
@@ -161,9 +166,11 @@ impl Drop for ContainerPermissions {
     fn drop(&mut self) {
         unsafe {
             let _ = CString::from_raw(self.cont_name as *mut _);
-            let _ = Vec::from_raw_parts(self.access as *mut Permission,
-                                        self.access_len,
-                                        self.access_cap);
+            let _ = Vec::from_raw_parts(
+                self.access as *mut Permission,
+                self.access_len,
+                self.access_cap,
+            );
         }
     }
 }
