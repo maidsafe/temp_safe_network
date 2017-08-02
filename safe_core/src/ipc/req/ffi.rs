@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing::{Action, PermissionSet};
+use routing::{self, Action, XorName};
 use std::ffi::CString;
 use std::os::raw::c_char;
 
@@ -36,11 +36,11 @@ pub enum Permission {
 }
 
 /// Transforms a `Permission` collection into `routing::PermissionSet`
-pub fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
+pub fn convert_permission_set<'a, Iter>(permissions: Iter) -> routing::PermissionSet
 where
     Iter: IntoIterator<Item = &'a Permission>,
 {
-    let mut ps = PermissionSet::new();
+    let mut ps = routing::PermissionSet::new();
 
     for access in permissions {
         ps = match *access {
@@ -173,4 +173,55 @@ impl Drop for ContainerPermissions {
             );
         }
     }
+}
+
+#[repr(C)]
+/// Represents a request to share mutable data
+pub struct ShareMDataReq {
+    /// Info about the app requesting shared access
+    pub app: AppExchangeInfo,
+    /// List of MD names & type tags and permissions that need to be shared
+    pub mdata: *const ShareMData,
+    /// Length of the mdata array
+    pub mdata_len: usize,
+}
+
+#[repr(C)]
+/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
+pub struct ShareMData {
+    /// The mutable data type.
+    pub type_tag: u64,
+    /// The mutable data name.
+    pub name: XorName,
+    /// The metadata key.
+    pub metadata_key: *const c_char,
+    /// The permissions being requested.
+    pub perms: PermissionSet,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+/// Represents a requested set of changes to the permissions of a mutable data.
+pub struct PermissionSet {
+    /// How to modify the insert permission.
+    pub insert: PermissionModifier,
+    /// How to modify the update permission.
+    pub update: PermissionModifier,
+    /// How to modify the delete permission.
+    pub delete: PermissionModifier,
+    /// How to modify the manage permissions permission.
+    pub manage_permissions: PermissionModifier,
+}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+/// How to modify a permission. Used in the definition of `PermissionSet`.
+pub enum PermissionModifier {
+    /// No change to the permission.
+    NO_CHANGE = 0,
+    /// Allow
+    SET = 1,
+    /// Deny
+    UNSET = 2,
 }

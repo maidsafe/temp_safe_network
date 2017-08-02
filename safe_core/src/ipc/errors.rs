@@ -19,6 +19,7 @@ use base64::Base64Error;
 use ffi_utils::StringError;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
+use routing::XorName;
 use std::error::Error;
 use std::str::Utf8Error;
 
@@ -39,6 +40,10 @@ pub enum IpcError {
     AlreadyAuthorised,
     /// App is not registered
     UnknownApp,
+    /// User denied request for shared access to MD
+    ShareMDataDenied,
+    /// Requested shared access to non-owned MD
+    InvalidOwner(Vec<(u64, XorName)>),
 
     /// Unexpected error
     Unexpected(String),

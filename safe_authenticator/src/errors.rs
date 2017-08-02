@@ -80,6 +80,8 @@ mod codes {
     pub const ERR_ALREADY_AUTHORISED: i32 = -203;
     pub const ERR_UNKNOWN_APP: i32 = -204;
     pub const ERR_STRING_ERROR: i32 = -205;
+    pub const ERR_SHARE_MDATA_DENIED: i32 = -206;
+    pub const ERR_INVALID_OWNER: i32 = -207;
 
     // NFS errors.
     pub const ERR_FILE_EXISTS: i32 = -300;
@@ -229,6 +231,8 @@ impl ErrorCode for AuthError {
                     IpcError::UnknownApp => ERR_UNKNOWN_APP,
                     IpcError::Unexpected(_) => ERR_UNEXPECTED,
                     IpcError::StringError(_) => ERR_STRING_ERROR,
+                    IpcError::ShareMDataDenied => ERR_SHARE_MDATA_DENIED,
+                    IpcError::InvalidOwner(..) => ERR_INVALID_OWNER,
                 }
             }
             AuthError::NfsError(ref err) => {
