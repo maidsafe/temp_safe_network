@@ -28,15 +28,16 @@ const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;
 const TEST_TAG: u64 = 12345678;
 
+
 #[test]
 fn account_basics() {
     let (src, client_key) = test_utils::gen_client_authority();
     let dst = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
-    // Retrieving account info for non-existintg account fails.
+    // Retrieving account info for non-existing account fails.
     let res = get_account_info(&mut node, &mut mm, src, dst);
     assert_match!(res, Err(ClientError::NoSuchAccount));
 
@@ -55,7 +56,7 @@ fn idata_basics() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create account and retrieve the current account info.
@@ -106,7 +107,7 @@ fn mdata_basics() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create account and retrieve the current account info.
@@ -193,7 +194,7 @@ fn mdata_permissions_and_owners() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let _ = create_account(&mut node, &mut mm, client, client_manager);
@@ -357,7 +358,7 @@ fn auth_keys() {
     let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
     let (_, app_key) = test_utils::gen_client_authority();
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create owner account
@@ -385,7 +386,7 @@ fn auth_keys() {
                                    msg_id));
 
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
-                  Response::InsAuthKey { res: Err(ClientError::InvalidSuccessor), .. });
+                  Response::InsAuthKey { res: Err(ClientError::InvalidSuccessor(0)), .. });
 
     // Attempt to insert new auth key by non-owner fails.
     let (evil_client, _) = test_utils::gen_client_authority();
@@ -438,7 +439,7 @@ fn mutation_authorisation() {
     let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
     let (app_client, app_key) = test_utils::gen_client_authority();
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create owner account
@@ -648,13 +649,13 @@ fn account_replication_during_churn() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut old_node = RoutingNode::new();
+    let mut old_node = test_utils::new_routing_node(GROUP_SIZE);
     let mut old_mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let op_msg_id = create_account(&mut old_node, &mut old_mm, client, client_manager);
     let old_info = unwrap!(get_account_info(&mut old_node, &mut old_mm, client, client_manager));
 
-    let mut new_node = RoutingNode::new();
+    let mut new_node = test_utils::new_routing_node(GROUP_SIZE);
     let mut new_mm = MaidManager::new(GROUP_SIZE, None, false);
     let new_node_name = *unwrap!(new_node.id()).name();
 
@@ -711,7 +712,7 @@ fn account_replication_during_churn() {
 fn limits() {
     let mut rng = rand::thread_rng();
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let (client, client_key) = test_utils::gen_client_authority();
@@ -791,7 +792,7 @@ fn refresh_data_ops_count() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
     let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create account and retrieve the current balance.

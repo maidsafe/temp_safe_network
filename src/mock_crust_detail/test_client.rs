@@ -47,8 +47,7 @@ macro_rules! assert_recv_response {
             Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
                 assert_eq!($request_msg_id, msg_id);
                 if $is_oversized {
-                    let res = Err(ClientError::NetworkFull);
-                    Loop::Break(res)
+                    Loop::Break(Err(ClientError::NetworkFull))
                 } else {
                     FakeClock::advance_time(RETRY_DELAY_MS);
                     Loop::Continue
@@ -56,8 +55,7 @@ macro_rules! assert_recv_response {
             }
             Ok(Event::Terminate) => {
                 if $is_oversized {
-                    let res = Err(ClientError::InvalidOperation);
-                    Loop::Break(res)
+                    Loop::Break(Err(ClientError::InvalidOperation))
                 } else {
                     panic!("Unexpected termination")
                 }

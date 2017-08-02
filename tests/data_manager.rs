@@ -20,9 +20,9 @@
 
 use fake_clock::FakeClock;
 use rand::Rng;
-use routing::{Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions, Event,
-              ImmutableData, MAX_MUTABLE_DATA_ENTRIES, MessageId, MutableData, PermissionSet,
-              Response, User};
+use routing::{Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions,
+              EntryError, Event, ImmutableData, MAX_MUTABLE_DATA_ENTRIES, MessageId, MutableData,
+              PermissionSet, Response, User};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
 use safe_vault::{PENDING_WRITE_TIMEOUT_SECS, test_utils};
@@ -543,20 +543,21 @@ fn mutable_data_error_flow() {
     let actions = EntryActions::new()
         .update(non_existing_key.clone(), b"value".to_vec(), 1)
         .into();
-    assert_match!(
-        client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes),
-        Err(ClientError::NoSuchEntry)
-    );
+    let mut entry_errors = BTreeMap::new();
+    let _ = entry_errors.insert(non_existing_key.clone(), EntryError::NoSuchEntry);
+    match client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes) {
+        Err(ClientError::InvalidEntryActions(results)) => assert_eq!(results, entry_errors),
+        result => panic!("Unexpected {:?}", result),
+    }
 
     // Deleting a non-existing key fails.
     let actions = EntryActions::new().del(non_existing_key.clone(), 1).into();
-    assert_match!(
-        client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes),
-        Err(ClientError::NoSuchEntry)
-    );
+    match client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes) {
+        Err(ClientError::InvalidEntryActions(results)) => assert_eq!(results, entry_errors),
+        result => panic!("Unexpected {:?}", result),
+    }
 
-    // Mutations are all-or-nothing. If at least one entry actions fails, none
-    // gets applied.
+    // Mutations are all-or-nothing. If at least one entry actions fails, none gets applied.
     let actions = EntryActions::new()
         .ins(b"key".to_vec(), b"value".to_vec(), 0)
         .update(non_existing_key.clone(), b"value".to_vec(), 1)
@@ -592,26 +593,30 @@ fn mutable_data_error_flow() {
     let actions = EntryActions::new()
         .ins(b"key".to_vec(), b"value-0".to_vec(), 0)
         .into();
-    assert_match!(
-        client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes),
-        Err(ClientError::EntryExists)
-    );
+    entry_errors.clear();
+    let _ = entry_errors.insert(b"key".to_vec(), EntryError::EntryExists(0));
+    match client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes) {
+        Err(ClientError::InvalidEntryActions(results)) => assert_eq!(results, entry_errors),
+        result => panic!("Unexpected {:?}", result),
+    }
 
     // Updating entry with wrong version fails.
     let actions = EntryActions::new()
         .update(b"key".to_vec(), b"value-1".to_vec(), 0)
         .into();
-    assert_match!(
-        client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes),
-        Err(ClientError::InvalidSuccessor)
-    );
+    entry_errors.clear();
+    let _ = entry_errors.insert(b"key".to_vec(), EntryError::InvalidSuccessor(0));
+    match client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes) {
+        Err(ClientError::InvalidEntryActions(results)) => assert_eq!(results, entry_errors),
+        result => panic!("Unexpected {:?}", result),
+    }
 
     // Deleting entry with wrong version fails.
     let actions = EntryActions::new().del(b"key".to_vec(), 0).into();
-    assert_match!(
-        client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes),
-        Err(ClientError::InvalidSuccessor)
-    );
+    match client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes) {
+        Err(ClientError::InvalidEntryActions(results)) => assert_eq!(results, entry_errors),
+        result => panic!("Unexpected {:?}", result),
+    }
 
     // Create app.
     let mut app = TestClient::new(&network, Some(config));

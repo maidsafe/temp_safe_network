@@ -21,12 +21,10 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use mock_routing::RequestWrapper;
 use rand::{self, Rng};
 use routing::{Action, EntryActions, Request, Response, User};
-use std::env;
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
-const CHUNK_STORE_CAPACITY: u64 = 1024 * 1024;
-const CHUNK_STORE_DIR: &'static str = "test_safe_vault_chunk_store";
+const CHUNK_STORE_CAPACITY: Option<u64> = Some(1024 * 1024);
 const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;
 const TEST_TAG: u64 = 12345678;
@@ -41,8 +39,8 @@ fn idata_basics() {
     let data = test_utils::gen_immutable_data(10, &mut rng);
     let nae_manager = Authority::NaeManager(*data.name());
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Get non-existent data fails.
     let msg_id = MessageId::new();
@@ -97,8 +95,8 @@ fn mdata_basics() {
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Attempt to list entries of non-existent data fails.
     let msg_id = MessageId::new();
@@ -159,8 +157,8 @@ fn mdata_mutations() {
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Put the data.
     dm.put_into_chunk_store(data);
@@ -245,8 +243,8 @@ fn mdata_change_owner() {
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Put the data.
     dm.put_into_chunk_store(data);
@@ -298,8 +296,8 @@ fn mdata_change_owner() {
 fn handle_node_added() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let new_node_name = rand::random();
     node.add_to_routing_table(new_node_name);
@@ -554,8 +552,8 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
 fn mdata_non_conflicting_parallel_mutations() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -631,8 +629,8 @@ fn mdata_non_conflicting_parallel_mutations() {
 fn mdata_conflicting_parallel_mutations() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -702,8 +700,8 @@ fn mdata_conflicting_parallel_mutations() {
 fn mdata_parallel_mutations_limits() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -815,22 +813,13 @@ fn mdata_parallel_mutations_limits() {
     assert_match!(message.response, Response::MutateMDataEntries { res: Err(_), .. });
 }
 
-fn create_data_manager() -> DataManager {
-    let suffix: u64 = rand::random();
-    let dir = format!("{:?}/{}_{}", env::temp_dir(), CHUNK_STORE_DIR, suffix);
-
-    unwrap!(DataManager::new(GROUP_SIZE,
-                             Some(dir),
-                             Some(CHUNK_STORE_CAPACITY)))
-}
-
 // Create and setup all the objects necessary for churn-related tests.
 // Returns:
 //   - new node (RoutingNode + DataManager),
 //   - names of the rest of the nodes in the group.
 fn setup_churn<R: Rng>(rng: &mut R) -> (RoutingNode, DataManager, Vec<XorName>) {
-    let mut new_node = RoutingNode::new();
-    let new_dm = create_data_manager();
+    let mut new_node = test_utils::new_routing_node(GROUP_SIZE);
+    let new_dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let other_node_names: Vec<_> = rng.gen_iter().take(GROUP_SIZE - 1).collect();
 

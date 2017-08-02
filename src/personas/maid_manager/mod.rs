@@ -29,8 +29,8 @@ use error::InternalError;
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
 use routing::{ACC_LOGIN_ENTRY_KEY, AccountPacket, Authority, ClientError, EntryAction,
-              EntryActions, ImmutableData, MessageId, MutableData, PermissionSet, RoutingTable,
-              TYPE_TAG_SESSION_PACKET, User, XorName};
+              EntryActions, EntryError, ImmutableData, MessageId, MutableData, PermissionSet,
+              RoutingTable, TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::hash_map::{Entry, VacantEntry};
@@ -388,7 +388,8 @@ impl MaidManager {
 
             match res {
                 Ok(()) => {
-                    let _ = self.accounts.insert(*src.name(), Account::new(self.disable_mutation_limit));
+                    let _ = self.accounts.insert(*src.name(),
+                                                 Account::new(self.disable_mutation_limit));
                     self.forward_put_mdata(routing_node,
                                            src,
                                            dst,
@@ -397,14 +398,29 @@ impl MaidManager {
                                            *src.client_key())?;
                 }
                 Err(error) => {
-                    let error = match error {
+                    let converted_error = match error {
                         ClientError::NoSuchData => ClientError::InvalidInvitation,
-                        ClientError::EntryExists => ClientError::InvitationAlreadyClaimed,
+                        ClientError::InvalidEntryActions(ref entry_errors) => {
+                            let is_entry_exists_error = |entry_error: &EntryError| {
+                                match *entry_error {
+                                    EntryError::EntryExists(_) => true,
+                                    EntryError::NoSuchEntry |
+                                    EntryError::InvalidSuccessor(_) => false,
+                                }
+                            };
+                            if entry_errors.values().any(is_entry_exists_error) {
+                                ClientError::InvitationAlreadyClaimed
+                            } else {
+                                ClientError::from(format!("Error claiming invitation: {:?}", error))
+                            }
+                        }
                         _ => ClientError::from(format!("Error claiming invitation: {:?}", error)),
                     };
 
-                    routing_node
-                        .send_put_mdata_response(dst.into(), src.into(), Err(error), msg_id)?;
+                    routing_node.send_put_mdata_response(dst.into(),
+                                                         src.into(),
+                                                         Err(converted_error),
+                                                         msg_id)?;
                 }
             }
         } else {
@@ -1044,7 +1060,7 @@ impl MaidManager {
         )?;
 
         if version != account.keys_ops_count + 1 {
-            return Err(ClientError::InvalidSuccessor);
+            return Err(ClientError::InvalidSuccessor(account.keys_ops_count));
         }
 
         if !account.has_balance() {

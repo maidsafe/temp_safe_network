@@ -20,10 +20,16 @@ use authority::ClientAuthority;
 use authority::ClientManagerAuthority;
 use rand::{self, Rand, Rng};
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
+#[cfg(all(test, feature = "use-mock-routing"))]
+use routing::Config as RoutingConfig;
+#[cfg(all(test, feature = "use-mock-routing"))]
+use routing::DevConfig as RoutingDevConfig;
 use rust_sodium::crypto::sign;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use utils;
+#[cfg(all(test, feature = "use-mock-routing"))]
+use vault::RoutingNode;
 
 #[macro_export]
 macro_rules! assert_match {
@@ -155,4 +161,15 @@ pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
 /// Generate `ClientManager` authority for the client with the given client key.
 pub fn gen_client_manager_authority(client_key: sign::PublicKey) -> ClientManagerAuthority {
     ClientManagerAuthority(utils::client_name_from_key(&client_key))
+}
+
+#[cfg(all(test, feature = "use-mock-routing"))]
+pub fn new_routing_node(group_size: usize) -> RoutingNode {
+    let routing_config = RoutingConfig {
+        dev: Some(RoutingDevConfig {
+            min_section_size: Some(group_size),
+            ..RoutingDevConfig::default()
+        }),
+    };
+    unwrap!(RoutingNode::builder().config(routing_config).create())
 }
