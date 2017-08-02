@@ -15,13 +15,14 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use GROUP_SIZE;
 use routing::{AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream, FullId,
               ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId,
               Request, Response, RoutingError, RoutingTable, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
+
+const GROUP_SIZE: usize = 8;
 
 /// Mock routing node for unit testing.
 pub struct Node {
@@ -102,6 +103,10 @@ impl Node {
     // mock-only method.
     pub fn add_to_routing_table(&mut self, name: XorName) {
         unwrap!(self.routing_table.add(name));
+    }
+
+    pub fn min_section_size(&self) -> usize {
+        GROUP_SIZE
     }
 
     impl_request!(
@@ -289,10 +294,6 @@ pub struct NodeBuilder;
 
 impl NodeBuilder {
     pub fn first(self, _first: bool) -> Self {
-        self
-    }
-
-    pub fn deny_other_local_nodes(self) -> Self {
         self
     }
 
