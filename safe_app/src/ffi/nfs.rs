@@ -635,7 +635,14 @@ mod tests {
 
         let write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
-                file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)
+                file_open(
+                    &app,
+                    container_info_h,
+                    &ffi_file,
+                    OPEN_MODE_OVERWRITE,
+                    ud,
+                    cb,
+                )
             }))
         };
 
@@ -682,7 +689,14 @@ mod tests {
 
         let write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
-                file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)
+                file_open(
+                    &app,
+                    container_info_h,
+                    &ffi_file,
+                    OPEN_MODE_OVERWRITE,
+                    ud,
+                    cb,
+                )
             }))
         };
 
@@ -730,6 +744,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
+                    container_info_h,
                     &file.into_repr_c(),
                     OPEN_MODE_READ | OPEN_MODE_APPEND,
                     ud,

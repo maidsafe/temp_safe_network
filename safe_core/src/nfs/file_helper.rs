@@ -421,7 +421,8 @@ mod tests {
                 .then(move |res| {
                     let (dir, file) = unwrap!(res);
 
-                    file_helper::write(c3, file, Mode::Overwrite).map(move |writer| (writer, dir))
+                    file_helper::write(c3, file, Mode::Overwrite, dir.enc_key().cloned())
+                        .map(move |writer| (writer, dir))
                 })
                 .then(move |res| {
                     let (writer, dir) = unwrap!(res);
@@ -437,12 +438,14 @@ mod tests {
                 })
                 .then(move |res| {
                     let dir = unwrap!(res);
-                    file_helper::fetch(c5, dir, "hello.txt")
+                    file_helper::fetch(c5, dir.clone(), "hello.txt").map(
+                        move |(version, file)| (version, file, dir),
+                    )
                 })
                 .then(move |res| {
-                    let (version, file) = unwrap!(res);
+                    let (version, file, dir) = unwrap!(res);
                     assert_eq!(version, 2);
-                    file_helper::read(c6, &file)
+                    file_helper::read(c6, &file, dir.enc_key().cloned())
                 })
                 .then(move |res| {
                     let reader = unwrap!(res);
