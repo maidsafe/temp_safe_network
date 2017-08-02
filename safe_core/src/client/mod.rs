@@ -883,6 +883,29 @@ impl<T: 'static> Client<T> {
         })
     }
 
+    /// Sets the current status of standard dirs creation.
+    /// Used for operation recovery in case if std dirs creation step has
+    /// failed. TODO(nbaksalyar): find a better way to do this to decouple
+    /// from safe_authenticator
+    pub fn set_std_dirs_created(&self, val: bool) -> Box<CoreFuture<()>> {
+        {
+            let mut inner = self.inner_mut();
+            let mut account = fry!(inner.client_type.acc_mut());
+            account.std_dirs_created = val;
+        }
+        self.update_account_packet()
+    }
+
+    /// Returns the current status of standard dirs creation.
+    /// Used for operation recovery in case if std dirs creation step has
+    /// failed. TODO(nbaksalyar): find a better way to do this to decouple
+    /// from safe_authenticator
+    pub fn get_std_dirs_created(&self) -> Result<bool, CoreError> {
+        let inner = self.inner();
+        let account = inner.client_type.acc()?;
+        Ok(account.std_dirs_created)
+    }
+
     /// Create an entry for the Root Directory ID for the user into the account
     /// packet, encrypt and store it. It will be retrieved when the user logs
     /// into their account.  Root directory ID is necessary to fetch all of the

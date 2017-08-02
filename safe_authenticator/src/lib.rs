@@ -95,6 +95,7 @@ use safe_core::{Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, Net
 use safe_core::MockRouting;
 use safe_core::ipc::Permission;
 use safe_core::nfs::{create_dir, create_std_dirs};
+use safe_core::recovery;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
@@ -110,7 +111,7 @@ macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
         match $result {
             Ok(res) => res,
-            Err(e) => { return unwrap!($tx.send(Err(AuthError::from(e)))); }
+            Err(e) => { return unwrap!($tx.send(Err((None, AuthError::from(e))))); }
         }
     }
 }
@@ -184,37 +185,15 @@ impl Authenticator {
 
             let tx2 = tx.clone();
             let core_tx2 = core_tx.clone();
+            let core_tx3 = core_tx.clone();
+
             unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
-                let client = client.clone();
-                let c2 = client.clone();
-
-                create_std_dirs(client.clone())
-                    .map_err(AuthError::from)
-                    .and_then(move |_| {
-                        create_dir(&client, false)
-                            .map_err(AuthError::from)
-                    })
-                    .and_then(move |dir| {
-                        let config_dir = unwrap!(c2.config_root_dir());
-
-                        let actions = EntryActions::new()
-                            .ins(KEY_APPS.to_vec(), Vec::new(), 0)
-                            .ins(KEY_ACCESS_CONTAINER.to_vec(), fry!(serialise(&dir)), 0)
-                            .into();
-                        let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir,
-                                                                             &actions));
-
-                        c2.mutate_mdata_entries(config_dir.name,
-                                                       config_dir.type_tag,
-                                                    actions)
-                            .map_err(AuthError::from)
-                            .into_box()
-                    })
+                init_std_dirs(client)
                     .map(move |()| {
                         unwrap!(tx.send(Ok(core_tx2)));
                     })
                     .map_err(move |e| {
-                        unwrap!(tx2.send(Err(AuthError::from(e))));
+                        unwrap!(tx2.send(Err((Some(core_tx3), AuthError::from(e)))));
                     })
                     .into_box()
                     .into()
@@ -223,7 +202,15 @@ impl Authenticator {
             event_loop::run(el, &client, &(), core_rx);
         });
 
-        let core_tx = rx.recv()??;
+        let core_tx = match rx.recv()? {
+            Ok(core_tx) => core_tx,
+            Err((None, e)) => return Err(e),
+            Err((Some(core_tx), e)) => {
+                // Make sure to shut down the event loop
+                core_tx.send(CoreMsg::build_terminator())?;
+                return Err(e);
+            }
+        };
 
         Ok(Authenticator {
             core_tx: Mutex::new(core_tx),
@@ -277,12 +264,40 @@ impl Authenticator {
 
             let client = try_tx!(create_client_fn(el_h, core_tx_clone, net_tx), tx);
 
-            unwrap!(tx.send(Ok(core_tx)));
+            if !try_tx!(client.get_std_dirs_created(), tx) {
+                // Standard directories haven't been created during
+                // the user account registration - retry it again.
+                let tx2 = tx.clone();
+                let core_tx2 = core_tx.clone();
+                let core_tx3 = core_tx.clone();
+
+                unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
+                    init_std_dirs(client)
+                        .map(move |()| {
+                            unwrap!(tx.send(Ok(core_tx2)));
+                        })
+                        .map_err(move |e| {
+                            unwrap!(tx2.send(Err((Some(core_tx3), AuthError::from(e)))));
+                        })
+                        .into_box()
+                        .into()
+                })));
+            } else {
+                unwrap!(tx.send(Ok(core_tx)));
+            }
 
             event_loop::run(el, &client, &(), core_rx);
         });
 
-        let core_tx = rx.recv()??;
+        let core_tx = match rx.recv()? {
+            Ok(core_tx) => core_tx,
+            Err((None, e)) => return Err(e),
+            Err((Some(core_tx), e)) => {
+                // Make sure to shut down the event loop
+                core_tx.send(CoreMsg::build_terminator())?;
+                return Err(e);
+            }
+        };
 
         Ok(Authenticator {
             core_tx: Mutex::new(core_tx),
@@ -369,4 +384,39 @@ impl Drop for Authenticator {
             info!("Unexpected error in drop: {:?}", e);
         }
     }
+}
+
+// Create standard directories and the access container
+fn init_std_dirs(client: &Client<()>) -> Box<AuthFuture<()>> {
+    let client = client.clone();
+    let c2 = client.clone();
+    let c3 = client.clone();
+
+    create_std_dirs(client.clone())
+        .map_err(AuthError::from)
+        .and_then(move |_| {
+            create_dir(&client, false)
+                .map_err(AuthError::from)
+        })
+        .and_then(move |dir| {
+            let config_dir = unwrap!(c2.config_root_dir());
+
+            let actions = EntryActions::new()
+                .ins(KEY_APPS.to_vec(), Vec::new(), 0)
+                .ins(KEY_ACCESS_CONTAINER.to_vec(), fry!(serialise(&dir)), 0)
+                .into();
+            let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir,
+                                                                 &actions));
+
+            recovery::mutate_mdata_entries(&c2, config_dir.name,
+                                    config_dir.type_tag,
+                                    actions)
+                .map_err(AuthError::from)
+                .into_box()
+        })
+        .and_then(move |()| {
+            c3.set_std_dirs_created(true)
+                .map_err(AuthError::from)
+        })
+        .into_box()
 }

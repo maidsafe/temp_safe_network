@@ -17,6 +17,7 @@
 // relating to use of the SAFE Network Software.
 
 use Authenticator;
+use access_container as access_container_tools;
 use config::{self, KEY_ACCESS_CONTAINER, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use ffi::apps::*;
@@ -26,8 +27,12 @@ use futures::{Future, future};
 use ipc::{encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
 use maidsafe_utilities::serialisation::deserialise;
 use revocation;
+#[cfg(feature = "use-mock-routing")]
+use routing::{ClientError, Request, Response};
 use routing::User;
 use safe_core::{CoreError, MDataInfo, mdata_info};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::{MockRouting, utils};
 use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
                      IpcResp, Permission};
 use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
@@ -132,6 +137,106 @@ fn config_root_dir() {
 
     assert!(entries.is_empty());
     assert!(permissions.is_empty());
+}
+
+// Test operation recovery for std dirs creation
+// 1. Try to create a new user's account using `safe_authenticator::Authenticator::create_acc`
+// 2. Simulate a network disconnection [1] for a randomly selected `PutMData` operation
+//    with a type_tag == `safe_core::DIR_TAG` (in the range from 3rd request to
+//    `safe_core::nfs::DEFAULT_PRIVATE_DIRS.len()`). This will meddle with creation of
+//    default directories.
+// 3. Try to log in using the same credentials that have been provided for `create_acc`.
+//    The log in operation should be successful.
+// 4. Check that after logging in the remaining default directories have been created
+//    (= operation recovery worked after log in)
+// 5. Check the access container entry in the user's config root - it must be accessible
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn std_dirs_recovery() {
+    use safe_core::DIR_TAG;
+
+    // Add a request hook to forbid root dir modification. In this case
+    // account creation operation will be failed, but login still should
+    // be possible afterwards.
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    {
+        let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+            let mut put_mdata_counter = 0;
+
+            routing.set_request_hook(move |req| {
+                match *req {
+                    Request::PutMData { ref data, msg_id, .. } if data.tag() == DIR_TAG => {
+                        put_mdata_counter += 1;
+
+                        if put_mdata_counter > 4 {
+                            Some(Response::PutMData {
+                                msg_id,
+                                res: Err(ClientError::LowBalance),
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                    // Pass-through
+                    _ => None,
+                }
+            });
+            routing
+        };
+
+        let authenticator = Authenticator::create_acc_with_hook(
+            locator.clone(),
+            password.clone(),
+            invitation,
+            |_| (),
+            routing_hook,
+        );
+
+        // This operation should fail
+        match authenticator {
+            Err(AuthError::NfsError(NfsError::CoreError(CoreError::RoutingClientError(
+                ClientError::LowBalance)))) => (),
+            Err(x) => panic!("Unexpected error {:?}", x),
+            Ok(_) => panic!("Expected an error"),
+        }
+    }
+
+    // Log in using the same credentials
+    let authenticator = unwrap!(Authenticator::login(locator, password, |_| ()));
+
+    // Make sure that all default directories have been created after log in.
+    let std_dir_names: Vec<_> = DEFAULT_PRIVATE_DIRS
+        .iter()
+        .chain(DEFAULT_PUBLIC_DIRS.iter())
+        .collect();
+
+    // Fetch the entries of the user root dir.
+    let (dir, entries) = run(&authenticator, |client| {
+        let dir = unwrap!(client.user_root_dir());
+        client
+            .list_mdata_entries(dir.name, dir.type_tag)
+            .map(move |entries| (dir, entries))
+            .map_err(AuthError::from)
+    });
+    let entries = unwrap!(mdata_info::decrypt_entries(&dir, &entries));
+
+    // Verify that all the std dirs are there.
+    for name in &std_dir_names {
+        assert!(entries.contains_key(name.as_bytes()));
+    }
+
+    // Verify that accesss container has been created too
+    let _version = run(&authenticator, |client| {
+        let c2 = client.clone();
+
+        access_container_tools::access_container(client).and_then(move |ac_info| {
+            c2.get_mdata_version(ac_info.name, ac_info.type_tag)
+                .map_err(AuthError::from)
+        })
+    });
 }
 
 // Test app authentication with network errors simulation.
@@ -859,10 +964,6 @@ fn lists_of_registered_and_revoked_apps() {
 #[cfg(feature = "use-mock-routing")]
 #[test]
 fn app_revocation_recovery() {
-    use safe_core::MockRouting;
-    use routing::{ClientError, Request, Response};
-    use safe_core::utils;
-
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
     let invitation = unwrap!(utils::generate_random_string(10));
@@ -1039,7 +1140,6 @@ fn app_revocation_recovery() {
 #[test]
 fn app_authentication_recovery() {
     use safe_core::MockRouting;
-    use routing::{ClientError, Request, Response};
     use safe_core::utils;
 
     let locator = unwrap!(utils::generate_random_string(10));
