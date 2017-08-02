@@ -18,17 +18,18 @@
 use super::AccessContainerEntry;
 use Authenticator;
 use access_container::access_container_entry;
+use app_auth;
 use errors::AuthError;
-use ffi_utils::base64_encode;
-use ffi_utils::test_utils::call_1;
 use futures::{Future, IntoFuture};
 use futures::future;
-use ipc::{decode_ipc_msg, encode_auth_resp};
+use ipc::decode_ipc_msg;
+use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, utils};
-use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq, IpcResp,
-                     Permission};
+use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::MockRouting;
+use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq, Permission};
 use safe_core::ipc::req::ffi::convert_permission_set;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
@@ -62,13 +63,36 @@ pub fn create_account_and_login() -> Authenticator {
     unwrap!(Authenticator::login(locator, password, |_| ()))
 }
 
+/// Create a random authenticator and login using the same credentials.
+/// Attaches a hook to the Routing to override responses.
+#[cfg(all(any(test, feature = "testing"), feature = "use-mock-routing"))]
+pub fn create_account_and_login_with_hook<F>(hook: F) -> Authenticator
+where
+    F: Fn(MockRouting) -> MockRouting + Send + 'static,
+{
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let _ = unwrap!(Authenticator::create_acc(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+    ));
+    unwrap!(Authenticator::login_with_hook(
+        locator,
+        password,
+        |_| (),
+        hook,
+    ))
+}
+
 /// Registers a mock application using a given `AuthReq`.
 pub fn register_app(
     authenticator: &Authenticator,
     auth_req: &AuthReq,
 ) -> Result<AuthGranted, AuthError> {
-    let base64_app_id = base64_encode(auth_req.app.id.as_bytes());
-
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
         req_id: req_id,
@@ -82,30 +106,10 @@ pub fn register_app(
         x => return Err(AuthError::Unexpected(format!("Unexpected {:?}", x))),
     }
 
-    let encoded_auth_resp: String = unsafe {
-        // Call `encode_auth_resp` with is_granted = true
-        unwrap!(call_1(|ud, cb| {
-            let auth_req = unwrap!(auth_req.clone().into_repr_c());
-            encode_auth_resp(
-                authenticator,
-                &auth_req,
-                req_id,
-                true, // is_granted
-                ud,
-                cb,
-            )
-        }))
-    };
-
-    assert!(encoded_auth_resp.starts_with(
-        &format!("safe-{}", base64_app_id),
-    ));
-
-    match ipc::decode_msg(&encoded_auth_resp) {
-        Ok(IpcMsg::Resp { resp: IpcResp::Auth(Ok(auth_granted)), .. }) => Ok(auth_granted),
-        Ok(x) => Err(AuthError::Unexpected(format!("Unexpected {:?}", x))),
-        Err(x) => Err(AuthError::from(x)),
-    }
+    let auth_req = auth_req.clone();
+    try_run(authenticator, move |client| {
+        app_auth::authenticate(client, auth_req)
+    })
 }
 
 /// Run the given closure inside the event loop of the authenticator. The closure
@@ -179,6 +183,28 @@ pub fn try_access_container<S: Into<String>>(
     let app_id = app_id.into();
     run(authenticator, move |client| {
         access_container_entry(client, &ac_md_info, &app_id, app_keys).map(move |(_, entry)| entry)
+    })
+}
+
+/// Get the container entry from the user's root dir
+pub fn get_container_from_root(
+    authenticator: &Authenticator,
+    container: &str,
+) -> Result<MDataInfo, AuthError> {
+    let container = container.as_bytes().to_vec();
+
+    try_run(authenticator, move |client| {
+        let user_root = fry!(client.user_root_dir());
+        let container_key = fry!(user_root.enc_entry_key(&container));
+
+        client
+            .get_mdata_value(user_root.name, user_root.type_tag, container_key)
+            .map_err(AuthError::from)
+            .and_then(move |value| {
+                let raw_content = user_root.decrypt(&value.content)?;
+                deserialise::<MDataInfo>(&raw_content).map_err(AuthError::from)
+            })
+            .into_box()
     })
 }
 

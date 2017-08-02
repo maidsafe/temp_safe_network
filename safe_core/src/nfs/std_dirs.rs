@@ -21,6 +21,7 @@ use futures::{Future, future};
 use maidsafe_utilities::serialisation::serialise;
 use nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, NfsError, NfsFuture};
 use nfs::dir::create_dir;
+use recovery;
 use routing::{EntryAction, Value};
 use std::collections::BTreeMap;
 use utils::FutureExt;
@@ -57,8 +58,7 @@ pub fn create_std_dirs<T: 'static>(client: Client<T>) -> Box<NfsFuture<()>> {
                     }),
                 );
             }
-            client
-                .mutate_mdata_entries(root_dir.name, DIR_TAG, actions)
+            recovery::mutate_mdata_entries(&client, root_dir.name, DIR_TAG, actions)
                 .map_err(NfsError::from)
                 .into_box()
         })

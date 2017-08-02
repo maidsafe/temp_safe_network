@@ -32,6 +32,13 @@ pub struct Account {
     pub user_root: MDataInfo,
     /// The users configuration directory
     pub config_root: MDataInfo,
+    /// Flag set to true when user_root and config_dir are actually created
+    pub root_dirs_created: bool,
+    /// Flag set to true when standard directories and access container are
+    /// stored in the network
+    /// TODO(nbaksalyar): find a better way to implement it and decouple
+    /// from safe_authenticator
+    pub std_dirs_created: bool,
 }
 
 impl Account {
@@ -41,6 +48,8 @@ impl Account {
             maid_keys: keys,
             user_root: user_root,
             config_root: config_root,
+            root_dirs_created: false,
+            std_dirs_created: false,
         }
     }
 

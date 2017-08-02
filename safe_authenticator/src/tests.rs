@@ -1,3 +1,4 @@
+
 // Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
@@ -16,16 +17,22 @@
 // relating to use of the SAFE Network Software.
 
 use Authenticator;
+use access_container as access_container_tools;
+use config::{self, KEY_ACCESS_CONTAINER, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
-use ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp,
-          get_config};
+use ipc::{encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
 use maidsafe_utilities::serialisation::deserialise;
+use revocation;
+#[cfg(feature = "use-mock-routing")]
+use routing::{ClientError, Request, Response};
 use routing::User;
 use safe_core::{CoreError, MDataInfo, mdata_info};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::{MockRouting, utils};
 use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
                      IpcResp, Permission};
 use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
@@ -39,6 +46,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
                  rand_app, register_app, run, try_access_container, try_run};
+#[cfg(feature = "use-mock-routing")]
+use test_utils::get_container_from_root;
 use tiny_keccak::sha3_256;
 
 // Test creation and content of std dirs after account creation.
@@ -112,10 +121,10 @@ fn config_root_dir() {
     let entries = unwrap!(mdata_info::decrypt_entries(&dir, &entries));
 
     // Verify it contains the required entries.
-    let config = unwrap!(entries.get(&b"authenticator-config"[..]));
+    let config = unwrap!(entries.get(KEY_APPS));
     assert!(config.content.is_empty());
 
-    let ac = unwrap!(entries.get(&b"access-container"[..]));
+    let ac = unwrap!(entries.get(KEY_ACCESS_CONTAINER));
     let ac: MDataInfo = unwrap!(deserialise(&ac.content));
 
     // Fetch access container and verify it's empty.
@@ -128,6 +137,106 @@ fn config_root_dir() {
 
     assert!(entries.is_empty());
     assert!(permissions.is_empty());
+}
+
+// Test operation recovery for std dirs creation
+// 1. Try to create a new user's account using `safe_authenticator::Authenticator::create_acc`
+// 2. Simulate a network disconnection [1] for a randomly selected `PutMData` operation
+//    with a type_tag == `safe_core::DIR_TAG` (in the range from 3rd request to
+//    `safe_core::nfs::DEFAULT_PRIVATE_DIRS.len()`). This will meddle with creation of
+//    default directories.
+// 3. Try to log in using the same credentials that have been provided for `create_acc`.
+//    The log in operation should be successful.
+// 4. Check that after logging in the remaining default directories have been created
+//    (= operation recovery worked after log in)
+// 5. Check the access container entry in the user's config root - it must be accessible
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn std_dirs_recovery() {
+    use safe_core::DIR_TAG;
+
+    // Add a request hook to forbid root dir modification. In this case
+    // account creation operation will be failed, but login still should
+    // be possible afterwards.
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    {
+        let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+            let mut put_mdata_counter = 0;
+
+            routing.set_request_hook(move |req| {
+                match *req {
+                    Request::PutMData { ref data, msg_id, .. } if data.tag() == DIR_TAG => {
+                        put_mdata_counter += 1;
+
+                        if put_mdata_counter > 4 {
+                            Some(Response::PutMData {
+                                msg_id,
+                                res: Err(ClientError::LowBalance),
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                    // Pass-through
+                    _ => None,
+                }
+            });
+            routing
+        };
+
+        let authenticator = Authenticator::create_acc_with_hook(
+            locator.clone(),
+            password.clone(),
+            invitation,
+            |_| (),
+            routing_hook,
+        );
+
+        // This operation should fail
+        match authenticator {
+            Err(AuthError::NfsError(NfsError::CoreError(CoreError::RoutingClientError(
+                ClientError::LowBalance)))) => (),
+            Err(x) => panic!("Unexpected error {:?}", x),
+            Ok(_) => panic!("Expected an error"),
+        }
+    }
+
+    // Log in using the same credentials
+    let authenticator = unwrap!(Authenticator::login(locator, password, |_| ()));
+
+    // Make sure that all default directories have been created after log in.
+    let std_dir_names: Vec<_> = DEFAULT_PRIVATE_DIRS
+        .iter()
+        .chain(DEFAULT_PUBLIC_DIRS.iter())
+        .collect();
+
+    // Fetch the entries of the user root dir.
+    let (dir, entries) = run(&authenticator, |client| {
+        let dir = unwrap!(client.user_root_dir());
+        client
+            .list_mdata_entries(dir.name, dir.type_tag)
+            .map(move |entries| (dir, entries))
+            .map_err(AuthError::from)
+    });
+    let entries = unwrap!(mdata_info::decrypt_entries(&dir, &entries));
+
+    // Verify that all the std dirs are there.
+    for name in &std_dir_names {
+        assert!(entries.contains_key(name.as_bytes()));
+    }
+
+    // Verify that accesss container has been created too
+    let _version = run(&authenticator, |client| {
+        let c2 = client.clone();
+
+        access_container_tools::access_container(client).and_then(move |ac_info| {
+            c2.get_mdata_version(ac_info.name, ac_info.type_tag)
+                .map_err(AuthError::from)
+        })
+    });
 }
 
 // Test app authentication with network errors simulation.
@@ -192,12 +301,12 @@ fn app_authentication_with_network_errors() {
     };
 
     // Check the app info is present in the config file.
-    let config = run(&authenticator, |client| {
-        get_config(client).map(|(_, config)| config)
+    let apps = run(&authenticator, |client| {
+        config::list_apps(client).map(|(_, apps)| apps)
     });
 
     let app_config_key = sha3_256(app_id.as_bytes());
-    let app_info = unwrap!(config.get(&app_config_key));
+    let app_info = unwrap!(apps.get(&app_config_key));
 
     assert_eq!(app_info.info, app_exchange_info);
 }
@@ -304,12 +413,12 @@ fn app_authentication() {
     let (app_dir_info, _) = unwrap!(access_container.remove(&format!("apps/{}", app_id)));
 
     // Check the app info is present in the config file.
-    let config = run(&authenticator, |client| {
-        get_config(client).map(|(_, config)| config)
+    let apps = run(&authenticator, |client| {
+        config::list_apps(client).map(|(_, apps)| apps)
     });
 
     let app_config_key = sha3_256(app_id.as_bytes());
-    let app_info = unwrap!(config.get(&app_config_key));
+    let app_info = unwrap!(apps.get(&app_config_key));
 
     assert_eq!(app_info.info, app_exchange_info);
     assert_eq!(app_info.keys, app_keys);
@@ -835,6 +944,396 @@ fn lists_of_registered_and_revoked_apps() {
     assert_eq!(revoked.len(), 0);
 }
 
+// Test operation recovery for app revocation
+//
+// 1. Create a test app and authenticate it.
+// 2. Grant access to some of the default containers (e.g. `_video`, `_documents`).
+// 3. Put several files with a known content in both containers (e.g. `_video/test.txt` and
+//    `_documents/test2.txt`).
+// 4. Revoke the app access from the authenticator.
+// 5. After re-encryption of the `_document` container is done, simulate a network failure
+//    for the `_video` container encryption step.
+// 6. Verify that the `_videos` container is still accessible using the previous encryption key.
+// 7. Verify that the `_documents` container is not accessible using the current key, but is
+//    accessible using the new key.
+// 8. Check that the app's key is not listed in MaidManagers.
+// 9. Repeat step 1.4 (restart the revoke operation for the app) and don't interfere with the
+//    re-encryption process this time. It should pass.
+// 10. Verify that both the second and first containers aren't accessible using previous keys.
+// 11. Verify that both the second and first containers are accesible using the new keys.
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn app_revocation_recovery() {
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let auth = unwrap!(Authenticator::create_acc(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+    ));
+
+    // Create a test app and authenticate it.
+    // Grant access to some of the default containers (e.g. `_video`, `_documents`).
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+    let app_id = auth_req.app.id.clone();
+    let auth_granted = unwrap!(register_app(&auth, &auth_req));
+
+    // Put several files with a known content in both containers
+    let mut ac_entries = access_container(&auth, app_id.clone(), auth_granted.clone());
+    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let (docs_md, _) = unwrap!(ac_entries.remove("_documents"));
+
+    unwrap!(create_file(
+        &auth,
+        videos_md.clone(),
+        "video.mp4",
+        vec![1; 10],
+    ));
+    unwrap!(create_file(&auth, docs_md.clone(), "test.doc", vec![2; 10]));
+
+    // After re-encryption of the first container (`_video`) is done, simulate a network failure
+    let docs_name = docs_md.name;
+
+    let user_root_md = run(&auth, move |client| {
+        client.user_root_dir().map_err(AuthError::from)
+    });
+    let user_root_name = user_root_md.name;
+
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        let mut fail_user_root_update = false;
+
+        routing.set_request_hook(move |req| {
+            match *req {
+                // Simulate a network failure for a second request to re-encrypt containers
+                // so that the _videos container should remain untouched
+                Request::MutateMDataEntries { name, msg_id, .. }
+                    if name == docs_name || (name == user_root_name && fail_user_root_update) => {
+                    fail_user_root_update = true;
+
+                    Some(Response::MutateMDataEntries {
+                        msg_id,
+                        res: Err(ClientError::LowBalance),
+                    })
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
+
+    // Revoke the app.
+    match try_revoke(&auth, &app_id) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Verify that the `_documents` container is still accessible using the previous key.
+    let _ = unwrap!(fetch_file(&auth, docs_md.clone(), "test.doc"));
+
+    // Verify that the `_videos` container is not accessible using the previous key,
+    // but is accessible using the new key.
+    match fetch_file(&auth, videos_md.clone(), "video.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // We'd need to get that new key from the root container though, as the access container
+    // entry for the app hasn't been updated at this point.
+    let mut reencrypted_videos_md = unwrap!(get_container_from_root(&auth, "_videos"));
+
+    // The container has been reencrypted now, swap the old enc info
+    reencrypted_videos_md.commit_new_enc_info();
+    let _ = unwrap!(fetch_file(
+        &auth,
+        reencrypted_videos_md.clone(),
+        "video.mp4",
+    ));
+
+    // Ensure that the app's key has been removed from MaidManagers
+    let auth_keys = run(&auth, move |client| {
+        client
+            .list_auth_keys_and_version()
+            .map(move |(auth_keys, _version)| auth_keys)
+            .map_err(AuthError::from)
+    });
+    assert!(!auth_keys.contains(&auth_granted.app_keys.sign_pk));
+
+    // Login and try to revoke the app again, now without interfering with responses
+    let auth = unwrap!(Authenticator::login(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+    ));
+
+    // App revocation should succeed
+    revoke(&auth, &app_id);
+
+    // Try to access both files using previous keys - they shouldn't be accessible
+    match fetch_file(&auth, docs_md.clone(), "test.doc") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+    match fetch_file(&auth, videos_md.clone(), "video.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Get the new encryption info from the user's root dir (as the access container has been
+    // removed now). Both containers should be accessible with the new keys without any extra
+    // effort
+    let ac_entries = try_access_container(&auth, app_id.clone(), auth_granted.clone());
+    assert!(ac_entries.is_none());
+
+    let reencrypted_docs_md = unwrap!(get_container_from_root(&auth, "_documents"));
+    let reencrypted_videos_md = unwrap!(get_container_from_root(&auth, "_videos"));
+
+    let _ = unwrap!(fetch_file(&auth, reencrypted_docs_md.clone(), "test.doc"));
+    let _ = unwrap!(fetch_file(
+        &auth,
+        reencrypted_videos_md.clone(),
+        "video.mp4",
+    ));
+}
+
+// Test operation recovery for app authentication
+//
+// 1. Create a test app and try to authenticate it (with `app_container` set to true).
+//
+// 2. Simulate a network failure after the `mutate_mdata_entries` operation (relating to the
+//    addition of the app to the user's config dir) - it should leave the app in the
+//    `Revoked` state (as it is listen in the config root, but not in the access
+//    container)
+// 3. Try to authenticate the app again, it should continue without errors
+//
+// 4. Simulate a network failure after the `ins_auth_key` operation.
+//    The authentication op should fail.
+// 5. Try to authenticate the app again, it should continue without errors
+//
+// 6. Simulate a network failure for the `set_mdata_user_permissions` operation
+//    (relating to the app's container - so that it will be created successfuly, but fail
+//    at the permissions set stage).
+// 7. Try to authenticate the app again, it should continue without errors.
+//
+// 8. Simulate a network failure for the `mutate_mdata_entries` operation
+//    (relating to update of the access container).
+// 9. Try to authenticate the app again, it should succeed now.
+//
+// 10. Check that the app's container has been created.
+// 11. Check that the app's container has required permissions.
+// 12. Check that the app's container is listed in the access container entry for
+//     the app.
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn app_authentication_recovery() {
+    use safe_core::MockRouting;
+    use safe_core::utils;
+
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        routing.set_request_hook(move |req| {
+            match *req {
+                // Simulate a network failure after
+                // the `mutate_mdata_entries` operation (relating to
+                // the addition of the app to the user's config dir)
+                Request::InsAuthKey { msg_id, .. } => {
+                    Some(Response::InsAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::create_acc_with_hook(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+        routing_hook,
+    ));
+
+    // Create a test app and try to authenticate it (with `app_container` set to true).
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: true,
+        containers: create_containers_req(),
+    };
+    let app_id = auth_req.app.id.clone();
+
+    // App authentication request should fail and leave the app in the
+    // `Revoked` state (as it is listed in the config root, but not in the access
+    // container)
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Simulate a network failure for the `update_container_perms` step -
+    // it should fail at the second container (`_videos`)
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        let mut reqs_counter = 0;
+
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::SetMDataUserPermissions { msg_id, .. } => {
+                    reqs_counter += 1;
+
+                    if reqs_counter == 2 {
+                        Some(Response::SetMDataUserPermissions {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Simulate a network failure for the `app_container` setup step -
+    // it should fail at the third request for `SetMDataPermissions` (after
+    // setting permissions for 2 requested containers, `_video` and `_documents`)
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        let mut reqs_counter = 0;
+
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::SetMDataUserPermissions { msg_id, .. } => {
+                    reqs_counter += 1;
+
+                    if reqs_counter == 3 {
+                        Some(Response::SetMDataUserPermissions {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Simulate a network failure for the `MutateMDataEntries` request, which
+    // is supposed to setup the access container entry for the app
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::MutateMDataEntries { msg_id, .. } => {
+                    // None
+                    Some(Response::SetMDataUserPermissions {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Now try to authenticate the app without network failure simulation -
+    // it should succeed.
+    let auth = unwrap!(Authenticator::login(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+    ));
+    let auth_granted = match register_app(&auth, &auth_req) {
+        Ok(auth_granted) => auth_granted,
+        x => panic!("Unexpected {:?}", x),
+    };
+
+    // Check that the app's container has been created and that the access container
+    // contains info about all of the requested containers.
+    let mut ac_entries = access_container(&auth, app_id.clone(), auth_granted.clone());
+    let (_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let (_documents_md, _) = unwrap!(ac_entries.remove("_documents"));
+    let (app_container_md, _) = unwrap!(ac_entries.remove(&format!("apps/{}", app_id.clone())));
+
+    let app_pk = auth_granted.app_keys.sign_pk;
+
+    run(&auth, move |client| {
+        let c2 = client.clone();
+
+        client
+            .get_mdata_version(app_container_md.name, app_container_md.type_tag)
+            .then(move |res| {
+                let version = unwrap!(res);
+                assert!(version > 0);
+
+                // Check that the app's container has required permissions.
+                c2.list_mdata_permissions(app_container_md.name, app_container_md.type_tag)
+            })
+            .then(move |res| {
+                let perms = unwrap!(res);
+                assert!(perms.contains_key(&User::Key(app_pk)));
+                assert_eq!(perms.len(), 1);
+
+                Ok(())
+            })
+    });
+}
+
 // Create file in the given container, with the given name and content.
 fn create_file<T: Into<String>>(
     authenticator: &Authenticator,
@@ -846,11 +1345,15 @@ fn create_file<T: Into<String>>(
     try_run(authenticator, |client| {
         let c2 = client.clone();
 
-        file_helper::write(client.clone(), File::new(vec![]), Mode::Overwrite)
-            .then(move |res| {
-                let writer = unwrap!(res);
-                writer.write(&content).and_then(move |_| writer.close())
-            })
+        file_helper::write(
+            client.clone(),
+            File::new(vec![]),
+            Mode::Overwrite,
+            container_info.enc_key().cloned(),
+        ).then(move |res| {
+            let writer = unwrap!(res);
+            writer.write(&content).and_then(move |_| writer.close())
+        })
             .then(move |file| {
                 file_helper::insert(c2, container_info, name, &unwrap!(file))
             })
@@ -880,24 +1383,19 @@ fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize 
     })
 }
 
+fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String, AuthError> {
+    let app_id = app_id.to_string();
+
+    try_run(authenticator, move |client| {
+        revocation::revoke_app(client, &app_id)
+    })
+}
+
 fn revoke(authenticator: &Authenticator, app_id: &str) {
-    let base64_app_id = base64_encode(app_id.as_bytes());
-
-    let revoke_resp: String = unsafe {
-        let app_id = unwrap!(CString::new(app_id));
-        unwrap!(call_1(|ud, cb| {
-            auth_revoke_app(authenticator, app_id.as_ptr(), ud, cb)
-        }))
-    };
-
-    // Assert the callback is called with error-code 0 and FfiString contains
-    // "safe_<app-id-b64>:payload" where payload is b64 encoded IpcMsg::Revoked.
-    assert!(revoke_resp.starts_with(&format!("safe-{}", base64_app_id)));
-
-    match ipc::decode_msg(&revoke_resp) {
-        Ok(IpcMsg::Revoked { .. }) => (),
+    match try_revoke(authenticator, app_id) {
+        Ok(_) => (),
         x => panic!("Unexpected {:?}", x),
-    };
+    }
 }
 
 // Creates a containers request asking for "documents with permission to

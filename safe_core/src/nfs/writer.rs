@@ -19,6 +19,7 @@ use chrono::Utc;
 use client::Client;
 use futures::Future;
 use nfs::{File, NfsFuture, data_map};
+use rust_sodium::crypto::secretbox;
 use self_encryption::SequentialEncryptor;
 use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
@@ -37,6 +38,7 @@ pub struct Writer<T> {
     client: Client<T>,
     file: File,
     self_encryptor: SequentialEncryptor<SelfEncryptionStorage<T>>,
+    encryption_key: Option<secretbox::Key>,
 }
 
 impl<T: 'static> Writer<T> {
@@ -44,12 +46,13 @@ impl<T: 'static> Writer<T> {
     pub fn new(
         client: Client<T>,
         storage: SelfEncryptionStorage<T>,
-        mode: Mode,
         file: File,
+        mode: Mode,
+        encryption_key: Option<secretbox::Key>,
     ) -> Box<NfsFuture<Writer<T>>> {
         let fut = match mode {
             Mode::Append => {
-                data_map::get(&client, file.data_map_name())
+                data_map::get(&client, file.data_map_name(), encryption_key.clone())
                     .map(Some)
                     .into_box()
             }
@@ -63,6 +66,7 @@ impl<T: 'static> Writer<T> {
                     client,
                     file,
                     self_encryptor,
+                    encryption_key,
                 }
             })
             .map_err(From::from)
@@ -90,11 +94,14 @@ impl<T: 'static> Writer<T> {
         let mut file = self.file;
         let size = self.self_encryptor.len();
         let client = self.client;
+        let encryption_key = self.encryption_key;
 
         self.self_encryptor
             .close()
             .map_err(From::from)
-            .and_then(move |(data_map, _)| data_map::put(&client, &data_map))
+            .and_then(move |(data_map, _)| {
+                data_map::put(&client, &data_map, encryption_key)
+            })
             .map(move |data_map_name| {
                 file.set_data_map_name(data_map_name);
                 file.set_modified_time(Utc::now());

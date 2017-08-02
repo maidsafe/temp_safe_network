@@ -92,7 +92,7 @@ pub unsafe extern "C" fn login(
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
 
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
-        trace!("Authenticator - log in a registererd client.");
+        trace!("Authenticator - log in a registered client.");
 
         let acc_locator = from_c_str(account_locator)?;
         let acc_password = from_c_str(account_password)?;

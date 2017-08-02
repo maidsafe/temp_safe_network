@@ -20,8 +20,8 @@ use super::vault::{self, Data, Vault, VaultGuard};
 use maidsafe_utilities::thread;
 use rand;
 use routing::{Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
-              InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError,
-              TYPE_TAG_SESSION_PACKET, User, XorName};
+              InterfaceError, MessageId, MutableData, PermissionSet, Request, Response,
+              RoutingError, TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
@@ -30,6 +30,10 @@ use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use tiny_keccak::sha3_256;
+
+/// Function that is used to tap into routing requests
+/// and return preconditioned responsed.
+pub type RequestHookFn = FnMut(&Request) -> Option<Response> + 'static;
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
@@ -63,6 +67,8 @@ fn lock_vault(write: bool) -> VaultGuard<'static> {
     vault::lock(&VAULT, write)
 }
 
+/// Mock routing implementation that mirrors the behaviour
+/// of the real network but is not connected to it
 pub struct Routing {
     sender: Sender<Event>,
     full_id: FullId,
@@ -70,9 +76,12 @@ pub struct Routing {
     max_ops_countdown: Option<Cell<u64>>,
     timeout_simulation: bool,
     rate_limit_error_count: Cell<usize>,
+    request_hook: Option<Box<RequestHookFn>>,
 }
 
 impl Routing {
+    /// Initialises mock routing.
+    /// The function signature mirrors `routing::Client`.
     pub fn new(
         sender: Sender<Event>,
         id: Option<FullId>,
@@ -98,6 +107,7 @@ impl Routing {
             max_ops_countdown: None,
             timeout_simulation: false,
             rate_limit_error_count: Cell::new(0),
+            request_hook: None,
         })
     }
 
@@ -146,12 +156,27 @@ impl Routing {
         data: ImmutableData,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        let data_name = *data.name();
+        let nae_auth = Authority::NaeManager(data_name);
+
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&Request::PutIData {
+                data: data.clone(),
+                msg_id,
+            })
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(PUT_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
+            return Ok(());
+        }
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
         let mut vault = lock_vault(true);
-        let data_name = *data.name();
 
         let res = {
             self.verify_network_limits(msg_id, "put_idata")
@@ -170,15 +195,11 @@ impl Routing {
                 .map(|_| vault.commit_mutation(&dst))
         };
 
-        let nae_auth = Authority::NaeManager(data_name);
         self.send_response(
             PUT_IDATA_DELAY_MS,
             nae_auth,
             self.client_auth,
-            Response::PutIData {
-                res: res,
-                msg_id: msg_id,
-            },
+            Response::PutIData { res, msg_id },
         );
         Ok(())
     }
@@ -190,6 +211,18 @@ impl Routing {
         name: XorName,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        let nae_auth = Authority::NaeManager(name);
+
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&Request::GetIData { name, msg_id })
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(GET_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
+            return Ok(());
+        }
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -207,15 +240,11 @@ impl Routing {
             }
         };
 
-        let nae_auth = Authority::NaeManager(name);
         self.send_response(
             GET_IDATA_DELAY_MS,
             nae_auth,
             self.client_auth,
-            Response::GetIData {
-                res: res,
-                msg_id: msg_id,
-            },
+            Response::GetIData { res, msg_id },
         );
         Ok(())
     }
@@ -226,14 +255,30 @@ impl Routing {
         dst: Authority<XorName>,
         data: MutableData,
         msg_id: MessageId,
-        _requester: sign::PublicKey,
+        requester: sign::PublicKey,
     ) -> Result<(), InterfaceError> {
+        let data_name = DataId::mutable(*data.name(), data.tag());
+        let nae_auth = Authority::NaeManager(*data_name.name());
+
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&Request::PutMData {
+                data: data.clone(),
+                msg_id,
+                requester,
+            })
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(PUT_MDATA_DELAY_MS, nae_auth, self.client_auth, response);
+            return Ok(());
+        }
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
         let mut vault = lock_vault(true);
-        let data_name = DataId::mutable(*data.name(), data.tag());
 
         let res = if let Err(err) = self.verify_network_limits(msg_id, "put_mdata") {
             Err(err)
@@ -255,7 +300,7 @@ impl Routing {
             // Put normal data.
             vault
                 .authorise_mutation(&dst, self.client_key())
-                .and_then(|_| self.verify_owner(&dst, data.owners()))
+                .and_then(|_| Self::verify_owner(&dst, data.owners()))
                 .and_then(|_| if vault.contains_data(&data_name) {
                     Err(ClientError::DataExists)
                 } else {
@@ -265,15 +310,11 @@ impl Routing {
                 .map(|_| vault.commit_mutation(&dst))
         };
 
-        let nae_auth = Authority::NaeManager(*data_name.name());
         self.send_response(
             PUT_MDATA_DELAY_MS,
             nae_auth,
             self.client_auth,
-            Response::PutMData {
-                res: res,
-                msg_id: msg_id,
-            },
+            Response::PutMData { res, msg_id },
         );
         Ok(())
     }
@@ -289,16 +330,11 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::GetMDataVersion { name, tag, msg_id },
                         "get_mdata_version",
                         GET_MDATA_VERSION_DELAY_MS,
                         |data| Ok(data.version()),
-                        |res| {
-                            Response::GetMDataVersion {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::GetMDataVersion { res, msg_id })
     }
 
     /// Fetches a complete MutableData object.
@@ -309,21 +345,14 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(
-            dst,
-            name,
-            tag,
-            msg_id,
-            "get_mdata",
-            GET_MDATA_DELAY_MS,
-            Ok,
-            |res| {
-                Response::GetMData {
-                    res: res,
-                    msg_id: msg_id,
-                }
-            },
-        )
+        self.read_mdata(dst,
+                        name,
+                        tag,
+                        Request::GetMData { name, tag, msg_id },
+                        "get_mdata",
+                        GET_MDATA_DELAY_MS,
+                        Ok,
+                        |res| Response::GetMData { res, msg_id })
     }
 
     /// Fetches a shell of given MutableData.
@@ -337,16 +366,11 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::GetMDataShell { name, tag, msg_id },
                         "get_mdata_shell",
                         GET_MDATA_SHELL_DELAY_MS,
                         |data| Ok(data.shell()),
-                        |res| {
-                            Response::GetMDataShell {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::GetMDataShell { res, msg_id })
     }
 
     /// Fetches a list of entries (keys + values).
@@ -360,16 +384,11 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::ListMDataEntries { name, tag, msg_id },
                         "list_mdata_entries",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| Ok(data.entries().clone()),
-                        |res| {
-                            Response::ListMDataEntries {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::ListMDataEntries { res, msg_id })
     }
 
     /// Fetches a list of keys in MutableData.
@@ -383,19 +402,14 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::ListMDataKeys { name, tag, msg_id },
                         "list_mdata_keys",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| {
                             let keys = data.keys().into_iter().cloned().collect();
                             Ok(keys)
                         },
-                        |res| {
-                            Response::ListMDataKeys {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::ListMDataKeys { res, msg_id })
     }
 
     /// Fetches a list of values in MutableData.
@@ -409,19 +423,14 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::ListMDataValues { name, tag, msg_id },
                         "list_mdata_values",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| {
                             let values = data.values().into_iter().cloned().collect();
                             Ok(values)
                         },
-                        |res| {
-                            Response::ListMDataValues {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::ListMDataValues { res, msg_id })
     }
 
     /// Fetches a single value from MutableData
@@ -436,16 +445,16 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::GetMDataValue {
+                            name,
+                            tag,
+                            key: key.clone(),
+                            msg_id,
+                        },
                         "get_mdata_value",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry),
-                        |res| {
-                            Response::GetMDataValue {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::GetMDataValue { res, msg_id })
     }
 
     /// Updates MutableData entries in bulk.
@@ -458,20 +467,23 @@ impl Routing {
         msg_id: MessageId,
         requester: sign::PublicKey,
     ) -> Result<(), InterfaceError> {
+        let actions2 = actions.clone();
+
         self.mutate_mdata(dst,
                           name,
                           tag,
-                          msg_id,
+                          Request::MutateMDataEntries {
+                              name,
+                              tag,
+                              msg_id,
+                              actions,
+                              requester,
+                          },
                           requester,
                           "mutate_mdata_entries",
                           SET_MDATA_ENTRIES_DELAY_MS,
-                          |data| data.mutate_entries(actions, requester),
-                          |res| {
-                              Response::MutateMDataEntries {
-                                  res: res,
-                                  msg_id: msg_id,
-                              }
-                          })
+                          |data| data.mutate_entries(actions2, requester),
+                          |res| Response::MutateMDataEntries { res, msg_id })
     }
 
     /// Fetches a complete list of permissions.
@@ -485,16 +497,11 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::ListMDataPermissions { name, tag, msg_id },
                         "list_mdata_permissions",
                         GET_MDATA_PERMISSIONS_DELAY_MS,
                         |data| Ok(data.permissions().clone()),
-                        |res| {
-                            Response::ListMDataPermissions {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::ListMDataPermissions { res, msg_id })
     }
 
     /// Fetches a list of permissions for a particular User.
@@ -509,16 +516,16 @@ impl Routing {
         self.read_mdata(dst,
                         name,
                         tag,
-                        msg_id,
+                        Request::ListMDataUserPermissions {
+                            name,
+                            tag,
+                            user,
+                            msg_id,
+                        },
                         "list_mdata_user_permissions",
                         GET_MDATA_PERMISSIONS_DELAY_MS,
                         |data| data.user_permissions(&user).map(|p| *p),
-                        |res| {
-                            Response::ListMDataUserPermissions {
-                                res: res,
-                                msg_id: msg_id,
-                            }
-                        })
+                        |res| Response::ListMDataUserPermissions { res, msg_id })
     }
 
     /// Updates or inserts a list of permissions for a particular User in the given
@@ -537,17 +544,20 @@ impl Routing {
         self.mutate_mdata(dst,
                           name,
                           tag,
-                          msg_id,
+                          Request::SetMDataUserPermissions {
+                              name,
+                              tag,
+                              user,
+                              permissions,
+                              version,
+                              msg_id,
+                              requester,
+                          },
                           requester,
                           "set_mdata_user_permissions",
                           SET_MDATA_PERMISSIONS_DELAY_MS,
                           |data| data.set_user_permissions(user, permissions, version, requester),
-                          |res| {
-                              Response::SetMDataUserPermissions {
-                                  res: res,
-                                  msg_id: msg_id,
-                              }
-                          })
+                          |res| Response::SetMDataUserPermissions { res, msg_id })
     }
 
     /// Deletes a list of permissions for a particular User in the given MutableData.
@@ -564,17 +574,19 @@ impl Routing {
         self.mutate_mdata(dst,
                           name,
                           tag,
-                          msg_id,
+                          Request::DelMDataUserPermissions {
+                              name,
+                              tag,
+                              user,
+                              version,
+                              msg_id,
+                              requester,
+                          },
                           requester,
                           "del_mdata_user_permissions",
                           SET_MDATA_PERMISSIONS_DELAY_MS,
                           |data| data.del_user_permissions(&user, version, requester),
-                          |res| {
-                              Response::DelMDataUserPermissions {
-                                  res: res,
-                                  msg_id: msg_id,
-                              }
-                          })
+                          |res| Response::DelMDataUserPermissions { res, msg_id })
     }
 
     /// Changes an owner of the given MutableData. Only the current owner can perform this action.
@@ -598,7 +610,7 @@ impl Routing {
                     self.client_auth,
                     Response::ChangeMDataOwner {
                         res: Err(ClientError::InvalidOwners),
-                        msg_id: msg_id,
+                        msg_id,
                     },
                 );
                 return Ok(());
@@ -611,7 +623,13 @@ impl Routing {
         self.mutate_mdata(dst,
                           name,
                           tag,
-                          msg_id,
+                          Request::ChangeMDataOwner {
+                              name,
+                              tag,
+                              new_owners: btree_set![new_owner],
+                              version,
+                              msg_id,
+                          },
                           requester,
                           "change_mdata_owner",
                           CHANGE_MDATA_OWNER_DELAY_MS,
@@ -622,7 +640,7 @@ impl Routing {
             };
 
             // Only the current owner can change ownership for MD
-            match self.verify_owner(&dst, data.owners()) {
+            match Self::verify_owner(&dst, data.owners()) {
                 Err(ClientError::InvalidOwners) => return Err(ClientError::AccessDenied),
                 Err(e) => return Err(e),
                 Ok(_) => (),
@@ -634,12 +652,7 @@ impl Routing {
                 data.change_owner(new_owner, version)
             }
         },
-                          |res| {
-                              Response::ChangeMDataOwner {
-                                  res: res,
-                                  msg_id: msg_id,
-                              }
-                          })
+                          |res| Response::ChangeMDataOwner { res, msg_id })
     }
 
     /// Fetches a list of authorised keys and version in MaidManager
@@ -648,6 +661,21 @@ impl Routing {
         dst: Authority<XorName>,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&Request::ListAuthKeysAndVersion(msg_id))
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(
+                LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
+                dst,
+                self.client_auth,
+                response,
+            );
+            return Ok(());
+        }
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -673,10 +701,7 @@ impl Routing {
             LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
             dst,
             self.client_auth,
-            Response::ListAuthKeysAndVersion {
-                res: res,
-                msg_id: msg_id,
-            },
+            Response::ListAuthKeysAndVersion { res, msg_id },
         );
         Ok(())
     }
@@ -689,6 +714,20 @@ impl Routing {
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&Request::InsAuthKey {
+                key,
+                version,
+                msg_id,
+            })
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(INS_AUTH_KEY_DELAY_MS, dst, self.client_auth, response);
+            return Ok(());
+        }
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -714,10 +753,7 @@ impl Routing {
             INS_AUTH_KEY_DELAY_MS,
             dst,
             self.client_auth,
-            Response::InsAuthKey {
-                res: res,
-                msg_id: msg_id,
-            },
+            Response::InsAuthKey { res, msg_id },
         );
         Ok(())
     }
@@ -730,6 +766,20 @@ impl Routing {
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&Request::DelAuthKey {
+                key,
+                version,
+                msg_id,
+            })
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(DEL_AUTH_KEY_DELAY_MS, dst, self.client_auth, response);
+            return Ok(());
+        }
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -754,10 +804,7 @@ impl Routing {
             DEL_AUTH_KEY_DELAY_MS,
             dst,
             self.client_auth,
-            Response::DelAuthKey {
-                res: res,
-                msg_id: msg_id,
-            },
+            Response::DelAuthKey { res, msg_id },
         );
         Ok(())
     }
@@ -800,11 +847,11 @@ impl Routing {
     }
 
     fn read_mdata<F, G, R>(
-        &self,
+        &mut self,
         dst: Authority<XorName>,
         name: XorName,
         tag: u64,
-        msg_id: MessageId,
+        request: Request,
         log_label: &str,
         delay_ms: u64,
         f: F,
@@ -817,7 +864,7 @@ impl Routing {
         self.with_mdata(
             name,
             tag,
-            msg_id,
+            request,
             None,
             log_label,
             delay_ms,
@@ -831,11 +878,11 @@ impl Routing {
     }
 
     fn mutate_mdata<F, G, R>(
-        &self,
+        &mut self,
         dst: Authority<XorName>,
         name: XorName,
         tag: u64,
-        msg_id: MessageId,
+        request: Request,
         requester: sign::PublicKey,
         log_label: &str,
         delay_ms: u64,
@@ -846,8 +893,9 @@ impl Routing {
         F: FnOnce(&mut MutableData) -> Result<R, ClientError>,
         G: FnOnce(Result<R, ClientError>) -> Response,
     {
+        let client_key = *self.client_key();
         let mutate = |mut data: MutableData, vault: &mut Vault| {
-            vault.authorise_mutation(&dst, self.client_key())?;
+            vault.authorise_mutation(&dst, &client_key)?;
 
             let output = f(&mut data)?;
             vault.insert_data(DataId::mutable(name, tag), Data::Mutable(data));
@@ -859,7 +907,8 @@ impl Routing {
         self.with_mdata(
             name,
             tag,
-            msg_id,
+
+            request,
             Some(requester),
             log_label,
             delay_ms,
@@ -870,10 +919,10 @@ impl Routing {
     }
 
     fn with_mdata<F, G, R>(
-        &self,
+        &mut self,
         name: XorName,
         tag: u64,
-        msg_id: MessageId,
+        request: Request,
         requester: Option<sign::PublicKey>,
         log_label: &str,
         delay_ms: u64,
@@ -885,6 +934,19 @@ impl Routing {
         F: FnOnce(MutableData, &mut Vault) -> Result<R, ClientError>,
         G: FnOnce(Result<R, ClientError>) -> Response,
     {
+        let nae_auth = Authority::NaeManager(name);
+        let msg_id = *request.message_id();
+
+        let override_response = if let Some(ref mut hook) = self.request_hook {
+            hook(&request)
+        } else {
+            None
+        };
+        if let Some(response) = override_response {
+            self.send_response(delay_ms, nae_auth, self.client_auth, response);
+            return Ok(());
+        };
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -907,13 +969,11 @@ impl Routing {
             }
         };
 
-        let nae_auth = Authority::NaeManager(name);
         self.send_response(delay_ms, nae_auth, self.client_auth, g(res));
         Ok(())
     }
 
     fn verify_owner(
-        &self,
         dst: &Authority<XorName>,
         owner_keys: &BTreeSet<sign::PublicKey>,
     ) -> Result<(), ClientError> {
@@ -947,6 +1007,7 @@ impl Routing {
         }
     }
 
+    /// Returns the default boostrap config
     pub fn bootstrap_config() -> Result<BootstrapConfig, InterfaceError> {
         Ok(BootstrapConfig::default())
     }
@@ -1007,20 +1068,37 @@ impl Routing {
 
 #[cfg(any(feature = "testing", test))]
 impl Routing {
+    /// Set hook function to override response results for test purposes.
+    pub fn set_request_hook<F>(&mut self, hook: F)
+    where
+        F: FnMut(&Request) -> Option<Response> + 'static,
+    {
+        let hook: Box<RequestHookFn> = Box::new(hook);
+        self.request_hook = Some(hook);
+    }
+
+    /// Removes hook function to override response results
+    pub fn remove_request_hook(&mut self) {
+        self.request_hook = None;
+    }
+
+    /// Sets a maximum number of operations
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
         self.max_ops_countdown = max_ops_count.map(Cell::new)
     }
 
+    /// Simulates network disconnect
     pub fn simulate_disconnect(&self) {
         let sender = self.sender.clone();
         let _ = std::thread::spawn(move || unwrap!(sender.send(Event::Terminate)));
     }
 
+    /// Simulates network timeouts
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
     }
 
-    // The following `count` requests will fail with exceeded rate limit.
+    /// The following `count` requests will fail with exceeded rate limit.
     pub fn simulate_rate_limit_errors(&mut self, count: usize) {
         self.rate_limit_error_count = Cell::new(count);
     }

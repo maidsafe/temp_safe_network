@@ -50,6 +50,7 @@ extern crate futures;
 extern crate log;
 extern crate maidsafe_utilities;
 extern crate routing;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate rust_sodium;
@@ -67,8 +68,12 @@ pub mod ipc;
 /// Public ID routines
 pub mod public_id;
 
-mod errors;
 mod access_container;
+mod app_auth;
+mod app_container;
+mod config;
+mod errors;
+mod revocation;
 
 /// Provides utilities to test the authenticator functionality
 #[cfg(any(test, feature = "testing"))]
@@ -77,20 +82,24 @@ pub mod test_utils;
 mod tests;
 
 pub use self::errors::AuthError;
+use config::{KEY_ACCESS_CONTAINER, KEY_APPS};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::EntryActions;
-use safe_core::{Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent, event_loop,
-                mdata_info};
+use safe_core::{Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
+                NetworkTx, event_loop, mdata_info};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::MockRouting;
 use safe_core::ipc::Permission;
 use safe_core::nfs::{create_dir, create_std_dirs};
+use safe_core::recovery;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 
 /// Future type specialised with `AuthError` as an error type
 pub type AuthFuture<T> = Future<Item = T, Error = AuthError>;
@@ -102,7 +111,7 @@ macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
         match $result {
             Ok(res) => res,
-            Err(e) => { return unwrap!($tx.send(Err(AuthError::from(e)))); }
+            Err(e) => { return unwrap!($tx.send(Err((None, AuthError::from(e))))); }
         }
     }
 }
@@ -130,17 +139,34 @@ impl Authenticator {
         locator: S,
         password: S,
         invitation: S,
-        mut network_observer: NetObs,
+        network_observer: NetObs,
     ) -> Result<Self, AuthError>
     where
-        S: Into<String>,
         NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        S: Into<String>,
     {
-        let (tx, rx) = sync_channel(0);
-
         let locator = locator.into();
         let password = password.into();
         let invitation = invitation.into();
+
+        Self::create_acc_impl(
+            move |el_h, core_tx, net_tx| {
+                Client::registered(&locator, &password, &invitation, el_h, core_tx, net_tx)
+            },
+            network_observer,
+        )
+    }
+
+    /// Create a new account
+    fn create_acc_impl<F: 'static + Send, NetObs>(
+        create_client_fn: F,
+        mut network_observer: NetObs,
+    ) -> Result<Self, AuthError>
+    where
+        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        F: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+    {
+        let (tx, rx) = sync_channel(0);
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = try_tx!(Core::new(), tx);
@@ -155,49 +181,36 @@ impl Authenticator {
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(
-                Client::registered(
-                    &locator,
-                    &password,
-                    &invitation,
-                    el_h,
-                    core_tx_clone,
-                    net_tx,
-                ),
-                tx
-            );
+            let client = try_tx!(create_client_fn(el_h, core_tx_clone, net_tx), tx);
 
             let tx2 = tx.clone();
             let core_tx2 = core_tx.clone();
+            let core_tx3 = core_tx.clone();
+
             unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
-                let client = client.clone();
-                create_std_dirs(client.clone()).map_err(AuthError::from).and_then(move |()| {
-                    create_dir(&client, false).map_err(AuthError::from).and_then(move |dir| {
-                        let config_dir = unwrap!(client.config_root_dir());
-
-                        let actions = EntryActions::new()
-                            .ins(b"authenticator-config".to_vec(), Vec::new(), 0)
-                            .ins(b"access-container".to_vec(), serialise(&dir)?, 0)
-                            .into();
-                        let actions = mdata_info::encrypt_entry_actions(&config_dir, &actions)?;
-
-                        Ok(client.mutate_mdata_entries(config_dir.name,
-                                                       config_dir.type_tag,
-                                                       actions))
-                    }).and_then(move |fut| {
-                        fut.map_err(AuthError::from)
-                    }).map(move |()| {
+                init_std_dirs(client)
+                    .map(move |()| {
                         unwrap!(tx.send(Ok(core_tx2)));
                     })
-                }).map_err(move |e| {
-                    unwrap!(tx2.send(Err(AuthError::from(e))));
-                }).into_box().into()
+                    .map_err(move |e| {
+                        unwrap!(tx2.send(Err((Some(core_tx3), AuthError::from(e)))));
+                    })
+                    .into_box()
+                    .into()
             })));
 
             event_loop::run(el, &client, &(), core_rx);
         });
 
-        let core_tx = rx.recv()??;
+        let core_tx = match rx.recv()? {
+            Ok(core_tx) => core_tx,
+            Err((None, e)) => return Err(e),
+            Err((Some(core_tx), e)) => {
+                // Make sure to shut down the event loop
+                core_tx.send(CoreMsg::build_terminator())?;
+                return Err(e);
+            }
+        };
 
         Ok(Authenticator {
             core_tx: Mutex::new(core_tx),
@@ -209,16 +222,32 @@ impl Authenticator {
     pub fn login<S, NetObs>(
         locator: S,
         password: S,
-        mut network_observer: NetObs,
+        network_observer: NetObs,
     ) -> Result<Self, AuthError>
     where
         S: Into<String>,
         NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
     {
-        let (tx, rx) = sync_channel(0);
 
         let locator = locator.into();
         let password = password.into();
+
+        Self::login_impl(
+            move |el_h, core_tx, net_tx| Client::login(&locator, &password, el_h, core_tx, net_tx),
+            network_observer,
+        )
+    }
+
+    /// Log in to an existing account
+    pub fn login_impl<F: Send + 'static, NetObs>(
+        create_client_fn: F,
+        mut network_observer: NetObs,
+    ) -> Result<Self, AuthError>
+    where
+        F: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+    {
+        let (tx, rx) = sync_channel(0);
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = try_tx!(Core::new(), tx);
@@ -233,22 +262,114 @@ impl Authenticator {
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(
-                Client::login(&locator, &password, el_h, core_tx_clone, net_tx),
-                tx
-            );
+            let client = try_tx!(create_client_fn(el_h, core_tx_clone, net_tx), tx);
 
-            unwrap!(tx.send(Ok(core_tx)));
+            if !try_tx!(client.get_std_dirs_created(), tx) {
+                // Standard directories haven't been created during
+                // the user account registration - retry it again.
+                let tx2 = tx.clone();
+                let core_tx2 = core_tx.clone();
+                let core_tx3 = core_tx.clone();
+
+                unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
+                    init_std_dirs(client)
+                        .map(move |()| {
+                            unwrap!(tx.send(Ok(core_tx2)));
+                        })
+                        .map_err(move |e| {
+                            unwrap!(tx2.send(Err((Some(core_tx3), AuthError::from(e)))));
+                        })
+                        .into_box()
+                        .into()
+                })));
+            } else {
+                unwrap!(tx.send(Ok(core_tx)));
+            }
 
             event_loop::run(el, &client, &(), core_rx);
         });
 
-        let core_tx = rx.recv()??;
+        let core_tx = match rx.recv()? {
+            Ok(core_tx) => core_tx,
+            Err((None, e)) => return Err(e),
+            Err((Some(core_tx), e)) => {
+                // Make sure to shut down the event loop
+                core_tx.send(CoreMsg::build_terminator())?;
+                return Err(e);
+            }
+        };
 
         Ok(Authenticator {
             core_tx: Mutex::new(core_tx),
             _core_joiner: joiner,
         })
+    }
+}
+
+#[cfg(all(feature = "use-mock-routing", any(test, feature = "testing")))]
+impl Authenticator {
+    #[allow(unused)]
+    fn login_with_hook<F, S, NetObs>(
+        locator: S,
+        password: S,
+        network_observer: NetObs,
+        routing_wrapper_fn: F,
+    ) -> Result<Self, AuthError>
+    where
+        S: Into<String>,
+        F: Fn(MockRouting) -> MockRouting + Send + 'static,
+        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+    {
+
+        let locator = locator.into();
+        let password = password.into();
+
+        Self::login_impl(
+            move |el_h, core_tx, net_tx| {
+                Client::login_with_hook(
+                    &locator,
+                    &password,
+                    el_h,
+                    core_tx,
+                    net_tx,
+                    routing_wrapper_fn,
+                )
+            },
+            network_observer,
+        )
+    }
+
+    #[allow(unused)]
+    fn create_acc_with_hook<F, S, NetObs>(
+        locator: S,
+        password: S,
+        invitation: S,
+        network_observer: NetObs,
+        routing_wrapper_fn: F,
+    ) -> Result<Self, AuthError>
+    where
+        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        F: Fn(MockRouting) -> MockRouting + Send + 'static,
+        S: Into<String>,
+    {
+        let locator = locator.into();
+        let password = password.into();
+        let invitation = invitation.into();
+
+        Self::create_acc_impl(
+            move |el_h, core_tx_clone, net_tx| {
+                Client::registered_with_hook(
+                    &locator,
+                    &password,
+                    &invitation,
+                    el_h,
+                    core_tx_clone,
+                    net_tx,
+                    routing_wrapper_fn,
+                )
+            },
+            network_observer,
+        )
     }
 }
 
@@ -263,4 +384,39 @@ impl Drop for Authenticator {
             info!("Unexpected error in drop: {:?}", e);
         }
     }
+}
+
+// Create standard directories and the access container
+fn init_std_dirs(client: &Client<()>) -> Box<AuthFuture<()>> {
+    let client = client.clone();
+    let c2 = client.clone();
+    let c3 = client.clone();
+
+    create_std_dirs(client.clone())
+        .map_err(AuthError::from)
+        .and_then(move |_| {
+            create_dir(&client, false)
+                .map_err(AuthError::from)
+        })
+        .and_then(move |dir| {
+            let config_dir = unwrap!(c2.config_root_dir());
+
+            let actions = EntryActions::new()
+                .ins(KEY_APPS.to_vec(), Vec::new(), 0)
+                .ins(KEY_ACCESS_CONTAINER.to_vec(), fry!(serialise(&dir)), 0)
+                .into();
+            let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir,
+                                                                 &actions));
+
+            recovery::mutate_mdata_entries(&c2, config_dir.name,
+                                    config_dir.type_tag,
+                                    actions)
+                .map_err(AuthError::from)
+                .into_box()
+        })
+        .and_then(move |()| {
+            c3.set_std_dirs_created(true)
+                .map_err(AuthError::from)
+        })
+        .into_box()
 }

@@ -19,7 +19,7 @@ use super::routing::Routing;
 use super::vault::DEFAULT_MAX_MUTATIONS;
 use rand;
 use routing::{AccountInfo, Action, Authority, ClientError, EntryAction, EntryActions, Event,
-              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Response,
+              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Request, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::sync::mpsc::{self, Receiver};
@@ -419,36 +419,24 @@ fn mutable_data_entry_versioning() {
         msg_id,
         owner_key,
     ));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::InvalidSuccessor
-    );
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::InvalidEntryActions(_));
 
     // Attempt to update it with incorrect version fails.
     let actions = EntryActions::new()
         .update(key.to_vec(), value_v1.clone(), 314159265)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        owner_key,
-    ));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::InvalidSuccessor
-    );
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::InvalidEntryActions(_));
 
     // Update with correct version bump succeeds.
-    let actions =
-        btree_map![
+    let actions = btree_map![
             key.to_vec() => EntryAction::Update(Value {
                 content: value_v1.clone(),
                 entry_version: 1,
@@ -456,53 +444,28 @@ fn mutable_data_entry_versioning() {
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
     expect_success!(routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Delete without version bump fails.
-    let actions =
-        btree_map![
+    let actions = btree_map![
             key.to_vec() => EntryAction::Del(1)
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        owner_key,
-    ));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::InvalidSuccessor
-    );
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::InvalidEntryActions(_));
 
     // Delete with correct version bump succeeds.
-    let actions =
-        btree_map![
+    let actions = btree_map![
             key.to_vec() => EntryAction::Del(2)
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
     expect_success!(routing_rx, msg_id, Response::MutateMDataEntries);
 }
 
@@ -520,19 +483,16 @@ fn mutable_data_permissions() {
     let key0 = b"key0";
     let value0_v0 = unwrap!(utils::generate_random_vector(10));
 
-    let entries =
-        btree_map![
+    let entries = btree_map![
             key0.to_vec() => Value { content: value0_v0, entry_version: 0 }
         ];
 
 
-    let data = unwrap!(MutableData::new(
-        name,
-        tag,
-        Default::default(),
-        entries,
-        btree_set!(owner_key),
-    ));
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        entries,
+                                        btree_set!(owner_key)));
 
     let nae_mgr = Authority::NaeManager(*data.name());
 
@@ -553,14 +513,7 @@ fn mutable_data_permissions() {
         .update(key0.to_vec(), value0_v1, 1)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
     expect_success!(routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Create app and authorise it.
@@ -572,12 +525,7 @@ fn mutable_data_permissions() {
     let (_, version) = expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
 
     let msg_id = MessageId::new();
-    unwrap!(routing.ins_auth_key(
-        client_mgr,
-        app_sign_key,
-        version + 1,
-        msg_id,
-    ));
+    unwrap!(routing.ins_auth_key(client_mgr, app_sign_key, version + 1, msg_id));
     expect_success!(routing_rx, msg_id, Response::InsAuthKey);
 
     // App can't mutate any entry, by default.
@@ -586,40 +534,27 @@ fn mutable_data_permissions() {
         .update(key0.to_vec(), value0_v2.clone(), 2)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 
     // App can't grant itself permission to update.
     let perms = PermissionSet::new().allow(Action::Update);
     let msg_id = MessageId::new();
-    unwrap!(app_routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        perms,
-        1,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::SetMDataUserPermissions,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.set_mdata_user_permissions(client_mgr,
+                                                   name,
+                                                   tag,
+                                                   User::Key(app_sign_key),
+                                                   perms,
+                                                   1,
+                                                   msg_id,
+                                                   app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::SetMDataUserPermissions,
+                    ClientError::AccessDenied);
 
     // Verify app still can't update, after the previous attempt to
     // modify its permissions.
@@ -627,34 +562,23 @@ fn mutable_data_permissions() {
         .update(key0.to_vec(), value0_v2.clone(), 2)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 
     // Grant insert permission for app.
     let perms = PermissionSet::new().allow(Action::Insert);
     let msg_id = MessageId::new();
-    unwrap!(routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        perms,
-        1,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.set_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Key(app_sign_key),
+                                               perms,
+                                               1,
+                                               msg_id,
+                                               owner_key));
     expect_success!(routing_rx, msg_id, Response::SetMDataUserPermissions);
 
     // The version is bumped.
@@ -664,8 +588,7 @@ fn mutable_data_permissions() {
     assert_eq!(version, 1);
 
     // App still can't update entries.
-    let actions =
-        btree_map![
+    let actions = btree_map![
             key0.to_vec() => EntryAction::Update(Value {
                 content: value0_v2.clone(),
                 entry_version: 2,
@@ -673,26 +596,16 @@ fn mutable_data_permissions() {
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 
     // But it insert new ones.
     let key1 = b"key1";
     let value1_v0 = unwrap!(utils::generate_random_vector(10));
-    let actions =
-        btree_map![
+    let actions = btree_map![
             key1.to_vec() => EntryAction::Ins(Value {
                 content: value1_v0,
                 entry_version: 0,
@@ -700,14 +613,7 @@ fn mutable_data_permissions() {
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
     expect_success!(app_routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Attempt to modify permissions without proper version bump fails
@@ -715,43 +621,36 @@ fn mutable_data_permissions() {
         Action::Update,
     );
     let msg_id = MessageId::new();
-    unwrap!(routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        perms,
-        1,
-        msg_id,
-        owner_key,
-    ));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::SetMDataUserPermissions,
-        ClientError::InvalidSuccessor
-    );
+    unwrap!(routing.set_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Key(app_sign_key),
+                                               perms,
+                                               1,
+                                               msg_id,
+                                               owner_key));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::SetMDataUserPermissions,
+                    ClientError::InvalidSuccessor(_));
 
     // Modifing permissions with version bump succeeds.
     let perms = PermissionSet::new().allow(Action::Insert).allow(
         Action::Update,
     );
     let msg_id = MessageId::new();
-    unwrap!(routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        perms,
-        2,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.set_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Key(app_sign_key),
+                                               perms,
+                                               2,
+                                               msg_id,
+                                               owner_key));
     expect_success!(routing_rx, msg_id, Response::SetMDataUserPermissions);
 
     // App can now update entries.
-    let actions =
-        btree_map![
+    let actions = btree_map![
             key0.to_vec() => EntryAction::Update(Value {
                 content: value0_v2,
                 entry_version: 2,
@@ -759,27 +658,18 @@ fn mutable_data_permissions() {
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
     expect_success!(app_routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Revoke all permissions from app.
     let msg_id = MessageId::new();
-    unwrap!(routing.del_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        3,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.del_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Key(app_sign_key),
+                                               3,
+                                               msg_id,
+                                               owner_key));
     expect_success!(routing_rx, msg_id, Response::DelMDataUserPermissions);
 
     // App can no longer mutate the entries.
@@ -787,34 +677,23 @@ fn mutable_data_permissions() {
     let value2_v0 = unwrap!(utils::generate_random_vector(10));
     let actions = EntryActions::new().ins(key2.to_vec(), value2_v0, 0).into();
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 
     // Grant the app permission to manage permissions.
     let perms = PermissionSet::new().allow(Action::ManagePermissions);
     let msg_id = MessageId::new();
-    unwrap!(routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        perms,
-        4,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.set_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Key(app_sign_key),
+                                               perms,
+                                               4,
+                                               msg_id,
+                                               owner_key));
     expect_success!(routing_rx, msg_id, Response::SetMDataUserPermissions);
 
     // The app still can't mutate the entries.
@@ -823,34 +702,23 @@ fn mutable_data_permissions() {
         .update(key1.to_vec(), value1_v1, 1)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 
     // App can modify its own permission.
     let perms = PermissionSet::new().allow(Action::Update);
     let msg_id = MessageId::new();
-    unwrap!(app_routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Key(app_sign_key),
-        perms,
-        5,
-        msg_id,
-        app_sign_key,
-    ));
+    unwrap!(app_routing.set_mdata_user_permissions(client_mgr,
+                                                   name,
+                                                   tag,
+                                                   User::Key(app_sign_key),
+                                                   perms,
+                                                   5,
+                                                   msg_id,
+                                                   app_sign_key));
     expect_success!(app_routing_rx, msg_id, Response::SetMDataUserPermissions);
 
     // The app can now mutate the entries.
@@ -859,14 +727,7 @@ fn mutable_data_permissions() {
         .update(key1.to_vec(), value1_v1, 1)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(app_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app_sign_key,
-    ));
+    unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
     expect_success!(app_routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Create another app and authorise it.
@@ -878,12 +739,7 @@ fn mutable_data_permissions() {
     let (_, version) = expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
 
     let msg_id = MessageId::new();
-    unwrap!(routing.ins_auth_key(
-        client_mgr,
-        app2_sign_key,
-        version + 1,
-        msg_id,
-    ));
+    unwrap!(routing.ins_auth_key(client_mgr, app2_sign_key, version + 1, msg_id));
     expect_success!(routing_rx, msg_id, Response::InsAuthKey);
 
     // The new app can't mutate entries
@@ -893,60 +749,50 @@ fn mutable_data_permissions() {
         .ins(key3.to_vec(), value3_v0.clone(), 0)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(app2_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app2_sign_key,
-    ));
-    expect_failure!(
-        app2_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app2_routing.mutate_mdata_entries(client_mgr,
+                                              name,
+                                              tag,
+                                              actions,
+                                              msg_id,
+                                              app2_sign_key));
+    expect_failure!(app2_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 
     // Grant insert permission for anyone.
     let perms = PermissionSet::new().allow(Action::Insert);
     let msg_id = MessageId::new();
-    unwrap!(routing.set_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Anyone,
-        perms,
-        6,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.set_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Anyone,
+                                               perms,
+                                               6,
+                                               msg_id,
+                                               owner_key));
     expect_success!(routing_rx, msg_id, Response::SetMDataUserPermissions);
 
     // The new app can now mutate entries
     let actions = EntryActions::new().ins(key3.to_vec(), value3_v0, 0).into();
     let msg_id = MessageId::new();
-    unwrap!(app2_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app2_sign_key,
-    ));
+    unwrap!(app2_routing.mutate_mdata_entries(client_mgr,
+                                              name,
+                                              tag,
+                                              actions,
+                                              msg_id,
+                                              app2_sign_key));
     expect_success!(app2_routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Revoke the insert permission for anyone.
     let msg_id = MessageId::new();
-    unwrap!(routing.del_mdata_user_permissions(
-        client_mgr,
-        name,
-        tag,
-        User::Anyone,
-        7,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.del_mdata_user_permissions(client_mgr,
+                                               name,
+                                               tag,
+                                               User::Anyone,
+                                               7,
+                                               msg_id,
+                                               owner_key));
     expect_success!(routing_rx, msg_id, Response::DelMDataUserPermissions);
 
     // The new app can now longer mutate entries
@@ -956,20 +802,16 @@ fn mutable_data_permissions() {
         .ins(key4.to_vec(), value4_v0.clone(), 0)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(app2_routing.mutate_mdata_entries(
-        client_mgr,
-        name,
-        tag,
-        actions,
-        msg_id,
-        app2_sign_key,
-    ));
-    expect_failure!(
-        app2_routing_rx,
-        msg_id,
-        Response::MutateMDataEntries,
-        ClientError::AccessDenied
-    );
+    unwrap!(app2_routing.mutate_mdata_entries(client_mgr,
+                                              name,
+                                              tag,
+                                              actions,
+                                              msg_id,
+                                              app2_sign_key));
+    expect_failure!(app2_routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::AccessDenied);
 }
 
 #[test]
@@ -985,47 +827,31 @@ fn mutable_data_ownership() {
     let app_sign_key = *app_full_id.public_id().signing_public_key();
 
     let msg_id = MessageId::new();
-    unwrap!(owner_routing.ins_auth_key(
-        client_mgr,
-        app_sign_key,
-        1,
-        msg_id,
-    ));
+    unwrap!(owner_routing.ins_auth_key(client_mgr, app_sign_key, 1, msg_id));
     expect_success!(owner_routing_rx, msg_id, Response::InsAuthKey);
 
     // Attempt to put MutableData using the app sign key as owner key should fail.
     let name = rand::random();
     let tag = 1000u64;
-    let data = unwrap!(MutableData::new(
-        name,
-        tag,
-        Default::default(),
-        Default::default(),
-        btree_set![app_sign_key],
-    ));
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set![app_sign_key]));
 
     let msg_id = MessageId::new();
-    unwrap!(app_routing.put_mdata(
-        client_mgr,
-        data,
-        msg_id,
-        app_sign_key,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::PutMData,
-        ClientError::InvalidOwners
-    );
+    unwrap!(app_routing.put_mdata(client_mgr, data, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::PutMData,
+                    ClientError::InvalidOwners);
 
     // Putting it with correct owner succeeds.
-    let data = unwrap!(MutableData::new(
-        name,
-        tag,
-        Default::default(),
-        Default::default(),
-        btree_set![owner_key],
-    ));
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set![owner_key]));
 
     let msg_id = MessageId::new();
     unwrap!(owner_routing.put_mdata(client_mgr, data, msg_id, owner_key));
@@ -1033,49 +859,39 @@ fn mutable_data_ownership() {
 
     // Attempt to change owner by app should fail.
     let msg_id = MessageId::new();
-    unwrap!(app_routing.change_mdata_owner(
-        client_mgr,
-        name,
-        tag,
-        btree_set![app_sign_key],
-        1,
-        msg_id,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::ChangeMDataOwner,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.change_mdata_owner(client_mgr,
+                                           name,
+                                           tag,
+                                           btree_set![app_sign_key],
+                                           1,
+                                           msg_id));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::ChangeMDataOwner,
+                    ClientError::AccessDenied);
 
     // Attempt to change owner by app via its own account should fail.
     let app_client_mgr = create_account(&mut app_routing, &app_routing_rx, app_sign_key);
     let msg_id = MessageId::new();
-    unwrap!(app_routing.change_mdata_owner(
-        app_client_mgr,
-        name,
-        tag,
-        btree_set![app_sign_key],
-        1,
-        msg_id,
-    ));
-    expect_failure!(
-        app_routing_rx,
-        msg_id,
-        Response::ChangeMDataOwner,
-        ClientError::AccessDenied
-    );
+    unwrap!(app_routing.change_mdata_owner(app_client_mgr,
+                                           name,
+                                           tag,
+                                           btree_set![app_sign_key],
+                                           1,
+                                           msg_id));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::ChangeMDataOwner,
+                    ClientError::AccessDenied);
 
     // Changing the owner by owner should succeed.
     let msg_id = MessageId::new();
-    unwrap!(owner_routing.change_mdata_owner(
-        client_mgr,
-        name,
-        tag,
-        btree_set![app_sign_key],
-        1,
-        msg_id,
-    ));
+    unwrap!(owner_routing.change_mdata_owner(client_mgr,
+                                             name,
+                                             tag,
+                                             btree_set![app_sign_key],
+                                             1,
+                                             msg_id));
     expect_success!(owner_routing_rx, msg_id, Response::ChangeMDataOwner);
 }
 
@@ -1091,20 +907,18 @@ fn auth_keys() {
     // Initially, the list of auth keys should be empty and the version should be zero.
     let msg_id = MessageId::new();
     unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
-    let (auth_keys, version) =
-        expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+    let (auth_keys, version) = expect_success!(routing_rx, msg_id,
+                                               Response::ListAuthKeysAndVersion);
     assert!(auth_keys.is_empty());
     assert_eq!(version, 0);
 
     // Attempt to insert an auth key without proper version bump fails.
     let msg_id = MessageId::new();
     unwrap!(routing.ins_auth_key(client_mgr, auth_key1, 0, msg_id));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::InsAuthKey,
-        ClientError::InvalidSuccessor
-    );
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::InsAuthKey,
+                    ClientError::InvalidSuccessor(_));
 
     // Insert an auth key with proper version bump succeeds.
     let msg_id = MessageId::new();
@@ -1114,8 +928,8 @@ fn auth_keys() {
     // Retrieve the list of auth keys and version
     let msg_id = MessageId::new();
     unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
-    let (auth_keys, version) =
-        expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+    let (auth_keys, version) = expect_success!(routing_rx, msg_id,
+                                               Response::ListAuthKeysAndVersion);
     assert_eq!(auth_keys.len(), 1);
     assert!(auth_keys.contains(&auth_key1));
     assert_eq!(version, 1);
@@ -1123,22 +937,18 @@ fn auth_keys() {
     // Attempt to delete auth key without proper version bump fails.
     let msg_id = MessageId::new();
     unwrap!(routing.del_auth_key(client_mgr, auth_key1, 1, msg_id));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::DelAuthKey,
-        ClientError::InvalidSuccessor
-    );
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::DelAuthKey,
+                    ClientError::InvalidSuccessor(_));
 
     // Attempt to delete non-existing key fails.
     let msg_id = MessageId::new();
     unwrap!(routing.del_auth_key(client_mgr, auth_key2, 2, msg_id));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::DelAuthKey,
-        ClientError::NoSuchKey
-    );
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::DelAuthKey,
+                    ClientError::NoSuchKey);
 
     // Delete auth key with proper version bump succeeds.
     let msg_id = MessageId::new();
@@ -1148,8 +958,8 @@ fn auth_keys() {
     // Retrieve the list of auth keys and version
     let msg_id = MessageId::new();
     unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
-    let (auth_keys, version) =
-        expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+    let (auth_keys, version) = expect_success!(routing_rx, msg_id,
+                                               Response::ListAuthKeysAndVersion);
     assert!(auth_keys.is_empty());
     assert_eq!(version, 2);
 }
@@ -1177,12 +987,10 @@ fn balance_check() {
     let msg_id = MessageId::new();
     let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
     unwrap!(routing.put_idata(client_mgr, data, msg_id));
-    expect_failure!(
-        routing_rx,
-        msg_id,
-        Response::PutIData,
-        ClientError::LowBalance
-    );
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::PutIData,
+                    ClientError::LowBalance);
 }
 
 #[test]
@@ -1216,6 +1024,98 @@ fn simulate_rate_limit_errors() {
     let _ = expect_success!(routing_rx, msg_id, Response::GetAccountInfo);
 }
 
+#[test]
+fn request_hooks() {
+    let (mut routing, routing_rx, full_id) = setup();
+
+    routing.set_request_hook(move |req| {
+        match *req {
+            Request::PutMData { ref data, msg_id, .. } if data.tag() == 10000u64 => {
+                // Send an OK response but don't put data on the mock vault
+                Some(Response::PutMData {
+                    res: Ok(()),
+                    msg_id,
+                })
+            }
+            Request::MutateMDataEntries { tag, msg_id, .. } if tag == 12345u64 => {
+                Some(Response::MutateMDataEntries {
+                    res: Err(ClientError::from("hello world")),
+                    msg_id,
+                })
+            }
+            // Pass-through
+            _ => None,
+        }
+    });
+
+    // Create account
+    let owner_key = *full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+
+    // Construct MutableData (but hook won't allow to store it on the network
+    // if the tag is 10000)
+    let name = rand::random();
+    let tag = 10000u64;
+
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set!(owner_key)));
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
+
+    // Check that this MData is not available
+    let msg_id = MessageId::new();
+    unwrap!(routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::GetMDataVersion,
+                    ClientError::NoSuchData);
+
+    // Put an MData with a different tag, this should be stored now
+    let name = rand::random();
+    let tag = 12345u64;
+
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set!(owner_key)));
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
+
+    // Try adding some entries - this should fail, as the hook function
+    // won't allow to put entries to MD with a tag 12345
+    let key0 = b"key0";
+    let value0_v0 = unwrap!(utils::generate_random_vector(10));
+
+    let actions = btree_map![
+            key0.to_vec() => EntryAction::Ins(Value {
+                content: value0_v0.clone(),
+                entry_version: 0,
+            })
+        ];
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions.clone(),
+                                         msg_id, owner_key));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::NetworkOther(..));
+
+    // Now remove the hook function and try again - this should succeed now
+    routing.remove_request_hook();
+
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::MutateMDataEntries);
+}
+
 fn setup() -> (Routing, Receiver<Event>, FullId) {
     let full_id = FullId::new();
     let (routing_tx, routing_rx) = mpsc::channel();
@@ -1237,21 +1137,17 @@ fn create_account(
     owner_key: sign::PublicKey,
 ) -> Authority<XorName> {
     let account_name = XorName(sha3_256(&owner_key[..]));
-    let account_data = unwrap!(MutableData::new(
-        account_name,
-        TYPE_TAG_SESSION_PACKET,
-        Default::default(),
-        Default::default(),
-        btree_set![owner_key],
-    ));
+    let account_data = unwrap!(MutableData::new(account_name,
+                                                TYPE_TAG_SESSION_PACKET,
+                                                Default::default(),
+                                                Default::default(),
+                                                btree_set![owner_key]));
 
     let msg_id = MessageId::new();
-    unwrap!(routing.put_mdata(
-        Authority::ClientManager(account_name),
-        account_data,
-        msg_id,
-        owner_key,
-    ));
+    unwrap!(routing.put_mdata(Authority::ClientManager(account_name),
+                              account_data,
+                              msg_id,
+                              owner_key));
     expect_success!(routing_rx, msg_id, Response::PutMData);
 
     Authority::ClientManager(account_name)

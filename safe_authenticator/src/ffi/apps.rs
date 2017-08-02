@@ -19,10 +19,12 @@ use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use access_container::{access_container, access_container_nonce};
+use app_auth::{AppState, app_state};
+use app_container;
+use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str,
                 vec_into_raw_parts};
 use futures::Future;
-use ipc::{AppState, app_state, get_config, remove_app_container, update_config};
 use maidsafe_utilities::serialisation::deserialise;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};
@@ -79,7 +81,7 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
             let c3 = client.clone();
             let c4 = client.clone();
 
-            get_config(client)
+            config::list_apps(client)
                 .and_then(move |(cfg_version, auth_cfg)| {
                     app_state(&c2, &auth_cfg, app_id).map(move |app_state| {
                         (app_state, auth_cfg, cfg_version)
@@ -98,9 +100,9 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
                         )
                     }));
 
-                    update_config(&c3, Some(cfg_version + 1), &auth_cfg)
+                    config::update_apps(&c3, &auth_cfg, cfg_version + 1)
                 })
-                .and_then(move |_| remove_app_container(c4, &app_id2))
+                .and_then(move |_| app_container::remove(c4, &app_id2))
                 .then(move |res| {
                     call_result_cb!(res, user_data, o_cb);
                     Ok(())
@@ -124,7 +126,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
             let c2 = client.clone();
             let c3 = client.clone();
 
-            get_config(client)
+            config::list_apps(client)
                 .and_then(move |(_, auth_cfg)| {
                     access_container(&c2).map(move |access_container| (access_container, auth_cfg))
                 })
@@ -181,7 +183,7 @@ pub unsafe extern "C" fn auth_registered_apps(
             let c2 = client.clone();
             let c3 = client.clone();
 
-            get_config(client)
+            config::list_apps(client)
                 .and_then(move |(_, auth_cfg)| {
                     access_container(&c2).map(move |access_container| (access_container, auth_cfg))
                 })
