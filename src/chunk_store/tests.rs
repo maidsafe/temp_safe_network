@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-const TEST_DIR: &'static str = "safe_vault_test";
-
 macro_rules! assert_err {
     ($cond : expr, $error : pat) => {
         match $cond {
@@ -74,9 +72,10 @@ fn generate_random_chunks() -> Chunks {
 
 #[test]
 fn create_multiple_instances_in_the_same_root() {
+    let test_dir = "safe_vault_test";
     // root already exists
     {
-        let temp_dir = unwrap!(TempDir::new(TEST_DIR));
+        let temp_dir = unwrap!(TempDir::new(test_dir));
         let root = unwrap!(temp_dir.path().to_str()).to_string();
         let chunk_store1 = unwrap!(ChunkStore::<Id>::new(Some(root.clone()), Some(64)));
         let chunk_store2 = unwrap!(ChunkStore::<Id>::new(Some(root), Some(64)));
@@ -84,7 +83,7 @@ fn create_multiple_instances_in_the_same_root() {
     }
     // root doesn't exist yet
     {
-        let temp_dir = unwrap!(TempDir::new(TEST_DIR));
+        let temp_dir = unwrap!(TempDir::new(test_dir));
         let root = unwrap!(temp_dir.path().join("foo").join("bar").to_str()).to_string();
         let chunk_store1 = unwrap!(ChunkStore::<Id>::new(Some(root.clone()), Some(64)));
         let chunk_store2 = unwrap!(ChunkStore::<Id>::new(Some(root), Some(64)));
@@ -94,11 +93,9 @@ fn create_multiple_instances_in_the_same_root() {
 
 #[test]
 fn store_dir_should_cleanup() {
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
     let store_dir;
     {
-        let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(64)));
+        let mut chunk_store = unwrap!(ChunkStore::new(None, Some(64)));
         store_dir = chunk_store.root_dir.path().to_path_buf();
         unwrap!(chunk_store.put(&Id(0), &Data(vec![0; 10])));
         assert!(store_dir.exists());
@@ -109,9 +106,7 @@ fn store_dir_should_cleanup() {
 #[test]
 fn successful_put() {
     let chunks = generate_random_chunks();
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(chunks.total_size)));
+    let mut chunk_store = unwrap!(ChunkStore::new(None, Some(chunks.total_size)));
     {
         let mut put = |id, data, size| {
             let size_before_insert = chunk_store.used_space();
@@ -141,9 +136,7 @@ fn successful_put() {
 #[test]
 fn failed_put_when_not_enough_space() {
     let disk_size = 32;
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(disk_size)));
+    let mut chunk_store = unwrap!(ChunkStore::new(None, Some(disk_size)));
     let mut rng = SeededRng::thread_rng();
     let id = Id(rng.gen());
     let data = Data(rng.gen_iter().take((disk_size + 1) as usize).collect());
@@ -153,9 +146,7 @@ fn failed_put_when_not_enough_space() {
 #[test]
 fn delete() {
     let chunks = generate_random_chunks();
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(chunks.total_size)));
+    let mut chunk_store = unwrap!(ChunkStore::new(None, Some(chunks.total_size)));
     let mut put_and_delete = |id, value, size| {
         unwrap!(chunk_store.put(&id, &value));
         assert_eq!(chunk_store.used_space(), size);
@@ -173,9 +164,7 @@ fn delete() {
 #[test]
 fn put_and_get_value_should_be_same() {
     let chunks = generate_random_chunks();
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(chunks.total_size)));
+    let mut chunk_store = unwrap!(ChunkStore::new(None, Some(chunks.total_size)));
     for (index, &(ref data, _)) in chunks.data_and_sizes.iter().enumerate() {
         unwrap!(chunk_store.put(&Id(index as u64), &Data(data.clone())));
     }
@@ -188,9 +177,7 @@ fn put_and_get_value_should_be_same() {
 #[test]
 fn overwrite_value() {
     let chunks = generate_random_chunks();
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(chunks.total_size)));
+    let mut chunk_store = unwrap!(ChunkStore::new(None, Some(chunks.total_size)));
     for (ref data, ref size) in chunks.data_and_sizes {
         unwrap!(chunk_store.put(&Id(0), &Data(data.clone())));
         assert_eq!(chunk_store.used_space(), *size);
@@ -201,24 +188,18 @@ fn overwrite_value() {
 
 #[test]
 fn get_fails_when_key_does_not_exist() {
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let chunk_store = unwrap!(ChunkStore::new(Some(root), Some(64)));
-    let mut rng = SeededRng::thread_rng();
-    let id = Id(rng.gen());
+    let chunk_store = unwrap!(ChunkStore::new(None, Some(64)));
+    let id = Id(SeededRng::thread_rng().gen());
     assert_err!(chunk_store.get(&id), Error::NotFound);
 }
 
 #[test]
 fn keys() {
     let chunks = generate_random_chunks();
-    let temp_dir = unwrap!(TempDir::new(TEST_DIR));
-    let root = unwrap!(temp_dir.path().to_str()).to_string();
-    let mut chunk_store = unwrap!(ChunkStore::new(Some(root), Some(chunks.total_size)));
+    let mut chunk_store = unwrap!(ChunkStore::new(None, Some(chunks.total_size)));
 
     for (index, &(ref data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
-
         assert!(!chunk_store.keys().contains(&id));
         unwrap!(chunk_store.put(&id, &Data(data.clone())));
         assert!(chunk_store.keys().contains(&id));
