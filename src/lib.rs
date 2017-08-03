@@ -212,7 +212,6 @@
 extern crate accumulator;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate fake_clock;
-extern crate fs2;
 extern crate hex;
 #[cfg(feature = "use-mock-crust")]
 extern crate itertools;
@@ -233,7 +232,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-#[cfg(test)]
 extern crate tempdir;
 extern crate tiny_keccak;
 #[macro_use]
@@ -267,11 +265,6 @@ pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
 pub use vault::Vault;
-
-/// The number of nodes in groups managing data and user accounts.
-pub const GROUP_SIZE: usize = 8;
-/// The minimal number of nodes in group to reach consensus.
-pub const QUORUM: usize = GROUP_SIZE / 2 + 1;
 
 /// The type tag of invitations to create an account.
 pub const TYPE_TAG_INVITE: u64 = 8;

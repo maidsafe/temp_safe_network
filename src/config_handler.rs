@@ -28,10 +28,19 @@ pub struct Config {
     pub wallet_address: Option<XorName>,
     /// Upper limit for allowed network storage on this vault.
     pub max_capacity: Option<u64>, // measured by Bytes
-    /// root directory for chunk_store directories
+    /// Root directory for chunk_store directories.
     pub chunk_store_root: Option<String>,
     /// Key that is allowed to put mutable data for account creation invitations.
     pub invite_key: Option<[u8; sign::PUBLICKEYBYTES]>,
+    /// Developer options.
+    pub dev: Option<DevConfig>,
+}
+
+/// Extra configuration options intended for developers
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct DevConfig {
+    /// Allow clients to make unlimited mutation requests, i.e. ignore `DEFAULT_MAX_OPS_COUNT`.
+    pub disable_mutation_limit: bool,
 }
 
 /// Reads the default vault config file.
@@ -72,31 +81,52 @@ fn get_file_name() -> Result<OsString, InternalError> {
 
 #[cfg(test)]
 mod test {
+    use super::Config;
+    use serde_json;
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::Path;
+
     #[test]
     fn parse_sample_config_file() {
-        use std::path::Path;
-        use std::fs::File;
-        use std::io::Read;
-        use super::Config;
-        use serde_json;
-
         let path = Path::new("installer/common/sample.vault.config").to_path_buf();
-
-        let mut file = match File::open(path) {
-            Ok(file) => file,
-            Err(what) => {
-                panic!(format!("Error opening safe_vault.vault.config: {:?}", what));
-            }
-        };
-
+        let mut file = unwrap!(File::open(&path), "Error opening {}:", path.display());
         let mut encoded_contents = String::new();
+        let _ = unwrap!(
+            file.read_to_string(&mut encoded_contents),
+            "Error reading {}:",
+            path.display()
+        );
+        let config: Config = unwrap!(
+            serde_json::from_str(&encoded_contents),
+            "Error parsing {} as JSON:",
+            path.display()
+        );
 
-        if let Err(what) = file.read_to_string(&mut encoded_contents) {
-            panic!(format!("Error reading safe_vault.vault.config: {:?}", what));
-        }
-
-        if let Err(what) = serde_json::from_str::<Config>(&encoded_contents) {
-            panic!(format!("Error parsing safe_vault.vault.config: {:?}", what));
-        }
+        assert!(
+            config.wallet_address.is_some(),
+            "{} is missing `wallet_address` field.",
+            path.display()
+        );
+        assert!(
+            config.max_capacity.is_some(),
+            "{} is missing `max_capacity` field.",
+            path.display()
+        );
+        assert!(
+            config.chunk_store_root.is_some(),
+            "{} is missing `chunk_store_root` field.",
+            path.display()
+        );
+        assert!(
+            config.invite_key.is_some(),
+            "{} is missing `invite_key` field.",
+            path.display()
+        );
+        assert!(
+            config.dev.is_some(),
+            "{} is missing `dev` field.",
+            path.display()
+        );
     }
 }

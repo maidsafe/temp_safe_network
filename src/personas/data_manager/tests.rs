@@ -16,19 +16,17 @@
 // relating to use of the SAFE Network Software.
 
 use super::*;
-use QUORUM;
 use maidsafe_utilities::SeededRng;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use mock_routing::RequestWrapper;
 use rand::{self, Rng};
 use routing::{Action, EntryActions, Request, Response, User};
-use std::env;
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
-const CHUNK_STORE_CAPACITY: u64 = 1024 * 1024;
-const CHUNK_STORE_DIR: &'static str = "test_safe_vault_chunk_store";
-
+const CHUNK_STORE_CAPACITY: Option<u64> = Some(1024 * 1024);
+const GROUP_SIZE: usize = 8;
+const QUORUM: usize = 5;
 const TEST_TAG: u64 = 12345678;
 
 #[test]
@@ -41,12 +39,18 @@ fn idata_basics() {
     let data = test_utils::gen_immutable_data(10, &mut rng);
     let nae_manager = Authority::NaeManager(*data.name());
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Get non-existent data fails.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id));
+    unwrap!(dm.handle_get_idata(
+        &mut node,
+        client.into(),
+        nae_manager,
+        *data.name(),
+        msg_id,
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
@@ -75,8 +79,8 @@ fn idata_basics() {
     unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    let retrieved_data =
-        assert_match!(message.response, Response::GetIData { res: Ok(data), .. } => data);
+    let retrieved_data = assert_match!(message.response,
+                                       Response::GetIData { res: Ok(data), .. } => data);
     assert_eq!(retrieved_data, data);
 }
 
@@ -91,8 +95,8 @@ fn mdata_basics() {
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Attempt to list entries of non-existent data fails.
     let msg_id = MessageId::new();
@@ -153,8 +157,8 @@ fn mdata_mutations() {
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Put the data.
     dm.put_into_chunk_store(data);
@@ -239,8 +243,8 @@ fn mdata_change_owner() {
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     // Put the data.
     dm.put_into_chunk_store(data);
@@ -292,8 +296,8 @@ fn mdata_change_owner() {
 fn handle_node_added() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let new_node_name = rand::random();
     node.add_to_routing_table(new_node_name);
@@ -323,22 +327,17 @@ fn handle_node_added() {
 
     assert_eq!(refreshes.len(), 2);
 
-    let check = refreshes
-        .iter()
-        .any(|refresh| match *refresh {
-                 Refresh::Fragment(FragmentInfo::ImmutableData(ref name)) if name ==
-                                                                             data0.name() => true,
-                 _ => false,
-             });
+    let check = refreshes.iter().any(|refresh| match *refresh {
+        Refresh::Fragment(FragmentInfo::ImmutableData(ref name)) if name == data0.name() => true,
+        _ => false,
+    });
     assert!(check);
 
-    let check = refreshes
-        .iter()
-        .any(|refresh| match *refresh {
-                 Refresh::Chunk(MutableDataId(ref name, tag)) if name == data1.name() &&
-                                                                 tag == data1.tag() => true,
-                 _ => false,
-             });
+    let check = refreshes.iter().any(|refresh| match *refresh {
+        Refresh::Chunk(MutableDataId(ref name, tag))
+            if name == data1.name() && tag == data1.tag() => true,
+        _ => false,
+    });
     assert!(check);
 
     // TODO: test also that the refresh contains fragments that the node doesn't
@@ -474,9 +473,9 @@ fn mdata_with_churn_with_partial_accumulation() {
     // None of the groups reaches quorum for their data, but the nodes together do reach
     // quorum for the shell and some of the entries. Only the entries that reached
     // quorum are written to the chunk store.
-    let mut entries = data.entries()
-        .into_iter()
-        .map(|(key, value)| (key.clone(), value.clone()));
+    let mut entries = data.entries().into_iter().map(|(key, value)| {
+        (key.clone(), value.clone())
+    });
     let (key0, value0) = unwrap!(entries.next());
     let (key1, value1) = unwrap!(entries.next());
     let (key2, value2) = unwrap!(entries.next());
@@ -496,10 +495,7 @@ fn mdata_with_churn_with_partial_accumulation() {
                                                 msg_id));
     }
 
-    for node_name in other_node_names
-            .iter()
-            .skip(QUORUM - 1)
-            .take(QUORUM - 1) {
+    for node_name in other_node_names.iter().skip(QUORUM - 1).take(QUORUM - 1) {
         unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
                                                 *node_name,
                                                 partial_data1.clone(),
@@ -556,8 +552,8 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
 fn mdata_non_conflicting_parallel_mutations() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -633,8 +629,8 @@ fn mdata_non_conflicting_parallel_mutations() {
 fn mdata_conflicting_parallel_mutations() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -704,8 +700,8 @@ fn mdata_conflicting_parallel_mutations() {
 fn mdata_parallel_mutations_limits() {
     let mut rng = SeededRng::new();
 
-    let mut node = RoutingNode::new();
-    let mut dm = create_data_manager();
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -817,20 +813,13 @@ fn mdata_parallel_mutations_limits() {
     assert_match!(message.response, Response::MutateMDataEntries { res: Err(_), .. });
 }
 
-fn create_data_manager() -> DataManager {
-    let suffix: u64 = rand::random();
-    let dir = format!("{}_{}", CHUNK_STORE_DIR, suffix);
-
-    unwrap!(DataManager::new(env::temp_dir().join(dir), CHUNK_STORE_CAPACITY))
-}
-
 // Create and setup all the objects necessary for churn-related tests.
 // Returns:
 //   - new node (RoutingNode + DataManager),
 //   - names of the rest of the nodes in the group.
 fn setup_churn<R: Rng>(rng: &mut R) -> (RoutingNode, DataManager, Vec<XorName>) {
-    let mut new_node = RoutingNode::new();
-    let new_dm = create_data_manager();
+    let mut new_node = test_utils::new_routing_node(GROUP_SIZE);
+    let new_dm = unwrap!(DataManager::new(GROUP_SIZE, None, CHUNK_STORE_CAPACITY));
 
     let other_node_names: Vec<_> = rng.gen_iter().take(GROUP_SIZE - 1).collect();
 
@@ -847,9 +836,10 @@ fn setup_churn<R: Rng>(rng: &mut R) -> (RoutingNode, DataManager, Vec<XorName>) 
 //   - Simulate it receiving refresh messages and accumulate them.
 //   - Returns the new RoutingNode and DataManager and the names of the rest of
 //     the group.
-fn setup_mdata_refresh<R: Rng>(data: &MutableData,
-                               rng: &mut R)
-                               -> (RoutingNode, DataManager, Vec<XorName>) {
+fn setup_mdata_refresh<R: Rng>(
+    data: &MutableData,
+    rng: &mut R,
+) -> (RoutingNode, DataManager, Vec<XorName>) {
     let (mut new_node, mut new_dm, other_node_names) = setup_churn(rng);
 
     let refresh = vec![Refresh::Chunk(data.id())];
@@ -869,18 +859,23 @@ fn take_get_mdata_request(node: &mut RoutingNode) -> (MessageId, MutableDataId) 
         _ => false,
     });
 
-    let (name, tag) =
-        assert_match!(message.request, Request::GetMData { name, tag, .. } => (name, tag));
+    let (name, tag) = assert_match!(message.request,
+                                    Request::GetMData { name, tag, .. } => (name, tag));
     (msg_id, MutableDataId(name, tag))
 }
 
 // Removes and returns the sent request matching the given predicate.
 fn take_request<F>(node: &mut RoutingNode, mut f: F) -> (MessageId, RequestWrapper)
-    where F: FnMut(&RequestWrapper) -> bool
+where
+    F: FnMut(&RequestWrapper) -> bool,
 {
     let msg_id = node.sent_requests
         .iter()
-        .filter_map(|(msg_id, message)| if f(message) { Some(*msg_id) } else { None })
+        .filter_map(|(msg_id, message)| if f(message) {
+            Some(*msg_id)
+        } else {
+            None
+        })
         .next();
     let msg_id = unwrap!(msg_id);
     (msg_id, unwrap!(node.sent_requests.remove(&msg_id)))

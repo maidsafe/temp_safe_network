@@ -18,14 +18,16 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
+use fake_clock::FakeClock;
 use rand::Rng;
 use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
               MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
               MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
+use routing::rate_limiter_consts::{CLIENT_CAPACITY, RATE};
 use rust_sodium::crypto::sign;
-use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, GROUP_SIZE, TYPE_TAG_INVITE, test_utils};
+use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -36,7 +38,8 @@ const TEST_TAG: u64 = 123456;
 
 #[test]
 fn handle_put_without_account() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = TEST_NET_SIZE;
@@ -54,20 +57,23 @@ fn handle_put_without_account() {
     let count = nodes
         .iter()
         .filter(|node| {
-                    node.get_maid_manager_mutation_count(client.name())
-                        .is_some()
-                })
+            node.get_maid_manager_mutation_count(client.name())
+                .is_some()
+        })
         .count();
-    assert_eq!(count,
-               0,
-               "mutations count {} found with {} nodes",
-               count,
-               node_count);
+    assert_eq!(
+        count,
+        0,
+        "mutations count {} found with {} nodes",
+        count,
+        node_count
+    );
 }
 
 #[test]
 fn handle_put_with_account() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = TEST_NET_SIZE;
@@ -85,8 +91,10 @@ fn handle_put_with_account() {
     let mut expected_mutations_available = DEFAULT_MAX_OPS_COUNT - expected_mutations_done;
     let account_info = unwrap!(client.get_account_info_response(&mut nodes));
     assert_eq!(account_info.mutations_done, expected_mutations_done);
-    assert_eq!(account_info.mutations_available,
-               expected_mutations_available);
+    assert_eq!(
+        account_info.mutations_available,
+        expected_mutations_available
+    );
 
     let data = test_utils::gen_immutable_data(1024, &mut rng);
     let _ = client.put_idata(data.clone());
@@ -96,29 +104,34 @@ fn handle_put_with_account() {
     let count = nodes
         .iter()
         .filter(|node| {
-                    node.get_maid_manager_mutation_count(client.name())
-                        .is_some()
-                })
+            node.get_maid_manager_mutation_count(client.name())
+                .is_some()
+        })
         .count();
-    assert_eq!(count,
-               GROUP_SIZE,
-               "client account count {} found on {} nodes",
-               count,
-               node_count);
+    assert_eq!(
+        count,
+        group_size,
+        "client account count {} found on {} nodes",
+        count,
+        node_count
+    );
 
-    mock_crust_detail::check_data(vec![Data::Immutable(data)], &nodes);
+    mock_crust_detail::check_data(vec![Data::Immutable(data)], &nodes, group_size);
 
     expected_mutations_done += 1;
     expected_mutations_available = DEFAULT_MAX_OPS_COUNT - expected_mutations_done;
     let account_info = unwrap!(client.get_account_info_response(&mut nodes));
     assert_eq!(account_info.mutations_done, expected_mutations_done);
-    assert_eq!(account_info.mutations_available,
-               expected_mutations_available);
+    assert_eq!(
+        account_info.mutations_available,
+        expected_mutations_available
+    );
 }
 
 #[test]
 fn put_oversized_data() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, TEST_NET_SIZE, None, true);
@@ -129,18 +142,20 @@ fn put_oversized_data() {
     client.create_account(&mut nodes);
 
     // Too large immutable data
-    let data = test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1,
-                                              &mut rng);
-    match client.put_idata_response(data, &mut nodes) {
+    let data =
+        test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
+    match client.put_large_sized_idata(data, &mut nodes) {
         Err(ClientError::DataTooLarge) => (),
         x => panic!("Unexpected response: {:?}", x),
     }
 
     // Mutable data with too large entries
-    let mut data = test_utils::gen_mutable_data(TEST_TAG,
-                                                0,
-                                                *client.full_id().public_id().signing_public_key(),
-                                                &mut rng);
+    let mut data = test_utils::gen_mutable_data(
+        TEST_TAG,
+        0,
+        *client.full_id().public_id().signing_public_key(),
+        &mut rng,
+    );
     let key0 = b"key0".to_vec();
     let value0 = Value {
         content: test_utils::gen_vec(MAX_MUTABLE_DATA_SIZE_IN_BYTES as usize / 2, &mut rng),
@@ -162,10 +177,12 @@ fn put_oversized_data() {
     }
 
     // Mutable data with too many entries
-    let mut data = test_utils::gen_mutable_data(TEST_TAG,
-                                                0,
-                                                *client.full_id().public_id().signing_public_key(),
-                                                &mut rng);
+    let mut data = test_utils::gen_mutable_data(
+        TEST_TAG,
+        0,
+        *client.full_id().public_id().signing_public_key(),
+        &mut rng,
+    );
     for i in 0..MAX_MUTABLE_DATA_ENTRIES + 1 {
         let key = format!("key{}", i).into_bytes();
         let value = Value {
@@ -180,37 +197,54 @@ fn put_oversized_data() {
         Err(ClientError::TooManyEntries) => (),
         x => panic!("Unexpected response: {:?}", x),
     }
+
+    // Larger than rate limiter per client capacity
+    // This makes `part_count` of each message part exceed `MAX_PARTs`.
+    // Hence the client will be banned and terminated.
+    FakeClock::advance_time((CLIENT_CAPACITY * 1000 / RATE as u64) + 1);
+    let data = test_utils::gen_immutable_data(CLIENT_CAPACITY as usize, &mut rng);
+    match client.put_large_sized_idata(data, &mut nodes) {
+        Err(ClientError::InvalidOperation) => (),
+        x => panic!("Unexpected response: {:?}", x),
+    }
 }
 
 
 #[test]
 fn create_account_twice() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
-                                                      .endpoint()]);
+    let config =
+        BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found").endpoint()]);
     let mut client0 = TestClient::new(&network, Some(config.clone()));
     let mut client1 = TestClient::new(&network, Some(config.clone()));
 
     client0.ensure_connected(&mut nodes);
     client1.ensure_connected(&mut nodes);
 
-    assert_eq!(Err(ClientError::NoSuchAccount),
-               client0.get_account_info_response(&mut nodes));
-    assert_eq!(Err(ClientError::NoSuchAccount),
-               client1.get_account_info_response(&mut nodes));
+    assert_eq!(
+        Err(ClientError::NoSuchAccount),
+        client0.get_account_info_response(&mut nodes)
+    );
+    assert_eq!(
+        Err(ClientError::NoSuchAccount),
+        client1.get_account_info_response(&mut nodes)
+    );
 
     let mut owners = BTreeSet::new();
     let _ = owners.insert(*client0.signing_public_key());
 
-    let account = unwrap!(MutableData::new(rng.gen(),
-                                           TYPE_TAG_SESSION_PACKET,
-                                           Default::default(),
-                                           Default::default(),
-                                           owners.clone()));
+    let account = unwrap!(MutableData::new(
+        rng.gen(),
+        TYPE_TAG_SESSION_PACKET,
+        Default::default(),
+        Default::default(),
+        owners.clone(),
+    ));
 
     let expected_account_info = AccountInfo {
         mutations_done: 1,
@@ -220,41 +254,61 @@ fn create_account_twice() {
     // Create the account using `client0`.
     unwrap!(client0.put_mdata_response(account.clone(), &mut nodes));
 
-    assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
-               expected_account_info);
-    assert_eq!(client1.get_account_info_response(&mut nodes),
-               Err(ClientError::NoSuchAccount));
+    assert_eq!(
+        unwrap!(client0.get_account_info_response(&mut nodes)),
+        expected_account_info
+    );
+    assert_eq!(
+        client1.get_account_info_response(&mut nodes),
+        Err(ClientError::NoSuchAccount)
+    );
 
     // Create the account again using `client0`.
-    assert_eq!(client0.put_mdata_response(account.clone(), &mut nodes),
-               Err(ClientError::AccountExists));
+    assert_eq!(
+        client0.put_mdata_response(account.clone(), &mut nodes),
+        Err(ClientError::AccountExists)
+    );
     let _ = poll::nodes_and_client(&mut nodes, &mut client0);
 
     // That should not have changed anything.
-    assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
-               expected_account_info);
-    assert_eq!(client1.get_account_info_response(&mut nodes),
-               Err(ClientError::NoSuchAccount));
+    assert_eq!(
+        unwrap!(client0.get_account_info_response(&mut nodes)),
+        expected_account_info
+    );
+    assert_eq!(
+        client1.get_account_info_response(&mut nodes),
+        Err(ClientError::NoSuchAccount)
+    );
 
     // Create the same account using `client1`.
-    assert_eq!(client1.put_mdata_response(account, &mut nodes),
-               Err(ClientError::InvalidOwners));
+    assert_eq!(
+        client1.put_mdata_response(account, &mut nodes),
+        Err(ClientError::InvalidOwners)
+    );
     let _ = poll::nodes_and_client(&mut nodes, &mut client1);
 
     // That should not succeed.
-    assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
-               expected_account_info);
-    assert_eq!(client1.get_account_info_response(&mut nodes),
-               Err(ClientError::NoSuchAccount));
+    assert_eq!(
+        unwrap!(client0.get_account_info_response(&mut nodes)),
+        expected_account_info
+    );
+    assert_eq!(
+        client1.get_account_info_response(&mut nodes),
+        Err(ClientError::NoSuchAccount)
+    );
 
     // Create the account again, but with different name, using `client0`.
-    let account = unwrap!(MutableData::new(rng.gen(),
-                                           TYPE_TAG_SESSION_PACKET,
-                                           Default::default(),
-                                           Default::default(),
-                                           owners));
-    assert_eq!(client0.put_mdata_response(account, &mut nodes),
-               Err(ClientError::AccountExists));
+    let account = unwrap!(MutableData::new(
+        rng.gen(),
+        TYPE_TAG_SESSION_PACKET,
+        Default::default(),
+        Default::default(),
+        owners,
+    ));
+    assert_eq!(
+        client0.put_mdata_response(account, &mut nodes),
+        Err(ClientError::AccountExists)
+    );
 }
 
 // Test the invite workflow:
@@ -265,9 +319,10 @@ fn create_account_twice() {
 #[test]
 fn invite() {
     let seed = None;
-    let node_count = GROUP_SIZE;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size;
+    let network = Network::new(group_size, seed);
     let admin_id = FullId::new();
     let vault_config = Config {
         invite_key: Some(admin_id.public_id().signing_public_key().0),
@@ -276,8 +331,8 @@ fn invite() {
 
     let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
     let mut rng = network.new_rng();
-    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
-                                                      .endpoint()]);
+    let config =
+        BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found").endpoint()]);
 
     let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
     admin_client.ensure_connected(&mut nodes);
@@ -291,46 +346,60 @@ fn invite() {
     let _ = owners.insert(*admin_client.signing_public_key());
     let mut permissions = BTreeMap::new();
     let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
-    let data = unwrap!(MutableData::new(name,
-                                        TYPE_TAG_INVITE,
-                                        permissions.clone(),
-                                        Default::default(),
-                                        owners));
+    let data = unwrap!(MutableData::new(
+        name,
+        TYPE_TAG_INVITE,
+        permissions.clone(),
+        Default::default(),
+        owners,
+    ));
     unwrap!(admin_client.put_mdata_response(data, &mut nodes));
 
     let mut client1 = TestClient::new(&network, Some(config.clone()));
     client1.ensure_connected(&mut nodes);
 
     // Attempt to create account using invalid invite code fails.
-    assert_eq!(Err(ClientError::InvalidInvitation),
-               client1.create_account_with_invitation_response("invalid invite", &mut nodes));
+    assert_eq!(
+        Err(ClientError::InvalidInvitation),
+        client1.create_account_with_invitation_response("invalid invite", &mut nodes)
+    );
 
     // Create account using valid invite code.
-    unwrap!(client1.create_account_with_invitation_response(invite_code, &mut nodes));
+    unwrap!(client1.create_account_with_invitation_response(
+        invite_code,
+        &mut nodes,
+    ));
 
     // Attempt to put an invite by non-admin client fails.
     let name = XorName(tiny_keccak::sha3_256(b"fake invite"));
     let mut owners = BTreeSet::new();
     let _ = owners.insert(*client1.signing_public_key());
-    let data = unwrap!(MutableData::new(name,
-                                        TYPE_TAG_INVITE,
-                                        permissions,
-                                        Default::default(),
-                                        owners));
-    assert_eq!(Err(ClientError::InvalidOperation),
-               client1.put_mdata_response(data, &mut nodes));
+    let data = unwrap!(MutableData::new(
+        name,
+        TYPE_TAG_INVITE,
+        permissions,
+        Default::default(),
+        owners,
+    ));
+    assert_eq!(
+        Err(ClientError::InvalidOperation),
+        client1.put_mdata_response(data, &mut nodes)
+    );
 
     // Attempt to reuse already claimed invite fails.
     let mut client2 = TestClient::new(&network, Some(config));
     client2.ensure_connected(&mut nodes);
 
-    assert_eq!(Err(ClientError::InvitationAlreadyClaimed),
-               client2.create_account_with_invitation_response(invite_code, &mut nodes));
+    assert_eq!(
+        Err(ClientError::InvitationAlreadyClaimed),
+        client2.create_account_with_invitation_response(invite_code, &mut nodes)
+    );
 }
 
 #[test]
 fn storing_till_client_account_full() {
-    let network = Network::new(GROUP_SIZE, None);
+    let group_size = 8;
+    let network = Network::new(group_size, None);
     let mut rng = network.new_rng();
 
     let node_count = 15;
@@ -366,7 +435,8 @@ fn account_balance_with_successful_mutations_with_churn() {
     let node_count = 15;
     let data_count = 4;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -390,7 +460,7 @@ fn account_balance_with_successful_mutations_with_churn() {
             mutation_count += 1;
         }
 
-        if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
+        if nodes.len() <= group_size + 2 || rng.gen() {
             let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
@@ -406,20 +476,25 @@ fn account_balance_with_successful_mutations_with_churn() {
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+        let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
         let node_count_stats: Vec<_> = sorted_nodes
             .into_iter()
             .map(|node| {
-                     (node.name(), unwrap!(node.get_maid_manager_mutation_count(client.name())))
-                 })
+                (
+                    node.name(),
+                    unwrap!(node.get_maid_manager_mutation_count(client.name())),
+                )
+            })
             .collect();
 
         for &(_, count) in &node_count_stats {
-            assert_eq!(count,
-                       mutation_count,
-                       "Expected {} mutations, got: {:?}",
-                       mutation_count,
-                       node_count_stats);
+            assert_eq!(
+                count,
+                mutation_count,
+                "Expected {} mutations, got: {:?}",
+                mutation_count,
+                node_count_stats
+            );
         }
 
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
@@ -432,7 +507,8 @@ fn account_balance_with_failed_mutations_with_churn() {
     let node_count = 15;
     let chunks_per_iter = 4;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -465,7 +541,7 @@ fn account_balance_with_failed_mutations_with_churn() {
             }
         }
 
-        if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
+        if nodes.len() <= group_size + 2 || rng.gen() {
             let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
@@ -481,20 +557,25 @@ fn account_balance_with_failed_mutations_with_churn() {
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+        let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
         let node_count_stats: Vec<_> = sorted_nodes
             .into_iter()
             .map(|node| {
-                     (node.name(), unwrap!(node.get_maid_manager_mutation_count(client.name())))
-                 })
+                (
+                    node.name(),
+                    unwrap!(node.get_maid_manager_mutation_count(client.name())),
+                )
+            })
             .collect();
 
         let expected_mutation_count = chunks_per_iter * (i / 2 + 1) + 1;
         for &(_, count) in &node_count_stats {
-            assert_eq!(count,
-                       expected_mutation_count,
-                       "Unexpected mutation count: {:?}",
-                       node_count_stats);
+            assert_eq!(
+                count,
+                expected_mutation_count,
+                "Unexpected mutation count: {:?}",
+                node_count_stats
+            );
 
         }
     }
@@ -511,7 +592,8 @@ fn account_concurrent_keys_mutation() {
     let iterations = test_utils::iterations();
     let max_mutations = 4;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -602,7 +684,8 @@ fn account_concurrent_insert_key_put_data() {
     let node_count = TEST_NET_SIZE;
     let iterations = test_utils::iterations();
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -629,16 +712,19 @@ fn account_concurrent_insert_key_put_data() {
         // TODO: advance clock and create another event to trigger expiration check.
         while let Ok(event) = client.try_recv() {
             if let Event::Response { response: Response::InsAuthKey { res, .. }, .. } =
-                event.clone() {
+                event.clone()
+            {
                 match res {
                     Ok(()) => {
                         version += 1;
                         let _ = auth_keys.insert(app_key);
                     }
                     Err(error) => {
-                        trace!("Received failed response of insertion {:?}. Reason: {:?}",
-                               msg_id_k,
-                               error);
+                        trace!(
+                            "Received failed response of insertion {:?}. Reason: {:?}",
+                            msg_id_k,
+                            error
+                        );
                     }
                 }
             }
@@ -646,9 +732,11 @@ fn account_concurrent_insert_key_put_data() {
                 match res {
                     Ok(()) => mutate_count += 1,
                     Err(error) => {
-                        trace!("Received failed response of put data {:?}. Reason: {:?}",
-                               msg_id_d,
-                               error);
+                        trace!(
+                            "Received failed response of put data {:?}. Reason: {:?}",
+                            msg_id_d,
+                            error
+                        );
                     }
                 }
             }
@@ -660,10 +748,15 @@ fn account_concurrent_insert_key_put_data() {
         }
     }
 
-    let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+    let sorted_nodes = test_node::closest_to(&nodes, client.name(), group_size);
     let node_count_stats: Vec<_> = sorted_nodes
         .into_iter()
-        .map(|node| (node.name(), node.get_maid_manager_mutation_count(client.name())))
+        .map(|node| {
+            (
+                node.name(),
+                node.get_maid_manager_mutation_count(client.name()),
+            )
+        })
         .collect();
 
     for &(_, count) in &node_count_stats {
@@ -677,7 +770,8 @@ fn reusing_msg_ids() {
     let seed = None;
     let node_count = 8;
 
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let network = Network::new(group_size, seed);
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
 
@@ -694,7 +788,11 @@ fn reusing_msg_ids() {
     let data1 = test_utils::gen_immutable_data(10, &mut rng);
     let msg_id = MessageId::new();
 
-    unwrap!(client.put_idata_response_with_msg_id(data0.clone(), msg_id, &mut nodes));
+    unwrap!(client.put_idata_response_with_msg_id(
+        data0.clone(),
+        msg_id,
+        &mut nodes,
+    ));
     match client.put_idata_response_with_msg_id(data1.clone(), msg_id, &mut nodes) {
         Err(ClientError::InvalidOperation) => (),
         Err(error) => panic!("Unexpected error: {:?}", error),
@@ -704,8 +802,10 @@ fn reusing_msg_ids() {
     // Only one chunk is stored.
     let retrieved_data = unwrap!(client.get_idata_response(*data0.name(), &mut nodes));
     assert_eq!(retrieved_data, data0);
-    assert_eq!(client.get_idata_response(*data1.name(), &mut nodes),
-               Err(ClientError::NoSuchData));
+    assert_eq!(
+        client.get_idata_response(*data1.name(), &mut nodes),
+        Err(ClientError::NoSuchData)
+    );
 
     // Only one request is charged.
     let balance1 = unwrap!(client.get_account_info_response(&mut nodes));
@@ -752,9 +852,9 @@ fn reusing_msg_ids() {
 #[test]
 fn claiming_invitation_concurrently() {
     let seed = None;
-    let node_count = GROUP_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
+    let group_size = 8;
+    let node_count = group_size;
+    let network = Network::new(group_size, seed);
     let admin_id = FullId::new();
     let vault_config = Config {
         invite_key: Some(admin_id.public_id().signing_public_key().0),
@@ -763,8 +863,8 @@ fn claiming_invitation_concurrently() {
 
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
-    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
-                                                      .endpoint()]);
+    let config =
+        BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found").endpoint()]);
 
     let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
     admin_client.ensure_connected(&mut nodes);
@@ -778,19 +878,21 @@ fn claiming_invitation_concurrently() {
     let _ = owners.insert(*admin_client.signing_public_key());
     let mut permissions = BTreeMap::new();
     let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
-    let data = unwrap!(MutableData::new(name,
-                                        TYPE_TAG_INVITE,
-                                        permissions.clone(),
-                                        Default::default(),
-                                        owners));
+    let data = unwrap!(MutableData::new(
+        name,
+        TYPE_TAG_INVITE,
+        permissions.clone(),
+        Default::default(),
+        owners,
+    ));
     unwrap!(admin_client.put_mdata_response(data, &mut nodes));
 
     let mut clients: Vec<_> = (0..2)
         .map(|_| {
-                 let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-                 let config = BootstrapConfig::with_contacts(&[endpoint]);
-                 TestClient::new(&network, Some(config.clone()))
-             })
+            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
+            let config = BootstrapConfig::with_contacts(&[endpoint]);
+            TestClient::new(&network, Some(config.clone()))
+        })
         .collect();
 
     for client in &mut clients {
@@ -810,9 +912,11 @@ fn claiming_invitation_concurrently() {
                 match res {
                     Ok(()) => succeeded += 1,
                     Err(error) => {
-                        trace!("Client {:?} received failed response. Reason: {:?}",
-                               client.name(),
-                               error);
+                        trace!(
+                            "Client {:?} received failed response. Reason: {:?}",
+                            client.name(),
+                            error
+                        );
                     }
                 }
             }

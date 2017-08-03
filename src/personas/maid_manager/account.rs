@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 
 /// Default available number of operations per account.
 #[cfg(not(feature = "use-mock-crust"))]
-pub const DEFAULT_MAX_OPS_COUNT: u64 = 500;
+pub const DEFAULT_MAX_OPS_COUNT: u64 = 1000;
 /// Default available number of mutations per account.
 #[cfg(feature = "use-mock-crust")]
 pub const DEFAULT_MAX_OPS_COUNT: u64 = 100;
@@ -34,13 +34,28 @@ pub struct Account {
     pub keys_ops_count: u64,
     /// App authentication keys.
     pub keys: BTreeSet<sign::PublicKey>,
+    /// Dev option to allow clients to make unlimited mutation requests.
+    disable_mutation_limit: bool,
 }
 
 impl Account {
+    pub fn new(disable_mutation_limit: bool) -> Self {
+        Account {
+            data_ops_msg_ids: BTreeSet::new(),
+            keys_ops_count: 0,
+            keys: BTreeSet::new(),
+            disable_mutation_limit,
+        }
+    }
+
     // TODO: Change the `AccountInfo` struct in routing.
     pub fn balance(&self) -> AccountInfo {
         let done = self.data_ops_msg_ids.len() as u64 + self.keys_ops_count;
-        let available = DEFAULT_MAX_OPS_COUNT.saturating_sub(done);
+        let available = if self.disable_mutation_limit {
+            u64::max_value()
+        } else {
+            DEFAULT_MAX_OPS_COUNT.saturating_sub(done)
+        };
 
         AccountInfo {
             mutations_done: done,
@@ -49,17 +64,8 @@ impl Account {
     }
 
     pub fn has_balance(&self) -> bool {
-        self.data_ops_msg_ids.len() as u64 + self.keys_ops_count < DEFAULT_MAX_OPS_COUNT
-    }
-}
-
-impl Default for Account {
-    fn default() -> Self {
-        Account {
-            data_ops_msg_ids: BTreeSet::new(),
-            keys_ops_count: 0,
-            keys: BTreeSet::new(),
-        }
+        self.disable_mutation_limit ||
+            self.data_ops_msg_ids.len() as u64 + self.keys_ops_count < DEFAULT_MAX_OPS_COUNT
     }
 }
 
@@ -70,7 +76,7 @@ mod tests {
 
     #[test]
     fn balance() {
-        let mut account = Account::default();
+        let mut account = Account::new(false);
         assert!(account.has_balance());
 
         account.keys_ops_count = DEFAULT_MAX_OPS_COUNT - 1;
@@ -78,5 +84,11 @@ mod tests {
 
         let _ = account.data_ops_msg_ids.insert(MessageId::zero());
         assert!(!account.has_balance());
+
+        let mut unlimited_account = Account::new(true);
+        assert!(unlimited_account.has_balance());
+
+        unlimited_account.keys_ops_count = DEFAULT_MAX_OPS_COUNT;
+        assert!(unlimited_account.has_balance());
     }
 }

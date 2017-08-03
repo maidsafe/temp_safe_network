@@ -16,32 +16,31 @@
 // relating to use of the SAFE Network Software.
 
 use lru_time_cache::LruCache;
-use routing::XorName;
+use routing::{QUORUM_DENOMINATOR, QUORUM_NUMERATOR, XorName};
 use std::collections::BTreeSet;
 use std::time::Duration;
 
 pub struct MessageIdAccumulator<K> {
-    quorum: usize,
+    group_size: usize,
     map: LruCache<K, BTreeSet<XorName>>,
 }
 
 impl<K> MessageIdAccumulator<K>
-    where K: Clone + Ord
+where
+    K: Clone + Ord,
 {
-    pub fn new(quorum: usize, duration: Duration) -> Self {
+    pub fn new(group_size: usize, duration: Duration) -> Self {
         MessageIdAccumulator {
-            quorum: quorum,
+            group_size,
             map: LruCache::with_expiry_duration(duration),
         }
     }
 
     pub fn add(&mut self, key: K, src_name: XorName) -> Option<K> {
         let done = {
-            let src_list = self.map
-                .entry(key.clone())
-                .or_insert_with(Default::default);
+            let src_list = self.map.entry(key.clone()).or_insert_with(Default::default);
             let _ = src_list.insert(src_name);
-            src_list.len() >= self.quorum
+            src_list.len() * QUORUM_DENOMINATOR > self.group_size * QUORUM_NUMERATOR
         };
 
         if done {
@@ -61,7 +60,7 @@ mod tests {
 
     #[test]
     fn smoke() {
-        let mut accumulator = MessageIdAccumulator::new(5, Duration::from_secs(10));
+        let mut accumulator = MessageIdAccumulator::new(8, Duration::from_secs(10));
         let msg_id = 0;
         let duplicate_sender = XorName(rand::random());
         assert_eq!(accumulator.add(msg_id, XorName(rand::random())), None);
@@ -69,7 +68,9 @@ mod tests {
         assert_eq!(accumulator.add(msg_id, XorName(rand::random())), None);
         assert_eq!(accumulator.add(msg_id, XorName(rand::random())), None);
         assert_eq!(accumulator.add(msg_id, duplicate_sender), None);
-        assert_eq!(accumulator.add(msg_id, XorName(rand::random())),
-                   Some(msg_id));
+        assert_eq!(
+            accumulator.add(msg_id, XorName(rand::random())),
+            Some(msg_id)
+        );
     }
 }

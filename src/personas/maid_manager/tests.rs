@@ -24,17 +24,20 @@ use routing::{AccountInfo, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_EN
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
+const GROUP_SIZE: usize = 8;
+const QUORUM: usize = 5;
 const TEST_TAG: u64 = 12345678;
+
 
 #[test]
 fn account_basics() {
     let (src, client_key) = test_utils::gen_client_authority();
     let dst = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
-    // Retrieving account info for non-existintg account fails.
+    // Retrieving account info for non-existing account fails.
     let res = get_account_info(&mut node, &mut mm, src, dst);
     assert_match!(res, Err(ClientError::NoSuchAccount));
 
@@ -53,8 +56,8 @@ fn idata_basics() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create account and retrieve the current account info.
     let _ = create_account(&mut node, &mut mm, client, client_manager);
@@ -63,7 +66,13 @@ fn idata_basics() {
     // Put immutable data.
     let data = test_utils::gen_immutable_data(10, &mut rand::thread_rng());
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_idata(&mut node, client, client_manager, data.clone(), msg_id));
+    unwrap!(mm.handle_put_idata(
+        &mut node,
+        client,
+        client_manager,
+        data.clone(),
+        msg_id,
+    ));
 
     // Verify it gets forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -98,8 +107,8 @@ fn mdata_basics() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create account and retrieve the current account info.
     let _ = create_account(&mut node, &mut mm, client, client_manager);
@@ -185,8 +194,8 @@ fn mdata_permissions_and_owners() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let _ = create_account(&mut node, &mut mm, client, client_manager);
 
@@ -349,8 +358,8 @@ fn auth_keys() {
     let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
     let (_, app_key) = test_utils::gen_client_authority();
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create owner account
     let _ = create_account(&mut node, &mut mm, owner_client, owner_client_manager);
@@ -361,8 +370,7 @@ fn auth_keys() {
                                                  owner_client,
                                                  owner_client_manager,
                                                  msg_id));
-    let (auth_keys, version) =
-        assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
+    let (auth_keys, version) = assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                       Response::ListAuthKeysAndVersion { res: Ok(ok), .. } => ok);
 
     assert!(auth_keys.is_empty());
@@ -378,7 +386,7 @@ fn auth_keys() {
                                    msg_id));
 
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
-                  Response::InsAuthKey { res: Err(ClientError::InvalidSuccessor), .. });
+                  Response::InsAuthKey { res: Err(ClientError::InvalidSuccessor(0)), .. });
 
     // Attempt to insert new auth key by non-owner fails.
     let (evil_client, _) = test_utils::gen_client_authority();
@@ -415,8 +423,7 @@ fn auth_keys() {
                                                  owner_client,
                                                  owner_client_manager,
                                                  msg_id));
-    let (auth_keys, version) =
-        assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
+    let (auth_keys, version) = assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                       Response::ListAuthKeysAndVersion { res: Ok(ok), .. } => ok);
 
     assert_eq!(auth_keys.len(), 1);
@@ -432,8 +439,8 @@ fn mutation_authorisation() {
     let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
     let (app_client, app_key) = test_utils::gen_client_authority();
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create owner account
     let _ = create_account(&mut node, &mut mm, owner_client, owner_client_manager);
@@ -642,14 +649,14 @@ fn account_replication_during_churn() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut old_node = RoutingNode::new();
-    let mut old_mm = MaidManager::new(None);
+    let mut old_node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut old_mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let op_msg_id = create_account(&mut old_node, &mut old_mm, client, client_manager);
     let old_info = unwrap!(get_account_info(&mut old_node, &mut old_mm, client, client_manager));
 
-    let mut new_node = RoutingNode::new();
-    let mut new_mm = MaidManager::new(None);
+    let mut new_node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut new_mm = MaidManager::new(GROUP_SIZE, None, false);
     let new_node_name = *unwrap!(new_node.id()).name();
 
     // The new node doesn't have the account initially.
@@ -705,15 +712,15 @@ fn account_replication_during_churn() {
 fn limits() {
     let mut rng = rand::thread_rng();
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
     // Attempt to put oversized immutable data fails.
-    let bad_data = test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1,
-                                                  &mut rng);
+    let bad_data =
+        test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_idata(&mut node,
                                 client,
@@ -726,18 +733,22 @@ fn limits() {
 
 
     // Attempt to put mutable data with too many entries fails.
-    let mut bad_data = test_utils::gen_mutable_data(TEST_TAG,
-                                                    MAX_MUTABLE_DATA_ENTRIES as usize,
-                                                    client_key,
-                                                    &mut rng);
+    let mut bad_data = test_utils::gen_mutable_data(
+        TEST_TAG,
+        MAX_MUTABLE_DATA_ENTRIES as usize,
+        client_key,
+        &mut rng,
+    );
     while bad_data.keys().len() <= MAX_MUTABLE_DATA_ENTRIES as usize {
         let key = test_utils::gen_vec(10, &mut rng);
         let content = test_utils::gen_vec(10, &mut rng);
-        let _ = bad_data.mutate_entry_without_validation(key,
-                                                         Value {
-                                                             content: content,
-                                                             entry_version: 0,
-                                                         });
+        let _ = bad_data.mutate_entry_without_validation(
+            key,
+            Value {
+                content: content,
+                entry_version: 0,
+            },
+        );
     }
 
     let msg_id = MessageId::new();
@@ -755,11 +766,13 @@ fn limits() {
     let mut bad_data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let key = test_utils::gen_vec(10, &mut rng);
     let content = test_utils::gen_vec(MAX_MUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
-    let res = bad_data.mutate_entry_without_validation(key,
-                                                       Value {
-                                                           content: content,
-                                                           entry_version: 0,
-                                                       });
+    let res = bad_data.mutate_entry_without_validation(
+        key,
+        Value {
+            content: content,
+            entry_version: 0,
+        },
+    );
     assert!(res);
 
     let msg_id = MessageId::new();
@@ -779,8 +792,8 @@ fn refresh_data_ops_count() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let mut node = RoutingNode::new();
-    let mut mm = MaidManager::new(None);
+    let mut node = test_utils::new_routing_node(GROUP_SIZE);
+    let mut mm = MaidManager::new(GROUP_SIZE, None, false);
 
     // Create account and retrieve the current balance.
     let _ = create_account(&mut node, &mut mm, client, client_manager);
@@ -812,16 +825,19 @@ fn refresh_data_ops_count() {
     assert_eq!(balance_1.mutations_done, balance_0.mutations_done + 1);
 }
 
-fn create_account(node: &mut RoutingNode,
-                  mm: &mut MaidManager,
-                  src: ClientAuthority,
-                  dst: ClientManagerAuthority)
-                  -> MessageId {
+fn create_account(
+    node: &mut RoutingNode,
+    mm: &mut MaidManager,
+    src: ClientAuthority,
+    dst: ClientManagerAuthority,
+) -> MessageId {
     let client_key = *src.client_key();
-    let account_packet = test_utils::gen_mutable_data(TYPE_TAG_SESSION_PACKET,
-                                                      0,
-                                                      client_key,
-                                                      &mut rand::thread_rng());
+    let account_packet = test_utils::gen_mutable_data(
+        TYPE_TAG_SESSION_PACKET,
+        0,
+        client_key,
+        &mut rand::thread_rng(),
+    );
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(node, src, dst, account_packet, msg_id, client_key));
 
@@ -835,11 +851,12 @@ fn create_account(node: &mut RoutingNode,
     msg_id
 }
 
-fn get_account_info(node: &mut RoutingNode,
-                    mm: &mut MaidManager,
-                    src: ClientAuthority,
-                    dst: ClientManagerAuthority)
-                    -> Result<AccountInfo, ClientError> {
+fn get_account_info(
+    node: &mut RoutingNode,
+    mm: &mut MaidManager,
+    src: ClientAuthority,
+    dst: ClientManagerAuthority,
+) -> Result<AccountInfo, ClientError> {
     let msg_id = MessageId::new();
     unwrap!(mm.handle_get_account_info(node, src, dst, msg_id));
 
@@ -849,10 +866,7 @@ fn get_account_info(node: &mut RoutingNode,
 
 // Simulate the node sending a refresh message with the given `msg_id` and then
 // receiving it back.
-fn simulate_refresh(node: &mut RoutingNode,
-                    mm: &mut MaidManager,
-                    msg_id: MessageId,
-                    count: usize) {
+fn simulate_refresh(node: &mut RoutingNode, mm: &mut MaidManager, msg_id: MessageId, count: usize) {
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, ..) => payload);
     if message.src.is_single() && message.dst.is_single() {

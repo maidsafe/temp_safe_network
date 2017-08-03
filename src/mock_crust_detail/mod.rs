@@ -22,7 +22,6 @@ pub mod test_client;
 /// Test full node
 pub mod test_node;
 
-use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::DataId;
@@ -52,24 +51,27 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
     let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::id).collect();
     let mut data_count = HashMap::new();
 
-    for data_idv in nodes
-            .iter()
-            .flat_map(|node| unwrap!(node.get_stored_ids_and_versions())) {
+    for data_idv in nodes.iter().flat_map(|node| {
+        unwrap!(node.get_stored_ids_and_versions())
+    })
+    {
         if deleted_data_ids.contains(&data_idv.0) {
             *data_count.entry(data_idv).or_insert(0) += 1;
         }
     }
 
     for (data_id, count) in data_count {
-        assert!(count < 5,
-                "Found deleted data: {:?}. count: {}",
-                data_id,
-                count);
+        assert!(
+            count < 5,
+            "Found deleted data: {:?}. count: {}",
+            data_id,
+            count
+        );
     }
 }
 
 /// Checks that the given `nodes` store the expected number of copies of the given data.
-pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
+pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode], group_size: usize) {
     let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
         for data_idv in unwrap!(node.get_stored_ids_and_versions()) {
@@ -94,18 +96,18 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             .into_iter()
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
-        let mut expected_data_holders =
-            nodes
-                .iter()
-                .map(TestNode::name)
-                .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
-        expected_data_holders.truncate(GROUP_SIZE);
+        let mut expected_data_holders = nodes.iter().map(TestNode::name).sorted_by(|left, right| {
+            data_id.name().cmp_distance(left, right)
+        });
+        expected_data_holders.truncate(group_size);
 
         if expected_data_holders != data_holders {
-            panic!("Unexpected data holders for {:?}\n  expected: {:?}\n    actual: {:?}",
-                   data_id,
-                   expected_data_holders,
-                   data_holders);
+            panic!(
+                "Unexpected data holders for {:?}\n  expected: {:?}\n    actual: {:?}",
+                data_id,
+                expected_data_holders,
+                data_holders
+            );
         }
     }
 }
