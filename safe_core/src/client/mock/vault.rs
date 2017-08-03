@@ -23,7 +23,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::time::SystemTime;
 use tiny_keccak::sha3_256;
 
-pub const DEFAULT_MAX_MUTATIONS: u64 = 500;
+pub const DEFAULT_MAX_MUTATIONS: u64 = 1000;
 
 #[derive(Deserialize, Serialize)]
 pub struct Storage {
