@@ -437,11 +437,11 @@ fn mutable_data_entry_versioning() {
 
     // Update with correct version bump succeeds.
     let actions = btree_map![
-            key.to_vec() => EntryAction::Update(Value {
-                content: value_v1.clone(),
-                entry_version: 1,
-            })
-        ];
+        key.to_vec() => EntryAction::Update(Value {
+            content: value_v1.clone(),
+            entry_version: 1,
+        })
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
@@ -449,8 +449,8 @@ fn mutable_data_entry_versioning() {
 
     // Delete without version bump fails.
     let actions = btree_map![
-            key.to_vec() => EntryAction::Del(1)
-        ];
+        key.to_vec() => EntryAction::Del(1)
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
@@ -461,8 +461,8 @@ fn mutable_data_entry_versioning() {
 
     // Delete with correct version bump succeeds.
     let actions = btree_map![
-            key.to_vec() => EntryAction::Del(2)
-        ];
+        key.to_vec() => EntryAction::Del(2)
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
@@ -484,8 +484,8 @@ fn mutable_data_permissions() {
     let value0_v0 = unwrap!(utils::generate_random_vector(10));
 
     let entries = btree_map![
-            key0.to_vec() => Value { content: value0_v0, entry_version: 0 }
-        ];
+        key0.to_vec() => Value { content: value0_v0, entry_version: 0 }
+    ];
 
 
     let data = unwrap!(MutableData::new(name,
@@ -589,11 +589,11 @@ fn mutable_data_permissions() {
 
     // App still can't update entries.
     let actions = btree_map![
-            key0.to_vec() => EntryAction::Update(Value {
-                content: value0_v2.clone(),
-                entry_version: 2,
-            })
-        ];
+        key0.to_vec() => EntryAction::Update(Value {
+            content: value0_v2.clone(),
+            entry_version: 2,
+        })
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
@@ -606,11 +606,11 @@ fn mutable_data_permissions() {
     let key1 = b"key1";
     let value1_v0 = unwrap!(utils::generate_random_vector(10));
     let actions = btree_map![
-            key1.to_vec() => EntryAction::Ins(Value {
-                content: value1_v0,
-                entry_version: 0,
-            })
-        ];
+        key1.to_vec() => EntryAction::Ins(Value {
+            content: value1_v0,
+            entry_version: 0,
+        })
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
@@ -651,11 +651,11 @@ fn mutable_data_permissions() {
 
     // App can now update entries.
     let actions = btree_map![
-            key0.to_vec() => EntryAction::Update(Value {
-                content: value0_v2,
-                entry_version: 2,
-            })
-        ];
+        key0.to_vec() => EntryAction::Update(Value {
+            content: value0_v2,
+            entry_version: 2,
+        })
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(app_routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, app_sign_key));
@@ -964,11 +964,30 @@ fn auth_keys() {
     assert_eq!(version, 2);
 }
 
+// Exhaust the account balance and ensure that mutations fail
 #[test]
 fn balance_check() {
     let (mut routing, routing_rx, full_id) = setup();
     let owner_key = *full_id.public_id().signing_public_key();
     let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+
+    // Put MutableData so we can test getting it later.
+    // Do this before exhausting the balance (below).
+    let name = rand::random();
+    let tag = 1000u64;
+
+    let data = unwrap!(MutableData::new(
+        name,
+        tag,
+        Default::default(),
+        Default::default(),
+        btree_set!(owner_key),
+    ));
+    let nae_mgr = Authority::NaeManager(*data.name());
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
 
     // Exhaust the account balance.
     loop {
@@ -991,6 +1010,12 @@ fn balance_check() {
                     msg_id,
                     Response::PutIData,
                     ClientError::LowBalance);
+
+    // Try getting MutableData (should succeed in spite of low balance)
+    let msg_id = MessageId::new();
+    unwrap!(routing.get_mdata(nae_mgr, name, tag, msg_id));
+    let mdata = expect_success!(routing_rx, msg_id, Response::GetMData);
+    assert!(mdata.serialised_size() > 0);
 }
 
 #[test]
@@ -1095,11 +1120,11 @@ fn request_hooks() {
     let value0_v0 = unwrap!(utils::generate_random_vector(10));
 
     let actions = btree_map![
-            key0.to_vec() => EntryAction::Ins(Value {
-                content: value0_v0.clone(),
-                entry_version: 0,
-            })
-        ];
+        key0.to_vec() => EntryAction::Ins(Value {
+            content: value0_v0.clone(),
+            entry_version: 0,
+        })
+    ];
 
     let msg_id = MessageId::new();
     unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions.clone(),

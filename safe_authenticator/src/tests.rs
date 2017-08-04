@@ -1,4 +1,3 @@
-
 // Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
@@ -45,7 +44,8 @@ use std::os::raw::{c_char, c_void};
 use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
-                 rand_app, register_app, run, try_access_container, try_run};
+                 create_account_and_login_with_hook, rand_app, register_app, run,
+                 try_access_container, try_run};
 #[cfg(feature = "use-mock-routing")]
 use test_utils::get_container_from_root;
 use tiny_keccak::sha3_256;
@@ -681,6 +681,72 @@ fn containers_access_request() {
     compare_access_container_entries(&authenticator, app_sign_pk, access_container, expected);
 }
 
+// Ensure that users can log in with low account balance.
+#[test]
+fn login_with_low_balance() {
+    // Register a hook prohibiting mutations and login
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::PutIData { msg_id, .. } => {
+                    Some(Response::PutIData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::PutMData { msg_id, .. } => {
+                    Some(Response::PutMData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::MutateMDataEntries { msg_id, .. } => {
+                    Some(Response::MutateMDataEntries {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::SetMDataUserPermissions { msg_id, .. } => {
+                    Some(Response::SetMDataUserPermissions {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::DelMDataUserPermissions { msg_id, .. } => {
+                    Some(Response::DelMDataUserPermissions {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::ChangeMDataOwner { msg_id, .. } => {
+                    Some(Response::ChangeMDataOwner {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::InsAuthKey { msg_id, .. } => {
+                    Some(Response::InsAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                Request::DelAuthKey { msg_id, .. } => {
+                    Some(Response::DelAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+
+    // Make sure we can log in
+    let _authenticator = create_account_and_login_with_hook(routing_hook);
+}
+
 // The app revocation and re-authorization workflow.
 #[test]
 fn app_revocation() {
@@ -1139,9 +1205,6 @@ fn app_revocation_recovery() {
 #[cfg(feature = "use-mock-routing")]
 #[test]
 fn app_authentication_recovery() {
-    use safe_core::MockRouting;
-    use safe_core::utils;
-
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
     let invitation = unwrap!(utils::generate_random_string(10));

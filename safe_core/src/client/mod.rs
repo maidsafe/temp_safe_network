@@ -532,12 +532,35 @@ impl<T: 'static> Client<T> {
         core_tx: CoreMsgTx<T>,
         net_tx: NetworkTx,
         config: BootstrapConfig,
+    ) -> Result<Client<T>, CoreError> {
+        Self::from_keys_impl(
+            keys,
+            owner,
+            el_handle,
+            core_tx,
+            net_tx,
+            config,
+            |routing| routing,
+        )
+    }
+
+    fn from_keys_impl<F>(
+        keys: ClientKeys,
+        owner: sign::PublicKey,
+        el_handle: Handle,
+        core_tx: CoreMsgTx<T>,
+        net_tx: NetworkTx,
+        config: BootstrapConfig,
+        routing_wrapper_fn: F,
     ) -> Result<Client<T>, CoreError>
     where
         T: 'static,
+        F: Fn(Routing) -> Routing,
     {
         trace!("Attempting to log into an acc using client keys.");
-        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), Some(config.clone()))?;
+        let (mut routing, routing_rx) =
+            setup_routing(Some(keys.clone().into()), Some(config.clone()))?;
+        routing = routing_wrapper_fn(routing);
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
@@ -552,6 +575,33 @@ impl<T: 'static> Client<T> {
             net_tx: net_tx,
             core_tx: core_tx,
         }))
+    }
+
+
+    /// Allows customising the mock Routing client before logging in using client keys
+    #[cfg(any(all(test, feature = "use-mock-routing"),
+                all(feature = "testing", feature = "use-mock-routing")))]
+    pub fn from_keys_with_hook<F>(
+        keys: ClientKeys,
+        owner: sign::PublicKey,
+        el_handle: Handle,
+        core_tx: CoreMsgTx<T>,
+        net_tx: NetworkTx,
+        config: BootstrapConfig,
+        routing_wrapper_fn: F,
+    ) -> Result<Client<T>, CoreError>
+    where
+        F: Fn(Routing) -> Routing,
+    {
+        Self::from_keys_impl(
+            keys,
+            owner,
+            el_handle,
+            core_tx,
+            net_tx,
+            config,
+            routing_wrapper_fn,
+        )
     }
 
     fn new(inner: Inner<T>) -> Self {
@@ -1095,10 +1145,11 @@ impl<T: 'static> Client<T> {
     }
 }
 
+
 #[cfg(any(all(test, feature = "use-mock-routing"),
             all(feature = "testing", feature = "use-mock-routing")))]
 impl<T: 'static> Client<T> {
-    /// Allows to customise the mock Routing client before registering a new account
+    /// Allows customising the mock Routing client before registering a new account
     pub fn registered_with_hook<F>(
         acc_locator: &str,
         acc_password: &str,

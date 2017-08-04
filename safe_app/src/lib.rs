@@ -83,6 +83,8 @@ use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::secretbox;
 use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
                 NetworkTx, event_loop, utils};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::MockRouting as Routing;
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig, Permission};
 use safe_core::ipc::resp::access_container_enc_key;
 use std::cell::RefCell;
@@ -136,6 +138,17 @@ impl App {
     where
         N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
     {
+        Self::registered_impl(app_id, auth_granted, network_observer)
+    }
+
+    fn registered_impl<N>(
+        app_id: String,
+        auth_granted: AuthGranted,
+        network_observer: N,
+    ) -> Result<Self, AppError>
+    where
+        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+    {
         let AuthGranted {
             app_keys: AppKeys {
                 owner_key,
@@ -164,6 +177,55 @@ impl App {
                 core_tx,
                 net_tx,
                 bootstrap_config,
+            )?;
+            let context = AppContext::registered(app_id, enc_key, access_container);
+            Ok((client, context))
+        })
+    }
+
+
+    /// Allows customising the mock Routing client before registering a new account
+    #[cfg(any(all(test, feature = "use-mock-routing"),
+                all(feature = "testing", feature = "use-mock-routing")))]
+    pub fn registered_with_hook<N, F>(
+        app_id: String,
+        auth_granted: AuthGranted,
+        network_observer: N,
+        routing_wrapper_fn: F,
+    ) -> Result<Self, AppError>
+    where
+        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        F: Fn(Routing) -> Routing + Send + 'static,
+    {
+        let AuthGranted {
+            app_keys: AppKeys {
+                owner_key,
+                enc_key,
+                enc_pk,
+                enc_sk,
+                sign_pk,
+                sign_sk,
+            },
+            access_container,
+            bootstrap_config,
+        } = auth_granted;
+
+        let client_keys = ClientKeys {
+            sign_pk,
+            sign_sk,
+            enc_pk,
+            enc_sk,
+        };
+
+        Self::new(network_observer, move |el_h, core_tx, net_tx| {
+            let client = Client::from_keys_with_hook(
+                client_keys,
+                owner_key,
+                el_h,
+                core_tx,
+                net_tx,
+                bootstrap_config,
+                routing_wrapper_fn,
             )?;
             let context = AppContext::registered(app_id, enc_key, access_container);
             Ok((client, context))
@@ -399,10 +461,16 @@ fn fetch_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Bo
 
 #[cfg(test)]
 mod tests {
+    use App;
     use futures::Future;
+    use routing::{ClientError, Request, Response};
+    use safe_authenticator::test_utils as authenticator;
+    #[cfg(feature = "use-mock-routing")]
+    use safe_core::MockRouting;
     use safe_core::ipc::Permission;
+    use safe_core::ipc::req::AuthReq;
     use std::collections::HashMap;
-    use test_utils::{create_app_with_access, run};
+    use test_utils::{create_app_with_access, gen_app_exchange_info, run};
 
     #[test]
     fn refresh_access_info() {
@@ -500,5 +568,91 @@ mod tests {
             f1.join(f2).map(|_| ())
         });
 
+    }
+
+    // Make sure we can login to a registered app with low balance.
+    #[test]
+    pub fn login_registered_with_low_balance() {
+        // Register a hook prohibiting mutations and login
+        let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+            routing.set_request_hook(move |req| {
+                match *req {
+                    Request::PutIData { msg_id, .. } => {
+                        Some(Response::PutIData {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::PutMData { msg_id, .. } => {
+                        Some(Response::PutMData {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::MutateMDataEntries { msg_id, .. } => {
+                        Some(Response::MutateMDataEntries {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::SetMDataUserPermissions { msg_id, .. } => {
+                        Some(Response::SetMDataUserPermissions {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::DelMDataUserPermissions { msg_id, .. } => {
+                        Some(Response::DelMDataUserPermissions {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::ChangeMDataOwner { msg_id, .. } => {
+                        Some(Response::ChangeMDataOwner {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::InsAuthKey { msg_id, .. } => {
+                        Some(Response::InsAuthKey {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    Request::DelAuthKey { msg_id, .. } => {
+                        Some(Response::DelAuthKey {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    }
+                    // Pass-through
+                    _ => None,
+                }
+            });
+            routing
+        };
+
+        // Login to the client
+        let auth = authenticator::create_account_and_login();
+
+        // Register and login to the app
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+
+        let auth_granted = unwrap!(authenticator::register_app(
+            &auth,
+            &AuthReq {
+                app: app_info,
+                app_container: false,
+                containers: HashMap::new(),
+            },
+        ));
+
+        let _app = unwrap!(App::registered_with_hook(
+            app_id,
+            auth_granted,
+            |_network_event| (),
+            routing_hook,
+        ));
     }
 }
