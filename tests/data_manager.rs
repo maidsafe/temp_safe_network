@@ -799,7 +799,7 @@ fn mutable_data_parallel_mutations() {
             })
             .collect();
 
-        event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients, true);
         trace!("Processed {} events.", event_count);
 
         // Collect the responses from the clients. For those that succeed,
@@ -1061,17 +1061,17 @@ fn mutable_data_put_and_mutate() {
         let node_index = rng.gen_range(0, nodes.len());
         nodes[node_index].delay_group_refreshes(true);
 
-        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients, false);
         trace!("Processed {} events.", event_count);
 
         let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
         let _ = clients[1].mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
 
-        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients, false);
         nodes[node_index].delay_group_refreshes(false);
         // Required to ensure the group leader handle delayed group refresh messages.
         // Hence the response to the client is guaranteed to be sent.
-        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients, false);
         trace!("Processed {} events.", event_count);
 
         while let Ok(event) = clients[0].try_recv() {
@@ -1204,7 +1204,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
         let _ = clients[0].mutate_mdata_entries(data_name, data_tag, actions.clone());
         let _ = clients[1].mutate_mdata_entries(data_name, data_tag, actions.clone());
 
-        event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients, true);
         trace!("Processed {} events.", event_count);
 
         let mut network_responded = false;

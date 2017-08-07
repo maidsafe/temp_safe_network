@@ -17,7 +17,6 @@
 
 use super::poll;
 use super::test_node::TestNode;
-use fake_clock::FakeClock;
 use maidsafe_utilities::{SeededRng, serialisation};
 use rand::Rng;
 use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, BootstrapConfig, Client,
@@ -31,8 +30,10 @@ use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::sync::mpsc::TryRecvError;
+use std::time::Duration;
 
-const RETRY_DELAY_MS: u64 = 800;
+// Duration clients expect a response by.
+const CLIENT_MSG_EXPIRY_DUR_SECS: u64 = 90;
 
 macro_rules! assert_recv_response {
     ($client:expr, $resp:ident, $request_msg_id:expr) => {
@@ -43,15 +44,6 @@ macro_rules! assert_recv_response {
             Ok(Event::Response { response: Response::$resp { res, msg_id }, .. }) => {
                 assert_eq!($request_msg_id, msg_id);
                 Loop::Break(res)
-            }
-            Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
-                assert_eq!($request_msg_id, msg_id);
-                if $is_oversized {
-                    Loop::Break(Err(ClientError::NetworkFull))
-                } else {
-                    FakeClock::advance_time(RETRY_DELAY_MS);
-                    Loop::Continue
-                }
             }
             Ok(Event::Terminate) => {
                 if $is_oversized {
@@ -108,6 +100,7 @@ impl TestClient {
                 Some(full_id.clone()),
                 bootstrap_config,
                 routing_config,
+                Duration::from_secs(CLIENT_MSG_EXPIRY_DUR_SECS),
             ))
         });
 
@@ -269,16 +262,11 @@ impl TestClient {
         msg_id: MessageId,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
-        // Note: can't use loop_fn here, because we would be reusing the msg_id.
-        // Instead, simulate delay so we won't trigger the rate limit error.
-        FakeClock::advance_time(RETRY_DELAY_MS);
-
         self.put_idata_with_msg_id(data, msg_id);
         let _ = poll::nodes_and_client(nodes, self);
 
         match assert_recv_response!(self, PutIData, msg_id) {
             Loop::Break(res) => res,
-            Loop::Continue => panic!("Unexpected rate limit exceeded error"),
         }
     }
 
@@ -297,11 +285,6 @@ impl TestClient {
                     trace!("received {:?} - {:?}", msg_id, res);
                     assert_eq!(request_msg_id, msg_id);
                     Loop::Break(res)
-                }
-                Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
-                    assert_eq!(request_msg_id, msg_id);
-                    FakeClock::advance_time(RETRY_DELAY_MS);
-                    Loop::Continue
                 }
                 Ok(response) => panic!("Unexpected response: {:?}", response),
                 Err(error) => {
@@ -348,11 +331,6 @@ impl TestClient {
                    }) => {
                     assert_eq!(request_msg_id, msg_id);
                     Loop::Break(res.map(|data| (data, src)))
-                }
-                Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
-                    assert_eq!(request_msg_id, msg_id);
-                    FakeClock::advance_time(RETRY_DELAY_MS);
-                    Loop::Continue
                 }
                 Ok(event) => panic!("Unexpected event: {:?}", event),
                 Err(error) => panic!("Expected error: {:?}", error),
@@ -749,17 +727,13 @@ impl TestClient {
 
 enum Loop<T> {
     Break(T),
-    Continue,
 }
 
 fn loop_fn<F, T>(mut f: F) -> T
 where
     F: FnMut() -> Loop<T>,
 {
-    loop {
-        match f() {
-            Loop::Break(res) => return res,
-            Loop::Continue => (),
-        }
+    match f() {
+        Loop::Break(res) => res,
     }
 }
