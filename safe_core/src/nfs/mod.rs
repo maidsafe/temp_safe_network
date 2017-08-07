@@ -39,10 +39,13 @@ use futures::Future;
 /// Helper type for futures that can result in `NfsError`
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
 
-lazy_static!{
 /// Default Directories to be created at registration
-    pub static ref DEFAULT_PRIVATE_DIRS: Vec<&'static str> = vec!["_documents",
-            "_downloads", "_music", "_videos", "_publicNames"];
-    ///publicly accessible default directories to be created upon registration
-    pub static ref DEFAULT_PUBLIC_DIRS: Vec<&'static str> = vec!["_public"];
-}
+pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
+    "_documents",
+    "_downloads",
+    "_music",
+    "_videos",
+    "_publicNames",
+];
+///publicly accessible default directories to be created upon registration
+pub static DEFAULT_PUBLIC_DIRS: [&'static str; 1] = ["_public"];
