@@ -102,9 +102,9 @@ fn immutable_data_basics() {
     assert_eq!(got_data, orig_data);
 
     // GetAccountInfo should pass and show one mutation performed
-    let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
-    assert_eq!(account_info.mutations_done, 1);
-    assert_eq!(account_info.mutations_available, DEFAULT_MAX_MUTATIONS - 1);
+    let acct_info = account_info(&mut routing, &routing_rx, client_mgr);
+    assert_eq!(acct_info.mutations_done, 1);
+    assert_eq!(acct_info.mutations_available, DEFAULT_MAX_MUTATIONS - 1);
 
     // Subsequent PutIData for same data should succeed - De-duplication
     let msg_id = MessageId::new();
@@ -118,9 +118,9 @@ fn immutable_data_basics() {
     assert_eq!(got_data, orig_data);
 
     // GetAccountInfo should pass and show two mutations performed
-    let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
-    assert_eq!(account_info.mutations_done, 2);
-    assert_eq!(account_info.mutations_available, DEFAULT_MAX_MUTATIONS - 2);
+    let acct_info = account_info(&mut routing, &routing_rx, client_mgr);
+    assert_eq!(acct_info.mutations_done, 2);
+    assert_eq!(acct_info.mutations_available, DEFAULT_MAX_MUTATIONS - 2);
 }
 
 #[test]
@@ -989,22 +989,22 @@ fn balance_check() {
     unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
     expect_success!(routing_rx, msg_id, Response::PutMData);
 
+    let vec_data = unwrap!(utils::generate_random_vector(10));
+    let data = ImmutableData::new(vec_data);
+    let msg_id = MessageId::new();
+
     // Exhaust the account balance.
     loop {
-        let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
-        let msg_id = MessageId::new();
-        unwrap!(routing.put_idata(client_mgr, data, msg_id));
+        unwrap!(routing.put_idata(client_mgr, data.clone(), msg_id));
         expect_success!(routing_rx, msg_id, Response::PutIData);
 
-        let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
-        if account_info.mutations_available == 0 {
+        let acct_info = account_info(&mut routing, &routing_rx, client_mgr);
+        if acct_info.mutations_available == 0 {
             break;
         }
     }
 
     // Attempt to perform another mutation fails on low balance.
-    let msg_id = MessageId::new();
-    let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
     unwrap!(routing.put_idata(client_mgr, data, msg_id));
     expect_failure!(routing_rx,
                     msg_id,
@@ -1178,7 +1178,7 @@ fn create_account(
     Authority::ClientManager(account_name)
 }
 
-fn do_get_account_info(
+fn account_info(
     routing: &mut Routing,
     routing_rx: &Receiver<Event>,
     dst: Authority<XorName>,

@@ -461,16 +461,22 @@ fn fetch_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Bo
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "use-mock-routing")]
     use App;
     use futures::Future;
+    #[cfg(feature = "use-mock-routing")]
     use routing::{ClientError, Request, Response};
+    #[cfg(feature = "use-mock-routing")]
     use safe_authenticator::test_utils as authenticator;
     #[cfg(feature = "use-mock-routing")]
     use safe_core::MockRouting;
     use safe_core::ipc::Permission;
+    #[cfg(feature = "use-mock-routing")]
     use safe_core::ipc::req::AuthReq;
     use std::collections::HashMap;
-    use test_utils::{create_app_with_access, gen_app_exchange_info, run};
+    use test_utils::{create_app_with_access, run};
+    #[cfg(feature = "use-mock-routing")]
+    use test_utils::gen_app_exchange_info;
 
     #[test]
     fn refresh_access_info() {
@@ -571,6 +577,7 @@ mod tests {
     }
 
     // Make sure we can login to a registered app with low balance.
+    #[cfg(feature = "use-mock-routing")]
     #[test]
     pub fn login_registered_with_low_balance() {
         // Register a hook prohibiting mutations and login

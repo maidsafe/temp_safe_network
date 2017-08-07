@@ -682,6 +682,7 @@ fn containers_access_request() {
 }
 
 // Ensure that users can log in with low account balance.
+#[cfg(feature = "use-mock-routing")]
 #[test]
 fn login_with_low_balance() {
     // Register a hook prohibiting mutations and login
