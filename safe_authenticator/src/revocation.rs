@@ -411,7 +411,7 @@ fn reencrypt_containers(
                     }
 
                     // Try to see if we've already re-encrypted key and a value on a previous
-                    // try that's possibly has failed with an error
+                    // try that's possibly failed with an error
                     match mdata_info.decrypt_new_enc_info(&old_key) {
                         Ok(_old_key) => {
                             // It's already re-encrypted - do nothing about it.
