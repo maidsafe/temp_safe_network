@@ -46,6 +46,7 @@ extern crate base64;
 extern crate chrono;
 extern crate ffi_utils;
 extern crate futures;
+#[cfg(feature = "use-mock-routing")]
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -95,5 +96,5 @@ pub use self::utils::FutureExt;
 pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// `MutableData` type tag for a directory
 pub const DIR_TAG: u64 = 15000;
-/// type tag for public ids.
+/// Type tag for public ids
 pub const PUBLIC_ID_TAG: u64 = 7;

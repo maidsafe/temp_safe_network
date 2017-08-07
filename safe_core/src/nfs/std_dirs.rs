@@ -32,10 +32,10 @@ use utils::FutureExt;
 pub fn create_std_dirs<T: 'static>(client: Client<T>) -> Box<NfsFuture<()>> {
     let root_dir = fry!(client.user_root_dir());
     let mut creations = vec![];
-    for _ in DEFAULT_PRIVATE_DIRS.iter() {
+    for _ in &DEFAULT_PRIVATE_DIRS {
         creations.push(create_dir(&client, false))
     }
-    for _ in DEFAULT_PUBLIC_DIRS.iter() {
+    for _ in &DEFAULT_PUBLIC_DIRS {
         creations.push(create_dir(&client, true))
     }
 
