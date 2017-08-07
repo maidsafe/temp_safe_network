@@ -21,7 +21,7 @@ use super::{AuthError, AuthFuture};
 use access_container::{access_container, access_container_entry, put_access_container_entry};
 use app_container;
 use config::{self, AppInfo, Apps};
-use futures::Future;
+use futures::{Future, future};
 use ipc::update_container_perms;
 use routing::ClientError;
 use safe_core::{Client, CoreError, FutureExt, recovery};
@@ -90,12 +90,12 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
     let c4 = client.clone();
 
     config::list_apps(client)
-        .and_then(move |(_cfg_version, config)| {
-            app_state(&c2, &config, app_id.clone()).map(
-                move |app_state| {
-                    (config, app_state, app_id)
-                },
-            )
+        .join(check_revocation(client, app_id.clone()))
+        .and_then(move |((_, apps), ())| {
+            app_state(&c2, &apps, app_id.clone())
+                .map(move |app_state| {
+                    (apps, app_state, app_id)
+                })
         })
         .and_then(move |(mut config, app_state, app_id)| {
             // Determine an app state. If it's revoked we can reuse existing
@@ -239,6 +239,23 @@ fn authenticate_new_app(
                 bootstrap_config: Client::<()>::bootstrap_config()?,
                 access_container: AccessContInfo::from_mdata_info(dir)?,
             })
+        })
+        .into_box()
+}
+
+fn check_revocation(client: &Client<()>, app_id: String) -> Box<AuthFuture<()>> {
+    config::get_revocation_queue(client)
+        .map(|queue| if let Some((_, queue)) = queue {
+            queue
+        } else {
+            Default::default()
+        })
+        .and_then(move |queue| if queue.contains(&app_id) {
+            future::err(AuthError::from(
+                "Couldn't authenticate app that is pending revocation",
+            ))
+        } else {
+            future::ok(())
         })
         .into_box()
 }

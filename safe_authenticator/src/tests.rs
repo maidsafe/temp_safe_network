@@ -1409,6 +1409,89 @@ fn app_authentication_recovery() {
     });
 }
 
+//
+// 1. Create and authenticate an app.
+// 2. Initiate a revocation of the app, but simulate a network failure to prevent it
+//    from finishing.
+// 3. Try to re-authenticate the app and assert that it fails (as the app is in the
+//    middle of its revocation process)
+// 4. Re-try the revocation with no simulated failures to let it finish successfuly.
+// 5. Try to re-authenticate the app again. This time it will succeed.
+#[test]
+fn app_authentication_during_pending_revocation() {
+    // Create account.
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let auth = unwrap!(Authenticator::create_acc(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+    ));
+
+    let ac_info = run(&auth, |client| {
+        access_container_tools::access_container(client)
+    });
+
+    // Authenticate the app.
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+
+    let app_id = auth_req.app.id.clone();
+    let _ = unwrap!(register_app(&auth, &auth_req));
+
+    // Simulate network failure during mutation of the access container.
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        move |mut routing| {
+            let mut failed = false;
+            let ac_info = ac_info.clone();
+
+            routing.set_request_hook(move |request| match *request {
+                Request::MutateMDataEntries { name, tag, msg_id, .. } => {
+                    if name == ac_info.name && tag == ac_info.type_tag && !failed {
+                        failed = true;
+                        Some(Response::MutateMDataEntries {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            });
+
+            routing
+        },
+    ));
+
+    // Attempt to revoke the app fails.
+    match try_revoke(&auth, &app_id) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Attempt to re-authenticate the app fails, because revocation is pending.
+    match register_app(&auth, &auth_req) {
+        Err(_) => (), // TODO: assert expected error variant
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Retry the app revocation. This time it succeeds.
+    revoke(&auth, &app_id);
+
+    // Re-authentication now succeeds.
+    let _ = unwrap!(register_app(&auth, &auth_req));
+}
+
 #[test]
 fn share_zero_mdatas() {
     let authenticator = create_account_and_login();

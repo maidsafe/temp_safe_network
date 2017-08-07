@@ -101,8 +101,7 @@ mod codes {
 pub enum AuthError {
     /// Unexpected - Probably a Logic error
     Unexpected(String),
-    /// Error from safe_core. Boxed to hold a pointer instead of value so that this enum variant is
-    /// not insanely bigger than others.
+    /// Error from safe_core.
     CoreError(CoreError),
     /// Input/output error
     IoError(IoError),
