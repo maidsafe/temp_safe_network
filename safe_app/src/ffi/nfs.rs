@@ -426,11 +426,13 @@ mod tests {
     // 3. Fetch the file from a container, check that it has a correct version.
     // 4. Open the file again, now in a combined append + read mode.
     // 5. Read the file contents; it should be the same as we have written it.
+    // Check that the file's created and modified timestamps are correct.
     // 6. Append a string to a file contents (by using `OPEN_MODE_APPEND`, _not_
     // by rewriting the existing data with an appended string).
     // 7. Update the file in the directory.
     // 8. Fetch the updated file version again and ensure that it contains
     // the expected string.
+    // 9. Check that the file's created and modified timestamps are correct.
     #[test]
     fn open_file() {
         let mut container_permissions = HashMap::new();
@@ -483,6 +485,8 @@ mod tests {
             unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
         };
 
+        let created_time = *written_file.created_time();
+
         // Insert file into container.
         unsafe {
             unwrap!(call_0(|ud, cb| {
@@ -490,7 +494,7 @@ mod tests {
                     &app,
                     container_info_h,
                     ffi_file_name1.as_ptr(),
-                    &written_file.into_repr_c(),
+                    &written_file.clone().into_repr_c(),
                     ud,
                     cb,
                 )
@@ -507,7 +511,7 @@ mod tests {
         };
         assert_eq!(version, 0);
 
-        // Read the content and append data
+        // Read the content and check timestamps
         let read_write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
                 file_open(
@@ -528,6 +532,10 @@ mod tests {
         };
         assert_eq!(retrieved_content, content);
 
+        assert_eq!(created_time, *written_file.created_time());
+        assert!(created_time <= *written_file.modified_time());
+
+        // Append content
         let append_content = b" appended";
 
         let written_file: NativeFile = unsafe {
@@ -551,7 +559,7 @@ mod tests {
                     &app,
                     container_info_h,
                     ffi_file_name1.as_ptr(),
-                    &written_file.into_repr_c(),
+                    &written_file.clone().into_repr_c(),
                     1,
                     ud,
                     cb,
@@ -591,6 +599,10 @@ mod tests {
 
         let f: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
         assert!(f.is_null());
+
+        // Check timestamps again after append and update
+        assert_eq!(created_time, *written_file.created_time());
+        assert!(created_time <= *written_file.modified_time());
     }
 
     // Tests that NFS functions still work after deleting and updating file contents.
