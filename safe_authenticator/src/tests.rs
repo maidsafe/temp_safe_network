@@ -17,6 +17,7 @@
 
 use Authenticator;
 use access_container as access_container_tools;
+use app_auth::{self, AppState};
 use config::{self, KEY_ACCESS_CONTAINER, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_INVALID_OWNER, ERR_OPERATION_FORBIDDEN,
              ERR_SHARE_MDATA_DENIED, ERR_UNKNOWN_APP};
@@ -1409,8 +1410,9 @@ fn app_authentication_recovery() {
     });
 }
 
+// Test app cannot be (re)authenticated while it's being revoked.
 //
-// 1. Create and authenticate an app.
+// 1. Create an app.
 // 2. Initiate a revocation of the app, but simulate a network failure to prevent it
 //    from finishing.
 // 3. Try to re-authenticate the app and assert that it fails (as the app is in the
@@ -1490,6 +1492,145 @@ fn app_authentication_during_pending_revocation() {
 
     // Re-authentication now succeeds.
     let _ = unwrap!(register_app(&auth, &auth_req));
+}
+
+// Test flushing the app revocation queue.
+//
+// 1. Create two apps
+// 2. Revoke both of them, but simulate network failure so both revocations would
+//    fail.
+// 3. Log in again and flush the revocation queue with no simulated failures.
+// 4. Verify both apps are successfuly revoked.
+#[test]
+fn flushing_app_revocation_queue() {
+    // Create account.
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let auth = unwrap!(Authenticator::create_acc(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+    ));
+
+    let ac_info = run(&auth, |client| {
+        access_container_tools::access_container(client)
+    });
+
+    // Authenticate the first app.
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+
+    let _ = unwrap!(register_app(&auth, &auth_req));
+    let app_id_0 = auth_req.app.id.clone();
+
+    // Authenticate the second app.
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+
+    let _ = unwrap!(register_app(&auth, &auth_req));
+    let app_id_1 = auth_req.app.id.clone();
+
+    // Simulate network failure that prevents any subsequent revocation from
+    // successful completion.
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        move |mut routing| {
+            let ac_info = ac_info.clone();
+
+            routing.set_request_hook(move |request| match *request {
+                Request::MutateMDataEntries { name, tag, msg_id, .. } => {
+                    if name == ac_info.name && tag == ac_info.type_tag {
+                        Some(Response::MutateMDataEntries {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            });
+
+            routing
+        },
+    ));
+
+    // Attempt to revoke the apps fails.
+    match try_revoke(&auth, &app_id_0) {
+        Err(_) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    match try_revoke(&auth, &app_id_1) {
+        Err(_) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Verify the apps are not revoked yet.
+    {
+        let app_id_0 = app_id_0.clone();
+        let app_id_1 = app_id_1.clone();
+
+        run(&auth, |client| {
+            let client = client.clone();
+
+            config::list_apps(&client)
+                .then(move |res| {
+                    let (_, apps) = unwrap!(res);
+                    let f_0 = app_auth::app_state(&client, &apps, app_id_0);
+                    let f_1 = app_auth::app_state(&client, &apps, app_id_1);
+
+                    f_0.join(f_1)
+                })
+                .then(|res| {
+                    let (state_0, state_1) = unwrap!(res);
+                    assert_eq!(state_0, AppState::Authenticated);
+                    assert_eq!(state_1, AppState::Authenticated);
+
+                    Ok(())
+                })
+        })
+    }
+
+    // Login again without simulated failures.
+    let auth = unwrap!(Authenticator::login(locator, password, |_| ()));
+
+    // Flush the revocation queue and verify both apps get revoked.
+    run(&auth, |client| {
+        let c2 = client.clone();
+        let c3 = client.clone();
+
+        revocation::flush_app_revocation_queue(client)
+            .then(move |res| {
+                unwrap!(res);
+                config::list_apps(&c2)
+            })
+            .then(move |res| {
+                let (_, apps) = unwrap!(res);
+                let f_0 = app_auth::app_state(&c3, &apps, app_id_0);
+                let f_1 = app_auth::app_state(&c3, &apps, app_id_1);
+
+                f_0.join(f_1)
+            })
+            .then(move |res| {
+                let (state_0, state_1) = unwrap!(res);
+                assert_eq!(state_0, AppState::Revoked);
+                assert_eq!(state_1, AppState::Revoked);
+
+                Ok(())
+            })
+    })
 }
 
 #[test]

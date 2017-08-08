@@ -32,7 +32,7 @@ use std::collections::{BTreeSet, HashMap};
 use tiny_keccak::sha3_256;
 
 /// Represents current app state
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum AppState {
     /// Exists in the authenticator config, access container, and registered in MaidManagers
     Authenticated,
