@@ -466,12 +466,14 @@ mod tests {
     use futures::Future;
     #[cfg(feature = "use-mock-routing")]
     use routing::{ClientError, Request, Response};
+    use safe_authenticator::Authenticator;
     #[cfg(feature = "use-mock-routing")]
     use safe_authenticator::test_utils as authenticator;
+    use safe_authenticator::test_utils::try_revoke;
     #[cfg(feature = "use-mock-routing")]
     use safe_core::MockRouting;
     use safe_core::ipc::Permission;
-    #[cfg(feature = "use-mock-routing")]
+    use safe_core::ipc::req::AppExchangeInfo;
     use safe_core::ipc::req::AuthReq;
     use std::collections::HashMap;
     use test_utils::{create_app_with_access, run};
@@ -661,5 +663,81 @@ mod tests {
             |_network_event| (),
             routing_hook,
         ));
+    }
+
+    // Authorise an app with `app_container`.
+    fn authorise_app(
+        auth: &Authenticator,
+        app_info: AppExchangeInfo,
+        app_id: String,
+        app_container: bool,
+    ) -> App {
+        let auth_granted = unwrap!(authenticator::register_app(
+            &auth,
+            &AuthReq {
+                app: app_info.clone(),
+                app_container: app_container,
+                containers: HashMap::new(),
+            },
+        ));
+
+        unwrap!(App::registered(
+            app_id.clone(),
+            auth_granted,
+            |_network_event| (),
+        ))
+    }
+
+    // Get the number of containers for `app`
+    fn num_containers(app: &App) -> usize {
+        run(app, move |client, context| {
+            context.get_container_names(client).then(move |res| {
+                let info = unwrap!(res);
+                Ok(info.len())
+            })
+        })
+    }
+
+    // Test app container creation under the following circumstances:
+    // 1. An app is authorised for the first time with `app_container` set to `true`.
+    // 2. If an app is authorised for the first time with `app_container` set to `false`,
+    // then any subsequent authorisation with `app_container` set to `true` should trigger
+    // the creation of the app's own container.
+    // 3. Make sure that the app's own container is also created when it's re-authorised
+    // with `app_container` set to `true` after it's been revoked.
+    #[test]
+    fn app_container_creation() {
+        // Authorise an app for the first time with `app_container` set to `true`.
+        let auth = authenticator::create_account_and_login();
+
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+
+        let app = authorise_app(&auth, app_info, app_id, true);
+
+        assert_eq!(num_containers(&app), 1); // should only contain app container
+
+        // Authorise a new app with `app_container` set to `false`.
+        let auth = authenticator::create_account_and_login();
+
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+
+        let app = authorise_app(&auth, app_info.clone(), app_id.clone(), false);
+
+        assert_eq!(num_containers(&app), 0); // should be empty
+
+        // Re-authorise the app with `app_container` set to `true`.
+        let app = authorise_app(&auth, app_info.clone(), app_id.clone(), true);
+
+        assert_eq!(num_containers(&app), 1); // should only contain app container
+
+        // Revoke the app
+        let _ = unwrap!(try_revoke(&auth, &app_id));
+
+        // Re-re-authorise the app with `app_container` set to `true`.
+        let app = authorise_app(&auth, app_info, app_id, true);
+
+        assert_eq!(num_containers(&app), 1); // should only contain app container
     }
 }

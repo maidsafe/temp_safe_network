@@ -99,8 +99,6 @@ pub fn create_app() -> App {
 }
 
 /// Create app and grant it access to the specified containers.
-/// If `create_containers` is true, also create all the containers specified in
-/// the `access_info` and set their permissions accordingly.
 pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>) -> App {
     let auth = authenticator::create_account_and_login();
 

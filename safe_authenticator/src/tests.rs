@@ -27,8 +27,8 @@ use ffi_utils::test_utils::{self, call_1, call_vec};
 use futures::{Future, future};
 use ipc::{encode_auth_resp, encode_containers_resp, encode_share_mdata_resp,
           encode_unregistered_resp};
-use maidsafe_utilities::serialisation::{deserialise, serialise};
-use rand;
+use maidsafe_utilities::serialisation::deserialise;
+use rand::{self, Rng};
 use revocation;
 #[cfg(feature = "use-mock-routing")]
 use routing::{Action, ClientError, MutableData, PermissionSet, Request, Response, User, Value};
@@ -55,7 +55,7 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
                  create_account_and_login_with_hook, rand_app, register_app, run,
-                 try_access_container, try_run};
+                 try_access_container, try_revoke, try_run};
 #[cfg(feature = "use-mock-routing")]
 use test_utils::get_container_from_root;
 use tiny_keccak::sha3_256;
@@ -1808,14 +1808,6 @@ fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize 
             .list_mdata_entries(info.name, info.type_tag)
             .map(|entries| entries.len())
             .map_err(From::from)
-    })
-}
-
-fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String, AuthError> {
-    let app_id = app_id.to_string();
-
-    try_run(authenticator, move |client| {
-        revocation::revoke_app(client, &app_id)
     })
 }
 
