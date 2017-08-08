@@ -426,11 +426,13 @@ mod tests {
     // 3. Fetch the file from a container, check that it has a correct version.
     // 4. Open the file again, now in a combined append + read mode.
     // 5. Read the file contents; it should be the same as we have written it.
+    // Check that the file's created and modified timestamps are correct.
     // 6. Append a string to a file contents (by using `OPEN_MODE_APPEND`, _not_
     // by rewriting the existing data with an appended string).
     // 7. Update the file in the directory.
     // 8. Fetch the updated file version again and ensure that it contains
     // the expected string.
+    // 9. Check that the file's created and modified timestamps are correct.
     #[test]
     fn open_file() {
         let mut container_permissions = HashMap::new();
@@ -483,6 +485,8 @@ mod tests {
             unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
         };
 
+        let created_time = *written_file.created_time();
+
         // Insert file into container.
         unsafe {
             unwrap!(call_0(|ud, cb| {
@@ -507,7 +511,7 @@ mod tests {
         };
         assert_eq!(version, 0);
 
-        // Read the content and append data
+        // Read the content
         let read_write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
                 file_open(
@@ -528,6 +532,20 @@ mod tests {
         };
         assert_eq!(retrieved_content, content);
 
+        // Fetch the file back and compare timestamps
+        let (file, _version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                }))
+            }
+        };
+        let read_created_time = *file.created_time();
+        let read_modified_time = *file.modified_time();
+        assert_eq!(created_time, read_created_time);
+        assert!(created_time <= read_modified_time);
+
+        // Append content
         let append_content = b" appended";
 
         let written_file: NativeFile = unsafe {
@@ -568,6 +586,10 @@ mod tests {
             }
         };
         assert_eq!(version, 1);
+
+        // Check timestamps again after append and update
+        assert_eq!(created_time, *file.created_time());
+        assert!(read_modified_time <= *file.modified_time());
 
         let read_h = unsafe {
             unwrap!(call_1(|ud, cb| {

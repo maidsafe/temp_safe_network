@@ -244,6 +244,8 @@ mod tests {
             .into_box()
     }
 
+    // Create a file and open it for reading.
+    // Additionally test that the created and modified timestamps are correct.
     #[test]
     fn file_read() {
         random_client(|client| {
@@ -252,13 +254,22 @@ mod tests {
             create_test_file(client)
                 .then(move |res| {
                     let (dir, file) = unwrap!(res);
-                    file_helper::read(c2, &file, dir.enc_key().cloned())
+                    let creation_time = *file.created_time();
+
+                    file_helper::read(c2, &file, dir.enc_key().cloned()).map(
+                        move |reader| (reader, file, creation_time),
+                    )
                 })
                 .then(|res| {
-                    let reader = unwrap!(res);
+                    let (reader, file, creation_time) = unwrap!(res);
                     let size = reader.size();
                     println!("reading {} bytes", size);
-                    reader.read(0, size)
+                    let result = reader.read(0, size);
+
+                    assert_eq!(creation_time, *file.created_time());
+                    assert!(creation_time <= *file.modified_time());
+
+                    result
                 })
                 .map(move |data| {
                     assert_eq!(data, vec![0u8; 100]);
@@ -266,6 +277,8 @@ mod tests {
         });
     }
 
+    // Test writing to a file in Overwrite mode.
+    // Additionally test that the created and modified timestamps are correct.
     #[test]
     fn file_update_overwrite() {
         random_client(|client| {
@@ -278,28 +291,35 @@ mod tests {
                 .then(move |res| {
                     // Updating file - full rewrite
                     let (dir, file) = unwrap!(res);
+                    let creation_time = *file.created_time();
 
                     file_helper::write(c2, file, Mode::Overwrite, dir.enc_key().cloned())
-                        .map(move |writer| (writer, dir))
+                        .map(move |writer| (writer, dir, creation_time))
                 })
                 .then(move |res| {
-                    let (writer, dir) = unwrap!(res);
+                    let (writer, dir, creation_time) = unwrap!(res);
                     writer
                         .write(&[1u8; NEW_SIZE])
                         .and_then(move |_| writer.close())
-                        .map(move |file| (file, dir))
+                        .map(move |file| (file, dir, creation_time))
                 })
                 .then(move |res| {
-                    let (file, dir) = unwrap!(res);
-                    file_helper::update(c3, dir.clone(), "hello.txt", &file, 1).map(move |_| dir)
+                    let (file, dir, creation_time) = unwrap!(res);
+                    file_helper::update(c3, dir.clone(), "hello.txt", &file, 1)
+                        .map(move |_| (dir, creation_time))
                 })
                 .then(move |res| {
-                    let dir = unwrap!(res);
+                    let (dir, creation_time) = unwrap!(res);
                     let fut = file_helper::fetch(c4, dir.clone(), "hello.txt");
-                    fut.map(move |(version, file)| (dir, version, file))
+                    fut.map(move |(version, file)| (dir, version, file, creation_time))
                 })
                 .then(move |res| {
-                    let (dir, _version, file) = unwrap!(res);
+                    let (dir, _version, file, creation_time) = unwrap!(res);
+
+                    // Check file timestamps
+                    assert_eq!(creation_time, *file.created_time());
+                    assert!(creation_time <= *file.modified_time());
+
                     file_helper::read(c5, &file, dir.enc_key().cloned())
                 })
                 .then(move |res| {
@@ -374,7 +394,6 @@ mod tests {
                 })
         });
     }
-
     #[test]
     fn file_delete() {
         random_client(|client| {

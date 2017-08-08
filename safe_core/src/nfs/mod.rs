@@ -40,10 +40,11 @@ use futures::Future;
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
 
 /// Default Directories to be created at registration
-pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
+pub static DEFAULT_PRIVATE_DIRS: [&'static str; 6] = [
     "_documents",
     "_downloads",
     "_music",
+    "_pictures",
     "_videos",
     "_publicNames",
 ];
