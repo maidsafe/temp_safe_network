@@ -494,7 +494,7 @@ mod tests {
                     &app,
                     container_info_h,
                     ffi_file_name1.as_ptr(),
-                    &written_file.clone().into_repr_c(),
+                    &written_file.into_repr_c(),
                     ud,
                     cb,
                 )
@@ -511,7 +511,7 @@ mod tests {
         };
         assert_eq!(version, 0);
 
-        // Read the content and check timestamps
+        // Read the content
         let read_write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
                 file_open(
@@ -532,8 +532,18 @@ mod tests {
         };
         assert_eq!(retrieved_content, content);
 
-        assert_eq!(created_time, *written_file.created_time());
-        assert!(created_time <= *written_file.modified_time());
+        // Fetch the file back and compare timestamps
+        let (file, _version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                }))
+            }
+        };
+        let read_created_time = *file.created_time();
+        let read_modified_time = *file.modified_time();
+        assert_eq!(created_time, read_created_time);
+        assert!(created_time <= read_modified_time);
 
         // Append content
         let append_content = b" appended";
@@ -559,7 +569,7 @@ mod tests {
                     &app,
                     container_info_h,
                     ffi_file_name1.as_ptr(),
-                    &written_file.clone().into_repr_c(),
+                    &written_file.into_repr_c(),
                     1,
                     ud,
                     cb,
@@ -576,6 +586,10 @@ mod tests {
             }
         };
         assert_eq!(version, 1);
+
+        // Check timestamps again after append and update
+        assert_eq!(created_time, *file.created_time());
+        assert!(read_modified_time <= *file.modified_time());
 
         let read_h = unsafe {
             unwrap!(call_1(|ud, cb| {
@@ -599,10 +613,6 @@ mod tests {
 
         let f: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
         assert!(f.is_null());
-
-        // Check timestamps again after append and update
-        assert_eq!(created_time, *written_file.created_time());
-        assert!(created_time <= *written_file.modified_time());
     }
 
     // Tests that NFS functions still work after deleting and updating file contents.
