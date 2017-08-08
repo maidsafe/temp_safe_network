@@ -15,8 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use super::DEFAULT_MAX_MUTATIONS;
 use super::routing::Routing;
-use super::vault::DEFAULT_MAX_MUTATIONS;
 use rand;
 use routing::{AccountInfo, Action, Authority, ClientError, EntryAction, EntryActions, Event,
               FullId, ImmutableData, MessageId, MutableData, PermissionSet, Request, Response,

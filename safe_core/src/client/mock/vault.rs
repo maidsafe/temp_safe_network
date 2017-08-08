@@ -15,52 +15,65 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-pub use self::locking::{VaultGuard, lock};
+use super::Account;
 use super::DataId;
-use routing::{AccountInfo, Authority, ClientError, ImmutableData, MutableData, XorName};
+use fs2::FileExt;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use routing::{Authority, ClientError, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::sign;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
+use std::env;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
+use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
+use std::sync::{Mutex, MutexGuard};
+use std::time::Duration;
 use std::time::SystemTime;
 use tiny_keccak::sha3_256;
 
-pub const DEFAULT_MAX_MUTATIONS: u64 = 1000;
-
-#[derive(Deserialize, Serialize)]
-pub struct Storage {
-    client_manager: HashMap<XorName, Account>,
-    nae_manager: HashMap<DataId, Data>,
-}
+const FILE_NAME: &'static str = "MockVault";
 
 pub struct Vault {
-    storage: Storage,
-    #[allow(dead_code)]
-    sync_time: SystemTime,
+    cache: Cache,
+    store: Box<Store>,
 }
 
 impl Vault {
     pub fn new() -> Self {
+        let store: Box<Store> = match env::var("SAFE_MEMORY_STORE") {
+            Ok(_) => {
+                trace!("Mock vault: using memory store");
+                Box::new(MemoryStore)
+            }
+            Err(_) => {
+                trace!("Mock vault: using file store");
+                Box::new(FileStore::new())
+            }
+        };
+
         Vault {
-            storage: Storage {
+            cache: Cache {
                 client_manager: HashMap::new(),
                 nae_manager: HashMap::new(),
             },
-            sync_time: SystemTime::now(),
+            store: store,
         }
     }
 
     // Get account for the client manager name.
     pub fn get_account(&self, name: &XorName) -> Option<&Account> {
-        self.storage.client_manager.get(name)
+        self.cache.client_manager.get(name)
     }
 
     // Get mutable reference to account for the client manager name.
     pub fn get_account_mut(&mut self, name: &XorName) -> Option<&mut Account> {
-        self.storage.client_manager.get_mut(name)
+        self.cache.client_manager.get_mut(name)
     }
 
     // Create account for the given client manager name.
     pub fn insert_account(&mut self, name: XorName) {
-        let _ = self.storage.client_manager.insert(name, Account::new());
+        let _ = self.cache.client_manager.insert(name, Account::new());
     }
 
     // Authorise read (non-mutation) operation.
@@ -102,12 +115,12 @@ impl Vault {
 
         // Check if we are the owner or app.
         let owner_name = XorName(sha3_256(&sign_pk[..]));
-        if owner_name != dst_name && !account.auth_keys.contains(sign_pk) {
+        if owner_name != dst_name && !account.auth_keys().contains(sign_pk) {
             println!("Mutation not authorised");
             return Err(ClientError::AccessDenied);
         }
 
-        if account.account_info.mutations_available == 0 {
+        if account.account_info().mutations_available == 0 {
             return Err(ClientError::LowBalance);
         }
 
@@ -124,18 +137,56 @@ impl Vault {
 
     // Check if data with the given name is in the storage.
     pub fn contains_data(&self, name: &DataId) -> bool {
-        self.storage.nae_manager.contains_key(name)
+        self.cache.nae_manager.contains_key(name)
     }
 
     // Load data with the given name from the storage.
     pub fn get_data(&self, name: &DataId) -> Option<Data> {
-        self.storage.nae_manager.get(name).cloned()
+        self.cache.nae_manager.get(name).cloned()
     }
 
     // Save the data to the storage.
     pub fn insert_data(&mut self, name: DataId, data: Data) {
-        let _ = self.storage.nae_manager.insert(name, data);
+        let _ = self.cache.nae_manager.insert(name, data);
     }
+}
+
+pub struct VaultGuard<'a>(MutexGuard<'a, Vault>);
+
+impl<'a> Deref for VaultGuard<'a> {
+    type Target = Vault;
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl<'a> DerefMut for VaultGuard<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.deref_mut()
+    }
+}
+
+impl<'a> Drop for VaultGuard<'a> {
+    fn drop(&mut self) {
+        let vault = &mut *self.0;
+        vault.store.save(&vault.cache)
+    }
+}
+
+pub fn lock(vault: &Mutex<Vault>, writing: bool) -> VaultGuard {
+    let mut inner = unwrap!(vault.lock());
+
+    if let Some(cache) = inner.store.load(writing) {
+        inner.cache = cache;
+    }
+
+    VaultGuard(inner)
+}
+
+#[derive(Deserialize, Serialize)]
+struct Cache {
+    client_manager: HashMap<XorName, Account>,
+    nae_manager: HashMap<DataId, Data>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -144,146 +195,42 @@ pub enum Data {
     Mutable(MutableData),
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct Account {
-    account_info: AccountInfo,
-    auth_keys: BTreeSet<sign::PublicKey>,
-    version: u64,
+trait Store: Send {
+    fn load(&mut self, writing: bool) -> Option<Cache>;
+    fn save(&mut self, cache: &Cache);
 }
 
-impl Account {
-    pub fn new() -> Self {
-        Account {
-            account_info: AccountInfo {
-                mutations_done: 0,
-                mutations_available: DEFAULT_MAX_MUTATIONS,
-            },
-            auth_keys: Default::default(),
-            version: 0,
-        }
+struct MemoryStore;
+
+impl Store for MemoryStore {
+    fn load(&mut self, _: bool) -> Option<Cache> {
+        None
     }
 
-    pub fn version(&self) -> u64 {
-        self.version
-    }
-
-    pub fn account_info(&self) -> &AccountInfo {
-        &self.account_info
-    }
-
-    // Insert new auth key and bump the version. Returns false if the given version
-    // is not one more than the current version.
-    pub fn ins_auth_key(&mut self, key: sign::PublicKey, version: u64) -> Result<(), ClientError> {
-        self.validate_version(version)?;
-
-        let _ = self.auth_keys.insert(key);
-        self.version = version;
-        Ok(())
-    }
-
-    // Remove the auth key and bump the version. Returns false if the given version
-    // is not one more than the current version.
-    pub fn del_auth_key(&mut self, key: &sign::PublicKey, version: u64) -> Result<(), ClientError> {
-        self.validate_version(version)?;
-
-        if self.auth_keys.remove(key) {
-            self.version = version;
-            Ok(())
-        } else {
-            Err(ClientError::NoSuchKey)
-        }
-    }
-
-    pub fn auth_keys(&self) -> &BTreeSet<sign::PublicKey> {
-        &self.auth_keys
-    }
-
-    pub fn increment_mutations_counter(&mut self) {
-        self.account_info.mutations_done += 1;
-        self.account_info.mutations_available -= 1;
-        self.version += 1;
-    }
-
-    fn validate_version(&self, version: u64) -> Result<(), ClientError> {
-        if version == self.version + 1 {
-            Ok(())
-        } else {
-            Err(ClientError::InvalidSuccessor(self.version))
-        }
-    }
+    fn save(&mut self, _: &Cache) {}
 }
 
-#[cfg(test)]
-mod locking {
-    use super::Vault;
-    use std::sync::{Mutex, MutexGuard};
-
-    pub type VaultGuard<'a> = MutexGuard<'a, Vault>;
-
-    pub fn lock(vault: &Mutex<Vault>, _write: bool) -> VaultGuard {
-        unwrap!(vault.lock())
-    }
+struct FileStore {
+    // `bool` element indicates whether the store is being written to.
+    file: Option<(File, bool)>,
+    sync_time: SystemTime,
 }
 
-#[cfg(not(test))]
-mod locking {
-    extern crate fs2;
-
-    use self::fs2::FileExt;
-    use super::{Storage, Vault};
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
-    use std::env;
-    use std::fs::{File, OpenOptions};
-    use std::io::{Read, Write};
-    use std::ops::{Deref, DerefMut};
-    use std::path::PathBuf;
-    use std::sync::{Mutex, MutexGuard};
-    use std::time::Duration;
-
-    const FILE_NAME: &'static str = "MockVault";
+impl FileStore {
+    fn new() -> Self {
+        FileStore {
+            file: None,
+            sync_time: SystemTime::now(),
+        }
+    }
 
     fn path() -> PathBuf {
         env::temp_dir().join(FILE_NAME)
     }
+}
 
-    pub struct VaultGuard<'a> {
-        vault: MutexGuard<'a, Vault>,
-        write: bool,
-        file: File,
-    }
-
-    impl<'a> Deref for VaultGuard<'a> {
-        type Target = Vault;
-        fn deref(&self) -> &Self::Target {
-            &*self.vault
-        }
-    }
-
-    impl<'a> DerefMut for VaultGuard<'a> {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut *self.vault
-        }
-    }
-
-    impl<'a> Drop for VaultGuard<'a> {
-        fn drop(&mut self) {
-            // Write the data to the storage file (if in write mode) and remove
-            // the lock.
-
-            if self.write {
-                let raw_data = unwrap!(serialise(&self.vault.storage));
-                unwrap!(self.file.write_all(&raw_data));
-                unwrap!(self.file.sync_all());
-
-                let mtime = unwrap!(unwrap!(self.file.metadata()).modified());
-                self.vault.sync_time = mtime;
-            }
-
-            let _ = self.file.unlock();
-        }
-    }
-
-    pub fn lock(vault: &Mutex<Vault>, write: bool) -> VaultGuard {
+impl Store for FileStore {
+    fn load(&mut self, writing: bool) -> Option<Cache> {
         // Create the file if it doesn't exist yet.
         let mut file = unwrap!(
             OpenOptions::new()
@@ -291,41 +238,54 @@ mod locking {
                 .write(true)
                 .create(true)
                 .truncate(false)
-                .open(path())
+                .open(Self::path())
         );
 
-        if write {
+        if writing {
             unwrap!(file.lock_exclusive());
         } else {
             unwrap!(file.lock_shared());
         };
 
-        let mut vault = unwrap!(vault.lock());
-
         let metadata = unwrap!(file.metadata());
         let mtime = unwrap!(metadata.modified());
-        let mtime_duration = mtime.duration_since(vault.sync_time).unwrap_or(
-            Duration::from_millis(
-                1,
-            ),
-        );
+        let mtime_duration = mtime.duration_since(self.sync_time).unwrap_or_else(|_| {
+            Duration::from_millis(1)
+        });
 
         // Update vault only if it's not already synchronised
-        if mtime_duration.as_secs() != 0 || mtime_duration.subsec_nanos() != 0 {
+        let mut result = None;
+        if mtime_duration > Duration::new(0, 0) {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
 
             if file.read_to_end(&mut raw_data).is_ok() && !raw_data.is_empty() {
-                if let Ok(storage) = deserialise::<Storage>(&raw_data) {
-                    vault.storage = storage;
-                    vault.sync_time = mtime;
+                if let Ok(cache) = deserialise::<Cache>(&raw_data) {
+                    self.sync_time = mtime;
+                    result = Some(cache);
                 }
             }
         }
 
-        VaultGuard {
-            vault: vault,
-            write: write,
-            file: file,
+        self.file = Some((file, writing));
+
+        result
+    }
+
+    fn save(&mut self, cache: &Cache) {
+        // Write the data to the storage file (if in write mode) and remove
+        // the lock.
+        if let Some((mut file, writing)) = self.file.take() {
+            if writing {
+                let raw_data = unwrap!(serialise(&cache));
+                unwrap!(file.write_all(&raw_data));
+                unwrap!(file.sync_all());
+
+                let mtime = unwrap!(unwrap!(file.metadata()).modified());
+                self.sync_time = mtime;
+
+            }
+
+            let _ = file.unlock();
         }
     }
 }
