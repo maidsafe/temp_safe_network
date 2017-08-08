@@ -40,6 +40,8 @@ pub enum IpcResp {
     Containers(Result<(), IpcError>),
     /// Unregistered client
     Unregistered(Result<BootstrapConfig, IpcError>),
+    /// Share mutable data
+    ShareMData(Result<(), IpcError>),
 }
 
 /// It represents the authentication response.

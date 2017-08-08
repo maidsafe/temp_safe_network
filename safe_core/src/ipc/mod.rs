@@ -23,7 +23,7 @@ pub mod resp;
 mod errors;
 
 pub use self::errors::IpcError;
-pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
+pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq, ShareMData, ShareMDataReq};
 pub use self::req::ffi::Permission;
 pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp, access_container_enc_key};
 use ffi_utils::{base64_decode, base64_encode};
@@ -34,7 +34,7 @@ use std::u32;
 
 /// IPC message
 #[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum IpcMsg {
     /// Request
     Req {

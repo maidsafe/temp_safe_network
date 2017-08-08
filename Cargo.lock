@@ -824,6 +824,7 @@ dependencies = [
  "futures 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "maidsafe_utilities 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "routing 0.32.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_core 0.25.1",

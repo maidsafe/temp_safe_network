@@ -21,21 +21,39 @@ use app_auth::{self, AppState, app_state};
 use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, StringError, base64_encode,
                 catch_unwind_cb, from_c_str};
-use futures::{Future, future};
+use futures::{Future, Stream, future, stream};
 use maidsafe_utilities::serialisation::deserialise;
 use revocation::revoke_app;
 use routing::{ClientError, User};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
 use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
-use safe_core::ipc::req::{AuthReq, ContainersReq, IpcReq};
+use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq, ShareMDataReq};
 use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::ipc::resp::IpcResp;
+use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
+use safe_core::ipc::resp::{AppKeys, IpcResp};
+use safe_core::ipc::resp::ffi::MDataMeta;
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
+use std::ptr;
+
+/// App data stored in the authenticator configuration.
+///
+/// We need to store it even for revoked apps because we need to
+/// preserve the app keys. An app can encrypt data and create mutable data
+/// instances on its own, so we need to make sure that the app can
+/// access the encrypted data in future, even if the app was revoked
+/// at some point.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppInfo {
+    /// Application info (id, name, vendor, etc.)
+    pub info: AppExchangeInfo,
+    /// Application keys
+    pub keys: AppKeys,
+}
 
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
@@ -63,6 +81,15 @@ pub fn decode_ipc_msg(
             ok!(Ok(IpcMsg::Req {
                 req_id: req_id,
                 req: IpcReq::Unregistered,
+            }))
+        }
+        IpcMsg::Req {
+            req: IpcReq::ShareMData(share_mdata_req),
+            req_id,
+        } => {
+            ok!(Ok(IpcMsg::Req {
+                req_id: req_id,
+                req: IpcReq::ShareMData(share_mdata_req),
             }))
         }
         IpcMsg::Req {
@@ -155,6 +182,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
     o_auth: extern "C" fn(*mut c_void, u32, *const FfiAuthReq),
     o_containers: extern "C" fn(*mut c_void, u32, *const FfiContainersReq),
     o_unregistered: extern "C" fn(*mut c_void, u32),
+    o_share_mdata: extern "C" fn(*mut c_void, u32, *const FfiShareMDataReq, *const MDataMeta),
     o_err: extern "C" fn(*mut c_void, FfiResult, *const c_char),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -164,49 +192,135 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
         let msg = decode_msg(msg_raw)?;
 
         (*auth).send(move |client| {
+            let c1 = client.clone();
             decode_ipc_msg(client, msg)
-                .and_then(move |msg| {
-                    match msg {
-                        Ok(IpcMsg::Req {
-                               req: IpcReq::Auth(auth_req),
-                               req_id,
-                           }) => {
-                            o_auth(user_data.0, req_id, &auth_req.into_repr_c()?);
-                        }
-                        Ok(IpcMsg::Req {
-                               req: IpcReq::Containers(cont_req),
-                               req_id,
-                           }) => {
-                            o_containers(user_data.0, req_id, &cont_req.into_repr_c()?);
-                        }
-                        Ok(IpcMsg::Req {
-                               req: IpcReq::Unregistered,
-                               req_id,
-                           }) => {
-                            o_unregistered(user_data.0, req_id);
-                        }
-                        Err((error_code, description, err)) => {
-                            o_err(
-                                user_data.0,
-                                FfiResult {
-                                    error_code,
-                                    description: description.as_ptr(),
-                                },
-                                err.as_ptr(),
-                            );
-                        }
-                        Ok(IpcMsg::Resp { .. }) |
-                        Ok(IpcMsg::Revoked { .. }) |
-                        Ok(IpcMsg::Err(..)) => {
-                            let err = AuthError::Unexpected(
-                                "Unexpected msg \
-                                                               type"
-                                    .to_owned(),
-                            );
-                            call_result_cb!(Err::<(), _>(err), user_data, o_err);
-                        }
+                .and_then(move |msg| match msg {
+                    Ok(IpcMsg::Req {
+                           req: IpcReq::Auth(auth_req),
+                           req_id,
+                       }) => {
+                        let repr_c = fry!(auth_req.into_repr_c().map_err(AuthError::IpcError));
+                        o_auth(user_data.0, req_id, &repr_c);
+                        ok!(())
                     }
-                    Ok(())
+                    Ok(IpcMsg::Req {
+                           req: IpcReq::Containers(cont_req),
+                           req_id,
+                       }) => {
+                        let repr_c = fry!(cont_req.into_repr_c().map_err(AuthError::IpcError));
+                        o_containers(user_data.0, req_id, &repr_c);
+                        ok!(())
+                    }
+                    Ok(IpcMsg::Req {
+                           req: IpcReq::Unregistered,
+                           req_id,
+                       }) => {
+                        o_unregistered(user_data.0, req_id);
+                        ok!(())
+                    }
+                    Ok(IpcMsg::Req {
+                           req: IpcReq::ShareMData(share_mdata_req),
+                           req_id,
+                       }) => {
+                        let user = fry!(c1.public_signing_key().map_err(AuthError::CoreError));
+                        let user_data_inner = user_data.0;
+                        let num_mdatas = share_mdata_req.mdata.len();
+                        let mut mdata_futures = Vec::with_capacity(num_mdatas);
+                        for mdata in &share_mdata_req.mdata {
+                            let name = mdata.name;
+                            let type_tag = mdata.type_tag;
+                            let metadata_key = mdata.metadata_key.clone();
+                            let c2 = c1.clone();
+                            let mdata_future = c1.get_mdata_shell(name, type_tag)
+                                .and_then(move |md| if md.owners().contains(&user) {
+                                    match metadata_key {
+                                        None => ok!(Ok(None)),
+                                        Some(key) => {
+                                            c2.get_mdata_value(name, type_tag, key.into())
+                                                .map(|value| Ok(Some(value.content)))
+                                                .into_box()
+                                        }
+                                    }
+                                } else {
+                                    ok!(Err((type_tag, name)))
+                                })
+                                .map_err(AuthError::CoreError);
+                            mdata_futures.push(mdata_future);
+                        }
+                        future::join_all(mdata_futures)
+                            .and_then(move |results| {
+                                let mut metadatas = Vec::with_capacity(num_mdatas);
+                                let mut err_index = None;
+                                for (i, result) in results.iter().enumerate() {
+                                    match *result {
+                                        Ok(ref metadata_opt) => {
+                                            let (data, len) = match *metadata_opt {
+                                                Some(ref metadata) => (
+                                                    metadata.as_ptr(),
+                                                    metadata.len(),
+                                                ),
+                                                None => (ptr::null(), 0),
+                                            };
+                                            metadatas.push(MDataMeta {
+                                                data: data,
+                                                len: len,
+                                            });
+                                        }
+                                        Err(..) => {
+                                            err_index = Some(i);
+                                            break;
+                                        }
+                                    }
+                                }
+                                match err_index {
+                                    Some(i) => {
+                                        let invalids = results
+                                            .into_iter()
+                                            .skip(i)
+                                            .filter_map(|r| r.err())
+                                            .collect();
+                                        err!(AuthError::IpcError(IpcError::InvalidOwner(invalids)))
+                                    }
+                                    None => {
+                                        let (share_mdata_req_repr_c, keep_alive) =
+                                            fry!(share_mdata_req.into_repr_c().map_err(
+                                                AuthError::IpcError,
+                                            ));
+                                        o_share_mdata(
+                                            user_data_inner,
+                                            req_id,
+                                            &share_mdata_req_repr_c,
+                                            metadatas.as_ptr(),
+                                        );
+                                        drop(keep_alive);
+                                        ok!(())
+                                    }
+                                }
+                            })
+                            .into_box()
+                    }
+                    Err((error_code, description, err)) => {
+                        o_err(
+                            user_data.0,
+                            FfiResult {
+                                error_code,
+                                description: description.as_ptr(),
+                            },
+                            err.as_ptr(),
+                        );
+                        ok!(())
+                    }
+                    Ok(IpcMsg::Resp { .. }) |
+                    Ok(IpcMsg::Revoked { .. }) |
+                    Ok(IpcMsg::Err(..)) => {
+                        let err = AuthError::Unexpected(
+                            "Unexpected msg \
+                                                               type"
+                                .to_owned(),
+                        );
+                        call_result_cb!(Err::<(), _>(err), user_data, o_err);
+                        ok!(())
+                    }
                 })
                 .map_err(move |err| {
                     call_result_cb!(Err::<(), _>(err), user_data, o_err);
@@ -214,6 +328,93 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                 .into_box()
                 .into()
         })?;
+        Ok(())
+    })
+}
+
+/// Encode share mutable data response.
+#[no_mangle]
+pub unsafe extern "C" fn encode_share_mdata_resp(
+    auth: *const Authenticator,
+    req: *const FfiShareMDataReq,
+    req_id: u32,
+    is_granted: bool,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const c_char),
+) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
+        let share_mdata_req = ShareMDataReq::clone_from_repr_c(req)?;
+        if is_granted {
+            (*auth).send(move |client| {
+                let client_cloned0 = client.clone();
+                let client_cloned1 = client.clone();
+                let user_data = user_data.0;
+                config::get_app(client, &share_mdata_req.app.id)
+                    .and_then(move |app_info| {
+                        let app_id = share_mdata_req.app.id;
+                        let user = User::Key(app_info.keys.sign_pk);
+                        let num_mdatas = share_mdata_req.mdata.len();
+                        stream::iter(share_mdata_req.mdata.into_iter().map(Ok))
+                        .map(move |mdata| {
+                            client_cloned0.get_mdata_shell(mdata.name, mdata.type_tag)
+                                          .map(|md| (md.version(), mdata))
+                        })
+                        .buffer_unordered(num_mdatas)
+                        .map(move |(version, mdata)| {
+                            client_cloned1.set_mdata_user_permissions(
+                                mdata.name,
+                                mdata.type_tag,
+                                user,
+                                mdata.perms,
+                                version + 1,
+                            )
+                        })
+                        .buffer_unordered(num_mdatas)
+                        .map_err(AuthError::CoreError)
+                        .for_each(|()| Ok(()))
+                        .and_then(move |()| {
+                            let resp = encode_response(
+                                &IpcMsg::Resp {
+                                    req_id: req_id,
+                                    resp: IpcResp::ShareMData(Ok(())),
+                                },
+                                &app_id
+                            ).map_err(AuthError::IpcError)?;
+                            o_cb(
+                                user_data,
+                                FFI_RESULT_OK,
+                                resp.as_ptr()
+                            );
+                            Ok(())
+                        })
+                        .into_box()
+                    })
+                    .map_err(move |e| {
+                        call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                    })
+                    .into_box()
+                    .into()
+            })?;
+        } else {
+            let resp = encode_response(
+                &IpcMsg::Resp {
+                    req_id: req_id,
+                    resp: IpcResp::ShareMData(Err(IpcError::ShareMDataDenied)),
+                },
+                &share_mdata_req.app.id,
+            )?;
+            let (error_code, description) = ffi_error!(AuthError::from(IpcError::ShareMDataDenied));
+            o_cb(
+                user_data.0,
+                FfiResult {
+                    error_code,
+                    description: description.as_ptr(),
+                },
+                resp.as_ptr(),
+            );
+        }
         Ok(())
     })
 }

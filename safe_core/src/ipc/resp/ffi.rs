@@ -104,3 +104,13 @@ pub struct AccessContInfo {
     /// Nonce
     pub nonce: [u8; secretbox::NONCEBYTES],
 }
+
+/// Metadata struct passed to `o_share_mdata` callback of `auth_decode_ipc_msg` of authenticator.
+/// Used to store a buffer of raw metadata.
+#[repr(C)]
+pub struct MDataMeta {
+    /// The data buffer
+    pub data: *const u8,
+    /// The length of the buffer
+    pub len: usize,
+}

@@ -23,13 +23,14 @@ pub mod ffi;
 use self::ffi::Permission;
 use ffi_utils::{ReprC, StringError, from_c_str, vec_into_raw_parts};
 use ipc::errors::IpcError;
+use routing::{Action, PermissionSet, XorName};
 use std::{ptr, slice};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CString, NulError};
 
 /// IPC request
 // TODO: `TransOwnership` variant
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum IpcReq {
     /// Authentication request
     Auth(AuthReq),
@@ -37,6 +38,8 @@ pub enum IpcReq {
     Containers(ContainersReq),
     /// Unregistered client authenticator request, returning bootstrap config
     Unregistered,
+    /// Share mutable data
+    ShareMData(ShareMDataReq),
 }
 
 /// Represents an authorization request
@@ -247,6 +250,154 @@ impl ReprC for AppExchangeInfo {
             name: from_c_str((*raw).name).map_err(StringError::from)?,
             vendor: from_c_str((*raw).vendor).map_err(StringError::from)?,
         })
+    }
+}
+
+/// Represents a request to share mutable data
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct ShareMDataReq {
+    /// Info about the app requesting shared access
+    pub app: AppExchangeInfo,
+    /// List of MD names & type tags and permissions that need to be shared
+    pub mdata: Vec<ShareMData>,
+}
+
+/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct ShareMData {
+    /// The mutable data type.
+    pub type_tag: u64,
+    /// The mutable data name.
+    pub name: XorName,
+    /// The metadata key.
+    pub metadata_key: Option<String>,
+    /// The permissions being requested.
+    pub perms: PermissionSet,
+}
+
+impl ShareMDataReq {
+    /// Convert to it's C representation
+    /// The returned `ffi::ShareMDataReq` contains pointers into the returned `Vec`. As such, the
+    /// `Vec` *must* be kept alive until the foreign code is finished with the
+    /// `ffi::ShareMDataReq`.
+    pub fn into_repr_c(self) -> Result<(ffi::ShareMDataReq, Vec<ffi::ShareMData>), IpcError> {
+        let mdata_repr_c: Vec<_> = self.mdata
+            .into_iter()
+            .map(|md| md.into_repr_c())
+            .collect::<Result<_, _>>()?;
+        Ok((
+            ffi::ShareMDataReq {
+                app: self.app.into_repr_c()?,
+                mdata: mdata_repr_c.as_ptr(),
+                mdata_len: mdata_repr_c.len(),
+            },
+            mdata_repr_c,
+        ))
+    }
+}
+
+impl ReprC for ShareMDataReq {
+    type C = *const ffi::ShareMDataReq;
+    type Error = IpcError;
+
+    /// Constructs the object from a raw pointer.
+    unsafe fn clone_from_repr_c(raw: *const ffi::ShareMDataReq) -> Result<Self, IpcError> {
+        Ok(ShareMDataReq {
+            app: AppExchangeInfo::clone_from_repr_c(&(*raw).app)?,
+            mdata: {
+                let mdata = slice::from_raw_parts((*raw).mdata, (*raw).mdata_len);
+                mdata
+                    .into_iter()
+                    .map(|c| ShareMData::clone_from_repr_c(c))
+                    .collect::<Result<_, _>>()?
+            },
+        })
+    }
+}
+
+impl ShareMData {
+    /// Convert to it's C representation
+    pub fn into_repr_c(self) -> Result<ffi::ShareMData, IpcError> {
+        Ok(ffi::ShareMData {
+            type_tag: self.type_tag,
+            name: self.name,
+            metadata_key: match self.metadata_key {
+                Some(key) => CString::new(key).map_err(StringError::from)?.into_raw(),
+                None => ptr::null(),
+            },
+            perms: permission_set_into_repr_c(self.perms),
+        })
+    }
+}
+
+impl ReprC for ShareMData {
+    type C = *const ffi::ShareMData;
+    type Error = IpcError;
+
+    /// Constructs the object from a raw pointer.
+    unsafe fn clone_from_repr_c(raw: *const ffi::ShareMData) -> Result<Self, IpcError> {
+        Ok(ShareMData {
+            type_tag: (*raw).type_tag,
+            name: (*raw).name,
+            metadata_key: if (*raw).metadata_key.is_null() {
+                None
+            } else {
+                Some(from_c_str((*raw).metadata_key)?)
+            },
+            perms: permission_set_clone_from_repr_c(&(*raw).perms),
+        })
+    }
+}
+
+/// Convert a `PermissionSet` into it's C representation.
+pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
+    ffi::PermissionSet {
+        insert: permission_modifier_into_repr_c(perms.is_allowed(Action::Insert)),
+        delete: permission_modifier_into_repr_c(perms.is_allowed(Action::Delete)),
+        update: permission_modifier_into_repr_c(perms.is_allowed(Action::Update)),
+        manage_permissions: permission_modifier_into_repr_c(
+            perms.is_allowed(Action::ManagePermissions),
+        ),
+    }
+}
+
+/// Create a `ffi::PermissionModifier` from a permission in a `PermissionSet`
+pub fn permission_modifier_into_repr_c(pm: Option<bool>) -> ffi::PermissionModifier {
+    match pm {
+        None => ffi::PermissionModifier::NO_CHANGE,
+        Some(true) => ffi::PermissionModifier::SET,
+        Some(false) => ffi::PermissionModifier::UNSET,
+    }
+}
+
+/// Create a `PermissionSet` from it's C representation.
+pub fn permission_set_clone_from_repr_c(perms: &ffi::PermissionSet) -> PermissionSet {
+    let mut pm = PermissionSet::new();
+    permission_modifier_clone_from_repr_c(perms.insert, &mut pm, Action::Insert);
+    permission_modifier_clone_from_repr_c(perms.delete, &mut pm, Action::Delete);
+    permission_modifier_clone_from_repr_c(perms.update, &mut pm, Action::Update);
+    permission_modifier_clone_from_repr_c(
+        perms.manage_permissions,
+        &mut pm,
+        Action::ManagePermissions,
+    );
+    pm
+}
+
+/// Set a permission on a `PermissionSet` based on a `PermissionModifier`.
+pub fn permission_modifier_clone_from_repr_c(
+    pm: ffi::PermissionModifier,
+    perms: &mut PermissionSet,
+    action: Action,
+) {
+    match pm {
+        ffi::PermissionModifier::NO_CHANGE => (),
+        ffi::PermissionModifier::SET => {
+            *perms = perms.allow(action);
+        }
+        ffi::PermissionModifier::UNSET => {
+            *perms = perms.deny(action);
+        }
     }
 }
 

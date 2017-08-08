@@ -60,6 +60,8 @@ extern crate tiny_keccak;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
+#[cfg(test)]
+extern crate rand;
 
 /// FFI routines
 pub mod ffi;
