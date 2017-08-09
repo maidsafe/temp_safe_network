@@ -1433,10 +1433,6 @@ fn app_authentication_during_pending_revocation() {
         |_| (),
     ));
 
-    let ac_info = run(&auth, |client| {
-        access_container_tools::access_container(client)
-    });
-
     // Authenticate the app.
     let auth_req = AuthReq {
         app: unwrap!(rand_app()),
@@ -1447,39 +1443,8 @@ fn app_authentication_during_pending_revocation() {
     let app_id = auth_req.app.id.clone();
     let _ = unwrap!(register_app(&auth, &auth_req));
 
-    // Simulate network failure during mutation of the access container.
-    let auth = unwrap!(Authenticator::login_with_hook(
-        locator.clone(),
-        password.clone(),
-        |_| (),
-        move |mut routing| {
-            let mut failed = false;
-            let ac_info = ac_info.clone();
-
-            routing.set_request_hook(move |request| match *request {
-                Request::MutateMDataEntries { name, tag, msg_id, .. } => {
-                    if name == ac_info.name && tag == ac_info.type_tag && !failed {
-                        failed = true;
-                        Some(Response::MutateMDataEntries {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            });
-
-            routing
-        },
-    ));
-
-    // Attempt to revoke the app fails.
-    match try_revoke(&auth, &app_id) {
-        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
-        x => panic!("Unexpected {:?}", x),
-    }
+    // Attempt to revoke it which fails due to simulated network failure.
+    simulate_revocation_failure(&locator, &password, iter::once(&app_id));
 
     // Attempt to re-authenticate the app fails, because revocation is pending.
     match register_app(&auth, &auth_req) {
@@ -1515,10 +1480,6 @@ fn flushing_app_revocation_queue() {
         |_| (),
     ));
 
-    let ac_info = run(&auth, |client| {
-        access_container_tools::access_container(client)
-    });
-
     // Authenticate the first app.
     let auth_req = AuthReq {
         app: unwrap!(rand_app()),
@@ -1539,43 +1500,8 @@ fn flushing_app_revocation_queue() {
     let _ = unwrap!(register_app(&auth, &auth_req));
     let app_id_1 = auth_req.app.id.clone();
 
-    // Simulate network failure that prevents any subsequent revocation from
-    // successful completion.
-    let auth = unwrap!(Authenticator::login_with_hook(
-        locator.clone(),
-        password.clone(),
-        |_| (),
-        move |mut routing| {
-            let ac_info = ac_info.clone();
-
-            routing.set_request_hook(move |request| match *request {
-                Request::MutateMDataEntries { name, tag, msg_id, .. } => {
-                    if name == ac_info.name && tag == ac_info.type_tag {
-                        Some(Response::MutateMDataEntries {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            });
-
-            routing
-        },
-    ));
-
-    // Attempt to revoke the apps fails.
-    match try_revoke(&auth, &app_id_0) {
-        Err(_) => (),
-        x => panic!("Unexpected {:?}", x),
-    }
-
-    match try_revoke(&auth, &app_id_1) {
-        Err(_) => (),
-        x => panic!("Unexpected {:?}", x),
-    }
+    // Simulate failed revocations of both apps.
+    simulate_revocation_failure(&locator, &password, &[&app_id_0, &app_id_1]);
 
     // Verify the apps are not revoked yet.
     {
@@ -1963,6 +1889,55 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
     match try_revoke(authenticator, app_id) {
         Ok(_) => (),
         x => panic!("Unexpected {:?}", x),
+    }
+}
+
+// Try to revoke apps with the given ids, but simulate network failure so they
+// would be initiated but not finished.
+fn simulate_revocation_failure<T, S>(locator: &str, password: &str, app_ids: T)
+where
+    T: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    // First, log in normally to obtain the access contained info.
+    let auth = unwrap!(Authenticator::login(locator, password, |_| ()));
+    let ac_info = run(&auth, |client| {
+        access_container_tools::access_container(client)
+    });
+
+    // Then, log in with a request hook that makes mutation of the access container
+    // fail.
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator,
+        password,
+        |_| (),
+        move |mut routing| {
+            let ac_info = ac_info.clone();
+
+            routing.set_request_hook(move |request| match *request {
+                Request::MutateMDataEntries { name, tag, msg_id, .. } => {
+                    if name == ac_info.name && tag == ac_info.type_tag {
+                        Some(Response::MutateMDataEntries {
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            });
+
+            routing
+        },
+    ));
+
+    // Then attempt to revoke each app from the iterator.
+    for app_id in app_ids {
+        match try_revoke(&auth, app_id.as_ref()) {
+            Err(_) => (),
+            x => panic!("Unexpected {:?}", x),
+        }
     }
 }
 
