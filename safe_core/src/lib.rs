@@ -45,6 +45,8 @@
 extern crate base64;
 extern crate chrono;
 extern crate ffi_utils;
+#[cfg(feature = "use-mock-routing")]
+extern crate fs2;
 extern crate futures;
 #[cfg(feature = "use-mock-routing")]
 #[macro_use]
