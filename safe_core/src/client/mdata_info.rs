@@ -24,7 +24,6 @@ use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
 const REENCRYPT_ERROR: &'static str = "Cannot reencrypt without new_enc_info";
-const DECRYPT_ERROR: &'static str = "Cannot decrypt without new_enc_info";
 
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -105,6 +104,12 @@ impl MDataInfo {
 
     /// decrypt key or value of this mdata entry
     pub fn decrypt(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
+        if let Some((ref key, _)) = self.new_enc_info {
+            if let Ok(plain) = symmetric_decrypt(cipher, key) {
+                return Ok(plain);
+            }
+        }
+
         if let Some((ref key, _)) = self.enc_info {
             symmetric_decrypt(cipher, key)
         } else {
@@ -112,12 +117,12 @@ impl MDataInfo {
         }
     }
 
-    /// Try to decrypt mdata entry using the new encryption info
+    /// decrypt key or value using the new encryption info (if any).
     pub fn decrypt_new_enc_info(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.new_enc_info {
             symmetric_decrypt(cipher, key)
         } else {
-            Err(CoreError::from(DECRYPT_ERROR))
+            Err(CoreError::SymmetricDecipherFailure)
         }
     }
 
@@ -324,5 +329,27 @@ mod tests {
         assert_ne!(enc_key, key);
         // encrypted is different on every run
         assert_ne!(unwrap!(info.enc_entry_key(&key)), key);
+    }
+
+    #[test]
+    fn decrypt() {
+        let mut info = unwrap!(MDataInfo::random_private(0));
+        info.start_new_enc_info();
+
+        let plain = Vec::from("plaintext");
+        let old_cipher = unwrap!(info.enc_entry_value(&plain));
+        let new_cipher = unwrap!(info.reencrypt_entry_value(&old_cipher));
+
+        // After start, both encryption infos work.
+        assert_eq!(unwrap!(info.decrypt(&old_cipher)), plain);
+        assert_eq!(unwrap!(info.decrypt(&new_cipher)), plain);
+
+        // After commit, only the new encryption info works.
+        info.commit_new_enc_info();
+        match info.decrypt(&old_cipher) {
+            Err(CoreError::SymmetricDecipherFailure) => (),
+            x => panic!("Unexpected {:?}", x),
+        }
+        assert_eq!(unwrap!(info.decrypt(&new_cipher)), plain);
     }
 }

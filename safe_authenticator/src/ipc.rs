@@ -23,7 +23,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, StringError, base64_
                 catch_unwind_cb, from_c_str};
 use futures::{Future, Stream, future, stream};
 use maidsafe_utilities::serialisation::deserialise;
-use revocation::revoke_app;
+use revocation::{flush_app_revocation_queue, revoke_app};
 use routing::{ClientError, User};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
@@ -449,6 +449,28 @@ pub unsafe extern "C" fn auth_revoke_app(
 
         Ok(())
     });
+}
+
+/// Flush the revocation queue.
+#[no_mangle]
+pub unsafe extern "C" fn auth_flush_app_revocation_queue(
+    auth: *const Authenticator,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult),
+) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
+        (*auth).send(move |client| {
+            flush_app_revocation_queue(client)
+                .then(move |res| {
+                    call_result_cb!(res, user_data, o_cb);
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
+    })
 }
 
 /// Encodes a response to unregistered client authentication request

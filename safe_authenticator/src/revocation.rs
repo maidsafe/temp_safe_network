@@ -21,7 +21,7 @@ use access_container::{access_container, access_container_entry, access_containe
 use config;
 use config::AppInfo;
 use futures::Future;
-use futures::future::{self, Loop};
+use futures::future::{self, Either, Loop};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{EntryActions, User};
 use rust_sodium::crypto::sign;
@@ -68,6 +68,7 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<String>> 
                                                      found in the config file",
                     )
                 })?;
+
                 if let Some(next_app_id) = queue.front().cloned() {
                     Ok(Loop::Continue(next_app_id))
                 } else {
@@ -76,6 +77,31 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<String>> 
             })
     }).into_box()
 
+}
+
+/// Revoke all apps currently in the revocation queue.
+pub fn flush_app_revocation_queue(client: &Client<()>) -> Box<AuthFuture<()>> {
+    let client = client.clone();
+
+    future::loop_fn((), move |_| {
+        let c2 = client.clone();
+        let c3 = client.clone();
+
+        config::get_revocation_queue(&client)
+            .map(|queue| {
+                queue.map(|(_, queue)| queue).unwrap_or_else(
+                    Default::default,
+                )
+            })
+            .and_then(move |queue| if let Some(app_id) = queue.front().cloned() {
+                let f = revoke_single_app(&c2, &app_id)
+                    .and_then(move |_| config::pop_from_revocation_queue(&c3))
+                    .and_then(move |_| Ok(Loop::Continue(())));
+                Either::A(f)
+            } else {
+                Either::B(future::ok(Loop::Break(())))
+            })
+    }).into_box()
 }
 
 /// Revoke access for a single app
@@ -411,7 +437,7 @@ fn reencrypt_containers(
                     }
 
                     // Try to see if we've already re-encrypted key and a value on a previous
-                    // try that's possibly has failed with an error
+                    // try that's possibly failed with an error
                     match mdata_info.decrypt_new_enc_info(&old_key) {
                         Ok(_old_key) => {
                             // It's already re-encrypted - do nothing about it.
