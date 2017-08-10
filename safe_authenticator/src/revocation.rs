@@ -25,7 +25,7 @@ use futures::future::{self, Either, Loop};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{EntryActions, User};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo};
+use safe_core::{Client, FutureExt, MDataInfo};
 use safe_core::ipc::IpcError;
 use safe_core::recovery;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
@@ -63,10 +63,7 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<String>> 
             .and_then(move |_| config::pop_from_revocation_queue(&c5))
             .and_then(move |opt_queue| {
                 let (app_id, queue) = opt_queue.ok_or_else(|| {
-                    AuthError::from(
-                        "No revocation queue \
-                                                     found in the config file",
-                    )
+                    AuthError::from("No revocation queue found in the config file")
                 })?;
 
                 if let Some(next_app_id) = queue.front().cloned() {
@@ -436,28 +433,19 @@ fn reencrypt_containers(
                         continue;
                     }
 
-                    // Try to see if we've already re-encrypted key and a value on a previous
-                    // try that's possibly failed with an error
-                    match mdata_info.decrypt_new_enc_info(&old_key) {
-                        Ok(_old_key) => {
-                            // It's already re-encrypted - do nothing about it.
-                            ()
-                        }
-                        Err(CoreError::SymmetricDecipherFailure) => {
-                            // It hasn't been reencrypted yet
-                            let new_key = mdata_info.reencrypt_entry_key(&old_key)?;
-                            let new_content = mdata_info.reencrypt_entry_value(&value.content)?;
+                    let plain_key = mdata_info.decrypt(&old_key)?;
+                    let new_key = mdata_info.enc_entry_key(&plain_key)?;
 
-                            // Delete the old entry with the old key and
-                            // insert the re-encrypted entry with a new key
-                            actions = actions.del(old_key, value.entry_version + 1).ins(
-                                new_key,
-                                new_content,
-                                0,
-                            );
-                        }
-                        Err(e) => return Err(e),
-                    }
+                    let plain_content = mdata_info.decrypt(&value.content)?;
+                    let new_content = mdata_info.enc_entry_value(&plain_content)?;
+
+                    // Delete the old entry with the old key and
+                    // insert the re-encrypted entry with a new key
+                    actions = actions.del(old_key, value.entry_version + 1).ins(
+                        new_key,
+                        new_content,
+                        0,
+                    );
                 }
 
                 Ok((mdata_info, actions))
