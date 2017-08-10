@@ -90,8 +90,6 @@ mod codes {
 
     // Authenticator errors
     pub const ERR_IO_ERROR: i32 = -1013;
-    pub const ERR_NO_SUCH_PUBLIC_ID: i32 = -1014;
-    pub const ERR_PUBLIC_ID_EXISTS: i32 = -1015;
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
 
@@ -111,10 +109,6 @@ pub enum AuthError {
     EncodeDecodeError,
     /// IPC error
     IpcError(IpcError),
-    /// Public ID not found
-    NoSuchPublicId,
-    /// Public ID already exists
-    PublicIdExists,
 }
 
 impl Display for AuthError {
@@ -128,8 +122,6 @@ impl Display for AuthError {
             AuthError::NfsError(ref error) => write!(formatter, "NFS error: {:?}", error),
             AuthError::EncodeDecodeError => write!(formatter, "Serialisation error"),
             AuthError::IpcError(ref error) => write!(formatter, "IPC error: {:?}", error),
-            AuthError::NoSuchPublicId => write!(formatter, "Public ID not found"),
-            AuthError::PublicIdExists => write!(formatter, "Public ID already exists"),
         }
     }
 }
@@ -247,8 +239,6 @@ impl ErrorCode for AuthError {
             }
             AuthError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
             AuthError::IoError(_) => ERR_IO_ERROR,
-            AuthError::NoSuchPublicId => ERR_NO_SUCH_PUBLIC_ID,
-            AuthError::PublicIdExists => ERR_PUBLIC_ID_EXISTS,
             AuthError::Unexpected(_) => ERR_UNEXPECTED,
         }
     }
