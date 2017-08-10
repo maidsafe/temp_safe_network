@@ -71,7 +71,7 @@ extern crate unwrap;
 pub mod utils;
 /// Event loop handling
 pub mod event_loop;
-/// Helper functions to handle `ImmutableData` related operations
+/// Utilities for handling `ImmutableData`
 pub mod immutable_data;
 /// Inter-Process Communication utilities
 pub mod ipc;
