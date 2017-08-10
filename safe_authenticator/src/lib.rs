@@ -67,8 +67,6 @@ extern crate rand;
 pub mod ffi;
 /// Authenticator communication with apps
 pub mod ipc;
-/// Public ID routines
-pub mod public_id;
 
 mod access_container;
 mod app_auth;
