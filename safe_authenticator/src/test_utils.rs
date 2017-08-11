@@ -73,6 +73,14 @@ pub fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String,
     })
 }
 
+/// Revoke an app, panicking on failure
+pub fn revoke(authenticator: &Authenticator, app_id: &str) {
+    match try_revoke(authenticator, app_id) {
+        Ok(_) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+}
+
 /// Create a random authenticator and login using the same credentials.
 /// Attaches a hook to the Routing to override responses.
 #[cfg(all(any(test, feature = "testing"), feature = "use-mock-routing"))]

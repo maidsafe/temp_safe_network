@@ -463,7 +463,7 @@ mod tests {
     use routing::{ClientError, Request, Response};
     use safe_authenticator::Authenticator;
     use safe_authenticator::test_utils as authenticator;
-    use safe_authenticator::test_utils::try_revoke;
+    use safe_authenticator::test_utils::revoke;
     #[cfg(feature = "use-mock-routing")]
     use safe_core::MockRouting;
     use safe_core::ipc::Permission;
@@ -695,7 +695,6 @@ mod tests {
 
         let app_info = gen_app_exchange_info();
         let app_id = app_info.id.clone();
-
         let app = authorise_app(&auth, &app_info, &app_id, true);
 
         assert_eq!(num_containers(&app), 1); // should only contain app container
@@ -705,7 +704,6 @@ mod tests {
 
         let app_info = gen_app_exchange_info();
         let app_id = app_info.id.clone();
-
         let app = authorise_app(&auth, &app_info, &app_id, false);
 
         assert_eq!(num_containers(&app), 0); // should be empty
@@ -715,10 +713,19 @@ mod tests {
 
         assert_eq!(num_containers(&app), 1); // should only contain app container
 
-        // Revoke the app
-        let _ = unwrap!(try_revoke(&auth, &app_id));
+        // Authorise a new app with `app_container` set to `false`.
+        let auth = authenticator::create_account_and_login();
 
-        // Re-re-authorise the app with `app_container` set to `true`.
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+        let app = authorise_app(&auth, &app_info, &app_id, false);
+
+        assert_eq!(num_containers(&app), 0); // should be empty
+
+        // Revoke the app
+        revoke(&auth, &app_id);
+
+        // Re-authorise the app with `app_container` set to `true`.
         let app = authorise_app(&auth, &app_info, &app_id, true);
 
         assert_eq!(num_containers(&app), 1); // should only contain app container

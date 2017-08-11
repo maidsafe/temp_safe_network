@@ -208,7 +208,6 @@ fn authenticated_app(
     let c2 = client.clone();
     let c3 = client.clone();
     let c4 = client.clone();
-    let c5 = client.clone();
 
     let app_keys = app.keys.clone();
     let app_keys_auth = app.keys.clone();
@@ -216,34 +215,37 @@ fn authenticated_app(
     let bootstrap_config = fry!(Client::<()>::bootstrap_config());
 
     // Check whether we need to create/update dedicated container
-    if app_container {
-        access_container(&c2)
+    let app_cont_fut = if app_container {
+        access_container(client)
             .and_then(move |dir| {
-                access_container_entry(&c3, &dir, &app_id, app_keys.clone())
+                access_container_entry(&c2, &dir, &app_id, app_keys.clone())
                     .map(move |(_, perms)| (perms, app_id))
             })
             .and_then(move |(perms, app_id)| {
                 let perms = perms.unwrap_or_else(AccessContainerEntry::default);
-                app_container::fetch(c4, app_id.clone(), sign_pk).map(
+                app_container::fetch(c3, app_id.clone(), sign_pk).map(
                     move |mdata_info| (mdata_info, perms, app_id),
                 )
             })
             .and_then(move |(mdata_info, perms, app_id)| {
                 insert_app_container(perms, &app_id, mdata_info).and_then(
-                    move |perms| update_access_container(&c5, &app, perms),
+                    move |perms| update_access_container(&c4, &app, perms),
                 )
             })
             .into_box()
     } else {
-        access_container(&c4)
-    }.and_then(move |dir| {
-        let access_container = AccessContInfo::from_mdata_info(dir)?;
-        Ok(AuthGranted {
-            app_keys: app_keys_auth,
-            bootstrap_config: bootstrap_config,
-            access_container: access_container,
+        access_container(client)
+    };
+
+    app_cont_fut
+        .and_then(move |dir| {
+            let access_container = AccessContInfo::from_mdata_info(dir)?;
+            Ok(AuthGranted {
+                app_keys: app_keys_auth,
+                bootstrap_config: bootstrap_config,
+                access_container: access_container,
+            })
         })
-    })
         .into_box()
 }
 
@@ -283,16 +285,15 @@ fn authenticate_new_app(
                 .map(move |perms| (perms, sign_pk))
                 .into_box()
         })
-        .and_then(move |(perms, sign_pk)| {
-            if app_container {
-                app_container::fetch(c4, app_id.clone(), sign_pk)
-                    .and_then(move |mdata_info| {
-                        insert_app_container(perms, &app_id, mdata_info)
-                    })
-                    .into_box()
-            } else {
-                ok!(perms)
-            }.map(move |perms| (perms, app))
+        .and_then(move |(perms, sign_pk)| if app_container {
+            app_container::fetch(c4, app_id.clone(), sign_pk)
+                .and_then(move |mdata_info| {
+                    insert_app_container(perms, &app_id, mdata_info)
+                })
+                .map(move |perms| (perms, app))
+                .into_box()
+        } else {
+            ok!((perms, app))
         })
         .and_then(move |(perms, app)| {
             update_access_container(&c5, &app, perms)
