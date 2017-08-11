@@ -76,32 +76,22 @@ pub fn app_state(client: &Client<()>, apps: &Apps, app_id: String) -> Box<AuthFu
     }
 }
 
-/// Create app container and update access container.
-fn create_or_update_app_container(
-    client: &Client<()>,
-    app: &AppInfo,
-    permissions: AccessContainerEntry,
+/// Store info about the app's dedicated container in the access container
+fn insert_app_container(
+    mut permissions: AccessContainerEntry,
+    app_id: &str,
+    app_container_info: MDataInfo,
 ) -> Box<AuthFuture<AccessContainerEntry>> {
-    let sign_pk = app.keys.sign_pk;
-    let app_info = app.info.clone();
-    let app_id = app_info.id.clone();
-
-    app_container::fetch(client.clone(), app_id, sign_pk)
-        .map(move |mdata_info| (mdata_info, permissions))
-        .and_then(move |(mdata_info, mut permissions)| {
-            // Store info about the app's dedicated container in the access container
-            let access =
-                btree_set![
+    let access =
+        btree_set![
                     Permission::Read,
                     Permission::Insert,
                     Permission::Update,
                     Permission::Delete,
                     Permission::ManagePermissions,
                 ];
-            let _ = permissions.insert(format!("apps/{}", app_info.id), (mdata_info, access));
-            ok!(permissions)
-        })
-        .into_box()
+    let _ = permissions.insert(format!("apps/{}", app_id), (app_container_info, access));
+    ok!(permissions)
 }
 
 fn update_access_container(
@@ -132,8 +122,8 @@ fn update_access_container(
                 Ok((version, app_info, app_keys, dir, permissions))
             })
         })
-        .and_then(move |(version, app_info, app_keys, dir, perms)| {
-            put_access_container_entry(&c4, &dir, &app_info.id, &app_keys, &perms, version)
+        .and_then(move |(version, app_info, app_keys, dir, permissions)| {
+            put_access_container_entry(&c4, &dir, &app_info.id, &app_keys, &permissions, version)
                 .map(move |_| dir)
         })
         .into_box()
@@ -178,7 +168,7 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
                         .into_box()
                 }
                 AppState::Authenticated | AppState::Revoked => {
-                    let app_entry_name = sha3_256(app_id.clone().as_bytes());
+                    let app_entry_name = sha3_256(app_id.as_bytes());
                     if let Some(app) = config.remove(&app_entry_name) {
                         ok!((app, app_state, app_id))
                     } else {
@@ -222,6 +212,7 @@ fn authenticated_app(
 
     let app_keys = app.keys.clone();
     let app_keys_auth = app.keys.clone();
+    let sign_pk = app.keys.sign_pk;
     let bootstrap_config = fry!(Client::<()>::bootstrap_config());
 
     // Check whether we need to create/update dedicated container
@@ -229,13 +220,18 @@ fn authenticated_app(
         access_container(&c2)
             .and_then(move |dir| {
                 access_container_entry(&c3, &dir, &app_id, app_keys.clone())
+                    .map(move |(_, perms)| (perms, app_id))
             })
-            .and_then(move |(_, perms)| {
-                let perms = unwrap!(perms);
-                create_or_update_app_container(&c4, &app, perms).map(move |perms| (perms, app))
+            .and_then(move |(perms, app_id)| {
+                let perms = perms.unwrap_or_else(AccessContainerEntry::default);
+                app_container::fetch(c4, app_id.clone(), sign_pk).map(
+                    move |mdata_info| (mdata_info, perms, app_id),
+                )
             })
-            .and_then(move |(perms, app)| {
-                update_access_container(&c5, &app, perms)
+            .and_then(move |(mdata_info, perms, app_id)| {
+                insert_app_container(perms, &app_id, mdata_info).and_then(
+                    move |perms| update_access_container(&c5, &app, perms),
+                )
             })
             .into_box()
     } else {
@@ -272,6 +268,7 @@ fn authenticate_new_app(
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
     let app_keys_auth = app.keys.clone();
+    let app_id = app.info.id.clone();
 
     client
         .list_auth_keys_and_version()
@@ -280,13 +277,19 @@ fn authenticate_new_app(
         })
         .map_err(AuthError::from)
         .and_then(move |_| if permissions.is_empty() {
-            ok!(Default::default())
+            ok!((Default::default(), sign_pk))
         } else {
             update_container_perms(&c3, permissions, sign_pk)
+                .map(move |perms| (perms, sign_pk))
+                .into_box()
         })
-        .and_then(move |perms| {
+        .and_then(move |(perms, sign_pk)| {
             if app_container {
-                create_or_update_app_container(&c4, &app, perms)
+                app_container::fetch(c4, app_id.clone(), sign_pk)
+                    .and_then(move |mdata_info| {
+                        insert_app_container(perms, &app_id, mdata_info)
+                    })
+                    .into_box()
             } else {
                 ok!(perms)
             }.map(move |perms| (perms, app))
