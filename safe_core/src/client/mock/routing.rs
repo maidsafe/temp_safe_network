@@ -75,7 +75,6 @@ pub struct Routing {
     client_auth: Authority<XorName>,
     max_ops_countdown: Option<Cell<u64>>,
     timeout_simulation: bool,
-    rate_limit_error_count: Cell<usize>,
     request_hook: Option<Box<RequestHookFn>>,
 }
 
@@ -86,6 +85,7 @@ impl Routing {
         sender: Sender<Event>,
         id: Option<FullId>,
         _config: Option<BootstrapConfig>,
+        _msg_expiry_dur: Duration,
     ) -> Result<Self, RoutingError> {
         ::rust_sodium::init();
 
@@ -106,7 +106,6 @@ impl Routing {
             client_auth: client_auth,
             max_ops_countdown: None,
             timeout_simulation: false,
-            rate_limit_error_count: Cell::new(0),
             request_hook: None,
         })
     }
@@ -117,7 +116,7 @@ impl Routing {
         dst: Authority<XorName>,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -172,7 +171,7 @@ impl Routing {
             return Ok(());
         }
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -223,7 +222,7 @@ impl Routing {
             return Ok(());
         }
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -274,7 +273,7 @@ impl Routing {
             return Ok(());
         }
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -676,7 +675,7 @@ impl Routing {
             return Ok(());
         }
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -728,7 +727,7 @@ impl Routing {
             return Ok(());
         }
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -780,7 +779,7 @@ impl Routing {
             return Ok(());
         }
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -947,7 +946,7 @@ impl Routing {
             return Ok(());
         };
 
-        if self.simulate_network_errors(msg_id) {
+        if self.simulate_network_errors() {
             return Ok(());
         }
 
@@ -1044,17 +1043,8 @@ impl Routing {
         })
     }
 
-    fn simulate_network_errors(&self, msg_id: MessageId) -> bool {
+    fn simulate_network_errors(&self) -> bool {
         if self.timeout_simulation {
-            return true;
-        }
-
-        if self.rate_limit_error_count.get() > 0 {
-            self.rate_limit_error_count.set(
-                self.rate_limit_error_count
-                    .get() - 1,
-            );
-            self.send_event(0, Event::ProxyRateLimitExceeded(msg_id));
             return true;
         }
 
@@ -1096,11 +1086,6 @@ impl Routing {
     /// Simulates network timeouts
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
-    }
-
-    /// The following `count` requests will fail with exceeded rate limit.
-    pub fn simulate_rate_limit_errors(&mut self, count: usize) {
-        self.rate_limit_error_count = Cell::new(count);
     }
 }
 

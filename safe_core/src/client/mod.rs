@@ -79,15 +79,6 @@ macro_rules! match_event {
     }
 }
 
-macro_rules! try_request {
-    ($op:expr) => {
-        match $op {
-            Ok(x) => x,
-            Err(err) => return SyncLoop::Break(Err(CoreError::from(err))),
-        }
-    }
-}
-
 macro_rules! wait_for_response {
     ($rx:expr, $res:path, $msg_id:expr) => {
         match $rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
@@ -96,25 +87,19 @@ macro_rules! wait_for_response {
                 ..
             }) => {
                 if res_msg_id == $msg_id {
-                    SyncLoop::Break(res.map_err(CoreError::RoutingClientError))
+                    res.map_err(CoreError::RoutingClientError)
                 } else {
                     warn!("Received response with unexpected message id");
-                    SyncLoop::Break(Err(CoreError::OperationAborted))
+                    Err(CoreError::OperationAborted)
                 }
-            }
-            Ok(Event::ProxyRateLimitExceeded(_)) => {
-                use std::thread::sleep;
-                debug!("Rate limit exceeded; retrying request after {} ms", RETRY_DELAY_MS);
-                sleep(Duration::from_millis(RETRY_DELAY_MS));
-                SyncLoop::Continue
             }
             Ok(x) => {
                 warn!("Received unexpected response: {:?}", x);
-                SyncLoop::Break(Err(CoreError::OperationAborted))
+                Err(CoreError::OperationAborted)
             }
             Err(err) => {
                 warn!("Failed to receive response: {:?}", err);
-                SyncLoop::Break(Err(CoreError::OperationAborted))
+                Err(CoreError::OperationAborted)
             }
         }
     }
@@ -299,19 +284,17 @@ impl<T: 'static> Client<T> {
         let digest = sha3_256(&pub_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
-        let res = sync_loop_fn(|| {
-            let msg_id = MessageId::new();
-            try_request!(routing.put_mdata(cm_addr, acc_md.clone(), msg_id, pub_key));
-            wait_for_response!(routing_rx, Response::PutMData, msg_id)
-        });
-
-        match res {
-            Ok(_) => (),
-            Err(err) => {
-                warn!("Could not put account to the Network: {:?}", err);
-                return Err(err);
-            }
-        }
+        let msg_id = MessageId::new();
+        routing
+            .put_mdata(cm_addr, acc_md.clone(), msg_id, pub_key)
+            .map_err(CoreError::from)
+            .and_then(|_| {
+                wait_for_response!(routing_rx, Response::PutMData, msg_id)
+            })
+            .map_err(|e| {
+                warn!("Could not put account to the Network: {:?}", e);
+                e
+            })?;
 
         create_empty_dir(&mut routing, &routing_rx, cm_addr, &user_root_dir, pub_key)?;
         create_empty_dir(&mut routing, &routing_rx, cm_addr, &config_dir, pub_key)?;
@@ -320,26 +303,25 @@ impl<T: 'static> Client<T> {
         // (so we don't have to recover them after login).
         acc.root_dirs_created = true;
 
-        let res = sync_loop_fn(|| {
-            let actions = try_request!(Self::prepare_account_packet_update(&acc, &user_cred, 1));
-            let msg_id = MessageId::new();
-            try_request!(routing.mutate_mdata_entries(
+        let actions = Self::prepare_account_packet_update(&acc, &user_cred, 1)?;
+        let msg_id = MessageId::new();
+        routing
+            .mutate_mdata_entries(
                 cm_addr,
                 acc_loc,
                 TYPE_TAG_SESSION_PACKET,
                 actions,
                 msg_id,
                 pub_key,
-            ));
-            wait_for_response!(routing_rx, Response::MutateMDataEntries, msg_id)
-        });
-        match res {
-            Ok(_) => (),
-            Err(err) => {
-                warn!("Could not update account on the Network: {:?}", err);
-                return Err(err);
-            }
-        }
+            )
+            .map_err(CoreError::from)
+            .and_then(|_| {
+                wait_for_response!(routing_rx, Response::MutateMDataEntries, msg_id)
+            })
+            .map_err(|e| {
+                warn!("Could not update account on the Network: {:?}", e);
+                e
+            })?;
 
         // Create the client
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
@@ -425,27 +407,24 @@ impl<T: 'static> Client<T> {
             let (mut routing, routing_rx) = setup_routing(None, None)?;
             routing = routing_wrapper_fn(routing);
 
-            let res = sync_loop_fn(|| {
-                let msg_id = MessageId::new();
-                try_request!(routing.get_mdata_value(
+            let msg_id = MessageId::new();
+            let val = routing
+                .get_mdata_value(
                     dst,
                     acc_loc,
                     TYPE_TAG_SESSION_PACKET,
                     ACC_LOGIN_ENTRY_KEY.to_owned(),
                     msg_id,
-                ));
-                wait_for_response!(routing_rx, Response::GetMDataValue, msg_id)
-            });
-            match res {
-                Ok(Value {
-                       content,
-                       entry_version,
-                   }) => (content, entry_version),
-                Err(err) => {
-                    warn!("Could not fetch account from the Network: {:?}", err);
-                    return Err(err);
-                }
-            }
+                )
+                .map_err(CoreError::from)
+                .and_then(|_| {
+                    wait_for_response!(routing_rx, Response::GetMDataValue, msg_id)
+                })
+                .map_err(|e| {
+                    warn!("Could not fetch account from the Network: {:?}", e);
+                    e
+                })?;
+            (val.content, val.entry_version)
         };
 
         let mut acc = match deserialise::<AccountPacket>(&acc_content)? {
@@ -481,30 +460,25 @@ impl<T: 'static> Client<T> {
             acc.root_dirs_created = true;
             acc_version += 1;
 
-            let res = sync_loop_fn(|| {
-                let actions = try_request!(Self::prepare_account_packet_update(
-                    &acc,
-                    &user_cred,
-                    acc_version,
-                ));
-                let msg_id = MessageId::new();
-                try_request!(routing.mutate_mdata_entries(
+            let actions = Self::prepare_account_packet_update(&acc, &user_cred, acc_version)?;
+            let msg_id = MessageId::new();
+            routing
+                .mutate_mdata_entries(
                     cm_addr,
                     acc_loc,
                     TYPE_TAG_SESSION_PACKET,
                     actions,
                     msg_id,
                     pub_key,
-                ));
-                wait_for_response!(routing_rx, Response::MutateMDataEntries, msg_id)
-            });
-            match res {
-                Ok(_) => (),
-                Err(err) => {
-                    warn!("Could not update account on the Network: {:?}", err);
-                    return Err(err);
-                }
-            }
+                )
+                .map_err(CoreError::from)
+                .and_then(|_| {
+                    wait_for_response!(routing_rx, Response::MutateMDataEntries, msg_id)
+                })
+                .map_err(|e| {
+                    warn!("Could not update account on the Network: {:?}", e);
+                    e
+                })?;
         }
 
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
@@ -1216,13 +1190,6 @@ impl<T: 'static> Client<T> {
             enabled,
         );
     }
-
-    #[doc(hidden)]
-    pub fn simulate_rate_limit_errors(&self, count: usize) {
-        self.inner.borrow_mut().routing.simulate_rate_limit_errors(
-            count,
-        )
-    }
 }
 
 impl<T> fmt::Debug for Client<T> {
@@ -1306,24 +1273,6 @@ type TimeoutFuture = Either<
         fn(io::Result<()>) -> Result<CoreEvent, CoreError>,
     >,
 >;
-
-enum SyncLoop<T> {
-    Break(Result<T, CoreError>),
-    Continue,
-}
-
-// Keep calling the given function until it returns `SyncLoop::Break(_)`.
-fn sync_loop_fn<F, T>(mut f: F) -> Result<T, CoreError>
-where
-    F: FnMut() -> SyncLoop<T>,
-{
-    loop {
-        match f() {
-            SyncLoop::Break(res) => return res,
-            SyncLoop::Continue => (),
-        }
-    }
-}
 
 // ------------------------------------------------------------
 // Helper Struct
@@ -1485,7 +1434,12 @@ fn setup_routing(
     config: Option<BootstrapConfig>,
 ) -> Result<(Routing, Receiver<Event>), CoreError> {
     let (routing_tx, routing_rx) = mpsc::channel();
-    let routing = Routing::new(routing_tx, full_id, config)?;
+    let routing = Routing::new(
+        routing_tx,
+        full_id,
+        config,
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+    )?;
 
     trace!("Waiting to get connected to the Network...");
     match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
@@ -1540,22 +1494,20 @@ fn create_empty_dir(
         btree_set![owner_key],
     )?;
 
-    let res = sync_loop_fn(|| {
-        let msg_id = MessageId::new();
-        let req = routing.put_mdata(dst, dir_md.clone(), msg_id, owner_key);
-        try_request!(req);
-        wait_for_response!(routing_rx, Response::PutMData, msg_id)
-    });
-
-    match res {
-        // If the dir is already created, then skip this error for the purpose
-        // of operations recovery
-        Ok(()) | Err(CoreError::RoutingClientError(ClientError::DataExists)) => Ok(()),
-        Err(err) => {
-            warn!("Could not put directory to the Network: {:?}", err);
-            Err(err)
-        }
-    }
+    let msg_id = MessageId::new();
+    routing
+        .put_mdata(dst, dir_md.clone(), msg_id, owner_key)
+        .map_err(CoreError::from)
+        .and_then(|_| {
+            wait_for_response!(routing_rx, Response::PutMData, msg_id)
+        })
+        .or_else(|e| match e {
+            CoreError::RoutingClientError(ClientError::DataExists) => Ok(()),
+            _ => {
+                warn!("Could not put directory to the Network: {:?}", e);
+                Err(e)
+            }
+        })
 }
 
 #[cfg(test)]
@@ -1846,33 +1798,6 @@ mod tests {
                     Ok(_) => panic!("Unexpected success"),
                     Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
                     Err(err) => panic!("Unexpected {:?}", err),
-                })
-        })
-    }
-
-    // Test resilience against rate limit errors - the client should keep retrying
-    // any request that fails on exceeded rate limit until it succeeds.
-    #[cfg(feature = "use-mock-routing")]
-    #[test]
-    fn rate_limit_errors() {
-        random_client(|client| {
-            let client2 = client.clone();
-
-            let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
-            let data_name = *data.name();
-
-            client.simulate_rate_limit_errors(2);
-            client
-                .put_idata(data.clone())
-                .then(move |result| {
-                    unwrap!(result);
-                    client2.simulate_rate_limit_errors(1);
-                    client2.get_idata(data_name)
-                })
-                .then(move |result| {
-                    let got_data = unwrap!(result);
-                    assert_eq!(got_data, data);
-                    Ok::<_, CoreError>(())
                 })
         })
     }

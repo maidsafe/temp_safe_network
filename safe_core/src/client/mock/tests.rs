@@ -1019,37 +1019,6 @@ fn balance_check() {
 }
 
 #[test]
-fn simulate_rate_limit_errors() {
-    let (mut routing, routing_rx, full_id) = setup();
-    let owner_key = *full_id.public_id().signing_public_key();
-    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
-
-    // Initialy the request should succeed.
-    let msg_id = MessageId::new();
-    unwrap!(routing.get_account_info(client_mgr, msg_id));
-    let _ = expect_success!(routing_rx, msg_id, Response::GetAccountInfo);
-
-    // The next `failure_count` requests should fail on rate limit error.
-    let failure_count = 2;
-    routing.simulate_rate_limit_errors(failure_count);
-
-    for _ in 0..failure_count {
-        let msg_id = MessageId::new();
-        unwrap!(routing.get_account_info(client_mgr, msg_id));
-
-        match unwrap!(routing_rx.recv()) {
-            Event::ProxyRateLimitExceeded(resp_msg_id) => assert_eq!(resp_msg_id, msg_id),
-            x => panic!("Unexpected {:?}", x),
-        }
-    }
-
-    // The next request should succeed again.
-    let msg_id = MessageId::new();
-    unwrap!(routing.get_account_info(client_mgr, msg_id));
-    let _ = expect_success!(routing_rx, msg_id, Response::GetAccountInfo);
-}
-
-#[test]
 fn request_hooks() {
     let (mut routing, routing_rx, full_id) = setup();
 
@@ -1144,7 +1113,12 @@ fn request_hooks() {
 fn setup() -> (Routing, Receiver<Event>, FullId) {
     let full_id = FullId::new();
     let (routing_tx, routing_rx) = mpsc::channel();
-    let routing = unwrap!(Routing::new(routing_tx, Some(full_id.clone()), None));
+    let routing = unwrap!(Routing::new(
+            routing_tx,
+            Some(full_id.clone()),
+            None,
+            Duration::new(0, 0),
+    ));
 
     // Wait until connection is established.
     match unwrap!(routing_rx.recv_timeout(Duration::from_secs(10))) {

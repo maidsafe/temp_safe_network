@@ -38,12 +38,6 @@ where
                     break;
                 }
             }
-            Event::ProxyRateLimitExceeded(msg_id) => {
-                debug!("Rate limit exceeded; retrying request");
-                if !fire(&mut core_tx, msg_id, CoreEvent::RateLimitExceeded) {
-                    break;
-                }
-            }
             Event::Terminate => {
                 if let Err(e) = net_tx.send(NetworkEvent::Disconnected) {
                     trace!("Couldn't send NetworkEvent::Disconnected: {:?}", e);
