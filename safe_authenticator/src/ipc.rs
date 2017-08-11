@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use access_container::{access_container, access_container_entry, put_access_container_entry};
+use access_container;
 use app_auth::{self, AppState, app_state};
 use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, StringError, base64_encode,
@@ -27,33 +27,17 @@ use maidsafe_utilities::serialisation::deserialise;
 use revocation::{flush_app_revocation_queue, revoke_app};
 use routing::{ClientError, User, XorName};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
+use safe_core::{Client, CoreError, FutureExt, recovery};
 use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
-use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq, ShareMDataReq};
+use safe_core::ipc::req::{AuthReq, ContainersReq, IpcReq, ShareMDataReq};
+use safe_core::ipc::req::ffi::{AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq,
+                               ShareMDataReq as FfiShareMDataReq};
 use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
-use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
-use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
-use safe_core::ipc::resp::{AppKeys, IpcResp, METADATA_KEY, UserMetadata};
+use safe_core::ipc::resp::{IpcResp, METADATA_KEY, UserMetadata};
 use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
-
-/// App data stored in the authenticator configuration.
-///
-/// We need to store it even for revoked apps because we need to
-/// preserve the app keys. An app can encrypt data and create mutable data
-/// instances on its own, so we need to make sure that the app can
-/// access the encrypted data in future, even if the app was revoked
-/// at some point.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AppInfo {
-    /// Application info (id, name, vendor, etc.)
-    pub info: AppExchangeInfo,
-    /// Application keys
-    pub keys: AppKeys,
-}
 
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
@@ -103,7 +87,7 @@ pub fn decode_ipc_msg(
 
             config::list_apps(client)
                 .and_then(move |(_config_version, config)| {
-                    app_state(&c2, &config, app_id)
+                    app_state(&c2, &config, &app_id)
                 })
                 .and_then(move |app_state| {
                     match app_state {
@@ -591,7 +575,6 @@ pub unsafe extern "C" fn encode_containers_resp(
                 let c2 = client.clone();
                 let c3 = client.clone();
                 let c4 = client.clone();
-                let c5 = client.clone();
 
                 config::get_app(client, &app_id)
                     .and_then(move |app| {
@@ -600,13 +583,10 @@ pub unsafe extern "C" fn encode_containers_resp(
                             move |perms| (app, perms),
                         )
                     })
-                    .and_then(move |(app, perms)| {
-                        access_container(&c3).map(move |dir| (dir, app, perms))
-                    })
-                    .and_then(move |(dir, app, mut perms)| {
+                    .and_then(move |(app, mut perms)| {
                         let app_keys = app.keys;
 
-                        access_container_entry(&c4, &dir, &app_id, app_keys.clone())
+                        access_container::fetch_entry(&c3, &app_id, app_keys.clone())
                             .then(move |res| {
                                 let version = match res {
                                     // Updating an existing entry
@@ -629,11 +609,11 @@ pub unsafe extern "C" fn encode_containers_resp(
                                     // existing entry
                                     Err(e) => return Err(e),
                                 };
-                                Ok((version, app_id, app_keys, dir, perms))
+                                Ok((version, app_id, app_keys, perms))
                             })
                     })
-                    .and_then(move |(version, app_id, app_keys, dir, perms)| {
-                        put_access_container_entry(&c5, &dir, &app_id, &app_keys, &perms, version)
+                    .and_then(move |(version, app_id, app_keys, perms)| {
+                        access_container::put_entry(&c4, &app_id, &app_keys, &perms, version)
                     })
                     .and_then(move |_| {
                         let resp = encode_response(
@@ -680,51 +660,49 @@ pub fn update_container_perms(
     permissions: HashMap<String, BTreeSet<Permission>>,
     sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<AccessContainerEntry>> {
-    let root = fry!(client.user_root_dir());
-    let mut reqs = Vec::new();
+    let c2 = client.clone();
 
-    for (container_key, access) in permissions {
-        let key = fry!(root.enc_entry_key(container_key.as_bytes()));
-        let perm_set = convert_permission_set(&access);
+    access_container::authenticator_entry(client)
+        .and_then(move |(_, mut root_containers)| {
+            let mut reqs = Vec::new();
+            let client = c2.clone();
 
-        let c2 = client.clone();
-        let c3 = client.clone();
-        let dir2 = root.clone();
+            for (container_key, access) in permissions {
+                let c2 = client.clone();
+                let mdata_info = fry!(root_containers.remove(&container_key).ok_or_else(|| {
+                    AuthError::from(format!(
+                        "'{}' not found in the access container",
+                        container_key
+                    ))
+                }));
+                let perm_set = convert_permission_set(&access);
 
-        let fut = client
-            .get_mdata_value(root.name, root.type_tag, key)
-            .and_then(move |val| {
-                let plaintext = fry!(dir2.decrypt(&val.content));
-                let mdata_info = fry!(deserialise::<MDataInfo>(&plaintext));
+                let fut = client
+                    .get_mdata_version(mdata_info.name, mdata_info.type_tag)
+                    .and_then(move |version| {
+                        recovery::set_mdata_user_permissions(
+                            &c2,
+                            mdata_info.name,
+                            mdata_info.type_tag,
+                            User::Key(sign_pk),
+                            perm_set,
+                            version + 1,
+                        ).map(move |_| (container_key, mdata_info, access))
+                    })
+                    .map_err(AuthError::from);
 
-                c2.get_mdata_version(mdata_info.name, mdata_info.type_tag)
-                    .map(move |version| (mdata_info, version))
-                    .into_box()
-            })
-            .and_then(move |(mdata_info, version)| {
-                recovery::set_mdata_user_permissions(
-                    &c3,
-                    mdata_info.name,
-                    mdata_info.type_tag,
-                    User::Key(sign_pk),
-                    perm_set,
-                    version + 1,
-                ).map(move |_| (container_key, mdata_info, access))
-            })
-            .map_err(AuthError::from);
+                reqs.push(fut);
+            }
 
-        reqs.push(fut);
-    }
-
-    future::join_all(reqs)
+            future::join_all(reqs).into_box()
+        })
         .map(|perms| {
-            perms.into_iter().fold(HashMap::new(), |mut map,
-             (container_key,
-              dir,
-              access)| {
-                let _ = map.insert(container_key, (dir, access));
-                map
-            })
+            perms
+                .into_iter()
+                .map(|(container_key, dir, access)| {
+                    (container_key, (dir, access))
+                })
+                .collect()
         })
         .map_err(AuthError::from)
         .into_box()

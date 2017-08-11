@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use client::Client;
+use Client;
 use errors::CoreError;
 use event::{NetworkEvent, NetworkTx};
 use event_loop::{self, CoreMsg, CoreMsgTx};

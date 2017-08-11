@@ -15,40 +15,36 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use DIR_TAG;
 use client::{Client, MDataInfo};
 use errors::CoreError;
 use futures::Future;
 use nfs::{NfsError, NfsFuture};
-use routing::MutableData;
+use routing::{ClientError, MutableData, PermissionSet, User, Value};
 use std::collections::BTreeMap;
 use utils::FutureExt;
 
-/// create a new directory emulation
-pub fn create_dir<T: 'static>(client: &Client<T>, is_public: bool) -> Box<NfsFuture<MDataInfo>> {
-    match client.owner_key() {
-        Ok(pub_key) => {
-            let dir = if is_public {
-                fry!(MDataInfo::random_public(DIR_TAG))
-            } else {
-                fry!(MDataInfo::random_private(DIR_TAG))
-            };
-
-            let owners = btree_set![pub_key];
-            let dir_md = fry!(
-                MutableData::new(
-                    dir.name,
-                    dir.type_tag,
-                    BTreeMap::new(),
-                    BTreeMap::new(),
-                    owners,
-                ).map_err(CoreError::from)
-            );
-            client.put_mdata(dir_md)
-                .and_then(|()| Ok(dir))
-                .map_err(NfsError::from)
-                .into_box()
-        }
-        Err(err) => err!(NfsError::from(err)).into_box(),
-    }
+/// Create a new directory based on the provided `MDataInfo`
+pub fn create_dir<T: 'static>(
+    client: &Client<T>,
+    dir: &MDataInfo,
+    contents: BTreeMap<Vec<u8>, Value>,
+    perms: BTreeMap<User, PermissionSet>,
+) -> Box<NfsFuture<()>> {
+    let pub_key = fry!(client.owner_key().map_err(NfsError::from));
+    let owners = btree_set![pub_key];
+    let dir_md = fry!(
+        MutableData::new(dir.name, dir.type_tag, perms, contents, owners)
+            .map_err(CoreError::from)
+    );
+    client
+        .put_mdata(dir_md)
+        .or_else(move |err| {
+            match err {
+                // This dir has been already created
+                CoreError::RoutingClientError(ClientError::DataExists) => Ok(()),
+                e => Err(e),
+            }
+        })
+        .map_err(NfsError::from)
+        .into_box()
 }

@@ -28,28 +28,24 @@ use tiny_keccak::sha3_256;
 pub struct Account {
     /// The User Account Keys
     pub maid_keys: ClientKeys,
-    /// The users root directory
-    pub user_root: MDataInfo,
-    /// The users configuration directory
-    pub config_root: MDataInfo,
-    /// Flag set to true when user_root and config_dir are actually created
+    /// The user's access container
+    pub access_container: Option<MDataInfo>,
+    /// The user's configuration directory
+    pub config_root: Option<MDataInfo>,
+    /// Set to `true` when all root and standard containers
+    /// have been created successfully. `false` signifies that
+    /// previous attempt might have failed - check on login.
     pub root_dirs_created: bool,
-    /// Flag set to true when standard directories and access container are
-    /// stored in the network
-    /// TODO(nbaksalyar): find a better way to implement it and decouple
-    /// from safe_authenticator
-    pub std_dirs_created: bool,
 }
 
 impl Account {
     /// Create new Account with a provided set of keys
-    pub fn new(keys: ClientKeys, user_root: MDataInfo, config_root: MDataInfo) -> Self {
+    pub fn new(maid_keys: ClientKeys) -> Self {
         Account {
-            maid_keys: keys,
-            user_root: user_root,
-            config_root: config_root,
+            maid_keys,
+            access_container: None,
+            config_root: None,
             root_dirs_created: false,
-            std_dirs_created: false,
         }
     }
 
@@ -132,6 +128,8 @@ pub struct ClientKeys {
     pub enc_pk: box_::PublicKey,
     /// Encryption private key
     pub enc_sk: box_::SecretKey,
+    /// Symmetric encryption key
+    pub enc_key: secretbox::Key,
 }
 
 impl ClientKeys {
@@ -142,12 +140,14 @@ impl ClientKeys {
             None => sign::gen_keypair(),
         };
         let enc = box_::gen_keypair();
+        let enc_key = secretbox::gen_key();
 
         ClientKeys {
             sign_pk: sign.0,
             sign_sk: sign.1,
             enc_pk: enc.0,
             enc_sk: enc.1,
+            enc_key: enc_key,
         }
     }
 }
@@ -167,7 +167,6 @@ impl Into<FullId> for ClientKeys {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use client::MDataInfo;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::u32;
 
@@ -235,7 +234,7 @@ mod tests {
 
     #[test]
     fn serialisation() {
-        let account = create_account();
+        let account = Account::new(ClientKeys::new(None));
         let encoded = unwrap!(serialise(&account));
         let decoded: Account = unwrap!(deserialise(&encoded));
 
@@ -244,7 +243,7 @@ mod tests {
 
     #[test]
     fn encryption() {
-        let account = create_account();
+        let account = Account::new(ClientKeys::new(None));
 
         let password = b"impossible to guess";
         let pin = b"1000";
@@ -256,12 +255,5 @@ mod tests {
 
         let decrypted = unwrap!(Account::decrypt(&encrypted, password, pin));
         assert_eq!(account, decrypted);
-    }
-
-    fn create_account() -> Account {
-        let user_root = unwrap!(MDataInfo::random_private(0));
-        let config_root = unwrap!(MDataInfo::random_private(0));
-
-        Account::new(ClientKeys::new(None), user_root, config_root)
     }
 }

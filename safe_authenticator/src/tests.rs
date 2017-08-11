@@ -18,7 +18,7 @@
 use Authenticator;
 use access_container as access_container_tools;
 use app_auth::{self, AppState};
-use config::{self, KEY_ACCESS_CONTAINER, KEY_APPS};
+use config::{self, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_INVALID_OWNER, ERR_OPERATION_FORBIDDEN,
              ERR_SHARE_MDATA_DENIED, ERR_UNKNOWN_APP};
 use ffi::apps::*;
@@ -27,7 +27,7 @@ use ffi_utils::test_utils::{self, call_1, call_vec};
 use futures::{Future, future};
 use ipc::{encode_auth_resp, encode_containers_resp, encode_share_mdata_resp,
           encode_unregistered_resp};
-use maidsafe_utilities::serialisation::{deserialise, serialise};
+use maidsafe_utilities::serialisation::serialise;
 use rand;
 use revocation;
 #[cfg(feature = "use-mock-routing")]
@@ -44,7 +44,7 @@ use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
 use safe_core::ipc::resp::{METADATA_KEY, UserMetadata};
 use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
-use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, File, Mode, NfsError, file_helper};
+use safe_core::nfs::{File, Mode, NfsError, file_helper};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::iter;
@@ -53,6 +53,7 @@ use std::slice;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
+use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
                  create_account_and_login_with_hook, rand_app, register_app, revoke, run,
                  try_access_container, try_revoke, try_run};
@@ -62,40 +63,28 @@ use tiny_keccak::sha3_256;
 
 // Test creation and content of std dirs after account creation.
 #[test]
-fn user_root_dir() {
+fn test_access_container() {
     let authenticator = create_account_and_login();
     let std_dir_names: Vec<_> = DEFAULT_PRIVATE_DIRS
         .iter()
         .chain(DEFAULT_PUBLIC_DIRS.iter())
         .collect();
 
-    // Fetch the entries of the user root dir.
-    let (dir, entries) = run(&authenticator, |client| {
-        let dir = unwrap!(client.user_root_dir());
-        client
-            .list_mdata_entries(dir.name, dir.type_tag)
-            .map(move |entries| (dir, entries))
-            .map_err(AuthError::from)
+    // Fetch the entries of the access container.
+    let entries = run(&authenticator, |client| {
+        access_container_tools::authenticator_entry(client).map(|(_version, entries)| entries)
     });
-
-    let entries = unwrap!(mdata_info::decrypt_entries(&dir, &entries));
 
     // Verify that all the std dirs are there.
     for name in &std_dir_names {
-        assert!(entries.contains_key(name.as_bytes()));
+        assert!(entries.contains_key(**name));
     }
 
     // Fetch all the dirs under user root dir and verify they are empty.
-    let dirs: Vec<_> = entries
-        .into_iter()
-        .map(|(_, value)| {
-            unwrap!(deserialise::<MDataInfo>(&value.content))
-        })
-        .collect();
-
     let dirs = run(&authenticator, move |client| {
-        let fs: Vec<_> = dirs.into_iter()
-            .map(|dir| {
+        let fs: Vec<_> = entries
+            .into_iter()
+            .map(|(_, dir)| {
                 let f1 = client.list_mdata_entries(dir.name, dir.type_tag);
                 let f2 = client.list_mdata_permissions(dir.name, dir.type_tag);
 
@@ -133,20 +122,6 @@ fn config_root_dir() {
     // Verify it contains the required entries.
     let config = unwrap!(entries.get(KEY_APPS));
     assert!(config.content.is_empty());
-
-    let ac = unwrap!(entries.get(KEY_ACCESS_CONTAINER));
-    let ac: MDataInfo = unwrap!(deserialise(&ac.content));
-
-    // Fetch access container and verify it's empty.
-    let (entries, permissions) = run(&authenticator, move |client| {
-        let f1 = client.list_mdata_entries(ac.name, ac.type_tag);
-        let f2 = client.list_mdata_permissions(ac.name, ac.type_tag);
-
-        f1.join(f2).map_err(AuthError::from)
-    });
-
-    assert!(entries.is_empty());
-    assert!(permissions.is_empty());
 }
 
 // Test operation recovery for std dirs creation
@@ -220,33 +195,20 @@ fn std_dirs_recovery() {
     // Make sure that all default directories have been created after log in.
     let std_dir_names: Vec<_> = DEFAULT_PRIVATE_DIRS
         .iter()
-        .chain(DEFAULT_PUBLIC_DIRS.iter())
+        .cloned()
+        .chain(DEFAULT_PUBLIC_DIRS.iter().cloned())
         .collect();
 
-    // Fetch the entries of the user root dir.
-    let (dir, entries) = run(&authenticator, |client| {
-        let dir = unwrap!(client.user_root_dir());
-        client
-            .list_mdata_entries(dir.name, dir.type_tag)
-            .map(move |entries| (dir, entries))
-            .map_err(AuthError::from)
+    // Verify that the access container has been created and
+    // fetch the entries of the root authenticator entry.
+    let (_entry_version, entries) = run(&authenticator, |client| {
+        access_container_tools::authenticator_entry(client).map_err(AuthError::from)
     });
-    let entries = unwrap!(mdata_info::decrypt_entries(&dir, &entries));
 
     // Verify that all the std dirs are there.
-    for name in &std_dir_names {
-        assert!(entries.contains_key(name.as_bytes()));
+    for name in std_dir_names {
+        assert!(entries.contains_key(name));
     }
-
-    // Verify that accesss container has been created too
-    let _version = run(&authenticator, |client| {
-        let c2 = client.clone();
-
-        access_container_tools::access_container(client).and_then(move |ac_info| {
-            c2.get_mdata_version(ac_info.name, ac_info.type_tag)
-                .map_err(AuthError::from)
-        })
-    });
 }
 
 // Test app authentication.
@@ -362,21 +324,15 @@ fn app_authentication() {
     assert_eq!(app_info.info, app_exchange_info);
     assert_eq!(app_info.keys, app_keys);
 
-    // Check there app dir is present in the user root.
+    // Check the app dir is present in the access container's authenticator entry.
     let received_app_dir_info = run(&authenticator, move |client| {
-        let user_root_dir = unwrap!(client.user_root_dir());
+        let app_dir_key = format!("apps/{}", app_id);
 
-        let app_dir_key = format!("apps/{}", app_id).into_bytes();
-        let app_dir_key = unwrap!(user_root_dir.enc_entry_key(&app_dir_key));
-
-        client
-            .get_mdata_value(user_root_dir.name, user_root_dir.type_tag, app_dir_key)
-            .and_then(move |value| {
-                let encoded = user_root_dir.decrypt(&value.content)?;
-                let decoded = deserialise::<MDataInfo>(&encoded)?;
-                Ok(decoded)
+        access_container_tools::authenticator_entry(client).and_then(move |(_, mut entries)| {
+            entries.remove(&app_dir_key).ok_or_else(|| {
+                AuthError::from(format!("'{}' not found", app_dir_key))
             })
-            .map_err(AuthError::from)
+        })
     });
 
     assert_eq!(received_app_dir_info, app_dir_info);
@@ -1009,21 +965,21 @@ fn app_revocation_recovery() {
     // After re-encryption of the first container (`_video`) is done, simulate a network failure
     let docs_name = docs_md.name;
 
-    let user_root_md = run(&auth, move |client| {
-        client.user_root_dir().map_err(AuthError::from)
+    let access_container_md = run(&auth, move |client| {
+        client.access_container().map_err(AuthError::from)
     });
-    let user_root_name = user_root_md.name;
+    let access_cont_name = access_container_md.name;
 
     let routing_hook = move |mut routing: MockRouting| -> MockRouting {
-        let mut fail_user_root_update = false;
+        let mut fail_ac_update = false;
 
         routing.set_request_hook(move |req| {
             match *req {
                 // Simulate a network failure for a second request to re-encrypt containers
                 // so that the _videos container should remain untouched
                 Request::MutateMDataEntries { name, msg_id, .. }
-                    if name == docs_name || (name == user_root_name && fail_user_root_update) => {
-                    fail_user_root_update = true;
+                    if name == docs_name || (name == access_cont_name && fail_ac_update) => {
+                    fail_ac_update = true;
 
                     Some(Response::MutateMDataEntries {
                         msg_id,
@@ -1233,21 +1189,13 @@ fn app_authentication_recovery() {
     // it should fail at the third request for `SetMDataPermissions` (after
     // setting permissions for 2 requested containers, `_video` and `_documents`)
     let routing_hook = move |mut routing: MockRouting| -> MockRouting {
-        let mut reqs_counter = 0;
-
         routing.set_request_hook(move |req| {
             match *req {
-                Request::SetMDataUserPermissions { msg_id, .. } => {
-                    reqs_counter += 1;
-
-                    if reqs_counter == 3 {
-                        Some(Response::SetMDataUserPermissions {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    } else {
-                        None
-                    }
+                Request::PutMData { msg_id, .. } => {
+                    Some(Response::PutMData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
                 }
                 // Pass-through
                 _ => None,
@@ -1262,7 +1210,8 @@ fn app_authentication_recovery() {
         routing_hook,
     ));
     match register_app(&auth, &auth_req) {
-        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        Err(AuthError::NfsError(NfsError::CoreError(
+            CoreError::RoutingClientError(ClientError::LowBalance)))) => (),
         x => panic!("Unexpected {:?}", x),
     }
 
@@ -1324,7 +1273,7 @@ fn app_authentication_recovery() {
             .get_mdata_version(app_container_md.name, app_container_md.type_tag)
             .then(move |res| {
                 let version = unwrap!(res);
-                assert!(version > 0);
+                assert_eq!(version, 0);
 
                 // Check that the app's container has required permissions.
                 c2.list_mdata_permissions(app_container_md.name, app_container_md.type_tag)
@@ -1443,8 +1392,8 @@ fn flushing_app_revocation_queue() {
             config::list_apps(&client)
                 .then(move |res| {
                     let (_, apps) = unwrap!(res);
-                    let f_0 = app_auth::app_state(&client, &apps, app_id_0);
-                    let f_1 = app_auth::app_state(&client, &apps, app_id_1);
+                    let f_0 = app_auth::app_state(&client, &apps, &app_id_0);
+                    let f_1 = app_auth::app_state(&client, &apps, &app_id_1);
 
                     f_0.join(f_1)
                 })
@@ -1473,8 +1422,8 @@ fn flushing_app_revocation_queue() {
             })
             .then(move |res| {
                 let (_, apps) = unwrap!(res);
-                let f_0 = app_auth::app_state(&c3, &apps, app_id_0);
-                let f_1 = app_auth::app_state(&c3, &apps, app_id_1);
+                let f_0 = app_auth::app_state(&c3, &apps, &app_id_0);
+                let f_1 = app_auth::app_state(&c3, &apps, &app_id_1);
 
                 f_0.join(f_1)
             })
@@ -1530,8 +1479,8 @@ fn share_some_mdatas() {
             unwrap!(MutableData::new(
                 name,
                 0,
-                BTreeMap::new(),
-                BTreeMap::new(),
+                btree_map![],
+                btree_map![],
                 owners,
             ))
         };
@@ -1705,8 +1654,8 @@ fn share_some_mdatas_with_ownership_error() {
             unwrap!(MutableData::new(
                 name,
                 0,
-                BTreeMap::new(),
-                BTreeMap::new(),
+                btree_map![],
+                btree_map![],
                 owners,
             ))
         };
@@ -1820,9 +1769,7 @@ where
 {
     // First, log in normally to obtain the access contained info.
     let auth = unwrap!(Authenticator::login(locator, password, |_| ()));
-    let ac_info = run(&auth, |client| {
-        access_container_tools::access_container(client)
-    });
+    let ac_info = run(&auth, |client| Ok(unwrap!(client.access_container())));
 
     // Then, log in with a request hook that makes mutation of the access container
     // fail.

@@ -17,13 +17,12 @@
 
 use super::AccessContainerEntry;
 use Authenticator;
-use access_container::access_container_entry;
+use access_container;
 use app_auth;
 use errors::AuthError;
 use futures::{Future, IntoFuture};
 use futures::future;
 use ipc::decode_ipc_msg;
-use maidsafe_utilities::serialisation::deserialise;
 use revocation;
 use routing::User;
 use rust_sodium::crypto::sign;
@@ -195,34 +194,25 @@ pub fn try_access_container<S: Into<String>>(
     auth_granted: AuthGranted,
 ) -> Option<AccessContainerEntry> {
     let app_keys = auth_granted.app_keys;
-    let ac_md_info = auth_granted.access_container.into_mdata_info(
-        app_keys.enc_key.clone(),
-    );
     let app_id = app_id.into();
     run(authenticator, move |client| {
-        access_container_entry(client, &ac_md_info, &app_id, app_keys).map(move |(_, entry)| entry)
+        access_container::fetch_entry(client, &app_id, app_keys).map(move |(_, entry)| entry)
     })
 }
 
-/// Get the container entry from the user's root dir
+/// Get the container entry from the access container root entry
 pub fn get_container_from_root(
     authenticator: &Authenticator,
     container: &str,
 ) -> Result<MDataInfo, AuthError> {
-    let container = container.as_bytes().to_vec();
+    let container = String::from(container);
 
     try_run(authenticator, move |client| {
-        let user_root = fry!(client.user_root_dir());
-        let container_key = fry!(user_root.enc_entry_key(&container));
-
-        client
-            .get_mdata_value(user_root.name, user_root.type_tag, container_key)
-            .map_err(AuthError::from)
-            .and_then(move |value| {
-                let raw_content = user_root.decrypt(&value.content)?;
-                deserialise::<MDataInfo>(&raw_content).map_err(AuthError::from)
+        access_container::authenticator_entry(client).and_then(move |(_, mut ac_entries)| {
+            ac_entries.remove(&container).ok_or_else(|| {
+                AuthError::from(format!("'{}' not found in the access container", container))
             })
-            .into_box()
+        })
     })
 }
 

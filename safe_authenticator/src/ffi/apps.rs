@@ -18,7 +18,6 @@
 use AccessContainerEntry;
 use AuthError;
 use Authenticator;
-use access_container::{access_container, access_container_nonce};
 use app_auth::{AppState, app_state};
 use app_container;
 use config;
@@ -82,7 +81,7 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
 
             config::list_apps(client)
                 .and_then(move |(apps_version, apps)| {
-                    app_state(&c2, &apps, app_id).map(move |app_state| {
+                    app_state(&c2, &apps, &app_id).map(move |app_state| {
                         (app_state, apps, apps_version)
                     })
                 })
@@ -120,7 +119,9 @@ pub unsafe extern "C" fn auth_revoked_apps(
 
             config::list_apps(client)
                 .and_then(move |(_, auth_cfg)| {
-                    access_container(&c2).map(move |access_container| (access_container, auth_cfg))
+                    c2.access_container().map_err(AuthError::from).map(
+                        move |access_container| (access_container, auth_cfg),
+                    )
                 })
                 .and_then(move |(access_container, auth_cfg)| {
                     c3.list_mdata_entries(access_container.name, access_container.type_tag)
@@ -129,9 +130,11 @@ pub unsafe extern "C" fn auth_revoked_apps(
                 })
                 .and_then(move |(access_container, entries, auth_cfg)| {
                     let mut apps = Vec::new();
+                    let nonce = access_container.nonce().ok_or_else(|| {
+                        AuthError::from("No nonce on access container's MDataInfo")
+                    })?;
 
                     for app in auth_cfg.values() {
-                        let nonce = access_container_nonce(&access_container)?;
                         let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
                         // If the app is not in the access container, or if the app entry has
@@ -177,7 +180,9 @@ pub unsafe extern "C" fn auth_registered_apps(
 
             config::list_apps(client)
                 .and_then(move |(_, auth_cfg)| {
-                    access_container(&c2).map(move |access_container| (access_container, auth_cfg))
+                    c2.access_container().map_err(AuthError::from).map(
+                        move |access_container| (access_container, auth_cfg),
+                    )
                 })
                 .and_then(move |(access_container, auth_cfg)| {
                     c3.list_mdata_entries(access_container.name, access_container.type_tag)
@@ -186,9 +191,11 @@ pub unsafe extern "C" fn auth_registered_apps(
                 })
                 .and_then(move |(access_container, entries, auth_cfg)| {
                     let mut apps = Vec::new();
+                    let nonce = access_container.nonce().ok_or_else(|| {
+                        AuthError::from("No nonce on access container's MDataInfo")
+                    })?;
 
                     for app in auth_cfg.values() {
-                        let nonce = access_container_nonce(&access_container)?;
                         let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
                         // Empty entry means it has been deleted.

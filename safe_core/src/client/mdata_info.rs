@@ -82,6 +82,13 @@ impl MDataInfo {
         self.enc_info.as_ref().map(|&(ref key, _)| key)
     }
 
+    /// Returns the nonce, inf any.
+    pub fn nonce(&self) -> Option<&secretbox::Nonce> {
+        self.enc_info.as_ref().and_then(
+            |&(_, ref nonce)| nonce.as_ref(),
+        )
+    }
+
     /// encrypt the the key for the mdata entry accordingly
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.new_enc_info {

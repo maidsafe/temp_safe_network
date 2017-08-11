@@ -19,7 +19,7 @@
 
 use super::{AuthError, AuthFuture};
 use AccessContainerEntry;
-use access_container::{access_container, access_container_entry, put_access_container_entry};
+use access_container;
 use app_container;
 use config::{self, AppInfo, Apps};
 use futures::Future;
@@ -47,16 +47,13 @@ pub enum AppState {
 /// in the config file AND the access container, `Revoked` if it has
 /// an entry in the config but not in the access container, and `NotAuthenticated`
 /// if it's not registered anywhere).
-pub fn app_state(client: &Client<()>, apps: &Apps, app_id: String) -> Box<AuthFuture<AppState>> {
-    let c2 = client.clone();
-    let app_id_hash = sha3_256(app_id.clone().as_bytes());
+pub fn app_state(client: &Client<()>, apps: &Apps, app_id: &str) -> Box<AuthFuture<AppState>> {
+    let app_id_hash = sha3_256(app_id.as_bytes());
 
     if let Some(app) = apps.get(&app_id_hash) {
         let app_keys = app.keys.clone();
-        access_container(client)
-            .and_then(move |dir| {
-                access_container_entry(&c2, &dir, &app_id, app_keys)
-            })
+
+        access_container::fetch_entry(client, app_id, app_keys)
             .then(move |res| {
                 match res {
                     Ok((_version, Some(_))) => Ok(AppState::Authenticated),
@@ -98,33 +95,28 @@ fn update_access_container(
     client: &Client<()>,
     app: &AppInfo,
     permissions: AccessContainerEntry,
-) -> Box<AuthFuture<MDataInfo>> {
+) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
-    let c3 = client.clone();
-    let c4 = client.clone();
 
     let app_info = app.info.clone();
     let app_keys = app.keys.clone();
 
-    access_container(&c2)
-        .and_then(move |dir| {
-            access_container_entry(&c3, &dir, &app_info.id, app_keys.clone()).then(move |res| {
-                let version = match res {
-                    // Updating an existing entry
-                    Ok((version, _)) => version + 1,
-                    // Adding a new access container entry
-                    Err(AuthError::CoreError(
-                            CoreError::RoutingClientError(
-                                ClientError::NoSuchEntry))) => 0,
-                    // Error has occurred while trying to get an existing entry
-                    Err(e) => return Err(e),
-                };
-                Ok((version, app_info, app_keys, dir, permissions))
-            })
+    access_container::fetch_entry(client, &app_info.id, app_keys.clone())
+        .then(move |res| {
+            let version = match res {
+                // Updating an existing entry
+                Ok((version, _)) => version + 1,
+                // Adding a new access container entry
+                Err(AuthError::CoreError(
+                CoreError::RoutingClientError(
+                    ClientError::NoSuchEntry))) => 0,
+                // Error has occurred while trying to get an existing entry
+                Err(e) => return Err(e),
+            };
+            Ok((version, app_info, app_keys, permissions))
         })
-        .and_then(move |(version, app_info, app_keys, dir, permissions)| {
-            put_access_container_entry(&c4, &dir, &app_info.id, &app_keys, &permissions, version)
-                .map(move |_| dir)
+        .and_then(move |(version, app_info, app_keys, permissions)| {
+            access_container::put_entry(&c2, &app_info.id, &app_keys, &permissions, version)
         })
         .into_box()
 }
@@ -146,7 +138,7 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
     config::list_apps(client)
         .join(check_revocation(client, app_id.clone()))
         .and_then(move |((apps_version, apps), ())| {
-            app_state(&c2, &apps, app_id.clone())
+            app_state(&c2, &apps, &app_id)
                 .map(move |app_state| {
                     (apps_version, apps, app_state, app_id)
                 })
@@ -210,45 +202,42 @@ fn authenticated_app(
 ) -> Box<AuthFuture<AuthGranted>> {
     let c2 = client.clone();
     let c3 = client.clone();
-    let c4 = client.clone();
 
     let app_keys = app.keys.clone();
-    let app_keys_auth = app.keys.clone();
     let sign_pk = app.keys.sign_pk;
     let bootstrap_config = fry!(Client::<()>::bootstrap_config());
 
+    let access_container = fry!(client.access_container());
+    let access_container = fry!(AccessContInfo::from_mdata_info(access_container));
+
     // Check whether we need to create/update dedicated container
-    let app_cont_fut = if app_container {
-        access_container(client)
-            .and_then(move |dir| {
-                access_container_entry(&c2, &dir, &app_id, app_keys.clone())
-                    .map(move |(_, perms)| (perms, app_id))
-            })
-            .and_then(move |(perms, app_id)| {
+    if app_container {
+        access_container::fetch_entry(client, &app_id, app_keys.clone())
+            .and_then(move |(_version, perms)| {
                 let perms = perms.unwrap_or_else(AccessContainerEntry::default);
-                app_container::fetch(c3, app_id.clone(), sign_pk).map(
+                app_container::fetch(&c2, &app_id, sign_pk).map(
                     move |mdata_info| (mdata_info, perms, app_id),
                 )
             })
             .and_then(move |(mdata_info, perms, app_id)| {
                 let perms = insert_app_container(perms, &app_id, mdata_info);
-                update_access_container(&c4, &app, perms)
+                update_access_container(&c3, &app, perms)
+            })
+            .and_then(move |()| {
+                Ok(AuthGranted {
+                    app_keys,
+                    bootstrap_config,
+                    access_container,
+                })
             })
             .into_box()
     } else {
-        access_container(client)
-    };
-
-    app_cont_fut
-        .and_then(move |dir| {
-            let access_container = AccessContInfo::from_mdata_info(dir)?;
-            Ok(AuthGranted {
-                app_keys: app_keys_auth,
-                bootstrap_config: bootstrap_config,
-                access_container: access_container,
-            })
+        ok!(AuthGranted {
+            app_keys,
+            bootstrap_config,
+            access_container,
         })
-        .into_box()
+    }
 }
 
 /// Register a new or revoked app in Maid Managers and in the access container.
@@ -268,6 +257,7 @@ fn authenticate_new_app(
     let c3 = client.clone();
     let c4 = client.clone();
     let c5 = client.clone();
+    let c6 = client.clone();
 
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
@@ -288,7 +278,7 @@ fn authenticate_new_app(
                 .into_box()
         })
         .and_then(move |(perms, sign_pk)| if app_container {
-            app_container::fetch(c4, app_id.clone(), sign_pk)
+            app_container::fetch(&c4, &app_id, sign_pk)
                 .and_then(move |mdata_info| {
                     ok!(insert_app_container(perms, &app_id, mdata_info))
                 })
@@ -300,11 +290,13 @@ fn authenticate_new_app(
         .and_then(move |(perms, app)| {
             update_access_container(&c5, &app, perms)
         })
-        .and_then(move |dir| {
+        .and_then(move |()| {
+            let access_container = c6.access_container()?;
+
             Ok(AuthGranted {
                 app_keys: app_keys_auth,
                 bootstrap_config: Client::<()>::bootstrap_config()?,
-                access_container: AccessContInfo::from_mdata_info(dir)?,
+                access_container: AccessContInfo::from_mdata_info(access_container)?,
             })
         })
         .into_box()

@@ -47,9 +47,6 @@ pub struct AppInfo {
 /// Config file key under which the list of registered apps is stored.
 pub const KEY_APPS: &'static [u8] = b"apps";
 
-/// Key under which the access container info is stored.
-pub const KEY_ACCESS_CONTAINER: &'static [u8] = b"access-container";
-
 /// Config file key under which the revocation queue is stored.
 pub const KEY_APP_REVOCATION_QUEUE: &'static [u8] = b"revocation-queue";
 
