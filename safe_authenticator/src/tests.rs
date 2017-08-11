@@ -27,8 +27,8 @@ use ffi_utils::test_utils::{self, call_1, call_vec};
 use futures::{Future, future};
 use ipc::{encode_auth_resp, encode_containers_resp, encode_share_mdata_resp,
           encode_unregistered_resp};
-use maidsafe_utilities::serialisation::deserialise;
-use rand::{self, Rng};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use rand;
 use revocation;
 #[cfg(feature = "use-mock-routing")]
 use routing::{Action, ClientError, MutableData, PermissionSet, Request, Response, User, Value};

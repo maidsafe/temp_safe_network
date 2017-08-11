@@ -76,12 +76,12 @@ pub fn app_state(client: &Client<()>, apps: &Apps, app_id: String) -> Box<AuthFu
     }
 }
 
-/// Store info about the app's dedicated container in the access container
+/// Insert info about the app's dedicated container into the access container entry
 fn insert_app_container(
     mut permissions: AccessContainerEntry,
     app_id: &str,
     app_container_info: MDataInfo,
-) -> Box<AuthFuture<AccessContainerEntry>> {
+) -> AccessContainerEntry {
     let access =
         btree_set![
                     Permission::Read,
@@ -91,7 +91,7 @@ fn insert_app_container(
                     Permission::ManagePermissions,
                 ];
     let _ = permissions.insert(format!("apps/{}", app_id), (app_container_info, access));
-    ok!(permissions)
+    permissions
 }
 
 fn update_access_container(
@@ -228,9 +228,8 @@ fn authenticated_app(
                 )
             })
             .and_then(move |(mdata_info, perms, app_id)| {
-                insert_app_container(perms, &app_id, mdata_info).and_then(
-                    move |perms| update_access_container(&c4, &app, perms),
-                )
+                let perms = insert_app_container(perms, &app_id, mdata_info);
+                update_access_container(&c4, &app, perms)
             })
             .into_box()
     } else {
@@ -288,7 +287,7 @@ fn authenticate_new_app(
         .and_then(move |(perms, sign_pk)| if app_container {
             app_container::fetch(c4, app_id.clone(), sign_pk)
                 .and_then(move |mdata_info| {
-                    insert_app_container(perms, &app_id, mdata_info)
+                    ok!(insert_app_container(perms, &app_id, mdata_info))
                 })
                 .map(move |perms| (perms, app))
                 .into_box()
