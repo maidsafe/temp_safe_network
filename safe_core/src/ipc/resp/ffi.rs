@@ -132,12 +132,10 @@ impl Drop for UserMetadata {
         unsafe {
             if !self.name.is_null() {
                 let _ = CString::from_raw(self.name as *mut _);
-                self.name = ptr::null();
             }
 
             if !self.description.is_null() {
                 let _ = CString::from_raw(self.description as *mut _);
-                self.description = ptr::null();
             }
         }
     }

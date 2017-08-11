@@ -31,7 +31,12 @@ use std::slice;
 use tiny_keccak::sha3_256;
 
 /// Entry key under which the metadata are stored.
+#[no_mangle]
 pub static METADATA_KEY: &'static [u8] = b"_metadata";
+/// Length of the metadata key.
+// IMPORTANT: make sure this value stays in sync with the actual length of `METADATA_KEY`!
+#[no_mangle]
+pub static METADATA_KEY_LEN: usize = 9;
 
 /// IPC response
 // TODO: `TransOwnership` variant

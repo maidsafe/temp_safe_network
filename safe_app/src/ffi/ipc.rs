@@ -238,6 +238,7 @@ mod tests {
     use ffi_utils::ReprC;
     use ffi_utils::test_utils::call_2;
     use rand;
+    use routing::{Action, PermissionSet};
     use rust_sodium::crypto::{box_, secretbox, sign};
     use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
                          ContainersReq, IpcMsg, IpcReq, IpcResp, ShareMData, ShareMDataReq};
@@ -320,8 +321,9 @@ mod tests {
                 ShareMData {
                     type_tag: rand::random(),
                     name: rand::random(),
-                    metadata_key: Some(String::from("qweasd")),
-                    perms: rand::random(),
+                    perms: PermissionSet::new().allow(Action::Insert).allow(
+                        Action::Update
+                    ),
                 },
             ],
         };

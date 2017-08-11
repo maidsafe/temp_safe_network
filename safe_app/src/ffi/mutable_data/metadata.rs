@@ -20,7 +20,7 @@
 use AppError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb};
 use maidsafe_utilities::serialisation::serialise;
-use safe_core::ipc::resp::{METADATA_KEY, UserMetadata, ffi};
+use safe_core::ipc::resp::{UserMetadata, ffi};
 use std::os::raw::c_void;
 
 /// Serialize metadata.
@@ -34,23 +34,6 @@ pub unsafe extern "C" fn mdata_encode_metadata(
         let metadata = UserMetadata::clone_from_repr_c(metadata)?;
         let encoded = serialise(&metadata)?;
         o_cb(user_data, FFI_RESULT_OK, encoded.as_ptr(), encoded.len());
-        Ok(())
-    })
-}
-
-/// Get pointer and length of the key under which the metadata should be stored.
-#[no_mangle]
-pub unsafe extern "C" fn mdata_metadata_key(
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
-) {
-    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
-        o_cb(
-            user_data,
-            FFI_RESULT_OK,
-            METADATA_KEY.as_ptr(),
-            METADATA_KEY.len(),
-        );
         Ok(())
     })
 }
