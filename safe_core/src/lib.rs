@@ -98,5 +98,3 @@ pub use self::utils::FutureExt;
 pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// `MutableData` type tag for a directory
 pub const DIR_TAG: u64 = 15000;
-/// Type tag for public ids
-pub const PUBLIC_ID_TAG: u64 = 7;

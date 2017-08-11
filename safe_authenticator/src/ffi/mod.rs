@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// Public ID routines.
-pub mod public_id;
 /// Apps management.
 pub mod apps;
 /// Logging utilities
