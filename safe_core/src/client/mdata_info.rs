@@ -23,8 +23,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
-const REENCRYPT_ERROR: &'static str = "Cannot reencrypt without new_enc_info";
-
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct MDataInfo {
@@ -86,7 +84,9 @@ impl MDataInfo {
 
     /// encrypt the the key for the mdata entry accordingly
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
-        if let Some((ref key, seed)) = self.enc_info {
+        if let Some((ref key, seed)) = self.new_enc_info {
+            enc_entry_key(plain_text, key, seed)
+        } else if let Some((ref key, seed)) = self.enc_info {
             enc_entry_key(plain_text, key, seed)
         } else {
             Ok(plain_text.to_vec())
@@ -95,7 +95,9 @@ impl MDataInfo {
 
     /// encrypt the value for this mdata entry accordingly
     pub fn enc_entry_value(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
-        if let Some((ref key, _)) = self.enc_info {
+        if let Some((ref key, _)) = self.new_enc_info {
+            symmetric_encrypt(plain_text, key, None)
+        } else if let Some((ref key, _)) = self.enc_info {
             symmetric_encrypt(plain_text, key, None)
         } else {
             Ok(plain_text.to_vec())
@@ -114,15 +116,6 @@ impl MDataInfo {
             symmetric_decrypt(cipher, key)
         } else {
             Ok(cipher.to_vec())
-        }
-    }
-
-    /// decrypt key or value using the new encryption info (if any).
-    pub fn decrypt_new_enc_info(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
-        if let Some((ref key, _)) = self.new_enc_info {
-            symmetric_decrypt(cipher, key)
-        } else {
-            Err(CoreError::SymmetricDecipherFailure)
         }
     }
 
@@ -145,28 +138,6 @@ impl MDataInfo {
     /// Abort the encryption info regeneration by clearing the `new_enc_info` field.
     pub fn abort_new_enc_info(&mut self) {
         self.new_enc_info = None;
-    }
-
-    /// Re-encrypt entry key (decrypt using current enc_info, encrypt using
-    /// `new_enc_info`).
-    pub fn reencrypt_entry_key(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
-        if let Some((ref new_key, new_nonce)) = self.new_enc_info {
-            let plain_text = self.decrypt(cipher)?;
-            enc_entry_key(&plain_text, new_key, new_nonce)
-        } else {
-            Err(CoreError::from(REENCRYPT_ERROR))
-        }
-    }
-
-    /// Re-encrypt entry value (decrypt using current enc_info, encrypt using
-    /// `new_enc_info`).
-    pub fn reencrypt_entry_value(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
-        if let Some((ref new_key, _)) = self.new_enc_info {
-            let plain_text = self.decrypt(cipher)?;
-            symmetric_encrypt(&plain_text, new_key, None)
-        } else {
-            Err(CoreError::from(REENCRYPT_ERROR))
-        }
     }
 }
 
@@ -334,11 +305,11 @@ mod tests {
     #[test]
     fn decrypt() {
         let mut info = unwrap!(MDataInfo::random_private(0));
-        info.start_new_enc_info();
 
         let plain = Vec::from("plaintext");
         let old_cipher = unwrap!(info.enc_entry_value(&plain));
-        let new_cipher = unwrap!(info.reencrypt_entry_value(&old_cipher));
+        info.start_new_enc_info();
+        let new_cipher = unwrap!(info.enc_entry_value(&plain));
 
         // After start, both encryption infos work.
         assert_eq!(unwrap!(info.decrypt(&old_cipher)), plain);

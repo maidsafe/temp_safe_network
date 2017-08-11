@@ -27,8 +27,8 @@ use ffi_utils::test_utils::{self, call_1, call_vec};
 use futures::{Future, future};
 use ipc::{encode_auth_resp, encode_containers_resp, encode_share_mdata_resp,
           encode_unregistered_resp};
-use maidsafe_utilities::serialisation::deserialise;
-use rand::{self, Rng};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use rand;
 use revocation;
 #[cfg(feature = "use-mock-routing")]
 use routing::{Action, ClientError, MutableData, PermissionSet, Request, Response, User, Value};
@@ -42,7 +42,8 @@ use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
-use safe_core::ipc::resp::ffi::MDataMeta as FfiMDataMeta;
+use safe_core::ipc::resp::{METADATA_KEY, UserMetadata};
+use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
 use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, File, Mode, NfsError, file_helper};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
@@ -1503,7 +1504,7 @@ fn share_zero_mdatas() {
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
         (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(metadatas)) => {
+         Some(Payload::Metadata(metadatas))) => {
             assert_eq!(mdata.len(), 0);
             assert_eq!(metadatas.len(), 0);
         }
@@ -1542,7 +1543,6 @@ fn share_some_mdatas() {
         mdatas.push(ShareMData {
             type_tag: 0,
             name: name,
-            metadata_key: None,
             perms: PermissionSet::new(),
         });
     }
@@ -1559,13 +1559,11 @@ fn share_some_mdatas() {
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
         (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(metadatas)) => {
+         Some(Payload::Metadata(metadatas))) => {
             assert_eq!(mdata, mdatas);
             assert_eq!(
                 metadatas,
-                iter::repeat(Vec::<u8>::new())
-                    .take(NUM_MDATAS)
-                    .collect::<Vec<_>>()
+                iter::repeat(None).take(NUM_MDATAS).collect::<Vec<_>>()
             );
         }
         _ => panic!("Unexpected: {:?}", decoded),
@@ -1573,7 +1571,7 @@ fn share_some_mdatas() {
 }
 
 #[test]
-fn share_some_mdatas_with_metadata() {
+fn share_some_mdatas_with_valid_metadata() {
     let authenticator = create_account_and_login();
 
     let app_id = unwrap!(rand_app());
@@ -1595,18 +1593,28 @@ fn share_some_mdatas_with_metadata() {
     let perms = PermissionSet::new().allow(Action::Insert);
     let mut mdatas = Vec::new();
     let mut metadatas = Vec::new();
-    for _ in 0..NUM_MDATAS {
-        let metadata: Vec<u8> = rand::thread_rng().gen_iter().take(1024).collect();
+    for i in 0..NUM_MDATAS {
+        let metadata = UserMetadata {
+            name: format!("name {}", i),
+            description: format!("description {}", i),
+        };
+
         let name = rand::random();
+        let tag = 10_000;
         let mdata = {
             let value = Value {
-                content: metadata.clone(),
+                content: unwrap!(serialise(&metadata)),
                 entry_version: 0,
             };
             let owners = btree_set![user];
-            let mut data = BTreeMap::new();
-            let _ = data.insert(b"metadata"[..].to_owned(), value);
-            unwrap!(MutableData::new(name, 0, BTreeMap::new(), data, owners))
+            let entries = btree_map![METADATA_KEY.to_vec() => value];
+            unwrap!(MutableData::new(
+                name,
+                tag,
+                BTreeMap::new(),
+                entries,
+                owners,
+            ))
         };
 
         run(&authenticator, move |client| {
@@ -1614,12 +1622,11 @@ fn share_some_mdatas_with_metadata() {
         });
 
         mdatas.push(ShareMData {
-            type_tag: 0,
+            type_tag: tag,
             name: name,
-            metadata_key: Some(String::from("metadata")),
             perms: perms,
         });
-        metadatas.push(metadata);
+        metadatas.push(Some(metadata));
     }
 
     let req_id = ipc::gen_req_id();
@@ -1636,7 +1643,7 @@ fn share_some_mdatas_with_metadata() {
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
         (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(received_metadatas)) => {
+         Some(Payload::Metadata(received_metadatas))) => {
             assert_eq!(mdata, mdatas);
             assert_eq!(received_metadatas, metadatas);
         }
@@ -1711,7 +1718,6 @@ fn share_some_mdatas_with_ownership_error() {
         mdatas.push(ShareMData {
             type_tag: 0,
             name: name,
-            metadata_key: None,
             perms: PermissionSet::new(),
         });
     }
@@ -1929,7 +1935,7 @@ fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
         user_data: *mut c_void,
         req_id: u32,
         req: *const FfiShareMDataReq,
-        mdata_metas: *const FfiMDataMeta,
+        ffi_metadatas: *const FfiUserMetadata,
     ) {
         unsafe {
             let req = match ShareMDataReq::clone_from_repr_c(req) {
@@ -1937,20 +1943,21 @@ fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
                 Err(_) => return send_via_user_data(user_data, Err((-2, None))),
             };
 
-            let mut mdatas = Vec::with_capacity(req.mdata.len());
-            let mdatas_raw = slice::from_raw_parts(mdata_metas, req.mdata.len());
-            for mdata_raw in mdatas_raw {
-                let data_raw = slice::from_raw_parts(mdata_raw.data, mdata_raw.len);
-                let data = data_raw.to_owned();
-                mdatas.push(data);
-            }
+            let metadatas: Vec<_> = slice::from_raw_parts(ffi_metadatas, req.mdata.len())
+                .iter()
+                .map(|ffi_metadata| if ffi_metadata.name.is_null() {
+                    None
+                } else {
+                    Some(unwrap!(UserMetadata::clone_from_repr_c(ffi_metadata)))
+                })
+                .collect();
 
             let msg = IpcMsg::Req {
                 req_id: req_id,
                 req: IpcReq::ShareMData(req),
             };
 
-            send_via_user_data(user_data, Ok((msg, Some(mdatas))))
+            send_via_user_data(user_data, Ok((msg, Some(Payload::Metadata(metadatas)))))
         }
     }
 
@@ -2052,7 +2059,12 @@ extern "C" fn encode_share_mdata_cb(
     }
 }
 
-type ChannelType = Result<(IpcMsg, Option<Vec<Vec<u8>>>), (i32, Option<IpcMsg>)>;
+#[derive(Debug)]
+enum Payload {
+    Metadata(Vec<Option<UserMetadata>>),
+}
+
+type ChannelType = Result<(IpcMsg, Option<Payload>), (i32, Option<IpcMsg>)>;
 
 fn sender_as_user_data(tx: &Sender<ChannelType>) -> *mut c_void {
     test_utils::sender_as_user_data(tx)

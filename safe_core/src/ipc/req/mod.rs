@@ -269,8 +269,6 @@ pub struct ShareMData {
     pub type_tag: u64,
     /// The mutable data name.
     pub name: XorName,
-    /// The metadata key.
-    pub metadata_key: Option<String>,
     /// The permissions being requested.
     pub perms: PermissionSet,
 }
@@ -321,10 +319,6 @@ impl ShareMData {
         Ok(ffi::ShareMData {
             type_tag: self.type_tag,
             name: self.name,
-            metadata_key: match self.metadata_key {
-                Some(key) => CString::new(key).map_err(StringError::from)?.into_raw(),
-                None => ptr::null(),
-            },
             perms: permission_set_into_repr_c(self.perms),
         })
     }
@@ -339,11 +333,6 @@ impl ReprC for ShareMData {
         Ok(ShareMData {
             type_tag: (*raw).type_tag,
             name: (*raw).name,
-            metadata_key: if (*raw).metadata_key.is_null() {
-                None
-            } else {
-                Some(from_c_str((*raw).metadata_key)?)
-            },
             perms: permission_set_clone_from_repr_c(&(*raw).perms),
         })
     }
@@ -352,53 +341,34 @@ impl ReprC for ShareMData {
 /// Convert a `PermissionSet` into it's C representation.
 pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
     ffi::PermissionSet {
-        insert: permission_modifier_into_repr_c(perms.is_allowed(Action::Insert)),
-        delete: permission_modifier_into_repr_c(perms.is_allowed(Action::Delete)),
-        update: permission_modifier_into_repr_c(perms.is_allowed(Action::Update)),
-        manage_permissions: permission_modifier_into_repr_c(
-            perms.is_allowed(Action::ManagePermissions),
-        ),
-    }
-}
-
-/// Create a `ffi::PermissionModifier` from a permission in a `PermissionSet`
-pub fn permission_modifier_into_repr_c(pm: Option<bool>) -> ffi::PermissionModifier {
-    match pm {
-        None => ffi::PermissionModifier::NO_CHANGE,
-        Some(true) => ffi::PermissionModifier::SET,
-        Some(false) => ffi::PermissionModifier::UNSET,
+        insert: perms.is_allowed(Action::Insert).unwrap_or(false),
+        update: perms.is_allowed(Action::Update).unwrap_or(false),
+        delete: perms.is_allowed(Action::Delete).unwrap_or(false),
+        manage_permissions: perms.is_allowed(Action::ManagePermissions).unwrap_or(false),
     }
 }
 
 /// Create a `PermissionSet` from it's C representation.
 pub fn permission_set_clone_from_repr_c(perms: &ffi::PermissionSet) -> PermissionSet {
     let mut pm = PermissionSet::new();
-    permission_modifier_clone_from_repr_c(perms.insert, &mut pm, Action::Insert);
-    permission_modifier_clone_from_repr_c(perms.delete, &mut pm, Action::Delete);
-    permission_modifier_clone_from_repr_c(perms.update, &mut pm, Action::Update);
-    permission_modifier_clone_from_repr_c(
-        perms.manage_permissions,
-        &mut pm,
-        Action::ManagePermissions,
-    );
-    pm
-}
 
-/// Set a permission on a `PermissionSet` based on a `PermissionModifier`.
-pub fn permission_modifier_clone_from_repr_c(
-    pm: ffi::PermissionModifier,
-    perms: &mut PermissionSet,
-    action: Action,
-) {
-    match pm {
-        ffi::PermissionModifier::NO_CHANGE => (),
-        ffi::PermissionModifier::SET => {
-            *perms = perms.allow(action);
-        }
-        ffi::PermissionModifier::UNSET => {
-            *perms = perms.deny(action);
-        }
+    if perms.insert {
+        pm = pm.allow(Action::Insert);
     }
+
+    if perms.update {
+        pm = pm.allow(Action::Update);
+    }
+
+    if perms.delete {
+        pm = pm.allow(Action::Delete);
+    }
+
+    if perms.manage_permissions {
+        pm = pm.allow(Action::ManagePermissions);
+    }
+
+    pm
 }
 
 #[cfg(test)]

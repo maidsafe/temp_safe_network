@@ -18,6 +18,7 @@
 pub mod entry_actions;
 pub mod entries;
 pub mod permissions;
+pub mod metadata;
 mod helper;
 #[cfg(test)]
 mod tests;

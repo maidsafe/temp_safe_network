@@ -26,8 +26,17 @@ use ipc::IpcError;
 use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
 use rust_sodium::crypto::{box_, secretbox, sign};
+use std::ffi::{CString, NulError};
 use std::slice;
 use tiny_keccak::sha3_256;
+
+/// Entry key under which the metadata are stored.
+#[no_mangle]
+pub static METADATA_KEY: &'static [u8] = b"_metadata";
+/// Length of the metadata key.
+// IMPORTANT: make sure this value stays in sync with the actual length of `METADATA_KEY`!
+#[no_mangle]
+pub static METADATA_KEY_LEN: usize = 9;
 
 /// IPC response
 // TODO: `TransOwnership` variant
@@ -247,6 +256,37 @@ pub fn access_container_enc_key(
         .ok_or(IpcError::EncodeDecodeError)?;
 
     Ok(secretbox::seal(key, &key_nonce, app_enc_key))
+}
+
+/// Metadata for `MutableData`.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UserMetadata {
+    /// Name or purpose of this mutable data.
+    pub name: String,
+    /// Description of how this mutable data should or should not be shared.
+    pub description: String,
+}
+
+impl UserMetadata {
+    /// Converts this object into its FFI representation.
+    pub fn into_repr_c(self) -> Result<ffi::UserMetadata, NulError> {
+        Ok(ffi::UserMetadata {
+            name: CString::new(self.name)?.into_raw(),
+            description: CString::new(self.description)?.into_raw(),
+        })
+    }
+}
+
+impl ReprC for UserMetadata {
+    type C = *const ffi::UserMetadata;
+    type Error = IpcError;
+
+    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
+        Ok(UserMetadata {
+            name: String::clone_from_repr_c((*repr_c).name)?,
+            description: String::clone_from_repr_c((*repr_c).description)?,
+        })
+    }
 }
 
 #[cfg(test)]

@@ -193,8 +193,6 @@ pub struct ShareMData {
     pub type_tag: u64,
     /// The mutable data name.
     pub name: XorName,
-    /// The metadata key.
-    pub metadata_key: *const c_char,
     /// The permissions being requested.
     pub perms: PermissionSet,
 }
@@ -204,24 +202,11 @@ pub struct ShareMData {
 /// Represents a requested set of changes to the permissions of a mutable data.
 pub struct PermissionSet {
     /// How to modify the insert permission.
-    pub insert: PermissionModifier,
+    pub insert: bool,
     /// How to modify the update permission.
-    pub update: PermissionModifier,
+    pub update: bool,
     /// How to modify the delete permission.
-    pub delete: PermissionModifier,
+    pub delete: bool,
     /// How to modify the manage permissions permission.
-    pub manage_permissions: PermissionModifier,
-}
-
-#[repr(C)]
-#[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-/// How to modify a permission. Used in the definition of `PermissionSet`.
-pub enum PermissionModifier {
-    /// No change to the permission.
-    NO_CHANGE = 0,
-    /// Allow
-    SET = 1,
-    /// Deny
-    UNSET = 2,
+    pub manage_permissions: bool,
 }

@@ -43,8 +43,7 @@ pub enum IpcError {
     /// User denied request for shared access to MD
     ShareMDataDenied,
     /// Requested shared access to non-owned MD
-    InvalidOwner(Vec<(u64, XorName)>),
-
+    InvalidOwner(Vec<(XorName, u64)>),
     /// Unexpected error
     Unexpected(String),
 }

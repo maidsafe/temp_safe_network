@@ -21,10 +21,11 @@ use app_auth::{self, AppState, app_state};
 use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, StringError, base64_encode,
                 catch_unwind_cb, from_c_str};
-use futures::{Future, Stream, future, stream};
+use futures::{Future, Stream, stream};
+use futures::future::{self, Either};
 use maidsafe_utilities::serialisation::deserialise;
 use revocation::{flush_app_revocation_queue, revoke_app};
-use routing::{ClientError, User};
+use routing::{ClientError, User, XorName};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
 use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
@@ -33,12 +34,11 @@ use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
-use safe_core::ipc::resp::{AppKeys, IpcResp};
-use safe_core::ipc::resp::ffi::MDataMeta;
+use safe_core::ipc::resp::{AppKeys, IpcResp, METADATA_KEY, UserMetadata};
+use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
-use std::ptr;
 
 /// App data stored in the authenticator configuration.
 ///
@@ -182,7 +182,10 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
     o_auth: extern "C" fn(*mut c_void, u32, *const FfiAuthReq),
     o_containers: extern "C" fn(*mut c_void, u32, *const FfiContainersReq),
     o_unregistered: extern "C" fn(*mut c_void, u32),
-    o_share_mdata: extern "C" fn(*mut c_void, u32, *const FfiShareMDataReq, *const MDataMeta),
+    o_share_mdata: extern "C" fn(*mut c_void,
+                                 u32,
+                                 *const FfiShareMDataReq,
+                                 *const FfiUserMetadata),
     o_err: extern "C" fn(*mut c_void, FfiResult, *const c_char),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -222,80 +225,28 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                            req: IpcReq::ShareMData(share_mdata_req),
                            req_id,
                        }) => {
-                        let user = fry!(c1.public_signing_key().map_err(AuthError::CoreError));
-                        let user_data_inner = user_data.0;
-                        let num_mdatas = share_mdata_req.mdata.len();
-                        let mut mdata_futures = Vec::with_capacity(num_mdatas);
-                        for mdata in &share_mdata_req.mdata {
-                            let name = mdata.name;
-                            let type_tag = mdata.type_tag;
-                            let metadata_key = mdata.metadata_key.clone();
-                            let c2 = c1.clone();
-                            let mdata_future = c1.get_mdata_shell(name, type_tag)
-                                .and_then(move |md| if md.owners().contains(&user) {
-                                    match metadata_key {
-                                        None => ok!(Ok(None)),
-                                        Some(key) => {
-                                            c2.get_mdata_value(name, type_tag, key.into())
-                                                .map(|value| Ok(Some(value.content)))
-                                                .into_box()
-                                        }
-                                    }
-                                } else {
-                                    ok!(Err((type_tag, name)))
-                                })
-                                .map_err(AuthError::CoreError);
-                            mdata_futures.push(mdata_future);
-                        }
-                        future::join_all(mdata_futures)
-                            .and_then(move |results| {
-                                let mut metadatas = Vec::with_capacity(num_mdatas);
-                                let mut err_index = None;
-                                for (i, result) in results.iter().enumerate() {
-                                    match *result {
-                                        Ok(ref metadata_opt) => {
-                                            let (data, len) = match *metadata_opt {
-                                                Some(ref metadata) => (
-                                                    metadata.as_ptr(),
-                                                    metadata.len(),
-                                                ),
-                                                None => (ptr::null(), 0),
-                                            };
-                                            metadatas.push(MDataMeta {
-                                                data: data,
-                                                len: len,
-                                            });
-                                        }
-                                        Err(..) => {
-                                            err_index = Some(i);
-                                            break;
-                                        }
+                        decode_share_mdata_req(&c1, &share_mdata_req)
+                            .and_then(move |metadatas| {
+                                let (share_mdata_req_repr_c, _keep_alive) = share_mdata_req
+                                    .into_repr_c()?;
+
+                                let mut ffi_metadatas = Vec::with_capacity(metadatas.len());
+                                for metadata in metadatas {
+                                    if let Some(metadata) = metadata {
+                                        ffi_metadatas.push(metadata.into_repr_c()?);
+                                    } else {
+                                        ffi_metadatas.push(FfiUserMetadata::invalid());
                                     }
                                 }
-                                match err_index {
-                                    Some(i) => {
-                                        let invalids = results
-                                            .into_iter()
-                                            .skip(i)
-                                            .filter_map(|r| r.err())
-                                            .collect();
-                                        err!(AuthError::IpcError(IpcError::InvalidOwner(invalids)))
-                                    }
-                                    None => {
-                                        let (share_mdata_req_repr_c, keep_alive) =
-                                            fry!(share_mdata_req.into_repr_c().map_err(
-                                                AuthError::IpcError,
-                                            ));
-                                        o_share_mdata(
-                                            user_data_inner,
-                                            req_id,
-                                            &share_mdata_req_repr_c,
-                                            metadatas.as_ptr(),
-                                        );
-                                        drop(keep_alive);
-                                        ok!(())
-                                    }
-                                }
+
+                                o_share_mdata(
+                                    user_data.0,
+                                    req_id,
+                                    &share_mdata_req_repr_c,
+                                    ffi_metadatas.as_ptr(),
+                                );
+
+                                Ok(())
                             })
                             .into_box()
                     }
@@ -783,4 +734,71 @@ fn encode_response(msg: &IpcMsg, app_id: &str) -> Result<CString, IpcError> {
     let app_id = base64_encode(app_id.as_bytes());
     let resp = ipc::encode_msg(msg, &format!("safe-{}", app_id))?;
     Ok(CString::new(resp).map_err(StringError::from)?)
+}
+
+enum ShareMDataError {
+    InvalidOwner(XorName, u64),
+    InvalidMetadata,
+}
+
+fn decode_share_mdata_req(
+    client: &Client<()>,
+    req: &ShareMDataReq,
+) -> Box<AuthFuture<Vec<Option<UserMetadata>>>> {
+    let user = fry!(client.public_signing_key());
+    let num_mdatas = req.mdata.len();
+    let mut futures = Vec::with_capacity(num_mdatas);
+
+    for mdata in &req.mdata {
+        let client = client.clone();
+        let name = mdata.name;
+        let type_tag = mdata.type_tag;
+
+        let future = client
+            .get_mdata_shell(name, type_tag)
+            .and_then(move |shell| if shell.owners().contains(&user) {
+                let future_metadata = client
+                    .get_mdata_value(name, type_tag, METADATA_KEY.into())
+                    .then(|res| match res {
+                        Ok(value) => Ok(deserialise::<UserMetadata>(&value.content).map_err(|_| {
+                            ShareMDataError::InvalidMetadata
+                        })),
+                        Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => Ok(Err(
+                            ShareMDataError::InvalidMetadata,
+                        )),
+                        Err(error) => Err(error),
+                    });
+                Either::A(future_metadata)
+            } else {
+                Either::B(future::ok(
+                    Err(ShareMDataError::InvalidOwner(name, type_tag)),
+                ))
+            })
+            .map_err(AuthError::from);
+
+        futures.push(future);
+    }
+
+    future::join_all(futures)
+        .and_then(move |results| {
+            let mut metadatas = Vec::with_capacity(num_mdatas);
+            let mut invalids = Vec::with_capacity(num_mdatas);
+
+            for result in results {
+                match result {
+                    Ok(metadata) => metadatas.push(Some(metadata)),
+                    Err(ShareMDataError::InvalidMetadata) => metadatas.push(None),
+                    Err(ShareMDataError::InvalidOwner(name, type_tag)) => {
+                        invalids.push((name, type_tag))
+                    }
+                }
+            }
+
+            if invalids.is_empty() {
+                Ok(metadatas)
+            } else {
+                Err(AuthError::IpcError(IpcError::InvalidOwner(invalids)))
+            }
+        })
+        .into_box()
 }

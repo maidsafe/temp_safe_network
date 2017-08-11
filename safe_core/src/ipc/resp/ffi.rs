@@ -19,6 +19,9 @@
 
 use routing::XOR_NAME_LEN;
 use rust_sodium::crypto::{box_, secretbox, sign};
+use std::ffi::CString;
+use std::os::raw::c_char;
+use std::ptr;
 
 /// It represents the authentication response.
 #[repr(C)]
@@ -105,12 +108,35 @@ pub struct AccessContInfo {
     pub nonce: [u8; secretbox::NONCEBYTES],
 }
 
-/// Metadata struct passed to `o_share_mdata` callback of `auth_decode_ipc_msg` of authenticator.
-/// Used to store a buffer of raw metadata.
+/// User metadata for mutable data
 #[repr(C)]
-pub struct MDataMeta {
-    /// The data buffer
-    pub data: *const u8,
-    /// The length of the buffer
-    pub len: usize,
+pub struct UserMetadata {
+    /// Name or purpose of this mutable data.
+    pub name: *const c_char,
+    /// Description of how this mutable data should or should not be shared.
+    pub description: *const c_char,
+}
+
+impl UserMetadata {
+    /// Create invalid metadata.
+    pub fn invalid() -> Self {
+        UserMetadata {
+            name: ptr::null(),
+            description: ptr::null(),
+        }
+    }
+}
+
+impl Drop for UserMetadata {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.name.is_null() {
+                let _ = CString::from_raw(self.name as *mut _);
+            }
+
+            if !self.description.is_null() {
+                let _ = CString::from_raw(self.description as *mut _);
+            }
+        }
+    }
 }
