@@ -345,8 +345,7 @@ mod tests {
     use std::ffi::CString;
     use test_utils::{create_app_with_access, run};
 
-    #[test]
-    fn basics() {
+    fn setup() -> (App, MDataInfoHandle) {
         let mut container_permissions = HashMap::new();
         let _ = container_permissions.insert(
             "_videos".to_string(),
@@ -367,6 +366,13 @@ mod tests {
                 move |info| context.object_cache().insert_mdata_info(info),
             )
         });
+
+        (app, container_info_h)
+    }
+
+    #[test]
+    fn basics() {
+        let (app, container_info_h) = setup();
 
         let file_name0 = "file0.txt";
         let ffi_file_name0 = unwrap!(CString::new(file_name0));
@@ -420,7 +426,7 @@ mod tests {
         }
     }
 
-    // Tests NFS functions for writing and updating file contents.
+    // Test NFS functions for writing and updating file contents.
     // 1. Create an empty file, open it for writing, write contents.
     // 2. Insert file into a container.
     // 3. Fetch the file from a container, check that it has a correct version.
@@ -435,26 +441,7 @@ mod tests {
     // 9. Check that the file's created and modified timestamps are correct.
     #[test]
     fn open_file() {
-        let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(
-            "_videos".to_string(),
-            btree_set![
-                Permission::Read,
-                Permission::Insert,
-                Permission::Update,
-                Permission::Delete,
-            ],
-        );
-
-        let app = create_app_with_access(container_permissions);
-
-        let container_info_h = run(&app, move |client, context| {
-            let context = context.clone();
-
-            context.get_container_mdata_info(client, "_videos").map(
-                move |info| context.object_cache().insert_mdata_info(info),
-            )
-        });
+        let (app, container_info_h) = setup();
 
         // Create non-empty file.
         let file = NativeFile::new(Vec::new());
@@ -615,7 +602,7 @@ mod tests {
         assert!(f.is_null());
     }
 
-    // Tests that NFS functions still work after deleting and updating file contents.
+    // Test that NFS functions still work after deleting and updating file contents.
     // 1. Create an empty file, open it for writing, write original contents.
     // 2. Insert file into the container.
     // 3. Delete file in the container.
@@ -625,26 +612,7 @@ mod tests {
     // 7. Read the file contents and ensure that they correspond to the data from step 4.
     #[test]
     fn delete_then_open_file() {
-        let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(
-            "_videos".to_string(),
-            btree_set![
-                Permission::Read,
-                Permission::Insert,
-                Permission::Update,
-                Permission::Delete,
-            ],
-        );
-
-        let app = create_app_with_access(container_permissions);
-
-        let container_info_h = run(&app, move |client, context| {
-            let context = context.clone();
-
-            context.get_container_mdata_info(client, "_videos").map(
-                move |info| context.object_cache().insert_mdata_info(info),
-            )
-        });
+        let (app, container_info_h) = setup();
 
         // Create non-empty file.
         let file = NativeFile::new(Vec::new());
@@ -781,5 +749,134 @@ mod tests {
             }))
         };
         assert_eq!(retrieved_content, content_new);
+    }
+
+    // Test closing files immediately after opening them in the different modes.
+    // 1. Create a new file, close it, and insert it into a container.
+    // 2. Fetch it, open it in READ mode, and close it.
+    // 3. Open the file in OVERWRITE mode and close it.
+    // 4. Open the file in APPEND mode and close it.
+    #[test]
+    fn open_close_file() {
+        let (app, container_info_h) = setup();
+
+        let file_name = "file0.txt";
+        let ffi_file_name = unwrap!(CString::new(file_name));
+
+        // Create a file.
+        let user_metadata = b"metadata".to_vec();
+        let file = NativeFile::new(user_metadata.clone());
+        let ffi_file = file.into_repr_c();
+
+        let content = b"hello world";
+
+        let write_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                file_open(
+                    &app,
+                    container_info_h,
+                    &ffi_file,
+                    OPEN_MODE_OVERWRITE,
+                    ud,
+                    cb,
+                )
+            }))
+        };
+
+        // Write to the file, close it and insert it.
+        let written_file: NativeFile = unsafe {
+            unwrap!(call_0(|ud, cb| {
+                file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
+            }));
+            unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
+        };
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                dir_insert_file(
+                    &app,
+                    container_info_h,
+                    ffi_file_name.as_ptr(),
+                    &written_file.into_repr_c(),
+                    ud,
+                    cb,
+                )
+            }))
+        }
+
+        // Fetch the file
+        let (file, _version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                    dir_fetch_file(&app, container_info_h, ffi_file_name.as_ptr(), ud, cb)
+                }))
+            }
+        };
+
+        // Open in READ mode.
+        let read_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                file_open(
+                    &app,
+                    container_info_h,
+                    &file.into_repr_c(),
+                    OPEN_MODE_READ,
+                    ud,
+                    cb,
+                )
+            }))
+        };
+        // Close the file.
+        let _: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
+
+        // Fetch the file
+        let (file, _version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                    dir_fetch_file(&app, container_info_h, ffi_file_name.as_ptr(), ud, cb)
+                }))
+            }
+        };
+
+        // Open in OVERWRITE mode and close the file.
+        let write_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                file_open(
+                    &app,
+                    container_info_h,
+                    &file.into_repr_c(),
+                    OPEN_MODE_OVERWRITE,
+                    ud,
+                    cb,
+                )
+            }))
+        };
+
+        let _: NativeFile = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb))) };
+
+        // Fetch the file
+        let (file, _version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                    dir_fetch_file(&app, container_info_h, ffi_file_name.as_ptr(), ud, cb)
+                }))
+            }
+        };
+
+        // Open in APPEND mode and close the file.
+        let append_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                file_open(
+                    &app,
+                    container_info_h,
+                    &file.into_repr_c(),
+                    OPEN_MODE_APPEND,
+                    ud,
+                    cb,
+                )
+            }))
+        };
+
+        let _: NativeFile = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, append_h, ud, cb))) };
     }
 }
