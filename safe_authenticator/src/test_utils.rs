@@ -65,7 +65,7 @@ pub fn create_account_and_login() -> Authenticator {
 }
 
 /// Revoke an app, returning an error on failure
-pub fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String, AuthError> {
+pub fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<(), AuthError> {
     let app_id = app_id.to_string();
 
     try_run(authenticator, move |client| {
