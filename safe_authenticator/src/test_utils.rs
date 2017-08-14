@@ -24,6 +24,7 @@ use futures::{Future, IntoFuture};
 use futures::future;
 use ipc::decode_ipc_msg;
 use maidsafe_utilities::serialisation::deserialise;
+use revocation;
 use routing::User;
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
@@ -61,6 +62,23 @@ pub fn create_account_and_login() -> Authenticator {
         |_| (),
     ));
     unwrap!(Authenticator::login(locator, password, |_| ()))
+}
+
+/// Revoke an app, returning an error on failure
+pub fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String, AuthError> {
+    let app_id = app_id.to_string();
+
+    try_run(authenticator, move |client| {
+        revocation::revoke_app(client, &app_id)
+    })
+}
+
+/// Revoke an app, panicking on failure
+pub fn revoke(authenticator: &Authenticator, app_id: &str) {
+    match try_revoke(authenticator, app_id) {
+        Ok(_) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
 }
 
 /// Create a random authenticator and login using the same credentials.

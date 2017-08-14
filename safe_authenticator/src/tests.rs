@@ -54,8 +54,8 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
-                 create_account_and_login_with_hook, rand_app, register_app, run,
-                 try_access_container, try_run};
+                 create_account_and_login_with_hook, rand_app, register_app, revoke, run,
+                 try_access_container, try_revoke, try_run};
 #[cfg(feature = "use-mock-routing")]
 use test_utils::get_container_from_root;
 use tiny_keccak::sha3_256;
@@ -1809,21 +1809,6 @@ fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize 
             .map(|entries| entries.len())
             .map_err(From::from)
     })
-}
-
-fn try_revoke(authenticator: &Authenticator, app_id: &str) -> Result<String, AuthError> {
-    let app_id = app_id.to_string();
-
-    try_run(authenticator, move |client| {
-        revocation::revoke_app(client, &app_id)
-    })
-}
-
-fn revoke(authenticator: &Authenticator, app_id: &str) {
-    match try_revoke(authenticator, app_id) {
-        Ok(_) => (),
-        x => panic!("Unexpected {:?}", x),
-    }
 }
 
 // Try to revoke apps with the given ids, but simulate network failure so they

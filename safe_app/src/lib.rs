@@ -16,30 +16,26 @@
 // relating to use of the SAFE Network Software.
 
 //! SAFE App
-
-#![doc(html_logo_url =
-           "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-       html_root_url = "http://maidsafe.github.io/safe_app")]
-
+#![doc(html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/
+maidsafe_logo.png",
+      html_favicon_url = "http://maidsafe.net/img/favicon.ico",
+      html_root_url = "http://maidsafe.github.io/safe_app")]
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
-          unknown_crate_types, warnings)]
-#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
-        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
-        private_no_mangle_fns, private_no_mangle_statics, stable_features,
-        unconditional_recursion, unknown_lints, unsafe_code, unused,
-        unused_allocation, unused_attributes, unused_comparisons, unused_features,
-        unused_parens, while_true)]
+#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types,
+         warnings)]
+#![deny(bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
+       overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
+       stable_features, unconditional_recursion, unknown_lints, unsafe_code, unused,
+       unused_allocation, unused_attributes, unused_comparisons, unused_features, unused_parens,
+       while_true)]
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-        unused_qualifications, unused_results)]
+       unused_qualifications, unused_results)]
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
-         missing_debug_implementations, variant_size_differences)]
-
-#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                         option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
+        missing_debug_implementations, variant_size_differences)]
+#![cfg_attr(feature = "cargo-clippy",
+           deny(clippy, unicode_not_nfc, wrong_pub_self_convention, option_unwrap_used))]
+#![cfg_attr(feature = "cargo-clippy", allow(use_debug, too_many_arguments))]
 
 extern crate config_file_handler;
 #[macro_use]
@@ -461,21 +457,20 @@ fn fetch_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Bo
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "use-mock-routing")]
     use App;
     use futures::Future;
     #[cfg(feature = "use-mock-routing")]
     use routing::{ClientError, Request, Response};
-    #[cfg(feature = "use-mock-routing")]
+    use safe_authenticator::Authenticator;
     use safe_authenticator::test_utils as authenticator;
+    use safe_authenticator::test_utils::revoke;
     #[cfg(feature = "use-mock-routing")]
     use safe_core::MockRouting;
     use safe_core::ipc::Permission;
-    #[cfg(feature = "use-mock-routing")]
+    use safe_core::ipc::req::AppExchangeInfo;
     use safe_core::ipc::req::AuthReq;
     use std::collections::HashMap;
     use test_utils::{create_app_with_access, run};
-    #[cfg(feature = "use-mock-routing")]
     use test_utils::gen_app_exchange_info;
 
     #[test]
@@ -584,18 +579,14 @@ mod tests {
         let routing_hook = move |mut routing: MockRouting| -> MockRouting {
             routing.set_request_hook(move |req| {
                 match *req {
-                    Request::PutIData { msg_id, .. } => {
-                        Some(Response::PutIData {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
-                    Request::PutMData { msg_id, .. } => {
-                        Some(Response::PutMData {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
+                    Request::PutIData { msg_id, .. } => Some(Response::PutIData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
+                    Request::PutMData { msg_id, .. } => Some(Response::PutMData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
                     Request::MutateMDataEntries { msg_id, .. } => {
                         Some(Response::MutateMDataEntries {
                             res: Err(ClientError::LowBalance),
@@ -614,24 +605,18 @@ mod tests {
                             msg_id,
                         })
                     }
-                    Request::ChangeMDataOwner { msg_id, .. } => {
-                        Some(Response::ChangeMDataOwner {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
-                    Request::InsAuthKey { msg_id, .. } => {
-                        Some(Response::InsAuthKey {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
-                    Request::DelAuthKey { msg_id, .. } => {
-                        Some(Response::DelAuthKey {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
+                    Request::ChangeMDataOwner { msg_id, .. } => Some(Response::ChangeMDataOwner {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
+                    Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
+                    Request::DelAuthKey { msg_id, .. } => Some(Response::DelAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
                     // Pass-through
                     _ => None,
                 }
@@ -661,5 +646,88 @@ mod tests {
             |_network_event| (),
             routing_hook,
         ));
+    }
+
+    // Authorise an app with `app_container`.
+    fn authorise_app(
+        auth: &Authenticator,
+        app_info: &AppExchangeInfo,
+        app_id: &str,
+        app_container: bool,
+    ) -> App {
+        let auth_granted = unwrap!(authenticator::register_app(
+            auth,
+            &AuthReq {
+                app: app_info.clone(),
+                app_container: app_container,
+                containers: HashMap::new(),
+            },
+        ));
+
+        unwrap!(App::registered(
+            String::from(app_id),
+            auth_granted,
+            |_network_event| (),
+        ))
+    }
+
+    // Get the number of containers for `app`
+    fn num_containers(app: &App) -> usize {
+        run(app, move |client, context| {
+            context.get_container_names(client).then(move |res| {
+                let info = unwrap!(res);
+                Ok(info.len())
+            })
+        })
+    }
+
+    // Test app container creation under the following circumstances:
+    // 1. An app is authorised for the first time with `app_container` set to `true`.
+    // 2. If an app is authorised for the first time with `app_container` set to `false`,
+    // then any subsequent authorisation with `app_container` set to `true` should trigger
+    // the creation of the app's own container.
+    // 3. Make sure that the app's own container is also created when it's re-authorised
+    // with `app_container` set to `true` after it's been revoked.
+    #[test]
+    fn app_container_creation() {
+        // Authorise an app for the first time with `app_container` set to `true`.
+        let auth = authenticator::create_account_and_login();
+
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+        let app = authorise_app(&auth, &app_info, &app_id, true);
+
+        assert_eq!(num_containers(&app), 1); // should only contain app container
+
+        // Authorise a new app with `app_container` set to `false`.
+        let auth = authenticator::create_account_and_login();
+
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+        let app = authorise_app(&auth, &app_info, &app_id, false);
+
+        assert_eq!(num_containers(&app), 0); // should be empty
+
+        // Re-authorise the app with `app_container` set to `true`.
+        let app = authorise_app(&auth, &app_info, &app_id, true);
+
+        assert_eq!(num_containers(&app), 1); // should only contain app container
+
+        // Authorise a new app with `app_container` set to `false`.
+        let auth = authenticator::create_account_and_login();
+
+        let app_info = gen_app_exchange_info();
+        let app_id = app_info.id.clone();
+        let app = authorise_app(&auth, &app_info, &app_id, false);
+
+        assert_eq!(num_containers(&app), 0); // should be empty
+
+        // Revoke the app
+        revoke(&auth, &app_id);
+
+        // Re-authorise the app with `app_container` set to `true`.
+        let app = authorise_app(&auth, &app_info, &app_id, true);
+
+        assert_eq!(num_containers(&app), 1); // should only contain app container
     }
 }
