@@ -478,6 +478,56 @@ mod tests {
         });
     }
 
+    // Test closing files immediately after opening them in the different modes.
+    #[test]
+    fn file_open_close() {
+        random_client(|client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+
+            create_test_file(client)
+                .then(move |res| {
+                    let (dir, file) = unwrap!(res);
+                    // Open the file for reading
+                    file_helper::read(c2, &file, dir.enc_key().cloned()).map(
+                        move |reader| (reader, file, dir),
+                    )
+                })
+                .then(move |res| {
+                    // The reader should get dropped implicitly
+                    let (_reader, file, dir) = unwrap!(res);
+                    // Open the file for writing
+                    file_helper::write(c3, file.clone(), Mode::Overwrite, dir.enc_key().cloned())
+                        .map(move |writer| (writer, file, dir))
+                })
+                .then(move |res| {
+                    let (writer, file, dir) = unwrap!(res);
+                    // Close the file
+                    let _ = writer.close();
+                    // Open the file for appending
+                    file_helper::write(c4, file.clone(), Mode::Append, dir.enc_key().cloned())
+                        .map(move |writer| (writer, file, dir))
+                })
+                .then(move |res| {
+                    let (writer, file, dir) = unwrap!(res);
+                    // Close the file
+                    let _ = writer.close();
+                    // Open the file for reading, ensure it has original contents
+                    file_helper::read(c5, &file, dir.enc_key().cloned())
+                })
+                .then(move |res| {
+                    let reader = unwrap!(res);
+                    let size = reader.size();
+                    reader.read(0, size)
+                })
+                .map(move |data| {
+                    assert_eq!(data, vec![0u8; 100]);
+                })
+        });
+    }
+
     // Create and store encrypted file and make sure it can only be read back with
     // the original encryption key.
     #[test]
@@ -494,7 +544,6 @@ mod tests {
 
             let key = secretbox::gen_key();
             let wrong_key = secretbox::gen_key();
-
 
             file_helper::write(
                 client.clone(),
