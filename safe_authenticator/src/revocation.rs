@@ -16,8 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::{AccessContainerEntry, AuthError, AuthFuture};
-use access_container::{access_container, access_container_entry, access_container_key,
-                       delete_access_container_entry};
+use access_container::{self, AUTHENTICATOR_ENTRY};
 use config::{self, AppInfo, RevocationQueue};
 use futures::Future;
 use futures::future::{self, Either, Loop};
@@ -93,7 +92,6 @@ fn flush_app_revocation_queue_impl(
 /// Revoke access for a single app
 fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
-    let c3 = client.clone();
     let c4 = client.clone();
     let c5 = client.clone();
     let c6 = client.clone();
@@ -114,55 +112,30 @@ fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
             delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app)
         })
         .and_then(move |app| {
-            access_container(&c3).map(move |access_container| (app, access_container))
-        })
-        .and_then(move |(app, access_container)| {
-            access_container_entry(&c4, &access_container, &app.info.id, app.keys.clone())
+            access_container::fetch_entry(&c4, &app.info.id, app.keys.clone())
                 .and_then(move |(version, permissions)| {
                     Ok((
                         app,
-                        access_container,
                         version,
                         permissions.ok_or(AuthError::IpcError(IpcError::UnknownApp))?,
                     ))
                 })
         })
-        .and_then(move |(app,
-               access_container,
-               ac_entry_version,
-               permissions)| {
-            revoke_container_perms(&c5, &permissions, app.keys.sign_pk).map(move |_| {
-                (app, access_container, ac_entry_version, permissions)
+        .and_then(move |(app, ac_entry_version, permissions)| {
+            revoke_container_perms(&c5, &permissions, app.keys.sign_pk)
+                .map(move |_| (app, ac_entry_version, permissions))
+        })
+        .and_then(move |(app, ac_entry_version, permissions)| {
+            refresh_from_access_container_root(&c6, permissions).map(move |refreshed_containers| {
+                (app, ac_entry_version, refreshed_containers)
             })
         })
-        .and_then(move |(app,
-               access_container,
-               ac_entry_version,
-               permissions)| {
-            refresh_from_user_root_dir(&c6, permissions).map(move |refreshed_containers| {
-                (
-                    app,
-                    access_container,
-                    ac_entry_version,
-                    refreshed_containers,
-                )
-            })
+        .and_then(move |(app, ac_entry_version, permissions)| {
+            reencrypt_private_containers(&c7, permissions.clone(), &app)
+                .map(move |_| (app, ac_entry_version))
         })
-        .and_then(move |(app,
-               access_container,
-               ac_entry_version,
-               permissions)| {
-            reencrypt_private_containers(&c7, access_container.clone(), permissions.clone(), &app)
-                .map(move |_| (app, access_container, ac_entry_version))
-        })
-        .and_then(move |(app, access_container, version)| {
-            delete_access_container_entry(
-                &c8,
-                &access_container,
-                &app.info.id,
-                &app.keys,
-                version + 1,
-            )
+        .and_then(move |(app, version)| {
+            access_container::delete_entry(&c8, &app.info.id, &app.keys, version + 1)
         })
         .into_box()
 }
@@ -221,7 +194,6 @@ fn revoke_container_perms(
 // Re-encrypts private containers for a revoked app
 fn reencrypt_private_containers(
     client: &Client<()>,
-    access_container: MDataInfo,
     containers: AccessContainerEntry,
     revoked_app: &AppInfo,
 ) -> Box<AuthFuture<()>> {
@@ -236,28 +208,23 @@ fn reencrypt_private_containers(
     let c2 = client.clone();
     let c3 = client.clone();
 
+    let access_container = fry!(client.access_container().map_err(AuthError::from));
+
     let containers = start_new_containers_enc_info(containers);
-    let app_key = fry!(access_container_key(
+    let app_key = fry!(access_container::enc_key(
         &access_container,
         &revoked_app.info.id,
-        &revoked_app.keys,
+        &revoked_app.keys.enc_key,
     ));
 
-    let f0 = update_user_root_dir(client, containers.clone());
-    let f1 = update_access_container(
+    update_access_container(
         client,
         access_container.clone(),
         containers.clone(),
         app_key.clone(),
-    );
-
-    f0.join(f1)
-        .and_then(move |_| reencrypt_containers(&c2, containers))
+    ).and_then(move |_| reencrypt_containers(&c2, containers))
         .and_then(move |containers| {
-            let f0 = update_user_root_dir(&c3, containers.clone());
-            let f1 = update_access_container(&c3, access_container, containers, app_key);
-
-            f0.join(f1).map(|_| ())
+            update_access_container(&c3, access_container, containers, app_key).map(|_| ())
         })
         .into_box()
 }
@@ -275,66 +242,26 @@ fn start_new_containers_enc_info(containers: AccessContainerEntry) -> Vec<(Strin
 }
 
 /// Fetches containers info from the user's root dir
-fn refresh_from_user_root_dir(
+fn refresh_from_access_container_root(
     client: &Client<()>,
     containers: AccessContainerEntry,
 ) -> Box<AuthFuture<AccessContainerEntry>> {
-    let user_root = fry!(client.user_root_dir());
-
-    client
-        .list_mdata_entries(user_root.name, user_root.type_tag)
-        .and_then(move |entries| {
-            let mut refreshed = HashMap::new();
-            for (container, (mdata_info, perms)) in containers {
-                let key = user_root.enc_entry_key(container.as_bytes())?;
-
-                let _ = refreshed.insert(
-                    container,
-                    if let Some(new_value) = entries.get(&key) {
-                        let decoded = user_root.decrypt(&new_value.content)?;
-                        let root_mdata_info = deserialise::<MDataInfo>(&decoded)?;
-                        (root_mdata_info, perms)
-                    } else {
-                        (mdata_info, perms)
-                    },
-                );
-            }
-            Ok(refreshed)
+    access_container::authenticator_entry(client)
+        .and_then(move |(_, entries)| {
+            Ok(
+                containers
+                    .into_iter()
+                    .map(|(container, (mdata_info, perms))| {
+                        if let Some(root_mdata_info) = entries.get(&container) {
+                            (container, (root_mdata_info.clone(), perms))
+                        } else {
+                            (container, (mdata_info, perms))
+                        }
+                    })
+                    .collect(),
+            )
         })
         .map_err(AuthError::from)
-        .into_box()
-}
-
-fn update_user_root_dir(
-    client: &Client<()>,
-    containers: Vec<(String, MDataInfo)>,
-) -> Box<AuthFuture<()>> {
-    let c2 = client.clone();
-    let user_root = fry!(client.user_root_dir());
-
-    client
-        .list_mdata_entries(user_root.name, user_root.type_tag)
-        .and_then(move |entries| {
-            let mut actions = EntryActions::new();
-
-            for (container, mdata_info) in containers {
-                let key = user_root.enc_entry_key(container.as_bytes())?;
-                let encoded = serialise(&mdata_info)?;
-                let encoded = user_root.enc_entry_value(&encoded)?;
-
-                if let Some(old_value) = entries.get(&key) {
-                    actions = actions.update(key, encoded, old_value.entry_version + 1);
-                } else {
-                    actions = actions.ins(key, encoded, 0);
-                }
-            }
-
-            Ok((user_root, actions))
-        })
-        .and_then(move |(user_root, actions)| {
-            recovery::mutate_mdata_entries(&c2, user_root.name, user_root.type_tag, actions.into())
-        })
-        .map_err(From::from)
         .into_box()
 }
 
@@ -345,6 +272,7 @@ fn update_access_container(
     revoked_app_key: Vec<u8>,
 ) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
+    let c3 = client.clone();
 
     let f_config = config::list_apps(client).map(|(_, apps)| apps);
     let f_entries = client
@@ -357,13 +285,47 @@ fn update_access_container(
             entries
         });
 
+    let auth_key = {
+        let sk = fry!(client.secret_symmetric_key());
+        fry!(access_container::enc_key(
+            &access_container,
+            AUTHENTICATOR_ENTRY,
+            &sk,
+        ))
+    };
+
     f_config
         .join(f_entries)
         .and_then(move |(apps, entries)| {
             let mut actions = EntryActions::new();
 
+            // Update the authenticator entry
+            if let Some(raw) = entries.get(&auth_key) {
+                let decoded = {
+                    let sk = c2.secret_symmetric_key()?;
+                    symmetric_decrypt(&raw.content, &sk)?
+                };
+                let mut decoded: HashMap<String, MDataInfo> = deserialise(&decoded)?;
+
+                for &mut (ref container, ref mdata_info) in &mut containers {
+                    if let Some(entry) = decoded.get_mut(container) {
+                        *entry = mdata_info.clone();
+                    }
+                }
+
+                let encoded = serialise(&decoded)?;
+                let encoded = {
+                    let sk = c2.secret_symmetric_key()?;
+                    symmetric_encrypt(&encoded, &sk, None)?
+                };
+
+                actions = actions.update(auth_key, encoded, raw.entry_version + 1);
+            }
+
+            // Update apps' entries
             for app in apps.values() {
-                let key = access_container_key(&access_container, &app.info.id, &app.keys)?;
+                let key =
+                    access_container::enc_key(&access_container, &app.info.id, &app.keys.enc_key)?;
 
                 if let Some(raw) = entries.get(&key) {
                     // Skip deleted entries.
@@ -391,7 +353,7 @@ fn update_access_container(
         })
         .and_then(move |(access_container, actions)| {
             recovery::mutate_mdata_entries(
-                &c2,
+                &c3,
                 access_container.name,
                 access_container.type_tag,
                 actions.into(),

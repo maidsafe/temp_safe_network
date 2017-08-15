@@ -206,10 +206,11 @@ fn convert_error(err: CoreError) -> NfsError {
 
 #[cfg(test)]
 mod tests {
+    use DIR_TAG;
     use client::{Client, MDataInfo};
     use errors::CoreError;
     use futures::Future;
-    use nfs::{File, Mode, NfsError, NfsFuture, file_helper};
+    use nfs::{File, Mode, NfsError, NfsFuture, create_dir, file_helper};
     use rand::{self, Rng};
     use rust_sodium::crypto::secretbox;
     use utils::FutureExt;
@@ -221,25 +222,33 @@ mod tests {
 
     fn create_test_file(client: &Client<()>) -> Box<NfsFuture<(MDataInfo, File)>> {
         let c2 = client.clone();
-        let user_root = unwrap!(client.user_root_dir());
+        let c3 = client.clone();
+        let root = unwrap!(MDataInfo::random_private(DIR_TAG));
+        let root2 = root.clone();
 
-        file_helper::write(
-            client.clone(),
-            File::new(Vec::new()),
-            Mode::Overwrite,
-            user_root.enc_key().cloned(),
-        ).then(move |res| {
-            let writer = unwrap!(res);
+        create_dir(client, &root, btree_map![], btree_map![])
+            .then(move |res| {
+                assert!(res.is_ok());
 
-            writer.write(&[0u8; ORIG_SIZE]).and_then(
-                move |_| writer.close(),
-            )
-        })
+                file_helper::write(
+                    c2.clone(),
+                    File::new(Vec::new()),
+                    Mode::Overwrite,
+                    root.enc_key().cloned(),
+                )
+            })
+            .then(move |res| {
+                let writer = unwrap!(res);
+
+                writer.write(&[0u8; ORIG_SIZE]).and_then(
+                    move |_| writer.close(),
+                )
+            })
             .then(move |res| {
                 let file = unwrap!(res);
 
-                file_helper::insert(c2, user_root.clone(), "hello.txt", &file)
-                    .map(move |_| (user_root, file))
+                file_helper::insert(c3, root2.clone(), "hello.txt", &file)
+                    .map(move |_| (root2, file))
             })
             .into_box()
     }
@@ -382,12 +391,15 @@ mod tests {
             create_test_file(client)
                 .then(move |res| {
                     let (dir, mut file) = unwrap!(res);
+
                     file.set_user_metadata(vec![12u8; 10]);
-                    file_helper::update(c2, dir, "hello.txt", &file, 1)
+                    file_helper::update(c2, dir.clone(), "hello.txt", &file, 1)
+                        .map(move |()| dir)
                 })
                 .then(move |res| {
-                    assert!(res.is_ok());
-                    file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
+                    let dir = unwrap!(res);
+
+                    file_helper::fetch(c3.clone(), dir, "hello.txt")
                 })
                 .map(move |(_version, file)| {
                     assert_eq!(*file.user_metadata(), [12u8; 10][..]);
@@ -404,10 +416,11 @@ mod tests {
                 .then(move |res| {
                     let (dir, _file) = unwrap!(res);
                     file_helper::delete(&c2, &dir, "hello.txt", 1)
+                        .map(move |()| dir)
                 })
                 .then(move |res| {
-                    assert!(res.is_ok());
-                    file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
+                    let dir = unwrap!(res);
+                    file_helper::fetch(c3.clone(), dir, "hello.txt")
                 })
                 .then(move |res| -> Result<_, CoreError> {
                     match res {

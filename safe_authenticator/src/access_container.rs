@@ -17,10 +17,9 @@
 
 //! Routines that control the access container.
 //!
-//! Access container is stored in the user's config root dir.
+//! Access container is stored in the user's session packet.
 
 use super::{AccessContainerEntry, AuthError, AuthFuture};
-use config::KEY_ACCESS_CONTAINER;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
@@ -29,58 +28,91 @@ use safe_core::{Client, FutureExt, MDataInfo, recovery};
 use safe_core::ipc::AppKeys;
 use safe_core::ipc::resp::access_container_enc_key;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
+use std::collections::HashMap;
 
-/// Retrieves the authenticator configuration file
-pub fn access_container<T>(client: &Client<T>) -> Box<AuthFuture<MDataInfo>>
-where
-    T: 'static,
-{
-    let parent = fry!(client.config_root_dir());
-    let key = fry!(parent.enc_entry_key(KEY_ACCESS_CONTAINER));
+/// Key of the authenticator entry in the access container
+pub const AUTHENTICATOR_ENTRY: &str = "authenticator";
+
+/// Gets access container entry key corresponding to the given app.
+pub fn enc_key(
+    access_container: &MDataInfo,
+    app_id: &str,
+    secret_key: &secretbox::Key,
+) -> Result<Vec<u8>, AuthError> {
+    let nonce = access_container.nonce().ok_or_else(|| {
+        AuthError::from("No valid nonce for access container")
+    })?;
+    Ok(access_container_enc_key(app_id, secret_key, nonce)?)
+}
+
+/// Gets an authenticator entry from the access container
+pub fn authenticator_entry<T: 'static>(
+    client: &Client<T>,
+) -> Box<AuthFuture<(u64, HashMap<String, MDataInfo>)>> {
+    let c2 = client.clone();
+    let access_container = fry!(client.access_container());
+
+    let key = {
+        let sk = fry!(client.secret_symmetric_key());
+        fry!(enc_key(&access_container, AUTHENTICATOR_ENTRY, &sk))
+    };
 
     client
-        .get_mdata_value(parent.name, parent.type_tag, key)
-        .map_err(From::from)
-        .and_then(move |val| {
-            let content = parent.decrypt(&val.content)?;
-            deserialise(&content).map_err(From::from)
+        .get_mdata_value(access_container.name, access_container.type_tag, key)
+        .and_then(move |value| {
+            let plaintext = {
+                let enc_key = c2.secret_symmetric_key()?;
+                symmetric_decrypt(&value.content, &enc_key)?
+            };
+            Ok((value.entry_version, deserialise(&plaintext)?))
         })
+        .map_err(From::from)
         .into_box()
 }
 
-/// Gets the nonce from the access container mdata info.
-pub fn access_container_nonce(
-    access_container: &MDataInfo,
-) -> Result<&secretbox::Nonce, AuthError> {
-    if let Some((_, Some(ref nonce))) = access_container.enc_info {
-        Ok(nonce)
-    } else {
-        // No valid nonce for the MDataInfo could be found
-        Err(AuthError::from("No valid nonce for access container"))
-    }
-}
+/// Updates the authenticator entry
+pub fn put_authenticator_entry<T: 'static>(
+    client: &Client<T>,
+    new_value: &HashMap<String, MDataInfo>,
+    version: u64,
+) -> Box<AuthFuture<()>> {
+    let access_container = fry!(client.access_container());
+    let plaintext = fry!(serialise(new_value));
+    let (key, ciphertext) = {
+        let sk = fry!(client.secret_symmetric_key());
 
-/// Gets access container entry key corresponding to the given app.
-pub fn access_container_key(
-    access_container: &MDataInfo,
-    app_id: &str,
-    app_keys: &AppKeys,
-) -> Result<Vec<u8>, AuthError> {
-    let nonce = access_container_nonce(access_container)?;
-    Ok(access_container_enc_key(app_id, &app_keys.enc_key, nonce)?)
+        let key = fry!(enc_key(&access_container, AUTHENTICATOR_ENTRY, &sk));
+        let ciphertext = fry!(symmetric_encrypt(&plaintext, &sk, None));
+
+        (key, ciphertext)
+    };
+
+    let actions = if version == 0 {
+        EntryActions::new().ins(key, ciphertext, 0)
+    } else {
+        EntryActions::new().update(key, ciphertext, version)
+    };
+
+    recovery::mutate_mdata_entries(
+        client,
+        access_container.name,
+        access_container.type_tag,
+        actions.into(),
+    ).map_err(From::from)
+        .into_box()
 }
 
 /// Gets an access container entry
-pub fn access_container_entry<T>(
+pub fn fetch_entry<T>(
     client: &Client<T>,
-    access_container: &MDataInfo,
     app_id: &str,
     app_keys: AppKeys,
 ) -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>>
 where
     T: 'static,
 {
-    let key = fry!(access_container_key(access_container, app_id, &app_keys));
+    let access_container = fry!(client.access_container());
+    let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
 
     client
         .get_mdata_value(access_container.name, access_container.type_tag, key)
@@ -99,9 +131,8 @@ where
 }
 
 /// Adds a new entry to the authenticator access container
-pub fn put_access_container_entry<T>(
+pub fn put_entry<T>(
     client: &Client<T>,
-    access_container: &MDataInfo,
     app_id: &str,
     app_keys: &AppKeys,
     permissions: &AccessContainerEntry,
@@ -110,7 +141,8 @@ pub fn put_access_container_entry<T>(
 where
     T: 'static,
 {
-    let key = fry!(access_container_key(access_container, app_id, app_keys));
+    let access_container = fry!(client.access_container());
+    let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
     let plaintext = fry!(serialise(&permissions));
     let ciphertext = fry!(symmetric_encrypt(&plaintext, &app_keys.enc_key, None));
 
@@ -130,15 +162,18 @@ where
 }
 
 /// Deletes entry from the access container.
-pub fn delete_access_container_entry<T: 'static>(
+pub fn delete_entry<T: 'static>(
     client: &Client<T>,
-    access_container: &MDataInfo,
     app_id: &str,
     app_keys: &AppKeys,
     version: u64,
 ) -> Box<AuthFuture<()>> {
-    let key = fry!(access_container_key(access_container, app_id, app_keys));
+    // TODO: make sure this can't be called for authenticator Entry-0
+
+    let access_container = fry!(client.access_container());
+    let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
     let actions = EntryActions::new().del(key, version);
+
     recovery::mutate_mdata_entries(
         client,
         access_container.name,

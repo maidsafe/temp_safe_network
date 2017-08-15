@@ -1,4 +1,4 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -13,26 +13,14 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// relating to use of the SAFE Network Software
 
-/// FFI representation of NFS structures
-pub mod ffi;
-/// `FileHelper` provides functions for CRUD on file
-pub mod file_helper;
+//! Utility functions and types to work with the access container
 
-mod errors;
-mod data_map;
-mod dir;
-mod file;
-mod reader;
-mod writer;
-
-pub use self::dir::create_dir;
-pub use self::errors::NfsError;
-pub use self::file::File;
-pub use self::reader::Reader;
-pub use self::writer::{Mode, Writer};
-use futures::Future;
-
-/// Helper type for futures that can result in `NfsError`
-pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
+use {CoreError, DIR_TAG};
+use client::MDataInfo;
+use ipc::req::ffi::Permission;
+use nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
+use rust_sodium::crypto::secretbox;
+use std::collections::{BTreeSet, HashMap};
+use tiny_keccak::sha3_256;

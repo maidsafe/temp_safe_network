@@ -74,6 +74,7 @@ mod app_container;
 mod config;
 mod errors;
 mod revocation;
+mod std_dirs;
 
 /// Provides utilities to test the authenticator functionality
 #[cfg(any(test, feature = "testing"))]
@@ -82,20 +83,15 @@ pub mod test_utils;
 mod tests;
 
 pub use self::errors::AuthError;
-use config::{KEY_ACCESS_CONTAINER, KEY_APPS};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
-use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::EntryActions;
 use safe_core::{Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
-                NetworkTx, event_loop, mdata_info};
+                NetworkTx, event_loop};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
 use safe_core::ipc::Permission;
-use safe_core::nfs::{create_dir, create_std_dirs};
-use safe_core::recovery;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
@@ -188,7 +184,7 @@ impl Authenticator {
             let core_tx3 = core_tx.clone();
 
             unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
-                init_std_dirs(client)
+                std_dirs::create(client)
                     .map(move |()| {
                         unwrap!(tx.send(Ok(core_tx2)));
                     })
@@ -264,7 +260,7 @@ impl Authenticator {
 
             let client = try_tx!(create_client_fn(el_h, core_tx_clone, net_tx), tx);
 
-            if !try_tx!(client.get_std_dirs_created(), tx) {
+            if !try_tx!(client.std_dirs_created(), tx) {
                 // Standard directories haven't been created during
                 // the user account registration - retry it again.
                 let tx2 = tx.clone();
@@ -272,7 +268,7 @@ impl Authenticator {
                 let core_tx3 = core_tx.clone();
 
                 unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
-                    init_std_dirs(client)
+                    std_dirs::create(client)
                         .map(move |()| {
                             unwrap!(tx.send(Ok(core_tx2)));
                         })
@@ -384,39 +380,4 @@ impl Drop for Authenticator {
             info!("Unexpected error in drop: {:?}", e);
         }
     }
-}
-
-// Create standard directories and the access container
-fn init_std_dirs(client: &Client<()>) -> Box<AuthFuture<()>> {
-    let client = client.clone();
-    let c2 = client.clone();
-    let c3 = client.clone();
-
-    create_std_dirs(client.clone())
-        .map_err(AuthError::from)
-        .and_then(move |_| {
-            create_dir(&client, false)
-                .map_err(AuthError::from)
-        })
-        .and_then(move |dir| {
-            let config_dir = unwrap!(c2.config_root_dir());
-
-            let actions = EntryActions::new()
-                .ins(KEY_APPS.to_vec(), Vec::new(), 0)
-                .ins(KEY_ACCESS_CONTAINER.to_vec(), fry!(serialise(&dir)), 0)
-                .into();
-            let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir,
-                                                                 &actions));
-
-            recovery::mutate_mdata_entries(&c2, config_dir.name,
-                                    config_dir.type_tag,
-                                    actions)
-                .map_err(AuthError::from)
-                .into_box()
-        })
-        .and_then(move |()| {
-            c3.set_std_dirs_created(true)
-                .map_err(AuthError::from)
-        })
-        .into_box()
 }

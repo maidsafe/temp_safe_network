@@ -159,10 +159,11 @@ impl App {
         } = auth_granted;
 
         let client_keys = ClientKeys {
-            sign_pk: sign_pk,
-            sign_sk: sign_sk,
-            enc_pk: enc_pk,
-            enc_sk: enc_sk,
+            sign_pk,
+            sign_sk,
+            enc_pk,
+            enc_sk,
+            enc_key: enc_key.clone(),
         };
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
@@ -211,6 +212,7 @@ impl App {
             sign_sk,
             enc_pk,
             enc_sk,
+            enc_key: enc_key.clone(),
         };
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {

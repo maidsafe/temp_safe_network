@@ -17,41 +17,30 @@
 
 //! Routines to handle an apps dedicated containers
 
-use AuthFuture;
+use {AuthError, AuthFuture};
+use access_container;
 use futures::Future;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Action, ClientError, EntryActions, PermissionSet, User};
+use routing::{Action, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
+use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, nfs};
 
-/// Checks if an app's dedicated container is available and stored in the user's root dir.
+/// Checks if an app's dedicated container is available and stored in the access container.
 /// If no previously created container has been found, then it will be created.
 pub fn fetch(
-    client: Client<()>,
-    app_id: String,
+    client: &Client<()>,
+    app_id: &str,
     app_sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<MDataInfo>> {
-    let root = fry!(client.user_root_dir());
-    let app_cont_name = format!("apps/{}", app_id);
-    let key = fry!(root.enc_entry_key(app_cont_name.as_bytes()));
-
     let c2 = client.clone();
+    let c3 = client.clone();
+    let app_cont_name = app_container_name(app_id);
 
-    client
-        .get_mdata_value(root.name, root.type_tag, key)
-        .then(move |res| {
-            match res {
-                // If the container is not found, create it
-                Ok(ref v) if v.content.is_empty() => create(client, &app_id, app_sign_pk),
-                Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
-                    create(client, &app_id, app_sign_pk)
-                }
-                // Reuse the already existing app container
-                Ok(val) => {
-                    let plaintext = fry!(root.decrypt(&val.content));
-                    let mdata_info = fry!(deserialise::<MDataInfo>(&plaintext));
-
-                    // Update permissions for the app container
+    access_container::authenticator_entry(client)
+        .and_then(move |(ac_entry_version, mut ac_entries)| {
+            match ac_entries.remove(&app_cont_name) {
+                Some(mdata_info) => {
+                    // Reuse the already existing app container and update
+                    // permissions for it
                     let ps = PermissionSet::new()
                         .allow(Action::Insert)
                         .allow(Action::Update)
@@ -71,47 +60,21 @@ pub fn fetch(
                         .map_err(From::from)
                         .into_box()
                 }
-                Err(e) => err!(e),
+                None => {
+                    // If the container is not found, create it
+                    create(&c2, app_sign_pk)
+                        .and_then(move |md_info| {
+                            let _ = ac_entries.insert(app_cont_name, md_info.clone());
+
+                            access_container::put_authenticator_entry(
+                                &c3,
+                                &ac_entries,
+                                ac_entry_version + 1,
+                            ).map(move |()| md_info)
+                        })
+                        .into_box()
+                }
             }
-        })
-        .into_box()
-}
-
-/// Creates a new app dedicated container
-pub fn create(
-    client: Client<()>,
-    app_id: &str,
-    app_sign_pk: sign::PublicKey,
-) -> Box<AuthFuture<MDataInfo>> {
-    let root = fry!(client.user_root_dir());
-    let app_cont_name = format!("apps/{}", app_id);
-
-    let c2 = client.clone();
-
-    nfs::create_dir(&client, false)
-        .map_err(From::from)
-        .and_then(move |dir| {
-            let serialised = fry!(serialise(&dir));
-            let key = fry!(root.enc_entry_key(app_cont_name.as_bytes()));
-            let ciphertext = fry!(root.enc_entry_value(&serialised));
-
-            let actions = EntryActions::new().ins(key, ciphertext, 0);
-            client
-                .mutate_mdata_entries(root.name, root.type_tag, actions.into())
-                .map_err(From::from)
-                .map(move |_| dir)
-                .into_box()
-        })
-        .and_then(move |dir| {
-            let ps = PermissionSet::new()
-                .allow(Action::Insert)
-                .allow(Action::Update)
-                .allow(Action::Delete)
-                .allow(Action::ManagePermissions);
-
-            c2.set_mdata_user_permissions(dir.name, dir.type_tag, User::Key(app_sign_pk), ps, 1)
-                .map_err(From::from)
-                .map(move |_| dir)
         })
         .into_box()
 }
@@ -119,25 +82,17 @@ pub fn create(
 /// Removes an app's dedicated container if it's available and stored in the user's root dir.
 /// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
 pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
-    let root = fry!(client.user_root_dir());
-    let app_cont_name = format!("apps/{}", app_id);
-    let key = fry!(root.enc_entry_key(app_cont_name.as_bytes()));
-
     let c2 = client.clone();
+    let app_cont_name = app_container_name(app_id);
 
-    client
-        .get_mdata_value(root.name, root.type_tag, key.clone())
-        .then(move |res| {
-            match res {
-                Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
+    access_container::authenticator_entry(&client)
+        .and_then(move |(ac_entry_version, mut ac_entries)| {
+            match ac_entries.remove(&app_cont_name) {
+                None => {
                     // App container doesn't exist
                     ok!(false)
                 }
-                Err(e) => err!(e),
-                Ok(val) => {
-                    let decrypted = fry!(root.decrypt(&val.content));
-                    let mdata_info = fry!(deserialise::<MDataInfo>(&decrypted));
-
+                Some(mdata_info) => {
                     let c3 = c2.clone();
 
                     c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
@@ -147,16 +102,21 @@ pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
                              (entry_name, val)| {
                                 actions.del(entry_name.clone(), val.entry_version + 1)
                             });
+
                             c3.mutate_mdata_entries(
                                 mdata_info.name,
                                 mdata_info.type_tag,
                                 actions.into(),
                             )
                         })
+                        .map_err(From::from)
                         .and_then(move |_| {
-                            // Remove MData itself
-                            let actions = EntryActions::new().del(key, val.entry_version + 1);
-                            client.mutate_mdata_entries(root.name, root.type_tag, actions.into())
+                            // Remove MDataInfo from the access container
+                            access_container::put_authenticator_entry(
+                                &client,
+                                &ac_entries,
+                                ac_entry_version + 1,
+                            )
 
                             // TODO(nbaksalyar): when MData deletion is implemented properly,
                             // also delete the actual MutableData related to app
@@ -168,4 +128,25 @@ pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
             }
         })
         .into_box()
+}
+
+/// Creates a new app's dedicated container
+fn create(client: &Client<()>, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<MDataInfo>> {
+    let dir = fry!(MDataInfo::random_private(DIR_TAG).map_err(AuthError::from));
+    nfs::create_dir(
+        client,
+        &dir,
+        btree_map![],
+        btree_map![User::Key(app_sign_pk) => PermissionSet::new()
+                .allow(Action::Insert)
+                .allow(Action::Update)
+                .allow(Action::Delete)
+                .allow(Action::ManagePermissions)],
+    ).map(move |()| dir).map_err(From::from)
+        .into_box()
+}
+
+#[inline]
+fn app_container_name(app_id: &str) -> String {
+    format!("apps/{}", app_id)
 }

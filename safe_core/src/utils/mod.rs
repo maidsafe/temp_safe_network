@@ -45,6 +45,10 @@ macro_rules! btree_set {
 
 #[macro_export]
 macro_rules! btree_map {
+    () => ({
+        ::std::collections::BTreeMap::new()
+    });
+
     ($($key:expr => $value:expr),*) => {{
         let mut _map = ::std::collections::BTreeMap::new();
         $(
@@ -64,7 +68,8 @@ struct SymmetricEnc {
     cipher_text: Vec<u8>,
 }
 
-/// Symmetric encryption
+/// Symmetric encryption.
+/// If `nonce` is `None`, then it will be generated randomly.
 pub fn symmetric_encrypt(
     plain_text: &[u8],
     secret_key: &secretbox::Key,
