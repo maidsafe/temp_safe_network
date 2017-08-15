@@ -22,8 +22,9 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
-use routing::{XOR_NAME_LEN, XorName};
+use routing::XorName;
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
+use safe_core::ffi::XorNameArray;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::os::raw::c_void;
 
@@ -31,8 +32,6 @@ use std::os::raw::c_void;
 pub type SEWriterHandle = SelfEncryptorWriterHandle;
 /// Handle of a Self Encryptor Reader object
 pub type SEReaderHandle = SelfEncryptorReaderHandle;
-/// Xor Name bytes
-pub type XorNameArray = [u8; XOR_NAME_LEN];
 
 /// Get a Self Encryptor
 #[no_mangle]

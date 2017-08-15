@@ -17,13 +17,13 @@
 
 #![allow(unsafe_code)]
 
-use routing::XOR_NAME_LEN;
-use rust_sodium::crypto::{box_, secretbox, sign};
+use ffi::*;
+use rust_sodium::crypto::sign;
 use std::ffi::CString;
 use std::os::raw::c_char;
 use std::ptr;
 
-/// It represents the authentication response.
+/// Represents the authentication response.
 #[repr(C)]
 #[derive(Clone)]
 pub struct AuthGranted {
@@ -52,24 +52,24 @@ impl Drop for AuthGranted {
     }
 }
 
-/// Represents the needed keys to work with the data
+/// Represents the needed keys to work with the data.
 #[repr(C)]
 #[derive(Copy)]
 pub struct AppKeys {
     /// Owner signing public key
-    pub owner_key: [u8; sign::PUBLICKEYBYTES],
+    pub owner_key: SignPublicKey,
     /// Data symmetric encryption key
-    pub enc_key: [u8; secretbox::KEYBYTES],
+    pub enc_key: SymSecretKey,
     /// Asymmetric sign public key.
     ///
     /// This is the identity of the App in the Network.
-    pub sign_pk: [u8; sign::PUBLICKEYBYTES],
+    pub sign_pk: SignPublicKey,
     /// Asymmetric sign private key.
-    pub sign_sk: [u8; sign::SECRETKEYBYTES],
+    pub sign_sk: SignSecretKey,
     /// Asymmetric enc public key.
-    pub enc_pk: [u8; box_::PUBLICKEYBYTES],
+    pub enc_pk: PublicKey,
     /// Asymmetric enc private key.
-    pub enc_sk: [u8; box_::SECRETKEYBYTES],
+    pub enc_sk: AsymSecretKey,
 }
 
 impl Clone for AppKeys {
@@ -101,11 +101,11 @@ impl Clone for AppKeys {
 #[derive(Clone, Copy)]
 pub struct AccessContInfo {
     /// ID
-    pub id: [u8; XOR_NAME_LEN],
+    pub id: XorNameArray,
     /// Type tag
     pub tag: u64,
     /// Nonce
-    pub nonce: [u8; secretbox::NONCEBYTES],
+    pub nonce: SymNonce,
 }
 
 /// User metadata for mutable data

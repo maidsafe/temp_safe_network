@@ -22,16 +22,10 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
+use safe_core::ffi::{AsymNonce, AsymSecretKey, PublicKey};
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
-
-/// Private Key bytes array
-pub type SecKey = [u8; box_::SECRETKEYBYTES];
-/// Public Key bytes array
-pub type PubKey = [u8; box_::PUBLICKEYBYTES];
-/// Nonce bytes
-pub type Nonce = [u8; box_::NONCEBYTES];
 
 /// Get the public signing key of the app.
 #[no_mangle]
@@ -52,7 +46,7 @@ pub unsafe extern "C" fn app_pub_sign_key(
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_new(
     app: *const App,
-    data: *const PubKey,
+    data: *const PublicKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, SignKeyHandle),
 ) {
@@ -70,7 +64,7 @@ pub unsafe extern "C" fn sign_key_get(
     app: *const App,
     handle: SignKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const PubKey),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const PublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -140,7 +134,7 @@ pub unsafe extern "C" fn enc_generate_key_pair(
 #[no_mangle]
 pub unsafe extern "C" fn enc_pub_key_new(
     app: *const App,
-    data: *const PubKey,
+    data: *const PublicKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, EncryptPubKeyHandle),
 ) {
@@ -158,7 +152,7 @@ pub unsafe extern "C" fn enc_pub_key_get(
     app: *const App,
     handle: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const PubKey),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const PublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -174,7 +168,7 @@ pub unsafe extern "C" fn enc_secret_key_get(
     app: *const App,
     handle: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const SecKey),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymSecretKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -188,7 +182,7 @@ pub unsafe extern "C" fn enc_secret_key_get(
 #[no_mangle]
 pub unsafe extern "C" fn enc_secret_key_new(
     app: *const App,
-    data: *const SecKey,
+    data: *const AsymSecretKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, EncryptSecKeyHandle),
 ) {
@@ -414,7 +408,7 @@ pub unsafe extern "C" fn sha3_hash(
 #[no_mangle]
 pub unsafe extern "C" fn generate_nonce(
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const Nonce),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymNonce),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let nonce = box_::gen_nonce();
@@ -428,7 +422,8 @@ pub unsafe extern "C" fn generate_nonce(
 mod tests {
     use super::*;
     use ffi_utils::test_utils::{call_1, call_2, call_vec_u8};
-    use rust_sodium::crypto::{box_, sign};
+    use rust_sodium::crypto::box_;
+    use safe_core::ffi::{AsymNonce, PublicKey, SignPublicKey};
     use test_utils::{create_app, run_now};
 
     #[test]
@@ -443,9 +438,9 @@ mod tests {
 
         // Copying app2 pubkey to app1 object cache
         // and app1 pubkey to app2 object cache
-        let pk2_raw: [u8; box_::PUBLICKEYBYTES] =
+        let pk2_raw: PublicKey =
             unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app2, app2_pk2_h, ud, cb))) };
-        let pk1_raw: [u8; box_::PUBLICKEYBYTES] =
+        let pk1_raw: PublicKey =
             unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app1, app1_pk1_h, ud, cb))) };
 
         let app1_pk2_h =
@@ -497,7 +492,7 @@ mod tests {
 
         // Copying app2 pubkey to app1 object cache
         // and app1 pubkey to app2 object cache
-        let pk2_raw: [u8; box_::PUBLICKEYBYTES] =
+        let pk2_raw: PublicKey =
             unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app2, app2_pk2_h, ud, cb))) };
 
         let app1_pk2_h =
@@ -542,7 +537,7 @@ mod tests {
             app_sign_key1
         });
 
-        let app_sign_key1_raw: [u8; sign::PUBLICKEYBYTES] =
+        let app_sign_key1_raw: SignPublicKey =
             unsafe { unwrap!(call_1(|ud, cb| sign_key_get(&app, app_sign_key1_h, ud, cb))) };
 
         let app_sign_key2_h = unsafe {
@@ -571,7 +566,7 @@ mod tests {
             app_enc_key1
         });
 
-        let app_enc_key1_raw: [u8; box_::PUBLICKEYBYTES] = unsafe {
+        let app_enc_key1_raw: PublicKey = unsafe {
             unwrap!(call_1(
                 |ud, cb| enc_pub_key_get(&app, app_enc_key1_h, ud, cb),
             ))
@@ -592,8 +587,7 @@ mod tests {
 
     #[test]
     fn nonce_smoke_test() {
-        let nonce: [u8; box_::NONCEBYTES] =
-            unsafe { unwrap!(call_1(|ud, cb| generate_nonce(ud, cb))) };
+        let nonce: AsymNonce = unsafe { unwrap!(call_1(|ud, cb| generate_nonce(ud, cb))) };
         assert_eq!(nonce.len(), box_::NONCEBYTES);
     }
 }
