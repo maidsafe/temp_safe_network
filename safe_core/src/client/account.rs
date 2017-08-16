@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use DIR_TAG;
 use client::MDataInfo;
 use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -29,9 +30,9 @@ pub struct Account {
     /// The User Account Keys
     pub maid_keys: ClientKeys,
     /// The user's access container
-    pub access_container: Option<MDataInfo>,
+    pub access_container: MDataInfo,
     /// The user's configuration directory
-    pub config_root: Option<MDataInfo>,
+    pub config_root: MDataInfo,
     /// Set to `true` when all root and standard containers
     /// have been created successfully. `false` signifies that
     /// previous attempt might have failed - check on login.
@@ -40,13 +41,13 @@ pub struct Account {
 
 impl Account {
     /// Create new Account with a provided set of keys
-    pub fn new(maid_keys: ClientKeys) -> Self {
-        Account {
+    pub fn new(maid_keys: ClientKeys) -> Result<Self, CoreError> {
+        Ok(Account {
             maid_keys,
-            access_container: None,
-            config_root: None,
+            access_container: MDataInfo::random_private(DIR_TAG)?,
+            config_root: MDataInfo::random_private(DIR_TAG)?,
             root_dirs_created: false,
-        }
+        })
     }
 
     /// Symmetric encryption of Account using User's credentials.
@@ -234,7 +235,7 @@ mod tests {
 
     #[test]
     fn serialisation() {
-        let account = Account::new(ClientKeys::new(None));
+        let account = unwrap!(Account::new(ClientKeys::new(None)));
         let encoded = unwrap!(serialise(&account));
         let decoded: Account = unwrap!(deserialise(&encoded));
 
@@ -243,7 +244,7 @@ mod tests {
 
     #[test]
     fn encryption() {
-        let account = Account::new(ClientKeys::new(None));
+        let account = unwrap!(Account::new(ClientKeys::new(None)));
 
         let password = b"impossible to guess";
         let pin = b"1000";

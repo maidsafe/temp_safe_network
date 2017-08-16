@@ -46,71 +46,48 @@ pub fn create(client: &Client<()>) -> Box<AuthFuture<()>> {
     let c3 = client.clone();
     let c4 = client.clone();
 
-    // Initialise standard directories info
-    let access_container = fry!(client.access_container().or_else(|_| {
-        MDataInfo::random_private(DIR_TAG)
-    }));
-    let config_dir = fry!(client.config_root_dir().or_else(|_| {
-        MDataInfo::random_private(DIR_TAG)
-    }));
+    // Initialise standard directories
+    let access_container = fry!(client.access_container());
+    let config_dir = fry!(client.config_root_dir());
 
-    let upd_access_cont = fry!(client.set_access_container(access_container.clone()));
-    let upd_config_root = fry!(client.set_config_root_dir(config_dir.clone()));
+    // Try to get default dirs from the access container
+    let access_cont_fut = access_container::authenticator_entry(&c2)
+        .then(move |res| {
+            match res {
+                Ok((_, default_containers)) => {
+                    // Make sure that all default dirs have been created
+                    create_std_dirs(&c3, &default_containers)
+                }
+                Err(AuthError::CoreError(
+                    CoreError::RoutingClientError(ClientError::NoSuchData))) => {
+                    // Access container hasn't been created yet
+                    let access_cont_value = fry!(random_std_dirs())
+                        .into_iter()
+                        .map(|(name, md_info)| (String::from(name), md_info))
+                        .collect();
+                    let std_dirs_fut = create_std_dirs(&c3, &access_cont_value);
+                    let access_cont_fut = create_access_container(&c3,
+                                                                  &access_container,
+                                                                  &access_cont_value);
 
-    let acc_pkt_fut = if upd_access_cont || upd_config_root {
-        // Update the account info with new MDataInfos
-        client
-            .update_account_packet()
-            .map_err(AuthError::from)
-            .into_box()
-    } else {
-        // Reuse the existing MDataInfo
-        ok!(())
-    };
-
-    acc_pkt_fut
-        .and_then(move |_| {
-            // Try to get default dirs from the access container
-            let access_cont_fut = access_container::authenticator_entry(&c2)
-                .then(move |res| {
-                    match res {
-                        Ok((_, default_containers)) => {
-                            // Make sure that all default dirs have been created
-                            create_std_dirs(&c3, &default_containers)
-                        }
-                        Err(AuthError::CoreError(
-                            CoreError::RoutingClientError(ClientError::NoSuchData))) => {
-                            // Access container hasn't been created yet
-                            let access_cont_value = fry!(random_std_dirs())
-                                .into_iter()
-                                .map(|(name, md_info)| (String::from(name), md_info))
-                                .collect();
-                            let std_dirs_fut = create_std_dirs(&c3, &access_cont_value);
-                            let access_cont_fut = create_access_container(&c3,
-                                                                          &access_container,
-                                                                          &access_cont_value);
-
-                            future::join_all(vec![std_dirs_fut, access_cont_fut])
-                                .map(|_| ())
-                                .into_box()
-                        }
-                        Err(e) => err!(e),
-                    }
-                })
-                .into_box();
-
-            future::join_all(vec![access_cont_fut, create_config_dir(&c2, &config_dir)])
-                .map_err(From::from)
-                .into_box()
+                    future::join_all(vec![std_dirs_fut, access_cont_fut])
+                        .map(|_| ())
+                        .into_box()
+                }
+                Err(e) => err!(e),
+            }
         })
+        .into_box();
+
+    future::join_all(vec![access_cont_fut, create_config_dir(&c2, &config_dir)])
+        .map_err(From::from)
         .and_then(move |_| {
-            // Update account packet again - root directories have been created successfully
+            // Update account packet - root directories have been created successfully
             // (so we don't have to recover them after login).
             fry!(c4.set_std_dirs_created(true).map_err(AuthError::from));
             c4.update_account_packet().map_err(From::from).into_box()
         })
         .into_box()
-
 }
 
 fn create_config_dir(client: &Client<()>, config_dir: &MDataInfo) -> Box<AuthFuture<()>> {
