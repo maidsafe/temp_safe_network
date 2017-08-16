@@ -252,7 +252,7 @@ impl<T: 'static> Client<T> {
         let (mut routing, routing_rx) = setup_routing(full_id, None)?;
         routing = routing_wrapper_fn(routing);
 
-        let acc = Account::new(maid_keys);
+        let acc = Account::new(maid_keys)?;
 
         let acc_ciphertext = acc.encrypt(&user_cred.password, &user_cred.pin)?;
         let acc_data =
@@ -865,7 +865,7 @@ impl<T: 'static> Client<T> {
 
         let mut inner = self.inner_mut();
         let mut account = inner.client_type.acc_mut()?;
-        let dir = Some(dir);
+
         if account.access_container != dir {
             account.access_container = dir;
             Ok(true)
@@ -877,10 +877,8 @@ impl<T: 'static> Client<T> {
     /// Get User's Access Container if available in account packet used for
     /// current login
     pub fn access_container(&self) -> Result<MDataInfo, CoreError> {
-        self.inner().client_type.acc().and_then(|account| {
-            Ok(account.access_container.clone().ok_or_else(|| {
-                CoreError::from("Access container is None")
-            })?)
+        self.inner().client_type.acc().map(|account| {
+            account.access_container.clone()
         })
     }
 
@@ -894,7 +892,7 @@ impl<T: 'static> Client<T> {
 
         let mut inner = self.inner_mut();
         let mut account = inner.client_type.acc_mut()?;
-        let dir = Some(dir);
+
         if account.config_root != dir {
             account.config_root = dir;
             Ok(true)
@@ -906,10 +904,8 @@ impl<T: 'static> Client<T> {
     /// Get Maidsafe specific configuration's Root Directory ID if available in
     /// account packet used for current login
     pub fn config_root_dir(&self) -> Result<MDataInfo, CoreError> {
-        self.inner().client_type.acc().and_then(|account| {
-            Ok(account.config_root.clone().ok_or_else(|| {
-                CoreError::from("Config dir is None")
-            })?)
+        self.inner().client_type.acc().map(|account| {
+            account.config_root.clone()
         })
     }
 
@@ -1611,7 +1607,7 @@ mod tests {
                          Client::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
                      },
                      move |client| {
-                         assert!(client.access_container().is_err());
+                         assert!(client.access_container().is_ok());
                          assert!(client.set_access_container(dir).is_ok());
                          client.update_account_packet()
                      });
@@ -1637,7 +1633,7 @@ mod tests {
                          Client::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
                      },
                      move |client| {
-                         assert!(client.config_root_dir().is_err());
+                         assert!(client.config_root_dir().is_ok());
                          assert!(client.set_config_root_dir(dir).is_ok());
                          client.update_account_packet()
                      });
