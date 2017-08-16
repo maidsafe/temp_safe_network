@@ -27,9 +27,9 @@ use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};
+use safe_core::ipc::req::containers_into_vec;
 use safe_core::ipc::req::ffi::{self, ContainerPermissions};
 use safe_core::utils::symmetric_decrypt;
-use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 /// Application registered in the authenticator
@@ -191,6 +191,7 @@ pub unsafe extern "C" fn auth_registered_apps(
                 })
                 .and_then(move |(access_container, entries, auth_cfg)| {
                     let mut apps = Vec::new();
+
                     let nonce = access_container.nonce().ok_or_else(|| {
                         AuthError::from("No nonce on access container's MDataInfo")
                     })?;
@@ -208,19 +209,10 @@ pub unsafe extern "C" fn auth_registered_apps(
                             let plaintext = symmetric_decrypt(&entry.content, &app.keys.enc_key)?;
                             let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
 
-                            let mut containers = Vec::new();
-
-                            for (key, (_, perms)) in app_access {
-                                let perms = perms.iter().cloned().collect::<Vec<_>>();
-                                let (access_ptr, len, cap) = vec_into_raw_parts(perms);
-
-                                containers.push(ContainerPermissions {
-                                    cont_name: CString::new(key)?.into_raw(),
-                                    access: access_ptr,
-                                    access_len: len,
-                                    access_cap: cap,
-                                });
-                            }
+                            let containers =
+                                containers_into_vec(
+                                    app_access.into_iter().map(|(key, (_, perms))| (key, perms)),
+                                )?;
 
                             let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
                             let reg_app = RegisteredApp {

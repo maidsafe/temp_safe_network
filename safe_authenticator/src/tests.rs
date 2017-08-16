@@ -1492,7 +1492,7 @@ fn share_some_mdatas() {
         mdatas.push(ShareMData {
             type_tag: 0,
             name: name,
-            perms: PermissionSet::new(),
+            perms: PermissionSet::new().allow(Action::Insert),
         });
     }
 
@@ -1600,7 +1600,7 @@ fn share_some_mdatas_with_valid_metadata() {
     };
 
     let (tx, rx) = mpsc::channel::<Result<(), (i32, String)>>();
-    let (req_c, req_c_data) = unwrap!(req.into_repr_c());
+    let req_c = unwrap!(req.into_repr_c());
     unsafe {
         encode_share_mdata_resp(
             &authenticator,
@@ -1625,9 +1625,6 @@ fn share_some_mdatas_with_valid_metadata() {
         let permissions = unwrap!(mdata.user_permissions(&User::Key(app_key)));
         assert_eq!(permissions, &perms);
     }
-
-    drop(tx);
-    drop(req_c_data);
 }
 
 #[test]
@@ -1667,7 +1664,7 @@ fn share_some_mdatas_with_ownership_error() {
         mdatas.push(ShareMData {
             type_tag: 0,
             name: name,
-            perms: PermissionSet::new(),
+            perms: PermissionSet::new().allow(Action::Insert),
         });
     }
 
@@ -1690,7 +1687,7 @@ fn share_some_mdatas_with_ownership_error() {
     };
 
     let (tx, rx) = mpsc::channel::<Result<(), (i32, String)>>();
-    let (req_c, req_c_data) = unwrap!(req.into_repr_c());
+    let req_c = unwrap!(req.into_repr_c());
     unsafe {
         encode_share_mdata_resp(
             &authenticator,
@@ -1707,8 +1704,6 @@ fn share_some_mdatas_with_ownership_error() {
         Err((ERR_SHARE_MDATA_DENIED, _)) => (),
         Err((code, description)) => panic!("Unexpected error ({}): {}", code, description),
     };
-    drop(tx);
-    drop(req_c_data);
 }
 
 // Create file in the given container, with the given name and content.

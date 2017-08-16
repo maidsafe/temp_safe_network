@@ -20,7 +20,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, f
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
-use safe_core::ipc::req::ffi::Permission;
+use safe_core::ipc::req::Permission;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
