@@ -15,44 +15,24 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing::{self, Action, XorName};
+use routing::XorName;
 use std::ffi::CString;
 use std::os::raw::c_char;
 
-/// Permission action
+/// Represents a requested set of changes to the permissions of a mutable data.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub enum Permission {
-    /// Read
-    Read,
-    /// Insert
-    Insert,
-    /// Update
-    Update,
-    /// Delete
-    Delete,
-    /// Modify permissions
-    ManagePermissions,
-}
-
-/// Transforms a `Permission` collection into `routing::PermissionSet`
-pub fn convert_permission_set<'a, Iter>(permissions: Iter) -> routing::PermissionSet
-where
-    Iter: IntoIterator<Item = &'a Permission>,
-{
-    let mut ps = routing::PermissionSet::new();
-
-    for access in permissions {
-        ps = match *access {
-            Permission::Read => ps,
-            Permission::Insert => ps.allow(Action::Insert),
-            Permission::Update => ps.allow(Action::Update),
-            Permission::Delete => ps.allow(Action::Delete),
-            Permission::ManagePermissions => ps.allow(Action::ManagePermissions),
-        };
-    }
-
-    ps
+#[derive(Copy, Clone, Default, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct PermissionSet {
+    /// How to modify the read permission.
+    pub read: bool,
+    /// How to modify the insert permission.
+    pub insert: bool,
+    /// How to modify the update permission.
+    pub update: bool,
+    /// How to modify the delete permission.
+    pub delete: bool,
+    /// How to modify the manage permissions permission.
+    pub manage_permissions: bool,
 }
 
 /// Represents an authorization request
@@ -152,13 +132,8 @@ impl Drop for AppExchangeInfo {
 pub struct ContainerPermissions {
     /// The UTF-8 encoded id
     pub cont_name: *const c_char,
-    /// The `Permission` array
-    pub access: *const Permission,
-    /// Size of the `Permission` array
-    pub access_len: usize,
-    /// Capacity of the `Permission` array. Internal field
-    /// required for the Rust allocator.
-    pub access_cap: usize,
+    /// The requested permission set
+    pub access: PermissionSet,
 }
 
 impl Drop for ContainerPermissions {
@@ -166,11 +141,6 @@ impl Drop for ContainerPermissions {
     fn drop(&mut self) {
         unsafe {
             let _ = CString::from_raw(self.cont_name as *mut _);
-            let _ = Vec::from_raw_parts(
-                self.access as *mut Permission,
-                self.access_len,
-                self.access_cap,
-            );
         }
     }
 }
@@ -184,6 +154,21 @@ pub struct ShareMDataReq {
     pub mdata: *const ShareMData,
     /// Length of the mdata array
     pub mdata_len: usize,
+    /// Capacity of the mdata vec - internal implementation detail
+    pub mdata_cap: usize,
+}
+
+impl Drop for ShareMDataReq {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.mdata as *mut ShareMData,
+                self.mdata_len,
+                self.mdata_cap,
+            );
+        }
+    }
 }
 
 #[repr(C)]
@@ -195,18 +180,4 @@ pub struct ShareMData {
     pub name: XorName,
     /// The permissions being requested.
     pub perms: PermissionSet,
-}
-
-#[repr(C)]
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-/// Represents a requested set of changes to the permissions of a mutable data.
-pub struct PermissionSet {
-    /// How to modify the insert permission.
-    pub insert: bool,
-    /// How to modify the update permission.
-    pub update: bool,
-    /// How to modify the delete permission.
-    pub delete: bool,
-    /// How to modify the manage permissions permission.
-    pub manage_permissions: bool,
 }

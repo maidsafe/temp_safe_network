@@ -29,9 +29,9 @@ use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq, Permission};
-use safe_core::ipc::req::ffi::convert_permission_set;
-use std::collections::{BTreeSet, HashMap};
+use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
+use safe_core::ipc::req::{ContainerPermissions, container_perms_into_permission_set};
+use std::collections::HashMap;
 use std::sync::mpsc;
 
 /// Creates a new random account for authenticator
@@ -221,7 +221,7 @@ pub fn compare_access_container_entries(
     authenticator: &Authenticator,
     app_sign_pk: sign::PublicKey,
     mut access_container: AccessContainerEntry,
-    expected: HashMap<String, BTreeSet<Permission>>,
+    expected: HashMap<String, ContainerPermissions>,
 ) {
     let results = run(authenticator, move |client| {
         let mut reqs = Vec::new();
@@ -229,7 +229,7 @@ pub fn compare_access_container_entries(
 
         for (container, expected_perms) in expected {
             // Check the requested permissions in the access container.
-            let expected_perm_set = convert_permission_set(&expected_perms);
+            let expected_perm_set = container_perms_into_permission_set(&expected_perms);
             let (md_info, perms) = unwrap!(
                 access_container.remove(&container),
                 "No '{}' in access container {:?}",

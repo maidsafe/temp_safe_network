@@ -29,13 +29,13 @@ use routing::{ClientError, User, XorName};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, recovery};
 use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
-use safe_core::ipc::req::{AuthReq, ContainersReq, IpcReq, ShareMDataReq};
+use safe_core::ipc::req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, ShareMDataReq,
+                          container_perms_into_permission_set};
 use safe_core::ipc::req::ffi::{AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq,
                                ShareMDataReq as FfiShareMDataReq};
-use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::resp::{IpcResp, METADATA_KEY, UserMetadata};
 use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
@@ -211,8 +211,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                        }) => {
                         decode_share_mdata_req(&c1, &share_mdata_req)
                             .and_then(move |metadatas| {
-                                let (share_mdata_req_repr_c, _keep_alive) = share_mdata_req
-                                    .into_repr_c()?;
+                                let share_mdata_req_repr_c = share_mdata_req.into_repr_c()?;
 
                                 let mut ffi_metadatas = Vec::with_capacity(metadatas.len());
                                 for metadata in metadatas {
@@ -657,7 +656,7 @@ pub unsafe extern "C" fn encode_containers_resp(
 /// Updates containers permissions (adds a given key to the permissions set)
 pub fn update_container_perms(
     client: &Client<()>,
-    permissions: HashMap<String, BTreeSet<Permission>>,
+    permissions: HashMap<String, ContainerPermissions>,
     sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<AccessContainerEntry>> {
     let c2 = client.clone();
@@ -675,7 +674,7 @@ pub fn update_container_perms(
                         container_key
                     ))
                 }));
-                let perm_set = convert_permission_set(&access);
+                let perm_set = container_perms_into_permission_set(&access);
 
                 let fut = client
                     .get_mdata_version(mdata_info.name, mdata_info.type_tag)

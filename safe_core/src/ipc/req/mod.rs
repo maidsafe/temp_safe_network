@@ -19,14 +19,40 @@
 
 /// Ffi module
 pub mod ffi;
+mod auth;
+mod containers;
+mod share_mdata;
 
-use self::ffi::Permission;
-use ffi_utils::{ReprC, StringError, from_c_str, vec_into_raw_parts};
+pub use self::auth::AuthReq;
+pub use self::containers::ContainersReq;
+use self::ffi::PermissionSet as FfiPermissionSet;
+pub use self::share_mdata::{ShareMData, ShareMDataReq};
+use ffi_utils::{ReprC, StringError, from_c_str};
 use ipc::errors::IpcError;
-use routing::{Action, PermissionSet, XorName};
+use routing::{Action, PermissionSet};
 use std::{ptr, slice};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CString, NulError};
+
+/// Permission enum - use for internal storage only
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub enum Permission {
+    /// Read
+    Read,
+    /// Insert
+    Insert,
+    /// Update
+    Update,
+    /// Delete
+    Delete,
+    /// Modify permissions
+    ManagePermissions,
+}
+
+/// Permissions stored internally in the access container.
+/// In FFI represented as `ffi::PermissionSet`
+pub type ContainerPermissions = BTreeSet<Permission>;
 
 /// IPC request
 // TODO: `TransOwnership` variant
@@ -42,47 +68,98 @@ pub enum IpcReq {
     ShareMData(ShareMDataReq),
 }
 
-/// Represents an authorization request
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct AuthReq {
-    /// The application identifier for this request
-    pub app: AppExchangeInfo,
-    /// `true` if the app wants dedicated container for itself. `false`
-    /// otherwise.
-    pub app_container: bool,
-    /// The list of containers it wishes to access (and desired permissions).
-    pub containers: HashMap<String, BTreeSet<Permission>>,
-}
-
+/// Consumes the object and returns the wrapped raw pointer.
 /// Converts a container name + a set of permissions into an FFI
-/// representation `ContainerPermissions`. You're now responsible for
-/// freeing this memory once you're done.
-pub fn container_perm_into_repr_c(
-    cont_name: String,
-    access: BTreeSet<Permission>,
-) -> Result<ffi::ContainerPermissions, NulError> {
-    let access_vec: Vec<_> = access.into_iter().collect();
-    let (access_ptr, len, cap) = vec_into_raw_parts(access_vec);
-
-    Ok(ffi::ContainerPermissions {
-        cont_name: CString::new(cont_name)?.into_raw(),
-        access: access_ptr,
-        access_len: len,
-        access_cap: cap,
-    })
-}
-
-/// Consumes the object and returns the wrapped raw pointer
+/// representation `ContainerPermissions`.
 ///
 /// You're now responsible for freeing this memory once you're done.
-pub fn containers_into_vec(
-    containers: HashMap<String, BTreeSet<Permission>>,
-) -> Result<Vec<ffi::ContainerPermissions>, NulError> {
-    let mut container_perms = Vec::new();
-    for (key, access) in containers {
-        container_perms.push(container_perm_into_repr_c(key, access)?);
+pub fn containers_into_vec<ContainersIter>(
+    containers: ContainersIter,
+) -> Result<Vec<ffi::ContainerPermissions>, NulError>
+where
+    ContainersIter: IntoIterator<Item = (String, ContainerPermissions)>,
+{
+    containers
+        .into_iter()
+        .map(|(cont_name, access)| {
+            Ok(ffi::ContainerPermissions {
+                cont_name: CString::new(cont_name)?.into_raw(),
+                access: container_perms_into_repr_c(&access),
+            })
+        })
+        .collect()
+}
+
+/// Transform a set of container permissions into its FFI representation
+fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet {
+    let mut output = FfiPermissionSet::default();
+
+    for perm in perms {
+        match *perm {
+            Permission::Read => {
+                output.read = true;
+            }
+            Permission::Insert => {
+                output.insert = true;
+            }
+            Permission::Update => {
+                output.update = true;
+            }
+            Permission::Delete => {
+                output.delete = true;
+            }
+            Permission::ManagePermissions => output.manage_permissions = true,
+        }
     }
-    Ok(container_perms)
+
+    output
+}
+
+/// Tranform an FFI representation into container permissions
+fn container_perms_from_repr_c(perms: FfiPermissionSet) -> Result<ContainerPermissions, IpcError> {
+    let mut output = BTreeSet::new();
+
+    if perms.read {
+        output.insert(Permission::Read);
+    }
+    if perms.insert {
+        output.insert(Permission::Insert);
+    }
+    if perms.update {
+        output.insert(Permission::Update);
+    }
+    if perms.delete {
+        output.insert(Permission::Delete);
+    }
+    if perms.manage_permissions {
+        output.insert(Permission::ManagePermissions);
+    }
+
+    if output.is_empty() {
+        Err(IpcError::from("No permissions were provided"))
+    } else {
+        Ok(output)
+    }
+}
+
+/// Transforms a collection of container permissions into `routing::PermissionSet`
+pub fn container_perms_into_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
+where
+    Iter: IntoIterator<Item = &'a Permission>,
+{
+    let mut ps = PermissionSet::new();
+
+    for access in permissions {
+        ps = match *access {
+            Permission::Read => ps,
+            Permission::Insert => ps.allow(Action::Insert),
+            Permission::Update => ps.allow(Action::Update),
+            Permission::Delete => ps.allow(Action::Delete),
+            Permission::ManagePermissions => ps.allow(Action::ManagePermissions),
+        };
+    }
+
+    ps
 }
 
 /// Constructs the object from a raw pointer.
@@ -93,104 +170,55 @@ pub fn containers_into_vec(
 pub unsafe fn containers_from_repr_c(
     raw: *const ffi::ContainerPermissions,
     len: usize,
-) -> Result<HashMap<String, BTreeSet<Permission>>, IpcError> {
-    let mut result = HashMap::new();
-    let vec = slice::from_raw_parts(raw, len);
-
-    for raw in vec {
-        let cont_name = from_c_str(raw.cont_name)?;
-        let access = slice::from_raw_parts(raw.access, raw.access_len);
-        let _ = result.insert(cont_name, access.iter().cloned().collect());
-    }
-
-    Ok(result)
-}
-
-impl AuthReq {
-    /// Consumes the object and returns the FFI counterpart.
-    ///
-    /// You're now responsible for freeing the subobjects memory once you're
-    /// done.
-    pub fn into_repr_c(self) -> Result<ffi::AuthReq, IpcError> {
-        let AuthReq {
-            app,
-            app_container,
-            containers,
-        } = self;
-
-        let containers = containers_into_vec(containers).map_err(StringError::from)?;
-        let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
-
-        Ok(ffi::AuthReq {
-            app: app.into_repr_c()?,
-            app_container: app_container,
-            containers: containers_ptr,
-            containers_len: len,
-            containers_cap: cap,
+) -> Result<HashMap<String, ContainerPermissions>, IpcError> {
+    slice::from_raw_parts(raw, len)
+        .iter()
+        .map(|raw| {
+            Ok((
+                from_c_str(raw.cont_name)?,
+                container_perms_from_repr_c(raw.access)?,
+            ))
         })
+        .collect()
+}
+
+/// Convert a `PermissionSet` into its C representation.
+fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
+    ffi::PermissionSet {
+        read: true,
+        insert: perms.is_allowed(Action::Insert).unwrap_or(false),
+        update: perms.is_allowed(Action::Update).unwrap_or(false),
+        delete: perms.is_allowed(Action::Delete).unwrap_or(false),
+        manage_permissions: perms.is_allowed(Action::ManagePermissions).unwrap_or(false),
     }
 }
 
-impl ReprC for AuthReq {
-    type C = *const ffi::AuthReq;
-    type Error = IpcError;
+/// Create a `PermissionSet` from its C representation.
+fn permission_set_clone_from_repr_c(perms: &ffi::PermissionSet) -> Result<PermissionSet, IpcError> {
+    let mut pm = PermissionSet::new();
 
-    /// Constructs the object from the FFI counterpart.
-    ///
-    /// After calling this function, the subobjects memory is owned by the
-    /// resulting object.
-    unsafe fn clone_from_repr_c(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
-        Ok(AuthReq {
-            app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
-            app_container: (*repr_c).app_container,
-            containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
-        })
+    if perms.read && !perms.insert && !perms.update && !perms.delete && !perms.manage_permissions {
+        // If only `read` is set to true, return an error
+        return Err(IpcError::from("Can't convert only the read permission"));
     }
-}
 
-/// Containers request
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
-pub struct ContainersReq {
-    /// Exchange info
-    pub app: AppExchangeInfo,
-    /// Requested containers
-    pub containers: HashMap<String, BTreeSet<Permission>>,
-}
-
-impl ContainersReq {
-    /// Consumes the object and returns the FFI counterpart.
-    ///
-    /// You're now responsible for freeing the subobjects memory once you're
-    /// done.
-    pub fn into_repr_c(self) -> Result<ffi::ContainersReq, IpcError> {
-        let ContainersReq { app, containers } = self;
-
-        let containers = containers_into_vec(containers).map_err(StringError::from)?;
-        let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
-
-        Ok(ffi::ContainersReq {
-            app: app.into_repr_c()?,
-            containers: containers_ptr,
-            containers_len: len,
-            containers_cap: cap,
-        })
+    if perms.insert {
+        pm = pm.allow(Action::Insert);
     }
-}
 
-impl ReprC for ContainersReq {
-    type C = *const ffi::ContainersReq;
-    type Error = IpcError;
-
-    /// Constructs the object from the FFI counterpart.
-    ///
-    /// After calling this functions, the subobjects memory is owned by the
-    /// resulting object.
-    unsafe fn clone_from_repr_c(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
-        Ok(ContainersReq {
-            app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
-            containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
-        })
+    if perms.update {
+        pm = pm.allow(Action::Update);
     }
+
+    if perms.delete {
+        pm = pm.allow(Action::Delete);
+    }
+
+    if perms.manage_permissions {
+        pm = pm.allow(Action::ManagePermissions);
+    }
+
+    Ok(pm)
 }
 
 /// Represents an application ID in the process of asking permissions
@@ -253,128 +281,11 @@ impl ReprC for AppExchangeInfo {
     }
 }
 
-/// Represents a request to share mutable data
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ShareMDataReq {
-    /// Info about the app requesting shared access
-    pub app: AppExchangeInfo,
-    /// List of MD names & type tags and permissions that need to be shared
-    pub mdata: Vec<ShareMData>,
-}
-
-/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ShareMData {
-    /// The mutable data type.
-    pub type_tag: u64,
-    /// The mutable data name.
-    pub name: XorName,
-    /// The permissions being requested.
-    pub perms: PermissionSet,
-}
-
-impl ShareMDataReq {
-    /// Convert to it's C representation
-    /// The returned `ffi::ShareMDataReq` contains pointers into the returned `Vec`. As such, the
-    /// `Vec` *must* be kept alive until the foreign code is finished with the
-    /// `ffi::ShareMDataReq`.
-    pub fn into_repr_c(self) -> Result<(ffi::ShareMDataReq, Vec<ffi::ShareMData>), IpcError> {
-        let mdata_repr_c: Vec<_> = self.mdata
-            .into_iter()
-            .map(|md| md.into_repr_c())
-            .collect::<Result<_, _>>()?;
-        Ok((
-            ffi::ShareMDataReq {
-                app: self.app.into_repr_c()?,
-                mdata: mdata_repr_c.as_ptr(),
-                mdata_len: mdata_repr_c.len(),
-            },
-            mdata_repr_c,
-        ))
-    }
-}
-
-impl ReprC for ShareMDataReq {
-    type C = *const ffi::ShareMDataReq;
-    type Error = IpcError;
-
-    /// Constructs the object from a raw pointer.
-    unsafe fn clone_from_repr_c(raw: *const ffi::ShareMDataReq) -> Result<Self, IpcError> {
-        Ok(ShareMDataReq {
-            app: AppExchangeInfo::clone_from_repr_c(&(*raw).app)?,
-            mdata: {
-                let mdata = slice::from_raw_parts((*raw).mdata, (*raw).mdata_len);
-                mdata
-                    .into_iter()
-                    .map(|c| ShareMData::clone_from_repr_c(c))
-                    .collect::<Result<_, _>>()?
-            },
-        })
-    }
-}
-
-impl ShareMData {
-    /// Convert to it's C representation
-    pub fn into_repr_c(self) -> Result<ffi::ShareMData, IpcError> {
-        Ok(ffi::ShareMData {
-            type_tag: self.type_tag,
-            name: self.name,
-            perms: permission_set_into_repr_c(self.perms),
-        })
-    }
-}
-
-impl ReprC for ShareMData {
-    type C = *const ffi::ShareMData;
-    type Error = IpcError;
-
-    /// Constructs the object from a raw pointer.
-    unsafe fn clone_from_repr_c(raw: *const ffi::ShareMData) -> Result<Self, IpcError> {
-        Ok(ShareMData {
-            type_tag: (*raw).type_tag,
-            name: (*raw).name,
-            perms: permission_set_clone_from_repr_c(&(*raw).perms),
-        })
-    }
-}
-
-/// Convert a `PermissionSet` into it's C representation.
-pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
-    ffi::PermissionSet {
-        insert: perms.is_allowed(Action::Insert).unwrap_or(false),
-        update: perms.is_allowed(Action::Update).unwrap_or(false),
-        delete: perms.is_allowed(Action::Delete).unwrap_or(false),
-        manage_permissions: perms.is_allowed(Action::ManagePermissions).unwrap_or(false),
-    }
-}
-
-/// Create a `PermissionSet` from it's C representation.
-pub fn permission_set_clone_from_repr_c(perms: &ffi::PermissionSet) -> PermissionSet {
-    let mut pm = PermissionSet::new();
-
-    if perms.insert {
-        pm = pm.allow(Action::Insert);
-    }
-
-    if perms.update {
-        pm = pm.allow(Action::Update);
-    }
-
-    if perms.delete {
-        pm = pm.allow(Action::Delete);
-    }
-
-    if perms.manage_permissions {
-        pm = pm.allow(Action::ManagePermissions);
-    }
-
-    pm
-}
-
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
     use super::*;
+    use super::ffi::PermissionSet as FfiPermissionSet;
     use ffi_utils::ReprC;
     use std::collections::HashMap;
     use std::ffi::CStr;
@@ -382,7 +293,7 @@ mod tests {
     #[test]
     fn container_permissions() {
         let mut cp = HashMap::new();
-        let _ = cp.insert("foobar".to_string(), Default::default());
+        let _ = cp.insert("foobar".to_string(), btree_set![Permission::Insert]);
 
         let ffi_cp = unwrap!(containers_into_vec(cp));
         assert_eq!(ffi_cp.len(), 1);
@@ -390,7 +301,50 @@ mod tests {
         let cp = unsafe { unwrap!(containers_from_repr_c(ffi_cp.as_ptr(), 1)) };
 
         assert!(cp.contains_key("foobar"));
-        assert!(unwrap!(cp.get("foobar")).is_empty());
+        assert_eq!(unwrap!(cp.get("foobar")), &btree_set![Permission::Insert]);
+    }
+
+    #[test]
+    fn empty_container_permissions() {
+        // Expect an error for an empty permission set
+        let mut cp = HashMap::new();
+        let _ = cp.insert("foobar".to_string(), Default::default());
+
+        let ffi_cp = unwrap!(containers_into_vec(cp));
+        assert_eq!(ffi_cp.len(), 1);
+
+        let cp = unsafe { containers_from_repr_c(ffi_cp.as_ptr(), 1) };
+        assert!(cp.is_err());
+    }
+
+    #[test]
+    fn permissions_set_conversion() {
+        // It should return an error in case if we have set only the `read` perm
+        let ps = FfiPermissionSet {
+            read: true,
+            insert: false,
+            update: false,
+            delete: false,
+            manage_permissions: false,
+        };
+
+        let res = permission_set_clone_from_repr_c(&ps);
+        assert!(res.is_err());
+
+        // It should ignore read perms in all other cases
+        let ps = FfiPermissionSet {
+            read: true,
+            insert: false,
+            update: true,
+            delete: true,
+            manage_permissions: false,
+        };
+
+        let res = unwrap!(permission_set_clone_from_repr_c(&ps));
+        assert!(unwrap!(res.is_allowed(Action::Update)));
+        assert!(unwrap!(res.is_allowed(Action::Delete)));
+        assert!(res.is_allowed(Action::Insert).is_none());
+        assert!(res.is_allowed(Action::ManagePermissions).is_none());
     }
 
     #[test]

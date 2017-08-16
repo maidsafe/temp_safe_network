@@ -242,7 +242,7 @@ mod tests {
     use rust_sodium::crypto::{box_, secretbox, sign};
     use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
                          ContainersReq, IpcMsg, IpcReq, IpcResp, ShareMData, ShareMDataReq};
-    use safe_core::ipc::req::ffi::Permission;
+    use safe_core::ipc::req::Permission;
     use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use safe_core::utils;
     use std::collections::HashMap;
@@ -328,7 +328,7 @@ mod tests {
             ],
         };
 
-        let (req_c, req_c_keep_alive) = unwrap!(req.clone().into_repr_c());
+        let req_c = unwrap!(req.clone().into_repr_c());
 
         let (req_id, encoded): (u32, String) =
             unsafe { unwrap!(call_2(|ud, cb| encode_share_mdata_req(&req_c, ud, cb))) };
@@ -347,7 +347,6 @@ mod tests {
 
         assert_eq!(decoded_req_id, req_id);
         assert_eq!(decoded_req, req);
-        drop(req_c_keep_alive);
     }
 
     #[test]
