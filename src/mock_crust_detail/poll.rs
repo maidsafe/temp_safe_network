@@ -81,14 +81,18 @@ pub fn nodes_and_clients(
     count
 }
 
-/// Empty event queue of nodes and client, until there are no unacknowledged messages
-/// left.
+/// Empty event queue of nodes and client, until there are no unacknowledged messages left.
 pub fn nodes_and_client_with_resend(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+    nodes_and_clients_with_resend(nodes, ref_slice_mut(client))
+}
+
+/// Empty event queue of nodes and clients, until there are no unacknowledged messages left.
+pub fn nodes_and_clients_with_resend(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
     let mut fired_connected_peer_timeout = false;
     let mut total_count = 0;
 
     for _ in 0..MAX_POLL_CALLS {
-        let count = nodes_and_client(nodes, client);
+        let count = nodes_and_clients(nodes, clients, false);
         if count > 0 {
             // Once each route is polled, advance time to trigger the following route.
             FakeClock::advance_time(ACK_TIMEOUT_SECS * 1000 + 1);

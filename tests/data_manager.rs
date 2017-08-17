@@ -1071,7 +1071,9 @@ fn mutable_data_put_and_mutate() {
         nodes[node_index].delay_group_refreshes(false);
         // Required to ensure the group leader handle delayed group refresh messages.
         // Hence the response to the client is guaranteed to be sent.
-        event_count += poll::nodes_and_clients(&mut nodes, &mut clients, false);
+        // `poll_with_resend` is required for the case that the group leader doesn't expect the
+        // request (thinking there is conflict operation), and have to accumulate on another route.
+        event_count += poll::nodes_and_clients_with_resend(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
 
         while let Ok(event) = clients[0].try_recv() {
