@@ -18,6 +18,7 @@
 #![allow(unsafe_code)]
 
 use ffi::*;
+use ipc::req::ffi::PermissionSet as FfiPermissionSet;
 use rust_sodium::crypto::sign;
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -108,26 +109,46 @@ pub struct AccessContInfo {
     pub nonce: SymNonce,
 }
 
+/// Information about an application that has access to an MD through `sign_key`
+#[repr(C)]
+pub struct AppAccess {
+    /// App's or user's public key
+    pub sign_key: *const SignPublicKey,
+    /// A list of permissions
+    pub permissions: FfiPermissionSet,
+    /// App's user-facing name
+    pub name: *const c_char,
+    /// App id.
+    /// This is u8, as the app-id can contain non-printable characters.
+    pub app_id: *const c_char,
+}
+
 /// User metadata for mutable data
 #[repr(C)]
-pub struct UserMetadata {
+pub struct MetadataResponse {
     /// Name or purpose of this mutable data.
     pub name: *const c_char,
     /// Description of how this mutable data should or should not be shared.
     pub description: *const c_char,
+    /// Xor name of this struct's corresponding MData object.
+    pub xor_name: *const XorNameArray,
+    /// Type tag of this struct's corresponding MData object.
+    pub type_tag: u64,
 }
 
-impl UserMetadata {
+impl MetadataResponse {
     /// Create invalid metadata.
     pub fn invalid() -> Self {
-        UserMetadata {
+        MetadataResponse {
             name: ptr::null(),
             description: ptr::null(),
+            xor_name: ptr::null(),
+            type_tag: 0,
         }
     }
 }
 
-impl Drop for UserMetadata {
+impl Drop for MetadataResponse {
     fn drop(&mut self) {
         unsafe {
             if !self.name.is_null() {

@@ -183,7 +183,7 @@ pub unsafe fn containers_from_repr_c(
 }
 
 /// Convert a `PermissionSet` into its C representation.
-fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
+pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
     ffi::PermissionSet {
         read: true,
         insert: perms.is_allowed(Action::Insert).unwrap_or(false),
@@ -235,7 +235,7 @@ pub struct AppExchangeInfo {
 }
 
 impl AppExchangeInfo {
-    /// Consumes the object and returns the wrapped raw pointer
+    /// Consumes the object and returns the wrapped raw pointer.
     ///
     /// You're now responsible for freeing this memory once you're done.
     pub fn into_repr_c(self) -> Result<ffi::AppExchangeInfo, IpcError> {
