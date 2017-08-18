@@ -26,13 +26,14 @@ use safe_core::FutureExt;
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::ffi::File;
-use std::{ptr, slice};
 use std::os::raw::{c_char, c_void};
+use std::slice;
 
 /// Holds context for file operations, depending on the mode.
 pub struct FileContext {
     reader: Option<Reader<AppContext>>,
     writer: Option<Writer<AppContext>>,
+    original_file: NativeFile,
 }
 
 /// Replaces the entire content of the file when writing data.
@@ -159,6 +160,7 @@ pub unsafe extern "C" fn file_open(
             o_cb,
             move |client, context, parent| {
                 let context = context.clone();
+                let original_file = file.clone();
 
                 // Initialise the reader if OPEN_MODE_READ is requested
                 let reader = if open_mode & OPEN_MODE_READ != 0 {
@@ -188,7 +190,11 @@ pub unsafe extern "C" fn file_open(
                 };
 
                 reader.join(writer).map(move |(reader, writer)| {
-                    let file_ctx = FileContext { reader, writer };
+                    let file_ctx = FileContext {
+                        reader,
+                        writer,
+                        original_file,
+                    };
                     context.object_cache().insert_file(file_ctx)
                 })
             },
@@ -298,6 +304,11 @@ pub unsafe extern "C" fn file_write(
 
 /// Close is invoked only after all the data is completely written. The
 /// file is saved only when `close` is invoked.
+///
+/// If the file was opened in any of the read modes, returns the modified
+/// file structure as a result. If the file was opened in the read mode,
+/// returns the original file structure that was passed as an argument to
+/// `file_open`.
 #[no_mangle]
 pub unsafe extern "C" fn file_close(
     app: *const App,
@@ -324,7 +335,11 @@ pub unsafe extern "C" fn file_close(
                     .into()
             } else {
                 // The reader will be dropped automatically
-                o_cb(user_data.0, FFI_RESULT_OK, ptr::null());
+                o_cb(
+                    user_data.0,
+                    FFI_RESULT_OK,
+                    &file_ctx.original_file.into_repr_c(),
+                );
                 None
             }
         })
@@ -578,6 +593,8 @@ mod tests {
         assert_eq!(created_time, *file.created_time());
         assert!(read_modified_time <= *file.modified_time());
 
+        let orig_file = file.clone();
+
         let read_h = unsafe {
             unwrap!(call_1(|ud, cb| {
                 file_open(
@@ -598,8 +615,12 @@ mod tests {
         };
         assert_eq!(retrieved_content, b"hello world appended");
 
-        let f: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
-        assert!(f.is_null());
+        let returned_file: *const File =
+            unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
+        assert_eq!(
+            unsafe { unwrap!(NativeFile::clone_from_repr_c(returned_file)) },
+            orig_file
+        );
     }
 
     // Test that NFS functions still work after deleting and updating file contents.
