@@ -25,7 +25,7 @@ use routing::XOR_NAME_LEN;
 use rust_sodium::crypto::{box_, secretbox, sign};
 
 /// Array containing public key bytes
-pub type PublicKey = [u8; box_::PUBLICKEYBYTES];
+pub type AsymPublicKey = [u8; box_::PUBLICKEYBYTES];
 /// Array containing private key bytes
 pub type AsymSecretKey = [u8; box_::SECRETKEYBYTES];
 /// Array containing nonce bytes

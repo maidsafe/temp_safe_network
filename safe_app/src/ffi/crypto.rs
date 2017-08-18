@@ -22,7 +22,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
-use safe_core::ffi::{AsymNonce, AsymSecretKey, PublicKey};
+use safe_core::ffi::{AsymNonce, AsymPublicKey, AsymSecretKey};
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn app_pub_sign_key(
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_new(
     app: *const App,
-    data: *const PublicKey,
+    data: *const AsymPublicKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, SignKeyHandle),
 ) {
@@ -64,7 +64,7 @@ pub unsafe extern "C" fn sign_key_get(
     app: *const App,
     handle: SignKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const PublicKey),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymPublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn enc_generate_key_pair(
 #[no_mangle]
 pub unsafe extern "C" fn enc_pub_key_new(
     app: *const App,
-    data: *const PublicKey,
+    data: *const AsymPublicKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, EncryptPubKeyHandle),
 ) {
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn enc_pub_key_get(
     app: *const App,
     handle: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const PublicKey),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymPublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -423,7 +423,7 @@ mod tests {
     use super::*;
     use ffi_utils::test_utils::{call_1, call_2, call_vec_u8};
     use rust_sodium::crypto::box_;
-    use safe_core::ffi::{AsymNonce, PublicKey, SignPublicKey};
+    use safe_core::ffi::{AsymNonce, AsymPublicKey, SignPublicKey};
     use test_utils::{create_app, run_now};
 
     #[test]
@@ -438,9 +438,9 @@ mod tests {
 
         // Copying app2 pubkey to app1 object cache
         // and app1 pubkey to app2 object cache
-        let pk2_raw: PublicKey =
+        let pk2_raw: AsymPublicKey =
             unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app2, app2_pk2_h, ud, cb))) };
-        let pk1_raw: PublicKey =
+        let pk1_raw: AsymPublicKey =
             unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app1, app1_pk1_h, ud, cb))) };
 
         let app1_pk2_h =
@@ -492,7 +492,7 @@ mod tests {
 
         // Copying app2 pubkey to app1 object cache
         // and app1 pubkey to app2 object cache
-        let pk2_raw: PublicKey =
+        let pk2_raw: AsymPublicKey =
             unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app2, app2_pk2_h, ud, cb))) };
 
         let app1_pk2_h =
@@ -566,7 +566,7 @@ mod tests {
             app_enc_key1
         });
 
-        let app_enc_key1_raw: PublicKey = unsafe {
+        let app_enc_key1_raw: AsymPublicKey = unsafe {
             unwrap!(call_1(
                 |ud, cb| enc_pub_key_get(&app, app_enc_key1_h, ud, cb),
             ))

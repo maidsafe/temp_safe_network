@@ -68,7 +68,7 @@ pub struct AppKeys {
     /// Asymmetric sign private key.
     pub sign_sk: SignSecretKey,
     /// Asymmetric enc public key.
-    pub enc_pk: PublicKey,
+    pub enc_pk: AsymPublicKey,
     /// Asymmetric enc private key.
     pub enc_sk: AsymSecretKey,
 }
