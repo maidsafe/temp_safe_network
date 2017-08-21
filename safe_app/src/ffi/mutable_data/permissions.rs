@@ -22,6 +22,7 @@ use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::mutable_data::helper;
 use ffi_utils::{FfiResult, OpaqueCtx, catch_unwind_cb};
+use ffi_utils::callback::CallbackArgs;
 use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle, SignKeyHandle};
 use routing::{Action, PermissionSet, User};
 use std::os::raw::c_void;
@@ -41,6 +42,17 @@ pub enum MDataAction {
     Delete,
     /// Permission to manage permissions.
     ManagePermissions,
+}
+
+/// State of action in the permission set
+#[repr(C)]
+pub enum PermissionValue {
+    /// Explicit permission is not set
+    NotSet,
+    /// Permission is allowed
+    Allowed,
+    /// Permission is denied
+    Denied,
 }
 
 impl Into<Action> for MDataAction {
@@ -120,6 +132,29 @@ pub unsafe extern "C" fn mdata_permissions_set_clear(
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
             *set = set.clear(action.into());
             Ok(())
+        })
+    })
+}
+
+/// Read the permission set.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_permissions_set_is_allowed(
+    app: *const App,
+    set_h: MDataPermissionSetHandle,
+    action: MDataAction,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, PermissionValue),
+) {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |_, context| {
+            let set = context.object_cache().get_mdata_permission_set(set_h)?;
+            let perm = match action {
+                MDataAction::Insert => set.is_allowed(Action::Insert),
+                MDataAction::Update => set.is_allowed(Action::Update),
+                MDataAction::Delete => set.is_allowed(Action::Delete),
+                MDataAction::ManagePermissions => set.is_allowed(Action::ManagePermissions),
+            };
+            Ok(permission_set_into_permission_value(&perm))
         })
     })
 }
@@ -264,4 +299,20 @@ pub unsafe extern "C" fn mdata_permissions_free(
             Ok(())
         })
     })
+}
+
+/// Converts the permission set state into a `PermissionValue` variant
+fn permission_set_into_permission_value(val: &Option<bool>) -> PermissionValue {
+    match *val {
+        Some(true) => PermissionValue::Allowed,
+        Some(false) => PermissionValue::Denied,
+        None => PermissionValue::NotSet,
+    }
+}
+
+/// Returns default `PermissionValue` in an error case
+impl CallbackArgs for PermissionValue {
+    fn default() -> Self {
+        PermissionValue::NotSet
+    }
 }
