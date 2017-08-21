@@ -377,9 +377,11 @@ mod tests {
         let container_info_h = run(&app, move |client, context| {
             let context = context.clone();
 
-            context.get_container_mdata_info(client, "_videos").map(
-                move |info| context.object_cache().insert_mdata_info(info),
-            )
+            context.get_access_info(client).then(move |res| {
+                let access_info = unwrap!(res);
+                let (ref md_info, _) = access_info["_videos"];
+                Ok(context.object_cache().insert_mdata_info(md_info.clone()))
+            })
         });
 
         (app, container_info_h)

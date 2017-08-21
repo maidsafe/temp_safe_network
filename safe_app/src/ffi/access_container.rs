@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use App;
+use {App, AppError};
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
-use safe_core::ipc::req::Permission;
-use std::ffi::CString;
+use safe_core::ipc::req::containers_into_vec;
+use safe_core::ipc::req::ffi::ContainerPermissions;
 use std::os::raw::{c_char, c_void};
 
 /// Fetch access info from the network.
@@ -49,33 +49,28 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 
 /// Retrieve a list of container names that an app has access to.
 #[no_mangle]
-pub unsafe extern "C" fn access_container_get_names(
+pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const *const c_char, u32),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ContainerPermissions, usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
             context
-                .get_container_names(client)
-                .and_then(move |names| {
-                    let mut c_str_vec = Vec::new();
-                    for name in names {
-                        c_str_vec.push(CString::new(name)?);
-                    }
-                    Ok(c_str_vec)
-                })
-                .map(move |c_str_vec| {
-                    let ptr_vec: Vec<*const c_char> =
-                        c_str_vec.iter().map(|c_string| c_string.as_ptr()).collect();
+                .get_access_info(client)
+                .and_then(move |containers| {
+                    let ffi_containers = containers_into_vec(containers.into_iter().map(
+                        |(key, (_, value))| (key, value),
+                    ))?;
                     o_cb(
                         user_data.0,
                         FFI_RESULT_OK,
-                        ptr_vec.as_safe_ptr(),
-                        c_str_vec.len() as u32,
+                        ffi_containers.as_safe_ptr(),
+                        ffi_containers.len(),
                     );
+                    Ok(())
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(e), user_data, o_cb);
@@ -102,37 +97,15 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
             let context = context.clone();
 
             context
-                .get_container_mdata_info(client, name)
-                .map(move |info| {
-                    let handle = context.object_cache().insert_mdata_info(info);
+                .get_access_info(client)
+                .map(move |containers| if let Some(&(ref mdata_info, _)) =
+                    containers.get(&name)
+                {
+                    let handle = context.object_cache().insert_mdata_info(mdata_info.clone());
                     o_cb(user_data.0, FFI_RESULT_OK, handle);
+                } else {
+                    call_result_cb!(Err::<(), _>(AppError::NoSuchContainer), user_data, o_cb);
                 })
-                .map_err(move |err| {
-                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                })
-                .into_box()
-                .into()
-        })
-    })
-}
-
-/// Check whether the app has the given permission for the given container.
-#[no_mangle]
-pub unsafe extern "C" fn access_container_is_permitted(
-    app: *const App,
-    name: *const c_char,
-    permission: Permission,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, bool),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        let user_data = OpaqueCtx(user_data);
-        let name = from_c_str(name)?;
-
-        (*app).send(move |client, context| {
-            context
-                .is_permitted(client, name, permission)
-                .map(move |answer| o_cb(user_data.0, FFI_RESULT_OK, answer))
                 .map_err(move |err| {
                     call_result_cb!(Err::<(), _>(err), user_data, o_cb);
                 })
