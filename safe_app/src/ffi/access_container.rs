@@ -114,3 +114,63 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
         })
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use errors::AppError;
+    use ffi::access_container::*;
+    use ffi_utils::{ReprC, from_c_str};
+    use ffi_utils::test_utils::{call_1, call_vec};
+    use safe_core::DIR_TAG;
+    use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
+    use std::collections::{BTreeSet, HashMap};
+    use std::ffi::CString;
+    use test_utils::{create_app_with_access, run_now};
+
+    #[test]
+    fn get_access_info() {
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
+        let app = create_app_with_access(container_permissions);
+
+        // Get access container info
+        let perms: Vec<PermSet> =
+            unsafe { unwrap!(call_vec(|ud, cb| access_container_fetch(&app, ud, cb))) };
+
+        let perms: HashMap<String, BTreeSet<Permission>> =
+            perms.into_iter().map(|val| (val.0, val.1)).collect();
+
+        assert_eq!(perms["_videos"], btree_set![Permission::Read]);
+        assert_eq!(perms.len(), 2);
+
+        // Get MD info
+        let md_info_h = {
+            let videos_str = unwrap!(CString::new("_videos"));
+            unsafe {
+                unwrap!(call_1(|ud, cb| {
+                    access_container_get_container_mdata_info(&app, videos_str.as_ptr(), ud, cb)
+                }))
+            }
+        };
+
+        run_now(&app, move |_, context| {
+            let info = unwrap!(context.object_cache().get_mdata_info(md_info_h));
+            assert_eq!(info.type_tag, DIR_TAG);
+        })
+    }
+
+    struct PermSet(String, BTreeSet<Permission>);
+
+    impl ReprC for PermSet {
+        type C = *const ContainerPermissions;
+        type Error = AppError;
+
+        unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+            Ok(PermSet(
+                from_c_str((*c_repr).cont_name)?,
+                container_perms_from_repr_c((*c_repr).access)?,
+            ))
+        }
+    }
+
+}

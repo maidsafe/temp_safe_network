@@ -119,7 +119,9 @@ fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet
 }
 
 /// Tranform an FFI representation into container permissions
-fn container_perms_from_repr_c(perms: FfiPermissionSet) -> Result<ContainerPermissions, IpcError> {
+pub fn container_perms_from_repr_c(
+    perms: FfiPermissionSet,
+) -> Result<ContainerPermissions, IpcError> {
     let mut output = BTreeSet::new();
 
     if perms.read {
