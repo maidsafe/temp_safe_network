@@ -17,13 +17,14 @@
 
 #![allow(unsafe_code)]
 
-use routing::XOR_NAME_LEN;
-use rust_sodium::crypto::{box_, secretbox, sign};
+use ffi::*;
+use ipc::req::ffi::PermissionSet as FfiPermissionSet;
+use rust_sodium::crypto::sign;
 use std::ffi::CString;
 use std::os::raw::c_char;
 use std::ptr;
 
-/// It represents the authentication response.
+/// Represents the authentication response.
 #[repr(C)]
 #[derive(Clone)]
 pub struct AuthGranted {
@@ -52,24 +53,24 @@ impl Drop for AuthGranted {
     }
 }
 
-/// Represents the needed keys to work with the data
+/// Represents the needed keys to work with the data.
 #[repr(C)]
 #[derive(Copy)]
 pub struct AppKeys {
     /// Owner signing public key
-    pub owner_key: [u8; sign::PUBLICKEYBYTES],
+    pub owner_key: SignPublicKey,
     /// Data symmetric encryption key
-    pub enc_key: [u8; secretbox::KEYBYTES],
+    pub enc_key: SymSecretKey,
     /// Asymmetric sign public key.
     ///
     /// This is the identity of the App in the Network.
-    pub sign_pk: [u8; sign::PUBLICKEYBYTES],
+    pub sign_pk: SignPublicKey,
     /// Asymmetric sign private key.
-    pub sign_sk: [u8; sign::SECRETKEYBYTES],
+    pub sign_sk: SignSecretKey,
     /// Asymmetric enc public key.
-    pub enc_pk: [u8; box_::PUBLICKEYBYTES],
+    pub enc_pk: AsymPublicKey,
     /// Asymmetric enc private key.
-    pub enc_sk: [u8; box_::SECRETKEYBYTES],
+    pub enc_sk: AsymSecretKey,
 }
 
 impl Clone for AppKeys {
@@ -101,33 +102,53 @@ impl Clone for AppKeys {
 #[derive(Clone, Copy)]
 pub struct AccessContInfo {
     /// ID
-    pub id: [u8; XOR_NAME_LEN],
+    pub id: XorNameArray,
     /// Type tag
     pub tag: u64,
     /// Nonce
-    pub nonce: [u8; secretbox::NONCEBYTES],
+    pub nonce: SymNonce,
+}
+
+/// Information about an application that has access to an MD through `sign_key`
+#[repr(C)]
+pub struct AppAccess {
+    /// App's or user's public key
+    pub sign_key: *const SignPublicKey,
+    /// A list of permissions
+    pub permissions: FfiPermissionSet,
+    /// App's user-facing name
+    pub name: *const c_char,
+    /// App id.
+    /// This is u8, as the app-id can contain non-printable characters.
+    pub app_id: *const c_char,
 }
 
 /// User metadata for mutable data
 #[repr(C)]
-pub struct UserMetadata {
+pub struct MetadataResponse {
     /// Name or purpose of this mutable data.
     pub name: *const c_char,
     /// Description of how this mutable data should or should not be shared.
     pub description: *const c_char,
+    /// Xor name of this struct's corresponding MData object.
+    pub xor_name: *const XorNameArray,
+    /// Type tag of this struct's corresponding MData object.
+    pub type_tag: u64,
 }
 
-impl UserMetadata {
+impl MetadataResponse {
     /// Create invalid metadata.
     pub fn invalid() -> Self {
-        UserMetadata {
+        MetadataResponse {
             name: ptr::null(),
             description: ptr::null(),
+            xor_name: ptr::null(),
+            type_tag: 0,
         }
     }
 }
 
-impl Drop for UserMetadata {
+impl Drop for MetadataResponse {
     fn drop(&mut self) {
         unsafe {
             if !self.name.is_null() {

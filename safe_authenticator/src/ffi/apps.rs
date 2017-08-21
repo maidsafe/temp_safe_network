@@ -25,11 +25,18 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, f
                 vec_into_raw_parts};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
+use routing::User::Key;
+use routing::XorName;
+use rust_sodium::crypto::sign::PublicKey;
 use safe_core::FutureExt;
+use safe_core::ffi::XorNameArray;
 use safe_core::ipc::{IpcError, access_container_enc_key};
-use safe_core::ipc::req::containers_into_vec;
+use safe_core::ipc::req::{AppExchangeInfo, containers_into_vec};
 use safe_core::ipc::req::ffi::{self, ContainerPermissions};
+use safe_core::ipc::resp::AppAccess;
+use safe_core::ipc::resp::ffi::AppAccess as FfiAppAccess;
 use safe_core::utils::symmetric_decrypt;
+use std::collections::HashMap;
 use std::os::raw::{c_char, c_void};
 
 /// Application registered in the authenticator
@@ -227,6 +234,88 @@ pub unsafe extern "C" fn auth_registered_apps(
                     }
 
                     o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+
+                    Ok(())
+                })
+                .map_err(move |e| {
+                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })?;
+
+        Ok(())
+    })
+}
+
+/// Return a list of apps having access to an arbitrary MD object.
+/// `md_name` and `md_type_tag` together correspond to a single MD.
+#[no_mangle]
+pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
+    auth: *mut Authenticator,
+    md_name: *const XorNameArray,
+    md_type_tag: u64,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAppAccess, usize),
+) {
+    let user_data = OpaqueCtx(user_data);
+    let name = XorName(*md_name);
+
+    catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
+        (*auth).send(move |client| {
+            let c2 = client.clone();
+
+            client
+                .list_mdata_permissions(name, md_type_tag)
+                .map_err(AuthError::from)
+                .join(
+                    // Fetch a list of registered apps in parallel
+                    config::list_apps(&c2).map(|(_, apps)| {
+                        // Convert the HashMap keyed by id to one keyed by public key
+                        apps.into_iter()
+                            .map(|(_, app_info)| (app_info.keys.owner_key, app_info.info))
+                            .collect::<HashMap<PublicKey, AppExchangeInfo>>()
+                    }),
+                )
+                .and_then(move |(permissions, apps)| {
+                    // Map the list of keys retrieved from MD to a list of registered apps (even if
+                    // they're in the Revoked state) and create a new `AppAccess` struct object
+                    let mut app_access_vec: Vec<FfiAppAccess> = Vec::new();
+
+                    for (user, perm_set) in permissions {
+                        if let Key(public_key) = user {
+                            let app_access = match apps.get(&public_key) {
+                                Some(app_info) => {
+                                    AppAccess {
+                                        sign_key: public_key,
+                                        permissions: perm_set,
+                                        name: Some(app_info.name.clone()),
+                                        app_id: Some(app_info.id.clone()),
+                                    }
+                                }
+                                None => {
+                                    // If an app is listed in the MD permissions list, but is not
+                                    // listed in the registered apps list in Authenticator, then set
+                                    // the app_id and app_name fields to ptr::null(), but provide
+                                    // the public sign key and the list of permissions.
+                                    AppAccess {
+                                        sign_key: public_key,
+                                        permissions: perm_set,
+                                        name: None,
+                                        app_id: None,
+                                    }
+                                }
+                            };
+                            app_access_vec.push(app_access.into_repr_c()?);
+                        }
+                    }
+
+                    o_cb(
+                        user_data.0,
+                        FFI_RESULT_OK,
+                        app_access_vec.as_safe_ptr(),
+                        app_access_vec.len(),
+                    );
 
                     Ok(())
                 })

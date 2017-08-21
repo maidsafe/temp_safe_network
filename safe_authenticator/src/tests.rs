@@ -43,7 +43,7 @@ use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
 use safe_core::ipc::resp::{METADATA_KEY, UserMetadata};
-use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
+use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
 use safe_core::nfs::{File, Mode, NfsError, file_helper};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
@@ -1544,8 +1544,8 @@ fn share_some_mdatas_with_valid_metadata() {
     let mut metadatas = Vec::new();
     for i in 0..NUM_MDATAS {
         let metadata = UserMetadata {
-            name: format!("name {}", i),
-            description: format!("description {}", i),
+            name: Some(format!("name {}", i)),
+            description: Some(format!("description {}", i)),
         };
 
         let name = rand::random();

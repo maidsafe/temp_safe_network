@@ -26,7 +26,7 @@ use std::os::raw::c_void;
 /// Serialize metadata.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_encode_metadata(
-    metadata: *const ffi::UserMetadata,
+    metadata: *const ffi::MetadataResponse,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
 ) {

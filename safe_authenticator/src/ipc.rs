@@ -34,7 +34,8 @@ use safe_core::ipc::req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, 
 use safe_core::ipc::req::ffi::{AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq,
                                ShareMDataReq as FfiShareMDataReq};
 use safe_core::ipc::resp::{IpcResp, METADATA_KEY, UserMetadata};
-use safe_core::ipc::resp::ffi::UserMetadata as FfiUserMetadata;
+use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
+use safe_core::ipc::resp::ffi::MetadataResponse;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
@@ -216,7 +217,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                                 let mut ffi_metadatas = Vec::with_capacity(metadatas.len());
                                 for metadata in metadatas {
                                     if let Some(metadata) = metadata {
-                                        ffi_metadatas.push(metadata.into_repr_c()?);
+                                        ffi_metadatas.push(metadata);
                                     } else {
                                         ffi_metadatas.push(FfiUserMetadata::invalid());
                                     }
@@ -721,7 +722,7 @@ enum ShareMDataError {
 fn decode_share_mdata_req(
     client: &Client<()>,
     req: &ShareMDataReq,
-) -> Box<AuthFuture<Vec<Option<UserMetadata>>>> {
+) -> Box<AuthFuture<Vec<Option<MetadataResponse>>>> {
     let user = fry!(client.public_signing_key());
     let num_mdatas = req.mdata.len();
     let mut futures = Vec::with_capacity(num_mdatas);
@@ -736,13 +737,27 @@ fn decode_share_mdata_req(
             .and_then(move |shell| if shell.owners().contains(&user) {
                 let future_metadata = client
                     .get_mdata_value(name, type_tag, METADATA_KEY.into())
-                    .then(|res| match res {
-                        Ok(value) => Ok(deserialise::<UserMetadata>(&value.content).map_err(|_| {
-                            ShareMDataError::InvalidMetadata
-                        })),
-                        Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => Ok(Err(
-                            ShareMDataError::InvalidMetadata,
-                        )),
+                    .then(move |res| match res {
+                        Ok(value) => Ok(
+                            deserialise::<UserMetadata>(&value.content)
+                            .map_err(|_| { ShareMDataError::InvalidMetadata })
+                            .and_then(move |metadata| {
+                                match metadata.into_md_response(name, type_tag) {
+                                    Ok(meta) => Ok(meta),
+                                    Err(_) => Err(ShareMDataError::InvalidMetadata)
+                                }
+                            }) )
+                        ,
+                        Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) =>
+                            // Allow requesting shared access to arbitrary Mutable Data objects even
+                            // if they don't have metadata.
+                                Ok( UserMetadata {
+                                    name: None,
+                                    description: None,
+                                }.into_md_response(name, type_tag)
+                               .map_err(|_| {
+                                   ShareMDataError::InvalidMetadata
+                               })),
                         Err(error) => Err(error),
                     });
                 Either::A(future_metadata)

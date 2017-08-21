@@ -22,14 +22,16 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
-use routing::{XOR_NAME_LEN, XorName};
+use routing::XorName;
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
+use safe_core::ffi::XorNameArray;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::os::raw::c_void;
 
-type SEWriterHandle = SelfEncryptorWriterHandle;
-type SEReaderHandle = SelfEncryptorReaderHandle;
-type XorNamePtr = *const [u8; XOR_NAME_LEN];
+/// Handle of a Self Encryptor Writer object
+pub type SEWriterHandle = SelfEncryptorWriterHandle;
+/// Handle of a Self Encryptor Reader object
+pub type SEReaderHandle = SelfEncryptorReaderHandle;
 
 /// Get a Self Encryptor
 #[no_mangle]
@@ -104,7 +106,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
     se_h: SEWriterHandle,
     cipher_opt_h: CipherOptHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, XorNamePtr),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const XorNameArray),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -161,7 +163,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
 #[no_mangle]
 pub unsafe extern "C" fn idata_fetch_self_encryptor(
     app: *const App,
-    name: XorNamePtr,
+    name: *const XorNameArray,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, SEReaderHandle),
 ) {
@@ -204,7 +206,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(
 #[no_mangle]
 pub unsafe extern "C" fn idata_serialised_size(
     app: *const App,
-    name: XorNamePtr,
+    name: *const XorNameArray,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
 ) {

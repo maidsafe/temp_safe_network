@@ -22,9 +22,10 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
                 vec_clone_from_raw_parts};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
-use routing::{XOR_NAME_LEN, XorName};
+use routing::XorName;
 use rust_sodium::crypto::secretbox;
 use safe_core::MDataInfo;
+use safe_core::ffi::{SymNonce, SymSecretKey, XorNameArray};
 use std::os::raw::c_void;
 use std::slice;
 
@@ -32,7 +33,7 @@ use std::slice;
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_public(
     app: *const App,
-    name: *const [u8; XOR_NAME_LEN],
+    name: *const XorNameArray,
     type_tag: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, MDataInfoHandle),
@@ -52,10 +53,10 @@ pub unsafe extern "C" fn mdata_info_new_public(
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_private(
     app: *const App,
-    name: *const [u8; XOR_NAME_LEN],
+    name: *const XorNameArray,
     type_tag: u64,
-    secret_key: *const [u8; secretbox::KEYBYTES],
-    nonce: *const [u8; secretbox::NONCEBYTES],
+    secret_key: *const SymSecretKey,
+    nonce: *const SymNonce,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, MDataInfoHandle),
 ) {
@@ -218,7 +219,7 @@ pub unsafe extern "C" fn mdata_info_extract_name_and_type_tag(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const [u8; XOR_NAME_LEN], u64),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const XorNameArray, u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {

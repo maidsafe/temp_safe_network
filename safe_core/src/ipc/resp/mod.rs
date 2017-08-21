@@ -21,12 +21,16 @@
 pub mod ffi;
 
 use client::MDataInfo;
-use ffi_utils::{ReprC, vec_into_raw_parts};
+use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::IpcError;
+use ipc::req::permission_set_into_repr_c;
 use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
+use routing::PermissionSet;
 use rust_sodium::crypto::{box_, secretbox, sign};
+use rust_sodium::crypto::sign::PublicKey;
 use std::ffi::{CString, NulError};
+use std::ptr;
 use std::slice;
 use tiny_keccak::sha3_256;
 
@@ -114,13 +118,13 @@ impl ReprC for AuthGranted {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct AppKeys {
     /// Owner signing public key.
-    pub owner_key: sign::PublicKey,
+    pub owner_key: PublicKey,
     /// Data symmetric encryption key
     pub enc_key: secretbox::Key,
     /// Asymmetric sign public key.
     ///
     /// This is the identity of the App in the Network.
-    pub sign_pk: sign::PublicKey,
+    pub sign_pk: PublicKey,
     /// Asymmetric sign private key.
     pub sign_sk: sign::SecretKey,
     /// Asymmetric enc public key.
@@ -131,7 +135,7 @@ pub struct AppKeys {
 
 impl AppKeys {
     /// Generate random keys
-    pub fn random(owner_key: sign::PublicKey) -> AppKeys {
+    pub fn random(owner_key: PublicKey) -> AppKeys {
         let (enc_pk, enc_sk) = box_::gen_keypair();
         let (sign_pk, sign_sk) = sign::gen_keypair();
 
@@ -174,9 +178,9 @@ impl ReprC for AppKeys {
 
     unsafe fn clone_from_repr_c(raw: Self::C) -> Result<Self, Self::Error> {
         Ok(AppKeys {
-            owner_key: sign::PublicKey(raw.owner_key),
+            owner_key: PublicKey(raw.owner_key),
             enc_key: secretbox::Key(raw.enc_key),
-            sign_pk: sign::PublicKey(raw.sign_pk),
+            sign_pk: PublicKey(raw.sign_pk),
             sign_sk: sign::SecretKey(raw.sign_sk),
             enc_pk: box_::PublicKey(raw.enc_pk),
             enc_sk: box_::SecretKey(raw.enc_sk),
@@ -258,33 +262,89 @@ pub fn access_container_enc_key(
     Ok(secretbox::seal(key, &key_nonce, app_enc_key))
 }
 
+/// Information about an app that has access to an MD through `sign_key`
+#[derive(Debug)]
+pub struct AppAccess {
+    /// App's or user's public key
+    pub sign_key: PublicKey,
+    /// A list of permissions
+    pub permissions: PermissionSet,
+    /// App's user-facing name
+    pub name: Option<String>,
+    /// App id
+    pub app_id: Option<String>,
+}
+
+impl AppAccess {
+    /// Consumes the object and returns the wrapped raw pointer.
+    ///
+    /// You're now responsible for freeing this memory once you're done.
+    pub fn into_repr_c(self) -> Result<ffi::AppAccess, IpcError> {
+        let AppAccess {
+            sign_key,
+            permissions,
+            name,
+            app_id,
+        } = self;
+
+        let name = match name {
+            Some(name) => CString::new(name).map_err(StringError::from)?.into_raw(),
+            None => ptr::null(),
+        };
+
+        let app_id = match app_id {
+            Some(app_id) => CString::new(app_id).map_err(StringError::from)?.into_raw(),
+            None => ptr::null(),
+        };
+
+        Ok(ffi::AppAccess {
+            sign_key: &sign_key.0,
+            permissions: permission_set_into_repr_c(permissions),
+            name: name,
+            app_id: app_id,
+        })
+    }
+}
+
 /// Metadata for `MutableData`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UserMetadata {
     /// Name or purpose of this mutable data.
-    pub name: String,
+    pub name: Option<String>,
     /// Description of how this mutable data should or should not be shared.
-    pub description: String,
+    pub description: Option<String>,
 }
 
 impl UserMetadata {
-    /// Converts this object into its FFI representation.
-    pub fn into_repr_c(self) -> Result<ffi::UserMetadata, NulError> {
-        Ok(ffi::UserMetadata {
-            name: CString::new(self.name)?.into_raw(),
-            description: CString::new(self.description)?.into_raw(),
+    /// Converts this object into an FFI representation with more information.
+    pub fn into_md_response(
+        self,
+        xor_name: XorName,
+        type_tag: u64,
+    ) -> Result<ffi::MetadataResponse, NulError> {
+        Ok(ffi::MetadataResponse {
+            name: match self.name {
+                Some(name) => CString::new(name)?.into_raw(),
+                None => ptr::null(),
+            },
+            description: match self.description {
+                Some(description) => CString::new(description)?.into_raw(),
+                None => ptr::null(),
+            },
+            xor_name: &xor_name.0,
+            type_tag: type_tag,
         })
     }
 }
 
 impl ReprC for UserMetadata {
-    type C = *const ffi::UserMetadata;
+    type C = *const ffi::MetadataResponse;
     type Error = IpcError;
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         Ok(UserMetadata {
-            name: String::clone_from_repr_c((*repr_c).name)?,
-            description: String::clone_from_repr_c((*repr_c).description)?,
+            name: Some(String::clone_from_repr_c((*repr_c).name)?),
+            description: Some(String::clone_from_repr_c((*repr_c).description)?),
         })
     }
 }
