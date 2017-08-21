@@ -617,12 +617,10 @@ mod tests {
         };
         assert_eq!(retrieved_content, b"hello world appended");
 
-        let returned_file: *const File =
+        let returned_file: NativeFile =
             unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
-        assert_eq!(
-            unsafe { unwrap!(NativeFile::clone_from_repr_c(returned_file)) },
-            orig_file
-        );
+
+        assert_eq!(returned_file, orig_file);
     }
 
     // Test that NFS functions still work after deleting and updating file contents.
