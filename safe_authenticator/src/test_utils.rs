@@ -36,32 +36,36 @@ use safe_core::nfs::{File, Mode, file_helper};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-/// Creates a new random account for authenticator
-pub fn create_authenticator() -> Authenticator {
-    let locator = unwrap!(utils::generate_random_string(10));
-    let password = unwrap!(utils::generate_random_string(10));
-    let invitation = unwrap!(utils::generate_random_string(10));
-
-    unwrap!(Authenticator::create_acc(
-        locator,
-        password,
-        invitation,
-        |_| (),
-    ))
+#[macro_export]
+macro_rules! assert_match {
+    ($e:expr, $p:pat) => {
+        match $e {
+            $p => (),
+            x => panic!("Unexpected {:?} (expecting {})", x, stringify!($p)),
+        }
+    }
 }
 
-/// Create a random authenticator and login using the same credentials.
-pub fn create_account_and_login() -> Authenticator {
+/// Creates a new random account for authenticator. Returns the `Authenticator`
+/// instance and the locator and password strings.
+pub fn create_authenticator() -> (Authenticator, String, String) {
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
     let invitation = unwrap!(utils::generate_random_string(10));
 
-    let _ = unwrap!(Authenticator::create_acc(
+    let auth = unwrap!(Authenticator::create_acc(
         locator.clone(),
         password.clone(),
         invitation,
         |_| (),
     ));
+
+    (auth, locator, password)
+}
+
+/// Create a random authenticator and login using the same credentials.
+pub fn create_account_and_login() -> Authenticator {
+    let (_, locator, password) = create_authenticator();
     unwrap!(Authenticator::login(locator, password, |_| ()))
 }
 

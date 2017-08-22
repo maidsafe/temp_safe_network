@@ -16,31 +16,38 @@
 // relating to use of the SAFE Network Software.
 
 use super::utils::create_containers_req;
+use AccessContainerEntry;
+use AuthFuture;
 use Authenticator;
+use access_container;
 #[cfg(feature = "use-mock-routing")]
-use app_auth::{self, AppState};
+use app_auth::{AppState, app_state};
 #[cfg(feature = "use-mock-routing")]
 use config;
 use errors::AuthError;
-use futures::Future;
+use futures::{Future, future};
+use rand::{self, Rng};
 #[cfg(feature = "use-mock-routing")]
 use revocation::flush_app_revocation_queue;
 #[cfg(feature = "use-mock-routing")]
 use routing::{ClientError, Request, Response};
 use routing::User;
-use safe_core::{CoreError, MDataInfo};
+use safe_core::{Client, CoreError, FutureExt, MDataInfo};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::ipc::AuthReq;
-use safe_core::nfs::NfsError;
-#[cfg(feature = "use-mock-routing")]
-use safe_core::utils::generate_random_string;
+use safe_core::ipc::{AuthReq, Permission};
+use safe_core::ipc::req::container_perms_into_permission_set;
+use safe_core::nfs::{File, Mode, NfsError, file_helper};
+use std::collections::HashMap;
 #[cfg(feature = "use-mock-routing")]
 use std::iter;
-use test_utils::{access_container, create_account_and_login, create_file, fetch_file, rand_app,
-                 register_app, revoke, run, try_access_container};
+use std::thread;
+use std::time::Duration;
+use test_utils::{access_container, create_account_and_login, create_authenticator, rand_app,
+                 register_app, revoke, run, try_access_container, try_run};
 #[cfg(feature = "use-mock-routing")]
 use test_utils::{get_container_from_root, try_revoke};
+use tiny_keccak::sha3_256;
 
 // The app revocation and re-authorization workflow.
 #[test]
@@ -226,16 +233,7 @@ fn app_revocation() {
 #[cfg(feature = "use-mock-routing")]
 #[test]
 fn app_revocation_recovery() {
-    let locator = unwrap!(generate_random_string(10));
-    let password = unwrap!(generate_random_string(10));
-    let invitation = unwrap!(generate_random_string(10));
-
-    let auth = unwrap!(Authenticator::create_acc(
-        locator.clone(),
-        password.clone(),
-        invitation,
-        |_| (),
-    ));
+    let (auth, locator, password) = create_authenticator();
 
     // Create a test app and authenticate it.
     // Grant access to some of the default containers (e.g. `_video`, `_documents`).
@@ -384,16 +382,7 @@ fn app_revocation_recovery() {
 #[test]
 fn app_authentication_during_pending_revocation() {
     // Create account.
-    let locator = unwrap!(generate_random_string(10));
-    let password = unwrap!(generate_random_string(10));
-    let invitation = unwrap!(generate_random_string(10));
-
-    let auth = unwrap!(Authenticator::create_acc(
-        locator.clone(),
-        password.clone(),
-        invitation,
-        |_| (),
-    ));
+    let (auth, locator, password) = create_authenticator();
 
     // Authenticate the app.
     let auth_req = AuthReq {
@@ -432,16 +421,7 @@ fn app_authentication_during_pending_revocation() {
 #[test]
 fn flushing_app_revocation_queue() {
     // Create account.
-    let locator = unwrap!(generate_random_string(10));
-    let password = unwrap!(generate_random_string(10));
-    let invitation = unwrap!(generate_random_string(10));
-
-    let auth = unwrap!(Authenticator::create_acc(
-        locator.clone(),
-        password.clone(),
-        invitation,
-        |_| (),
-    ));
+    let (auth, locator, password) = create_authenticator();
 
     // Authenticate the first app.
     let auth_req = AuthReq {
@@ -477,8 +457,8 @@ fn flushing_app_revocation_queue() {
             config::list_apps(&client)
                 .then(move |res| {
                     let (_, apps) = unwrap!(res);
-                    let f_0 = app_auth::app_state(&client, &apps, &app_id_0);
-                    let f_1 = app_auth::app_state(&client, &apps, &app_id_1);
+                    let f_0 = app_state(&client, &apps, &app_id_0);
+                    let f_1 = app_state(&client, &apps, &app_id_1);
 
                     f_0.join(f_1)
                 })
@@ -507,8 +487,8 @@ fn flushing_app_revocation_queue() {
             })
             .then(move |res| {
                 let (_, apps) = unwrap!(res);
-                let f_0 = app_auth::app_state(&c3, &apps, &app_id_0);
-                let f_1 = app_auth::app_state(&c3, &apps, &app_id_1);
+                let f_0 = app_state(&c3, &apps, &app_id_0);
+                let f_1 = app_state(&c3, &apps, &app_id_1);
 
                 f_0.join(f_1)
             })
@@ -522,11 +502,148 @@ fn flushing_app_revocation_queue() {
     })
 }
 
+// Test one app being revoked by multiple authenticator concurrently.
+#[test]
+fn concurrent_revocation_of_single_app() {
+    // Number of concurrent operations.
+    let concurrency = 2;
+
+    // Create account.
+    let (auth, locator, password) = create_authenticator();
+
+    // Create two apps with dedicated containers + access to one shared container.
+    let mut containers_req = HashMap::new();
+    let _ = containers_req.insert(
+        "_documents".to_owned(),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+        ],
+    );
+
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: true,
+        containers: containers_req.clone(),
+    };
+    let auth_granted_0 = unwrap!(register_app(&auth, &auth_req));
+    let app_id_0 = auth_req.app.id;
+
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: true,
+        containers: containers_req,
+    };
+    let _ = unwrap!(register_app(&auth, &auth_req));
+    let app_id_1 = auth_req.app.id;
+
+    // Put a file into the shared container.
+    let mut ac_entries = access_container(&auth, app_id_0.clone(), auth_granted_0.clone());
+    let (info, _) = unwrap!(ac_entries.remove("_documents"));
+
+    let file_name = "file.txt";
+    let file_content = vec![0; 10];
+    unwrap!(create_file(&auth, info, file_name, file_content));
+
+    // Try to revoke the app concurrently using mutliple authenticators (running
+    // in separate threads).
+    // (NOTE: doing `collect` after every step to prevent short-circuiting)
+    let auths: Vec<_> = (0..concurrency)
+        .map(|_| {
+            // Insert random delays to prevent the operations from silently being
+            // executed sequentially due to being too quick.
+            let hook = move |mut routing: MockRouting| -> MockRouting {
+                routing.set_request_hook(move |_| {
+                    let mut rng = rand::thread_rng();
+                    let delay_ms = rng.gen_range(0, 200);
+                    thread::sleep(Duration::from_millis(delay_ms));
+
+                    None
+                });
+                routing
+            };
+
+            unwrap!(Authenticator::login_with_hook(
+                locator.clone(),
+                password.clone(),
+                |_| (),
+                hook,
+            ))
+        })
+        .collect();
+
+    let join_handles: Vec<_> = auths
+        .into_iter()
+        .map(|auth| {
+            let app_id = app_id_0.clone();
+            thread::spawn(move || try_revoke(&auth, &app_id))
+        })
+        .collect();
+
+    let results: Vec<_> = join_handles
+        .into_iter()
+        .map(|handle| unwrap!(handle.join()))
+        .collect();
+
+    // At least one operation should have succeeded.
+    assert!(results.into_iter().any(|result| result.is_ok()));
+
+    // Check that the first app is now revoked, but the second app is not.
+    run(&auth, move |client| {
+        let app_0 = verify_app_is_revoked(client, app_id_0, ac_entries);
+        let app_1 = verify_app_is_authenticated(client, app_id_1);
+
+        app_0.join(app_1).map(|_| ())
+    });
+}
+
 fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize {
     run(authenticator, move |client| {
         client
             .list_mdata_entries(info.name, info.type_tag)
             .map(|entries| entries.len())
+            .map_err(From::from)
+    })
+}
+
+// Create file in the given container, with the given name and content.
+fn create_file<T: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: T,
+    content: Vec<u8>,
+) -> Result<(), AuthError> {
+    let name = name.into();
+    try_run(authenticator, |client| {
+        let c2 = client.clone();
+
+        file_helper::write(
+            client.clone(),
+            File::new(vec![]),
+            Mode::Overwrite,
+            container_info.enc_key().cloned(),
+        ).then(move |res| {
+            let writer = unwrap!(res);
+            writer.write(&content).and_then(move |_| writer.close())
+        })
+            .then(move |file| {
+                file_helper::insert(c2, container_info, name, &unwrap!(file))
+            })
+            .map_err(From::from)
+    })
+}
+
+fn fetch_file<T: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: T,
+) -> Result<File, AuthError> {
+    let name = name.into();
+    try_run(authenticator, |client| {
+        file_helper::fetch(client.clone(), container_info, name)
+            .map(|(_, file)| file)
             .map_err(From::from)
     })
 }
@@ -577,4 +694,150 @@ where
             x => panic!("Unexpected {:?}", x),
         }
     }
+}
+
+fn verify_app_is_revoked(
+    client: &Client<()>,
+    app_id: String,
+    prev_ac_entry: AccessContainerEntry,
+) -> Box<AuthFuture<()>> {
+    let c0 = client.clone();
+    let c1 = client.clone();
+
+    config::list_apps(client)
+        .then(move |res| {
+            let (_, apps) = unwrap!(res);
+
+            let auth_keys = c0.list_auth_keys_and_version().map_err(AuthError::from);
+            let state = app_state(&c0, &apps, &app_id);
+
+            let app_hash = sha3_256(app_id.as_bytes());
+            let app_key = unwrap!(apps.get(&app_hash)).keys.sign_pk;
+
+            auth_keys.join(state).map(move |((auth_keys, _), state)| {
+                (auth_keys, app_key, state)
+            })
+        })
+        .then(move |res| -> Result<_, AuthError> {
+            let (auth_keys, app_key, state) = unwrap!(res);
+
+            // Verify the app is no longer authenticated.
+            assert!(!auth_keys.contains(&app_key));
+
+            // Verify its state is `Revoked` (meaning it has no entry in the
+            // access container)
+            assert_match!(state, AppState::Revoked);
+
+            Ok(app_key)
+        })
+        .then(move |res| {
+            let app_key = unwrap!(res);
+            let futures = prev_ac_entry.into_iter().map(move |(_, (mdata_info, _))| {
+                // Verify the app has no permissions in the containers.
+                let perms = c1.list_mdata_user_permissions(
+                    mdata_info.name,
+                    mdata_info.type_tag,
+                    User::Key(app_key.clone()),
+                ).then(|res| {
+                        assert_match!(
+                            res,
+                            Err(CoreError::RoutingClientError(ClientError::NoSuchKey))
+                        );
+                        Ok(())
+                    });
+
+                // Verify the app can't decrypt the content of the containers.
+                let entries = c1.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
+                    .then(move |res| {
+                        let entries = unwrap!(res);
+                        for (key, value) in entries {
+                            if value.content.is_empty() {
+                                continue;
+                            }
+
+                            assert_match!(mdata_info.decrypt(&key), Err(_));
+                            assert_match!(mdata_info.decrypt(&value.content), Err(_));
+                        }
+
+                        Ok(())
+                    });
+
+                perms.join(entries).map(|_| ())
+            });
+
+            future::join_all(futures).map(|_| ())
+        })
+        .into_box()
+}
+
+fn verify_app_is_authenticated(client: &Client<()>, app_id: String) -> Box<AuthFuture<()>> {
+    let c0 = client.clone();
+    let c1 = client.clone();
+    let c2 = client.clone();
+
+    config::list_apps(client)
+        .then(move |res| {
+            let (_, mut apps) = unwrap!(res);
+
+            let app_hash = sha3_256(app_id.as_bytes());
+            let app_keys = unwrap!(apps.remove(&app_hash)).keys;
+
+            c0.list_auth_keys_and_version()
+                .map_err(AuthError::from)
+                .map(move |(auth_keys, _)| (auth_keys, app_id, app_keys))
+        })
+        .then(move |res| {
+            let (auth_keys, app_id, app_keys) = unwrap!(res);
+            let app_key = app_keys.sign_pk;
+
+            // Verify the app is authenticated.
+            assert!(auth_keys.contains(&app_key));
+
+            // Fetch the access container entry
+            access_container::fetch_entry(&c1, &app_id, app_keys).map(
+                move |(_, entry)| (app_key, entry),
+            )
+        })
+        .then(move |res| {
+            let (app_key, ac_entry) = unwrap!(res);
+            let user = User::Key(app_key);
+            let ac_entry = unwrap!(ac_entry);
+
+            let futures = ac_entry.into_iter().map(
+                move |(_, (mdata_info, permissions))| {
+                    // Verify the app has the permissions set according to the access container.
+                    let expected_perms = container_perms_into_permission_set(&permissions);
+                    let perms = c2.list_mdata_user_permissions(
+                        mdata_info.name,
+                        mdata_info.type_tag,
+                        user.clone(),
+                    ).then(move |res| {
+                            let perms = unwrap!(res);
+                            assert_eq!(perms, expected_perms);
+                            Ok(())
+                        });
+
+                    // Verify the app can decrypt the content of the containers.
+                    let entries = c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
+                        .then(move |res| {
+                            let entries = unwrap!(res);
+                            for (key, value) in entries {
+                                if value.content.is_empty() {
+                                    continue;
+                                }
+
+                                let _ = unwrap!(mdata_info.decrypt(&key));
+                                let _ = unwrap!(mdata_info.decrypt(&value.content));
+                            }
+
+                            Ok(())
+                        });
+
+                    perms.join(entries).map(|_| ())
+                },
+            );
+
+            future::join_all(futures).map(|_| ())
+        })
+        .into_box()
 }
