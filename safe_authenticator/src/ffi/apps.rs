@@ -252,7 +252,7 @@ pub unsafe extern "C" fn auth_registered_apps(
 /// `md_name` and `md_type_tag` together correspond to a single MD.
 #[no_mangle]
 pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
-    auth: *mut Authenticator,
+    auth: *const Authenticator,
     md_name: *const XorNameArray,
     md_type_tag: u64,
     user_data: *mut c_void,
@@ -273,7 +273,7 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
                     config::list_apps(&c2).map(|(_, apps)| {
                         // Convert the HashMap keyed by id to one keyed by public key
                         apps.into_iter()
-                            .map(|(_, app_info)| (app_info.keys.owner_key, app_info.info))
+                            .map(|(_, app_info)| (app_info.keys.sign_pk, app_info.info))
                             .collect::<HashMap<PublicKey, AppExchangeInfo>>()
                     }),
                 )

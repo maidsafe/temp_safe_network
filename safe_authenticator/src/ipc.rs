@@ -35,7 +35,6 @@ use safe_core::ipc::req::ffi::{AuthReq as FfiAuthReq, ContainersReq as FfiContai
                                ShareMDataReq as FfiShareMDataReq};
 use safe_core::ipc::resp::{IpcResp, METADATA_KEY, UserMetadata};
 use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
-use safe_core::ipc::resp::ffi::MetadataResponse;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
@@ -722,7 +721,7 @@ enum ShareMDataError {
 fn decode_share_mdata_req(
     client: &Client<()>,
     req: &ShareMDataReq,
-) -> Box<AuthFuture<Vec<Option<MetadataResponse>>>> {
+) -> Box<AuthFuture<Vec<Option<FfiUserMetadata>>>> {
     let user = fry!(client.public_signing_key());
     let num_mdatas = req.mdata.len();
     let mut futures = Vec::with_capacity(num_mdatas);
@@ -751,13 +750,13 @@ fn decode_share_mdata_req(
                         Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) =>
                             // Allow requesting shared access to arbitrary Mutable Data objects even
                             // if they don't have metadata.
-                                Ok( UserMetadata {
-                                    name: None,
-                                    description: None,
-                                }.into_md_response(name, type_tag)
-                               .map_err(|_| {
-                                   ShareMDataError::InvalidMetadata
-                               })),
+                            Ok( UserMetadata {
+                                name: None,
+                                description: None,
+                            }.into_md_response(name, type_tag)
+                                .map_err(|_| {
+                                    ShareMDataError::InvalidMetadata
+                                })),
                         Err(error) => Err(error),
                     });
                 Either::A(future_metadata)

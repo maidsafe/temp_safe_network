@@ -23,7 +23,7 @@ pub mod ffi;
 use client::MDataInfo;
 use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::IpcError;
-use ipc::req::permission_set_into_repr_c;
+use ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
 use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
 use routing::PermissionSet;
@@ -298,10 +298,24 @@ impl AppAccess {
         };
 
         Ok(ffi::AppAccess {
-            sign_key: &sign_key.0,
+            sign_key: sign_key.0,
             permissions: permission_set_into_repr_c(permissions),
             name: name,
             app_id: app_id,
+        })
+    }
+}
+
+impl ReprC for AppAccess {
+    type C = *const ffi::AppAccess;
+    type Error = IpcError;
+
+    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
+        Ok(AppAccess {
+            sign_key: PublicKey((*repr_c).sign_key),
+            permissions: permission_set_clone_from_repr_c(&(*repr_c).permissions)?,
+            name: Some(String::clone_from_repr_c((*repr_c).name)?),
+            app_id: Some(String::clone_from_repr_c((*repr_c).app_id)?),
         })
     }
 }
@@ -331,7 +345,7 @@ impl UserMetadata {
                 Some(description) => CString::new(description)?.into_raw(),
                 None => ptr::null(),
             },
-            xor_name: &xor_name.0,
+            xor_name: xor_name.0,
             type_tag: type_tag,
         })
     }
@@ -343,8 +357,16 @@ impl ReprC for UserMetadata {
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         Ok(UserMetadata {
-            name: Some(String::clone_from_repr_c((*repr_c).name)?),
-            description: Some(String::clone_from_repr_c((*repr_c).description)?),
+            name: if (*repr_c).name.is_null() {
+                None
+            } else {
+                Some(String::clone_from_repr_c((*repr_c).name)?)
+            },
+            description: if (*repr_c).description.is_null() {
+                None
+            } else {
+                Some(String::clone_from_repr_c((*repr_c).description)?)
+            },
         })
     }
 }
