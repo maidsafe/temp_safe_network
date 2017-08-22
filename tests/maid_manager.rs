@@ -25,7 +25,7 @@ use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
               MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
-use routing::rate_limiter_consts::{CLIENT_CAPACITY, RATE};
+use routing::rate_limiter_consts::{MIN_CLIENT_CAPACITY, RATE};
 use rust_sodium::crypto::sign;
 use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
@@ -201,8 +201,8 @@ fn put_oversized_data() {
     // Larger than rate limiter per client capacity
     // This makes `part_count` of each message part exceed `MAX_PARTs`.
     // Hence the client will be banned and terminated.
-    FakeClock::advance_time((CLIENT_CAPACITY * 1000 / RATE as u64) + 1);
-    let data = test_utils::gen_immutable_data(CLIENT_CAPACITY as usize, &mut rng);
+    FakeClock::advance_time((MIN_CLIENT_CAPACITY * 1000 / RATE as u64) + 1);
+    let data = test_utils::gen_immutable_data(MIN_CLIENT_CAPACITY as usize, &mut rng);
     match client.put_large_sized_idata(data, &mut nodes) {
         Err(ClientError::InvalidOperation) => (),
         x => panic!("Unexpected response: {:?}", x),
@@ -903,7 +903,7 @@ fn claiming_invitation_concurrently() {
         let _ = client.create_account_with_invitation(invite_code);
     }
 
-    let _ = poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+    let _ = poll::nodes_and_clients(&mut nodes, &mut clients, true);
 
     let mut succeeded = 0;
     for client in &mut clients {

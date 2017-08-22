@@ -17,7 +17,6 @@
 
 use super::poll;
 use super::test_node::TestNode;
-use fake_clock::FakeClock;
 use maidsafe_utilities::{SeededRng, serialisation};
 use rand::Rng;
 use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, BootstrapConfig, Client,
@@ -31,8 +30,10 @@ use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::sync::mpsc::TryRecvError;
+use std::time::Duration;
 
-const RETRY_DELAY_MS: u64 = 800;
+// Duration clients expect a response by.
+const CLIENT_MSG_EXPIRY_DUR_SECS: u64 = 90;
 
 macro_rules! assert_recv_response {
     ($client:expr, $resp:ident, $request_msg_id:expr) => {
@@ -42,20 +43,11 @@ macro_rules! assert_recv_response {
         match $client.try_recv() {
             Ok(Event::Response { response: Response::$resp { res, msg_id }, .. }) => {
                 assert_eq!($request_msg_id, msg_id);
-                Loop::Break(res)
-            }
-            Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
-                assert_eq!($request_msg_id, msg_id);
-                if $is_oversized {
-                    Loop::Break(Err(ClientError::NetworkFull))
-                } else {
-                    FakeClock::advance_time(RETRY_DELAY_MS);
-                    Loop::Continue
-                }
+                res
             }
             Ok(Event::Terminate) => {
                 if $is_oversized {
-                    Loop::Break(Err(ClientError::InvalidOperation))
+                    Err(ClientError::InvalidOperation)
                 } else {
                     panic!("Unexpected termination")
                 }
@@ -108,6 +100,7 @@ impl TestClient {
                 Some(full_id.clone()),
                 bootstrap_config,
                 routing_config,
+                Duration::from_secs(CLIENT_MSG_EXPIRY_DUR_SECS),
             ))
         });
 
@@ -240,12 +233,10 @@ impl TestClient {
         data: ImmutableData,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            self.put_idata_with_msg_id(data.clone(), msg_id);
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, PutIData, msg_id)
-        })
+        let msg_id = MessageId::new();
+        self.put_idata_with_msg_id(data.clone(), msg_id);
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, PutIData, msg_id)
     }
 
     /// Puts large sized immutable data
@@ -254,12 +245,10 @@ impl TestClient {
         data: ImmutableData,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            self.put_idata_with_msg_id(data.clone(), msg_id);
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, PutIData, msg_id, true)
-        })
+        let msg_id = MessageId::new();
+        self.put_idata_with_msg_id(data.clone(), msg_id);
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, PutIData, msg_id, true)
     }
 
     /// Puts immutable data and reads from the mock network
@@ -269,17 +258,10 @@ impl TestClient {
         msg_id: MessageId,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
-        // Note: can't use loop_fn here, because we would be reusing the msg_id.
-        // Instead, simulate delay so we won't trigger the rate limit error.
-        FakeClock::advance_time(RETRY_DELAY_MS);
-
         self.put_idata_with_msg_id(data, msg_id);
         let _ = poll::nodes_and_client(nodes, self);
 
-        match assert_recv_response!(self, PutIData, msg_id) {
-            Loop::Break(res) => res,
-            Loop::Continue => panic!("Unexpected rate limit exceeded error"),
-        }
+        assert_recv_response!(self, PutIData, msg_id)
     }
 
     /// Puts immutable data and try reads from the mock network
@@ -288,28 +270,21 @@ impl TestClient {
         data: ImmutableData,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
-        loop_fn(|| {
-            let request_msg_id = self.put_idata(data.clone());
-            let _ = poll::nodes_and_client(nodes, self);
+        let request_msg_id = self.put_idata(data.clone());
+        let _ = poll::nodes_and_client(nodes, self);
 
-            match self.try_recv() {
-                Ok(Event::Response { response: Response::PutIData { res, msg_id }, .. }) => {
-                    trace!("received {:?} - {:?}", msg_id, res);
-                    assert_eq!(request_msg_id, msg_id);
-                    Loop::Break(res)
-                }
-                Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
-                    assert_eq!(request_msg_id, msg_id);
-                    FakeClock::advance_time(RETRY_DELAY_MS);
-                    Loop::Continue
-                }
-                Ok(response) => panic!("Unexpected response: {:?}", response),
-                Err(error) => {
-                    trace!("Unexpected error: {:?}", error);
-                    Loop::Break(Err(ClientError::from("No Response")))
-                }
+        match self.try_recv() {
+            Ok(Event::Response { response: Response::PutIData { res, msg_id }, .. }) => {
+                trace!("received {:?} - {:?}", msg_id, res);
+                assert_eq!(request_msg_id, msg_id);
+                res
             }
-        })
+            Ok(response) => panic!("Unexpected response: {:?}", response),
+            Err(error) => {
+                trace!("Unexpected error: {:?}", error);
+                Err(ClientError::from("No Response"))
+            }
+        }
     }
 
     /// Gets immutable data from nodes provided.
@@ -335,29 +310,22 @@ impl TestClient {
         let dst = Authority::NaeManager(name);
         self.flush();
 
-        loop_fn(|| {
-            let request_msg_id = MessageId::new();
-            unwrap!(self.routing_client.get_idata(dst, name, request_msg_id));
-            let _ = poll::nodes_and_client(nodes, self);
+        let request_msg_id = MessageId::new();
+        unwrap!(self.routing_client.get_idata(dst, name, request_msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
 
-            match self.try_recv() {
-                Ok(Event::Response {
-                       response: Response::GetIData { res, msg_id },
-                       src,
-                       ..
-                   }) => {
-                    assert_eq!(request_msg_id, msg_id);
-                    Loop::Break(res.map(|data| (data, src)))
-                }
-                Ok(Event::ProxyRateLimitExceeded(msg_id)) => {
-                    assert_eq!(request_msg_id, msg_id);
-                    FakeClock::advance_time(RETRY_DELAY_MS);
-                    Loop::Continue
-                }
-                Ok(event) => panic!("Unexpected event: {:?}", event),
-                Err(error) => panic!("Expected error: {:?}", error),
+        match self.try_recv() {
+            Ok(Event::Response {
+                   response: Response::GetIData { res, msg_id },
+                   src,
+                   ..
+               }) => {
+                assert_eq!(request_msg_id, msg_id);
+                res.map(|data| (data, src))
             }
-        })
+            Ok(event) => panic!("Unexpected event: {:?}", event),
+            Err(error) => panic!("Expected error: {:?}", error),
+        }
     }
 
     /// Puts mutable data
@@ -379,12 +347,10 @@ impl TestClient {
         data: MutableData,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
-        loop_fn(|| {
-            let msg_id = self.put_mdata(data.clone());
-            let _ = poll::nodes_and_client(nodes, self);
+        let msg_id = self.put_mdata(data.clone());
+        let _ = poll::nodes_and_client(nodes, self);
 
-            assert_recv_response!(self, PutMData, msg_id)
-        })
+        assert_recv_response!(self, PutMData, msg_id)
     }
 
     /// Sends a `GetMDataVersion` request and waits for the response.
@@ -397,17 +363,15 @@ impl TestClient {
         self.flush();
         let dst = Authority::NaeManager(name);
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.get_mdata_version(
-                dst,
-                name,
-                tag,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, GetMDataVersion, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.get_mdata_version(
+            dst,
+            name,
+            tag,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, GetMDataVersion, msg_id)
     }
 
     /// Sends a `GetMDataShell` request and waits for the response.
@@ -420,12 +384,10 @@ impl TestClient {
         self.flush();
         let dst = Authority::NaeManager(name);
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.get_mdata_shell(dst, name, tag, msg_id));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, GetMDataShell, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.get_mdata_shell(dst, name, tag, msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, GetMDataShell, msg_id)
     }
 
     /// Sends a `ListMDataEntries` request and waits for the response.
@@ -438,17 +400,15 @@ impl TestClient {
         self.flush();
         let dst = Authority::NaeManager(name);
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.list_mdata_entries(
-                dst,
-                name,
-                tag,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, ListMDataEntries, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.list_mdata_entries(
+            dst,
+            name,
+            tag,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, ListMDataEntries, msg_id)
     }
 
     /// Sends a `GetMDataValue` request and waits for the response.
@@ -462,18 +422,16 @@ impl TestClient {
         self.flush();
         let dst = Authority::NaeManager(name);
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.get_mdata_value(
-                dst,
-                name,
-                tag,
-                key.clone(),
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, GetMDataValue, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.get_mdata_value(
+            dst,
+            name,
+            tag,
+            key.clone(),
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, GetMDataValue, msg_id)
     }
 
     /// Sends a `MutateMDataEntries` request.
@@ -505,11 +463,9 @@ impl TestClient {
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
         self.flush();
-        loop_fn(|| {
-            let msg_id = self.mutate_mdata_entries(name, tag, actions.clone());
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, MutateMDataEntries, msg_id)
-        })
+        let msg_id = self.mutate_mdata_entries(name, tag, actions.clone());
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, MutateMDataEntries, msg_id)
     }
 
     /// Sends a `ListMDataPermissions` request and waits for the response.
@@ -522,17 +478,15 @@ impl TestClient {
         self.flush();
         let dst = Authority::NaeManager(name);
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.list_mdata_permissions(
-                dst,
-                name,
-                tag,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, ListMDataPermissions, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.list_mdata_permissions(
+            dst,
+            name,
+            tag,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, ListMDataPermissions, msg_id)
     }
 
     /// Sends a `ListMDataUserPermissions` request and waits for the response.
@@ -546,18 +500,16 @@ impl TestClient {
         self.flush();
         let dst = Authority::NaeManager(name);
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.list_mdata_user_permissions(
-                dst,
-                name,
-                tag,
-                user,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, ListMDataUserPermissions, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.list_mdata_user_permissions(
+            dst,
+            name,
+            tag,
+            user,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, ListMDataUserPermissions, msg_id)
     }
 
     /// Sends a `SetMDataUserPermissions` request and waits for the response.
@@ -573,21 +525,19 @@ impl TestClient {
         self.flush();
         let requester = *self.signing_public_key();
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.set_mdata_user_permissions(
-                self.client_manager,
-                name,
-                tag,
-                user,
-                permissions,
-                version,
-                msg_id,
-                requester,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, SetMDataUserPermissions, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.set_mdata_user_permissions(
+            self.client_manager,
+            name,
+            tag,
+            user,
+            permissions,
+            version,
+            msg_id,
+            requester,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, SetMDataUserPermissions, msg_id)
     }
 
     /// Sends a `DelMDataUserPermissions` request and waits for the response.
@@ -602,20 +552,18 @@ impl TestClient {
         self.flush();
         let requester = *self.signing_public_key();
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.del_mdata_user_permissions(
-                self.client_manager,
-                name,
-                tag,
-                user,
-                version,
-                msg_id,
-                requester,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, DelMDataUserPermissions, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.del_mdata_user_permissions(
+            self.client_manager,
+            name,
+            tag,
+            user,
+            version,
+            msg_id,
+            requester,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, DelMDataUserPermissions, msg_id)
     }
 
     /// Sends a `ChangeMDataOwner` request and waits for the response.
@@ -629,19 +577,17 @@ impl TestClient {
     ) -> Result<(), ClientError> {
         self.flush();
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.change_mdata_owner(
-                self.client_manager,
-                name,
-                tag,
-                new_owners.clone(),
-                version,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, ChangeMDataOwner, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.change_mdata_owner(
+            self.client_manager,
+            name,
+            tag,
+            new_owners.clone(),
+            version,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, ChangeMDataOwner, msg_id)
     }
 
     /// Sends a `GetAccountInfo` request, polls the mock network and expects a
@@ -652,15 +598,13 @@ impl TestClient {
     ) -> Result<AccountInfo, ClientError> {
         self.flush();
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.get_account_info(
-                self.client_manager,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, GetAccountInfo, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.get_account_info(
+            self.client_manager,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, GetAccountInfo, msg_id)
     }
 
     /// Sends a `ListAuthKeysAndVersion` request and wait for the response.
@@ -670,15 +614,13 @@ impl TestClient {
     ) -> Result<(BTreeSet<sign::PublicKey>, u64), ClientError> {
         self.flush();
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.list_auth_keys_and_version(
-                self.client_manager,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, ListAuthKeysAndVersion, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.list_auth_keys_and_version(
+            self.client_manager,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, ListAuthKeysAndVersion, msg_id)
     }
 
     /// Sends a `DelAuthKey` request.
@@ -714,17 +656,15 @@ impl TestClient {
     ) -> Result<(), ClientError> {
         self.flush();
 
-        loop_fn(|| {
-            let msg_id = MessageId::new();
-            unwrap!(self.routing_client.ins_auth_key(
-                self.client_manager,
-                key,
-                version,
-                msg_id,
-            ));
-            let _ = poll::nodes_and_client(nodes, self);
-            assert_recv_response!(self, InsAuthKey, msg_id)
-        })
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.ins_auth_key(
+            self.client_manager,
+            key,
+            version,
+            msg_id,
+        ));
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, InsAuthKey, msg_id)
     }
 
     /// Returns a full id for this client
@@ -744,22 +684,5 @@ impl TestClient {
 
     fn flush(&mut self) {
         while let Ok(_) = self.try_recv() {}
-    }
-}
-
-enum Loop<T> {
-    Break(T),
-    Continue,
-}
-
-fn loop_fn<F, T>(mut f: F) -> T
-where
-    F: FnMut() -> Loop<T>,
-{
-    loop {
-        match f() {
-            Loop::Break(res) => return res,
-            Loop::Continue => (),
-        }
     }
 }

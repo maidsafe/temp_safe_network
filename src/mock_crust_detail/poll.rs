@@ -18,7 +18,7 @@
 use super::test_client::TestClient;
 use super::test_node::TestNode;
 use fake_clock::FakeClock;
-use routing::test_consts::{ACK_TIMEOUT_SECS, CONNECTED_PEER_TIMEOUT_SECS};
+use routing::test_consts::{ACK_TIMEOUT_SECS, CONNECTED_PEER_TIMEOUT_SECS, RATE_EXCEED_RETRY_MS};
 
 // Maximum number of times to try and poll in a loop.  This is several orders higher than the
 // anticipated upper limit for any test, and if hit is likely to indicate an infinite loop.
@@ -26,109 +26,85 @@ const MAX_POLL_CALLS: usize = 1000;
 
 /// Empty event queue of nodes provided
 pub fn nodes(nodes: &mut [TestNode]) -> usize {
-    nodes_and_clients(nodes, &mut [])
+    nodes_and_clients(nodes, &mut [], false)
 }
 
 /// Empty event queue of nodes and the client provided
 pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
-    nodes_and_clients(nodes, ref_slice_mut(client))
+    nodes_and_clients(nodes, ref_slice_mut(client), false)
 }
 
 /// Empty event queue of nodes and clients provided
-pub fn nodes_and_clients(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
-    let mut count: usize = 0;
-
-    loop {
-        nodes[0].handle.deliver_messages();
-        let prev_count = count;
-
-        for node in nodes.iter_mut() {
-            count += node.poll();
-        }
-
-        for client in clients.iter_mut() {
-            count += client.poll();
-        }
-
-        if prev_count == count {
-            break;
-        }
-    }
-
-    count
-}
-
-/// Empty event queue of nodes and client, until there are no unacknowledged messages
-/// left.
-pub fn nodes_and_client_with_resend(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
-    with_resend(|| nodes_and_client(nodes, client))
-}
-
-/// Empty event queue of nodes and clients, until there are no unacknowledged messages
-/// left.
-pub fn nodes_and_clients_with_resend(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
-    with_resend(|| nodes_and_clients(nodes, clients))
-}
-
-/// Empty event queue of nodes and clients.
-/// Handles more than one client and handles only one event per round for each node and client,
-/// to better simulate simultaneous requests.
-pub fn nodes_and_clients_parallel(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
-    let mut count = 0;
-    loop {
-        nodes[0].handle.deliver_messages();
-        let prev_count = count;
-
-        for node in nodes.iter_mut() {
-            if node.poll_once() {
-                count += 1;
-            }
-        }
-
-        for client in clients.iter_mut() {
-            if client.poll_once() {
-                count += 1;
-            }
-        }
-
-        if prev_count == count {
-            break;
-        }
-    }
-    count
-}
-
-/// Empty event queue of nodes and clients, until there are no unacknowledged messages
-/// left. Handles only one event per round for each node and client to better simulate
-/// simultaneous requests.
-pub fn nodes_and_clients_parallel_with_resend(
+pub fn nodes_and_clients(
     nodes: &mut [TestNode],
     clients: &mut [TestClient],
+    parallel_poll: bool,
 ) -> usize {
-    with_resend(|| nodes_and_clients_parallel(nodes, clients))
-}
-
-fn with_resend<F>(mut f: F) -> usize
-where
-    F: FnMut() -> usize,
-{
-    let clock_advance_duration_ms = ACK_TIMEOUT_SECS * 1000 + 1;
-    let mut clock_advanced_by_ms = 0;
-    let mut count = 0;
-
-    for _ in 0..MAX_POLL_CALLS {
+    let mut count: usize = 0;
+    let mut fired_rate_exceeded_timeout = false;
+    loop {
+        nodes[0].handle.deliver_messages();
         let prev_count = count;
-        count += f();
-        if count > prev_count {
-            clock_advanced_by_ms = 0;
-        } else if clock_advanced_by_ms > (CONNECTED_PEER_TIMEOUT_SECS * 1000) {
-            return count;
+
+        for node in nodes.iter_mut() {
+            if parallel_poll {
+                if node.poll_once() {
+                    count += 1;
+                }
+            } else {
+                count += node.poll();
+            }
         }
 
-        FakeClock::advance_time(clock_advance_duration_ms);
-        clock_advanced_by_ms += clock_advance_duration_ms;
+        for client in clients.iter_mut() {
+            if parallel_poll {
+                if client.poll_once() {
+                    count += 1;
+                }
+            } else {
+                count += client.poll();
+            }
+        }
+
+        if prev_count == count {
+            if !fired_rate_exceeded_timeout {
+                fired_rate_exceeded_timeout = true;
+                FakeClock::advance_time(RATE_EXCEED_RETRY_MS + 1);
+            } else {
+                break;
+            }
+        } else {
+            fired_rate_exceeded_timeout = false;
+        }
     }
 
+    count
+}
+
+/// Empty event queue of nodes and client, until there are no unacknowledged messages left.
+pub fn nodes_and_client_with_resend(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+    nodes_and_clients_with_resend(nodes, ref_slice_mut(client))
+}
+
+/// Empty event queue of nodes and clients, until there are no unacknowledged messages left.
+pub fn nodes_and_clients_with_resend(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
+    let mut fired_connected_peer_timeout = false;
+    let mut total_count = 0;
+
+    for _ in 0..MAX_POLL_CALLS {
+        let count = nodes_and_clients(nodes, clients, false);
+        if count > 0 {
+            // Once each route is polled, advance time to trigger the following route.
+            FakeClock::advance_time(ACK_TIMEOUT_SECS * 1000 + 1);
+            total_count += count;
+        } else if !fired_connected_peer_timeout {
+            // When all routes are polled, advance time to purge any invalid peers.
+            FakeClock::advance_time(CONNECTED_PEER_TIMEOUT_SECS * 1000 + 1);
+            fired_connected_peer_timeout = true;
+        } else {
+            return total_count;
+        }
+    }
     panic!("Polling has been called {} times.", MAX_POLL_CALLS);
 }
 
