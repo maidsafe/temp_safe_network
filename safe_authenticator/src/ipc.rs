@@ -210,15 +210,15 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                            req_id,
                        }) => {
                         decode_share_mdata_req(&c1, &share_mdata_req)
-                            .and_then(move |metadatas| {
+                            .and_then(move |metadata_cont| {
                                 let share_mdata_req_repr_c = share_mdata_req.into_repr_c()?;
 
-                                let mut ffi_metadatas = Vec::with_capacity(metadatas.len());
-                                for metadata in metadatas {
+                                let mut ffi_metadata_cont = Vec::with_capacity(metadata_cont.len());
+                                for metadata in metadata_cont {
                                     if let Some(metadata) = metadata {
-                                        ffi_metadatas.push(metadata);
+                                        ffi_metadata_cont.push(metadata);
                                     } else {
-                                        ffi_metadatas.push(FfiUserMetadata::invalid());
+                                        ffi_metadata_cont.push(FfiUserMetadata::invalid());
                                     }
                                 }
 
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                                     user_data.0,
                                     req_id,
                                     &share_mdata_req_repr_c,
-                                    ffi_metadatas.as_ptr(),
+                                    ffi_metadata_cont.as_ptr(),
                                 );
 
                                 Ok(())
@@ -289,13 +289,13 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                     .and_then(move |app_info| {
                         let app_id = share_mdata_req.app.id;
                         let user = User::Key(app_info.keys.sign_pk);
-                        let num_mdatas = share_mdata_req.mdata.len();
+                        let num_mdata = share_mdata_req.mdata.len();
                         stream::iter(share_mdata_req.mdata.into_iter().map(Ok))
                         .map(move |mdata| {
                             client_cloned0.get_mdata_shell(mdata.name, mdata.type_tag)
                                           .map(|md| (md.version(), mdata))
                         })
-                        .buffer_unordered(num_mdatas)
+                        .buffer_unordered(num_mdata)
                         .map(move |(version, mdata)| {
                             client_cloned1.set_mdata_user_permissions(
                                 mdata.name,
@@ -305,7 +305,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                                 version + 1,
                             )
                         })
-                        .buffer_unordered(num_mdatas)
+                        .buffer_unordered(num_mdata)
                         .map_err(AuthError::CoreError)
                         .for_each(|()| Ok(()))
                         .and_then(move |()| {
@@ -723,8 +723,8 @@ fn decode_share_mdata_req(
     req: &ShareMDataReq,
 ) -> Box<AuthFuture<Vec<Option<FfiUserMetadata>>>> {
     let user = fry!(client.public_signing_key());
-    let num_mdatas = req.mdata.len();
-    let mut futures = Vec::with_capacity(num_mdatas);
+    let num_mdata = req.mdata.len();
+    let mut futures = Vec::with_capacity(num_mdata);
 
     for mdata in &req.mdata {
         let client = client.clone();
@@ -772,13 +772,13 @@ fn decode_share_mdata_req(
 
     future::join_all(futures)
         .and_then(move |results| {
-            let mut metadatas = Vec::with_capacity(num_mdatas);
-            let mut invalids = Vec::with_capacity(num_mdatas);
+            let mut metadata_cont = Vec::with_capacity(num_mdata);
+            let mut invalids = Vec::with_capacity(num_mdata);
 
             for result in results {
                 match result {
-                    Ok(metadata) => metadatas.push(Some(metadata)),
-                    Err(ShareMDataError::InvalidMetadata) => metadatas.push(None),
+                    Ok(metadata) => metadata_cont.push(Some(metadata)),
+                    Err(ShareMDataError::InvalidMetadata) => metadata_cont.push(None),
                     Err(ShareMDataError::InvalidOwner(name, type_tag)) => {
                         invalids.push((name, type_tag))
                     }
@@ -786,7 +786,7 @@ fn decode_share_mdata_req(
             }
 
             if invalids.is_empty() {
-                Ok(metadatas)
+                Ok(metadata_cont)
             } else {
                 Err(AuthError::IpcError(IpcError::InvalidOwner(invalids)))
             }

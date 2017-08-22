@@ -1441,7 +1441,7 @@ fn flushing_app_revocation_queue() {
 }
 
 #[test]
-fn share_zero_mdatas() {
+fn share_zero_mdata() {
     let authenticator = create_account_and_login();
 
     let msg = IpcMsg::Req {
@@ -1456,27 +1456,27 @@ fn share_zero_mdatas() {
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
         (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(Payload::Metadata(metadatas))) => {
+         Some(Payload::Metadata(metadata_cont))) => {
             assert_eq!(mdata.len(), 0);
-            assert_eq!(metadatas.len(), 0);
+            assert_eq!(metadata_cont.len(), 0);
         }
         _ => panic!("Unexpected: {:?}", decoded),
     };
 }
 
 #[test]
-fn share_some_mdatas() {
+fn share_some_mdata() {
     let authenticator = create_account_and_login();
 
     let user = run(&authenticator, move |client| {
         client.public_signing_key().map_err(AuthError::CoreError)
     });
 
-    const NUM_MDATAS: usize = 3;
+    const NUM_MDATA: usize = 3;
 
-    let mut mdatas = Vec::new();
-    let mut metadatas = Vec::new();
-    for _ in 0..NUM_MDATAS {
+    let mut mdata_cont = Vec::new();
+    let mut metadata_cont = Vec::new();
+    for _ in 0..NUM_MDATA {
         let name = rand::random();
         let tag = 0;
         let mdata = {
@@ -1494,19 +1494,19 @@ fn share_some_mdatas() {
             client.put_mdata(mdata).map_err(AuthError::CoreError)
         });
 
-        mdatas.push(ShareMData {
+        mdata_cont.push(ShareMData {
             type_tag: tag,
             name: name,
             perms: PermissionSet::new().allow(Action::Insert),
         });
-        metadatas.push((None, name, tag));
+        metadata_cont.push((None, name, tag));
     }
 
     let msg = IpcMsg::Req {
         req_id: ipc::gen_req_id(),
         req: IpcReq::ShareMData(ShareMDataReq {
             app: unwrap!(rand_app()),
-            mdata: mdatas.clone(),
+            mdata: mdata_cont.clone(),
         }),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
@@ -1514,16 +1514,16 @@ fn share_some_mdatas() {
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
         (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(Payload::Metadata(received_metadatas))) => {
-            assert_eq!(mdata, mdatas);
-            assert_eq!(received_metadatas, metadatas);
+         Some(Payload::Metadata(received_metadata_cont))) => {
+            assert_eq!(mdata, mdata_cont);
+            assert_eq!(received_metadata_cont, metadata_cont);
         }
         _ => panic!("Unexpected: {:?}", decoded),
     };
 }
 
 #[test]
-fn share_some_mdatas_with_valid_metadata() {
+fn share_some_mdata_with_valid_metadata() {
     let authenticator = create_account_and_login();
 
     let app_id = unwrap!(rand_app());
@@ -1540,12 +1540,12 @@ fn share_some_mdatas_with_valid_metadata() {
         client.public_signing_key().map_err(AuthError::CoreError)
     });
 
-    const NUM_MDATAS: usize = 3;
+    const NUM_MDATA: usize = 3;
 
     let perms = PermissionSet::new().allow(Action::Insert);
-    let mut mdatas = Vec::new();
-    let mut metadatas = Vec::new();
-    for i in 0..NUM_MDATAS {
+    let mut mdata_cont = Vec::new();
+    let mut metadata_cont = Vec::new();
+    for i in 0..NUM_MDATA {
         let metadata = UserMetadata {
             name: Some(format!("name {}", i)),
             description: Some(format!("description {}", i)),
@@ -1573,18 +1573,18 @@ fn share_some_mdatas_with_valid_metadata() {
             client.put_mdata(mdata).map_err(AuthError::CoreError)
         });
 
-        mdatas.push(ShareMData {
+        mdata_cont.push(ShareMData {
             type_tag: tag,
             name: name,
             perms: perms,
         });
-        metadatas.push((Some(metadata), name, tag));
+        metadata_cont.push((Some(metadata), name, tag));
     }
 
     let req_id = ipc::gen_req_id();
     let req = ShareMDataReq {
         app: app_id,
-        mdata: mdatas.clone(),
+        mdata: mdata_cont.clone(),
     };
     let msg = IpcMsg::Req {
         req_id: req_id,
@@ -1595,9 +1595,9 @@ fn share_some_mdatas_with_valid_metadata() {
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
         (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(Payload::Metadata(received_metadatas))) => {
-            assert_eq!(mdata, mdatas);
-            assert_eq!(received_metadatas, metadatas);
+         Some(Payload::Metadata(received_metadata_cont))) => {
+            assert_eq!(mdata, mdata_cont);
+            assert_eq!(received_metadata_cont, metadata_cont);
         }
         _ => panic!("Unexpected: {:?}", decoded),
     };
@@ -1617,7 +1617,7 @@ fn share_some_mdatas_with_valid_metadata() {
 
     unwrap!(unwrap!(rx.recv_timeout(Duration::from_secs(15))));
 
-    for share_mdata in &mdatas {
+    for share_mdata in &mdata_cont {
         let name = share_mdata.name;
         let type_tag = share_mdata.type_tag;
         let mdata = run(&authenticator, move |client| {
@@ -1631,7 +1631,7 @@ fn share_some_mdatas_with_valid_metadata() {
 }
 
 #[test]
-fn share_some_mdatas_with_ownership_error() {
+fn share_some_mdata_with_ownership_error() {
     let authenticator = create_account_and_login();
 
     let user = run(&authenticator, move |client| {
@@ -1647,7 +1647,7 @@ fn share_some_mdatas_with_ownership_error() {
         btree_set![],
     ];
 
-    let mut mdatas = Vec::new();
+    let mut mdata_cont = Vec::new();
     for owners in ownerss {
         let name = rand::random();
         let mdata = {
@@ -1664,7 +1664,7 @@ fn share_some_mdatas_with_ownership_error() {
             client.put_mdata(mdata).map_err(AuthError::CoreError)
         });
 
-        mdatas.push(ShareMData {
+        mdata_cont.push(ShareMData {
             type_tag: 0,
             name: name,
             perms: PermissionSet::new().allow(Action::Insert),
@@ -1674,7 +1674,7 @@ fn share_some_mdatas_with_ownership_error() {
     let req_id = ipc::gen_req_id();
     let req = ShareMDataReq {
         app: unwrap!(rand_app()),
-        mdata: mdatas.clone(),
+        mdata: mdata_cont.clone(),
     };
     let msg = IpcMsg::Req {
         req_id: req_id,
@@ -1711,9 +1711,8 @@ fn share_some_mdatas_with_ownership_error() {
 
 // Test cases for:
 // 1. Shared access is requested for an MData object that has metadata.
-// a. Test that `name` and `description` were returned correctly. (This should mostly be covered by
-// various tests in `safe_authenticator::tests` such as `share_some_mdatas()`.) Check that the
-// returned `xor_name` and `type_tag` can identify the right MData.
+// a. Test that `name` and `description` were returned correctly. Check that the returned `xor_name`
+// and `type_tag` can identify the right MData.
 // b. Add some tests similar to 2b and 2c (below), but where the MData does have metadata. The
 // behavior should be the same.
 // 2. Shared access is requested for an MData object that doesn't have metadata.
@@ -1725,24 +1724,24 @@ fn share_some_mdatas_with_ownership_error() {
 // in Authenticator, then test that the `app_id` and `name` fields are null, but the public sign key
 // and the list of permissions are correct.
 #[test]
-fn auth_apps_accessing_mdatas() {
+fn auth_apps_accessing_mdata() {
     let authenticator = create_account_and_login();
 
     let user = run(&authenticator, move |client| {
         client.public_signing_key().map_err(AuthError::CoreError)
     });
 
-    const NUM_MDATAS: usize = 3;
-    const NUM_MDATAS_NO_META: usize = 3;
+    const NUM_MDATA: usize = 3;
+    const NUM_MDATA_NO_META: usize = 3;
 
     // Create a few MData objects with metadata
     let perms = PermissionSet::new().allow(Action::Insert);
-    let mut mdatas = Vec::new();
-    let mut metadatas = Vec::new();
+    let mut mdata_cont = Vec::new();
+    let mut metadata_cont = Vec::new();
     let unregistered = sign::gen_keypair().0;
 
-    for i in 0..(NUM_MDATAS + NUM_MDATAS_NO_META) {
-        let metadata = if i < NUM_MDATAS {
+    for i in 0..(NUM_MDATA + NUM_MDATA_NO_META) {
+        let metadata = if i < NUM_MDATA {
             Some(UserMetadata {
                 name: Some(format!("name {}", i)),
                 description: Some(format!("description {}", i)),
@@ -1782,12 +1781,12 @@ fn auth_apps_accessing_mdatas() {
             client.put_mdata(mdata).map_err(AuthError::CoreError)
         });
 
-        mdatas.push(ShareMData {
+        mdata_cont.push(ShareMData {
             type_tag: tag,
             name: name,
             perms: perms,
         });
-        metadatas.push((metadata, name, tag));
+        metadata_cont.push((metadata, name, tag));
     }
 
     const NUM_APPS: usize = 3;
@@ -1805,11 +1804,11 @@ fn auth_apps_accessing_mdatas() {
         let app_auth = unwrap!(register_app(&authenticator, &auth_req));
         let app_key = app_auth.app_keys.sign_pk;
 
-        // Share the Mdatas with the app.
+        // Share the Mdata with the app.
         let req_id = ipc::gen_req_id();
         let req = ShareMDataReq {
             app: app_id.clone(),
-            mdata: mdatas.clone(),
+            mdata: mdata_cont.clone(),
         };
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -1821,11 +1820,11 @@ fn auth_apps_accessing_mdatas() {
 
         match decoded {
             (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-             Some(Payload::Metadata(received_metadatas))) => {
-                assert_eq!(mdata, mdatas);
-                // Ensure the received metadatas, xor names and type tags are equal.
+             Some(Payload::Metadata(received_metadata_cont))) => {
+                assert_eq!(mdata, mdata_cont);
+                // Ensure the received metadata_cont, xor names and type tags are equal.
                 // For mdata without metadata, received metadata should be `None`.
-                assert_eq!(received_metadatas, metadatas);
+                assert_eq!(received_metadata_cont, metadata_cont);
             }
             _ => panic!("Unexpected: {:?}", decoded),
         };
@@ -1849,7 +1848,7 @@ fn auth_apps_accessing_mdatas() {
     }
 
     // Test the correctness of returned `AppAccess` objects
-    for (_, name, tag) in metadatas {
+    for (_, name, tag) in metadata_cont {
         let app_access: Vec<AppAccess> = unsafe {
             unwrap!(call_vec(|ud, cb| {
                 auth_apps_accessing_mutable_data(&authenticator, &name.0, tag, ud, cb)
@@ -2040,7 +2039,7 @@ fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
         user_data: *mut c_void,
         req_id: u32,
         req: *const FfiShareMDataReq,
-        ffi_metadatas: *const FfiUserMetadata,
+        ffi_metadata_cont: *const FfiUserMetadata,
     ) {
         unsafe {
             let req = match ShareMDataReq::clone_from_repr_c(req) {
@@ -2048,7 +2047,7 @@ fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
                 Err(_) => return send_via_user_data(user_data, Err((-2, None))),
             };
 
-            let metadatas: Vec<_> = slice::from_raw_parts(ffi_metadatas, req.mdata.len())
+            let metadata_cont: Vec<_> = slice::from_raw_parts(ffi_metadata_cont, req.mdata.len())
                 .iter()
                 .map(|ffi_metadata| {
                     (
@@ -2068,7 +2067,7 @@ fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
                 req: IpcReq::ShareMData(req),
             };
 
-            send_via_user_data(user_data, Ok((msg, Some(Payload::Metadata(metadatas)))))
+            send_via_user_data(user_data, Ok((msg, Some(Payload::Metadata(metadata_cont)))))
         }
     }
 
