@@ -731,10 +731,11 @@ fn decode_share_mdata_req(
         let name = mdata.name;
         let type_tag = mdata.type_tag;
 
-        let future = client
-            .get_mdata_shell(name, type_tag)
-            .and_then(move |shell| if shell.owners().contains(&user) {
-                let future_metadata = client
+        let future =
+            client
+                .get_mdata_shell(name, type_tag)
+                .and_then(move |shell| if shell.owners().contains(&user) {
+                    let future_metadata = client
                     .get_mdata_value(name, type_tag, METADATA_KEY.into())
                     .then(move |res| match res {
                         Ok(value) => Ok(
@@ -748,24 +749,26 @@ fn decode_share_mdata_req(
                             }) )
                         ,
                         Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) =>
+                        {
                             // Allow requesting shared access to arbitrary Mutable Data objects even
                             // if they don't have metadata.
-                            Ok( UserMetadata {
-                                name: None,
-                                description: None,
-                            }.into_md_response(name, type_tag)
+                            let user_metadata = UserMetadata { name: None, description: None };
+                            let user_md_response = user_metadata
+                                .into_md_response(name, type_tag)
                                 .map_err(|_| {
                                     ShareMDataError::InvalidMetadata
-                                })),
+                                });
+                            Ok(user_md_response)
+                        }
                         Err(error) => Err(error),
                     });
-                Either::A(future_metadata)
-            } else {
-                Either::B(future::ok(
-                    Err(ShareMDataError::InvalidOwner(name, type_tag)),
-                ))
-            })
-            .map_err(AuthError::from);
+                    Either::A(future_metadata)
+                } else {
+                    Either::B(future::ok(
+                        Err(ShareMDataError::InvalidOwner(name, type_tag)),
+                    ))
+                })
+                .map_err(AuthError::from);
 
         futures.push(future);
     }

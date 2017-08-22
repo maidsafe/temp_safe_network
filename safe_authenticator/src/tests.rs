@@ -1731,17 +1731,17 @@ fn auth_apps_accessing_mdata() {
         client.public_signing_key().map_err(AuthError::CoreError)
     });
 
-    const NUM_MDATA: usize = 3;
-    const NUM_MDATA_NO_META: usize = 3;
+    const NUM_MD: usize = 3;
+    const NUM_MD_NO_META: usize = 3;
 
     // Create a few MData objects with metadata
     let perms = PermissionSet::new().allow(Action::Insert);
-    let mut mdata_cont = Vec::new();
+    let mut md_cont = Vec::new();
     let mut metadata_cont = Vec::new();
     let unregistered = sign::gen_keypair().0;
 
-    for i in 0..(NUM_MDATA + NUM_MDATA_NO_META) {
-        let metadata = if i < NUM_MDATA {
+    for i in 0..(NUM_MD + NUM_MD_NO_META) {
+        let metadata = if i < NUM_MD {
             Some(UserMetadata {
                 name: Some(format!("name {}", i)),
                 description: Some(format!("description {}", i)),
@@ -1752,7 +1752,7 @@ fn auth_apps_accessing_mdata() {
 
         let name = rand::random();
         let tag = 10_000 + i as u64;
-        let mdata = {
+        let md = {
             let owners = btree_set![user];
 
             // We need to test both with and without metadata
@@ -1778,10 +1778,10 @@ fn auth_apps_accessing_mdata() {
         };
 
         run(&authenticator, move |client| {
-            client.put_mdata(mdata).map_err(AuthError::CoreError)
+            client.put_mdata(md).map_err(AuthError::CoreError)
         });
 
-        mdata_cont.push(ShareMData {
+        md_cont.push(ShareMData {
             type_tag: tag,
             name: name,
             perms: perms,
@@ -1808,7 +1808,7 @@ fn auth_apps_accessing_mdata() {
         let req_id = ipc::gen_req_id();
         let req = ShareMDataReq {
             app: app_id.clone(),
-            mdata: mdata_cont.clone(),
+            mdata: md_cont.clone(),
         };
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -1821,7 +1821,7 @@ fn auth_apps_accessing_mdata() {
         match decoded {
             (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
              Some(Payload::Metadata(received_metadata_cont))) => {
-                assert_eq!(mdata, mdata_cont);
+                assert_eq!(mdata, md_cont);
                 // Ensure the received metadata_cont, xor names and type tags are equal.
                 // For mdata without metadata, received metadata should be `None`.
                 assert_eq!(received_metadata_cont, metadata_cont);
