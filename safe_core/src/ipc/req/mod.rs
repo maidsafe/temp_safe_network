@@ -199,7 +199,9 @@ pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
 }
 
 /// Create a `PermissionSet` from its C representation.
-fn permission_set_clone_from_repr_c(perms: &ffi::PermissionSet) -> Result<PermissionSet, IpcError> {
+pub fn permission_set_clone_from_repr_c(
+    perms: &ffi::PermissionSet,
+) -> Result<PermissionSet, IpcError> {
     let mut pm = PermissionSet::new();
 
     if perms.read && !perms.insert && !perms.update && !perms.delete && !perms.manage_permissions {

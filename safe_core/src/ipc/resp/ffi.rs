@@ -113,7 +113,7 @@ pub struct AccessContInfo {
 #[repr(C)]
 pub struct AppAccess {
     /// App's or user's public key
-    pub sign_key: *const SignPublicKey,
+    pub sign_key: SignPublicKey,
     /// A list of permissions
     pub permissions: FfiPermissionSet,
     /// App's user-facing name
@@ -131,7 +131,7 @@ pub struct MetadataResponse {
     /// Description of how this mutable data should or should not be shared.
     pub description: *const c_char,
     /// Xor name of this struct's corresponding MData object.
-    pub xor_name: *const XorNameArray,
+    pub xor_name: XorNameArray,
     /// Type tag of this struct's corresponding MData object.
     pub type_tag: u64,
 }
@@ -142,7 +142,7 @@ impl MetadataResponse {
         MetadataResponse {
             name: ptr::null(),
             description: ptr::null(),
-            xor_name: ptr::null(),
+            xor_name: Default::default(),
             type_tag: 0,
         }
     }
