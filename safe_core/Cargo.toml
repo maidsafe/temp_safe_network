@@ -11,6 +11,7 @@ version = "0.25.1"
 
 [dependencies]
 base64 = "~0.4.1"
+bincode = { version = "~0.8.0", optional = true }
 chrono = { version = "~0.4.0", features = ["serde"] }
 ffi_utils = { path = "../ffi_utils", version = "~0.2.0" }
 fs2 = "~0.4.2"
@@ -34,7 +35,7 @@ docopt = "~0.7.0"
 rustc-serialize = "~0.3.23"
 
 [features]
-use-mock-routing = []
+use-mock-routing = ["bincode"]
 testing = []
 
 [[example]]
