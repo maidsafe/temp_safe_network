@@ -17,8 +17,8 @@
 
 use super::Account;
 use super::DataId;
+use bincode::{Infinite, deserialize, serialize};
 use fs2::FileExt;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Authority, ClientError, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::HashMap;
@@ -213,14 +213,14 @@ impl Store for MemoryStore {
 struct FileStore {
     // `bool` element indicates whether the store is being written to.
     file: Option<(File, bool)>,
-    sync_time: SystemTime,
+    sync_time: Option<SystemTime>,
 }
 
 impl FileStore {
     fn new() -> Self {
         FileStore {
             file: None,
-            sync_time: SystemTime::now(),
+            sync_time: None,
         }
     }
 
@@ -249,19 +249,33 @@ impl Store for FileStore {
 
         let metadata = unwrap!(file.metadata());
         let mtime = unwrap!(metadata.modified());
-        let mtime_duration = mtime.duration_since(self.sync_time).unwrap_or_else(|_| {
+        let mtime_duration = if let Some(sync_time) = self.sync_time {
+            mtime.duration_since(sync_time).unwrap_or_else(
+                |_| Duration::from_millis(0),
+            )
+        } else {
             Duration::from_millis(1)
-        });
+        };
 
         // Update vault only if it's not already synchronised
         let mut result = None;
         if mtime_duration > Duration::new(0, 0) {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
+            match file.read_to_end(&mut raw_data) {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Can't read the mock vault: {:?}", e);
+                    return None;
+                }
+            }
 
-            if file.read_to_end(&mut raw_data).is_ok() && !raw_data.is_empty() {
-                if let Ok(cache) = deserialise::<Cache>(&raw_data) {
-                    self.sync_time = mtime;
+            match deserialize::<Cache>(&raw_data) {
+                Ok(cache) => {
+                    self.sync_time = Some(mtime);
                     result = Some(cache);
+                }
+                Err(e) => {
+                    println!("Can't read the mock vault: {:?}", e);
                 }
             }
         }
@@ -276,12 +290,12 @@ impl Store for FileStore {
         // the lock.
         if let Some((mut file, writing)) = self.file.take() {
             if writing {
-                let raw_data = unwrap!(serialise(&cache));
+                let raw_data = unwrap!(serialize(&cache, Infinite));
                 unwrap!(file.write_all(&raw_data));
                 unwrap!(file.sync_all());
 
                 let mtime = unwrap!(unwrap!(file.metadata()).modified());
-                self.sync_time = mtime;
+                self.sync_time = Some(mtime);
 
             }
 
