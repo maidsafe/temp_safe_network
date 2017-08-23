@@ -45,8 +45,26 @@ pub fn enc_key(
     Ok(access_container_enc_key(app_id, secret_key, nonce)?)
 }
 
+/// Decode raw authenticator entry.
+pub fn decode_authenticator_entry(
+    encoded: &[u8],
+    enc_key: &secretbox::Key,
+) -> Result<HashMap<String, MDataInfo>, AuthError> {
+    let plaintext = symmetric_decrypt(encoded, enc_key)?;
+    Ok(deserialise(&plaintext)?)
+}
+
+/// Encode authenticator entry into raw mdata content.
+pub fn encode_authenticator_entry(
+    decoded: &HashMap<String, MDataInfo>,
+    enc_key: &secretbox::Key,
+) -> Result<Vec<u8>, AuthError> {
+    let plaintext = serialise(decoded)?;
+    Ok(symmetric_encrypt(&plaintext, enc_key, None)?)
+}
+
 /// Gets an authenticator entry from the access container
-pub fn authenticator_entry<T: 'static>(
+pub fn fetch_authenticator_entry<T: 'static>(
     client: &Client<T>,
 ) -> Box<AuthFuture<(u64, HashMap<String, MDataInfo>)>> {
     let c2 = client.clone();
@@ -59,14 +77,13 @@ pub fn authenticator_entry<T: 'static>(
 
     client
         .get_mdata_value(access_container.name, access_container.type_tag, key)
-        .and_then(move |value| {
-            let plaintext = {
-                let enc_key = c2.secret_symmetric_key()?;
-                symmetric_decrypt(&value.content, &enc_key)?
-            };
-            Ok((value.entry_version, deserialise(&plaintext)?))
-        })
         .map_err(From::from)
+        .and_then(move |value| {
+            let enc_key = c2.secret_symmetric_key()?;
+            decode_authenticator_entry(&value.content, &enc_key).map(
+                |decoded| (value.entry_version, decoded),
+            )
+        })
         .into_box()
 }
 
@@ -77,12 +94,10 @@ pub fn put_authenticator_entry<T: 'static>(
     version: u64,
 ) -> Box<AuthFuture<()>> {
     let access_container = fry!(client.access_container());
-    let plaintext = fry!(serialise(new_value));
     let (key, ciphertext) = {
         let sk = fry!(client.secret_symmetric_key());
-
         let key = fry!(enc_key(&access_container, AUTHENTICATOR_ENTRY, &sk));
-        let ciphertext = fry!(symmetric_encrypt(&plaintext, &sk, None));
+        let ciphertext = fry!(encode_authenticator_entry(new_value, &sk));
 
         (key, ciphertext)
     };
@@ -102,6 +117,24 @@ pub fn put_authenticator_entry<T: 'static>(
         .into_box()
 }
 
+/// Decode raw app entry.
+pub fn decode_app_entry(
+    encoded: &[u8],
+    enc_key: &secretbox::Key,
+) -> Result<AccessContainerEntry, AuthError> {
+    let plaintext = symmetric_decrypt(encoded, enc_key)?;
+    Ok(deserialise(&plaintext)?)
+}
+
+/// Encode app entry into raw mdata content.
+pub fn encode_app_entry(
+    decoded: &AccessContainerEntry,
+    enc_key: &secretbox::Key,
+) -> Result<Vec<u8>, AuthError> {
+    let plaintext = serialise(decoded)?;
+    Ok(symmetric_encrypt(&plaintext, enc_key, None)?)
+}
+
 /// Gets an access container entry
 pub fn fetch_entry<T>(
     client: &Client<T>,
@@ -116,17 +149,16 @@ where
 
     client
         .get_mdata_value(access_container.name, access_container.type_tag, key)
-        .and_then(move |value| {
-            if value.content.is_empty() {
-                // Access container entry has been removed
-                // FIXME(nbaksalyar): get rid of this check after proper deletion is implemented
-                Ok((value.entry_version, None))
-            } else {
-                let plaintext = symmetric_decrypt(&value.content, &app_keys.enc_key)?;
-                Ok((value.entry_version, Some(deserialise(&plaintext)?)))
-            }
-        })
         .map_err(From::from)
+        .and_then(move |value| {
+            let decoded = if value.content.is_empty() {
+                None
+            } else {
+                Some(decode_app_entry(&value.content, &app_keys.enc_key)?)
+            };
+
+            Ok((value.entry_version, decoded))
+        })
         .into_box()
 }
 
@@ -143,8 +175,7 @@ where
 {
     let access_container = fry!(client.access_container());
     let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
-    let plaintext = fry!(serialise(&permissions));
-    let ciphertext = fry!(symmetric_encrypt(&plaintext, &app_keys.enc_key, None));
+    let ciphertext = fry!(encode_app_entry(permissions, &app_keys.enc_key));
 
     let actions = if version == 0 {
         EntryActions::new().ins(key, ciphertext, 0)

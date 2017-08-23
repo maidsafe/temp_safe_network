@@ -127,9 +127,9 @@ impl MDataInfo {
     }
 
     /// Start the encryption info re-generation by populating the `new_enc_info`
-    /// field with random keys.
+    /// field with random keys, unless it's already populated.
     pub fn start_new_enc_info(&mut self) {
-        if self.enc_info.is_some() {
+        if self.enc_info.is_some() && self.new_enc_info.is_none() {
             self.new_enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
         }
     }
@@ -140,11 +140,6 @@ impl MDataInfo {
         if let Some(new_enc_info) = self.new_enc_info.take() {
             self.enc_info = Some(new_enc_info);
         }
-    }
-
-    /// Abort the encryption info regeneration by clearing the `new_enc_info` field.
-    pub fn abort_new_enc_info(&mut self) {
-        self.new_enc_info = None;
     }
 }
 

@@ -28,9 +28,9 @@ use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, nfs};
 /// `None` otherwise.
 #[cfg(test)]
 pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataInfo>>> {
-    let app_cont_name = app_container_name(app_id);
+    let app_cont_name = name(app_id);
 
-    access_container::authenticator_entry(client)
+    access_container::fetch_authenticator_entry(client)
         .and_then(move |(_, mut ac_entries)| {
             Ok(ac_entries.remove(&app_cont_name))
         })
@@ -46,9 +46,9 @@ pub fn fetch_or_create(
 ) -> Box<AuthFuture<MDataInfo>> {
     let c2 = client.clone();
     let c3 = client.clone();
-    let app_cont_name = app_container_name(app_id);
+    let app_cont_name = name(app_id);
 
-    access_container::authenticator_entry(client)
+    access_container::fetch_authenticator_entry(client)
         .and_then(move |(ac_entry_version, mut ac_entries)| {
             match ac_entries.remove(&app_cont_name) {
                 Some(mdata_info) => {
@@ -96,9 +96,9 @@ pub fn fetch_or_create(
 /// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
 pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
     let c2 = client.clone();
-    let app_cont_name = app_container_name(app_id);
+    let app_cont_name = name(app_id);
 
-    access_container::authenticator_entry(&client)
+    access_container::fetch_authenticator_entry(&client)
         .and_then(move |(ac_entry_version, mut ac_entries)| {
             match ac_entries.remove(&app_cont_name) {
                 None => {
@@ -159,7 +159,7 @@ fn create(client: &Client<()>, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<M
         .into_box()
 }
 
-#[inline]
-fn app_container_name(app_id: &str) -> String {
+/// Get name of the dedicated container of the given app.
+pub fn name(app_id: &str) -> String {
     format!("apps/{}", app_id)
 }

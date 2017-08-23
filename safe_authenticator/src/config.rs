@@ -211,16 +211,20 @@ where
     client
         .mutate_mdata_entries(parent.name, parent.type_tag, actions.into())
         .or_else(move |error| {
-            // As we are mutating only one entry, let's make the common error
+            // As we are mutating only one entry, let's make the common errors
             // more convenient to handle.
             if let CoreError::RoutingClientError(ClientError::InvalidEntryActions(ref errors)) =
                 error
             {
                 if let Some(error) = errors.get(&key) {
-                    if let EntryError::InvalidSuccessor(version) = *error {
-                        return Err(CoreError::RoutingClientError(
-                            ClientError::InvalidSuccessor(version),
-                        ));
+                    match *error {
+                        EntryError::InvalidSuccessor(version) |
+                        EntryError::EntryExists(version) => {
+                            return Err(CoreError::RoutingClientError(
+                                ClientError::InvalidSuccessor(version),
+                            ));
+                        }
+                        _ => (),
                     }
                 }
             }

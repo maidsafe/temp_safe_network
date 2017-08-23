@@ -67,7 +67,7 @@ fn test_access_container() {
 
     // Fetch the entries of the access container.
     let entries = run(&authenticator, |client| {
-        access_container_tools::authenticator_entry(client).map(|(_version, entries)| entries)
+        access_container_tools::fetch_authenticator_entry(client).map(|(_version, entries)| entries)
     });
 
     // Verify that all the std dirs are there.
@@ -197,7 +197,7 @@ fn std_dirs_recovery() {
     // Verify that the access container has been created and
     // fetch the entries of the root authenticator entry.
     let (_entry_version, entries) = run(&authenticator, |client| {
-        access_container_tools::authenticator_entry(client).map_err(AuthError::from)
+        access_container_tools::fetch_authenticator_entry(client).map_err(AuthError::from)
     });
 
     // Verify that all the std dirs are there.

@@ -268,7 +268,7 @@ pub fn get_container_from_root(
     let container = String::from(container);
 
     try_run(authenticator, move |client| {
-        access_container::authenticator_entry(client).and_then(move |(_, mut ac_entries)| {
+        access_container::fetch_authenticator_entry(client).and_then(move |(_, mut ac_entries)| {
             ac_entries.remove(&container).ok_or_else(|| {
                 AuthError::from(format!("'{}' not found in the access container", container))
             })

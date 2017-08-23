@@ -16,37 +16,53 @@
 // relating to use of the SAFE Network Software.
 
 use super::utils::create_containers_req;
+#[cfg(feature = "use-mock-routing")]
 use AccessContainerEntry;
+#[cfg(feature = "use-mock-routing")]
 use AuthFuture;
 use Authenticator;
+#[cfg(feature = "use-mock-routing")]
 use access_container;
 #[cfg(feature = "use-mock-routing")]
 use app_auth::{AppState, app_state};
+use app_container;
 #[cfg(feature = "use-mock-routing")]
 use config;
 use errors::AuthError;
-use futures::{Future, future};
+use futures::Future;
+#[cfg(feature = "use-mock-routing")]
+use futures::future;
+#[cfg(feature = "use-mock-routing")]
 use rand::{self, Rng};
 #[cfg(feature = "use-mock-routing")]
 use revocation::flush_app_revocation_queue;
 #[cfg(feature = "use-mock-routing")]
 use routing::{ClientError, Request, Response};
 use routing::User;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::{Client, FutureExt};
+use safe_core::{CoreError, MDataInfo};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::ipc::{AuthReq, Permission};
+#[cfg(feature = "use-mock-routing")]
+use safe_core::ipc::{IpcError, Permission};
+use safe_core::ipc::AuthReq;
+#[cfg(feature = "use-mock-routing")]
 use safe_core::ipc::req::container_perms_into_permission_set;
-use safe_core::nfs::{File, Mode, NfsError, file_helper};
+use safe_core::nfs::NfsError;
+#[cfg(feature = "use-mock-routing")]
 use std::collections::HashMap;
 #[cfg(feature = "use-mock-routing")]
 use std::iter;
-use std::thread;
-use std::time::Duration;
-use test_utils::{access_container, create_account_and_login, create_authenticator, rand_app,
-                 register_app, revoke, run, try_access_container, try_run};
 #[cfg(feature = "use-mock-routing")]
-use test_utils::{get_container_from_root, try_revoke};
+use std::thread;
+#[cfg(feature = "use-mock-routing")]
+use std::time::Duration;
+use test_utils::{access_container, create_account_and_login, create_file, fetch_file, rand_app,
+                 register_app, revoke, run, try_access_container};
+#[cfg(feature = "use-mock-routing")]
+use test_utils::{create_authenticator, get_container_from_root, try_revoke};
+#[cfg(feature = "use-mock-routing")]
 use tiny_keccak::sha3_256;
 
 // The app revocation and re-authorization workflow.
@@ -90,7 +106,7 @@ fn app_revocation() {
         vec![1; 10],
     ));
 
-    let app_container_name = format!("apps/{}", app_id2.clone());
+    let app_container_name = app_container::name(&app_id2);
     let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container_name));
     unwrap!(create_file(
         &authenticator,
@@ -113,7 +129,7 @@ fn app_revocation() {
     revoke(&authenticator, &app_id1);
 
     // There should now be 4 entries - 2 deleted previous entries, 2 new,
-    // reencrypted entries.
+    // re-encrypted entries.
     assert_eq!(count_mdata_entries(&authenticator, videos_md1.clone()), 4);
 
     // The first app is no longer be in the access container.
@@ -376,7 +392,7 @@ fn app_revocation_recovery() {
 //    from finishing.
 // 3. Try to re-authenticate the app and assert that it fails (as the app is in the
 //    middle of its revocation process)
-// 4. Re-try the revocation with no simulated failures to let it finish successfuly.
+// 4. Re-try the revocation with no simulated failures to let it finish successfully.
 // 5. Try to re-authenticate the app again. This time it will succeed.
 #[cfg(feature = "use-mock-routing")]
 #[test]
@@ -416,7 +432,7 @@ fn app_authentication_during_pending_revocation() {
 // 2. Revoke both of them, but simulate network failure so both revocations would
 //    fail.
 // 3. Log in again and flush the revocation queue with no simulated failures.
-// 4. Verify both apps are successfuly revoked.
+// 4. Verify both apps are successfully revoked.
 #[cfg(feature = "use-mock-routing")]
 #[test]
 fn flushing_app_revocation_queue() {
@@ -503,6 +519,7 @@ fn flushing_app_revocation_queue() {
 }
 
 // Test one app being revoked by multiple authenticator concurrently.
+#[cfg(feature = "use-mock-routing")]
 #[test]
 fn concurrent_revocation_of_single_app() {
     // Number of concurrent operations.
@@ -530,6 +547,7 @@ fn concurrent_revocation_of_single_app() {
     };
     let auth_granted_0 = unwrap!(register_app(&auth, &auth_req));
     let app_id_0 = auth_req.app.id;
+    let app_0_ac_entries = access_container(&auth, app_id_0.clone(), auth_granted_0);
 
     let auth_req = AuthReq {
         app: unwrap!(rand_app()),
@@ -539,15 +557,18 @@ fn concurrent_revocation_of_single_app() {
     let _ = unwrap!(register_app(&auth, &auth_req));
     let app_id_1 = auth_req.app.id;
 
+
     // Put a file into the shared container.
-    let mut ac_entries = access_container(&auth, app_id_0.clone(), auth_granted_0.clone());
-    let (info, _) = unwrap!(ac_entries.remove("_documents"));
+    let info = unwrap!(get_container_from_root(&auth, "_documents"));
+    unwrap!(create_file(&auth, info, "shared.txt", vec![0; 10]));
 
-    let file_name = "file.txt";
-    let file_content = vec![0; 10];
-    unwrap!(create_file(&auth, info, file_name, file_content));
+    // Put a file into the dedicated container of each app.
+    for app_id in &[&app_id_0, &app_id_1] {
+        let info = unwrap!(get_container_from_root(&auth, &app_container::name(app_id)));
+        unwrap!(create_file(&auth, info, "private.txt", vec![0; 10]));
+    }
 
-    // Try to revoke the app concurrently using mutliple authenticators (running
+    // Try to revoke the app concurrently using multiple authenticators (running
     // in separate threads).
     // (NOTE: doing `collect` after every step to prevent short-circuiting)
     let auths: Vec<_> = (0..concurrency)
@@ -582,17 +603,29 @@ fn concurrent_revocation_of_single_app() {
         })
         .collect();
 
-    let results: Vec<_> = join_handles
-        .into_iter()
-        .map(|handle| unwrap!(handle.join()))
-        .collect();
+    let success = join_handles.into_iter().fold(
+        false,
+        |success, handle| match unwrap!(
+            handle.join()
+        ) {
+            Ok(_) |
+            Err(AuthError::IpcError(IpcError::UnknownApp)) => true,
+            _ => success,
+        },
+    );
 
-    // At least one operation should have succeeded.
-    assert!(results.into_iter().any(|result| result.is_ok()));
+    // If none of the concurrently running revocations succeeded, let's give it
+    // one more try, but this time using only one authenticator.
+    // The idea behind this is that it's OK if revocation fails when run concurrently,
+    // but it should always succeed when run non-concurrently - that is, the
+    // concurrent runs should never leave things in inconsistent state.
+    if !success {
+        unwrap!(try_revoke(&auth, &app_id_0));
+    }
 
     // Check that the first app is now revoked, but the second app is not.
     run(&auth, move |client| {
-        let app_0 = verify_app_is_revoked(client, app_id_0, ac_entries);
+        let app_0 = verify_app_is_revoked(client, app_id_0, app_0_ac_entries);
         let app_1 = verify_app_is_authenticated(client, app_id_1);
 
         app_0.join(app_1).map(|_| ())
@@ -604,46 +637,6 @@ fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize 
         client
             .list_mdata_entries(info.name, info.type_tag)
             .map(|entries| entries.len())
-            .map_err(From::from)
-    })
-}
-
-// Create file in the given container, with the given name and content.
-fn create_file<T: Into<String>>(
-    authenticator: &Authenticator,
-    container_info: MDataInfo,
-    name: T,
-    content: Vec<u8>,
-) -> Result<(), AuthError> {
-    let name = name.into();
-    try_run(authenticator, |client| {
-        let c2 = client.clone();
-
-        file_helper::write(
-            client.clone(),
-            File::new(vec![]),
-            Mode::Overwrite,
-            container_info.enc_key().cloned(),
-        ).then(move |res| {
-            let writer = unwrap!(res);
-            writer.write(&content).and_then(move |_| writer.close())
-        })
-            .then(move |file| {
-                file_helper::insert(c2, container_info, name, &unwrap!(file))
-            })
-            .map_err(From::from)
-    })
-}
-
-fn fetch_file<T: Into<String>>(
-    authenticator: &Authenticator,
-    container_info: MDataInfo,
-    name: T,
-) -> Result<File, AuthError> {
-    let name = name.into();
-    try_run(authenticator, |client| {
-        file_helper::fetch(client.clone(), container_info, name)
-            .map(|(_, file)| file)
             .map_err(From::from)
     })
 }
@@ -696,6 +689,7 @@ where
     }
 }
 
+#[cfg(feature = "use-mock-routing")]
 fn verify_app_is_revoked(
     client: &Client<()>,
     app_id: String,
@@ -737,7 +731,7 @@ fn verify_app_is_revoked(
                 let perms = c1.list_mdata_user_permissions(
                     mdata_info.name,
                     mdata_info.type_tag,
-                    User::Key(app_key.clone()),
+                    User::Key(app_key),
                 ).then(|res| {
                         assert_match!(
                             res,
@@ -770,6 +764,7 @@ fn verify_app_is_revoked(
         .into_box()
 }
 
+#[cfg(feature = "use-mock-routing")]
 fn verify_app_is_authenticated(client: &Client<()>, app_id: String) -> Box<AuthFuture<()>> {
     let c0 = client.clone();
     let c1 = client.clone();
@@ -807,15 +802,13 @@ fn verify_app_is_authenticated(client: &Client<()>, app_id: String) -> Box<AuthF
                 move |(_, (mdata_info, permissions))| {
                     // Verify the app has the permissions set according to the access container.
                     let expected_perms = container_perms_into_permission_set(&permissions);
-                    let perms = c2.list_mdata_user_permissions(
-                        mdata_info.name,
-                        mdata_info.type_tag,
-                        user.clone(),
-                    ).then(move |res| {
-                            let perms = unwrap!(res);
-                            assert_eq!(perms, expected_perms);
-                            Ok(())
-                        });
+                    let perms =
+                        c2.list_mdata_user_permissions(mdata_info.name, mdata_info.type_tag, user)
+                            .then(move |res| {
+                                let perms = unwrap!(res);
+                                assert_eq!(perms, expected_perms);
+                                Ok(())
+                            });
 
                     // Verify the app can decrypt the content of the containers.
                     let entries = c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)

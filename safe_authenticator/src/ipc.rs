@@ -661,7 +661,7 @@ pub fn update_container_perms(
 ) -> Box<AuthFuture<AccessContainerEntry>> {
     let c2 = client.clone();
 
-    access_container::authenticator_entry(client)
+    access_container::fetch_authenticator_entry(client)
         .and_then(move |(_, mut root_containers)| {
             let mut reqs = Vec::new();
             let client = c2.clone();
