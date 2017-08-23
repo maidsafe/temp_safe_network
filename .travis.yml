@@ -73,8 +73,13 @@ script:
     elif [[ $TRAVIS_EVENT_TYPE = pull_request ]]; then
       (
         set -x;
-        cd ffi_utils && cargo clippy && cargo clippy --profile=test &&
-        cd ../safe_core && cargo clippy && cargo clippy --profile=test --features=$FEATURES &&
+        cd ffi_utils && cargo clippy --profile=test &&
+        echo "--- Test build for real network ---" &&
+        cd ../safe_core && cargo clippy --profile=test --features=testing &&
+        cd ../safe_authenticator && cargo clippy --profile=test --features=testing &&
+        cd ../safe_app && cargo clippy --profile=test --features=testing &&
+        echo "--- Test build for mock-routing ---" &&
+        cd ../safe_core && cargo clippy --profile=test --features=$FEATURES &&
         cd ../safe_authenticator && cargo clippy --profile=test --features=$FEATURES &&
         cd ../safe_app && cargo clippy --profile=test --features=$FEATURES;
       )

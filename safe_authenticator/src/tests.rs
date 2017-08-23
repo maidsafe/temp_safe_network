@@ -17,6 +17,7 @@
 
 use Authenticator;
 use access_container as access_container_tools;
+#[cfg(feature = "use-mock-routing")]
 use app_auth::{self, AppState};
 use config::{self, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_INVALID_OWNER, ERR_OPERATION_FORBIDDEN,
@@ -29,10 +30,11 @@ use ipc::{encode_auth_resp, encode_containers_resp, encode_share_mdata_resp,
           encode_unregistered_resp};
 use maidsafe_utilities::serialisation::serialise;
 use rand;
-use revocation;
 #[cfg(feature = "use-mock-routing")]
-use routing::{Action, ClientError, MutableData, PermissionSet, Request, Response, User, Value,
-              XorName};
+use revocation;
+use routing::{Action, MutableData, PermissionSet, User, Value, XorName};
+#[cfg(feature = "use-mock-routing")]
+use routing::{ClientError, Request, Response};
 use rust_sodium::crypto::sign;
 use rust_sodium::crypto::sign::PublicKey;
 use safe_core::{CoreError, MDataInfo, mdata_info};
@@ -50,6 +52,7 @@ use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
 use safe_core::nfs::{File, Mode, NfsError, file_helper};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
+#[cfg(feature = "use-mock-routing")]
 use std::iter;
 use std::os::raw::{c_char, c_void};
 use std::slice;
@@ -58,10 +61,9 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
-                 create_account_and_login_with_hook, rand_app, register_app, revoke, run,
-                 try_access_container, try_revoke, try_run};
+                 rand_app, register_app, revoke, run, try_access_container, try_run};
 #[cfg(feature = "use-mock-routing")]
-use test_utils::get_container_from_root;
+use test_utils::{create_account_and_login_with_hook, get_container_from_root, try_revoke};
 use tiny_keccak::sha3_256;
 
 // Test creation and content of std dirs after account creation.
@@ -1300,6 +1302,7 @@ fn app_authentication_recovery() {
 //    middle of its revocation process)
 // 4. Re-try the revocation with no simulated failures to let it finish successfuly.
 // 5. Try to re-authenticate the app again. This time it will succeed.
+#[cfg(feature = "use-mock-routing")]
 #[test]
 fn app_authentication_during_pending_revocation() {
     // Create account.
@@ -1347,6 +1350,7 @@ fn app_authentication_during_pending_revocation() {
 //    fail.
 // 3. Log in again and flush the revocation queue with no simulated failures.
 // 4. Verify both apps are successfuly revoked.
+#[cfg(feature = "use-mock-routing")]
 #[test]
 fn flushing_app_revocation_queue() {
     // Create account.
@@ -1934,6 +1938,7 @@ fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize 
 
 // Try to revoke apps with the given ids, but simulate network failure so they
 // would be initiated but not finished.
+#[cfg(feature = "use-mock-routing")]
 fn simulate_revocation_failure<T, S>(locator: &str, password: &str, app_ids: T)
 where
     T: IntoIterator<Item = S>,
