@@ -76,15 +76,17 @@ before_deploy:
   - cargo build --verbose --release --features=use-mock-routing,testing --manifest-path=safe_authenticator/Cargo.toml
   - cargo build --verbose --release --features=use-mock-routing,testing --manifest-path=safe_app/Cargo.toml
   - strip target\release\safe_authenticator.dll target\release\safe_app.dll
-  - ps: |
-        Push-AppveyorArtifact target\release\safe_authenticator.dll -FileName safe_authenticator-mock-$env:SAFE_AUTHENTICATOR_VERSION-win-$env:PLATFORM.zip
-        Push-AppveyorArtifact target\release\safe_app.dll -FileName safe_app-mock-$env:SAFE_APP_VERSION-win-$env:PLATFORM.zip
+  - 7z a -mx9 safe_authenticator-mock-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_authenticator.dll
+  - 7z a -mx9 safe_app-mock-%SAFE_APP_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_app.dll
+  - appveyor PushArtifact safe_authenticator-mock-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip
+  - appveyor PushArtifact safe_app-mock-%SAFE_APP_VERSION%-win-%PLATFORM%.zip
   - cargo build --verbose --release --manifest-path=safe_authenticator/Cargo.toml
   - cargo build --verbose --release --manifest-path=safe_app/Cargo.toml
   - strip target\release\safe_authenticator.dll target\release\safe_app.dll
-  - ps: |
-        Push-AppveyorArtifact target\release\safe_authenticator.dll -FileName safe_authenticator-$env:SAFE_AUTHENTICATOR_VERSION-win-$env:PLATFORM.zip
-        Push-AppveyorArtifact target\release\safe_app.dll -FileName safe_app-$env:SAFE_APP_VERSION-win-$env:PLATFORM.zip
+  - 7z a -mx9 safe_authenticator-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_authenticator.dll
+  - 7z a -mx9 safe_app-%SAFE_APP_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_app.dll
+  - appveyor PushArtifact safe_authenticator-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip
+  - appveyor PushArtifact safe_app-%SAFE_APP_VERSION%-win-%PLATFORM%.zip
 
 deploy:
   provider: S3

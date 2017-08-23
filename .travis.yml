@@ -109,14 +109,14 @@ before_deploy:
   - cargo build --verbose --release --features=$FEATURES --manifest-path=safe_authenticator/Cargo.toml
   - cargo build --verbose --release --features=$FEATURES --manifest-path=safe_app/Cargo.toml
   - strip $STRIP_ARG target/release/libsafe_authenticator.$SUFFIX target/release/libsafe_app.$SUFFIX
-  - zip target/deploy/safe_authenticator-mock-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
-  - zip target/deploy/safe_app-mock-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX
+  - zip -j target/deploy/safe_authenticator-mock-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
+  - zip -j target/deploy/safe_app-mock-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX
   # Build for production.
   - cargo build --verbose --release --manifest-path=safe_authenticator/Cargo.toml
   - cargo build --verbose --release --manifest-path=safe_app/Cargo.toml
   - strip $STRIP_ARG target/release/libsafe_authenticator.$SUFFIX target/release/libsafe_app.$SUFFIX
-  - zip target/deploy/safe_authenticator-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
-  - zip target/deploy/safe_app-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX
+  - zip -j target/deploy/safe_authenticator-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
+  - zip -j target/deploy/safe_app-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX
 deploy:
   provider: s3
   access_key_id: AKIAIA2TXTG7EV5VIG2Q
