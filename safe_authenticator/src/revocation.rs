@@ -194,7 +194,7 @@ fn revoke_container_perms(
     future::join_all(reqs).map(move |_| ()).into_box()
 }
 
-/// Fetches containers info from the user's root dir
+/// Fetches containers info from the root entry in the access container.
 fn refresh_from_access_container_root(
     client: &Client<()>,
     containers: HashMap<String, MDataInfo>,

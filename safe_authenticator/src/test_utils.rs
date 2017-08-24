@@ -161,7 +161,7 @@ pub fn register_rand_app(
         containers: containers_req,
     };
 
-    let auth_granted = register_app(&authenticator, &auth_req)?;
+    let auth_granted = register_app(authenticator, &auth_req)?;
     let app_id = auth_req.app.id;
 
     Ok((app_id, auth_granted))
