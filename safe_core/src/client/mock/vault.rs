@@ -17,8 +17,8 @@
 
 use super::Account;
 use super::DataId;
-use bincode::{Infinite, deserialize, serialize};
 use fs2::FileExt;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Authority, ClientError, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::HashMap;
@@ -269,7 +269,7 @@ impl Store for FileStore {
                 }
             }
 
-            match deserialize::<Cache>(&raw_data) {
+            match deserialise::<Cache>(&raw_data) {
                 Ok(cache) => {
                     self.sync_time = Some(mtime);
                     result = Some(cache);
@@ -290,7 +290,8 @@ impl Store for FileStore {
         // the lock.
         if let Some((mut file, writing)) = self.file.take() {
             if writing {
-                let raw_data = unwrap!(serialize(&cache, Infinite));
+                let raw_data = unwrap!(serialise(&cache));
+                unwrap!(file.set_len(0));
                 unwrap!(file.write_all(&raw_data));
                 unwrap!(file.sync_all());
 

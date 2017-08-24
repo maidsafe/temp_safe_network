@@ -43,8 +43,6 @@
 #![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
 
 extern crate base64;
-#[cfg(feature = "use-mock-routing")]
-extern crate bincode;
 extern crate chrono;
 extern crate ffi_utils;
 #[cfg(feature = "use-mock-routing")]
