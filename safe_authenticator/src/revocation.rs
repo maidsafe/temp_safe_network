@@ -247,18 +247,12 @@ fn reencrypt_containers_and_update_access_container(
         ac_info.clone(),
         containers,
         app_key.clone(),
-        MDataInfo::start_new_enc_info,
+        MDataInfoAction::Start,
     ).and_then(move |containers| {
         reencrypt_containers(&c2, containers.clone()).map(move |_| containers)
     })
         .and_then(move |containers| {
-            update_access_container(
-                &c3,
-                ac_info,
-                containers,
-                app_key,
-                MDataInfo::commit_new_enc_info,
-            )
+            update_access_container(&c3, ac_info, containers, app_key, MDataInfoAction::Commit)
         })
         .map(|_| ())
         .into_box()
@@ -266,16 +260,13 @@ fn reencrypt_containers_and_update_access_container(
 
 // Update `MDataInfo`s of the given containers in all the entries of the access
 // container.
-fn update_access_container<F>(
+fn update_access_container(
     client: &Client<()>,
     ac_info: MDataInfo,
     mut containers: HashMap<String, MDataInfo>,
     revoked_app_key: Vec<u8>,
-    mut mutate_mdata_info: F,
-) -> Box<AuthFuture<HashMap<String, MDataInfo>>>
-where
-    F: FnMut(&mut MDataInfo) + 'static,
-{
+    mdata_info_action: MDataInfoAction,
+) -> Box<AuthFuture<HashMap<String, MDataInfo>>> {
     let c2 = client.clone();
     let c3 = client.clone();
 
@@ -310,8 +301,7 @@ where
 
                 for (container, mdata_info) in &mut containers {
                     if let Some(entry) = decoded.get_mut(container) {
-                        mutate_mdata_info(mdata_info);
-                        *entry = mdata_info.clone();
+                        mdata_info_action.apply(entry, mdata_info);
                     }
                 }
 
@@ -334,8 +324,7 @@ where
 
                     for (container, mdata_info) in &mut containers {
                         if let Some(entry) = decoded.get_mut(container) {
-                            mutate_mdata_info(mdata_info);
-                            entry.0 = mdata_info.clone();
+                            mdata_info_action.apply(&mut entry.0, mdata_info);
                         }
                     }
 
@@ -352,6 +341,37 @@ where
                 .map_err(From::from)
         })
         .into_box()
+}
+
+// Action to be performed on `MDataInfo` during access container update.
+enum MDataInfoAction {
+    // Start new enc info.
+    Start,
+    // Commit new enc info.
+    Commit,
+}
+
+impl MDataInfoAction {
+    fn apply(&self, stored: &mut MDataInfo, cached: &mut MDataInfo) {
+        match *self {
+            MDataInfoAction::Start => {
+                if stored.new_enc_info.is_none() {
+                    cached.start_new_enc_info();
+                    *stored = cached.clone();
+                } else {
+                    *cached = stored.clone();
+                }
+            }
+            MDataInfoAction::Commit => {
+                if stored.new_enc_info.is_some() {
+                    cached.commit_new_enc_info();
+                    *stored = cached.clone();
+                } else {
+                    *cached = stored.clone();
+                }
+            }
+        }
+    }
 }
 
 // Re-encrypt the given `containers` using the `new_enc_info` in the corresponding
