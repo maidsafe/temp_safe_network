@@ -24,10 +24,11 @@ use errors::AuthError;
 use futures::{Future, IntoFuture};
 use futures::future;
 use ipc::decode_ipc_msg;
+use rand::{self, Rng};
 use revocation;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
+use safe_core::{Client, FutureExt, MDataInfo, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
@@ -148,6 +149,24 @@ pub fn register_app(
     })
 }
 
+/// Register random app. Returns the id of the app and the `AuthGranted` struct.
+pub fn register_rand_app(
+    authenticator: &Authenticator,
+    app_container: bool,
+    containers_req: HashMap<String, ContainerPermissions>,
+) -> Result<(String, AuthGranted), AuthError> {
+    let auth_req = AuthReq {
+        app: rand_app(),
+        app_container: app_container,
+        containers: containers_req,
+    };
+
+    let auth_granted = register_app(&authenticator, &auth_req)?;
+    let app_id = auth_req.app.id;
+
+    Ok((app_id, auth_granted))
+}
+
 /// Run the given closure inside the event loop of the authenticator. The closure
 /// should return a future which will then be driven to completion and its result
 /// returned.
@@ -185,13 +204,15 @@ where
 }
 
 /// Creates a random `AppExchangeInfo`
-pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
-    Ok(AppExchangeInfo {
-        id: utils::generate_random_string(10)?,
+pub fn rand_app() -> AppExchangeInfo {
+    let mut rng = rand::thread_rng();
+
+    AppExchangeInfo {
+        id: rng.gen_ascii_chars().take(10).collect(),
         scope: None,
-        name: utils::generate_random_string(10)?,
-        vendor: utils::generate_random_string(10)?,
-    })
+        name: rng.gen_ascii_chars().take(10).collect(),
+        vendor: rng.gen_ascii_chars().take(10).collect(),
+    }
 }
 
 /// Create file in the given container, with the given name and content.

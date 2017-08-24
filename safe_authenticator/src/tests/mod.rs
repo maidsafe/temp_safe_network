@@ -221,7 +221,7 @@ fn app_authentication() {
 
     // Try to send IpcReq::Auth - it should pass
     let req_id = ipc::gen_req_id();
-    let app_exchange_info = unwrap!(rand_app());
+    let app_exchange_info = rand_app();
     let app_id = app_exchange_info.id.clone();
 
     let auth_req = AuthReq {
@@ -352,7 +352,7 @@ fn unregistered_authentication() {
     let msg = IpcMsg::Req {
         req_id: ipc::gen_req_id(),
         req: IpcReq::Auth(AuthReq {
-            app: unwrap!(rand_app()),
+            app: rand_app(),
             app_container: true,
             containers: create_containers_req(),
         }),
@@ -430,7 +430,7 @@ fn authenticated_app_can_be_authenticated_again() {
     let authenticator = create_account_and_login();
 
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: Default::default(),
     };
@@ -484,7 +484,7 @@ fn containers_unknown_app() {
     let msg = IpcMsg::Req {
         req_id: req_id,
         req: IpcReq::Containers(ContainersReq {
-            app: unwrap!(rand_app()),
+            app: rand_app(),
             containers: create_containers_req(),
         }),
     };
@@ -511,7 +511,7 @@ fn containers_access_request() {
     // and containers "documents with permission to insert", "videos with all the permissions
     // possible",
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: true,
         containers: create_containers_req(),
     };
@@ -678,13 +678,13 @@ fn lists_of_registered_and_revoked_apps() {
 
     // Register two apps.
     let auth_req1 = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: Default::default(),
     };
 
     let auth_req2 = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: Default::default(),
     };
@@ -798,7 +798,7 @@ fn app_authentication_recovery() {
 
     // Create a test app and try to authenticate it (with `app_container` set to true).
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: true,
         containers: create_containers_req(),
     };

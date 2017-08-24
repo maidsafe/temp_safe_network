@@ -61,7 +61,7 @@ use std::time::Duration;
 use test_utils::{access_container, create_account_and_login, create_file, fetch_file, rand_app,
                  register_app, revoke, run, try_access_container};
 #[cfg(feature = "use-mock-routing")]
-use test_utils::{create_authenticator, get_container_from_root, try_revoke};
+use test_utils::{create_authenticator, get_container_from_root, register_rand_app, try_revoke};
 #[cfg(feature = "use-mock-routing")]
 use tiny_keccak::sha3_256;
 
@@ -72,7 +72,7 @@ fn app_revocation() {
 
     // Create and authorise two apps.
     let auth_req1 = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: create_containers_req(),
     };
@@ -80,7 +80,7 @@ fn app_revocation() {
     let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
 
     let auth_req2 = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: true,
         containers: create_containers_req(),
     };
@@ -254,7 +254,7 @@ fn app_revocation_recovery() {
     // Create a test app and authenticate it.
     // Grant access to some of the default containers (e.g. `_video`, `_documents`).
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: create_containers_req(),
     };
@@ -402,7 +402,7 @@ fn app_authentication_during_pending_revocation() {
 
     // Authenticate the app.
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: create_containers_req(),
     };
@@ -441,7 +441,7 @@ fn flushing_app_revocation_queue() {
 
     // Authenticate the first app.
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: create_containers_req(),
     };
@@ -451,7 +451,7 @@ fn flushing_app_revocation_queue() {
 
     // Authenticate the second app.
     let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         app_container: false,
         containers: create_containers_req(),
     };
@@ -540,23 +540,11 @@ fn concurrent_revocation_of_single_app() {
         ],
     );
 
-    let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
-        app_container: true,
-        containers: containers_req.clone(),
-    };
-    let auth_granted_0 = unwrap!(register_app(&auth, &auth_req));
-    let app_id_0 = auth_req.app.id;
-    let app_0_ac_entries = access_container(&auth, app_id_0.clone(), auth_granted_0);
+    let (app_id_0, auth_granted_0) =
+        unwrap!(register_rand_app(&auth, true, containers_req.clone()));
+    let (app_id_1, _) = unwrap!(register_rand_app(&auth, true, containers_req));
 
-    let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
-        app_container: true,
-        containers: containers_req,
-    };
-    let _ = unwrap!(register_app(&auth, &auth_req));
-    let app_id_1 = auth_req.app.id;
-
+    let ac_entries_0 = access_container(&auth, app_id_0.clone(), auth_granted_0);
 
     // Put a file into the shared container.
     let info = unwrap!(get_container_from_root(&auth, "_documents"));
@@ -575,22 +563,9 @@ fn concurrent_revocation_of_single_app() {
         .map(|_| {
             // Insert random delays to prevent the operations from silently being
             // executed sequentially due to being too quick.
-            let hook = move |mut routing: MockRouting| -> MockRouting {
-                routing.set_request_hook(move |_| {
-                    let mut rng = rand::thread_rng();
-                    let delay_ms = rng.gen_range(0, 200);
-                    thread::sleep(Duration::from_millis(delay_ms));
-
-                    None
-                });
-                routing
-            };
-
-            unwrap!(Authenticator::login_with_hook(
+            unwrap!(login_authenticator_with_random_delays(
                 locator.clone(),
                 password.clone(),
-                |_| (),
-                hook,
             ))
         })
         .collect();
@@ -625,10 +600,95 @@ fn concurrent_revocation_of_single_app() {
 
     // Check that the first app is now revoked, but the second app is not.
     run(&auth, move |client| {
-        let app_0 = verify_app_is_revoked(client, app_id_0, app_0_ac_entries);
+        let app_0 = verify_app_is_revoked(client, app_id_0, ac_entries_0);
         let app_1 = verify_app_is_authenticated(client, app_id_1);
 
         app_0.join(app_1).map(|_| ())
+    });
+}
+
+// Test multiple apps being revoked concurrently.
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn concurrent_revocation_of_multiple_apps() {
+    // Create account.
+    let (auth, locator, password) = create_authenticator();
+
+    // Create apps with dedicated containers + access to one shared container.
+    let mut containers_req = HashMap::new();
+    let _ = containers_req.insert(
+        "_documents".to_owned(),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+        ],
+    );
+
+    let (app_id_0, auth_granted_0) =
+        unwrap!(register_rand_app(&auth, true, containers_req.clone()));
+    let (app_id_1, auth_granted_1) =
+        unwrap!(register_rand_app(&auth, true, containers_req.clone()));
+    let (app_id_2, _) = unwrap!(register_rand_app(&auth, true, containers_req));
+
+    let ac_entries_0 = access_container(&auth, app_id_0.clone(), auth_granted_0);
+    let ac_entries_1 = access_container(&auth, app_id_1.clone(), auth_granted_1);
+
+    // Put a file into the shared container.
+    let info = unwrap!(get_container_from_root(&auth, "_documents"));
+    unwrap!(create_file(&auth, info, "shared.txt", vec![0; 10]));
+
+    // Put a file into the dedicated container of each app.
+    for app_id in &[&app_id_0, &app_id_1, &app_id_2] {
+        let info = unwrap!(get_container_from_root(&auth, &app_container::name(app_id)));
+        unwrap!(create_file(&auth, info, "private.txt", vec![0; 10]));
+    }
+
+    // Revoke the first two apps, concurrently.
+    let apps_to_revoke = [app_id_0.clone(), app_id_1.clone()];
+    let auths: Vec<_> = apps_to_revoke
+        .iter()
+        .map(|app_id| {
+            let auth = unwrap!(login_authenticator_with_random_delays(
+                locator.clone(),
+                password.clone(),
+            ));
+
+            (auth, app_id.to_string())
+        })
+        .collect();
+
+    let join_handles: Vec<_> = auths
+        .into_iter()
+        .map(|(auth, app_id)| {
+            thread::spawn(move || try_revoke(&auth, &app_id))
+        })
+        .collect();
+
+    let results: Vec<_> = join_handles
+        .into_iter()
+        .map(|handle| unwrap!(handle.join()))
+        .collect();
+
+    // Retry failed revocations sequentially.
+    for (app_id, result) in apps_to_revoke.iter().zip(results) {
+        if result.is_err() {
+            match try_revoke(&auth, app_id) {
+                Ok(_) |
+                Err(AuthError::IpcError(IpcError::UnknownApp)) => (),
+                Err(error) => panic!("Unexpected revocation failure: {:?}", error),
+            }
+        }
+    }
+
+    // Check that the first two apps are now revoked, but the other one is not.
+    run(&auth, move |client| {
+        let app_0 = verify_app_is_revoked(client, app_id_0, ac_entries_0);
+        let app_1 = verify_app_is_revoked(client, app_id_1, ac_entries_1);
+        let app_2 = verify_app_is_authenticated(client, app_id_2);
+
+        app_0.join3(app_1, app_2).map(|_| ())
     });
 }
 
@@ -833,4 +893,24 @@ fn verify_app_is_authenticated(client: &Client<()>, app_id: String) -> Box<AuthF
             future::join_all(futures).map(|_| ())
         })
         .into_box()
+}
+
+// Create authenticator instance that will randomly delay before each request.
+#[cfg(feature = "use-mock-routing")]
+fn login_authenticator_with_random_delays(
+    locator: String,
+    password: String,
+) -> Result<Authenticator, AuthError> {
+    let hook = move |mut routing: MockRouting| -> MockRouting {
+        routing.set_request_hook(move |_| {
+            let mut rng = rand::thread_rng();
+            let delay_ms = rng.gen_range(0, 200);
+            thread::sleep(Duration::from_millis(delay_ms));
+
+            None
+        });
+        routing
+    };
+
+    Authenticator::login_with_hook(locator, password, |_| (), hook)
 }

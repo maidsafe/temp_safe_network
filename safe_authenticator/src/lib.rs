@@ -60,7 +60,7 @@ extern crate tiny_keccak;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 extern crate rand;
 
 /// Provides utilities to test the authenticator functionality

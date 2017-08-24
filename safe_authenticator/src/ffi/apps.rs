@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn rm_revoked_nonexisting() {
         let auth = create_account_and_login();
-        let app_info = unwrap!(rand_app());
+        let app_info = rand_app();
         let app_info_ffi = unwrap!(app_info.into_repr_c());
 
         let result =
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn rm_revoked_authorised() {
         let auth = create_account_and_login();
-        let app_info = unwrap!(rand_app());
+        let app_info = rand_app();
         let app_id = app_info.id.clone();
 
         let _ = unwrap!(register_app(
@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn rm_revoked_complete() {
         let auth = create_account_and_login();
-        let app_info = unwrap!(rand_app());
+        let app_info = rand_app();
         let app_id = app_info.id.clone();
         let app_id2 = app_id.clone();
         let app_id3 = app_id.clone();

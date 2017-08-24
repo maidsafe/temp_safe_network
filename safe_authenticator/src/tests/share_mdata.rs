@@ -43,7 +43,7 @@ fn share_zero_mdatas() {
     let msg = IpcMsg::Req {
         req_id: ipc::gen_req_id(),
         req: IpcReq::ShareMData(ShareMDataReq {
-            app: unwrap!(rand_app()),
+            app: rand_app(),
             mdata: vec![],
         }),
     };
@@ -102,7 +102,7 @@ fn share_some_mdatas() {
     let msg = IpcMsg::Req {
         req_id: ipc::gen_req_id(),
         req: IpcReq::ShareMData(ShareMDataReq {
-            app: unwrap!(rand_app()),
+            app: rand_app(),
             mdata: mdatas.clone(),
         }),
     };
@@ -123,7 +123,7 @@ fn share_some_mdatas() {
 fn share_some_mdatas_with_valid_metadata() {
     let authenticator = create_account_and_login();
 
-    let app_id = unwrap!(rand_app());
+    let app_id = rand_app();
     let auth_req = AuthReq {
         app: app_id.clone(),
         app_container: false,
@@ -270,7 +270,7 @@ fn share_some_mdatas_with_ownership_error() {
 
     let req_id = ipc::gen_req_id();
     let req = ShareMDataReq {
-        app: unwrap!(rand_app()),
+        app: rand_app(),
         mdata: mdatas.clone(),
     };
     let msg = IpcMsg::Req {
@@ -392,7 +392,7 @@ fn auth_apps_accessing_mdatas() {
     let mut apps: Vec<(sign::PublicKey, AppExchangeInfo)> = Vec::with_capacity(NUM_APPS);
     for _ in 0..NUM_APPS {
         // Create an app and register it.
-        let app_id = unwrap!(rand_app());
+        let app_id = rand_app();
         let auth_req = AuthReq {
             app: app_id.clone(),
             app_container: false,
