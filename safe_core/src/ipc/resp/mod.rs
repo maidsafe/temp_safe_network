@@ -381,6 +381,7 @@ mod tests {
     use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::secretbox;
 
+    // Test converting an `AuthGranted` object to its FFI representation and then back again.
     #[test]
     fn auth_granted() {
         let (ok, _) = shared_sign::gen_keypair();
@@ -415,6 +416,7 @@ mod tests {
         assert_eq!(ag.access_container.tag, 681);
     }
 
+    // Testing converting an `AppKeys` object to its FFI representation and back again.
     #[test]
     fn app_keys() {
         let (ok, _) = shared_sign::gen_keypair();
@@ -467,6 +469,7 @@ mod tests {
         assert_eq!(ak.enc_sk, oursk);
     }
 
+    // Test converting an `AccessContInfo` struct to its FFI representation and back again.
     #[test]
     fn access_container() {
         let nonce = secretbox::gen_nonce();

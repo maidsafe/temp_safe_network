@@ -1440,6 +1440,7 @@ mod tests {
     use utils;
     use utils::test_utils::{finish, random_client, setup_client};
 
+    // Test logging in using a seeded account.
     #[test]
     fn seeded_login() {
         let invalid_seed = String::from("123");
@@ -1486,6 +1487,10 @@ mod tests {
                      |_| finish());
     }
 
+    // Tests for unregistered clients.
+    // 1. Have a registered client PUT something on the network.
+    // 2. Try to set the access container as unregistered - this should fail.
+    // 3. Try to set the config root directory as unregistered - this should fail.
     #[test]
     fn unregistered_client() {
         let orig_data = ImmutableData::new(unwrap!(utils::generate_random_vector(30)));
@@ -1542,6 +1547,8 @@ mod tests {
         });
     }
 
+    // Test account creation.
+    // It should succeed the first time and fail the second time with the same secrets.
     #[test]
     fn registered_client() {
         let el = unwrap!(Core::new());
@@ -1570,6 +1577,7 @@ mod tests {
         }
     }
 
+    // Test creating and logging in to an account on the network.
     #[test]
     fn login() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1597,6 +1605,7 @@ mod tests {
                      |_| finish());
     }
 
+    // Test creation of an access container.
     #[test]
     fn access_container_creation() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1623,6 +1632,7 @@ mod tests {
                      });
     }
 
+    // Test setting the configuration root directory.
     #[test]
     fn config_root_dir_creation() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1649,6 +1659,7 @@ mod tests {
                      });
     }
 
+    // Test restarting routing after a network disconnect.
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn restart_routing() {
@@ -1683,6 +1694,7 @@ mod tests {
         );
     }
 
+    // Test that a `RequestTimeout` error is returned on network timeout.
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn timeout() {
