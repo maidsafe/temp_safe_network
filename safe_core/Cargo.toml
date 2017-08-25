@@ -14,7 +14,7 @@ base64 = "~0.4.1"
 chrono = { version = "~0.4.0", features = ["serde"] }
 ffi_utils = { path = "../ffi_utils", version = "~0.2.0" }
 fs2 = "~0.4.2"
-futures = "~0.1.14"
+futures = "~0.1.15"
 lazy_static = "~0.2.4"
 log = "~0.3.7"
 lru-cache = "~0.1.0"

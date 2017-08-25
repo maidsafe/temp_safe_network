@@ -12,7 +12,7 @@ version = "0.3.0"
 [dependencies]
 config_file_handler = "~0.8.1"
 ffi_utils = { path = "../ffi_utils", version = "~0.2.0" }
-futures = "~0.1.14"
+futures = "~0.1.15"
 log = "~0.3.7"
 lru-cache = "~0.1.0"
 maidsafe_utilities = "~0.14.0"
