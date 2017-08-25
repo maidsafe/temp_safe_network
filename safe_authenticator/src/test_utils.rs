@@ -24,10 +24,11 @@ use errors::AuthError;
 use futures::{Future, IntoFuture};
 use futures::future;
 use ipc::decode_ipc_msg;
+use rand::{self, Rng};
 use revocation;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
+use safe_core::{Client, FutureExt, MDataInfo, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
@@ -36,32 +37,36 @@ use safe_core::nfs::{File, Mode, file_helper};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-/// Creates a new random account for authenticator
-pub fn create_authenticator() -> Authenticator {
-    let locator = unwrap!(utils::generate_random_string(10));
-    let password = unwrap!(utils::generate_random_string(10));
-    let invitation = unwrap!(utils::generate_random_string(10));
-
-    unwrap!(Authenticator::create_acc(
-        locator,
-        password,
-        invitation,
-        |_| (),
-    ))
+#[macro_export]
+macro_rules! assert_match {
+    ($e:expr, $p:pat) => {
+        match $e {
+            $p => (),
+            x => panic!("Unexpected {:?} (expecting {})", x, stringify!($p)),
+        }
+    }
 }
 
-/// Create a random authenticator and login using the same credentials.
-pub fn create_account_and_login() -> Authenticator {
+/// Creates a new random account for authenticator. Returns the `Authenticator`
+/// instance and the locator and password strings.
+pub fn create_authenticator() -> (Authenticator, String, String) {
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
     let invitation = unwrap!(utils::generate_random_string(10));
 
-    let _ = unwrap!(Authenticator::create_acc(
+    let auth = unwrap!(Authenticator::create_acc(
         locator.clone(),
         password.clone(),
         invitation,
         |_| (),
     ));
+
+    (auth, locator, password)
+}
+
+/// Create a random authenticator and login using the same credentials.
+pub fn create_account_and_login() -> Authenticator {
+    let (_, locator, password) = create_authenticator();
     unwrap!(Authenticator::login(locator, password, |_| ()))
 }
 
@@ -144,6 +149,24 @@ pub fn register_app(
     })
 }
 
+/// Register random app. Returns the id of the app and the `AuthGranted` struct.
+pub fn register_rand_app(
+    authenticator: &Authenticator,
+    app_container: bool,
+    containers_req: HashMap<String, ContainerPermissions>,
+) -> Result<(String, AuthGranted), AuthError> {
+    let auth_req = AuthReq {
+        app: rand_app(),
+        app_container: app_container,
+        containers: containers_req,
+    };
+
+    let auth_granted = register_app(authenticator, &auth_req)?;
+    let app_id = auth_req.app.id;
+
+    Ok((app_id, auth_granted))
+}
+
 /// Run the given closure inside the event loop of the authenticator. The closure
 /// should return a future which will then be driven to completion and its result
 /// returned.
@@ -181,13 +204,15 @@ where
 }
 
 /// Creates a random `AppExchangeInfo`
-pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
-    Ok(AppExchangeInfo {
-        id: utils::generate_random_string(10)?,
+pub fn rand_app() -> AppExchangeInfo {
+    let mut rng = rand::thread_rng();
+
+    AppExchangeInfo {
+        id: rng.gen_ascii_chars().take(10).collect(),
         scope: None,
-        name: utils::generate_random_string(10)?,
-        vendor: utils::generate_random_string(10)?,
-    })
+        name: rng.gen_ascii_chars().take(10).collect(),
+        vendor: rng.gen_ascii_chars().take(10).collect(),
+    }
 }
 
 /// Create file in the given container, with the given name and content.
@@ -264,7 +289,7 @@ pub fn get_container_from_root(
     let container = String::from(container);
 
     try_run(authenticator, move |client| {
-        access_container::authenticator_entry(client).and_then(move |(_, mut ac_entries)| {
+        access_container::fetch_authenticator_entry(client).and_then(move |(_, mut ac_entries)| {
             ac_entries.remove(&container).ok_or_else(|| {
                 AuthError::from(format!("'{}' not found in the access container", container))
             })

@@ -104,7 +104,7 @@ pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
         error!("{:?}", error);
         CoreError::RandomDataGenerationFailure
     })?;
-    Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
+    Ok(os_rng.gen_iter::<char>().take(length).collect())
 }
 
 /// Generate a random vector of given length
@@ -116,7 +116,7 @@ where
         error!("{:?}", error);
         CoreError::RandomDataGenerationFailure
     })?;
-    Ok((0..length).map(|_| os_rng.gen()).collect())
+    Ok(os_rng.gen_iter().take(length).collect())
 }
 
 /// Derive Password, Keyword and PIN (in order)

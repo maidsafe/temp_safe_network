@@ -51,7 +51,7 @@ pub fn create(client: &Client<()>) -> Box<AuthFuture<()>> {
     let config_dir = fry!(client.config_root_dir());
 
     // Try to get default dirs from the access container
-    let access_cont_fut = access_container::authenticator_entry(&c2)
+    let access_cont_fut = access_container::fetch_authenticator_entry(&c2)
         .then(move |res| {
             match res {
                 Ok((_, default_containers)) => {
@@ -186,7 +186,7 @@ mod tests {
             ).then(move |res| {
                 assert!(res.is_ok());
 
-                access_container::authenticator_entry(&client)
+                access_container::fetch_authenticator_entry(&client)
             })
                 .then(move |res| {
                     let (_, mdata_entries) = unwrap!(res);

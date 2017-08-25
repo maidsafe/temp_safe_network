@@ -60,8 +60,13 @@ extern crate tiny_keccak;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 extern crate rand;
+
+/// Provides utilities to test the authenticator functionality
+#[cfg(any(test, feature = "testing"))]
+#[macro_use]
+pub mod test_utils;
 
 /// FFI routines
 pub mod ffi;
@@ -76,9 +81,6 @@ mod errors;
 mod revocation;
 mod std_dirs;
 
-/// Provides utilities to test the authenticator functionality
-#[cfg(any(test, feature = "testing"))]
-pub mod test_utils;
 #[cfg(test)]
 mod tests;
 
@@ -127,7 +129,7 @@ impl Authenticator {
     {
         let msg = CoreMsg::new(|client, _| f(client));
         let core_tx = unwrap!(self.core_tx.lock());
-        core_tx.send(msg).map_err(AuthError::from)
+        core_tx.unbounded_send(msg).map_err(AuthError::from)
     }
 
     /// Create a new account
@@ -183,7 +185,7 @@ impl Authenticator {
             let core_tx2 = core_tx.clone();
             let core_tx3 = core_tx.clone();
 
-            unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
+            unwrap!(core_tx.unbounded_send(CoreMsg::new(move |client, &()| {
                 std_dirs::create(client)
                     .map(move |()| {
                         unwrap!(tx.send(Ok(core_tx2)));
@@ -203,7 +205,7 @@ impl Authenticator {
             Err((None, e)) => return Err(e),
             Err((Some(core_tx), e)) => {
                 // Make sure to shut down the event loop
-                core_tx.send(CoreMsg::build_terminator())?;
+                core_tx.unbounded_send(CoreMsg::build_terminator())?;
                 return Err(e);
             }
         };
@@ -267,7 +269,7 @@ impl Authenticator {
                 let core_tx2 = core_tx.clone();
                 let core_tx3 = core_tx.clone();
 
-                unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
+                unwrap!(core_tx.unbounded_send(CoreMsg::new(move |client, &()| {
                     std_dirs::create(client)
                         .map(move |()| {
                             unwrap!(tx.send(Ok(core_tx2)));
@@ -290,7 +292,7 @@ impl Authenticator {
             Err((None, e)) => return Err(e),
             Err((Some(core_tx), e)) => {
                 // Make sure to shut down the event loop
-                core_tx.send(CoreMsg::build_terminator())?;
+                core_tx.unbounded_send(CoreMsg::build_terminator())?;
                 return Err(e);
             }
         };
@@ -376,7 +378,7 @@ impl Drop for Authenticator {
         let core_tx = unwrap!(self.core_tx.lock());
         let msg = CoreMsg::build_terminator();
 
-        if let Err(e) = core_tx.send(msg) {
+        if let Err(e) = core_tx.unbounded_send(msg) {
             info!("Unexpected error in drop: {:?}", e);
         }
     }

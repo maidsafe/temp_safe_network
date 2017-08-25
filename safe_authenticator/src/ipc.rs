@@ -290,7 +290,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                         let app_id = share_mdata_req.app.id;
                         let user = User::Key(app_info.keys.sign_pk);
                         let num_mdata = share_mdata_req.mdata.len();
-                        stream::iter(share_mdata_req.mdata.into_iter().map(Ok))
+                        stream::iter_ok(share_mdata_req.mdata.into_iter())
                         .map(move |mdata| {
                             client_cloned0.get_mdata_shell(mdata.name, mdata.type_tag)
                                           .map(|md| (md.version(), mdata))
@@ -661,7 +661,7 @@ pub fn update_container_perms(
 ) -> Box<AuthFuture<AccessContainerEntry>> {
     let c2 = client.clone();
 
-    access_container::authenticator_entry(client)
+    access_container::fetch_authenticator_entry(client)
         .and_then(move |(_, mut root_containers)| {
             let mut reqs = Vec::new();
             let client = c2.clone();
