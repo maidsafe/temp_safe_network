@@ -20,7 +20,7 @@ use maidsafe_utilities::SeededRng;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use mock_routing::RequestWrapper;
 use rand::{self, Rng};
-use routing::{Action, EntryActions, Request, Response, User};
+use routing::{Action, EntryActions, MAX_MUTABLE_DATA_ENTRIES, Request, Response, User};
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
@@ -722,11 +722,14 @@ fn mdata_parallel_mutations_limits() {
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
 
-    // Send two parallel, non-conflicting mutations, each inserting 25 entries.
-    // As the data is initially empty, both should succeed.
+    // Send two parallel, non-conflicting mutations, each inserting `MAX_MUTABLE_DATA_ENTRIES / 4`
+    // entries.  As the data is initially empty, both should succeed.
+    let to_vec_of_u8 = |i: u64| vec![(i >> 24) as u8, (i >> 16) as u8, (i >> 8) as u8, i as u8];
     let mut actions = EntryActions::new();
-    for i in 0..25 {
-        actions = actions.ins(vec![0, i as u8], vec![], 0);
+    let mut index = 0;
+    for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 4) {
+        actions = actions.ins(to_vec_of_u8(index), vec![], 0);
+        index += 1;
     }
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -739,8 +742,9 @@ fn mdata_parallel_mutations_limits() {
                                            client_key_0));
 
     let mut actions = EntryActions::new();
-    for i in 0..25 {
-        actions = actions.ins(vec![1, i as u8], vec![], 0);
+    for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 4) {
+        actions = actions.ins(to_vec_of_u8(index), vec![], 0);
+        index += 1;
     }
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -768,12 +772,14 @@ fn mdata_parallel_mutations_limits() {
     let message = unwrap!(node.sent_responses.remove(&msg_id_1));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
 
-    // Now send two more non-conflicting mutations. This time each inserting 15
-    // entries. Because 2 * 15 = 30 is more than half the allowed remaining entries
-    // (50 / 2 = 25), the second request should be rejected.
+    // Now send two more non-conflicting mutations. This time each inserting
+    // `MAX_MUTABLE_DATA_ENTRIES / 8` entries. Because the `2 * (MAX_MUTABLE_DATA_ENTRIES / 8 + 1)`
+    // is more than half the allowed remaining entries (i.e. `MAX_MUTABLE_DATA_ENTRIES / 2`), the
+    // second request should be rejected.
     let mut actions = EntryActions::new();
-    for i in 0..15 {
-        actions = actions.ins(vec![2, i as u8], vec![], 0);
+    for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 8 + 1) {
+        actions = actions.ins(to_vec_of_u8(index), vec![], 0);
+        index += 1;
     }
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -786,8 +792,9 @@ fn mdata_parallel_mutations_limits() {
                                            client_key_0));
 
     let mut actions = EntryActions::new();
-    for i in 0..15 {
-        actions = actions.ins(vec![3, i as u8], vec![], 0);
+    for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 8 + 1) {
+        actions = actions.ins(to_vec_of_u8(index), vec![], 0);
+        index += 1;
     }
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
