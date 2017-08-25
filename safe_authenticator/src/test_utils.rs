@@ -19,6 +19,7 @@ use super::AccessContainerEntry;
 use Authenticator;
 use access_container;
 use app_auth;
+use config;
 use errors::AuthError;
 use futures::{Future, IntoFuture};
 use futures::future;
@@ -31,6 +32,7 @@ use safe_core::{Client, CoreError, FutureExt, MDataInfo, utils};
 use safe_core::MockRouting;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
 use safe_core::ipc::req::{ContainerPermissions, container_perms_into_permission_set};
+use safe_core::nfs::{File, Mode, file_helper};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
@@ -105,6 +107,19 @@ where
     ))
 }
 
+/// Returns `AppInfo` iff the app is listed in the authenticator config.
+pub fn get_app_or_err(
+    authenticator: &Authenticator,
+    app_id: &str,
+) -> Result<config::AppInfo, AuthError> {
+    let app_id = app_id.to_string();
+
+    try_run(
+        authenticator,
+        move |client| config::get_app(client, &app_id),
+    )
+}
+
 /// Registers a mock application using a given `AuthReq`.
 pub fn register_app(
     authenticator: &Authenticator,
@@ -172,6 +187,47 @@ pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
         scope: None,
         name: utils::generate_random_string(10)?,
         vendor: utils::generate_random_string(10)?,
+    })
+}
+
+/// Create file in the given container, with the given name and content.
+pub fn create_file<T: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: T,
+    content: Vec<u8>,
+) -> Result<(), AuthError> {
+    let name = name.into();
+    try_run(authenticator, |client| {
+        let c2 = client.clone();
+
+        file_helper::write(
+            client.clone(),
+            File::new(vec![]),
+            Mode::Overwrite,
+            container_info.enc_key().cloned(),
+        ).then(move |res| {
+            let writer = unwrap!(res);
+            writer.write(&content).and_then(move |_| writer.close())
+        })
+            .then(move |file| {
+                file_helper::insert(c2, container_info, name, &unwrap!(file))
+            })
+            .map_err(From::from)
+    })
+}
+
+/// Fetches file from the given directory by given name
+pub fn fetch_file<T: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: T,
+) -> Result<File, AuthError> {
+    let name = name.into();
+    try_run(authenticator, |client| {
+        file_helper::fetch(client.clone(), container_info, name)
+            .map(|(_, file)| file)
+            .map_err(From::from)
     })
 }
 

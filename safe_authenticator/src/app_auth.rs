@@ -214,7 +214,7 @@ fn authenticated_app(
         access_container::fetch_entry(client, &app_id, app_keys.clone())
             .and_then(move |(_version, perms)| {
                 let perms = perms.unwrap_or_else(AccessContainerEntry::default);
-                app_container::fetch(&c2, &app_id, sign_pk).map(
+                app_container::fetch_or_create(&c2, &app_id, sign_pk).map(
                     move |mdata_info| (mdata_info, perms, app_id),
                 )
             })
@@ -277,7 +277,7 @@ fn authenticate_new_app(
                 .into_box()
         })
         .and_then(move |(perms, sign_pk)| if app_container {
-            app_container::fetch(&c4, &app_id, sign_pk)
+            app_container::fetch_or_create(&c4, &app_id, sign_pk)
                 .and_then(move |mdata_info| {
                     ok!(insert_app_container(perms, &app_id, mdata_info))
                 })

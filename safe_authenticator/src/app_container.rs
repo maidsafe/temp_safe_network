@@ -24,9 +24,22 @@ use routing::{Action, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, nfs};
 
+/// Returns an app's dedicated container if available and stored in the access container,
+/// `None` otherwise.
+#[cfg(test)]
+pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataInfo>>> {
+    let app_cont_name = app_container_name(app_id);
+
+    access_container::authenticator_entry(client)
+        .and_then(move |(_, mut ac_entries)| {
+            Ok(ac_entries.remove(&app_cont_name))
+        })
+        .into_box()
+}
+
 /// Checks if an app's dedicated container is available and stored in the access container.
 /// If no previously created container has been found, then it will be created.
-pub fn fetch(
+pub fn fetch_or_create(
     client: &Client<()>,
     app_id: &str,
     app_sign_pk: sign::PublicKey,

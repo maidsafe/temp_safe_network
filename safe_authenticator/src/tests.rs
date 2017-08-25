@@ -19,6 +19,7 @@ use Authenticator;
 use access_container as access_container_tools;
 #[cfg(feature = "use-mock-routing")]
 use app_auth::{self, AppState};
+use app_container;
 use config::{self, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_INVALID_OWNER, ERR_OPERATION_FORBIDDEN,
              ERR_SHARE_MDATA_DENIED, ERR_UNKNOWN_APP};
@@ -49,7 +50,7 @@ use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
 use safe_core::ipc::resp::{AppAccess, METADATA_KEY, UserMetadata};
 use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
-use safe_core::nfs::{File, Mode, NfsError, file_helper};
+use safe_core::nfs::NfsError;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 #[cfg(feature = "use-mock-routing")]
@@ -61,7 +62,8 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
-                 rand_app, register_app, revoke, run, try_access_container, try_run};
+                 create_file, fetch_file, rand_app, register_app, revoke, run,
+                 try_access_container};
 #[cfg(feature = "use-mock-routing")]
 use test_utils::{create_account_and_login_with_hook, get_container_from_root, try_revoke};
 use tiny_keccak::sha3_256;
@@ -331,12 +333,9 @@ fn app_authentication() {
 
     // Check the app dir is present in the access container's authenticator entry.
     let received_app_dir_info = run(&authenticator, move |client| {
-        let app_dir_key = format!("apps/{}", app_id);
-
-        access_container_tools::authenticator_entry(client).and_then(move |(_, mut entries)| {
-            entries.remove(&app_dir_key).ok_or_else(|| {
-                AuthError::from(format!("'{}' not found", app_dir_key))
-            })
+        app_container::fetch(client, &app_id).and_then(move |app_dir| match app_dir {
+            Some(app_dir) => Ok(app_dir),
+            None => panic!("App directory not present"),
         })
     });
 
@@ -1885,46 +1884,6 @@ fn auth_apps_accessing_mdata() {
         assert_eq!(access.name, Some(String::from("")));
         assert_eq!(access.app_id, Some(String::from("")));
     }
-}
-
-// Create file in the given container, with the given name and content.
-fn create_file<T: Into<String>>(
-    authenticator: &Authenticator,
-    container_info: MDataInfo,
-    name: T,
-    content: Vec<u8>,
-) -> Result<(), AuthError> {
-    let name = name.into();
-    try_run(authenticator, |client| {
-        let c2 = client.clone();
-
-        file_helper::write(
-            client.clone(),
-            File::new(vec![]),
-            Mode::Overwrite,
-            container_info.enc_key().cloned(),
-        ).then(move |res| {
-            let writer = unwrap!(res);
-            writer.write(&content).and_then(move |_| writer.close())
-        })
-            .then(move |file| {
-                file_helper::insert(c2, container_info, name, &unwrap!(file))
-            })
-            .map_err(From::from)
-    })
-}
-
-fn fetch_file<T: Into<String>>(
-    authenticator: &Authenticator,
-    container_info: MDataInfo,
-    name: T,
-) -> Result<File, AuthError> {
-    let name = name.into();
-    try_run(authenticator, |client| {
-        file_helper::fetch(client.clone(), container_info, name)
-            .map(|(_, file)| file)
-            .map_err(From::from)
-    })
 }
 
 fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize {
