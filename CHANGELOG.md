@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.17.1]
+- Change test to use value of MAX_MUTABLE_DATA_ENTRIES rather than magic numbers.
+
 ## [0.17.0]
 - Remove proxy rate exceed event.
 
