@@ -85,7 +85,7 @@ impl Vault {
         match *dst {
             Authority::NaeManager(name) if name == *data_name => Ok(()),
             x => {
-                println!("Unexpected authority for read: {:?}", x);
+                debug!("Unexpected authority for read: {:?}", x);
                 Err(ClientError::InvalidOperation)
             }
         }
@@ -100,7 +100,7 @@ impl Vault {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
             x => {
-                println!("Unexpected authority for mutation: {:?}", x);
+                debug!("Unexpected authority for mutation: {:?}", x);
                 return Err(ClientError::InvalidOperation);
             }
         };
@@ -108,7 +108,7 @@ impl Vault {
         let account = match self.get_account(&dst_name) {
             Some(account) => account,
             None => {
-                println!("Account not found for {:?}", dst);
+                debug!("Account not found for {:?}", dst);
                 return Err(ClientError::NoSuchAccount);
             }
         };
@@ -116,7 +116,7 @@ impl Vault {
         // Check if we are the owner or app.
         let owner_name = XorName(sha3_256(&sign_pk[..]));
         if owner_name != dst_name && !account.auth_keys().contains(sign_pk) {
-            println!("Mutation not authorised");
+            debug!("Mutation not authorised");
             return Err(ClientError::AccessDenied);
         }
 
@@ -262,20 +262,21 @@ impl Store for FileStore {
         if mtime_duration > Duration::new(0, 0) {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
             match file.read_to_end(&mut raw_data) {
-                Ok(_) => (),
+                Ok(0) => (),
+                Ok(_) => {
+                    match deserialise::<Cache>(&raw_data) {
+                        Ok(cache) => {
+                            self.sync_time = Some(mtime);
+                            result = Some(cache);
+                        }
+                        Err(e) => {
+                            warn!("Can't read the mock vault: {:?}", e);
+                        }
+                    }
+                }
                 Err(e) => {
-                    println!("Can't read the mock vault: {:?}", e);
+                    warn!("Can't read the mock vault: {:?}", e);
                     return None;
-                }
-            }
-
-            match deserialise::<Cache>(&raw_data) {
-                Ok(cache) => {
-                    self.sync_time = Some(mtime);
-                    result = Some(cache);
-                }
-                Err(e) => {
-                    println!("Can't read the mock vault: {:?}", e);
                 }
             }
         }
