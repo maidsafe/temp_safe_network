@@ -262,6 +262,7 @@ impl Store for FileStore {
         if mtime_duration > Duration::new(0, 0) {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
             match file.read_to_end(&mut raw_data) {
+                Ok(0) => return None,
                 Ok(_) => (),
                 Err(e) => {
                     println!("Can't read the mock vault: {:?}", e);
