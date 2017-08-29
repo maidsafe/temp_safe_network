@@ -262,21 +262,21 @@ impl Store for FileStore {
         if mtime_duration > Duration::new(0, 0) {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
             match file.read_to_end(&mut raw_data) {
-                Ok(0) => return None,
-                Ok(_) => (),
+                Ok(0) => (),
+                Ok(_) => {
+                    match deserialise::<Cache>(&raw_data) {
+                        Ok(cache) => {
+                            self.sync_time = Some(mtime);
+                            result = Some(cache);
+                        }
+                        Err(e) => {
+                            warn!("Can't read the mock vault: {:?}", e);
+                        }
+                    }
+                }
                 Err(e) => {
                     warn!("Can't read the mock vault: {:?}", e);
                     return None;
-                }
-            }
-
-            match deserialise::<Cache>(&raw_data) {
-                Ok(cache) => {
-                    self.sync_time = Some(mtime);
-                    result = Some(cache);
-                }
-                Err(e) => {
-                    warn!("Can't read the mock vault: {:?}", e);
                 }
             }
         }
