@@ -18,7 +18,7 @@
 use {App, AppContext};
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str};
 use futures::Future;
 use futures::future::{self, Either};
 use object_cache::{FileContextHandle, MDataInfoHandle};
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn file_read(
                         },
                     )
                     .map(move |data| {
-                        o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
+                        o_cb(user_data.0, FFI_RESULT_OK, data.as_safe_ptr(), data.len());
                     })
                     .map_err(move |err| {
                         call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
