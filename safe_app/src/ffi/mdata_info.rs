@@ -64,11 +64,7 @@ pub unsafe extern "C" fn mdata_info_new_private(
         let name = XorName(*name);
 
         let sk = secretbox::Key(*secret_key);
-        let nonce = if nonce.is_null() {
-            None
-        } else {
-            Some(secretbox::Nonce(*nonce))
-        };
+        let nonce = secretbox::Nonce(*nonce);
 
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = MDataInfo::new_private(name, type_tag, (sk, nonce));
@@ -354,9 +350,8 @@ mod tests {
                 assert_eq!(new_info.type_tag, type_tag);
                 match new_info.enc_info {
                     Some((ref got_key, ref got_nonce)) => {
-                        assert!(got_nonce.is_some());
                         assert_eq!(*got_key, key);
-                        assert_eq!(unwrap!(*got_nonce), nonce);
+                        assert_eq!(*got_nonce, nonce);
                     }
                     None => panic!("Unexpected result: no enc_info in private MDataInfo"),
                 }
