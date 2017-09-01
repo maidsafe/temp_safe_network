@@ -17,13 +17,13 @@
 
 use {App, AppContext};
 use errors::AppError;
-use ffi::helper::send_with_mdata_info;
+use ffi::helper::send;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str,
                 vec_clone_from_raw_parts};
 use futures::Future;
 use futures::future::{self, Either};
-use object_cache::{FileContextHandle, MDataInfoHandle};
-use safe_core::FutureExt;
+use object_cache::FileContextHandle;
+use safe_core::{FutureExt, MDataInfo, ffi};
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::ffi::File;
@@ -49,23 +49,18 @@ pub static FILE_READ_TO_END: u64 = 0;
 #[no_mangle]
 pub unsafe extern "C" fn dir_fetch_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const ffi::MDataInfo,
     file_name: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, *const File, u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file_name = from_c_str(file_name)?;
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |client, context| {
-            let parent = try_cb!(
-                context.object_cache().get_mdata_info(parent_h),
-                user_data.0,
-                o_cb
-            );
-
-            file_helper::fetch(client.clone(), parent.clone(), file_name)
+        (*app).send(move |client, _| {
+            file_helper::fetch(client.clone(), parent_info, file_name)
                 .map(move |(version, file)| {
                     let ffi_file = file.into_repr_c();
                     o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
@@ -84,18 +79,19 @@ pub unsafe extern "C" fn dir_fetch_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_insert_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const ffi::MDataInfo,
     file_name: *const c_char,
     file: *const File,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
-            file_helper::insert(client.clone(), parent.clone(), file_name, &file)
+        send(app, user_data, o_cb, move |client, _| {
+            file_helper::insert(client.clone(), parent_info, file_name, &file)
         })
     })
 }
@@ -105,7 +101,7 @@ pub unsafe extern "C" fn dir_insert_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const ffi::MDataInfo,
     file_name: *const c_char,
     file: *const File,
     version: u64,
@@ -113,11 +109,12 @@ pub unsafe extern "C" fn dir_update_file(
     o_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
-            file_helper::update(client.clone(), parent.clone(), file_name, &file, version)
+        send(app, user_data, o_cb, move |client, _| {
+            file_helper::update(client.clone(), parent_info, file_name, &file, version)
         })
     })
 }
@@ -126,16 +123,18 @@ pub unsafe extern "C" fn dir_update_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const ffi::MDataInfo,
     file_name: *const c_char,
     version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file_name = from_c_str(file_name)?;
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
-            file_helper::delete(client, parent, file_name, version)
+
+        send(app, user_data, o_cb, move |client, _| {
+            file_helper::delete(client, &parent_info, file_name, version)
         })
     })
 }
@@ -144,61 +143,56 @@ pub unsafe extern "C" fn dir_delete_file(
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const ffi::MDataInfo,
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
 
-        send_with_mdata_info(
-            app,
-            parent_h,
-            user_data,
-            o_cb,
-            move |client, context, parent| {
-                let context = context.clone();
-                let original_file = file.clone();
+        send(app, user_data, o_cb, move |client, context| {
+            let context = context.clone();
+            let original_file = file.clone();
 
-                // Initialise the reader if OPEN_MODE_READ is requested
-                let reader = if open_mode & OPEN_MODE_READ != 0 {
-                    let fut = file_helper::read(client.clone(), &file, parent.enc_key().cloned())
-                        .map(Some);
-                    Either::A(fut)
+            // Initialise the reader if OPEN_MODE_READ is requested
+            let reader = if open_mode & OPEN_MODE_READ != 0 {
+                let fut = file_helper::read(client.clone(), &file, parent_info.enc_key().cloned())
+                    .map(Some);
+                Either::A(fut)
+            } else {
+                Either::B(future::ok(None))
+            };
+
+            // Initialise the writer if one of write modes is requested
+            let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
+                let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
+                    Mode::Append
                 } else {
-                    Either::B(future::ok(None))
+                    Mode::Overwrite
                 };
+                let fut = file_helper::write(
+                    client.clone(),
+                    file,
+                    writer_mode,
+                    parent_info.enc_key().cloned(),
+                ).map(Some);
+                Either::A(fut)
+            } else {
+                Either::B(future::ok(None))
+            };
 
-                // Initialise the writer if one of write modes is requested
-                let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
-                    let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
-                        Mode::Append
-                    } else {
-                        Mode::Overwrite
-                    };
-                    let fut = file_helper::write(
-                        client.clone(),
-                        file,
-                        writer_mode,
-                        parent.enc_key().cloned(),
-                    ).map(Some);
-                    Either::A(fut)
-                } else {
-                    Either::B(future::ok(None))
+            reader.join(writer).map(move |(reader, writer)| {
+                let file_ctx = FileContext {
+                    reader,
+                    writer,
+                    original_file,
                 };
-
-                reader.join(writer).map(move |(reader, writer)| {
-                    let file_ctx = FileContext {
-                        reader,
-                        writer,
-                        original_file,
-                    };
-                    context.object_cache().insert_file(file_ctx)
-                })
-            },
-        )
+                context.object_cache().insert_file(file_ctx)
+            })
+        })
     })
 }
 
@@ -362,7 +356,7 @@ mod tests {
     use std::ffi::CString;
     use test_utils::{create_app_with_access, run};
 
-    fn setup() -> (App, MDataInfoHandle) {
+    fn setup() -> (App, ffi::MDataInfo) {
         let mut container_permissions = HashMap::new();
         let _ = container_permissions.insert(
             "_videos".to_string(),
@@ -376,22 +370,23 @@ mod tests {
 
         let app = create_app_with_access(container_permissions);
 
-        let container_info_h = run(&app, move |client, context| {
+        let container_info = run(&app, move |client, context| {
             let context = context.clone();
 
             context.get_access_info(client).then(move |res| {
-                let access_info = unwrap!(res);
-                let (ref md_info, _) = access_info["_videos"];
-                Ok(context.object_cache().insert_mdata_info(md_info.clone()))
+                let mut access_info = unwrap!(res);
+                let (md_info, _) = unwrap!(access_info.remove("_videos"));
+                Ok(md_info)
             })
         });
+        let container_info = container_info.into_repr_c();
 
-        (app, container_info_h)
+        (app, container_info)
     }
 
     #[test]
     fn basics() {
-        let (app, container_info_h) = setup();
+        let (app, container_info) = setup();
 
         let file_name0 = "file0.txt";
         let ffi_file_name0 = unwrap!(CString::new(file_name0));
@@ -399,7 +394,7 @@ mod tests {
         // fetching non-existing file fails.
         let res: Result<(NativeFile, u64), i32> = unsafe {
             call_2(|ud, cb| {
-                dir_fetch_file(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
+                dir_fetch_file(&app, &container_info, ffi_file_name0.as_ptr(), ud, cb)
             })
         };
 
@@ -418,7 +413,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| {
                 dir_insert_file(
                     &app,
-                    container_info_h,
+                    &container_info,
                     ffi_file_name0.as_ptr(),
                     &ffi_file,
                     ud,
@@ -430,7 +425,7 @@ mod tests {
         // Fetch it back.
         let (retrieved_file, retrieved_version): (NativeFile, u64) = unsafe {
             unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
+                dir_fetch_file(&app, &container_info, ffi_file_name0.as_ptr(), ud, cb)
             }))
         };
         assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
@@ -440,7 +435,7 @@ mod tests {
         // Delete file.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                dir_delete_file(&app, container_info_h, ffi_file_name0.as_ptr(), 1, ud, cb)
+                dir_delete_file(&app, &container_info, ffi_file_name0.as_ptr(), 1, ud, cb)
             }))
         }
     }
@@ -460,7 +455,7 @@ mod tests {
     // 9. Check that the file's created and modified timestamps are correct.
     #[test]
     fn open_file() {
-        let (app, container_info_h) = setup();
+        let (app, container_info) = setup();
 
         // Create non-empty file.
         let file = NativeFile::new(Vec::new());
@@ -475,7 +470,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &ffi_file,
                     OPEN_MODE_OVERWRITE,
                     ud,
@@ -498,7 +493,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| {
                 dir_insert_file(
                     &app,
-                    container_info_h,
+                    &container_info,
                     ffi_file_name1.as_ptr(),
                     &written_file.into_repr_c(),
                     ud,
@@ -511,7 +506,7 @@ mod tests {
         let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -522,7 +517,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &file.into_repr_c(),
                     OPEN_MODE_READ | OPEN_MODE_APPEND,
                     ud,
@@ -542,7 +537,7 @@ mod tests {
         let (file, _version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -573,7 +568,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| {
                 dir_update_file(
                     &app,
-                    container_info_h,
+                    &container_info,
                     ffi_file_name1.as_ptr(),
                     &written_file.into_repr_c(),
                     1,
@@ -587,7 +582,7 @@ mod tests {
         let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -603,7 +598,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &file.into_repr_c(),
                     OPEN_MODE_READ,
                     ud,
@@ -635,7 +630,7 @@ mod tests {
     // 7. Read the file contents and ensure that they correspond to the data from step 4.
     #[test]
     fn delete_then_open_file() {
-        let (app, container_info_h) = setup();
+        let (app, container_info) = setup();
 
         // Create non-empty file.
         let file = NativeFile::new(Vec::new());
@@ -650,7 +645,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &ffi_file,
                     OPEN_MODE_OVERWRITE,
                     ud,
@@ -678,7 +673,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| {
                 dir_insert_file(
                     &app,
-                    container_info_h,
+                    &container_info,
                     ffi_file_name2.as_ptr(),
                     &written_file.into_repr_c(),
                     ud,
@@ -690,7 +685,7 @@ mod tests {
         // Delete file.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                dir_delete_file(&app, container_info_h, ffi_file_name2.as_ptr(), 1, ud, cb)
+                dir_delete_file(&app, &container_info, ffi_file_name2.as_ptr(), 1, ud, cb)
             }))
         }
 
@@ -704,7 +699,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &ffi_file,
                     OPEN_MODE_OVERWRITE,
                     ud,
@@ -732,7 +727,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| {
                 dir_update_file(
                     &app,
-                    container_info_h,
+                    &container_info,
                     ffi_file_name2.as_ptr(),
                     &new_file.into_repr_c(),
                     2,
@@ -746,7 +741,7 @@ mod tests {
         let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name2.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name2.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -757,7 +752,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &file.into_repr_c(),
                     OPEN_MODE_READ | OPEN_MODE_APPEND,
                     ud,
@@ -781,7 +776,7 @@ mod tests {
     // 4. Open the file in APPEND mode and close it.
     #[test]
     fn open_close_file() {
-        let (app, container_info_h) = setup();
+        let (app, container_info) = setup();
 
         let file_name = "file0.txt";
         let ffi_file_name = unwrap!(CString::new(file_name));
@@ -797,7 +792,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &ffi_file,
                     OPEN_MODE_OVERWRITE,
                     ud,
@@ -818,7 +813,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| {
                 dir_insert_file(
                     &app,
-                    container_info_h,
+                    &container_info,
                     ffi_file_name.as_ptr(),
                     &written_file.into_repr_c(),
                     ud,
@@ -831,7 +826,7 @@ mod tests {
         let (file, _version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -841,7 +836,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &file.into_repr_c(),
                     OPEN_MODE_READ,
                     ud,
@@ -856,7 +851,7 @@ mod tests {
         let (file, _version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -866,7 +861,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &file.into_repr_c(),
                     OPEN_MODE_OVERWRITE,
                     ud,
@@ -881,7 +876,7 @@ mod tests {
         let (file, _version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    dir_fetch_file(&app, container_info_h, ffi_file_name.as_ptr(), ud, cb)
+                    dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
                 }))
             }
         };
@@ -891,7 +886,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
-                    container_info_h,
+                    &container_info,
                     &file.into_repr_c(),
                     OPEN_MODE_APPEND,
                     ud,

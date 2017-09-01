@@ -19,6 +19,9 @@
 
 #![allow(unsafe_code)]
 
+mod mdata_info;
+
+pub use self::mdata_info::MDataInfo;
 use errors::CoreError;
 use ffi_utils::ReprC;
 use routing::XOR_NAME_LEN;
