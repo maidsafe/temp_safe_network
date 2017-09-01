@@ -17,7 +17,7 @@
 
 #[macro_use]
 mod futures;
-/// Common utility functions for writting test cases
+/// Common utility functions for writing test cases
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
@@ -98,13 +98,22 @@ pub fn symmetric_decrypt(
         .map_err(|_| CoreError::SymmetricDecipherFailure)
 }
 
-/// Generates a random string for specified size
+/// Generates a `String` from `length` random UTF-8 `char`s.  Note that the NULL character will be
+/// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the
+/// returned `String` will likely be around `4 * length` as most of the randomly-generated `char`s
+/// will consume 4 elements of the `String`.
 pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
     let mut os_rng = ::rand::OsRng::new().map_err(|error| {
         error!("{:?}", error);
         CoreError::RandomDataGenerationFailure
     })?;
-    Ok(os_rng.gen_iter::<char>().take(length).collect())
+    Ok(
+        os_rng
+            .gen_iter::<char>()
+            .filter(|c| *c != '\u{0}')
+            .take(length)
+            .collect(),
+    )
 }
 
 /// Generate a random vector of given length
