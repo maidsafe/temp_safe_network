@@ -118,7 +118,7 @@ fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet
     output
 }
 
-/// Tranform an FFI representation into container permissions
+/// Transform an FFI representation into container permissions
 pub fn container_perms_from_repr_c(
     perms: FfiPermissionSet,
 ) -> Result<ContainerPermissions, IpcError> {
