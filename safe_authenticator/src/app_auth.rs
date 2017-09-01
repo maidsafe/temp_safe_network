@@ -18,7 +18,6 @@
 //! App authentication routines
 
 use super::{AuthError, AuthFuture};
-use AccessContainerEntry;
 use access_container;
 use app_container;
 use config::{self, AppInfo, Apps};
@@ -26,9 +25,9 @@ use futures::Future;
 use ipc::update_container_perms;
 use routing::ClientError;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
-use safe_core::ipc::req::{AuthReq, Permission};
-use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted};
-use std::collections::{BTreeSet, HashMap};
+use safe_core::ipc::req::{AuthReq, ContainerPermissions, Permission};
+use safe_core::ipc::resp::{AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted};
+use std::collections::HashMap;
 use tiny_keccak::sha3_256;
 
 /// Represents current app state
@@ -250,7 +249,7 @@ fn authenticate_new_app(
     client: &Client<()>,
     app: AppInfo,
     app_container: bool,
-    permissions: HashMap<String, BTreeSet<Permission>>,
+    permissions: HashMap<String, ContainerPermissions>,
 ) -> Box<AuthFuture<AuthGranted>> {
     let c2 = client.clone();
     let c3 = client.clone();

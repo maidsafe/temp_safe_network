@@ -21,7 +21,7 @@ use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
 use safe_core::ipc::req::containers_into_vec;
-use safe_core::ipc::req::ffi::ContainerPermissions;
+use safe_core::ipc::req::ffi::ContainerPermissions as FfiContainerPermissions;
 use std::os::raw::{c_char, c_void};
 
 /// Fetch access info from the network.
@@ -52,7 +52,10 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ContainerPermissions, usize),
+    o_cb: extern "C" fn(*mut c_void,
+                        FfiResult,
+                        *const FfiContainerPermissions,
+                        usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -122,8 +125,8 @@ mod tests {
     use ffi_utils::{ReprC, from_c_str};
     use ffi_utils::test_utils::{call_1, call_vec};
     use safe_core::DIR_TAG;
-    use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
-    use std::collections::{BTreeSet, HashMap};
+    use safe_core::ipc::req::{ContainerPermissions, Permission, container_perms_from_repr_c};
+    use std::collections::HashMap;
     use std::ffi::CString;
     use test_utils::{create_app_with_access, run_now};
 
@@ -137,7 +140,7 @@ mod tests {
         let perms: Vec<PermSet> =
             unsafe { unwrap!(call_vec(|ud, cb| access_container_fetch(&app, ud, cb))) };
 
-        let perms: HashMap<String, BTreeSet<Permission>> =
+        let perms: HashMap<String, ContainerPermissions> =
             perms.into_iter().map(|val| (val.0, val.1)).collect();
 
         assert_eq!(perms["_videos"], btree_set![Permission::Read]);
@@ -159,10 +162,10 @@ mod tests {
         })
     }
 
-    struct PermSet(String, BTreeSet<Permission>);
+    struct PermSet(String, ContainerPermissions);
 
     impl ReprC for PermSet {
-        type C = *const ContainerPermissions;
+        type C = *const FfiContainerPermissions;
         type Error = AppError;
 
         unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {

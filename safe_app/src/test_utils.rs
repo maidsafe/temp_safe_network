@@ -21,9 +21,9 @@ use ffi_utils::catch_unwind_error_code;
 use futures::{Future, IntoFuture};
 use safe_authenticator::test_utils as authenticator;
 use safe_core::{Client, FutureExt, utils};
-use safe_core::ipc::{AppExchangeInfo, Permission};
-use safe_core::ipc::req::{AuthReq, containers_from_repr_c, ffi};
-use std::collections::{BTreeSet, HashMap};
+use safe_core::ipc::AppExchangeInfo;
+use safe_core::ipc::req::{AuthReq, ContainerPermissions, containers_from_repr_c, ffi};
+use std::collections::HashMap;
 use std::sync::mpsc;
 
 /// Generates an `AppExchangeInfo` strucutre for a mock application
@@ -99,7 +99,7 @@ pub fn create_app() -> App {
 }
 
 /// Create app and grant it access to the specified containers.
-pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>) -> App {
+pub fn create_app_with_access(access_info: HashMap<String, ContainerPermissions>) -> App {
     let auth = authenticator::create_account_and_login();
 
     let app_info = gen_app_exchange_info();

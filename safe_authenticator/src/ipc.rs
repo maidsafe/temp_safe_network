@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
+use super::{AuthError, AuthFuture, Authenticator};
 use access_container;
 use app_auth::{self, AppState, app_state};
 use config;
@@ -33,7 +33,7 @@ use safe_core::ipc::req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, 
                           container_perms_into_permission_set};
 use safe_core::ipc::req::ffi::{AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq,
                                ShareMDataReq as FfiShareMDataReq};
-use safe_core::ipc::resp::{IpcResp, METADATA_KEY, UserMetadata};
+use safe_core::ipc::resp::{AccessContainerEntry, IpcResp, METADATA_KEY, UserMetadata};
 use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};

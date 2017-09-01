@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::AccessContainerEntry;
 use Authenticator;
 use access_container;
 use app_auth;
@@ -33,6 +32,7 @@ use safe_core::{Client, FutureExt, MDataInfo, utils};
 use safe_core::MockRouting;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
 use safe_core::ipc::req::{ContainerPermissions, container_perms_into_permission_set};
+use safe_core::ipc::resp::AccessContainerEntry;
 use safe_core::nfs::{File, Mode, file_helper};
 use std::collections::HashMap;
 use std::sync::mpsc;

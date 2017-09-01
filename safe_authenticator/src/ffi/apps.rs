@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use app_auth::{AppState, app_state};
@@ -33,7 +32,7 @@ use safe_core::ffi::XorNameArray;
 use safe_core::ipc::{IpcError, access_container_enc_key};
 use safe_core::ipc::req::{AppExchangeInfo, containers_into_vec};
 use safe_core::ipc::req::ffi::{self, ContainerPermissions};
-use safe_core::ipc::resp::AppAccess;
+use safe_core::ipc::resp::{AccessContainerEntry, AppAccess};
 use safe_core::ipc::resp::ffi::AppAccess as FfiAppAccess;
 use safe_core::utils::symmetric_decrypt;
 use std::collections::HashMap;
