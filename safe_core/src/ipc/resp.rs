@@ -22,12 +22,13 @@ use crypto::{shared_box, shared_secretbox, shared_sign};
 use ffi::ipc::resp as ffi;
 use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::IpcError;
-use ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
+use ipc::req::{ContainerPermissions, permission_set_clone_from_repr_c, permission_set_into_repr_c};
 use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
 use routing::PermissionSet;
 use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::sign::PublicKey;
+use std::collections::HashMap;
 use std::ffi::{CString, NulError};
 use std::ptr;
 use std::slice;
@@ -186,6 +187,9 @@ impl ReprC for AppKeys {
         })
     }
 }
+
+/// Represents an entry for a single app in the access container
+pub type AccessContainerEntry = HashMap<String, (MDataInfo, ContainerPermissions)>;
 
 /// Access container
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]

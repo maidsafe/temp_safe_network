@@ -94,15 +94,15 @@ use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
-                NetworkTx, event_loop, utils};
+use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
+                event_loop, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
 use safe_core::crypto::shared_secretbox;
-use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig, Permission};
-use safe_core::ipc::resp::access_container_enc_key;
+use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
+use safe_core::ipc::resp::{AccessContainerEntry, access_container_enc_key};
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
@@ -120,9 +120,6 @@ macro_rules! try_tx {
 }
 
 type AppFuture<T> = Future<Item = T, Error = AppError>;
-
-/// Represents an entry for a single app in the access container
-type AccessContainerEntry = HashMap<String, (MDataInfo, BTreeSet<Permission>)>;
 
 /// Handle to an application instance.
 pub struct App {

@@ -19,14 +19,14 @@
 //!
 //! Access container is stored in the user's session packet.
 
-use super::{AccessContainerEntry, AuthError, AuthFuture};
+use super::{AuthError, AuthFuture};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
 use rust_sodium::crypto::secretbox;
 use safe_core::{Client, FutureExt, MDataInfo, recovery};
 use safe_core::ipc::AppKeys;
-use safe_core::ipc::resp::access_container_enc_key;
+use safe_core::ipc::resp::{AccessContainerEntry, access_container_enc_key};
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::HashMap;
 
