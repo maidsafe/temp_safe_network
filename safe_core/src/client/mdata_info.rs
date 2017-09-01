@@ -1,4 +1,4 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -17,6 +17,9 @@
 
 use crypto::shared_secretbox;
 use errors::CoreError;
+use ffi::MDataInfo as FfiMDataInfo;
+use ffi::arrays::{SymNonce, SymSecretKey};
+use ffi_utils::ReprC;
 use rand::{OsRng, Rng};
 use routing::{EntryAction, Value, XorName};
 use rust_sodium::crypto::secretbox;
@@ -140,6 +143,27 @@ impl MDataInfo {
             self.enc_info = Some(new_enc_info);
         }
     }
+
+    /// Convert into C-representation.
+    pub fn into_repr_c(self) -> FfiMDataInfo {
+        if let Some((key, nonce)) = self.enc_info {
+            FfiMDataInfo {
+                name: self.name.0,
+                type_tag: self.type_tag,
+                is_private: true,
+                enc_key: key.0,
+                enc_nonce: nonce.0,
+            }
+        } else {
+            FfiMDataInfo {
+                name: self.name.0,
+                type_tag: self.type_tag,
+                is_private: false,
+                enc_key: SymSecretKey::default(),
+                enc_nonce: SymNonce::default(),
+            }
+        }
+    }
 }
 
 fn os_rng() -> Result<OsRng, CoreError> {
@@ -256,6 +280,31 @@ fn enc_entry_key(
     symmetric_encrypt(plain_text, key, Some(&nonce))
 }
 
+impl ReprC for MDataInfo {
+    type C = *const FfiMDataInfo;
+    type Error = CoreError;
+
+    #[allow(unsafe_code)]
+    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
+        let repr_c = &*repr_c;
+
+        let enc_info = if repr_c.is_private {
+            Some((
+                shared_secretbox::Key::from_raw(&repr_c.enc_key),
+                secretbox::Nonce(repr_c.enc_nonce),
+            ))
+        } else {
+            None
+        };
+
+        Ok(MDataInfo {
+            name: XorName(repr_c.name),
+            type_tag: repr_c.type_tag,
+            enc_info: enc_info,
+            new_enc_info: None,
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {

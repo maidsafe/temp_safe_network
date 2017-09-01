@@ -16,19 +16,15 @@
 // relating to use of the SAFE Network Software.
 
 use errors::{ERR_ACCESS_DENIED, ERR_INVALID_SUCCESSOR, ERR_NO_SUCH_ENTRY, ERR_NO_SUCH_KEY};
-use ffi::crypto::sign_key_new;
+use ffi::crypto::*;
 use ffi::mdata_info::*;
 use ffi::mutable_data::*;
 use ffi::mutable_data::entries::*;
 use ffi::mutable_data::entry_actions::*;
 use ffi::mutable_data::permissions::*;
-use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
-use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8, send_via_user_data,
-                            sender_as_user_data};
-use object_cache::{MDataInfoHandle, MDataPermissionSetHandle, MDataPermissionsHandle};
-use routing::XOR_NAME_LEN;
+use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data, sender_as_user_data};
 use rust_sodium::crypto::sign;
-use safe_core::ffi::arrays::XorNameArray;
+use safe_core::MDataInfo;
 use std::mem;
 use std::sync::mpsc;
 use test_utils::create_app;
@@ -46,16 +42,14 @@ fn test_change_owner() {
         unsafe { unwrap!(call_1(|ud, cb| sign_key_new(&app, &random_key.0, ud, cb))) };
 
     // Try to create an empty public MD
-    let md_info1_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
-        ))
-    };
+    let md_info1: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+    let md_info1 = md_info1.into_repr_c();
 
     let result = unsafe {
         // Try changing the owner - should fail due to access denied
         call_0(|ud, cb| {
-            mdata_change_owner(&app, md_info1_h, random_key_h, 1, ud, cb)
+            mdata_change_owner(&app, &md_info1, random_key_h, 1, ud, cb)
         })
     };
 
@@ -66,16 +60,14 @@ fn test_change_owner() {
     };
 
     // Try to create a new empty public MD
-    let md_info2_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
-        ))
-    };
+    let md_info2: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+    let md_info2 = md_info2.into_repr_c();
 
     let result = unsafe {
         // Try changing the owner - should fail due to invalid successor
         call_0(|ud, cb| {
-            mdata_change_owner(&app, md_info2_h, random_key_h, 0, ud, cb)
+            mdata_change_owner(&app, &md_info2, random_key_h, 0, ud, cb)
         })
     };
 
@@ -88,7 +80,7 @@ fn test_change_owner() {
     unsafe {
         // Try changing the owner - should succeed
         unwrap!(call_0(|ud, cb| {
-            mdata_change_owner(&app, md_info2_h, random_key_h, 2, ud, cb)
+            mdata_change_owner(&app, &md_info2, random_key_h, 2, ud, cb)
         }))
     }
 }
@@ -226,22 +218,20 @@ fn permissions_crud_ffi() {
     }
 
     // Try to create an empty public MD
-    let md_info_pub_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
-        ))
-    };
+    let md_info_pub: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+    let md_info_pub = md_info_pub.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
     {
         let read_perm_set_h: MDataPermissionSetHandle = unsafe {
             unwrap!(call_1(|ud, cb| {
-                mdata_list_user_permissions(&app, md_info_pub_h, USER_ANYONE, ud, cb)
+                mdata_list_user_permissions(&app, &md_info_pub, USER_ANYONE, ud, cb)
             }))
         };
         let permission_value: PermissionValue = unsafe {
@@ -305,7 +295,7 @@ fn permissions_crud_ffi() {
             call_0(|ud, cb| {
                 mdata_set_user_permissions(
                     &app,
-                    md_info_pub_h,
+                    &md_info_pub,
                     USER_ANYONE,
                     perm_set_new_h,
                     0,
@@ -325,7 +315,7 @@ fn permissions_crud_ffi() {
             unwrap!(call_0(|ud, cb| {
                 mdata_set_user_permissions(
                     &app,
-                    md_info_pub_h,
+                    &md_info_pub,
                     USER_ANYONE,
                     perm_set_new_h,
                     1,
@@ -336,14 +326,14 @@ fn permissions_crud_ffi() {
 
             // Delete the permission set - should succeed
             unwrap!(call_0(|ud, cb| {
-                mdata_del_user_permissions(&app, md_info_pub_h, USER_ANYONE, 2, ud, cb);
+                mdata_del_user_permissions(&app, &md_info_pub, USER_ANYONE, 2, ud, cb);
             }));
 
             // Try to change permissions - should fail
             call_0(|ud, cb| {
                 mdata_set_user_permissions(
                     &app,
-                    md_info_pub_h,
+                    &md_info_pub,
                     USER_ANYONE,
                     perm_set_new_h,
                     3,
@@ -360,7 +350,7 @@ fn permissions_crud_ffi() {
 
         let result: Result<MDataPermissionSetHandle, i32> = unsafe {
             call_1(|ud, cb| {
-                mdata_list_user_permissions(&app, md_info_pub_h, USER_ANYONE, ud, cb)
+                mdata_list_user_permissions(&app, &md_info_pub, USER_ANYONE, ud, cb)
             })
         };
 
@@ -401,22 +391,20 @@ fn entries_crud_ffi() {
     }
 
     // Try to create an empty public MD
-    let md_info_pub_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
-        ))
-    };
+    let md_info_pub: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+    let md_info_pub = md_info_pub.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
     // Try to create a MD instance using the same name & type tag - it should fail.
     let res = unsafe {
         call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub, perms_h, ENTRIES_EMPTY, ud, cb)
         })
     };
     match res {
@@ -425,29 +413,17 @@ fn entries_crud_ffi() {
     }
 
     // Try to create a MD instance using the same name & a different type tag - it should pass.
-    let (xor_name, type_tag): (XorNameArray, u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            mdata_info_extract_name_and_type_tag(&app, md_info_pub_h, ud, cb)
-        }))
+    let xor_name = md_info_pub.name;
+    let md_info_pub_2: MDataInfo = unsafe {
+        unwrap!(call_1(
+            |ud, cb| mdata_info_new_public(&xor_name, 10001, ud, cb),
+        ))
     };
-    assert_eq!(type_tag, 10000);
-
-    let md_info_pub_2_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            mdata_info_new_public(&app, &xor_name, 10001, ud, cb)
-        }))
-    };
-    let (xor_name2, type_tag2): ([u8; XOR_NAME_LEN], u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            mdata_info_extract_name_and_type_tag(&app, md_info_pub_2_h, ud, cb)
-        }))
-    };
-    assert_eq!(xor_name, xor_name2);
-    assert_eq!(type_tag2, 10001);
+    let md_info_pub_2 = md_info_pub_2.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_2_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub_2, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
@@ -472,7 +448,7 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)
+            mdata_mutate_entries(&app, &md_info_pub, actions_h, ud, cb)
         }))
     }
 
@@ -484,7 +460,7 @@ fn entries_crud_ffi() {
         unsafe {
             mdata_get_value(
                 &app,
-                md_info_pub_h,
+                &md_info_pub,
                 KEY.as_ptr(),
                 KEY.len(),
                 ud,
@@ -499,7 +475,7 @@ fn entries_crud_ffi() {
     // Check the version of a public MD
     let ver: u64 = unsafe {
         unwrap!(call_1(
-            |ud, cb| mdata_get_version(&app, md_info_pub_h, ud, cb),
+            |ud, cb| mdata_get_version(&app, &md_info_pub, ud, cb),
         ))
     };
     assert_eq!(ver, 0);
@@ -508,7 +484,7 @@ fn entries_crud_ffi() {
     {
         let read_perms_h: MDataPermissionsHandle = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_permissions(&app, md_info_pub_h, ud, cb),
+                |ud, cb| mdata_list_permissions(&app, &md_info_pub, ud, cb),
             ))
         };
 
@@ -534,28 +510,20 @@ fn entries_crud_ffi() {
     }
 
     // Try to create a private MD
-    let md_info_priv_h = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_private(&app, 10001, ud, cb),
-        ))
-    };
-    let (_xor_name, type_tag): (XorNameArray, u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            mdata_info_extract_name_and_type_tag(&app, md_info_priv_h, ud, cb)
-        }))
-    };
-    assert_eq!(type_tag, 10001);
+    let md_info_priv: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(10001, ud, cb))) };
+    let md_info_priv = md_info_priv.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_priv_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_priv, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
     // Check the version of a private MD
     let ver: u64 = unsafe {
         unwrap!(call_1(
-            |ud, cb| mdata_get_version(&app, md_info_priv_h, ud, cb),
+            |ud, cb| mdata_get_version(&app, &md_info_priv, ud, cb),
         ))
     };
     assert_eq!(ver, 0);
@@ -563,19 +531,12 @@ fn entries_crud_ffi() {
     // Try to add entries to a private MD
     let key_enc = unsafe {
         unwrap!(call_vec_u8(|ud, cb| {
-            mdata_info_encrypt_entry_key(&app, md_info_priv_h, KEY.as_ptr(), KEY.len(), ud, cb)
+            mdata_info_encrypt_entry_key(&md_info_priv, KEY.as_ptr(), KEY.len(), ud, cb)
         }))
     };
     let value_enc = unsafe {
         unwrap!(call_vec_u8(|ud, cb| {
-            mdata_info_encrypt_entry_value(
-                &app,
-                md_info_priv_h,
-                VALUE.as_ptr(),
-                VALUE.len(),
-                ud,
-                cb,
-            )
+            mdata_info_encrypt_entry_value(&md_info_priv, VALUE.as_ptr(), VALUE.len(), ud, cb)
         }))
     };
 
@@ -599,7 +560,7 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_mutate_entries(&app, md_info_priv_h, actions_priv_h, ud, cb)
+            mdata_mutate_entries(&app, &md_info_priv, actions_priv_h, ud, cb)
         }))
     }
 
@@ -607,14 +568,14 @@ fn entries_crud_ffi() {
     {
         let size: u64 = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_serialised_size(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_serialised_size(&app, &md_info_priv, ud, cb),
             ))
         };
         assert!(size > 0);
 
         let size: u64 = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_serialised_size(&app, md_info_pub_h, ud, cb),
+                |ud, cb| mdata_serialised_size(&app, &md_info_pub, ud, cb),
             ))
         };
         assert!(size > 0);
@@ -628,7 +589,7 @@ fn entries_crud_ffi() {
         unsafe {
             mdata_get_value(
                 &app,
-                md_info_priv_h,
+                &md_info_priv,
                 key_enc.as_ptr(),
                 key_enc.len(),
                 ud,
@@ -643,8 +604,7 @@ fn entries_crud_ffi() {
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
                 mdata_info_decrypt(
-                    &app,
-                    md_info_priv_h,
+                    &md_info_priv,
                     got_value_enc.as_ptr(),
                     got_value_enc.len(),
                     ud,
@@ -659,7 +619,7 @@ fn entries_crud_ffi() {
     {
         let entries_list_h = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_entries(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_list_entries(&app, &md_info_priv, ud, cb),
             ))
         };
 
@@ -707,8 +667,7 @@ fn entries_crud_ffi() {
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
                 mdata_info_decrypt(
-                    &app,
-                    md_info_priv_h,
+                    &md_info_priv,
                     got_value_enc.as_ptr(),
                     got_value_enc.len(),
                     ud,
@@ -729,7 +688,7 @@ fn entries_crud_ffi() {
     {
         let keys_list_h: MDataKeysHandle = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_keys(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_list_keys(&app, &md_info_priv, ud, cb),
             ))
         };
 
@@ -742,14 +701,7 @@ fn entries_crud_ffi() {
         assert_eq!(result.len(), 1);
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                mdata_info_decrypt(
-                    &app,
-                    md_info_priv_h,
-                    result[0].as_ptr(),
-                    result[0].len(),
-                    ud,
-                    cb,
-                )
+                mdata_info_decrypt(&md_info_priv, result[0].as_ptr(), result[0].len(), ud, cb)
             }))
         };
         assert_eq!(&decrypted, &KEY, "decrypted invalid key");
@@ -759,7 +711,7 @@ fn entries_crud_ffi() {
     {
         let vals_list_h: MDataValuesHandle = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_values(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_list_values(&app, &md_info_priv, ud, cb),
             ))
         };
 
@@ -772,14 +724,7 @@ fn entries_crud_ffi() {
         assert_eq!(result.len(), 1);
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                mdata_info_decrypt(
-                    &app,
-                    md_info_priv_h,
-                    result[0].as_ptr(),
-                    result[0].len(),
-                    ud,
-                    cb,
-                )
+                mdata_info_decrypt(&md_info_priv, result[0].as_ptr(), result[0].len(), ud, cb)
             }))
         };
         assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
@@ -792,12 +737,6 @@ fn entries_crud_ffi() {
         ));
         unwrap!(call_0(
             |ud, cb| mdata_permissions_free(&app, perms_h, ud, cb),
-        ));
-        unwrap!(call_0(
-            |ud, cb| mdata_info_free(&app, md_info_pub_h, ud, cb),
-        ));
-        unwrap!(call_0(
-            |ud, cb| mdata_info_free(&app, md_info_priv_h, ud, cb),
         ));
     }
 

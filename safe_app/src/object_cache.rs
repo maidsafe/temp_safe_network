@@ -25,7 +25,7 @@ use ffi::nfs::FileContext;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
-use safe_core::{MDataInfo, SelfEncryptionStorage};
+use safe_core::SelfEncryptionStorage;
 use safe_core::crypto::shared_box;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
@@ -54,8 +54,6 @@ pub type EncryptPubKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type EncryptSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type MDataInfoHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
 pub type MDataEntriesHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataKeysHandle = ObjectHandle;
@@ -82,7 +80,6 @@ pub struct ObjectCache {
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
     secret_key: Store<shared_box::SecretKey>,
-    mdata_info: Store<MDataInfo>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
@@ -103,7 +100,6 @@ impl ObjectCache {
             cipher_opt: Store::new(),
             encrypt_key: Store::new(),
             secret_key: Store::new(),
-            mdata_info: Store::new(),
             mdata_entries: Store::new(),
             mdata_keys: Store::new(),
             mdata_values: Store::new(),
@@ -123,7 +119,6 @@ impl ObjectCache {
         self.cipher_opt.clear();
         self.encrypt_key.clear();
         self.secret_key.clear();
-        self.mdata_info.clear();
         self.mdata_entries.clear();
         self.mdata_keys.clear();
         self.mdata_values.clear();
@@ -192,15 +187,6 @@ impl_cache!(
     get_secret_key,
     insert_secret_key,
     remove_secret_key
-);
-impl_cache!(
-    mdata_info,
-    MDataInfo,
-    MDataInfoHandle,
-    InvalidMDataInfoHandle,
-    get_mdata_info,
-    insert_mdata_info,
-    remove_mdata_info
 );
 impl_cache!(mdata_entries,
             BTreeMap<Vec<u8>, Value>,

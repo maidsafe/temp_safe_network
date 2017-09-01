@@ -15,37 +15,22 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! FFI
+use ffi::arrays::{SymNonce, SymSecretKey, XorNameArray};
 
-#![allow(unsafe_code)]
-
-/// IPC utilities
-pub mod ipc;
-/// NFS API
-pub mod nfs;
-/// Type definitions for arrays that are FFI input params
-pub mod arrays;
-mod mdata_info;
-
-pub use self::mdata_info::MDataInfo;
-use errors::CoreError;
-use ffi_utils::ReprC;
-
-/// Represents the FFI-safe account info
+/// FFI wrapper for `MDataInfo`
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct AccountInfo {
-    /// Number of used mutations
-    pub mutations_done: u64,
-    /// Number of available mutations
-    pub mutations_available: u64,
-}
+#[derive(Clone)]
+pub struct MDataInfo {
+    /// Name of the mutable data.
+    pub name: XorNameArray,
+    /// Type tag of the mutable data.
+    pub type_tag: u64,
 
-impl ReprC for AccountInfo {
-    type C = *const AccountInfo;
-    type Error = CoreError;
-
-    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        Ok(*repr_c)
-    }
+    /// Flag indicating whether the mutable data is private or public. If private,
+    /// thte `enc_key` and `enc_nonce` fields contain encryption details.
+    pub is_private: bool,
+    /// Encryption key. Meaningful only if `is_private` is `true`.
+    pub enc_key: SymSecretKey,
+    /// Encryption nonce. Meaningful only if `is_private` is `true`.
+    pub enc_nonce: SymNonce,
 }

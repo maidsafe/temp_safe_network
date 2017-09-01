@@ -17,13 +17,15 @@
 
 use {App, AppContext};
 use errors::AppError;
-use ffi::helper::send_with_mdata_info;
+use ffi::helper::send;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str,
                 vec_clone_from_raw_parts};
 use futures::Future;
 use futures::future::{self, Either};
-use object_cache::{FileContextHandle, MDataInfoHandle};
+use object_cache::FileContextHandle;
 use safe_core::FutureExt;
+use safe_core::MDataInfo as NativeMDataInfo;
+use safe_core::ffi::MDataInfo;
 use safe_core::ffi::nfs::File;
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
@@ -51,7 +53,7 @@ pub static FILE_READ_TO_END: u64 = 0;
 #[no_mangle]
 pub unsafe extern "C" fn dir_fetch_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const MDataInfo,
     file_name: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
@@ -60,17 +62,12 @@ pub unsafe extern "C" fn dir_fetch_file(
                         version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
         let file_name = from_c_str(file_name)?;
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |client, context| {
-            let parent = try_cb!(
-                context.object_cache().get_mdata_info(parent_h),
-                user_data.0,
-                o_cb
-            );
-
-            file_helper::fetch(client.clone(), parent.clone(), file_name)
+        (*app).send(move |client, _| {
+            file_helper::fetch(client.clone(), parent_info, file_name)
                 .map(move |(version, file)| {
                     let ffi_file = file.into_repr_c();
                     o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
@@ -91,18 +88,19 @@ pub unsafe extern "C" fn dir_fetch_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_insert_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const MDataInfo,
     file_name: *const c_char,
     file: *const File,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
-            file_helper::insert(client.clone(), parent.clone(), file_name, &file)
+        send(app, user_data, o_cb, move |client, _| {
+            file_helper::insert(client.clone(), parent_info, file_name, &file)
         })
     })
 }
@@ -114,7 +112,7 @@ pub unsafe extern "C" fn dir_insert_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const MDataInfo,
     file_name: *const c_char,
     file: *const File,
     version: u64,
@@ -122,11 +120,12 @@ pub unsafe extern "C" fn dir_update_file(
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
-            file_helper::update(client.clone(), parent.clone(), file_name, &file, version)
+        send(app, user_data, o_cb, move |client, _| {
+            file_helper::update(client.clone(), parent_info, file_name, &file, version)
         })
     })
 }
@@ -137,16 +136,18 @@ pub unsafe extern "C" fn dir_update_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const MDataInfo,
     file_name: *const c_char,
     version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
         let file_name = from_c_str(file_name)?;
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
-            file_helper::delete(client, parent, file_name, version)
+
+        send(app, user_data, o_cb, move |client, _| {
+            file_helper::delete(client, &parent_info, file_name, version)
         })
     })
 }
@@ -157,7 +158,7 @@ pub unsafe extern "C" fn dir_delete_file(
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
-    parent_h: MDataInfoHandle,
+    parent_info: *const MDataInfo,
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
@@ -166,54 +167,49 @@ pub unsafe extern "C" fn file_open(
                         file_h: FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
 
-        send_with_mdata_info(
-            app,
-            parent_h,
-            user_data,
-            o_cb,
-            move |client, context, parent| {
-                let context = context.clone();
-                let original_file = file.clone();
+        send(app, user_data, o_cb, move |client, context| {
+            let context = context.clone();
+            let original_file = file.clone();
 
-                // Initialise the reader if OPEN_MODE_READ is requested
-                let reader = if open_mode & OPEN_MODE_READ != 0 {
-                    let fut = file_helper::read(client.clone(), &file, parent.enc_key().cloned())
-                        .map(Some);
-                    Either::A(fut)
+            // Initialise the reader if OPEN_MODE_READ is requested
+            let reader = if open_mode & OPEN_MODE_READ != 0 {
+                let fut = file_helper::read(client.clone(), &file, parent_info.enc_key().cloned())
+                    .map(Some);
+                Either::A(fut)
+            } else {
+                Either::B(future::ok(None))
+            };
+
+            // Initialise the writer if one of write modes is requested
+            let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
+                let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
+                    Mode::Append
                 } else {
-                    Either::B(future::ok(None))
+                    Mode::Overwrite
                 };
+                let fut = file_helper::write(
+                    client.clone(),
+                    file,
+                    writer_mode,
+                    parent_info.enc_key().cloned(),
+                ).map(Some);
+                Either::A(fut)
+            } else {
+                Either::B(future::ok(None))
+            };
 
-                // Initialise the writer if one of write modes is requested
-                let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
-                    let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
-                        Mode::Append
-                    } else {
-                        Mode::Overwrite
-                    };
-                    let fut = file_helper::write(
-                        client.clone(),
-                        file,
-                        writer_mode,
-                        parent.enc_key().cloned(),
-                    ).map(Some);
-                    Either::A(fut)
-                } else {
-                    Either::B(future::ok(None))
+            reader.join(writer).map(move |(reader, writer)| {
+                let file_ctx = FileContext {
+                    reader,
+                    writer,
+                    original_file,
                 };
-
-                reader.join(writer).map(move |(reader, writer)| {
-                    let file_ctx = FileContext {
-                        reader,
-                        writer,
-                        original_file,
-                    };
-                    context.object_cache().insert_file(file_ctx)
-                })
-            },
-        )
+                context.object_cache().insert_file(file_ctx)
+            })
+        })
     })
 }
 

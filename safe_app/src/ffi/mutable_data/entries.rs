@@ -383,13 +383,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi::mdata_info::mdata_info_random_public;
+    use ffi::mdata_info::*;
     use ffi::mutable_data::*;
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
     use ffi_utils::test_utils::{call_0, call_1, send_via_user_data, sender_as_user_data};
     use ffi_utils::vec_clone_from_raw_parts;
-    use object_cache::{MDataEntryActionsHandle, MDataInfoHandle};
+    use object_cache::MDataEntryActionsHandle;
     use routing::Value;
     use safe_core::utils;
     use std::collections::BTreeMap;
@@ -603,21 +603,19 @@ mod tests {
         };
 
         // Create an empty public mdata
-        let md_info_h: MDataInfoHandle = unsafe {
-            unwrap!(call_1(
-                |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
-            ))
-        };
+        let md_info: MDataInfo =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+        let md_info = md_info.into_repr_c();
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                mdata_put(&app, md_info_h, perms_h, ENTRIES_EMPTY, ud, cb)
+                mdata_put(&app, &md_info, perms_h, ENTRIES_EMPTY, ud, cb)
             }))
         };
 
         // Get the keys handle, make sure number of keys is zero
         let keys_handle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, md_info_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
 
         let len: usize =
             unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_handle, ud, cb))) };
@@ -625,7 +623,7 @@ mod tests {
 
         // Ditto for values
         let values_handle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, md_info_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
 
         let len: usize = unsafe {
             unwrap!(call_1(
@@ -670,20 +668,20 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                mdata_mutate_entries(&app, md_info_h, actions_h, ud, cb)
+                mdata_mutate_entries(&app, &md_info, actions_h, ud, cb)
             }))
         }
 
         // Get the keys and values handles again
         let keys_handle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, md_info_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
 
         let len: usize =
             unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_handle, ud, cb))) };
         assert_eq!(len, 2);
 
         let values_handle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, md_info_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
 
         let len: usize = unsafe {
             unwrap!(call_1(
