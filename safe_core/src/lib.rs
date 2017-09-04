@@ -103,7 +103,6 @@ pub use self::event::{CoreEvent, NetworkEvent, NetworkRx, NetworkTx};
 pub use self::event_loop::{CoreFuture, CoreMsg, CoreMsgRx, CoreMsgTx};
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
 pub use self::utils::FutureExt;
-pub use ffi::*;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;

@@ -25,9 +25,8 @@ pub mod ipc;
 pub mod nfs;
 /// Type definitions for arrays that are FFI input params
 pub mod arrays;
-mod mdata_info;
 
-pub use self::mdata_info::MDataInfo;
+use self::arrays::{SymNonce, SymSecretKey, XorNameArray};
 use errors::CoreError;
 use ffi_utils::ReprC;
 
@@ -48,4 +47,22 @@ impl ReprC for AccountInfo {
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         Ok(*repr_c)
     }
+}
+
+/// FFI wrapper for `MDataInfo`
+#[repr(C)]
+#[derive(Clone)]
+pub struct MDataInfo {
+    /// Name of the mutable data.
+    pub name: XorNameArray,
+    /// Type tag of the mutable data.
+    pub type_tag: u64,
+
+    /// Flag indicating whether the mutable data is private or public. If private,
+    /// the `enc_key` and `enc_nonce` fields contain encryption details.
+    pub is_private: bool,
+    /// Encryption key. Meaningful only if `is_private` is `true`.
+    pub enc_key: SymSecretKey,
+    /// Encryption nonce. Meaningful only if `is_private` is `true`.
+    pub enc_nonce: SymNonce,
 }

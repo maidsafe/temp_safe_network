@@ -20,6 +20,7 @@ use errors::CoreError;
 use ffi::MDataInfo as FfiMDataInfo;
 use ffi::arrays::{SymNonce, SymSecretKey};
 use ffi_utils::ReprC;
+use ipc::IpcError;
 use rand::{OsRng, Rng};
 use routing::{EntryAction, Value, XorName};
 use rust_sodium::crypto::secretbox;
@@ -28,7 +29,7 @@ use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
 /// Information allowing to locate and access mutable data on the network.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct MDataInfo {
     /// Name of the data where the directory is stored.
     pub name: XorName,
@@ -282,7 +283,7 @@ fn enc_entry_key(
 
 impl ReprC for MDataInfo {
     type C = *const FfiMDataInfo;
-    type Error = CoreError;
+    type Error = IpcError;
 
     #[allow(unsafe_code)]
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {

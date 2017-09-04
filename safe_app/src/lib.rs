@@ -172,8 +172,9 @@ impl App {
                 sign_pk,
                 sign_sk,
             },
-            access_container,
+            access_container_info,
             bootstrap_config,
+            ..
         } = auth_granted;
 
         let client_keys = ClientKeys {
@@ -193,7 +194,7 @@ impl App {
                 net_tx,
                 bootstrap_config,
             )?;
-            let context = AppContext::registered(app_id, enc_key, access_container);
+            let context = AppContext::registered(app_id, enc_key, access_container_info);
             Ok((client, context))
         })
     }
@@ -220,8 +221,9 @@ impl App {
                 sign_pk,
                 sign_sk,
             },
-            access_container,
+            access_container_info,
             bootstrap_config,
+            ..
         } = auth_granted;
 
         let client_keys = ClientKeys {
@@ -242,7 +244,7 @@ impl App {
                 bootstrap_config,
                 routing_wrapper_fn,
             )?;
-            let context = AppContext::registered(app_id, enc_key, access_container);
+            let context = AppContext::registered(app_id, enc_key, access_container_info);
             Ok((client, context))
         })
     }

@@ -24,7 +24,9 @@ mod share_mdata;
 pub use self::auth::AuthReq;
 pub use self::containers::ContainersReq;
 pub use self::share_mdata::{ShareMData, ShareMDataReq};
-use ffi::ipc::req as ffi;
+use ffi::ipc::req::{AppExchangeInfo as FfiAppExchangeInfo,
+                    ContainerPermissions as FfiContainerPermissions,
+                    PermissionSet as FfiPermissionSet};
 use ffi_utils::{ReprC, StringError, from_c_str};
 use ipc::errors::IpcError;
 use routing::{Action, PermissionSet};
@@ -76,14 +78,14 @@ pub enum IpcReq {
 /// strings automatically.
 pub fn containers_into_vec<ContainersIter>(
     containers: ContainersIter,
-) -> Result<Vec<ffi::ContainerPermissions>, NulError>
+) -> Result<Vec<FfiContainerPermissions>, NulError>
 where
     ContainersIter: IntoIterator<Item = (String, ContainerPermissions)>,
 {
     containers
         .into_iter()
         .map(|(cont_name, access)| {
-            Ok(ffi::ContainerPermissions {
+            Ok(FfiContainerPermissions {
                 cont_name: CString::new(cont_name)?.into_raw(),
                 access: container_perms_into_repr_c(&access),
             })
@@ -92,8 +94,8 @@ where
 }
 
 /// Transform a set of container permissions into its FFI representation
-fn container_perms_into_repr_c(perms: &ContainerPermissions) -> ffi::PermissionSet {
-    let mut output = ffi::PermissionSet::default();
+pub fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet {
+    let mut output = FfiPermissionSet::default();
 
     for perm in perms {
         match *perm {
@@ -118,7 +120,7 @@ fn container_perms_into_repr_c(perms: &ContainerPermissions) -> ffi::PermissionS
 
 /// Transform an FFI representation into container permissions
 pub fn container_perms_from_repr_c(
-    perms: ffi::PermissionSet,
+    perms: FfiPermissionSet,
 ) -> Result<ContainerPermissions, IpcError> {
     let mut output = BTreeSet::new();
 
@@ -171,7 +173,7 @@ where
 /// object.
 #[allow(unsafe_code)]
 pub unsafe fn containers_from_repr_c(
-    raw: *const ffi::ContainerPermissions,
+    raw: *const FfiContainerPermissions,
     len: usize,
 ) -> Result<HashMap<String, ContainerPermissions>, IpcError> {
     slice::from_raw_parts(raw, len)
@@ -186,8 +188,8 @@ pub unsafe fn containers_from_repr_c(
 }
 
 /// Convert a `PermissionSet` into its C representation.
-pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
-    ffi::PermissionSet {
+pub fn permission_set_into_repr_c(perms: PermissionSet) -> FfiPermissionSet {
+    FfiPermissionSet {
         read: true,
         insert: perms.is_allowed(Action::Insert).unwrap_or(false),
         update: perms.is_allowed(Action::Update).unwrap_or(false),
@@ -198,7 +200,7 @@ pub fn permission_set_into_repr_c(perms: PermissionSet) -> ffi::PermissionSet {
 
 /// Create a `PermissionSet` from its C representation.
 pub fn permission_set_clone_from_repr_c(
-    perms: &ffi::PermissionSet,
+    perms: &FfiPermissionSet,
 ) -> Result<PermissionSet, IpcError> {
     let mut pm = PermissionSet::new();
 
@@ -243,7 +245,7 @@ impl AppExchangeInfo {
     /// Consumes the object and returns the wrapped raw pointer.
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> Result<ffi::AppExchangeInfo, IpcError> {
+    pub fn into_repr_c(self) -> Result<FfiAppExchangeInfo, IpcError> {
         let AppExchangeInfo {
             id,
             scope,
@@ -251,7 +253,7 @@ impl AppExchangeInfo {
             vendor,
         } = self;
 
-        Ok(ffi::AppExchangeInfo {
+        Ok(FfiAppExchangeInfo {
             id: CString::new(id).map_err(StringError::from)?.into_raw(),
             scope: if let Some(scope) = scope {
                 CString::new(scope).map_err(StringError::from)?.into_raw()
@@ -265,14 +267,14 @@ impl AppExchangeInfo {
 }
 
 impl ReprC for AppExchangeInfo {
-    type C = *const ffi::AppExchangeInfo;
+    type C = *const FfiAppExchangeInfo;
     type Error = IpcError;
 
     /// Constructs the object from a raw pointer.
     ///
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
-    unsafe fn clone_from_repr_c(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
+    unsafe fn clone_from_repr_c(raw: *const FfiAppExchangeInfo) -> Result<Self, IpcError> {
         Ok(AppExchangeInfo {
             id: from_c_str((*raw).id).map_err(StringError::from)?,
             scope: if (*raw).scope.is_null() {
@@ -290,7 +292,6 @@ impl ReprC for AppExchangeInfo {
 #[allow(unsafe_code)]
 mod tests {
     use super::*;
-    use ffi::ipc::req::PermissionSet as FfiPermissionSet;
     use ffi_utils::ReprC;
     use std::collections::HashMap;
     use std::ffi::CStr;
