@@ -20,12 +20,13 @@ use Authenticator;
 use app_container;
 use errors::AuthError;
 use futures::Future;
-use routing::User;
+use revocation;
+use routing::{AccountInfo, User};
 use safe_core::{CoreError, MDataInfo};
 use safe_core::ipc::AuthReq;
 use safe_core::nfs::NfsError;
-use test_utils::{access_container, create_account_and_login, create_file, fetch_file, rand_app,
-                 register_app, revoke, run, try_access_container};
+use test_utils::{access_container, create_account_and_login, create_authenticator, create_file,
+                 fetch_file, rand_app, register_app, revoke, run, try_access_container};
 
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing {
@@ -47,7 +48,7 @@ mod mock_routing {
     use std::iter;
     use std::thread;
     use std::time::Duration;
-    use test_utils::{create_authenticator, get_container_from_root, register_rand_app, try_revoke};
+    use test_utils::{get_container_from_root, register_rand_app, try_revoke};
     use tiny_keccak::sha3_256;
 
     // Test operation recovery for app revocation
@@ -886,11 +887,59 @@ fn app_revocation() {
     revoke(&authenticator, &app_id2);
 }
 
+// Test that flushing app revocation queue that is empty does not cause any
+// mutation requests to be sent and subsequently does not charge the account
+// balance.
+#[test]
+fn flushing_empty_app_revocation_queue_does_not_mutate_network() {
+    // Create account.
+    let (auth, ..) = create_authenticator();
+    let account_info_0 = get_account_info(&auth);
+
+    // There are no apps, so the queue is empty.
+    run(
+        &auth,
+        |client| revocation::flush_app_revocation_queue(client),
+    );
+
+    let account_info_1 = get_account_info(&auth);
+    assert_eq!(account_info_0, account_info_1);
+
+    // Now create an app and revoke it. Then flush the queue again and observe
+    // the account balance did not change.
+    let auth_req = AuthReq {
+        app: rand_app(),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+    let _ = unwrap!(register_app(&auth, &auth_req));
+    let app_id = auth_req.app.id;
+
+    revoke(&auth, &app_id);
+
+    let account_info_2 = get_account_info(&auth);
+
+    // The queue is empty again.
+    run(
+        &auth,
+        |client| revocation::flush_app_revocation_queue(client),
+    );
+
+    let account_info_3 = get_account_info(&auth);
+    assert_eq!(account_info_2, account_info_3);
+}
+
 fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize {
     run(authenticator, move |client| {
         client
             .list_mdata_entries(info.name, info.type_tag)
             .map(|entries| entries.len())
             .map_err(From::from)
+    })
+}
+
+fn get_account_info(authenticator: &Authenticator) -> AccountInfo {
+    run(authenticator, |client| {
+        client.get_account_info().map_err(AuthError::from)
     })
 }
