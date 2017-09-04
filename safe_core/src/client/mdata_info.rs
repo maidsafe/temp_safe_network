@@ -32,10 +32,10 @@ pub struct MDataInfo {
     pub type_tag: u64,
     /// Key to encrypt/decrypt the directory content.
     /// and the nonce to be used for keys
-    pub enc_info: Option<(secretbox::Key, Option<secretbox::Nonce>)>,
+    pub enc_info: Option<(secretbox::Key, secretbox::Nonce)>,
 
     /// Future encryption info, used for two-phase data reencryption.
-    pub new_enc_info: Option<(secretbox::Key, Option<secretbox::Nonce>)>,
+    pub new_enc_info: Option<(secretbox::Key, secretbox::Nonce)>,
 }
 
 impl MDataInfo {
@@ -44,7 +44,7 @@ impl MDataInfo {
     pub fn new_private(
         name: XorName,
         type_tag: u64,
-        enc_info: (secretbox::Key, Option<secretbox::Nonce>),
+        enc_info: (secretbox::Key, secretbox::Nonce),
     ) -> Self {
         MDataInfo {
             name,
@@ -67,7 +67,7 @@ impl MDataInfo {
     /// Generate random `MDataInfo` for private (encrypted) mutable data.
     pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
-        let enc_info = (secretbox::gen_key(), Some(secretbox::gen_nonce()));
+        let enc_info = (secretbox::gen_key(), secretbox::gen_nonce());
         Ok(Self::new_private(rng.gen(), type_tag, enc_info))
     }
 
@@ -84,9 +84,7 @@ impl MDataInfo {
 
     /// Returns the nonce, inf any.
     pub fn nonce(&self) -> Option<&secretbox::Nonce> {
-        self.enc_info.as_ref().and_then(
-            |&(_, ref nonce)| nonce.as_ref(),
-        )
+        self.enc_info.as_ref().map(|&(_, ref nonce)| nonce)
     }
 
     /// encrypt the the key for the mdata entry accordingly
@@ -130,7 +128,7 @@ impl MDataInfo {
     /// field with random keys, unless it's already populated.
     pub fn start_new_enc_info(&mut self) {
         if self.enc_info.is_some() && self.new_enc_info.is_none() {
-            self.new_enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
+            self.new_enc_info = Some((secretbox::gen_key(), secretbox::gen_nonce()));
         }
     }
 
@@ -244,17 +242,15 @@ fn decrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
 fn enc_entry_key(
     plain_text: &[u8],
     key: &secretbox::Key,
-    seed: Option<secretbox::Nonce>,
+    seed: secretbox::Nonce,
 ) -> Result<Vec<u8>, CoreError> {
-    let nonce = match seed {
-        Some(secretbox::Nonce(ref nonce)) => {
-            let mut pt = plain_text.to_vec();
-            pt.extend_from_slice(&nonce[..]);
-            unwrap!(secretbox::Nonce::from_slice(
-                &sha3_256(&pt)[..secretbox::NONCEBYTES],
-            ))
-        }
-        None => secretbox::gen_nonce(),
+    let nonce = {
+        let secretbox::Nonce(ref nonce) = seed;
+        let mut pt = plain_text.to_vec();
+        pt.extend_from_slice(&nonce[..]);
+        unwrap!(secretbox::Nonce::from_slice(
+            &sha3_256(&pt)[..secretbox::NONCEBYTES],
+        ))
     };
     symmetric_encrypt(plain_text, key, Some(&nonce))
 }
@@ -263,8 +259,6 @@ fn enc_entry_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand;
-    use rust_sodium::crypto::secretbox;
 
     #[test]
     fn private_mdata_info_encrypts() {
@@ -287,21 +281,6 @@ mod tests {
         assert_eq!(unwrap!(info.enc_entry_key(&key)), key);
         assert_eq!(unwrap!(info.enc_entry_value(&val)), val);
         assert_eq!(unwrap!(info.decrypt(&val)), val);
-    }
-
-    #[test]
-    fn no_nonce_means_random_nonce() {
-        let info = MDataInfo {
-            name: rand::random(),
-            type_tag: 0,
-            enc_info: Some((secretbox::gen_key(), None)),
-            new_enc_info: None,
-        };
-        let key = Vec::from("str of key");
-        let enc_key = unwrap!(info.enc_entry_key(&key));
-        assert_ne!(enc_key, key);
-        // encrypted is different on every run
-        assert_ne!(unwrap!(info.enc_entry_key(&key)), key);
     }
 
     #[test]
