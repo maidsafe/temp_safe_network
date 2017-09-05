@@ -304,7 +304,7 @@ impl Authenticator {
     }
 }
 
-#[cfg(all(feature = "use-mock-routing", any(test, feature = "testing")))]
+#[cfg(feature = "use-mock-routing")]
 impl Authenticator {
     #[allow(unused)]
     fn login_with_hook<F, S, NetObs>(

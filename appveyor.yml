@@ -68,13 +68,13 @@ after_build:
 test_script:
   - |-
     cargo test --verbose --release --manifest-path=ffi_utils/Cargo.toml
-    cargo test --verbose --release --features=use-mock-routing,testing --manifest-path=safe_core/Cargo.toml
-    cargo test --verbose --release --features=use-mock-routing,testing --manifest-path=safe_authenticator/Cargo.toml
-    cargo test --verbose --release --features=use-mock-routing,testing --manifest-path=safe_app/Cargo.toml
+    cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_core/Cargo.toml
+    cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml
+    cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
 
 before_deploy:
-  - cargo build --verbose --release --features=use-mock-routing,testing --manifest-path=safe_authenticator/Cargo.toml
-  - cargo build --verbose --release --features=use-mock-routing,testing --manifest-path=safe_app/Cargo.toml
+  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml
+  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
   - strip target\release\safe_authenticator.dll target\release\safe_app.dll
   - 7z a -mx9 safe_authenticator-mock-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_authenticator.dll
   - 7z a -mx9 safe_app-mock-%SAFE_APP_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_app.dll

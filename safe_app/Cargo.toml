@@ -21,19 +21,26 @@ routing = "~0.33.1"
 rust_sodium = "~0.5.0"
 serde = "~1.0.11"
 serde_derive = "~1.0.11"
-safe_core = { path = "../safe_core", version = "~0.26.1" }
 safe_authenticator = { path = "../safe_authenticator", version = "~0.3.1", optional = true }
+safe_core = { path = "../safe_core", version = "~0.26.1" }
 self_encryption = "~0.11.1"
 tiny-keccak = "~1.3.1"
 tokio-core = "~0.1.9"
 unwrap = "~1.1.0"
 
-[dev-dependencies]
-safe_authenticator = { path = "../safe_authenticator", version = "~0.3.1" }
+[dev-dependencies.safe_authenticator]
+path = "../safe_authenticator"
+version = "~0.3.1"
+features = ["testing"]
+
+[dev-dependencies.safe_core]
+path = "../safe_core"
+version = "~0.26.1"
+features = ["testing"]
 
 [features]
-use-mock-routing = ["safe_core/use-mock-routing"]
-testing = ["safe_authenticator", "safe_authenticator/testing", "safe_core/testing"]
+use-mock-routing = ["safe_core/use-mock-routing", "safe_authenticator/use-mock-routing"]
+testing = ["safe_core/testing", "safe_authenticator/testing"]
 
 [lib]
 crate_type = ["staticlib", "rlib", "cdylib"]
