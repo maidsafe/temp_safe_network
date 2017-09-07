@@ -85,7 +85,7 @@ pub unsafe extern "C" fn mdata_permission_set_new(
 
 /// Allow the action in the permission set.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_permissions_set_allow(
+pub unsafe extern "C" fn mdata_permission_set_allow(
     app: *const App,
     set_h: MDataPermissionSetHandle,
     action: MDataAction,
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn mdata_permissions_set_allow(
 
 /// Deny the action in the permission set.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_permissions_set_deny(
+pub unsafe extern "C" fn mdata_permission_set_deny(
     app: *const App,
     set_h: MDataPermissionSetHandle,
     action: MDataAction,
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn mdata_permissions_set_deny(
 
 /// Clear the actions in the permission set.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_permissions_set_clear(
+pub unsafe extern "C" fn mdata_permission_set_clear(
     app: *const App,
     set_h: MDataPermissionSetHandle,
     action: MDataAction,
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn mdata_permissions_set_clear(
 
 /// Read the permission set.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_permissions_set_is_allowed(
+pub unsafe extern "C" fn mdata_permission_set_is_allowed(
     app: *const App,
     set_h: MDataPermissionSetHandle,
     action: MDataAction,
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn mdata_permissions_set_is_allowed(
 
 /// Free the permission set from memory.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_permissions_set_free(
+pub unsafe extern "C" fn mdata_permission_set_free(
     app: *const App,
     set_h: MDataPermissionSetHandle,
     user_data: *mut c_void,
@@ -231,27 +231,27 @@ pub unsafe extern "C" fn mdata_permissions_get(
 }
 
 /// Iterate over the permissions.
-/// The `each_cb` is called for each (user, permission set) pair in the permissions.
-/// The `done_cb` is called after the iterations is over, or in case of error.
+/// The `o_each_cb` is called for each (user, permission set) pair in the permissions.
+/// The `o_done_cb` is called after the iterations is over, or in case of error.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_for_each(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
-    each_cb: extern "C" fn(*mut c_void, SignKeyHandle, MDataPermissionSetHandle),
     user_data: *mut c_void,
-    done_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: extern "C" fn(*mut c_void, SignKeyHandle, MDataPermissionSetHandle),
+    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
-    catch_unwind_cb(user_data, done_cb, || {
+    catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        send_sync(app, user_data.0, done_cb, move |_, context| {
+        send_sync(app, user_data.0, o_done_cb, move |_, context| {
             let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             for (user_key, permission_set_h) in &*permissions {
                 let user_h = match *user_key {
                     User::Key(key) => context.object_cache().insert_sign_key(key),
                     User::Anyone => USER_ANYONE,
                 };
-                each_cb(user_data.0, user_h, *permission_set_h);
+                o_each_cb(user_data.0, user_h, *permission_set_h);
             }
 
             Ok(())
@@ -262,6 +262,11 @@ pub unsafe extern "C" fn mdata_permissions_for_each(
 /// Insert permission set for the given user to the permissions.
 ///
 /// To insert permissions for "Anyone", pass `USER_ANYONE` as the user handle.
+///
+/// Note: the permission sets are stored by reference, which means they must
+/// remain alive (not be disposed of with `mdata_permission_set_free`) until
+/// the whole permissions collection is no longer needed. The users, on the
+/// other hand, are stored by value (copied).
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_insert(
     app: *const App,
@@ -285,6 +290,9 @@ pub unsafe extern "C" fn mdata_permissions_insert(
 }
 
 /// Free the permissions from memory.
+///
+/// Note: this doesn't free the individual permission sets. Those have to be
+/// disposed of manually by calling `mdata_permission_set_free`.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_free(
     app: *const App,

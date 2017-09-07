@@ -130,25 +130,25 @@ pub unsafe extern "C" fn mdata_entries_get(
 
 /// Iterate over the entries.
 ///
-/// The `entry_cb` callback is invoked once for each entry,
+/// The `o_each_cb` callback is invoked once for each entry,
 /// passing user data, pointer to key, key length, pointer to value, value length
 /// and entry version in that order.
 ///
-/// The `o_cb` callback is invoked after the iteration is done, or in case of error.
+/// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_for_each(
     app: *const App,
     entries_h: MDataEntriesHandle,
-    entry_cb: extern "C" fn(*mut c_void, *const u8, usize, *const u8, usize, u64),
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: extern "C" fn(*mut c_void, *const u8, usize, *const u8, usize, u64),
+    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
-    catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        with_entries(app, entries_h, user_data.0, o_cb, move |entries| {
+        with_entries(app, entries_h, user_data.0, o_done_cb, move |entries| {
             for (key, value) in entries {
-                entry_cb(
+                o_each_cb(
                     user_data.0,
                     key.as_safe_ptr(),
                     key.len(),
@@ -194,24 +194,24 @@ pub unsafe extern "C" fn mdata_keys_len(
 
 /// Iterate over the keys.
 ///
-/// The `key_cb` callback is invoked once for each key,
+/// The `o_each_cb` callback is invoked once for each key,
 /// passing user data, pointer to key and key length.
 ///
-/// The `o_cb` callback is invoked after the iteration is done, or in case of error.
+/// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_keys_for_each(
     app: *const App,
     keys_h: MDataKeysHandle,
-    key_cb: unsafe extern "C" fn(*mut c_void, *const u8, usize),
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: unsafe extern "C" fn(*mut c_void, *const u8, usize),
+    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
-    catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        with_keys(app, keys_h, user_data.0, o_cb, move |keys| {
+        with_keys(app, keys_h, user_data.0, o_done_cb, move |keys| {
             for key in keys {
-                key_cb(user_data.0, key.as_safe_ptr(), key.len());
+                o_each_cb(user_data.0, key.as_safe_ptr(), key.len());
             }
 
             Ok(())
@@ -250,24 +250,24 @@ pub unsafe extern "C" fn mdata_values_len(
 
 /// Iterate over the values.
 ///
-/// The `value_cb` callback is invoked once for each value,
+/// The `o_each_cb` callback is invoked once for each value,
 /// passing user data, pointer to value, value length and entry version.
 ///
-/// The `o_cb` callback is invoked after the iteration is done, or in case of error.
+/// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_values_for_each(
     app: *const App,
     values_h: MDataValuesHandle,
-    value_cb: unsafe extern "C" fn(*mut c_void, *const u8, usize, u64),
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: unsafe extern "C" fn(*mut c_void, *const u8, usize, u64),
+    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
 ) {
-    catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        with_values(app, values_h, user_data.0, o_cb, move |values| {
+        with_values(app, values_h, user_data.0, o_done_cb, move |values| {
             for value in values {
-                value_cb(
+                o_each_cb(
                     user_data.0,
                     value.content.as_safe_ptr(),
                     value.content.len(),
@@ -475,7 +475,7 @@ mod tests {
 
         unsafe {
             let user_data: *mut _ = &mut user_data;
-            mdata_entries_for_each(&app, handle, entry_cb, user_data as *mut c_void, done_cb)
+            mdata_entries_for_each(&app, handle, user_data as *mut c_void, entry_cb, done_cb)
         }
 
         unwrap!(rx.recv());
