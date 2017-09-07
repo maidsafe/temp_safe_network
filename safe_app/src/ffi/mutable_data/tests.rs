@@ -1143,20 +1143,20 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_permissions_set_allow(&app, perms_set_h, MDataAction::Insert, ud, cb)
+            mdata_permission_set_allow(&app, perms_set_h, MDataAction::Insert, ud, cb)
         }))
     };
 
     let permission_value: PermissionValue = unsafe {
         unwrap!(call_1(|ud, cb| {
-            mdata_permissions_set_is_allowed(&app, perms_set_h, MDataAction::Insert, ud, cb)
+            mdata_permission_set_is_allowed(&app, perms_set_h, MDataAction::Insert, ud, cb)
         }))
     };
     assert_eq!(permission_value, PermissionValue::Allowed);
 
     let permission_value: PermissionValue = unsafe {
         unwrap!(call_1(|ud, cb| {
-            mdata_permissions_set_is_allowed(&app, perms_set_h, MDataAction::Update, ud, cb)
+            mdata_permission_set_is_allowed(&app, perms_set_h, MDataAction::Update, ud, cb)
         }))
     };
     assert_eq!(permission_value, PermissionValue::NotSet);
@@ -1274,14 +1274,14 @@ fn entries_crud_ffi() {
     };
     let permission_value: PermissionValue = unsafe {
         unwrap!(call_1(|ud, cb| {
-            mdata_permissions_set_is_allowed(&app, read_perms_h, MDataAction::Insert, ud, cb)
+            mdata_permission_set_is_allowed(&app, read_perms_h, MDataAction::Insert, ud, cb)
         }))
     };
     assert_eq!(permission_value, PermissionValue::Allowed);
 
     let permission_value: PermissionValue = unsafe {
         unwrap!(call_1(|ud, cb| {
-            mdata_permissions_set_is_allowed(&app, read_perms_h, MDataAction::Update, ud, cb)
+            mdata_permission_set_is_allowed(&app, read_perms_h, MDataAction::Update, ud, cb)
         }))
     };
     assert_eq!(permission_value, PermissionValue::NotSet);
@@ -1452,7 +1452,7 @@ fn entries_crud_ffi() {
         let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
         let ud = sender_as_user_data(&tx);
 
-        unsafe { mdata_keys_for_each(&app, keys_list_h, iter_vec_u8_cb, ud, iter_done_cb) };
+        unsafe { mdata_keys_for_each(&app, keys_list_h, ud, iter_vec_u8_cb, iter_done_cb) };
 
         let mut result: Vec<Option<Vec<u8>>> = Vec::new();
         result.push(unwrap!(rx.recv_timeout(Duration::from_millis(1000))));
@@ -1489,7 +1489,7 @@ fn entries_crud_ffi() {
         let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
         let ud = sender_as_user_data(&tx);
 
-        unsafe { mdata_values_for_each(&app, vals_list_h, iter_value_cb, ud, iter_done_cb) };
+        unsafe { mdata_values_for_each(&app, vals_list_h, ud, iter_value_cb, iter_done_cb) };
 
         let mut result: Vec<Option<Vec<u8>>> = Vec::new();
         result.push(unwrap!(rx.recv_timeout(Duration::from_millis(1000))));
