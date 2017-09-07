@@ -262,6 +262,11 @@ pub unsafe extern "C" fn mdata_permissions_for_each(
 /// Insert permission set for the given user to the permissions.
 ///
 /// To insert permissions for "Anyone", pass `USER_ANYONE` as the user handle.
+///
+/// Note: the permission sets are stored by reference, which means they must
+/// remain alive (not be disposed of with `mdata_permission_set_free`) until
+/// the whole permissions collection is no longer needed. The users, on the
+/// other hand, are stored by value (copied).
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_insert(
     app: *const App,
@@ -285,6 +290,9 @@ pub unsafe extern "C" fn mdata_permissions_insert(
 }
 
 /// Free the permissions from memory.
+///
+/// Note: this doesn't free the individual permission sets. Those have to be
+/// disposed of manually by calling `mdata_permission_set_free`.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_free(
     app: *const App,
