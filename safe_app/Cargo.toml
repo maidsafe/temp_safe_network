@@ -8,6 +8,7 @@ name = "safe_app"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.3.2"
+build = "build.rs"
 
 [dependencies]
 config_file_handler = "~0.8.1"
@@ -37,6 +38,10 @@ features = ["testing"]
 path = "../safe_core"
 version = "~0.26.1"
 features = ["testing"]
+
+[build-dependencies]
+ffi_utils = { path = "../ffi_utils", version = "~0.2.0" }
+unwrap = "~1.1.0"
 
 [features]
 use-mock-routing = ["safe_core/use-mock-routing", "safe_authenticator/use-mock-routing"]
