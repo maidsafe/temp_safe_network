@@ -70,6 +70,7 @@ extern crate unwrap;
 pub mod ffi;
 
 pub use ffi::*;
+pub use ffi::arrays::*;
 pub use ffi::ipc::req::*;
 pub use ffi::ipc::resp::*;
 pub use ffi::nfs::*;
@@ -89,8 +90,6 @@ pub mod nfs;
 pub mod self_encryption_storage;
 /// Cryptographic utilities
 pub mod crypto;
-/// Type definitions for arrays that are FFI input params
-pub mod arrays;
 
 mod client;
 mod errors;
