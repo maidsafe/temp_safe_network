@@ -99,7 +99,7 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(
     });
 }
 
-/// Close Self Encryptor
+/// Close Self Encryptor and free the Self Encryptor Writer handle
 #[no_mangle]
 pub unsafe extern "C" fn idata_close_self_encryptor(
     app: *const App,

@@ -40,7 +40,7 @@ pub unsafe extern "C" fn create_acc(
     invitation: *const c_char,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
+    o_network_obs_cb: extern "C" fn(*mut c_void, i32, i32),
     o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -294,8 +294,10 @@ mod tests {
             unsafe { auth_free(auth) };
         }
 
-        unsafe extern "C" fn net_event_cb(user_data: *mut c_void, err_code: i32, event: i32) {
-            send_via_user_data(user_data, (err_code, event));
+        extern "C" fn net_event_cb(user_data: *mut c_void, err_code: i32, event: i32) {
+            unsafe {
+                send_via_user_data(user_data, (err_code, event));
+            }
         }
     }
 
@@ -344,7 +346,7 @@ mod tests {
         unsafe { auth_free(auth) };
     }
 
-    unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
+    extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
         assert_eq!(err_code, 0);
     }
 }

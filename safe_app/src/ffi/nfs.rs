@@ -18,7 +18,8 @@
 use {App, AppContext};
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str,
+                vec_clone_from_raw_parts};
 use futures::Future;
 use futures::future::{self, Either};
 use object_cache::{FileContextHandle, MDataInfoHandle};
@@ -27,7 +28,6 @@ use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::ffi::File;
 use std::os::raw::{c_char, c_void};
-use std::slice;
 
 /// Holds context for file operations, depending on the mode.
 pub struct FileContext {
@@ -280,14 +280,14 @@ pub unsafe extern "C" fn file_write(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let data = slice::from_raw_parts(data, size);
+        let data = vec_clone_from_raw_parts(data, size);
 
         (*app).send(move |_client, context| {
             let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
 
             if let Some(ref writer) = file_ctx.writer {
                 writer
-                    .write(data)
+                    .write(&data)
                     .then(move |res| {
                         call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                         Ok(())
@@ -309,6 +309,8 @@ pub unsafe extern "C" fn file_write(
 /// file structure as a result. If the file was opened in the read mode,
 /// returns the original file structure that was passed as an argument to
 /// `file_open`.
+///
+/// Frees the file context handle.
 #[no_mangle]
 pub unsafe extern "C" fn file_close(
     app: *const App,

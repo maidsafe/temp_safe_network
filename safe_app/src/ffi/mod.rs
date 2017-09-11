@@ -62,7 +62,7 @@ pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_len: usize,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_observer_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32),
+    o_network_observer_cb: extern "C" fn(*mut c_void, FfiResult, i32),
     o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -100,7 +100,7 @@ pub unsafe extern "C" fn app_registered(
     auth_granted: *const FfiAuthGranted,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_observer_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32),
+    o_network_observer_cb: extern "C" fn(*mut c_void, FfiResult, i32),
     o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -295,8 +295,10 @@ mod tests {
             unsafe { app_free(app) };
         }
 
-        unsafe extern "C" fn net_event_cb(user_data: *mut c_void, res: FfiResult, event: i32) {
-            send_via_user_data(user_data, (res.error_code, event));
+        extern "C" fn net_event_cb(user_data: *mut c_void, res: FfiResult, event: i32) {
+            unsafe {
+                send_via_user_data(user_data, (res.error_code, event));
+            }
         }
     }
 }
