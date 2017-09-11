@@ -18,7 +18,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn encrypt(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let plaintext = slice::from_raw_parts(data, len);
+        let plaintext = vec_clone_from_raw_parts(data, len);
 
         (*app).send(move |_, context| {
             let pk = try_cb!(
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn encrypt(
 
             let nonce = box_::gen_nonce();
 
-            let ciphertext = box_::seal(plaintext, &nonce, &pk, &sk);
+            let ciphertext = box_::seal(&plaintext, &nonce, &pk, &sk);
 
             match serialise(&(nonce, ciphertext)) {
                 Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
@@ -280,7 +280,7 @@ pub unsafe extern "C" fn decrypt(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let plaintext = slice::from_raw_parts(data, len);
+        let plaintext = vec_clone_from_raw_parts(data, len);
 
         (*app).send(move |_, context| {
             let pk = try_cb!(
@@ -290,7 +290,7 @@ pub unsafe extern "C" fn decrypt(
             );
             let sk = try_cb!(context.object_cache().get_secret_key(sk_h), user_data, o_cb);
 
-            match deserialise::<(box_::Nonce, Vec<u8>)>(plaintext) {
+            match deserialise::<(box_::Nonce, Vec<u8>)>(&plaintext) {
                 Ok((nonce, ciphertext)) => {
                     let plaintext =
                         try_cb!(box_::open(&ciphertext, &nonce, &pk, &sk)
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
     o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let plaintext = slice::from_raw_parts(data, len);
+        let plaintext = vec_clone_from_raw_parts(data, len);
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |_, context| {
@@ -334,7 +334,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
                 o_cb
             );
 
-            let ciphertext = sealedbox::seal(plaintext, &pk);
+            let ciphertext = sealedbox::seal(&plaintext, &pk);
             o_cb(
                 user_data.0,
                 FFI_RESULT_OK,
@@ -361,7 +361,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let plaintext = slice::from_raw_parts(data, len);
+        let plaintext = vec_clone_from_raw_parts(data, len);
 
         (*app).send(move |_, context| {
             let pk = try_cb!(
@@ -372,7 +372,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
             let sk = try_cb!(context.object_cache().get_secret_key(sk_h), user_data, o_cb);
 
             let plaintext =
-                try_cb!(sealedbox::open(plaintext, &pk, &sk)
+                try_cb!(sealedbox::open(&plaintext, &pk, &sk)
                                     .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
             o_cb(
                 user_data.0,

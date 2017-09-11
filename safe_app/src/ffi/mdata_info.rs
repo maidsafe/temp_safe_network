@@ -27,7 +27,6 @@ use rust_sodium::crypto::secretbox;
 use safe_core::MDataInfo;
 use safe_core::ffi::{SymNonce, SymSecretKey, XorNameArray};
 use std::os::raw::c_void;
-use std::slice;
 
 /// Create non-encrypted mdata info with explicit data name.
 #[no_mangle]
@@ -117,7 +116,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let input = slice::from_raw_parts(input_ptr, input_len).to_vec();
+        let input = vec_clone_from_raw_parts(input_ptr, input_len);
 
         (*app).send(move |_, context| {
             let info = try_cb!(
