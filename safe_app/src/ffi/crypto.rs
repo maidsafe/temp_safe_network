@@ -23,7 +23,7 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
 use safe_core::crypto::shared_box;
-use safe_core::ffi::{AsymNonce, AsymPublicKey, AsymSecretKey};
+use safe_core::ffi::{AsymNonce, AsymPublicKey, AsymSecretKey, SignPublicKey};
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn app_pub_sign_key(
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_new(
     app: *const App,
-    data: *const AsymPublicKey,
+    data: *const SignPublicKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, SignKeyHandle),
 ) {
@@ -65,7 +65,7 @@ pub unsafe extern "C" fn sign_key_get(
     app: *const App,
     handle: SignKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymPublicKey),
+    o_cb: extern "C" fn(*mut c_void, FfiResult, *const SignPublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -625,7 +625,7 @@ mod tests {
             assert_eq!(box_::PublicKey(app_public_key1), *app_public_key2);
 
             let app_secret_key2 = unwrap!(context.object_cache().get_secret_key(app_secret_key1_h));
-            assert_eq!(box_::SecretKey(app_secret_key1), *app_secret_key2);
+            assert_eq!(app_secret_key1, app_secret_key2.0);
 
             app_secret_key1
         });
@@ -644,7 +644,7 @@ mod tests {
 
         run_now(&app, move |_, context| {
             let app_secret_key2 = unwrap!(context.object_cache().get_secret_key(app_secret_key2_h));
-            assert_eq!(box_::SecretKey(app_secret_key1), *app_secret_key2);
+            assert_eq!(app_secret_key1, app_secret_key2.0);
         });
 
         unsafe {
