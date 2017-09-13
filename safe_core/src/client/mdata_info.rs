@@ -145,22 +145,19 @@ impl MDataInfo {
 
     /// Convert into C-representation.
     pub fn into_repr_c(self) -> FfiMDataInfo {
-        if let Some((key, nonce)) = self.enc_info {
-            FfiMDataInfo {
-                name: self.name.0,
-                type_tag: self.type_tag,
-                is_private: true,
-                enc_key: key.0,
-                enc_nonce: nonce.0,
-            }
-        } else {
-            FfiMDataInfo {
-                name: self.name.0,
-                type_tag: self.type_tag,
-                is_private: false,
-                enc_key: SymSecretKey::default(),
-                enc_nonce: SymNonce::default(),
-            }
+        let (has_enc_info, enc_key, enc_nonce) = enc_info_into_repr_c(self.enc_info);
+        let (has_new_enc_info, new_enc_key, new_enc_nonce) =
+            enc_info_into_repr_c(self.new_enc_info);
+
+        FfiMDataInfo {
+            name: self.name.0,
+            type_tag: self.type_tag,
+            has_enc_info,
+            enc_key,
+            enc_nonce,
+            has_new_enc_info,
+            new_enc_key,
+            new_enc_nonce,
         }
     }
 }
@@ -284,24 +281,37 @@ impl ReprC for MDataInfo {
     type Error = IpcError;
 
     #[allow(unsafe_code)]
-    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let repr_c = &*repr_c;
-
-        let enc_info = if repr_c.is_private {
-            Some((
-                secretbox::Key(repr_c.enc_key),
-                secretbox::Nonce(repr_c.enc_nonce),
-            ))
-        } else {
-            None
-        };
+    unsafe fn clone_from_repr_c(c: Self::C) -> Result<Self, Self::Error> {
+        let c = &*c;
 
         Ok(MDataInfo {
-            name: XorName(repr_c.name),
-            type_tag: repr_c.type_tag,
-            enc_info: enc_info,
-            new_enc_info: None,
+            name: XorName(c.name),
+            type_tag: c.type_tag,
+            enc_info: enc_info_from_repr_c(c.has_enc_info, c.enc_key, c.enc_nonce),
+            new_enc_info: enc_info_from_repr_c(c.has_new_enc_info, c.new_enc_key, c.new_enc_nonce),
         })
+    }
+}
+
+fn enc_info_into_repr_c(
+    info: Option<(secretbox::Key, secretbox::Nonce)>,
+) -> (bool, SymSecretKey, SymNonce) {
+    if let Some((key, nonce)) = info {
+        (true, key.0, nonce.0)
+    } else {
+        (false, Default::default(), Default::default())
+    }
+}
+
+fn enc_info_from_repr_c(
+    is_set: bool,
+    key: SymSecretKey,
+    nonce: SymNonce,
+) -> Option<(secretbox::Key, secretbox::Nonce)> {
+    if is_set {
+        Some((secretbox::Key(key), secretbox::Nonce(nonce)))
+    } else {
+        None
     }
 }
 
