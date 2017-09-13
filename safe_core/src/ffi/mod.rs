@@ -58,11 +58,20 @@ pub struct MDataInfo {
     /// Type tag of the mutable data.
     pub type_tag: u64,
 
-    /// Flag indicating whether the mutable data is private or public. If private,
-    /// the `enc_key` and `enc_nonce` fields contain encryption details.
-    pub is_private: bool,
-    /// Encryption key. Meaningful only if `is_private` is `true`.
+    /// Flag indicating whether the encryption info (`enc_key` and `enc_nonce`)
+    /// is set.
+    pub has_enc_info: bool,
+    /// Encryption key. Meaningful only if `has_enc_info` is `true`.
     pub enc_key: SymSecretKey,
-    /// Encryption nonce. Meaningful only if `is_private` is `true`.
+    /// Encryption nonce. Meaningful only if `has_enc_info` is `true`.
     pub enc_nonce: SymNonce,
+
+    /// Flag indicating whether the new encryption info is set.
+    pub has_new_enc_info: bool,
+    /// New encryption key (used for two-phase reencryption). Meaningful only if
+    /// `has_new_enc_info` is `true`.
+    pub new_enc_key: SymSecretKey,
+    /// New encryption nonce (used for two-phase reencryption). Meaningful only if
+    /// `has_new_enc_info` is `true`.
+    pub new_enc_nonce: SymNonce,
 }
