@@ -20,12 +20,13 @@ use ffi_utils::{FfiResult, ReprC};
 use ffi_utils::test_utils::{send_via_user_data, sender_as_user_data};
 use routing::XorName;
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcMsg, IpcReq, Permission, ShareMDataReq};
+use safe_core::ipc::req::ContainerPermissions;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::req::ffi::ShareMDataReq as FfiShareMDataReq;
 use safe_core::ipc::resp::UserMetadata;
 use safe_core::ipc::resp::ffi::MetadataResponse as FfiUserMetadata;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::slice;
@@ -41,7 +42,7 @@ pub type ChannelType = Result<(IpcMsg, Option<Payload>), (i32, Option<IpcMsg>)>;
 
 // Creates a containers request asking for "documents with permission to
 // insert", and "videos with all the permissions possible",
-pub fn create_containers_req() -> HashMap<String, BTreeSet<Permission>> {
+pub fn create_containers_req() -> HashMap<String, ContainerPermissions> {
     let mut containers = HashMap::new();
     let _ = containers.insert("_documents".to_owned(), btree_set![Permission::Insert]);
     let _ = containers.insert(

@@ -31,7 +31,6 @@ use test_utils::{access_container, create_account_and_login, create_authenticato
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing {
     use super::*;
-    use AccessContainerEntry;
     use AuthFuture;
     use access_container;
     use app_auth::{AppState, app_state};
@@ -44,6 +43,7 @@ mod mock_routing {
     use safe_core::MockRouting;
     use safe_core::ipc::{IpcError, Permission};
     use safe_core::ipc::req::container_perms_into_permission_set;
+    use safe_core::ipc::resp::AccessContainerEntry;
     use std::collections::HashMap;
     use std::iter;
     use std::thread;

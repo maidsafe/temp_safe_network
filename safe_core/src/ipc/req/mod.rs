@@ -94,7 +94,7 @@ where
 }
 
 /// Transform a set of container permissions into its FFI representation
-fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet {
+pub fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet {
     let mut output = FfiPermissionSet::default();
 
     for perm in perms {

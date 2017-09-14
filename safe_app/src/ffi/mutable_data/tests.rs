@@ -15,17 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
 use futures::Future;
 use maidsafe_utilities::thread;
 use rand::{OsRng, Rng};
-use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value,
-              XOR_NAME_LEN, XorName};
+use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use safe_core::{CoreError, DIR_TAG, FutureExt};
 use safe_core::utils::test_utils::random_client;
 use std::collections::{BTreeMap, BTreeSet};
+use std::mem;
+use std::os::raw::c_void;
 use std::sync::mpsc;
-use std::time::Duration;
 use test_utils::{create_app, run};
 
 // MD created by App. App lists its own sign_pk in owners field: Put should
@@ -1122,15 +1123,16 @@ fn entries_crud() {
 // Test `MutableData` functions from the FFI point of view.
 #[test]
 fn entries_crud_ffi() {
+    use safe_core::MDataInfo;
     use ffi::mdata_info::*;
     use ffi::mutable_data::*;
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
     use ffi::mutable_data::entries::*;
     use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
-    use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8, send_via_user_data,
+    use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data,
                                 sender_as_user_data};
-    use object_cache::{MDataInfoHandle, MDataPermissionSetHandle, MDataPermissionsHandle};
+    use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle};
 
     let app = create_app();
 
@@ -1172,22 +1174,20 @@ fn entries_crud_ffi() {
     };
 
     // Try to create an empty public MD
-    let md_info_pub_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_public(&app, 10000, ud, cb),
-        ))
-    };
+    let md_info_pub: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+    let md_info_pub = md_info_pub.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
     // Try to create a MD instance using the same name & type tag - it should fail.
     let res = unsafe {
         call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub, perms_h, ENTRIES_EMPTY, ud, cb)
         })
     };
     match res {
@@ -1196,20 +1196,17 @@ fn entries_crud_ffi() {
     }
 
     // Try to create a MD instance using the same name & a different type tag - it should pass.
-    let (xor_name, _type_tag): ([u8; XOR_NAME_LEN], u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            mdata_info_extract_name_and_type_tag(&app, md_info_pub_h, ud, cb)
-        }))
+    let xor_name = md_info_pub.name;
+    let md_info_pub_2: MDataInfo = unsafe {
+        unwrap!(call_1(
+            |ud, cb| mdata_info_new_public(&xor_name, 10001, ud, cb),
+        ))
     };
-    let md_info_pub_2_h: MDataInfoHandle = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            mdata_info_new_public(&app, &xor_name, 10001, ud, cb)
-        }))
-    };
+    let md_info_pub_2 = md_info_pub_2.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_pub_2_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_pub_2, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
@@ -1234,7 +1231,7 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)
+            mdata_mutate_entries(&app, &md_info_pub, actions_h, ud, cb)
         }))
     }
 
@@ -1246,7 +1243,7 @@ fn entries_crud_ffi() {
         unsafe {
             mdata_get_value(
                 &app,
-                md_info_pub_h,
+                &md_info_pub,
                 KEY.as_ptr(),
                 KEY.len(),
                 ud,
@@ -1261,7 +1258,7 @@ fn entries_crud_ffi() {
     // Check the version of a public MD
     let ver: u64 = unsafe {
         unwrap!(call_1(
-            |ud, cb| mdata_get_version(&app, md_info_pub_h, ud, cb),
+            |ud, cb| mdata_get_version(&app, &md_info_pub, ud, cb),
         ))
     };
     assert_eq!(ver, 0);
@@ -1269,7 +1266,7 @@ fn entries_crud_ffi() {
     // Check permissions
     let read_perms_h: MDataPermissionSetHandle = unsafe {
         unwrap!(call_1(|ud, cb| {
-            mdata_list_user_permissions(&app, md_info_pub_h, USER_ANYONE, ud, cb)
+            mdata_list_user_permissions(&app, &md_info_pub, USER_ANYONE, ud, cb)
         }))
     };
     let permission_value: PermissionValue = unsafe {
@@ -1287,34 +1284,25 @@ fn entries_crud_ffi() {
     assert_eq!(permission_value, PermissionValue::NotSet);
 
     // Try to create a private MD
-    let md_info_priv_h = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_random_private(&app, 10001, ud, cb),
-        ))
-    };
+    let md_info_priv: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(10001, ud, cb))) };
+    let md_info_priv = md_info_priv.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_put(&app, md_info_priv_h, perms_h, ENTRIES_EMPTY, ud, cb)
+            mdata_put(&app, &md_info_priv, perms_h, ENTRIES_EMPTY, ud, cb)
         }))
     };
 
     // Try to add entries to a private MD
     let key_enc = unsafe {
         unwrap!(call_vec_u8(|ud, cb| {
-            mdata_info_encrypt_entry_key(&app, md_info_priv_h, KEY.as_ptr(), KEY.len(), ud, cb)
+            mdata_info_encrypt_entry_key(&md_info_priv, KEY.as_ptr(), KEY.len(), ud, cb)
         }))
     };
     let value_enc = unsafe {
         unwrap!(call_vec_u8(|ud, cb| {
-            mdata_info_encrypt_entry_value(
-                &app,
-                md_info_priv_h,
-                VALUE.as_ptr(),
-                VALUE.len(),
-                ud,
-                cb,
-            )
+            mdata_info_encrypt_entry_value(&md_info_priv, VALUE.as_ptr(), VALUE.len(), ud, cb)
         }))
     };
 
@@ -1338,7 +1326,7 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
-            mdata_mutate_entries(&app, md_info_priv_h, actions_priv_h, ud, cb)
+            mdata_mutate_entries(&app, &md_info_priv, actions_priv_h, ud, cb)
         }))
     }
 
@@ -1346,14 +1334,14 @@ fn entries_crud_ffi() {
     {
         let size: u64 = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_serialised_size(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_serialised_size(&app, &md_info_priv, ud, cb),
             ))
         };
         assert!(size > 0);
 
         let size: u64 = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_serialised_size(&app, md_info_pub_h, ud, cb),
+                |ud, cb| mdata_serialised_size(&app, &md_info_pub, ud, cb),
             ))
         };
         assert!(size > 0);
@@ -1367,7 +1355,7 @@ fn entries_crud_ffi() {
         unsafe {
             mdata_get_value(
                 &app,
-                md_info_priv_h,
+                &md_info_priv,
                 key_enc.as_ptr(),
                 key_enc.len(),
                 ud,
@@ -1382,8 +1370,7 @@ fn entries_crud_ffi() {
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
                 mdata_info_decrypt(
-                    &app,
-                    md_info_priv_h,
+                    &md_info_priv,
                     got_value_enc.as_ptr(),
                     got_value_enc.len(),
                     ud,
@@ -1398,7 +1385,7 @@ fn entries_crud_ffi() {
     {
         let entries_list_h = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_entries(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_list_entries(&app, &md_info_priv, ud, cb),
             ))
         };
 
@@ -1423,8 +1410,7 @@ fn entries_crud_ffi() {
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
                 mdata_info_decrypt(
-                    &app,
-                    md_info_priv_h,
+                    &md_info_priv,
                     got_value_enc.as_ptr(),
                     got_value_enc.len(),
                     ud,
@@ -1443,76 +1429,48 @@ fn entries_crud_ffi() {
 
     // Check mdata_list_keys
     {
-        let keys_list_h = unsafe {
+        let keys_list_h: MDataKeysHandle = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_keys(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_list_keys(&app, &md_info_priv, ud, cb),
             ))
         };
 
-        let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
-        let ud = sender_as_user_data(&tx);
+        let result = unsafe {
+            call_keys(|ud, iter_cb, done_cb| {
+                mdata_keys_for_each(&app, keys_list_h, ud, iter_cb, done_cb)
+            })
+        };
 
-        unsafe { mdata_keys_for_each(&app, keys_list_h, ud, iter_vec_u8_cb, iter_done_cb) };
-
-        let mut result: Vec<Option<Vec<u8>>> = Vec::new();
-        result.push(unwrap!(rx.recv_timeout(Duration::from_millis(1000))));
-        result.push(unwrap!(rx.recv_timeout(Duration::from_millis(1000))));
-        assert_eq!(result.len(), 2);
-
-        if let Some(ref got_key_enc) = result[0] {
-            let decrypted = unsafe {
-                unwrap!(call_vec_u8(|ud, cb| {
-                    mdata_info_decrypt(
-                        &app,
-                        md_info_priv_h,
-                        got_key_enc.as_ptr(),
-                        got_key_enc.len(),
-                        ud,
-                        cb,
-                    )
-                }))
-            };
-            assert_eq!(&decrypted, &KEY, "decrypted invalid key");
-        } else {
-            panic!("Failed test: expected Some(Vec<u8>), got None");
-        }
+        assert_eq!(result.len(), 1);
+        let decrypted = unsafe {
+            unwrap!(call_vec_u8(|ud, cb| {
+                mdata_info_decrypt(&md_info_priv, result[0].as_ptr(), result[0].len(), ud, cb)
+            }))
+        };
+        assert_eq!(&decrypted, &KEY, "decrypted invalid key");
     }
 
     // Check mdata_list_values
     {
-        let vals_list_h = unsafe {
+        let vals_list_h: MDataValuesHandle = unsafe {
             unwrap!(call_1(
-                |ud, cb| mdata_list_values(&app, md_info_priv_h, ud, cb),
+                |ud, cb| mdata_list_values(&app, &md_info_priv, ud, cb),
             ))
         };
 
-        let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
-        let ud = sender_as_user_data(&tx);
+        let result = unsafe {
+            call_values(|ud, iter_cb, done_cb| {
+                mdata_values_for_each(&app, vals_list_h, ud, iter_cb, done_cb)
+            })
+        };
 
-        unsafe { mdata_values_for_each(&app, vals_list_h, ud, iter_value_cb, iter_done_cb) };
-
-        let mut result: Vec<Option<Vec<u8>>> = Vec::new();
-        result.push(unwrap!(rx.recv_timeout(Duration::from_millis(1000))));
-        result.push(unwrap!(rx.recv_timeout(Duration::from_millis(1000))));
-        assert_eq!(result.len(), 2);
-
-        if let Some(ref got_value_enc) = result[0] {
-            let decrypted = unsafe {
-                unwrap!(call_vec_u8(|ud, cb| {
-                    mdata_info_decrypt(
-                        &app,
-                        md_info_priv_h,
-                        got_value_enc.as_ptr(),
-                        got_value_enc.len(),
-                        ud,
-                        cb,
-                    )
-                }))
-            };
-            assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
-        } else {
-            panic!("Failed test: expected Some(Vec<u8>), got None");
-        }
+        assert_eq!(result.len(), 1);
+        let decrypted = unsafe {
+            unwrap!(call_vec_u8(|ud, cb| {
+                mdata_info_decrypt(&md_info_priv, result[0].as_ptr(), result[0].len(), ud, cb)
+            }))
+        };
+        assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
     }
 
     extern "C" fn get_value_cb(
@@ -1531,24 +1489,88 @@ fn entries_crud_ffi() {
             send_via_user_data(user_data, result);
         }
     }
+}
 
-    extern "C" fn iter_value_cb(user_data: *mut c_void, val: *const u8, len: usize, _version: u64) {
-        let result: Option<Vec<u8>> = Some(unsafe { vec_clone_from_raw_parts(val, len) });
-        unsafe {
-            send_via_user_data(user_data, result);
+// Helper function to call FFI function that iterates over mdata entry keys.
+unsafe fn call_keys<F>(f: F) -> Vec<Vec<u8>>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(*mut c_void, *const u8, usize),
+           extern "C" fn(*mut c_void, FfiResult)),
+{
+    let mut context = EntriesContext::new();
+    f(
+        context.user_data(),
+        EntriesContext::keys_cb,
+        EntriesContext::done_cb,
+    );
+    context.take_result()
+}
+
+// Helper function to call FFI function that iterates over mdata entry values.
+unsafe fn call_values<F>(f: F) -> Vec<Vec<u8>>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(*mut c_void, *const u8, usize, u64),
+           extern "C" fn(*mut c_void, FfiResult)),
+{
+    let mut context = EntriesContext::new();
+    f(
+        context.user_data(),
+        EntriesContext::values_cb,
+        EntriesContext::done_cb,
+    );
+    context.take_result()
+}
+
+struct EntriesContext {
+    tx: mpsc::Sender<()>,
+    rx: mpsc::Receiver<()>,
+    items: Vec<Vec<u8>>,
+}
+
+impl EntriesContext {
+    fn new() -> Self {
+        let (tx, rx) = mpsc::channel();
+        EntriesContext {
+            tx,
+            rx,
+            items: Vec::new(),
         }
     }
 
-    extern "C" fn iter_vec_u8_cb(user_data: *mut c_void, val: *const u8, len: usize) {
-        let result: Option<Vec<u8>> = Some(unsafe { vec_clone_from_raw_parts(val, len) });
+    fn user_data(&mut self) -> *mut c_void {
+        let ptr: *mut _ = self;
+        ptr as *mut c_void
+    }
+
+    fn take_result(&mut self) -> Vec<Vec<u8>> {
+        unwrap!(self.rx.recv());
+        mem::replace(&mut self.items, Vec::new())
+    }
+
+    extern "C" fn values_cb(user_data: *mut c_void, val: *const u8, len: usize, _version: u64) {
         unsafe {
-            send_via_user_data(user_data, result);
+            let data = vec_clone_from_raw_parts(val, len);
+
+            let context = user_data as *mut Self;
+            (*context).items.push(data);
         }
     }
 
-    extern "C" fn iter_done_cb(user_data: *mut c_void, _res: FfiResult) {
+    extern "C" fn keys_cb(user_data: *mut c_void, val: *const u8, len: usize) {
         unsafe {
-            send_via_user_data::<Option<Vec<u8>>>(user_data, None);
+            let data = vec_clone_from_raw_parts(val, len);
+
+            let context = user_data as *mut Self;
+            (*context).items.push(data);
+        }
+    }
+
+    extern "C" fn done_cb(user_data: *mut c_void, _res: FfiResult) {
+        unsafe {
+            let context = user_data as *const Self;
+            unwrap!((*context).tx.send(()));
         }
     }
 }

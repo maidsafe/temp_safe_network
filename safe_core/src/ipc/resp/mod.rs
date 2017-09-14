@@ -23,12 +23,14 @@ pub mod ffi;
 use client::MDataInfo;
 use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::IpcError;
-use ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
-use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
+use ipc::req::{ContainerPermissions, container_perms_from_repr_c, container_perms_into_repr_c,
+               permission_set_clone_from_repr_c, permission_set_into_repr_c};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
 use routing::PermissionSet;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use rust_sodium::crypto::sign::PublicKey;
+use std::collections::HashMap;
 use std::ffi::{CString, NulError};
 use std::ptr;
 use std::slice;
@@ -62,29 +64,35 @@ pub enum IpcResp {
 pub struct AuthGranted {
     /// The access keys.
     pub app_keys: AppKeys,
+
     /// The crust config.
-    ///
     /// Useful to reuse bootstrap nodes and speed up access.
     pub bootstrap_config: BootstrapConfig,
-    /// Access container
-    pub access_container: AccessContInfo,
+
+    /// Access container info
+    pub access_container_info: AccessContInfo,
+    /// Access container entry
+    pub access_container_entry: AccessContainerEntry,
 }
 
 impl AuthGranted {
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> Result<ffi::AuthGranted, SerialisationError> {
+    pub fn into_repr_c(self) -> Result<ffi::AuthGranted, IpcError> {
         let AuthGranted {
             app_keys,
             bootstrap_config,
-            access_container,
+            access_container_info,
+            access_container_entry,
         } = self;
         let bootstrap_config = serialise(&bootstrap_config)?;
         let (ptr, len, cap) = vec_into_raw_parts(bootstrap_config);
+
         Ok(ffi::AuthGranted {
             app_keys: app_keys.into_repr_c(),
-            access_container: access_container.into_repr_c(),
+            access_container_info: access_container_info.into_repr_c(),
+            access_container_entry: access_container_entry_into_repr_c(access_container_entry)?,
             bootstrap_config_ptr: ptr,
             bootstrap_config_len: len,
             bootstrap_config_cap: cap,
@@ -99,9 +107,10 @@ impl ReprC for AuthGranted {
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         let ffi::AuthGranted {
             app_keys,
-            access_container,
             bootstrap_config_ptr,
             bootstrap_config_len,
+            access_container_info,
+            ref access_container_entry,
             ..
         } = *repr_c;
         let bootstrap_config = slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
@@ -109,7 +118,10 @@ impl ReprC for AuthGranted {
         Ok(AuthGranted {
             app_keys: AppKeys::clone_from_repr_c(app_keys)?,
             bootstrap_config: bootstrap_config,
-            access_container: AccessContInfo::clone_from_repr_c(access_container)?,
+            access_container_info: AccessContInfo::clone_from_repr_c(access_container_info)?,
+            access_container_entry: access_container_entry_clone_from_repr_c(
+                access_container_entry,
+            )?,
         })
     }
 }
@@ -186,6 +198,45 @@ impl ReprC for AppKeys {
             enc_sk: box_::SecretKey(raw.enc_sk),
         })
     }
+}
+
+/// Represents an entry for a single app in the access container
+pub type AccessContainerEntry = HashMap<String, (MDataInfo, ContainerPermissions)>;
+
+/// Convert `AccessContainerEntry` to FFI representation.
+pub fn access_container_entry_into_repr_c(
+    entry: AccessContainerEntry,
+) -> Result<ffi::AccessContainerEntry, NulError> {
+    let mut vec = Vec::with_capacity(entry.len());
+
+    for (name, (mdata_info, permissions)) in entry {
+        vec.push(ffi::ContainerInfo {
+            name: CString::new(name)?.into_raw(),
+            mdata_info: mdata_info.into_repr_c(),
+            permissions: container_perms_into_repr_c(&permissions),
+        })
+    }
+
+    let (ptr, len, cap) = vec_into_raw_parts(vec);
+    Ok(ffi::AccessContainerEntry { ptr, len, cap })
+}
+
+/// Convert FFI representation of `AccessContainerEntry` to native rust representation by cloning.
+pub unsafe fn access_container_entry_clone_from_repr_c(
+    entry: *const ffi::AccessContainerEntry,
+) -> Result<AccessContainerEntry, IpcError> {
+    let input = slice::from_raw_parts((*entry).ptr, (*entry).len);
+    let mut output = AccessContainerEntry::with_capacity(input.len());
+
+    for container in input {
+        let name = String::clone_from_repr_c(container.name)?;
+        let mdata_info = MDataInfo::clone_from_repr_c(&container.mdata_info)?;
+        let permissions = container_perms_from_repr_c(container.permissions)?;
+
+        let _ = output.insert(name, (mdata_info, permissions));
+    }
+
+    Ok(output)
 }
 
 /// Access container
@@ -402,16 +453,17 @@ mod tests {
         let ag = AuthGranted {
             app_keys: ak,
             bootstrap_config: BootstrapConfig::default(),
-            access_container: ac,
+            access_container_info: ac,
+            access_container_entry: AccessContainerEntry::default(),
         };
 
         let ffi = unwrap!(ag.into_repr_c());
 
-        assert_eq!(ffi.access_container.tag, 681);
+        assert_eq!(ffi.access_container_info.tag, 681);
 
         let ag = unsafe { unwrap!(AuthGranted::clone_from_repr_c(&ffi)) };
 
-        assert_eq!(ag.access_container.tag, 681);
+        assert_eq!(ag.access_container_info.tag, 681);
     }
 
     #[test]
