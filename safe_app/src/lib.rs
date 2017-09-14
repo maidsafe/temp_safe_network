@@ -185,8 +185,7 @@ impl App {
 
 
     /// Allows customising the mock Routing client before registering a new account
-    #[cfg(any(all(test, feature = "use-mock-routing"),
-                all(feature = "testing", feature = "use-mock-routing")))]
+    #[cfg(feature = "use-mock-routing")]
     pub fn registered_with_hook<N, F>(
         app_id: String,
         auth_granted: AuthGranted,
