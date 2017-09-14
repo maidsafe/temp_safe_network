@@ -27,7 +27,7 @@ use safe_core::ipc::req::{AuthReq, containers_from_repr_c};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
 
-/// Generates an `AppExchangeInfo` structure for a mock application
+/// Generates an `AppExchangeInfo` structure for a mock application.
 pub fn gen_app_exchange_info() -> AppExchangeInfo {
     AppExchangeInfo {
         id: unwrap!(utils::generate_random_string(10)),
@@ -118,7 +118,7 @@ pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
 
-/// Creates a random app instance for testing
+/// Creates a random app instance for testing.
 #[no_mangle]
 #[allow(unsafe_code)]
 #[cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
@@ -132,7 +132,7 @@ pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
     })
 }
 
-/// Create a random app instance for testing, with access to containers
+/// Create a random app instance for testing, with access to containers.
 #[no_mangle]
 #[allow(unsafe_code)]
 #[cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]

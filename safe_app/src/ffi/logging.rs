@@ -27,11 +27,13 @@ use std::os::raw::{c_char, c_void};
 /// This function should be called to enable logging to a file.
 /// If `output_file_name_override` is provided, then this path will be used for
 /// the log output file.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn app_init_logging(
     output_file_name_override: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         if output_file_name_override.is_null() {
@@ -48,11 +50,15 @@ pub unsafe extern "C" fn app_init_logging(
 /// This function should be called to find where log file will be created. It
 /// will additionally create an empty log file in the path in the deduced
 /// location and will return the file name along with complete path to it.
+///
+/// Callback parameters: user data, error code, log path
 #[no_mangle]
 pub unsafe extern "C" fn app_output_log_path(
     output_file_name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        log_path: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let op_file = from_c_str(output_file_name)?;

@@ -25,11 +25,13 @@ use safe_core::ipc::req::containers_into_vec;
 use std::os::raw::{c_char, c_void};
 
 /// Fetch access info from the network.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn access_container_refresh_access_info(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -48,11 +50,16 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 }
 
 /// Retrieve a list of container names that an app has access to.
+///
+/// Callback parameters: user data, error code, container permissions vector
 #[no_mangle]
 pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ContainerPermissions, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        container_perms_ptr: *const ContainerPermissions,
+                        container_perms_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -82,12 +89,16 @@ pub unsafe extern "C" fn access_container_fetch(
 }
 
 /// Retrieve `MDataInfo` for the given container name from the access container.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn access_container_get_container_mdata_info(
     app: *const App,
     name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataInfoHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info_h: MDataInfoHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
