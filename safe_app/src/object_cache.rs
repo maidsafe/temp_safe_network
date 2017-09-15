@@ -64,8 +64,6 @@ pub type MDataEntryActionsHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataPermissionsHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type MDataPermissionSetHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
 pub type SelfEncryptorReaderHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SelfEncryptorWriterHandle = ObjectHandle;
@@ -84,8 +82,7 @@ pub struct ObjectCache {
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
-    mdata_permissions: Store<BTreeMap<User, MDataPermissionSetHandle>>,
-    mdata_permission_set: Store<PermissionSet>,
+    mdata_permissions: Store<BTreeMap<User, PermissionSet>>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppContext>>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppContext>>>,
     sign_key: Store<sign::PublicKey>,
@@ -105,7 +102,6 @@ impl ObjectCache {
             mdata_values: Store::new(),
             mdata_entry_actions: Store::new(),
             mdata_permissions: Store::new(),
-            mdata_permission_set: Store::new(),
             se_reader: Store::new(),
             se_writer: Store::new(),
             sign_key: Store::new(),
@@ -124,7 +120,6 @@ impl ObjectCache {
         self.mdata_values.clear();
         self.mdata_entry_actions.clear();
         self.mdata_permissions.clear();
-        self.mdata_permission_set.clear();
         self.se_reader.clear();
         self.se_writer.clear();
         self.sign_key.clear();
@@ -217,19 +212,12 @@ impl_cache!(mdata_entry_actions,
             insert_mdata_entry_actions,
             remove_mdata_entry_actions);
 impl_cache!(mdata_permissions,
-            BTreeMap<User, MDataPermissionSetHandle>,
+            BTreeMap<User, PermissionSet>,
             MDataPermissionsHandle,
             InvalidMDataPermissionsHandle,
             get_mdata_permissions,
             insert_mdata_permissions,
             remove_mdata_permissions);
-impl_cache!(mdata_permission_set,
-            PermissionSet,
-            MDataPermissionSetHandle,
-            InvalidMDataPermissionSetHandle,
-            get_mdata_permission_set,
-            insert_mdata_permission_set,
-            remove_mdata_permission_set);
 impl_cache!(se_reader,
             SelfEncryptor<SelfEncryptionStorage<AppContext>>,
             SelfEncryptorReaderHandle,
@@ -270,7 +258,7 @@ struct HandleGenerator(Cell<ObjectHandle>);
 
 impl HandleGenerator {
     fn new() -> Self {
-        HandleGenerator(Cell::new(u64::MAX))
+        HandleGenerator(Cell::new(0))
     }
 
     fn gen(&self) -> ObjectHandle {
