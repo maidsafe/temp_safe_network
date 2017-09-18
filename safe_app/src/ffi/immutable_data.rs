@@ -24,7 +24,7 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
 use routing::XorName;
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
-use safe_core::ffi::XorNameArray;
+use safe_core::ffi::arrays::XorNameArray;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::os::raw::c_void;
 
@@ -347,16 +347,17 @@ mod tests {
     use ffi::cipher_opt::*;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_vec_u8};
-    use routing::XOR_NAME_LEN;
     use safe_core::utils;
     use test_utils::create_app;
 
+    // Test immutable data operations.
     #[test]
     fn immut_data_operations() {
         let app = create_app();
 
         let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
 
+        // Write idata to self encryptor handle
         unsafe {
             let cipher_opt_h = unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app, ud, cb)));
             let se_writer_h = unwrap!(call_1(|ud, cb| idata_new_self_encryptor(&app, ud, cb)));
@@ -384,7 +385,7 @@ mod tests {
                 )
             }));
 
-            let name: [u8; XOR_NAME_LEN];
+            let name: XorNameArray;
             name = unwrap!(call_1(|ud, cb| {
                 idata_close_self_encryptor(&app, se_writer_h, cipher_opt_h, ud, cb)
             }));
@@ -395,15 +396,15 @@ mod tests {
             });
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
-            // Invalid Self encryptor reader.
+            // Invalid self encryptor reader.
             let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, 0, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
-            // Invalid Self encryptor reader.
+            // Invalid self encryptor reader.
             let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, se_writer_h, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
-            // Invalid Self encryptor reader.
+            // Invalid self encryptor reader.
             let res: u64 = unwrap!(call_1(|ud, cb| idata_serialised_size(&app, &name, ud, cb)));
             assert!(res > 0);
 

@@ -1,4 +1,4 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -17,11 +17,9 @@
 
 #![allow(unsafe_code)]
 
-/// Ffi module
-pub mod ffi;
-
 use client::MDataInfo;
 use crypto::{shared_box, shared_secretbox, shared_sign};
+use ffi::ipc::resp as ffi;
 use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::IpcError;
 use ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
@@ -381,6 +379,7 @@ mod tests {
     use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::secretbox;
 
+    // Test converting an `AuthGranted` object to its FFI representation and then back again.
     #[test]
     fn auth_granted() {
         let (ok, _) = shared_sign::gen_keypair();
@@ -415,6 +414,7 @@ mod tests {
         assert_eq!(ag.access_container.tag, 681);
     }
 
+    // Testing converting an `AppKeys` object to its FFI representation and back again.
     #[test]
     fn app_keys() {
         let (ok, _) = shared_sign::gen_keypair();
@@ -467,6 +467,7 @@ mod tests {
         assert_eq!(ak.enc_sk, oursk);
     }
 
+    // Test converting an `AccessContInfo` struct to its FFI representation and back again.
     #[test]
     fn access_container() {
         let nonce = secretbox::gen_nonce();

@@ -17,16 +17,14 @@
 
 #![allow(unsafe_code)]
 
-/// Ffi module
-pub mod ffi;
 mod auth;
 mod containers;
 mod share_mdata;
 
 pub use self::auth::AuthReq;
 pub use self::containers::ContainersReq;
-use self::ffi::PermissionSet as FfiPermissionSet;
 pub use self::share_mdata::{ShareMData, ShareMDataReq};
+use ffi::ipc::req as ffi;
 use ffi_utils::{ReprC, StringError, from_c_str};
 use ipc::errors::IpcError;
 use routing::{Action, PermissionSet};
@@ -94,8 +92,8 @@ where
 }
 
 /// Transform a set of container permissions into its FFI representation
-fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet {
-    let mut output = FfiPermissionSet::default();
+fn container_perms_into_repr_c(perms: &ContainerPermissions) -> ffi::PermissionSet {
+    let mut output = ffi::PermissionSet::default();
 
     for perm in perms {
         match *perm {
@@ -120,7 +118,7 @@ fn container_perms_into_repr_c(perms: &ContainerPermissions) -> FfiPermissionSet
 
 /// Transform an FFI representation into container permissions
 pub fn container_perms_from_repr_c(
-    perms: FfiPermissionSet,
+    perms: ffi::PermissionSet,
 ) -> Result<ContainerPermissions, IpcError> {
     let mut output = BTreeSet::new();
 
@@ -292,11 +290,12 @@ impl ReprC for AppExchangeInfo {
 #[allow(unsafe_code)]
 mod tests {
     use super::*;
-    use super::ffi::PermissionSet as FfiPermissionSet;
+    use ffi::ipc::req::PermissionSet as FfiPermissionSet;
     use ffi_utils::ReprC;
     use std::collections::HashMap;
     use std::ffi::CStr;
 
+    // Test converting `ContainerPermissions` to its FFI representation and back again.
     #[test]
     fn container_permissions() {
         let mut cp = HashMap::new();
@@ -311,6 +310,7 @@ mod tests {
         assert_eq!(unwrap!(cp.get("foobar")), &btree_set![Permission::Insert]);
     }
 
+    // Test that cloning an empty `ContainerPermissions` from FFI produces an error.
     #[test]
     fn empty_container_permissions() {
         // Expect an error for an empty permission set
@@ -324,6 +324,9 @@ mod tests {
         assert!(cp.is_err());
     }
 
+    // Test cloning a permission set for the following two cases:
+    // 1. If only the `read` perm is set - return an error.
+    // 2. The `read` perm should be ignored in all other cases.
     #[test]
     fn permissions_set_conversion() {
         // It should return an error in case if we have set only the `read` perm
@@ -338,7 +341,7 @@ mod tests {
         let res = permission_set_clone_from_repr_c(&ps);
         assert!(res.is_err());
 
-        // It should ignore read perms in all other cases
+        // It should ignore `read` perms in all other cases
         let ps = FfiPermissionSet {
             read: true,
             insert: false,
@@ -354,6 +357,7 @@ mod tests {
         assert!(res.is_allowed(Action::ManagePermissions).is_none());
     }
 
+    // Testing converting an `AppExchangeInfo` object to its FFI representation and back again.
     #[test]
     fn app_exchange_info() {
         let a = AppExchangeInfo {
@@ -391,6 +395,7 @@ mod tests {
         }
     }
 
+    // Test converting an `AuthReq` object to its FFI representation and back again.
     #[test]
     fn auth_request() {
         let app = AppExchangeInfo {
@@ -421,6 +426,7 @@ mod tests {
         assert_eq!(a.containers.len(), 0);
     }
 
+    // Test converting a `ContainersReq` object to its FFI representation and back again.
     #[test]
     fn containers_req() {
         let app = AppExchangeInfo {

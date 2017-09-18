@@ -16,9 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 use chrono::{DateTime, NaiveDateTime, Utc};
+use ffi::nfs::File as FfiFile;
 use ffi_utils::{ReprC, vec_into_raw_parts};
 use nfs::errors::NfsError;
-use nfs::ffi::File as FfiFile;
 use routing::XorName;
 use std::slice;
 
@@ -155,6 +155,7 @@ mod tests {
     use super::*;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
 
+    // Test that serialising and deserialising a file restores the original file.
     #[test]
     fn serialise_deserialise() {
         let obj_before = File::new("{mime:\"application/json\"}".to_string().into_bytes());

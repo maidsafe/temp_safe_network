@@ -20,13 +20,14 @@
 use AppError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb};
 use maidsafe_utilities::serialisation::serialise;
-use safe_core::ipc::resp::{UserMetadata, ffi};
+use safe_core::ffi::ipc::resp::MetadataResponse;
+use safe_core::ipc::resp::UserMetadata;
 use std::os::raw::c_void;
 
 /// Serialize metadata.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_encode_metadata(
-    metadata: *const ffi::MetadataResponse,
+    metadata: *const MetadataResponse,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
 ) {
@@ -36,4 +37,36 @@ pub unsafe extern "C" fn mdata_encode_metadata(
         o_cb(user_data, FFI_RESULT_OK, encoded.as_ptr(), encoded.len());
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use ffi::mutable_data::metadata::mdata_encode_metadata;
+    use ffi_utils::test_utils::call_vec_u8;
+    use maidsafe_utilities::serialisation::deserialise;
+    use safe_core::ipc::resp::UserMetadata;
+
+    // Test serializing and deserializing metadata.
+    #[test]
+    fn serialize_metadata() {
+        let metadata1 = UserMetadata {
+            name: None,
+            description: Some(String::from("test")),
+        };
+
+        let metadata_resp = match metadata1.clone().into_md_response(Default::default(), 0) {
+            Ok(val) => val,
+            _ => panic!("An error occurred"),
+        };
+
+        let serialised = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| mdata_encode_metadata(&metadata_resp, ud, cb),
+            ))
+        };
+
+        let metadata2 = unwrap!(deserialise::<UserMetadata>(&serialised));
+
+        assert_eq!(metadata1, metadata2);
+    }
 }

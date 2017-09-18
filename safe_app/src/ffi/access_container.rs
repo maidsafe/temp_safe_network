@@ -20,8 +20,8 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, f
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
+use safe_core::ffi::ipc::req::ContainerPermissions;
 use safe_core::ipc::req::containers_into_vec;
-use safe_core::ipc::req::ffi::ContainerPermissions;
 use std::os::raw::{c_char, c_void};
 
 /// Fetch access info from the network.
@@ -120,13 +120,52 @@ mod tests {
     use errors::AppError;
     use ffi::access_container::*;
     use ffi_utils::{ReprC, from_c_str};
-    use ffi_utils::test_utils::{call_1, call_vec};
+    use ffi_utils::test_utils::{call_0, call_1, call_vec};
     use safe_core::DIR_TAG;
     use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
     use std::collections::{BTreeSet, HashMap};
     use std::ffi::CString;
-    use test_utils::{create_app_with_access, run_now};
+    use test_utils::{create_app_with_access, run, run_now};
 
+    // Test refreshing access info by fetching it from the network.
+    #[test]
+    fn refresh_access_info() {
+        // Shared container
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert(
+            "_videos".to_string(),
+            btree_set![Permission::Read, Permission::Insert],
+        );
+
+        let app = create_app_with_access(container_permissions.clone());
+
+        run(&app, move |_client, context| {
+            let reg = unwrap!(context.as_registered()).clone();
+            assert!(reg.access_info.borrow().is_empty());
+            Ok(())
+        });
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| access_container_refresh_access_info(&app, ud, cb),
+            ))
+        }
+
+        run(&app, move |_client, context| {
+            let reg = unwrap!(context.as_registered()).clone();
+            assert!(!reg.access_info.borrow().is_empty());
+
+            let access_info = reg.access_info.borrow();
+            assert_eq!(
+                unwrap!(access_info.get("_videos")).1,
+                *unwrap!(container_permissions.get("_videos"))
+            );
+
+            Ok(())
+        });
+    }
+
+    // Test getting info about access containers and their mutable data.
     #[test]
     fn get_access_info() {
         let mut container_permissions = HashMap::new();
