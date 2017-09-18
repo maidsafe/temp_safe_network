@@ -175,6 +175,7 @@ mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::u32;
 
+    // Test deterministically generating User's Identity for the network using supplied credentials.
     #[test]
     fn generate_network_id() {
         let keyword1 = b"user1";
@@ -213,6 +214,7 @@ mod tests {
         assert_ne!(user1_id, user2_id);
     }
 
+    // Test deterministically generating cryptographic keys.
     #[test]
     fn generate_crypto_keys() {
         let password1 = b"super great password";
@@ -237,6 +239,7 @@ mod tests {
         assert_eq!(keys1, keys2);
     }
 
+    // Test serialising and deserialising accounts.
     #[test]
     fn serialisation() {
         let account = unwrap!(Account::new(ClientKeys::new(None)));
@@ -246,6 +249,7 @@ mod tests {
         assert_eq!(decoded, account);
     }
 
+    // Test encryption and decryption of accounts.
     #[test]
     fn encryption() {
         let account = unwrap!(Account::new(ClientKeys::new(None)));

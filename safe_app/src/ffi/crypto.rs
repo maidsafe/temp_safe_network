@@ -422,11 +422,12 @@ pub unsafe extern "C" fn generate_nonce(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::test_utils::{call_1, call_2, call_vec_u8};
+    use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
     use rust_sodium::crypto::box_;
     use safe_core::arrays::{AsymNonce, AsymPublicKey, SignPublicKey};
     use test_utils::{create_app, run_now};
 
+    // Test encrypting and decrypting messages between apps.
     #[test]
     fn encrypt_decrypt() {
         let app1 = create_app();
@@ -483,6 +484,7 @@ mod tests {
         assert_eq!(&decrypted, data);
     }
 
+    // Test encrypting and decrypting sealed box messages between apps.
     #[test]
     fn encrypt_decrypt_sealed() {
         let app1 = create_app();
@@ -525,6 +527,7 @@ mod tests {
         assert_eq!(&decrypted, data);
     }
 
+    // Test creating and fetching sign keys.
     #[test]
     fn sign_key_basics() {
         let app = create_app();
@@ -552,10 +555,17 @@ mod tests {
         });
 
         assert_eq!(app_sign_key1, app_sign_key2);
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| sign_key_free(&app, app_sign_key2_h, ud, cb),
+            ))
+        }
     }
 
+    // Test creating and fetching public encryption keys.
     #[test]
-    fn enc_key_basics() {
+    fn enc_public_key_basics() {
         let app = create_app();
         let app_enc_key1_h = unsafe { unwrap!(call_1(|ud, cb| app_pub_enc_key(&app, ud, cb))) };
 
@@ -584,11 +594,92 @@ mod tests {
         });
 
         assert_eq!(app_enc_key1, app_enc_key2);
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| enc_pub_key_free(&app, app_enc_key2_h, ud, cb),
+            ))
+        }
     }
 
+    // Test creating and fetching secret encryption keys.
+    #[test]
+    fn enc_secret_key_basics() {
+        let app = create_app();
+        let (app_public_key_h, app_secret_key1_h) =
+            unsafe { unwrap!(call_2(|ud, cb| enc_generate_key_pair(&app, ud, cb))) };
+
+        let app_public_key1: AsymPublicKey = unsafe {
+            unwrap!(call_1(
+                |ud, cb| enc_pub_key_get(&app, app_public_key_h, ud, cb),
+            ))
+        };
+        let app_secret_key1: AsymSecretKey = unsafe {
+            unwrap!(call_1(
+                |ud, cb| enc_secret_key_get(&app, app_secret_key1_h, ud, cb),
+            ))
+        };
+
+        let app_secret_key1 = run_now(&app, move |_client, context| {
+            let app_public_key2 = unwrap!(context.object_cache().get_encrypt_key(app_public_key_h));
+            assert_eq!(box_::PublicKey(app_public_key1), *app_public_key2);
+
+            let app_secret_key2 = unwrap!(context.object_cache().get_secret_key(app_secret_key1_h));
+            assert_eq!(app_secret_key1, app_secret_key2.0);
+
+            app_secret_key1
+        });
+
+        let app_secret_key1_raw: AsymSecretKey = unsafe {
+            unwrap!(call_1(
+                |ud, cb| enc_secret_key_get(&app, app_secret_key1_h, ud, cb),
+            ))
+        };
+
+        let app_secret_key2_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                enc_secret_key_new(&app, &app_secret_key1_raw, ud, cb)
+            }))
+        };
+
+        run_now(&app, move |_, context| {
+            let app_secret_key2 = unwrap!(context.object_cache().get_secret_key(app_secret_key2_h));
+            assert_eq!(app_secret_key1, app_secret_key2.0);
+        });
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                enc_secret_key_free(&app, app_secret_key2_h, ud, cb)
+            }))
+        }
+    }
+
+    // Test that generated nonces are the correct length.
     #[test]
     fn nonce_smoke_test() {
         let nonce: AsymNonce = unsafe { unwrap!(call_1(|ud, cb| generate_nonce(ud, cb))) };
         assert_eq!(nonce.len(), box_::NONCEBYTES);
+    }
+
+    // Test that generated sha3 hashes are the correct length.
+    #[test]
+    fn sha3_smoke_test() {
+        let data = b"test message";
+        let sha3 = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| sha3_hash(data.as_ptr(), data.len(), ud, cb),
+            ))
+        };
+
+        assert_eq!(sha3.len(), 256 / 8);
+
+        let data = b"";
+        let sha3 = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| sha3_hash(data.as_ptr(), data.len(), ud, cb),
+            ))
+        };
+
+        assert_eq!(sha3.len(), 256 / 8);
     }
 }

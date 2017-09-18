@@ -97,7 +97,6 @@ fn parse_root(fname: &str) -> io::Result<Vec<String>> {
     let mut modules = Vec::new();
     let mut found = false;
     let re_pub_use = unwrap!(regex::Regex::new(r"^pub use (ffi(::.+)*)::\*;$"));
-    // let re_module = unwrap!(regex::Regex::new(r"ffi::.*\*"));
 
     for line in contents.lines() {
         let captures = re_pub_use.captures(line);

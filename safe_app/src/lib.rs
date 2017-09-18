@@ -451,6 +451,7 @@ mod tests {
     use test_utils::{create_app_with_access, run};
     use test_utils::gen_app_exchange_info;
 
+    // Test refreshing access info by fetching it from the network.
     #[test]
     fn refresh_access_info() {
         // Shared container
@@ -479,6 +480,7 @@ mod tests {
         });
     }
 
+    // Test fetching containers that an app has access to.
     #[test]
     fn get_access_info() {
         let mut container_permissions = HashMap::new();
