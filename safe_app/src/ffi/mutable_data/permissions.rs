@@ -68,13 +68,15 @@ impl Into<Action> for MDataAction {
 }
 
 /// Create new permission set.
+///
+/// Callback parameters: user data, error code, permission set handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permission_set_new(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        MDataPermissionSetHandle),
+                        perm_set_h: MDataPermissionSetHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -86,6 +88,8 @@ pub unsafe extern "C" fn mdata_permission_set_new(
 }
 
 /// Allow the action in the permission set.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permission_set_allow(
     app: *const App,
@@ -104,6 +108,8 @@ pub unsafe extern "C" fn mdata_permission_set_allow(
 }
 
 /// Deny the action in the permission set.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permission_set_deny(
     app: *const App,
@@ -122,6 +128,8 @@ pub unsafe extern "C" fn mdata_permission_set_deny(
 }
 
 /// Clear the actions in the permission set.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permission_set_clear(
     app: *const App,
@@ -140,13 +148,17 @@ pub unsafe extern "C" fn mdata_permission_set_clear(
 }
 
 /// Read the permission set.
+///
+/// Callback parameters: user data, error code, permission value
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permission_set_is_allowed(
     app: *const App,
     set_h: MDataPermissionSetHandle,
     action: MDataAction,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, PermissionValue),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        perm_value: PermissionValue),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -163,6 +175,8 @@ pub unsafe extern "C" fn mdata_permission_set_is_allowed(
 }
 
 /// Free the permission set from memory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permission_set_free(
     app: *const App,

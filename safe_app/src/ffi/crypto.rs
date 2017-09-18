@@ -270,7 +270,7 @@ pub unsafe extern "C" fn enc_secret_key_free(
 /// Encrypts arbitrary data using a given key pair.
 /// You should provide a recipient's public key and a sender's secret key.
 ///
-/// Callback parameters: user data, error code, ciphertext vector
+/// Callback parameters: user data, error code, ciphertext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn encrypt(
     app: *const App,
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn encrypt(
 /// Decrypts arbitrary data using a given key pair.
 /// You should provide a sender's public key and a recipient's secret key.
 ///
-/// Callback parameters: user data, error code, plaintext vector
+/// Callback parameters: user data, error code, plaintext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn decrypt(
     app: *const App,
@@ -366,7 +366,7 @@ pub unsafe extern "C" fn decrypt(
 /// Encrypts arbitrary data for a single recipient.
 /// You should provide a recipient's public key.
 ///
-/// Callback parameters: user data, error code, ciphertext vector
+/// Callback parameters: user data, error code, ciphertext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn encrypt_sealed_box(
     app: *const App,
@@ -406,7 +406,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
 /// Decrypts arbitrary data for a single recipient.
 /// You should provide a recipients's private and public key.
 ///
-/// Callback parameters: user data, error code, plaintext vector
+/// Callback parameters: user data, error code, plaintext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn decrypt_sealed_box(
     app: *const App,
@@ -449,7 +449,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
 
 /// Returns a sha3 hash for a given data.
 ///
-/// Callback parameters: user data, error code, hash vector
+/// Callback parameters: user data, error code, hash vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn sha3_hash(
     data: *const u8,

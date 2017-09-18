@@ -51,7 +51,7 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 
 /// Retrieve a list of container names that an app has access to.
 ///
-/// Callback parameters: user data, error code, container permissions vector
+/// Callback parameters: user data, error code, container permissions vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn access_container_fetch(
     app: *const App,

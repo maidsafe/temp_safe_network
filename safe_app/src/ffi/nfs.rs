@@ -245,7 +245,7 @@ pub unsafe extern "C" fn file_size(
 
 /// Read data from file.
 ///
-/// Callback parameters: user data, error code, file data
+/// Callback parameters: user data, error code, file data vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn file_read(
     app: *const App,
@@ -255,8 +255,8 @@ pub unsafe extern "C" fn file_read(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        file_data_ptr: *const u8,
-                        file_data_len: usize),
+                        data_ptr: *const u8,
+                        data_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);

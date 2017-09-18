@@ -123,7 +123,7 @@ pub unsafe extern "C" fn mdata_info_random_private(
 
 /// Encrypt mdata entry key using the corresponding mdata info.
 ///
-/// Callback parameters: user data, error code, encrypted entry key
+/// Callback parameters: user data, error code, encrypted entry key vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
     app: *const App,
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
 
 /// Encrypt mdata entry value using the corresponding mdata info.
 ///
-/// Callback parameters: user data, error code, encrypted entry key value
+/// Callback parameters: user data, error code, encrypted entry value vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
     app: *const App,
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
 
 /// Decrypt mdata entry value or a key using the corresponding mdata info.
 ///
-/// Callback parameters: user data, error code, decrypted mdata info
+/// Callback parameters: user data, error code, decrypted mdata info vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_decrypt(
     app: *const App,
