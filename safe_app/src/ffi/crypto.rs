@@ -23,7 +23,7 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
 use safe_core::crypto::shared_box;
-use safe_core::ffi::arrays::*;
+use safe_core::ffi::arrays::{AsymNonce, AsymPublicKey, AsymSecretKey, SignPublicKey};
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
