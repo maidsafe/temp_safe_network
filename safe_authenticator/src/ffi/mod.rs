@@ -183,7 +183,7 @@ pub unsafe extern "C" fn auth_account_info(
 
 /// Discard and clean up the previously allocated authenticator instance.
 /// Use this only if the authenticator is obtained from one of the auth
-/// functions in this crate (`create_acc`, `login`, `create_unregistered`).
+/// functions in this crate (`create_acc` or `login`).
 /// Using `auth` after a call to this function is undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn auth_free(auth: *mut Authenticator) {
