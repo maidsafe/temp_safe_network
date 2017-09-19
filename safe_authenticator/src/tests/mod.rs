@@ -70,7 +70,6 @@ mod mock_routing {
     // 4. Check that after logging in the remaining default directories have been created
     //    (= operation recovery worked after log in)
     // 5. Check the access container entry in the user's config root - it must be accessible
-    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn std_dirs_recovery() {
         use safe_core::DIR_TAG;
@@ -117,10 +116,9 @@ mod mock_routing {
 
             // This operation should fail
             match authenticator {
-                Err(AuthError::NfsError(NfsError::CoreError(CoreError::RoutingClientError(
-                    ClientError::LowBalance)))) => (),
+                Err(AuthError::AccountContainersCreation(_)) => (),
                 Err(x) => panic!("Unexpected error {:?}", x),
-                Ok(_) => panic!("Expected an error"),
+                Ok(_) => panic!("Unexpected success"),
             }
         }
 
@@ -147,7 +145,6 @@ mod mock_routing {
     }
 
     // Ensure that users can log in with low account balance.
-    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn login_with_low_balance() {
         // Register a hook prohibiting mutations and login
@@ -240,7 +237,6 @@ mod mock_routing {
     // 11. Check that the app's container has required permissions.
     // 12. Check that the app's container is listed in the access container entry for
     //     the app.
-    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn app_authentication_recovery() {
         let locator = unwrap!(generate_random_string(10));

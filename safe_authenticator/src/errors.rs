@@ -90,6 +90,7 @@ mod codes {
 
     // Authenticator errors
     pub const ERR_IO_ERROR: i32 = -1013;
+    pub const ERR_ACCOUNT_CONTAINERS_CREATION: i32 = -1014;
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
 
@@ -109,6 +110,8 @@ pub enum AuthError {
     EncodeDecodeError,
     /// IPC error
     IpcError(IpcError),
+    /// Failure during the creation of standard account containers.
+    AccountContainersCreation(String),
 }
 
 impl Display for AuthError {
@@ -122,6 +125,13 @@ impl Display for AuthError {
             AuthError::NfsError(ref error) => write!(formatter, "NFS error: {:?}", error),
             AuthError::EncodeDecodeError => write!(formatter, "Serialisation error"),
             AuthError::IpcError(ref error) => write!(formatter, "IPC error: {:?}", error),
+            AuthError::AccountContainersCreation(ref reason) => {
+                write!(
+                    formatter,
+                    "Account containers creation error: {}. Login to attempt recovery.",
+                    reason
+                )
+            }
         }
     }
 }
@@ -239,6 +249,7 @@ impl ErrorCode for AuthError {
             }
             AuthError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
             AuthError::IoError(_) => ERR_IO_ERROR,
+            AuthError::AccountContainersCreation(_) => ERR_ACCOUNT_CONTAINERS_CREATION,
             AuthError::Unexpected(_) => ERR_UNEXPECTED,
         }
     }
