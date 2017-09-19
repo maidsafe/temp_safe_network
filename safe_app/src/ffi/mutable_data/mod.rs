@@ -51,6 +51,8 @@ pub static ENTRIES_EMPTY: u64 = 0;
 ///
 /// `entries_h` is a handle to entries for the mutable data.
 /// If `ENTRIES_EMPTY`, the entries will be empty.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_put(
     app: *const App,
@@ -58,7 +60,7 @@ pub unsafe extern "C" fn mdata_put(
     permissions_h: MDataPermissionsHandle,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -118,12 +120,14 @@ pub unsafe extern "C" fn mdata_put(
 }
 
 /// Get version of the mutable data.
+///
+/// Callback parameters: user data, error code, version
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_version(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, |client, _, info| {
@@ -133,12 +137,16 @@ pub unsafe extern "C" fn mdata_get_version(
 }
 
 /// Get size of serialised mutable data.
+///
+/// Callback parameters: user data, error code, serialised size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_serialised_size(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        serialised_size: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, |client, _, info| {
@@ -167,7 +175,11 @@ pub unsafe extern "C" fn mdata_get_value(
     key_ptr: *const u8,
     key_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        content_ptr: *const u8,
+                        content_len: usize,
+                        version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -204,12 +216,16 @@ pub unsafe extern "C" fn mdata_get_value(
 }
 
 /// Get complete list of entries in the mutable data.
+///
+/// Callback parameters: user data, error code, entries handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_entries(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataEntriesHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        entries_h: MDataEntriesHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
@@ -227,12 +243,16 @@ pub unsafe extern "C" fn mdata_list_entries(
 }
 
 /// Get list of keys in the mutable data.
+///
+/// Callback parameters: user data, error code, keys handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_keys(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataKeysHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        keys_h: MDataKeysHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
@@ -250,12 +270,16 @@ pub unsafe extern "C" fn mdata_list_keys(
 }
 
 /// Get list of values in the mutable data.
+///
+/// Callback parameters: user data, error code, values handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_values(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataValuesHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        values_h: MDataValuesHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
@@ -273,13 +297,15 @@ pub unsafe extern "C" fn mdata_list_values(
 }
 
 /// Mutate entries of the mutable data.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_mutate_entries(
     app: *const App,
     info_h: MDataInfoHandle,
     actions_h: MDataEntryActionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -309,12 +335,16 @@ pub unsafe extern "C" fn mdata_mutate_entries(
 }
 
 /// Get list of all permissions set on the mutable data
+///
+/// Callback parameters: user data, error code, permission handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_permissions(
     app: *const App,
     info_h: MDataInfoHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataPermissionsHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        perm_h: MDataPermissionsHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
@@ -331,13 +361,17 @@ pub unsafe extern "C" fn mdata_list_permissions(
 /// Get list of permissions set on the mutable data for the given user.
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
+///
+/// Callback parameters: user data, error code, permission set handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_user_permissions(
     app: *const App,
     info_h: MDataInfoHandle,
     user_h: SignKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataPermissionSetHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        perm_set_h: MDataPermissionSetHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -375,6 +409,8 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
 /// Set permissions set on the mutable data for the given user.
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_set_user_permissions(
     app: *const App,
@@ -383,7 +419,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
     permission_set_h: MDataPermissionSetHandle,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -423,6 +459,8 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
 /// Delete permissions set on the mutable data for the given user.
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_del_user_permissions(
     app: *const App,
@@ -430,7 +468,7 @@ pub unsafe extern "C" fn mdata_del_user_permissions(
     user_h: SignKeyHandle,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -461,6 +499,8 @@ pub unsafe extern "C" fn mdata_del_user_permissions(
 }
 
 /// Change owner of the mutable data.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_change_owner(
     app: *const App,
@@ -468,7 +508,7 @@ pub unsafe extern "C" fn mdata_change_owner(
     new_owner_h: SignKeyHandle,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);

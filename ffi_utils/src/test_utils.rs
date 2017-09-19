@@ -45,7 +45,8 @@ where
 /// and `error_code`.
 pub fn call_0<F>(f: F) -> Result<(), i32>
 where
-    F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, FfiResult)),
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult)),
 {
     let (tx, rx) = mpsc::channel::<i32>();
     f(sender_as_user_data(&tx), callback_0);
@@ -60,7 +61,8 @@ where
 /// and `error_code`.
 pub unsafe fn call_1<F, E: Debug, T>(f: F) -> Result<T, i32>
 where
-    F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, FfiResult, T::C)),
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C)),
     T: ReprC<Error = E>,
 {
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<T, i32>>>();
@@ -75,7 +77,7 @@ where
 pub unsafe fn call_2<F, E0, E1, T0, T1>(f: F) -> Result<(T0, T1), i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(*mut c_void, FfiResult, T0::C, T1::C)),
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, T0::C, T1::C)),
     E0: Debug,
     E1: Debug,
     T0: ReprC<Error = E0>,
@@ -93,7 +95,7 @@ where
 pub unsafe fn call_vec<F, E, T, U>(f: F) -> Result<Vec<T>, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(*mut c_void, FfiResult, T::C, usize)),
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C, usize)),
     E: Debug,
     T: ReprC<C = *const U, Error = E>,
 {
@@ -108,7 +110,7 @@ where
 pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(*mut c_void, FfiResult, *const u8, usize)),
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, *const u8, usize)),
 {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
     f(sender_as_user_data(&tx), callback_vec_u8);

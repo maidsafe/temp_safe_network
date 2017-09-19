@@ -30,11 +30,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::os::raw::c_void;
 
 /// Create new empty entries.
+///
+/// Callback parameters: user data, error code, entries handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_new(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataEntriesHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        entries_h: MDataEntriesHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -46,6 +50,8 @@ pub unsafe extern "C" fn mdata_entries_new(
 }
 
 /// Insert an entry to the entries.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_insert(
     app: *const App,
@@ -55,7 +61,7 @@ pub unsafe extern "C" fn mdata_entries_insert(
     value_ptr: *const u8,
     value_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = vec_clone_from_raw_parts(key_ptr, key_len);
@@ -76,12 +82,14 @@ pub unsafe extern "C" fn mdata_entries_insert(
 }
 
 /// Returns the number of entries.
+///
+/// Callback parameters: user data, error code, length
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_len(
     app: *const App,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         with_entries(app, entries_h, user_data, o_cb, |entries| Ok(entries.len()))
@@ -89,6 +97,7 @@ pub unsafe extern "C" fn mdata_entries_len(
 }
 
 /// Get the entry value at the given key.
+///
 /// The callbacks arguments are: user data, error code, pointer to value,
 /// value length, entry version. The caller must NOT free the pointer.
 #[no_mangle]
@@ -98,7 +107,11 @@ pub unsafe extern "C" fn mdata_entries_get(
     key_ptr: *const u8,
     key_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        content_ptr: *const u8,
+                        content_len: usize,
+                        version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -140,8 +153,13 @@ pub unsafe extern "C" fn mdata_entries_for_each(
     app: *const App,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_each_cb: extern "C" fn(*mut c_void, *const u8, usize, *const u8, usize, u64),
-    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: extern "C" fn(user_data: *mut c_void,
+                             key_ptr: *const u8,
+                             key_len: usize,
+                             value_ptr: *const u8,
+                             value_len: usize,
+                             entry_version: u64),
+    o_done_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -164,12 +182,14 @@ pub unsafe extern "C" fn mdata_entries_for_each(
 }
 
 /// Free the entries from memory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_free(
     app: *const App,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -180,12 +200,14 @@ pub unsafe extern "C" fn mdata_entries_free(
 }
 
 /// Returns the number of keys.
+///
+/// Callback parameters: user data, error code, length
 #[no_mangle]
 pub unsafe extern "C" fn mdata_keys_len(
     app: *const App,
     keys_h: MDataKeysHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         with_keys(app, keys_h, user_data, o_cb, |keys| Ok(keys.len()))
@@ -203,8 +225,8 @@ pub unsafe extern "C" fn mdata_keys_for_each(
     app: *const App,
     keys_h: MDataKeysHandle,
     user_data: *mut c_void,
-    o_each_cb: unsafe extern "C" fn(*mut c_void, *const u8, usize),
-    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: unsafe extern "C" fn(user_data: *mut c_void, key_ptr: *const u8, key_len: usize),
+    o_done_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -220,12 +242,14 @@ pub unsafe extern "C" fn mdata_keys_for_each(
 }
 
 /// Free the keys from memory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_keys_free(
     app: *const App,
     keys_h: MDataKeysHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -236,12 +260,14 @@ pub unsafe extern "C" fn mdata_keys_free(
 }
 
 /// Returns the number of values.
+///
+/// Callback parameters: user data, error code, length
 #[no_mangle]
 pub unsafe extern "C" fn mdata_values_len(
     app: *const App,
     values_h: MDataValuesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         with_values(app, values_h, user_data, o_cb, |values| Ok(values.len()))
@@ -259,8 +285,11 @@ pub unsafe extern "C" fn mdata_values_for_each(
     app: *const App,
     values_h: MDataValuesHandle,
     user_data: *mut c_void,
-    o_each_cb: unsafe extern "C" fn(*mut c_void, *const u8, usize, u64),
-    o_done_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_each_cb: unsafe extern "C" fn(user_data: *mut c_void,
+                                    value_ptr: *const u8,
+                                    value_len: usize,
+                                    entry_version: u64),
+    o_done_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_done_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -281,12 +310,14 @@ pub unsafe extern "C" fn mdata_values_for_each(
 }
 
 /// Free the values from memory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_values_free(
     app: *const App,
     values_h: MDataValuesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {

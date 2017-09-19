@@ -35,6 +35,8 @@ use std::os::raw::{c_char, c_void};
 /// operation allowed by this module. The `user_data` parameter corresponds to the
 /// first parameter of the `o_cb` callback, while `network_cb_user_data` corresponds
 /// to the first parameter of the network events observer callback (`o_network_obs_cb`).
+///
+/// Callback parameters: user data, error code, authenticator
 #[no_mangle]
 pub unsafe extern "C" fn create_acc(
     account_locator: *const c_char,
@@ -42,8 +44,10 @@ pub unsafe extern "C" fn create_acc(
     invitation: *const c_char,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_obs_cb: extern "C" fn(*mut c_void, i32, i32),
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
+    o_network_obs_cb: extern "C" fn(user_data: *mut c_void, err_code: i32, event: i32),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        authenticator: *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
@@ -79,14 +83,18 @@ pub unsafe extern "C" fn create_acc(
 /// any operation allowed for authenticator. The `user_data` parameter corresponds to the
 /// first parameter of the `o_cb` callback, while `network_cb_user_data` corresponds
 /// to the first parameter of the network events observer callback (`o_network_obs_cb`).
+///
+/// Callback parameters: user data, error code, authenticator
 #[no_mangle]
 pub unsafe extern "C" fn login(
     account_locator: *const c_char,
     account_password: *const c_char,
     user_data: *mut c_void,
     network_cb_user_data: *mut c_void,
-    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
+    o_network_obs_cb: unsafe extern "C" fn(user_data: *mut c_void, err_code: i32, event: i32),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        authenticaor: *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
@@ -117,11 +125,13 @@ pub unsafe extern "C" fn login(
 }
 
 /// Try to restore a failed connection with the network.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn auth_reconnect(
     auth: *mut Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
     let res = (*auth).send(move |client| {
@@ -139,11 +149,15 @@ pub unsafe extern "C" fn auth_reconnect(
 }
 
 /// Get the account usage statistics.
+///
+/// Callback parameters: user data, error code, account info
 #[no_mangle]
 pub unsafe extern "C" fn auth_account_info(
     auth: *mut Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAccountInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        account_info: *const FfiAccountInfo),
 ) {
     let user_data = OpaqueCtx(user_data);
     let res = (*auth).send(move |client| {

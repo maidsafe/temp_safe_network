@@ -46,13 +46,18 @@ pub static OPEN_MODE_READ: u64 = 4;
 pub static FILE_READ_TO_END: u64 = 0;
 
 /// Retrieve file with the given name, and its version, from the directory.
+///
+/// Callback parameters: user data, error code, file, version
 #[no_mangle]
 pub unsafe extern "C" fn dir_fetch_file(
     app: *const App,
     parent_h: MDataInfoHandle,
     file_name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        file: *const File,
+                        version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
@@ -81,6 +86,8 @@ pub unsafe extern "C" fn dir_fetch_file(
 }
 
 /// Insert the file into the parent directory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_insert_file(
     app: *const App,
@@ -88,7 +95,7 @@ pub unsafe extern "C" fn dir_insert_file(
     file_name: *const c_char,
     file: *const File,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
@@ -102,6 +109,8 @@ pub unsafe extern "C" fn dir_insert_file(
 
 /// Replace the file in the parent directory.
 /// If `version` is 0, the correct version is obtained automatically.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
     app: *const App,
@@ -110,7 +119,7 @@ pub unsafe extern "C" fn dir_update_file(
     file: *const File,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
@@ -123,6 +132,8 @@ pub unsafe extern "C" fn dir_update_file(
 }
 
 /// Delete the file in the parent directory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
@@ -130,7 +141,7 @@ pub unsafe extern "C" fn dir_delete_file(
     file_name: *const c_char,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
@@ -140,7 +151,9 @@ pub unsafe extern "C" fn dir_delete_file(
     })
 }
 
-/// Open the file to read of write its contents
+/// Open the file to read of write its contents.
+///
+/// Callback parameters: user data, error code, file context handle
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
@@ -148,7 +161,9 @@ pub unsafe extern "C" fn file_open(
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        file_h: FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
@@ -203,12 +218,14 @@ pub unsafe extern "C" fn file_open(
 }
 
 /// Get a size of file opened for read.
+///
+/// Callback parameters: user data, error code, file size
 #[no_mangle]
 pub unsafe extern "C" fn file_size(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, size: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -227,6 +244,8 @@ pub unsafe extern "C" fn file_size(
 }
 
 /// Read data from file.
+///
+/// Callback parameters: user data, error code, file data vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn file_read(
     app: *const App,
@@ -234,7 +253,10 @@ pub unsafe extern "C" fn file_read(
     position: u64,
     len: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        data_ptr: *const u8,
+                        data_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -269,6 +291,8 @@ pub unsafe extern "C" fn file_read(
 }
 
 /// Write data to file in smaller chunks.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn file_write(
     app: *const App,
@@ -276,7 +300,7 @@ pub unsafe extern "C" fn file_write(
     data: *const u8,
     size: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -311,12 +335,14 @@ pub unsafe extern "C" fn file_write(
 /// `file_open`.
 ///
 /// Frees the file context handle.
+///
+/// Callback parameters: user data, error code, file
 #[no_mangle]
 pub unsafe extern "C" fn file_close(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, file: *const File),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);

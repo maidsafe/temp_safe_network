@@ -29,11 +29,16 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 /// Encode `AuthReq`.
+///
+/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_auth_req(
     req: *const FfiAuthReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u32, *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        req_id: u32,
+                        encoded_ptr: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -46,11 +51,16 @@ pub unsafe extern "C" fn encode_auth_req(
 }
 
 /// Encode `ContainersReq`.
+///
+/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_containers_req(
     req: *const FfiContainersReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u32, *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        req_id: u32,
+                        encoded_ptr: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -63,10 +73,15 @@ pub unsafe extern "C" fn encode_containers_req(
 }
 
 /// Encode `AuthReq` for an unregistered client.
+///
+/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_unregistered_req(
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u32, *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        req_id: u32,
+                        encoded_ptr: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -77,11 +92,16 @@ pub unsafe extern "C" fn encode_unregistered_req(
 }
 
 /// Encode `ShareMDataReq`.
+///
+/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_share_mdata_req(
     req: *const FfiShareMDataReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u32, *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        req_id: u32,
+                        encoded_ptr: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -103,12 +123,17 @@ fn encode_ipc(req_id: u32, req: IpcReq) -> Result<CString, AppError> {
 pub unsafe extern "C" fn decode_ipc_msg(
     msg: *const c_char,
     user_data: *mut c_void,
-    o_auth: extern "C" fn(*mut c_void, u32, *const FfiAuthGranted),
-    o_unregistered: extern "C" fn(*mut c_void, u32, *const u8, usize),
-    o_containers: extern "C" fn(*mut c_void, u32),
-    o_share_mdata: extern "C" fn(*mut c_void, u32),
-    o_revoked: extern "C" fn(*mut c_void),
-    o_err: extern "C" fn(*mut c_void, FfiResult, u32),
+    o_auth: extern "C" fn(user_data: *mut c_void,
+                          req_id: u32,
+                          auth_granted: *const FfiAuthGranted),
+    o_unregistered: extern "C" fn(user_data: *mut c_void,
+                                  req_id: u32,
+                                  serialised_cfg_ptr: *const u8,
+                                  serialised_cfg_len: usize),
+    o_containers: extern "C" fn(user_data: *mut c_void, req_id: u32),
+    o_share_mdata: extern "C" fn(user_data: *mut c_void, req_id: u32),
+    o_revoked: extern "C" fn(user_data: *mut c_void),
+    o_err: extern "C" fn(user_data: *mut c_void, result: FfiResult, req_id: u32),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<_, AppError> {
         let msg = from_c_str(msg)?;
