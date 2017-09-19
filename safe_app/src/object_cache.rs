@@ -32,7 +32,7 @@ use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};
 use std::u64;
 
-const DEFAULT_CAPACITY: usize = 100;
+const DEFAULT_CAPACITY: usize = 1000;
 
 /// Object handle associated with objects. In normal C API one would expect rust
 /// code to pass pointers to opaque object to C. C code would then need to pass
