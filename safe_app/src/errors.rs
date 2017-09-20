@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 pub use self::codes::*;
+use config_file_handler::Error as ConfigFileHandlerError;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -247,6 +248,12 @@ impl From<IpcError> for AppError {
             IpcError::Unexpected(reason) => AppError::Unexpected(reason),
             _ => AppError::IpcError(err),
         }
+    }
+}
+
+impl From<ConfigFileHandlerError> for AppError {
+    fn from(err: ConfigFileHandlerError) -> Self {
+        AppError::Unexpected(err.to_string())
     }
 }
 

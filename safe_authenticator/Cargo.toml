@@ -11,7 +11,7 @@ version = "0.3.1"
 build = "build.rs"
 
 [dependencies]
-config_file_handler = "~0.8.1"
+config_file_handler = "~0.8.2"
 ffi_utils = { path = "../ffi_utils", version = "~0.2.0" }
 futures = "~0.1.15"
 log = "~0.3.7"

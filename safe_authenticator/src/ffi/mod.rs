@@ -23,11 +23,13 @@ pub mod logging;
 pub mod ipc;
 
 use Authenticator;
+use config_file_handler;
 use errors::AuthError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, from_c_str};
 use futures::Future;
 use safe_core::FutureExt;
 use safe_core::ffi::AccountInfo as FfiAccountInfo;
+use std::ffi::{CStr, CString, OsStr};
 use std::os::raw::{c_char, c_void};
 
 /// Create a registered client. This or any one of the other companion
@@ -179,6 +181,47 @@ pub unsafe extern "C" fn auth_account_info(
     if let Err(..) = res {
         call_result_cb!(res, user_data, o_cb);
     }
+}
+
+/// Returns the expected name for the application executable without an extension
+#[no_mangle]
+pub unsafe extern "C" fn auth_exe_file_stem(
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        filename: *const c_char),
+) {
+
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
+        if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
+            let path_c_str = CString::new(path)?;
+            o_cb(user_data, FFI_RESULT_OK, path_c_str.as_ptr());
+        } else {
+            call_result_cb!(
+                Err::<(), _>(AuthError::from(
+                    "config_file_handler returned invalid string",
+                )),
+                user_data,
+                o_cb
+            );
+        }
+        Ok(())
+    });
+}
+
+/// Sets the additional path in config_file_handler to to search for files
+#[no_mangle]
+pub unsafe extern "C" fn auth_set_additional_search_path(
+    new_path: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
+        let new_path = CStr::from_ptr(new_path).to_str()?;
+        config_file_handler::set_additional_search_path(OsStr::new(new_path));
+        o_cb(user_data, FFI_RESULT_OK);
+        Ok(())
+    });
 }
 
 /// Discard and clean up the previously allocated authenticator instance.
