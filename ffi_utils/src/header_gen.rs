@@ -63,7 +63,7 @@ pub fn gen_headers_custom_code(
         };
 
         let mut cheddar = cheddar::Cheddar::new().expect("could not read manifest");
-        let mut cheddar = if !ignore_modules.contains(&module) {
+        let cheddar = if !ignore_modules.contains(&module) {
             cheddar.module(&module).expect("malformed module path")
         } else {
             &mut cheddar
@@ -78,7 +78,7 @@ pub fn gen_headers_custom_code(
 
     let path = format!("{}{}.h", header_directory, header_name);
     let mut cheddar = cheddar::Cheddar::new().expect("could not read manifest");
-    let mut cheddar = cheddar.module("ffi").expect("malformed module path");
+    let cheddar = cheddar.module("ffi").expect("malformed module path");
 
     // Include header files
     for path in mod_paths {
