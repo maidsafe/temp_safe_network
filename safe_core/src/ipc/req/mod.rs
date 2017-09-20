@@ -123,19 +123,19 @@ pub fn container_perms_from_repr_c(
     let mut output = BTreeSet::new();
 
     if perms.read {
-        output.insert(Permission::Read);
+        let _ = output.insert(Permission::Read);
     }
     if perms.insert {
-        output.insert(Permission::Insert);
+        let _ = output.insert(Permission::Insert);
     }
     if perms.update {
-        output.insert(Permission::Update);
+        let _ = output.insert(Permission::Update);
     }
     if perms.delete {
-        output.insert(Permission::Delete);
+        let _ = output.insert(Permission::Delete);
     }
     if perms.manage_permissions {
-        output.insert(Permission::ManagePermissions);
+        let _ = output.insert(Permission::ManagePermissions);
     }
 
     if output.is_empty() {

@@ -844,7 +844,7 @@ impl<T: 'static> Client<T> {
     /// Sets the current status of std/root dirs creation
     pub fn set_std_dirs_created(&self, val: bool) -> Result<(), CoreError> {
         let mut inner = self.inner_mut();
-        let mut account = inner.client_type.acc_mut()?;
+        let account = inner.client_type.acc_mut()?;
         account.root_dirs_created = val;
         Ok(())
     }
@@ -865,7 +865,7 @@ impl<T: 'static> Client<T> {
         trace!("Setting user root Dir ID.");
 
         let mut inner = self.inner_mut();
-        let mut account = inner.client_type.acc_mut()?;
+        let account = inner.client_type.acc_mut()?;
 
         if account.access_container != dir {
             account.access_container = dir;
@@ -892,7 +892,7 @@ impl<T: 'static> Client<T> {
         trace!("Setting configuration root Dir ID.");
 
         let mut inner = self.inner_mut();
-        let mut account = inner.client_type.acc_mut()?;
+        let account = inner.client_type.acc_mut()?;
 
         if account.config_root != dir {
             account.config_root = dir;
