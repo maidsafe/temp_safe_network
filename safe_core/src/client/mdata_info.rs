@@ -15,8 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use crypto::shared_secretbox;
 use errors::CoreError;
-use ffi::{MDataInfo as FfiMDataInfo, SymNonce, SymSecretKey};
 use ffi_utils::ReprC;
 use ipc::IpcError;
 use rand::{OsRng, Rng};
@@ -25,6 +25,11 @@ use rust_sodium::crypto::secretbox;
 use std::collections::{BTreeMap, BTreeSet};
 use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
+
+mod ffi {
+    pub use ffi::MDataInfo;
+    pub use ffi::arrays::*;
+}
 
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -35,10 +40,10 @@ pub struct MDataInfo {
     pub type_tag: u64,
     /// Key to encrypt/decrypt the directory content.
     /// and the nonce to be used for keys
-    pub enc_info: Option<(secretbox::Key, secretbox::Nonce)>,
+    pub enc_info: Option<(shared_secretbox::Key, secretbox::Nonce)>,
 
     /// Future encryption info, used for two-phase data reencryption.
-    pub new_enc_info: Option<(secretbox::Key, secretbox::Nonce)>,
+    pub new_enc_info: Option<(shared_secretbox::Key, secretbox::Nonce)>,
 }
 
 impl MDataInfo {
@@ -47,7 +52,7 @@ impl MDataInfo {
     pub fn new_private(
         name: XorName,
         type_tag: u64,
-        enc_info: (secretbox::Key, secretbox::Nonce),
+        enc_info: (shared_secretbox::Key, secretbox::Nonce),
     ) -> Self {
         MDataInfo {
             name,
@@ -70,7 +75,7 @@ impl MDataInfo {
     /// Generate random `MDataInfo` for private (encrypted) mutable data.
     pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
-        let enc_info = (secretbox::gen_key(), secretbox::gen_nonce());
+        let enc_info = (shared_secretbox::gen_key(), secretbox::gen_nonce());
         Ok(Self::new_private(rng.gen(), type_tag, enc_info))
     }
 
@@ -81,7 +86,7 @@ impl MDataInfo {
     }
 
     /// Returns the encryption key, if any.
-    pub fn enc_key(&self) -> Option<&secretbox::Key> {
+    pub fn enc_key(&self) -> Option<&shared_secretbox::Key> {
         self.enc_info.as_ref().map(|&(ref key, _)| key)
     }
 
@@ -90,7 +95,7 @@ impl MDataInfo {
         self.enc_info.as_ref().map(|&(_, ref nonce)| nonce)
     }
 
-    /// encrypt the the key for the mdata entry accordingly
+    /// encrypt the key for the mdata entry accordingly
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.new_enc_info {
             enc_entry_key(plain_text, key, seed)
@@ -131,7 +136,7 @@ impl MDataInfo {
     /// field with random keys, unless it's already populated.
     pub fn start_new_enc_info(&mut self) {
         if self.enc_info.is_some() && self.new_enc_info.is_none() {
-            self.new_enc_info = Some((secretbox::gen_key(), secretbox::gen_nonce()));
+            self.new_enc_info = Some((shared_secretbox::gen_key(), secretbox::gen_nonce()));
         }
     }
 
@@ -144,12 +149,12 @@ impl MDataInfo {
     }
 
     /// Convert into C-representation.
-    pub fn into_repr_c(self) -> FfiMDataInfo {
+    pub fn into_repr_c(self) -> ffi::MDataInfo {
         let (has_enc_info, enc_key, enc_nonce) = enc_info_into_repr_c(self.enc_info);
         let (has_new_enc_info, new_enc_key, new_enc_nonce) =
             enc_info_into_repr_c(self.new_enc_info);
 
-        FfiMDataInfo {
+        ffi::MDataInfo {
             name: self.name.0,
             type_tag: self.type_tag,
             has_enc_info,
@@ -277,7 +282,7 @@ fn enc_entry_key(
 }
 
 impl ReprC for MDataInfo {
-    type C = *const FfiMDataInfo;
+    type C = *const ffi::MDataInfo;
     type Error = IpcError;
 
     #[allow(unsafe_code)]
@@ -294,8 +299,8 @@ impl ReprC for MDataInfo {
 }
 
 fn enc_info_into_repr_c(
-    info: Option<(secretbox::Key, secretbox::Nonce)>,
-) -> (bool, SymSecretKey, SymNonce) {
+    info: Option<(shared_secretbox::Key, secretbox::Nonce)>,
+) -> (bool, ffi::SymSecretKey, ffi::SymNonce) {
     if let Some((key, nonce)) = info {
         (true, key.0, nonce.0)
     } else {
@@ -305,11 +310,14 @@ fn enc_info_into_repr_c(
 
 fn enc_info_from_repr_c(
     is_set: bool,
-    key: SymSecretKey,
-    nonce: SymNonce,
-) -> Option<(secretbox::Key, secretbox::Nonce)> {
+    key: ffi::SymSecretKey,
+    nonce: ffi::SymNonce,
+) -> Option<(shared_secretbox::Key, secretbox::Nonce)> {
     if is_set {
-        Some((secretbox::Key(key), secretbox::Nonce(nonce)))
+        Some((
+            shared_secretbox::Key::from_raw(&key),
+            secretbox::Nonce(nonce),
+        ))
     } else {
         None
     }
@@ -319,6 +327,7 @@ fn enc_info_from_repr_c(
 mod tests {
     use super::*;
 
+    // Ensure that a private mdata info is encrypted.
     #[test]
     fn private_mdata_info_encrypts() {
         let info = unwrap!(MDataInfo::random_private(0));
@@ -332,6 +341,7 @@ mod tests {
         assert_eq!(unwrap!(info.decrypt(&enc_val)), val);
     }
 
+    // Ensure that a public mdata info is not encrypted.
     #[test]
     fn public_mdata_info_doesnt_encrypt() {
         let info = unwrap!(MDataInfo::random_public(0));
@@ -342,6 +352,7 @@ mod tests {
         assert_eq!(unwrap!(info.decrypt(&val)), val);
     }
 
+    // Test creating and committing new encryption info.
     #[test]
     fn decrypt() {
         let mut info = unwrap!(MDataInfo::random_private(0));

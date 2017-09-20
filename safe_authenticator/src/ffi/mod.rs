@@ -15,10 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// Apps management.
+/// Apps management
 pub mod apps;
 /// Logging utilities
 pub mod logging;
+/// Authenticator communication with apps
+pub mod ipc;
 
 use Authenticator;
 use errors::AuthError;
@@ -33,6 +35,8 @@ use std::os::raw::{c_char, c_void};
 /// operation allowed by this module. The `user_data` parameter corresponds to the
 /// first parameter of the `o_cb` callback, while `network_cb_user_data` corresponds
 /// to the first parameter of the network events observer callback (`o_network_obs_cb`).
+///
+/// Callback parameters: user data, error code, authenticator
 #[no_mangle]
 pub unsafe extern "C" fn create_acc(
     account_locator: *const c_char,
@@ -40,8 +44,10 @@ pub unsafe extern "C" fn create_acc(
     invitation: *const c_char,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_obs_cb: extern "C" fn(*mut c_void, i32, i32),
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
+    o_network_obs_cb: extern "C" fn(user_data: *mut c_void, err_code: i32, event: i32),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        authenticator: *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
@@ -77,14 +83,18 @@ pub unsafe extern "C" fn create_acc(
 /// any operation allowed for authenticator. The `user_data` parameter corresponds to the
 /// first parameter of the `o_cb` callback, while `network_cb_user_data` corresponds
 /// to the first parameter of the network events observer callback (`o_network_obs_cb`).
+///
+/// Callback parameters: user data, error code, authenticator
 #[no_mangle]
 pub unsafe extern "C" fn login(
     account_locator: *const c_char,
     account_password: *const c_char,
     user_data: *mut c_void,
     network_cb_user_data: *mut c_void,
-    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator),
+    o_network_obs_cb: unsafe extern "C" fn(user_data: *mut c_void, err_code: i32, event: i32),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        authenticaor: *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
     let network_cb_user_data = OpaqueCtx(network_cb_user_data);
@@ -115,11 +125,13 @@ pub unsafe extern "C" fn login(
 }
 
 /// Try to restore a failed connection with the network.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn auth_reconnect(
     auth: *mut Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
     let res = (*auth).send(move |client| {
@@ -137,11 +149,15 @@ pub unsafe extern "C" fn auth_reconnect(
 }
 
 /// Get the account usage statistics.
+///
+/// Callback parameters: user data, error code, account info
 #[no_mangle]
 pub unsafe extern "C" fn auth_account_info(
     auth: *mut Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAccountInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        account_info: *const FfiAccountInfo),
 ) {
     let user_data = OpaqueCtx(user_data);
     let res = (*auth).send(move |client| {
@@ -167,7 +183,7 @@ pub unsafe extern "C" fn auth_account_info(
 
 /// Discard and clean up the previously allocated authenticator instance.
 /// Use this only if the authenticator is obtained from one of the auth
-/// functions in this crate (`create_acc`, `login`, `create_unregistered`).
+/// functions in this crate (`create_acc` or `login`).
 /// Using `auth` after a call to this function is undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn auth_free(auth: *mut Authenticator) {
@@ -185,6 +201,7 @@ mod tests {
     use std::ffi::CString;
     use std::os::raw::c_void;
 
+    // Test creating an account and logging in.
     #[test]
     fn create_account_and_login() {
         let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
@@ -227,6 +244,7 @@ mod tests {
         }
     }
 
+    // Test disconnection and reconnection with the authenticator.
     #[cfg(all(test, feature = "use-mock-routing"))]
     #[test]
     fn network_status_callback() {
@@ -301,6 +319,7 @@ mod tests {
         }
     }
 
+    // Test account usage statistics before and after a mutation.
     #[test]
     fn account_info() {
         let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));

@@ -19,20 +19,19 @@ use {App, AppError};
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
 use futures::Future;
 use safe_core::FutureExt;
+use safe_core::ffi::MDataInfo as FfiMDataInfo;
+use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
 use safe_core::ipc::req::containers_into_vec;
 use std::os::raw::{c_char, c_void};
 
-mod ffi {
-    pub use safe_core::ffi::*;
-    pub use safe_core::ipc::req::ffi::*;
-}
-
 /// Fetch access info from the network.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn access_container_refresh_access_info(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -51,14 +50,16 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 }
 
 /// Retrieve a list of container names that an app has access to.
+///
+/// Callback parameters: user data, error code, container permissions vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void,
-                        FfiResult,
-                        *const ffi::ContainerPermissions,
-                        usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        container_perms_ptr: *const FfiContainerPermissions,
+                        container_perms_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -88,12 +89,16 @@ pub unsafe extern "C" fn access_container_fetch(
 }
 
 /// Retrieve `MDataInfo` for the given container name from the access container.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn access_container_get_container_mdata_info(
     app: *const App,
     name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::MDataInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -124,13 +129,54 @@ mod tests {
     use errors::AppError;
     use ffi::access_container::*;
     use ffi_utils::{ReprC, from_c_str};
-    use ffi_utils::test_utils::{call_1, call_vec};
+    use ffi_utils::test_utils::{call_0, call_1, call_vec};
     use safe_core::{DIR_TAG, MDataInfo};
-    use safe_core::ipc::req::{ContainerPermissions, Permission, container_perms_from_repr_c};
+    use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
+    use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
+    use safe_core::ipc::req::ContainerPermissions;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use test_utils::create_app_with_access;
+    use test_utils::{create_app_with_access, run};
 
+    // Test refreshing access info by fetching it from the network.
+    #[test]
+    fn refresh_access_info() {
+        // Shared container
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert(
+            "_videos".to_string(),
+            btree_set![Permission::Read, Permission::Insert],
+        );
+
+        let app = create_app_with_access(container_permissions.clone());
+
+        run(&app, move |_client, context| {
+            let reg = unwrap!(context.as_registered()).clone();
+            assert!(reg.access_info.borrow().is_empty());
+            Ok(())
+        });
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| access_container_refresh_access_info(&app, ud, cb),
+            ))
+        }
+
+        run(&app, move |_client, context| {
+            let reg = unwrap!(context.as_registered()).clone();
+            assert!(!reg.access_info.borrow().is_empty());
+
+            let access_info = reg.access_info.borrow();
+            assert_eq!(
+                unwrap!(access_info.get("_videos")).1,
+                *unwrap!(container_permissions.get("_videos"))
+            );
+
+            Ok(())
+        });
+    }
+
+    // Test getting info about access containers and their mutable data.
     #[test]
     fn get_access_info() {
         let mut container_permissions = HashMap::new();
@@ -141,9 +187,7 @@ mod tests {
         let perms: Vec<PermSet> =
             unsafe { unwrap!(call_vec(|ud, cb| access_container_fetch(&app, ud, cb))) };
 
-        let perms: HashMap<String, ContainerPermissions> =
-            perms.into_iter().map(|val| (val.0, val.1)).collect();
-
+        let perms: HashMap<_, _> = perms.into_iter().map(|val| (val.0, val.1)).collect();
         assert_eq!(perms["_videos"], btree_set![Permission::Read]);
         assert_eq!(perms.len(), 2);
 
@@ -163,7 +207,7 @@ mod tests {
     struct PermSet(String, ContainerPermissions);
 
     impl ReprC for PermSet {
-        type C = *const ffi::ContainerPermissions;
+        type C = *const FfiContainerPermissions;
         type Error = AppError;
 
         unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {

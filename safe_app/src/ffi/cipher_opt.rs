@@ -95,12 +95,16 @@ impl CipherOpt {
     }
 }
 
-/// Construct `CipherOpt::PlainText` handle
+/// Construct `CipherOpt::PlainText` handle.
+///
+/// Callback parameters: user data, error code, cipher opt handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_plaintext(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, CipherOptHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        handle: CipherOptHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -115,12 +119,16 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
     });
 }
 
-/// Construct `CipherOpt::Symmetric` handle
+/// Construct `CipherOpt::Symmetric` handle.
+///
+/// Callback parameters: user data, error code, cipher opt handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_symmetric(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, CipherOptHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        handle: CipherOptHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -134,13 +142,17 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(
     })
 }
 
-/// Construct `CipherOpt::Asymmetric` handle
+/// Construct `CipherOpt::Asymmetric` handle.
+///
+/// Callback parameters: user data, error code, cipher opt handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(
     app: *const App,
     peer_encrypt_key_h: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, CipherOptHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        handle: CipherOptHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -164,13 +176,15 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
     });
 }
 
-/// Free `CipherOpt` handle
+/// Free `CipherOpt` handle.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_free(
     app: *const App,
     handle: CipherOptHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -195,6 +209,7 @@ mod tests {
     use safe_core::{Client, utils};
     use test_utils::{create_app, run_now};
 
+    // Test plaintext "encryption" and decryption.
     #[test]
     fn app_0_to_app_0_plain() {
         let app_0 = create_app();
@@ -227,6 +242,7 @@ mod tests {
         });
     }
 
+    // Test symmetric encryption and decryption.
     #[test]
     fn app_0_to_app_0_sym() {
         let app_0 = create_app();
@@ -259,6 +275,7 @@ mod tests {
         });
     }
 
+    // Test asymmetric encryption and decryption.
     // NOTE: rustfmt is behaving erratically on this function. Disabling it for now.
     #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
@@ -309,6 +326,7 @@ mod tests {
         });
     }
 
+    // Test creating and freeing the different possible cipher option handles.
     #[test]
     fn create_and_free() {
         let app = create_app();

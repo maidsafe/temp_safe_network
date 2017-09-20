@@ -22,17 +22,22 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
-use safe_core::ffi::{AsymNonce, AsymPublicKey, AsymSecretKey};
+use safe_core::crypto::shared_box;
+use safe_core::ffi::arrays::{AsymNonce, AsymPublicKey, AsymSecretKey, SignPublicKey};
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
 
 /// Get the public signing key of the app.
+///
+/// Callback parameters: user data, error code, sign key handle
 #[no_mangle]
 pub unsafe extern "C" fn app_pub_sign_key(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, SignKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        handle: SignKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
@@ -43,12 +48,16 @@ pub unsafe extern "C" fn app_pub_sign_key(
 }
 
 /// Create new public signing key from raw array.
+///
+/// Callback parameters: user data, error code, sign key handle
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_new(
     app: *const App,
-    data: *const AsymPublicKey,
+    data: *const SignPublicKey,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, SignKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        handle: SignKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = sign::PublicKey(*data);
@@ -59,12 +68,16 @@ pub unsafe extern "C" fn sign_key_new(
 }
 
 /// Retrieve the public signing key as raw array.
+///
+/// Callback parameters: user data, error code, public sign key
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_get(
     app: *const App,
     handle: SignKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymPublicKey),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        pub_sign_key: *const SignPublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -74,13 +87,15 @@ pub unsafe extern "C" fn sign_key_get(
     })
 }
 
-/// Free signing key from memory
+/// Free signing key from memory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_free(
     app: *const App,
     handle: SignKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -91,11 +106,15 @@ pub unsafe extern "C" fn sign_key_free(
 }
 
 /// Get the public encryption key of the app.
+///
+/// Callback parameters: user data, error code, public encrypt key handle
 #[no_mangle]
 pub unsafe extern "C" fn app_pub_enc_key(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, EncryptPubKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        pk_h: EncryptPubKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
@@ -106,17 +125,19 @@ pub unsafe extern "C" fn app_pub_enc_key(
 }
 
 /// Generate a new encryption key pair (public & private key).
+///
+/// Callback parameters: user data, error code, public encrypt key handle, secret encrypt key handle
 #[no_mangle]
 pub unsafe extern "C" fn enc_generate_key_pair(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void,
-                        FfiResult,
-                        EncryptPubKeyHandle,
-                        EncryptSecKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        pk_h: EncryptPubKeyHandle,
+                        sk_h: EncryptSecKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let (ourpk, oursk) = box_::gen_keypair();
+        let (ourpk, oursk) = shared_box::gen_keypair();
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |_, context| {
@@ -131,12 +152,16 @@ pub unsafe extern "C" fn enc_generate_key_pair(
 }
 
 /// Create new public encryption key from raw array.
+///
+/// Callback parameters: user data, error code, public encrypt key handle
 #[no_mangle]
 pub unsafe extern "C" fn enc_pub_key_new(
     app: *const App,
     data: *const AsymPublicKey,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, EncryptPubKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        pk_h: EncryptPubKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = box_::PublicKey(*data);
@@ -147,12 +172,16 @@ pub unsafe extern "C" fn enc_pub_key_new(
 }
 
 /// Retrieve the public encryption key as raw array.
+///
+/// Callback parameters: user data, error code, public encrypt key
 #[no_mangle]
 pub unsafe extern "C" fn enc_pub_key_get(
     app: *const App,
     handle: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymPublicKey),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        pub_enc_key: *const AsymPublicKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -162,45 +191,15 @@ pub unsafe extern "C" fn enc_pub_key_get(
     })
 }
 
-/// Retrieve the private encryption key as raw array.
-#[no_mangle]
-pub unsafe extern "C" fn enc_secret_key_get(
-    app: *const App,
-    handle: EncryptSecKeyHandle,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymSecretKey),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let key = context.object_cache().get_secret_key(handle)?;
-            Ok(&key.0)
-        })
-    })
-}
-
-/// Create new public encryption key from raw array.
-#[no_mangle]
-pub unsafe extern "C" fn enc_secret_key_new(
-    app: *const App,
-    data: *const AsymSecretKey,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, EncryptSecKeyHandle),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        let key = box_::SecretKey(*data);
-        send_sync(app, user_data, o_cb, move |_, context| {
-            Ok(context.object_cache().insert_secret_key(key))
-        })
-    })
-}
-
 /// Free encryption key from memory
+///
+/// Callback parameters: user data, error code, secret encrypt key
 #[no_mangle]
 pub unsafe extern "C" fn enc_pub_key_free(
     app: *const App,
     handle: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -210,13 +209,55 @@ pub unsafe extern "C" fn enc_pub_key_free(
     })
 }
 
-/// Free private key from memory
+/// Create new public encryption key from raw array.
+///
+/// Callback parameters: user data, error code, secret encrypt key handle
+#[no_mangle]
+pub unsafe extern "C" fn enc_secret_key_new(
+    app: *const App,
+    data: *const AsymSecretKey,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        sk_h: EncryptSecKeyHandle),
+) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let key = shared_box::SecretKey::from_raw(&*data);
+        send_sync(app, user_data, o_cb, move |_, context| {
+            Ok(context.object_cache().insert_secret_key(key))
+        })
+    })
+}
+
+/// Retrieve the private encryption key as raw array.
+///
+/// Callback parameters: user data, error code
+#[no_mangle]
+pub unsafe extern "C" fn enc_secret_key_get(
+    app: *const App,
+    handle: EncryptSecKeyHandle,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        sec_enc_key: *const AsymSecretKey),
+) {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |_, context| {
+            let key = context.object_cache().get_secret_key(handle)?;
+            Ok(&key.0)
+        })
+    })
+}
+
+/// Free private key from memory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn enc_secret_key_free(
     app: *const App,
     handle: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -228,6 +269,8 @@ pub unsafe extern "C" fn enc_secret_key_free(
 
 /// Encrypts arbitrary data using a given key pair.
 /// You should provide a recipient's public key and a sender's secret key.
+///
+/// Callback parameters: user data, error code, ciphertext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn encrypt(
     app: *const App,
@@ -236,7 +279,10 @@ pub unsafe extern "C" fn encrypt(
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        ciphertext_ptr: *const u8,
+                        ciphertext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -268,6 +314,8 @@ pub unsafe extern "C" fn encrypt(
 
 /// Decrypts arbitrary data using a given key pair.
 /// You should provide a sender's public key and a recipient's secret key.
+///
+/// Callback parameters: user data, error code, plaintext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn decrypt(
     app: *const App,
@@ -276,7 +324,10 @@ pub unsafe extern "C" fn decrypt(
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        plaintext_ptr: *const u8,
+                        plaintext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -314,6 +365,8 @@ pub unsafe extern "C" fn decrypt(
 
 /// Encrypts arbitrary data for a single recipient.
 /// You should provide a recipient's public key.
+///
+/// Callback parameters: user data, error code, ciphertext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn encrypt_sealed_box(
     app: *const App,
@@ -321,7 +374,10 @@ pub unsafe extern "C" fn encrypt_sealed_box(
     len: usize,
     pk_h: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        ciphertext_ptr: *const u8,
+                        ciphertext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let plaintext = vec_clone_from_raw_parts(data, len);
@@ -349,6 +405,8 @@ pub unsafe extern "C" fn encrypt_sealed_box(
 
 /// Decrypts arbitrary data for a single recipient.
 /// You should provide a recipients's private and public key.
+///
+/// Callback parameters: user data, error code, plaintext vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn decrypt_sealed_box(
     app: *const App,
@@ -357,7 +415,10 @@ pub unsafe extern "C" fn decrypt_sealed_box(
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        plaintext_ptr: *const u8,
+                        plaintext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -387,12 +448,17 @@ pub unsafe extern "C" fn decrypt_sealed_box(
 }
 
 /// Returns a sha3 hash for a given data.
+///
+/// Callback parameters: user data, error code, hash vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn sha3_hash(
     data: *const u8,
     len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        hash_ptr: *const u8,
+                        hash_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let plaintext = slice::from_raw_parts(data, len);
@@ -405,10 +471,14 @@ pub unsafe extern "C" fn sha3_hash(
 }
 
 /// Generates a unique nonce and returns the result.
+///
+/// Callback parameters: user data, error code, nonce
 #[no_mangle]
 pub unsafe extern "C" fn generate_nonce(
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const AsymNonce),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        nonce: *const AsymNonce),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let nonce = box_::gen_nonce();
@@ -421,11 +491,12 @@ pub unsafe extern "C" fn generate_nonce(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::test_utils::{call_1, call_2, call_vec_u8};
+    use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
     use rust_sodium::crypto::box_;
-    use safe_core::ffi::{AsymNonce, AsymPublicKey, SignPublicKey};
+    use safe_core::arrays::{AsymNonce, AsymPublicKey, SignPublicKey};
     use test_utils::{create_app, run_now};
 
+    // Test encrypting and decrypting messages between apps.
     #[test]
     fn encrypt_decrypt() {
         let app1 = create_app();
@@ -482,6 +553,7 @@ mod tests {
         assert_eq!(&decrypted, data);
     }
 
+    // Test encrypting and decrypting sealed box messages between apps.
     #[test]
     fn encrypt_decrypt_sealed() {
         let app1 = create_app();
@@ -524,6 +596,7 @@ mod tests {
         assert_eq!(&decrypted, data);
     }
 
+    // Test creating and fetching sign keys.
     #[test]
     fn sign_key_basics() {
         let app = create_app();
@@ -551,10 +624,17 @@ mod tests {
         });
 
         assert_eq!(app_sign_key1, app_sign_key2);
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| sign_key_free(&app, app_sign_key2_h, ud, cb),
+            ))
+        }
     }
 
+    // Test creating and fetching public encryption keys.
     #[test]
-    fn enc_key_basics() {
+    fn enc_public_key_basics() {
         let app = create_app();
         let app_enc_key1_h = unsafe { unwrap!(call_1(|ud, cb| app_pub_enc_key(&app, ud, cb))) };
 
@@ -583,11 +663,92 @@ mod tests {
         });
 
         assert_eq!(app_enc_key1, app_enc_key2);
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| enc_pub_key_free(&app, app_enc_key2_h, ud, cb),
+            ))
+        }
     }
 
+    // Test creating and fetching secret encryption keys.
+    #[test]
+    fn enc_secret_key_basics() {
+        let app = create_app();
+        let (app_public_key_h, app_secret_key1_h) =
+            unsafe { unwrap!(call_2(|ud, cb| enc_generate_key_pair(&app, ud, cb))) };
+
+        let app_public_key1: AsymPublicKey = unsafe {
+            unwrap!(call_1(
+                |ud, cb| enc_pub_key_get(&app, app_public_key_h, ud, cb),
+            ))
+        };
+        let app_secret_key1: AsymSecretKey = unsafe {
+            unwrap!(call_1(
+                |ud, cb| enc_secret_key_get(&app, app_secret_key1_h, ud, cb),
+            ))
+        };
+
+        let app_secret_key1 = run_now(&app, move |_client, context| {
+            let app_public_key2 = unwrap!(context.object_cache().get_encrypt_key(app_public_key_h));
+            assert_eq!(box_::PublicKey(app_public_key1), *app_public_key2);
+
+            let app_secret_key2 = unwrap!(context.object_cache().get_secret_key(app_secret_key1_h));
+            assert_eq!(app_secret_key1, app_secret_key2.0);
+
+            app_secret_key1
+        });
+
+        let app_secret_key1_raw: AsymSecretKey = unsafe {
+            unwrap!(call_1(
+                |ud, cb| enc_secret_key_get(&app, app_secret_key1_h, ud, cb),
+            ))
+        };
+
+        let app_secret_key2_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                enc_secret_key_new(&app, &app_secret_key1_raw, ud, cb)
+            }))
+        };
+
+        run_now(&app, move |_, context| {
+            let app_secret_key2 = unwrap!(context.object_cache().get_secret_key(app_secret_key2_h));
+            assert_eq!(app_secret_key1, app_secret_key2.0);
+        });
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                enc_secret_key_free(&app, app_secret_key2_h, ud, cb)
+            }))
+        }
+    }
+
+    // Test that generated nonces are the correct length.
     #[test]
     fn nonce_smoke_test() {
         let nonce: AsymNonce = unsafe { unwrap!(call_1(|ud, cb| generate_nonce(ud, cb))) };
         assert_eq!(nonce.len(), box_::NONCEBYTES);
+    }
+
+    // Test that generated sha3 hashes are the correct length.
+    #[test]
+    fn sha3_smoke_test() {
+        let data = b"test message";
+        let sha3 = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| sha3_hash(data.as_ptr(), data.len(), ud, cb),
+            ))
+        };
+
+        assert_eq!(sha3.len(), 256 / 8);
+
+        let data = b"";
+        let sha3 = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| sha3_hash(data.as_ptr(), data.len(), ud, cb),
+            ))
+        };
+
+        assert_eq!(sha3.len(), 256 / 8);
     }
 }

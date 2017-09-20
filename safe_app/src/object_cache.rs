@@ -26,12 +26,13 @@ use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
 use safe_core::SelfEncryptionStorage;
+use safe_core::crypto::shared_box;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};
 use std::u64;
 
-const DEFAULT_CAPACITY: usize = 100;
+const DEFAULT_CAPACITY: usize = 1000;
 
 /// Object handle associated with objects. In normal C API one would expect rust
 /// code to pass pointers to opaque object to C. C code would then need to pass
@@ -78,7 +79,7 @@ pub struct ObjectCache {
     handle_gen: HandleGenerator,
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
-    secret_key: Store<box_::SecretKey>,
+    secret_key: Store<shared_box::SecretKey>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
@@ -180,7 +181,7 @@ impl_cache!(
 );
 impl_cache!(
     secret_key,
-    box_::SecretKey,
+    shared_box::SecretKey,
     EncryptSecKeyHandle,
     InvalidEncryptSecKeyHandle,
     get_secret_key,
@@ -320,6 +321,7 @@ mod tests {
     use super::*;
     use rust_sodium::crypto::sign;
 
+    // Test resetting the object cache.
     #[test]
     fn reset() {
         let object_cache = ObjectCache::new();

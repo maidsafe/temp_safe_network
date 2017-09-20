@@ -1,6 +1,5 @@
 env:
   global:
-    - FEATURES=use-mock-routing,testing
     - RUST_BACKTRACE=1
     - PATH=$PATH:$HOME/.cargo/bin
     - SAFE_MEMORY_STORE=1
@@ -66,9 +65,9 @@ script:
         cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_authenticator/Cargo.toml &&
         cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_app/Cargo.toml &&
         echo "--- Test against mock ---" &&
-        cargo test --verbose --release --features=$FEATURES --manifest-path=safe_core/Cargo.toml &&
-        cargo test --verbose --release --features=$FEATURES --manifest-path=safe_authenticator/Cargo.toml &&
-        cargo test --verbose --release --features=$FEATURES --manifest-path=safe_app/Cargo.toml;
+        cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_core/Cargo.toml &&
+        cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml &&
+        cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml;
       );
     elif [[ $TRAVIS_EVENT_TYPE = pull_request ]]; then
       (
@@ -79,9 +78,9 @@ script:
         cd ../safe_authenticator && cargo clippy --profile=test --features=testing &&
         cd ../safe_app && cargo clippy --profile=test --features=testing &&
         echo "--- Test build for mock-routing ---" &&
-        cd ../safe_core && cargo clippy --profile=test --features=$FEATURES &&
-        cd ../safe_authenticator && cargo clippy --profile=test --features=$FEATURES &&
-        cd ../safe_app && cargo clippy --profile=test --features=$FEATURES;
+        cd ../safe_core && cargo clippy --profile=test --features=use-mock-routing &&
+        cd ../safe_authenticator && cargo clippy --profile=test --features=use-mock-routing &&
+        cd ../safe_app && cargo clippy --profile=test --features=use-mock-routing;
       )
     fi
 after_script:
@@ -106,8 +105,8 @@ before_deploy:
       SUFFIX=dylib STRIP_ARG=-x;
     fi
   # Build for mock.
-  - cargo build --verbose --release --features=$FEATURES --manifest-path=safe_authenticator/Cargo.toml
-  - cargo build --verbose --release --features=$FEATURES --manifest-path=safe_app/Cargo.toml
+  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml
+  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
   - strip $STRIP_ARG target/release/libsafe_authenticator.$SUFFIX target/release/libsafe_app.$SUFFIX
   - zip -j target/deploy/safe_authenticator-mock-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
   - zip -j target/deploy/safe_app-mock-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX

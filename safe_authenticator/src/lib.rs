@@ -63,24 +63,27 @@ extern crate unwrap;
 #[cfg(any(test, feature = "testing"))]
 extern crate rand;
 
-/// Provides utilities to test the authenticator functionality
-#[cfg(any(test, feature = "testing"))]
-#[macro_use]
-pub mod test_utils;
-
 /// FFI routines
 pub mod ffi;
-/// Authenticator communication with apps
-pub mod ipc;
+
+pub use ffi::*;
+pub use ffi::apps::*;
+pub use ffi::ipc::*;
+pub use ffi::logging::*;
 
 mod access_container;
 mod app_auth;
 mod app_container;
 mod config;
 mod errors;
+mod ipc;
 mod revocation;
 mod std_dirs;
 
+/// Provides utilities to test the authenticator functionality
+#[cfg(any(test, feature = "testing"))]
+#[macro_use]
+pub mod test_utils;
 #[cfg(test)]
 mod tests;
 
@@ -166,27 +169,26 @@ impl Authenticator {
             let el_h = el.handle();
 
             let (core_tx, core_rx) = mpsc::unbounded();
+            let core_tx2 = core_tx.clone();
             let (net_tx, net_rx) = mpsc::unbounded::<NetworkEvent>();
-            let core_tx_clone = core_tx.clone();
 
             let net_obs_fut = net_rx
                 .then(move |net_event| Ok(network_observer(net_event)))
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(create_client_fn(el_h, core_tx_clone, net_tx), tx);
-
-            let tx2 = tx.clone();
-            let core_tx2 = core_tx.clone();
-            let core_tx3 = core_tx.clone();
+            let client = try_tx!(create_client_fn(el_h, core_tx.clone(), net_tx), tx);
 
             unwrap!(core_tx.unbounded_send(CoreMsg::new(move |client, &()| {
                 std_dirs::create(client)
-                    .map(move |()| {
-                        unwrap!(tx.send(Ok(core_tx2)));
-                    })
-                    .map_err(move |e| {
-                        unwrap!(tx2.send(Err((Some(core_tx3), AuthError::from(e)))));
+                    .map_err(|error| AuthError::AccountContainersCreation(error.to_string()))
+                    .then(move |res| {
+                        match res {
+                            Ok(_) => unwrap!(tx.send(Ok(core_tx2))),
+                            Err(error) => unwrap!(tx.send(Err((Some(core_tx2), error)))),
+                        }
+
+                        Ok(())
                     })
                     .into_box()
                     .into()
@@ -299,7 +301,7 @@ impl Authenticator {
     }
 }
 
-#[cfg(all(feature = "use-mock-routing", any(test, feature = "testing")))]
+#[cfg(feature = "use-mock-routing")]
 impl Authenticator {
     #[allow(unused)]
     fn login_with_hook<F, S, NetObs>(

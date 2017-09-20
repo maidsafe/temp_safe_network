@@ -32,6 +32,7 @@ pub use self::mdata_info::MDataInfo;
 use self::mock::Routing;
 #[cfg(feature = "use-mock-routing")]
 pub use self::mock::Routing as MockRouting;
+use crypto::{shared_box, shared_secretbox, shared_sign};
 use errors::CoreError;
 use event::{CoreEvent, NetworkEvent, NetworkTx};
 use event_loop::{CoreFuture, CoreMsgTx};
@@ -47,7 +48,7 @@ use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, EntryA
               Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use rust_sodium::crypto::{box_, secretbox};
+use rust_sodium::crypto::box_;
 use rust_sodium::crypto::sign::{self, Seed};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -915,12 +916,14 @@ impl<T: 'static> Client<T> {
     }
 
     /// Returns the Secret encryption key
-    pub fn secret_encryption_key(&self) -> Result<box_::SecretKey, CoreError> {
+    pub fn secret_encryption_key(&self) -> Result<shared_box::SecretKey, CoreError> {
         self.inner().client_type.secret_encryption_key()
     }
 
     /// Returns the public and secret encryption keys.
-    pub fn encryption_keypair(&self) -> Result<(box_::PublicKey, box_::SecretKey), CoreError> {
+    pub fn encryption_keypair(
+        &self,
+    ) -> Result<(box_::PublicKey, shared_box::SecretKey), CoreError> {
         let inner = self.inner();
         let pk = inner.client_type.public_encryption_key()?;
         let sk = inner.client_type.secret_encryption_key()?;
@@ -933,17 +936,17 @@ impl<T: 'static> Client<T> {
     }
 
     /// Returns the Secret Signing key
-    pub fn secret_signing_key(&self) -> Result<sign::SecretKey, CoreError> {
+    pub fn secret_signing_key(&self) -> Result<shared_sign::SecretKey, CoreError> {
         self.inner().client_type.secret_signing_key()
     }
 
     /// Returns the Symmetric Encryption key
-    pub fn secret_symmetric_key(&self) -> Result<secretbox::Key, CoreError> {
+    pub fn secret_symmetric_key(&self) -> Result<shared_secretbox::Key, CoreError> {
         self.inner().client_type.secret_symmetric_key()
     }
 
     /// Returns the public and secret signing keys.
-    pub fn signing_keypair(&self) -> Result<(sign::PublicKey, sign::SecretKey), CoreError> {
+    pub fn signing_keypair(&self) -> Result<(sign::PublicKey, shared_sign::SecretKey), CoreError> {
         let inner = self.inner();
         let pk = inner.client_type.public_signing_key()?;
         let sk = inner.client_type.secret_signing_key()?;
@@ -1342,7 +1345,7 @@ impl ClientType {
         }
     }
 
-    fn secret_signing_key(&self) -> Result<sign::SecretKey, CoreError> {
+    fn secret_signing_key(&self) -> Result<shared_sign::SecretKey, CoreError> {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_sk.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_sk.clone()),
@@ -1358,7 +1361,7 @@ impl ClientType {
         }
     }
 
-    fn secret_encryption_key(&self) -> Result<box_::SecretKey, CoreError> {
+    fn secret_encryption_key(&self) -> Result<shared_box::SecretKey, CoreError> {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_sk.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_sk.clone()),
@@ -1366,7 +1369,7 @@ impl ClientType {
         }
     }
 
-    fn secret_symmetric_key(&self) -> Result<secretbox::Key, CoreError> {
+    fn secret_symmetric_key(&self) -> Result<shared_secretbox::Key, CoreError> {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_key.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_key.clone()),
@@ -1437,6 +1440,7 @@ mod tests {
     use utils;
     use utils::test_utils::{finish, random_client, setup_client};
 
+    // Test logging in using a seeded account.
     #[test]
     fn seeded_login() {
         let invalid_seed = String::from("123");
@@ -1483,6 +1487,10 @@ mod tests {
                      |_| finish());
     }
 
+    // Tests for unregistered clients.
+    // 1. Have a registered client PUT something on the network.
+    // 2. Try to set the access container as unregistered - this should fail.
+    // 3. Try to set the config root directory as unregistered - this should fail.
     #[test]
     fn unregistered_client() {
         let orig_data = ImmutableData::new(unwrap!(utils::generate_random_vector(30)));
@@ -1539,6 +1547,8 @@ mod tests {
         });
     }
 
+    // Test account creation.
+    // It should succeed the first time and fail the second time with the same secrets.
     #[test]
     fn registered_client() {
         let el = unwrap!(Core::new());
@@ -1567,6 +1577,7 @@ mod tests {
         }
     }
 
+    // Test creating and logging in to an account on the network.
     #[test]
     fn login() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1594,6 +1605,7 @@ mod tests {
                      |_| finish());
     }
 
+    // Test creation of an access container.
     #[test]
     fn access_container_creation() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1620,6 +1632,7 @@ mod tests {
                      });
     }
 
+    // Test setting the configuration root directory.
     #[test]
     fn config_root_dir_creation() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1646,6 +1659,7 @@ mod tests {
                      });
     }
 
+    // Test restarting routing after a network disconnect.
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn restart_routing() {
@@ -1680,6 +1694,7 @@ mod tests {
         );
     }
 
+    // Test that a `RequestTimeout` error is returned on network timeout.
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn timeout() {

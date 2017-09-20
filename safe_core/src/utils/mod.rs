@@ -17,6 +17,7 @@
 
 #[macro_use]
 mod futures;
+
 /// Common utility functions for writing test cases
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
@@ -145,6 +146,7 @@ mod tests {
 
     const SIZE: usize = 10;
 
+    // Test `generate_random_string` and that the results are not repeated.
     #[test]
     fn random_string() {
         let str0 = unwrap!(generate_random_string(SIZE));
@@ -154,8 +156,13 @@ mod tests {
         assert_ne!(str0, str1);
         assert_ne!(str0, str2);
         assert_ne!(str1, str2);
+
+        assert_eq!(str0.chars().collect::<Vec<char>>().len(), SIZE);
+        assert_eq!(str1.chars().collect::<Vec<char>>().len(), SIZE);
+        assert_eq!(str2.chars().collect::<Vec<char>>().len(), SIZE);
     }
 
+    // Test `generate_random_vector` and that the results are not repeated.
     #[test]
     fn random_vector() {
         let vec0 = unwrap!(generate_random_vector::<u8>(SIZE));
@@ -165,8 +172,13 @@ mod tests {
         assert_ne!(vec0, vec1);
         assert_ne!(vec0, vec2);
         assert_ne!(vec1, vec2);
+
+        assert_eq!(vec0.len(), SIZE);
+        assert_eq!(vec1.len(), SIZE);
+        assert_eq!(vec2.len(), SIZE);
     }
 
+    // Test derivation of distinct password, keyword, and pin secrets.
     #[test]
     fn secrets_derivation() {
         // Random pass-phrase

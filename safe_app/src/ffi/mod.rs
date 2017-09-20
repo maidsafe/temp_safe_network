@@ -19,18 +19,6 @@
 
 #![allow(unsafe_code)]
 
-use super::App;
-use super::errors::AppError;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
-use futures::Future;
-use maidsafe_utilities::serialisation::deserialise;
-use safe_core::{FutureExt, NetworkEvent};
-use safe_core::ffi::AccountInfo as FfiAccountInfo;
-use safe_core::ipc::{AuthGranted, BootstrapConfig};
-use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
-use std::os::raw::{c_char, c_void};
-use std::slice;
-
 /// Access container
 pub mod access_container;
 /// Cipher Options
@@ -52,18 +40,32 @@ pub mod nfs;
 
 mod helper;
 
+use super::App;
+use super::errors::AppError;
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
+use futures::Future;
+use maidsafe_utilities::serialisation::deserialise;
+use safe_core::{FutureExt, NetworkEvent};
+use safe_core::ffi::AccountInfo as FfiAccountInfo;
+use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
+use safe_core::ipc::{AuthGranted, BootstrapConfig};
+use std::os::raw::{c_char, c_void};
+use std::slice;
+
 /// Create unregistered app.
 /// The `user_data` parameter corresponds to the first parameter of the
 /// `o_cb` callback, while `network_cb_user_data` corresponds to the
 /// first parameter of `o_network_observer_cb`.
+///
+/// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_ptr: *const u8,
     bootstrap_config_len: usize,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_observer_cb: extern "C" fn(*mut c_void, FfiResult, i32),
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App),
+    o_network_observer_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, event: i32),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -94,14 +96,16 @@ pub unsafe extern "C" fn app_unregistered(
 /// The `user_data` parameter corresponds to the first parameter of the
 /// `o_cb` callback, while `network_cb_user_data` corresponds to the
 /// first parameter of `o_network_observer_cb`.
+///
+/// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_registered(
     app_id: *const c_char,
     auth_granted: *const FfiAuthGranted,
     network_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_observer_cb: extern "C" fn(*mut c_void, FfiResult, i32),
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App),
+    o_network_observer_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, event: i32),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -120,11 +124,13 @@ pub unsafe extern "C" fn app_registered(
 }
 
 /// Try to restore a failed connection with the network.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn app_reconnect(
     app: *mut App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
     let res = (*app).send(move |client, _| {
@@ -141,12 +147,16 @@ pub unsafe extern "C" fn app_reconnect(
     }
 }
 
-/// Get the account usage statistics.
+/// Get the account usage statistics (mutations done and mutations available).
+///
+/// Callback parameters: user data, error code, account info
 #[no_mangle]
 pub unsafe extern "C" fn app_account_info(
     app: *mut App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAccountInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        account_info: *const FfiAccountInfo),
 ) {
     let user_data = OpaqueCtx(user_data);
     let res = (*app).send(move |client, _| {
@@ -182,7 +192,7 @@ pub unsafe extern "C" fn app_free(app: *mut App) {
 unsafe fn call_network_observer(
     event: Result<NetworkEvent, AppError>,
     user_data: *mut c_void,
-    o_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32),
+    o_cb: unsafe extern "C" fn(user_data: *mut c_void, result: FfiResult, event: i32),
 ) {
     match event {
         Ok(event) => o_cb(user_data, FFI_RESULT_OK, event.into()),
@@ -200,6 +210,7 @@ mod tests {
     use safe_core::ffi::AccountInfo;
     use test_utils::create_app;
 
+    // Test account usage statistics before and after a mutation.
     #[test]
     fn account_info() {
         let app = create_app();
@@ -229,6 +240,7 @@ mod tests {
         unsafe { app_free(app) };
     }
 
+    // Test disconnection and reconnection with apps.
     #[cfg(all(test, feature = "use-mock-routing"))]
     #[test]
     fn network_status_callback() {

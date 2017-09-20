@@ -28,12 +28,12 @@ use routing::User::Key;
 use routing::XorName;
 use rust_sodium::crypto::sign::PublicKey;
 use safe_core::FutureExt;
-use safe_core::ffi::XorNameArray;
+use safe_core::ffi::arrays::XorNameArray;
+use safe_core::ffi::ipc::req::{AppExchangeInfo as FfiAppExchangeInfo, ContainerPermissions};
+use safe_core::ffi::ipc::resp::AppAccess as FfiAppAccess;
 use safe_core::ipc::{IpcError, access_container_enc_key};
 use safe_core::ipc::req::{AppExchangeInfo, containers_into_vec};
-use safe_core::ipc::req::ffi::{self, ContainerPermissions};
 use safe_core::ipc::resp::{AccessContainerEntry, AppAccess};
-use safe_core::ipc::resp::ffi::AppAccess as FfiAppAccess;
 use safe_core::utils::symmetric_decrypt;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_void};
@@ -42,7 +42,7 @@ use std::os::raw::{c_char, c_void};
 #[repr(C)]
 pub struct RegisteredApp {
     /// Unique application identifier
-    pub app_info: ffi::AppExchangeInfo,
+    pub app_info: FfiAppExchangeInfo,
     /// List of containers that this application has access to
     pub containers: *const ContainerPermissions,
     /// Length of the containers array
@@ -64,13 +64,15 @@ impl Drop for RegisteredApp {
     }
 }
 
-/// Removes a revoked app from the authenticator config
+/// Removes a revoked app from the authenticator config.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn auth_rm_revoked_app(
     auth: *const Authenticator,
     app_id: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
 
     let user_data = OpaqueCtx(user_data);
@@ -110,11 +112,17 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
     });
 }
 
-/// Get a list of apps revoked from authenticator
+/// Get a list of apps revoked from authenticator.
+///
+/// Callback parameters: user data, error code, app exchange info vector, vector size
+#[no_mangle]
 pub unsafe extern "C" fn auth_revoked_apps(
     auth: *const Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::AppExchangeInfo, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        app_exchange_info_ptr: *const FfiAppExchangeInfo,
+                        app_exchange_info_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -170,12 +178,17 @@ pub unsafe extern "C" fn auth_revoked_apps(
     })
 }
 
-/// Get a list of apps registered in authenticator
+/// Get a list of apps registered in authenticator.
+///
+/// Callback parameters: user data, error code, registered app vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn auth_registered_apps(
     auth: *const Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const RegisteredApp, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        registered_app_ptr: *const RegisteredApp,
+                        registered_app_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -249,13 +262,18 @@ pub unsafe extern "C" fn auth_registered_apps(
 
 /// Return a list of apps having access to an arbitrary MD object.
 /// `md_name` and `md_type_tag` together correspond to a single MD.
+///
+/// Callback parameters: user data, error code, app access vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
     auth: *const Authenticator,
     md_name: *const XorNameArray,
     md_type_tag: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const FfiAppAccess, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        app_access_ptr: *const FfiAppAccess,
+                        app_access_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
     let name = XorName(*md_name);

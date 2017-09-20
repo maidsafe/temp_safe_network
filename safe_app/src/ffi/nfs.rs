@@ -23,10 +23,11 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwin
 use futures::Future;
 use futures::future::{self, Either};
 use object_cache::FileContextHandle;
-use safe_core::{FutureExt, MDataInfo, ffi};
+use safe_core::{FutureExt, MDataInfo};
+use safe_core::ffi::MDataInfo as FfiMDataInfo;
+use safe_core::ffi::nfs::File;
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
-use safe_core::nfs::ffi::File;
 use std::os::raw::{c_char, c_void};
 
 /// Holds context for file operations, depending on the mode.
@@ -46,13 +47,18 @@ pub static OPEN_MODE_READ: u64 = 4;
 pub static FILE_READ_TO_END: u64 = 0;
 
 /// Retrieve file with the given name, and its version, from the directory.
+///
+/// Callback parameters: user data, error code, file, version
 #[no_mangle]
 pub unsafe extern "C" fn dir_fetch_file(
     app: *const App,
-    parent_info: *const ffi::MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        file: *const File,
+                        version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -76,14 +82,16 @@ pub unsafe extern "C" fn dir_fetch_file(
 }
 
 /// Insert the file into the parent directory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_insert_file(
     app: *const App,
-    parent_info: *const ffi::MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     file: *const File,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -98,15 +106,17 @@ pub unsafe extern "C" fn dir_insert_file(
 
 /// Replace the file in the parent directory.
 /// If `version` is 0, the correct version is obtained automatically.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
     app: *const App,
-    parent_info: *const ffi::MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     file: *const File,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -120,14 +130,16 @@ pub unsafe extern "C" fn dir_update_file(
 }
 
 /// Delete the file in the parent directory.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
-    parent_info: *const ffi::MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -139,15 +151,19 @@ pub unsafe extern "C" fn dir_delete_file(
     })
 }
 
-/// Open the file to read of write its contents
+/// Open the file to read of write its contents.
+///
+/// Callback parameters: user data, error code, file context handle
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
-    parent_info: *const ffi::MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        file_h: FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -197,12 +213,14 @@ pub unsafe extern "C" fn file_open(
 }
 
 /// Get a size of file opened for read.
+///
+/// Callback parameters: user data, error code, file size
 #[no_mangle]
 pub unsafe extern "C" fn file_size(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, u64),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, size: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -221,6 +239,8 @@ pub unsafe extern "C" fn file_size(
 }
 
 /// Read data from file.
+///
+/// Callback parameters: user data, error code, file data vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn file_read(
     app: *const App,
@@ -228,7 +248,10 @@ pub unsafe extern "C" fn file_read(
     position: u64,
     len: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        data_ptr: *const u8,
+                        data_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -263,6 +286,8 @@ pub unsafe extern "C" fn file_read(
 }
 
 /// Write data to file in smaller chunks.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn file_write(
     app: *const App,
@@ -270,7 +295,7 @@ pub unsafe extern "C" fn file_write(
     data: *const u8,
     size: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -305,12 +330,14 @@ pub unsafe extern "C" fn file_write(
 /// `file_open`.
 ///
 /// Frees the file context handle.
+///
+/// Callback parameters: user data, error code, file
 #[no_mangle]
 pub unsafe extern "C" fn file_close(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, file: *const File),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -356,7 +383,7 @@ mod tests {
     use std::ffi::CString;
     use test_utils::{create_app_with_access, run};
 
-    fn setup() -> (App, ffi::MDataInfo) {
+    fn setup() -> (App, FfiMDataInfo) {
         let mut container_permissions = HashMap::new();
         let _ = container_permissions.insert(
             "_videos".to_string(),
@@ -384,6 +411,11 @@ mod tests {
         (app, container_info)
     }
 
+    // Test the basics of NFS.
+    // 1. Fetching a non-existing file should fail.
+    // 2. Create an empty file.
+    // 3. Fetch it back, assert that all file info is correct.
+    // 4. Delete the file.
     #[test]
     fn basics() {
         let (app, container_info) = setup();
@@ -479,6 +511,13 @@ mod tests {
             }))
         };
 
+        let size: Result<u64, i32> = unsafe { call_1(|ud, cb| file_size(&app, write_h, ud, cb)) };
+        match size {
+            Err(code) if code == AppError::InvalidFileMode.error_code() => (),
+            Err(x) => panic!("Unexpected: {:?}", x),
+            Ok(_) => panic!("Unexpected success"),
+        }
+
         let written_file: NativeFile = unsafe {
             unwrap!(call_0(|ud, cb| {
                 file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
@@ -512,6 +551,8 @@ mod tests {
         };
         assert_eq!(version, 0);
 
+        let size0 = file.size();
+
         // Read the content
         let read_write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
@@ -525,6 +566,9 @@ mod tests {
                 )
             }))
         };
+
+        let size1: u64 = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_write_h, ud, cb))) };
+        assert_eq!(size0, size1);
 
         let retrieved_content = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
@@ -606,6 +650,9 @@ mod tests {
                 )
             }))
         };
+
+        let size: u64 = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_h, ud, cb))) };
+        assert_eq!(size, orig_file.size());
 
         let retrieved_content = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
@@ -896,5 +943,122 @@ mod tests {
         };
 
         let _: NativeFile = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, append_h, ud, cb))) };
+    }
+
+    // Test reading files in chunks.
+    #[test]
+    fn file_read_chunks() {
+        const ORIG_SIZE: usize = 5555;
+
+        let (app, container_info) = setup();
+
+        // Create non-empty file.
+        let file = NativeFile::new(Vec::new());
+        let ffi_file = file.into_repr_c();
+
+        let file_name = "file.txt";
+        let ffi_file_name = unwrap!(CString::new(file_name));
+
+        let content = [0u8; ORIG_SIZE];
+
+        let write_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                file_open(
+                    &app,
+                    &container_info,
+                    &ffi_file,
+                    OPEN_MODE_OVERWRITE,
+                    ud,
+                    cb,
+                )
+            }))
+        };
+
+        let written_file: NativeFile = unsafe {
+            unwrap!(call_0(|ud, cb| {
+                file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
+            }));
+            unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
+        };
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                dir_insert_file(
+                    &app,
+                    &container_info,
+                    ffi_file_name.as_ptr(),
+                    &written_file.into_repr_c(),
+                    ud,
+                    cb,
+                )
+            }))
+        }
+
+        // Fetch it back.
+        let (file, version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                    dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
+                }))
+            }
+        };
+        assert_eq!(version, 0);
+
+        // Read the content in chunks
+        let read_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                file_open(
+                    &app,
+                    &container_info,
+                    &file.into_repr_c(),
+                    OPEN_MODE_READ,
+                    ud,
+                    cb,
+                )
+            }))
+        };
+
+        let size = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_h, ud, cb))) };
+        const CHUNK_SIZE: u64 = 1000;
+        let mut size_read = 0;
+        let mut result = Vec::new();
+
+        while size_read < size {
+            let to_read = if size_read + CHUNK_SIZE >= size {
+                size - size_read
+            } else {
+                CHUNK_SIZE
+            };
+
+            let mut retrieved_content = unsafe {
+                unwrap!(call_vec_u8(
+                    |ud, cb| file_read(&app, read_h, size_read, to_read, ud, cb),
+                ))
+            };
+
+            size_read += retrieved_content.len() as u64;
+            result.append(&mut retrieved_content);
+        }
+
+        assert_eq!(size, size_read);
+        assert_eq!(result, vec![0u8; ORIG_SIZE]);
+
+        // Read 0 bytes, should succeed
+
+        let retrieved_content = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| file_read(&app, read_h, size, 0, ud, cb),
+            ))
+        };
+        assert_eq!(retrieved_content, Vec::<u8>::new());
+
+        // Read 1 byte past end of file, should fail
+        let retrieved_content =
+            unsafe { call_vec_u8(|ud, cb| file_read(&app, read_h, size, 1, ud, cb)) };
+
+        match retrieved_content {
+            Err(code) if code == AppError::from(NfsError::InvalidRange).error_code() => (),
+            Err(x) => panic!("Unexpected: {:?}", x),
+            Ok(_) => panic!("Unexpected success"),
+        }
     }
 }
