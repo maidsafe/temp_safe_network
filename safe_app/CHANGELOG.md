@@ -1,5 +1,18 @@
 # SAFE App
 
+## [0.4.0]
+- Improve documentation and fix bugs
+- Add more tests for NFS (reading and writing files in chunks)
+- Refactor FFI API: rename functions prefixed with `mdata_permissions_set` to `mdata_permission_set`
+- Refactor FFI API: change order of callback parameters in some functions (e.g. `mdata_values_for_each`)
+- Refactor and reorganise modules structure
+- Fix dangling pointer issues in the crypto module
+- Improve error descriptions
+- Remove of the neccessity to pass `--feature testing` to run tests
+- Generate C headers automatically with cheddar
+- Increase the object cache capacity to 1000
+- Fix compiler errors on rustc-nightly
+
 ## [0.3.3]
 - Update routing to 0.33.2
 

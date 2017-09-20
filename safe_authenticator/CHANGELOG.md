@@ -1,5 +1,11 @@
 # SAFE Authenticator - Change Log
 
+## [0.4.0]
+- Add more tests for revocation
+- Remove of the neccessity to pass `--feature testing` to run tests
+- Generate C headers automatically with cheddar
+- Improve account creation error reporting
+
 ## [0.3.2]
 - Update routing to 0.33.2
 

@@ -1,5 +1,11 @@
 # Safe Core - Change Log
 
+## [0.27.0]
+- Improve documentation and fix bugs
+- Nonce in the MDataInfo struct is no longer optional. This is a breaking external change
+- Remove of the neccessity to pass `--feature testing` to run tests
+- Replace all secret keys with drop-in equivalents that implement secure cloning. They don't actually clone the underlying data but instead implicitly share it.
+
 ## [0.26.2]
 - Update routing to 0.33.2
 
