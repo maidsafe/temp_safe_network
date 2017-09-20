@@ -18,6 +18,7 @@
 //! Errors thrown by Authenticator routines
 
 pub use self::codes::*;
+use config_file_handler::Error as ConfigFileHandlerError;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -149,6 +150,12 @@ impl Into<IpcError> for AuthError {
 impl<T: 'static> From<SendError<T>> for AuthError {
     fn from(error: SendError<T>) -> AuthError {
         AuthError::Unexpected(error.description().to_owned())
+    }
+}
+
+impl From<ConfigFileHandlerError> for AuthError {
+    fn from(error: ConfigFileHandlerError) -> AuthError {
+        AuthError::from(error.to_string())
     }
 }
 
