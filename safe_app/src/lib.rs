@@ -62,8 +62,23 @@ extern crate tokio_core;
 extern crate unwrap;
 
 pub mod ffi;
-pub mod object_cache;
 
+pub use ffi::*;
+pub use ffi::access_container::*;
+pub use ffi::cipher_opt::*;
+pub use ffi::crypto::*;
+pub use ffi::immutable_data::*;
+pub use ffi::ipc::*;
+pub use ffi::logging::*;
+pub use ffi::mdata_info::*;
+pub use ffi::mutable_data::*;
+pub use ffi::mutable_data::entries::*;
+pub use ffi::mutable_data::entry_actions::*;
+pub use ffi::mutable_data::metadata::*;
+pub use ffi::mutable_data::permissions::*;
+pub use ffi::nfs::*;
+
+pub mod object_cache;
 mod errors;
 /// Utility functions to test apps functionality
 #[cfg(any(test, feature = "testing"))]
@@ -76,11 +91,11 @@ use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use rust_sodium::crypto::secretbox;
 use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
                 event_loop, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
+use safe_core::crypto::shared_secretbox;
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
 use safe_core::ipc::resp::{AccessContainerEntry, access_container_enc_key};
 use std::cell::RefCell;
@@ -183,8 +198,7 @@ impl App {
 
 
     /// Allows customising the mock Routing client before registering a new account
-    #[cfg(any(all(test, feature = "use-mock-routing"),
-                all(feature = "testing", feature = "use-mock-routing")))]
+    #[cfg(feature = "use-mock-routing")]
     pub fn registered_with_hook<N, F>(
         app_id: String,
         auth_granted: AuthGranted,
@@ -319,7 +333,7 @@ pub struct Unregistered {
 pub struct Registered {
     object_cache: ObjectCache,
     app_id: String,
-    sym_enc_key: secretbox::Key,
+    sym_enc_key: shared_secretbox::Key,
     access_container_info: AccessContInfo,
     access_info: RefCell<AccessContainerEntry>,
 }
@@ -331,7 +345,7 @@ impl AppContext {
 
     fn registered(
         app_id: String,
-        sym_enc_key: secretbox::Key,
+        sym_enc_key: shared_secretbox::Key,
         access_container_info: AccessContInfo,
     ) -> Self {
         AppContext::Registered(Rc::new(Registered {
@@ -352,7 +366,7 @@ impl AppContext {
     }
 
     /// Symmetric encryption/decryption key.
-    pub fn sym_enc_key(&self) -> Result<&secretbox::Key, AppError> {
+    pub fn sym_enc_key(&self) -> Result<&shared_secretbox::Key, AppError> {
         Ok(&self.as_registered()?.sym_enc_key)
     }
 
@@ -436,6 +450,7 @@ mod tests {
     use test_utils::{create_app_with_access, run};
     use test_utils::gen_app_exchange_info;
 
+    // Test refreshing access info by fetching it from the network.
     #[test]
     fn refresh_access_info() {
         // Shared container
@@ -464,6 +479,7 @@ mod tests {
         });
     }
 
+    // Test fetching containers that an app has access to.
     #[test]
     fn get_access_info() {
         let mut container_permissions = HashMap::new();

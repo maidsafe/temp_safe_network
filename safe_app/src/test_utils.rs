@@ -21,12 +21,13 @@ use ffi_utils::catch_unwind_error_code;
 use futures::{Future, IntoFuture};
 use safe_authenticator::test_utils as authenticator;
 use safe_core::{Client, FutureExt, utils};
+use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
 use safe_core::ipc::AppExchangeInfo;
-use safe_core::ipc::req::{AuthReq, ContainerPermissions, containers_from_repr_c, ffi};
+use safe_core::ipc::req::{AuthReq, ContainerPermissions, containers_from_repr_c};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-/// Generates an `AppExchangeInfo` strucutre for a mock application
+/// Generates an `AppExchangeInfo` structure for a mock application.
 pub fn gen_app_exchange_info() -> AppExchangeInfo {
     AppExchangeInfo {
         id: unwrap!(utils::generate_random_string(10)),
@@ -117,7 +118,7 @@ pub fn create_app_with_access(access_info: HashMap<String, ContainerPermissions>
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
 
-/// Creates a random app instance for testing
+/// Creates a random app instance for testing.
 #[no_mangle]
 #[allow(unsafe_code)]
 #[cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
@@ -131,12 +132,12 @@ pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
     })
 }
 
-/// Create a random app instance for testing, with access to containers
+/// Create a random app instance for testing, with access to containers.
 #[no_mangle]
 #[allow(unsafe_code)]
 #[cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
 pub extern "C" fn test_create_app_with_access(
-    access_info: *const ffi::ContainerPermissions,
+    access_info: *const FfiContainerPermissions,
     access_info_len: usize,
     o_app: *mut *mut App,
 ) -> i32 {

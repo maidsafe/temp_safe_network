@@ -32,21 +32,22 @@ pub trait Callback {
     fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args);
 }
 
-impl Callback for extern "C" fn(*mut c_void, FfiResult) {
+impl Callback for extern "C" fn(user_data: *mut c_void, result: FfiResult) {
     type Args = ();
     fn call(&self, user_data: *mut c_void, error: FfiResult, _args: Self::Args) {
         self(user_data, error)
     }
 }
 
-impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, FfiResult, a: T) {
+impl<T: CallbackArgs> Callback for extern "C" fn(user_data: *mut c_void, result: FfiResult, a: T) {
     type Args = T;
     fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         self(user_data, error, args)
     }
 }
 
-impl<T: CallbackArgs> Callback for unsafe extern "C" fn(*mut c_void, FfiResult, a: T) {
+impl<T: CallbackArgs> Callback
+    for unsafe extern "C" fn(user_data: *mut c_void, result: FfiResult, a: T) {
     type Args = T;
     fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         unsafe { self(user_data, error, args) }
@@ -54,7 +55,7 @@ impl<T: CallbackArgs> Callback for unsafe extern "C" fn(*mut c_void, FfiResult, 
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs> Callback
-    for extern "C" fn(*mut c_void, FfiResult, a0: T0, a1: T1) {
+    for extern "C" fn(user_data: *mut c_void, result: FfiResult, a0: T0, a1: T1) {
     type Args = (T0, T1);
     fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         self(user_data, error, args.0, args.1)
@@ -62,7 +63,11 @@ impl<T0: CallbackArgs, T1: CallbackArgs> Callback
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
-    for extern "C" fn(*mut c_void, FfiResult, a0: T0, a1: T1, a2: T2) {
+    for extern "C" fn(user_data: *mut c_void,
+                  result: FfiResult,
+                  a0: T0,
+                  a1: T1,
+                  a2: T2) {
     type Args = (T0, T1, T2);
     fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         self(user_data, error, args.0, args.1, args.2)

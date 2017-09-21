@@ -25,11 +25,15 @@ use routing::{EntryAction, Value};
 use std::os::raw::c_void;
 
 /// Create new entry actions.
+///
+/// Callback parameters: user data, error code, entry actions handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_new(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, MDataEntryActionsHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        entry_actions_h: MDataEntryActionsHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -40,6 +44,8 @@ pub unsafe extern "C" fn mdata_entry_actions_new(
 }
 
 /// Add action to insert new entry.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_insert(
     app: *const App,
@@ -49,7 +55,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(
     value_ptr: *const u8,
     value_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
@@ -60,6 +66,8 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(
 }
 
 /// Add action to update existing entry.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_update(
     app: *const App,
@@ -70,7 +78,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(
     value_len: usize,
     entry_version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
@@ -81,6 +89,8 @@ pub unsafe extern "C" fn mdata_entry_actions_update(
 }
 
 /// Add action to delete existing entry.
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_delete(
     app: *const App,
@@ -89,7 +99,7 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(
     key_len: usize,
     entry_version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Del(entry_version)
@@ -97,12 +107,14 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(
 }
 
 /// Free the entry actions from memory
+///
+/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_free(
     app: *const App,
     actions_h: MDataEntryActionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -120,7 +132,7 @@ unsafe fn add_action<F>(
     key_ptr: *const u8,
     key_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
     f: F,
 ) where
     F: FnOnce() -> EntryAction,
@@ -145,6 +157,7 @@ mod tests {
     use safe_core::utils;
     use test_utils::{create_app, run_now};
 
+    // Test entry action basics such as insert, update, and delete.
     #[test]
     fn basics() {
         let app = create_app();

@@ -17,6 +17,7 @@
 
 use DIR_TAG;
 use client::MDataInfo;
+use crypto::{shared_box, shared_secretbox, shared_sign};
 use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{FullId, XOR_NAME_LEN, XorName};
@@ -124,24 +125,24 @@ pub struct ClientKeys {
     /// Signing public key
     pub sign_pk: sign::PublicKey,
     /// Signing secret key
-    pub sign_sk: sign::SecretKey,
+    pub sign_sk: shared_sign::SecretKey,
     /// Encryption public key
     pub enc_pk: box_::PublicKey,
     /// Encryption private key
-    pub enc_sk: box_::SecretKey,
+    pub enc_sk: shared_box::SecretKey,
     /// Symmetric encryption key
-    pub enc_key: secretbox::Key,
+    pub enc_key: shared_secretbox::Key,
 }
 
 impl ClientKeys {
     /// Construct new `ClientKeys`
     pub fn new(seed: Option<&Seed>) -> Self {
         let sign = match seed {
-            Some(s) => sign::keypair_from_seed(s),
-            None => sign::gen_keypair(),
+            Some(s) => shared_sign::keypair_from_seed(s),
+            None => shared_sign::gen_keypair(),
         };
-        let enc = box_::gen_keypair();
-        let enc_key = secretbox::gen_key();
+        let enc = shared_box::gen_keypair();
+        let enc_key = shared_secretbox::gen_key();
 
         ClientKeys {
             sign_pk: sign.0,
@@ -161,7 +162,10 @@ impl Default for ClientKeys {
 
 impl Into<FullId> for ClientKeys {
     fn into(self) -> FullId {
-        FullId::with_keys((self.enc_pk, self.enc_sk), (self.sign_pk, self.sign_sk))
+        let enc_sk = (*self.enc_sk).clone();
+        let sign_sk = (*self.sign_sk).clone();
+
+        FullId::with_keys((self.enc_pk, enc_sk), (self.sign_pk, sign_sk))
     }
 }
 
@@ -171,6 +175,7 @@ mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::u32;
 
+    // Test deterministically generating User's Identity for the network using supplied credentials.
     #[test]
     fn generate_network_id() {
         let keyword1 = b"user1";
@@ -209,6 +214,7 @@ mod tests {
         assert_ne!(user1_id, user2_id);
     }
 
+    // Test deterministically generating cryptographic keys.
     #[test]
     fn generate_crypto_keys() {
         let password1 = b"super great password";
@@ -233,6 +239,7 @@ mod tests {
         assert_eq!(keys1, keys2);
     }
 
+    // Test serialising and deserialising accounts.
     #[test]
     fn serialisation() {
         let account = unwrap!(Account::new(ClientKeys::new(None)));
@@ -242,6 +249,7 @@ mod tests {
         assert_eq!(decoded, account);
     }
 
+    // Test encryption and decryption of accounts.
     #[test]
     fn encryption() {
         let account = unwrap!(Account::new(ClientKeys::new(None)));

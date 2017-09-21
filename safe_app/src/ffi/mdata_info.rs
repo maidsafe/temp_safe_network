@@ -21,17 +21,23 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::XorName;
 use rust_sodium::crypto::secretbox;
 use safe_core::MDataInfo;
-use safe_core::ffi::{self, SymNonce, SymSecretKey, XorNameArray};
+use safe_core::crypto::shared_secretbox;
+use safe_core::ffi::MDataInfo as FfiMDataInfo;
+use safe_core::ffi::arrays::{SymNonce, SymSecretKey, XorNameArray};
 use std::os::raw::c_void;
 use std::slice;
 
 /// Create non-encrypted mdata info with explicit data name.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_public(
     name: *const XorNameArray,
     type_tag: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::MDataInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let name = XorName(*name);
@@ -45,6 +51,8 @@ pub unsafe extern "C" fn mdata_info_new_public(
 
 /// Create encrypted mdata info with explicit data name and a
 /// provided private key.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_private(
     name: *const XorNameArray,
@@ -52,11 +60,14 @@ pub unsafe extern "C" fn mdata_info_new_private(
     secret_key: *const SymSecretKey,
     nonce: *const SymNonce,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::MDataInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let name = XorName(*name);
-        let sk = secretbox::Key(*secret_key);
+
+        let sk = shared_secretbox::Key::from_raw(&*secret_key);
         let nonce = secretbox::Nonce(*nonce);
 
         let info = MDataInfo::new_private(name, type_tag, (sk, nonce));
@@ -68,11 +79,15 @@ pub unsafe extern "C" fn mdata_info_new_private(
 }
 
 /// Create random, non-encrypted mdata info.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_random_public(
     type_tag: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::MDataInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::random_public(type_tag)?;
@@ -84,11 +99,15 @@ pub unsafe extern "C" fn mdata_info_random_public(
 }
 
 /// Create random, encrypted mdata info.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_random_private(
     type_tag: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::MDataInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::random_private(type_tag)?;
@@ -100,13 +119,18 @@ pub unsafe extern "C" fn mdata_info_random_private(
 }
 
 /// Encrypt mdata entry key using the corresponding mdata info.
+///
+/// Callback parameters: user data, error code, encrypted entry key vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
-    info: *const ffi::MDataInfo,
+    info: *const FfiMDataInfo,
     input_ptr: *const u8,
     input_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        enc_entry_key_ptr: *const u8,
+                        enc_entry_key_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::clone_from_repr_c(info)?;
@@ -124,13 +148,18 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
 }
 
 /// Encrypt mdata entry value using the corresponding mdata info.
+///
+/// Callback parameters: user data, error code, encrypted entry value vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
-    info: *const ffi::MDataInfo,
+    info: *const FfiMDataInfo,
     input_ptr: *const u8,
     input_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        enc_entry_value_ptr: *const u8,
+                        enc_entry_value_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::clone_from_repr_c(info)?;
@@ -148,13 +177,18 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
 }
 
 /// Decrypt mdata entry value or a key using the corresponding mdata info.
+///
+/// Callback parameters: user data, error code, decrypted mdata info vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_decrypt(
-    info: *const ffi::MDataInfo,
+    info: *const FfiMDataInfo,
     input_ptr: *const u8,
     input_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info_decrypt_ptr: *const u8,
+                        mdata_info_decrypt_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::clone_from_repr_c(info)?;
@@ -174,7 +208,7 @@ pub unsafe extern "C" fn mdata_info_decrypt(
 /// Serialise `MDataInfo`.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_serialise(
-    info: *const ffi::MDataInfo,
+    info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize),
 ) {
@@ -193,12 +227,16 @@ pub unsafe extern "C" fn mdata_info_serialise(
 }
 
 /// Deserialise `MDataInfo`.
+///
+/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_deserialise(
     ptr: *const u8,
     len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(*mut c_void, FfiResult, *const ffi::MDataInfo),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let encoded = slice::from_raw_parts(ptr, len);
@@ -218,7 +256,9 @@ mod tests {
     use routing::XOR_NAME_LEN;
     use rust_sodium::crypto::secretbox;
     use safe_core::MDataInfo;
+    use safe_core::crypto::shared_secretbox;
 
+    // Test creating non-encrypted mdata info.
     #[test]
     fn create_public() {
         let type_tag: u64 = rand::random();
@@ -230,6 +270,7 @@ mod tests {
         assert!(info.enc_info.is_none());
     }
 
+    // Test creating encrypted mdata info.
     #[test]
     fn create_private() {
         let type_tag: u64 = rand::random();
@@ -237,7 +278,7 @@ mod tests {
         let rand_info: MDataInfo =
             unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(type_tag, ud, cb))) };
 
-        let key = secretbox::gen_key();
+        let key = shared_secretbox::gen_key();
         let nonce = secretbox::gen_nonce();
         let new_info: MDataInfo = unsafe {
             unwrap!(call_1(|ud, cb| {
@@ -258,6 +299,7 @@ mod tests {
         }
     }
 
+    // Test serialising and deserialising mdata_info.
     #[test]
     fn serialise_deserialise() {
         let info1 = unwrap!(MDataInfo::random_private(1000));

@@ -1,4 +1,4 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -17,10 +17,9 @@
 
 #![allow(unsafe_code)]
 
-/// Ffi module
-pub mod ffi;
-
 use client::MDataInfo;
+use crypto::{shared_box, shared_secretbox, shared_sign};
+use ffi::ipc::resp as ffi;
 use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::IpcError;
 use ipc::req::{ContainerPermissions, container_perms_from_repr_c, container_perms_into_repr_c,
@@ -28,7 +27,7 @@ use ipc::req::{ContainerPermissions, container_perms_from_repr_c, container_perm
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
 use routing::PermissionSet;
-use rust_sodium::crypto::{box_, secretbox, sign};
+use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::sign::PublicKey;
 use std::collections::HashMap;
 use std::ffi::{CString, NulError};
@@ -132,28 +131,28 @@ pub struct AppKeys {
     /// Owner signing public key.
     pub owner_key: PublicKey,
     /// Data symmetric encryption key
-    pub enc_key: secretbox::Key,
+    pub enc_key: shared_secretbox::Key,
     /// Asymmetric sign public key.
     ///
     /// This is the identity of the App in the Network.
     pub sign_pk: PublicKey,
     /// Asymmetric sign private key.
-    pub sign_sk: sign::SecretKey,
+    pub sign_sk: shared_sign::SecretKey,
     /// Asymmetric enc public key.
     pub enc_pk: box_::PublicKey,
     /// Asymmetric enc private key.
-    pub enc_sk: box_::SecretKey,
+    pub enc_sk: shared_box::SecretKey,
 }
 
 impl AppKeys {
     /// Generate random keys
     pub fn random(owner_key: PublicKey) -> AppKeys {
-        let (enc_pk, enc_sk) = box_::gen_keypair();
-        let (sign_pk, sign_sk) = sign::gen_keypair();
+        let (enc_pk, enc_sk) = shared_box::gen_keypair();
+        let (sign_pk, sign_sk) = shared_sign::gen_keypair();
 
         AppKeys {
             owner_key: owner_key,
-            enc_key: secretbox::gen_key(),
+            enc_key: shared_secretbox::gen_key(),
             sign_pk: sign_pk,
             sign_sk: sign_sk,
             enc_pk: enc_pk,
@@ -191,11 +190,11 @@ impl ReprC for AppKeys {
     unsafe fn clone_from_repr_c(raw: Self::C) -> Result<Self, Self::Error> {
         Ok(AppKeys {
             owner_key: PublicKey(raw.owner_key),
-            enc_key: secretbox::Key(raw.enc_key),
+            enc_key: shared_secretbox::Key::from_raw(&raw.enc_key),
             sign_pk: PublicKey(raw.sign_pk),
-            sign_sk: sign::SecretKey(raw.sign_sk),
+            sign_sk: shared_sign::SecretKey::from_raw(&raw.sign_sk),
             enc_pk: box_::PublicKey(raw.enc_pk),
-            enc_sk: box_::SecretKey(raw.enc_sk),
+            enc_sk: shared_box::SecretKey::from_raw(&raw.enc_sk),
         })
     }
 }
@@ -264,7 +263,7 @@ impl AccessContInfo {
     }
 
     /// Creates `MDataInfo` from this `AccessContInfo`
-    pub fn into_mdata_info(self, enc_key: secretbox::Key) -> MDataInfo {
+    pub fn into_mdata_info(self, enc_key: shared_secretbox::Key) -> MDataInfo {
         MDataInfo::new_private(self.id, self.tag, (enc_key, self.nonce))
     }
 
@@ -429,14 +428,15 @@ mod tests {
     use ffi_utils::ReprC;
     use ipc::BootstrapConfig;
     use routing::{XOR_NAME_LEN, XorName};
-    use rust_sodium::crypto::{box_, secretbox, sign};
+    use rust_sodium::crypto::secretbox;
 
+    // Test converting an `AuthGranted` object to its FFI representation and then back again.
     #[test]
     fn auth_granted() {
-        let (ok, _) = sign::gen_keypair();
-        let (pk, sk) = sign::gen_keypair();
-        let key = secretbox::gen_key();
-        let (ourpk, oursk) = box_::gen_keypair();
+        let (ok, _) = shared_sign::gen_keypair();
+        let (pk, sk) = shared_sign::gen_keypair();
+        let key = shared_secretbox::gen_key();
+        let (ourpk, oursk) = shared_box::gen_keypair();
         let ak = AppKeys {
             owner_key: ok,
             enc_key: key,
@@ -466,12 +466,13 @@ mod tests {
         assert_eq!(ag.access_container_info.tag, 681);
     }
 
+    // Testing converting an `AppKeys` object to its FFI representation and back again.
     #[test]
     fn app_keys() {
-        let (ok, _) = sign::gen_keypair();
-        let (pk, sk) = sign::gen_keypair();
-        let key = secretbox::gen_key();
-        let (ourpk, oursk) = box_::gen_keypair();
+        let (ok, _) = shared_sign::gen_keypair();
+        let (pk, sk) = shared_sign::gen_keypair();
+        let key = shared_secretbox::gen_key();
+        let (ourpk, oursk) = shared_box::gen_keypair();
         let ak = AppKeys {
             owner_key: ok,
             enc_key: key.clone(),
@@ -518,6 +519,7 @@ mod tests {
         assert_eq!(ak.enc_sk, oursk);
     }
 
+    // Test converting an `AccessContInfo` struct to its FFI representation and back again.
     #[test]
     fn access_container() {
         let nonce = secretbox::gen_nonce();
