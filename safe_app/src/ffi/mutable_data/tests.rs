@@ -23,7 +23,8 @@ use ffi::mutable_data::entries::*;
 use ffi::mutable_data::entry_actions::*;
 use ffi::mutable_data::permissions::*;
 use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
-use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data, sender_as_user_data};
+use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, call_vec_vec_u8, send_via_user_data,
+                            sender_as_user_data};
 use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle};
 use rust_sodium::crypto::sign;
 use std::mem;
@@ -686,24 +687,24 @@ fn entries_crud_ffi() {
         }
     }
 
-    // Check mdata_list_keys
+    // Check mdata_get_all_keys
     {
-        let keys_list_h: MDataKeysHandle = unsafe {
-            unwrap!(call_1(
-                |ud, cb| mdata_list_keys(&app, &md_info_priv, ud, cb),
+        let keys_list: Vec<Vec<u8>> = unsafe {
+            unwrap!(call_vec_vec_u8(
+                |ud, cb| mdata_get_all_keys(&app, &md_info_priv, ud, cb),
             ))
         };
+        assert_eq!(keys_list.len(), 1);
 
-        let result = unsafe {
-            call_keys(|ud, iter_cb, done_cb| {
-                mdata_keys_for_each(&app, keys_list_h, ud, iter_cb, done_cb)
-            })
-        };
-
-        assert_eq!(result.len(), 1);
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| {
-                mdata_info_decrypt(&md_info_priv, result[0].as_ptr(), result[0].len(), ud, cb)
+                mdata_info_decrypt(
+                    &md_info_priv,
+                    keys_list[0].as_ptr(),
+                    keys_list[0].len(),
+                    ud,
+                    cb,
+                )
             }))
         };
         assert_eq!(&decrypted, &KEY, "decrypted invalid key");
@@ -824,22 +825,6 @@ impl PermissionEntriesContext {
     }
 }
 
-// Helper function to call FFI function that iterates over mdata entry keys.
-unsafe fn call_keys<F>(f: F) -> Vec<Vec<u8>>
-where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(*mut c_void, *const u8, usize),
-           extern "C" fn(*mut c_void, FfiResult)),
-{
-    let mut context = KeyValueEntriesContext::new();
-    f(
-        context.user_data(),
-        KeyValueEntriesContext::keys_cb,
-        KeyValueEntriesContext::done_cb,
-    );
-    context.take_result()
-}
-
 // Helper function to call FFI function that iterates over mdata entry values.
 unsafe fn call_values<F>(f: F) -> Vec<Vec<u8>>
 where
@@ -883,15 +868,6 @@ impl KeyValueEntriesContext {
     }
 
     extern "C" fn values_cb(user_data: *mut c_void, val: *const u8, len: usize, _version: u64) {
-        unsafe {
-            let data = vec_clone_from_raw_parts(val, len);
-
-            let context = user_data as *mut Self;
-            (*context).items.push(data);
-        }
-    }
-
-    extern "C" fn keys_cb(user_data: *mut c_void, val: *const u8, len: usize) {
         unsafe {
             let data = vec_clone_from_raw_parts(val, len);
 

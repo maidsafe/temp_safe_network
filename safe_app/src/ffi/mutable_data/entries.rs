@@ -23,10 +23,10 @@ use ffi::helper::send_sync;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
                 vec_clone_from_raw_parts};
 use ffi_utils::callback::Callback;
-use object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
+use object_cache::{MDataEntriesHandle, MDataValuesHandle};
 use routing::{ClientError, Value};
 use safe_core::CoreError;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::os::raw::c_void;
 
 /// Create new empty entries.
@@ -199,66 +199,6 @@ pub unsafe extern "C" fn mdata_entries_free(
     })
 }
 
-/// Returns the number of keys.
-///
-/// Callback parameters: user data, error code, length
-#[no_mangle]
-pub unsafe extern "C" fn mdata_keys_len(
-    app: *const App,
-    keys_h: MDataKeysHandle,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, len: usize),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        with_keys(app, keys_h, user_data, o_cb, |keys| Ok(keys.len()))
-    })
-}
-
-/// Iterate over the keys.
-///
-/// The `o_each_cb` callback is invoked once for each key,
-/// passing user data, pointer to key and key length.
-///
-/// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
-#[no_mangle]
-pub unsafe extern "C" fn mdata_keys_for_each(
-    app: *const App,
-    keys_h: MDataKeysHandle,
-    user_data: *mut c_void,
-    o_each_cb: unsafe extern "C" fn(user_data: *mut c_void, key_ptr: *const u8, key_len: usize),
-    o_done_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
-) {
-    catch_unwind_cb(user_data, o_done_cb, || {
-        let user_data = OpaqueCtx(user_data);
-
-        with_keys(app, keys_h, user_data.0, o_done_cb, move |keys| {
-            for key in keys {
-                o_each_cb(user_data.0, key.as_safe_ptr(), key.len());
-            }
-
-            Ok(())
-        })
-    })
-}
-
-/// Free the keys from memory.
-///
-/// Callback parameters: user data, error code
-#[no_mangle]
-pub unsafe extern "C" fn mdata_keys_free(
-    app: *const App,
-    keys_h: MDataKeysHandle,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_keys(keys_h)?;
-            Ok(())
-        })
-    })
-}
-
 /// Returns the number of values.
 ///
 /// Callback parameters: user data, error code, length
@@ -346,23 +286,6 @@ where
     })
 }
 
-unsafe fn with_keys<C, F>(
-    app: *const App,
-    keys_h: MDataKeysHandle,
-    user_data: *mut c_void,
-    o_cb: C,
-    f: F,
-) -> Result<(), AppError>
-where
-    C: Callback + Copy + Send + 'static,
-    F: FnOnce(&BTreeSet<Vec<u8>>) -> Result<C::Args, AppError> + Send + 'static,
-{
-    send_sync(app, user_data, o_cb, move |_, context| {
-        let keys = context.object_cache().get_mdata_keys(keys_h)?;
-        f(&*keys)
-    })
-}
-
 unsafe fn with_values<C, F>(
     app: *const App,
     values_h: MDataValuesHandle,
@@ -387,7 +310,8 @@ mod tests {
     use ffi::mutable_data::*;
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
-    use ffi_utils::test_utils::{call_0, call_1, send_via_user_data, sender_as_user_data};
+    use ffi_utils::test_utils::{call_0, call_1, call_vec_vec_u8, send_via_user_data,
+                                sender_as_user_data};
     use ffi_utils::vec_clone_from_raw_parts;
     use object_cache::MDataEntryActionsHandle;
     use routing::Value;
@@ -614,10 +538,13 @@ mod tests {
         };
 
         // Get the keys handle, make sure number of keys is zero
-        let keys_h = unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
+        let keys: Vec<Vec<u8>> = unsafe {
+            unwrap!(call_vec_vec_u8(
+                |ud, cb| mdata_get_all_keys(&app, &md_info, ud, cb),
+            ))
+        };
 
-        let len: usize = unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_h, ud, cb))) };
-        assert_eq!(len, 0);
+        assert_eq!(keys.len(), 0);
 
         // Ditto for values
         let values_h =
@@ -668,10 +595,15 @@ mod tests {
         }
 
         // Get the keys and values handles again
-        let keys_h = unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
+        let keys = unsafe {
+            unwrap!(call_vec_vec_u8(
+                |ud, cb| mdata_get_all_keys(&app, &md_info, ud, cb),
+            ))
+        };
+        assert_eq!(keys.len(), 2);
 
-        let len: usize = unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_h, ud, cb))) };
-        assert_eq!(len, 2);
+        assert!(keys.contains(&key0));
+        assert!(keys.contains(&key1));
 
         let values_h =
             unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
@@ -679,42 +611,6 @@ mod tests {
         let len: usize =
             unsafe { unwrap!(call_1(|ud, cb| mdata_values_len(&app, values_h, ud, cb))) };
         assert_eq!(len, 2);
-
-        // Iteration over keys
-        {
-            let (tx, rx) = mpsc::channel::<()>();
-            let mut user_data = (tx, Vec::<Vec<u8>>::new());
-
-            extern "C" fn entry_cb(user_data: *mut c_void, key_ptr: *const u8, key_len: usize) {
-                unsafe {
-                    let key = vec_clone_from_raw_parts(key_ptr, key_len);
-
-                    let user_data = user_data as *mut (Sender<()>, Vec<_>);
-                    (*user_data).1.push(key);
-                }
-            }
-
-            extern "C" fn done_cb(user_data: *mut c_void, res: FfiResult) {
-                assert_eq!(res.error_code, 0);
-                let user_data = user_data as *mut (Sender<_>, Vec<Vec<u8>>);
-
-                unsafe {
-                    unwrap!((*user_data).0.send(()));
-                }
-            }
-
-            unsafe {
-                let user_data: *mut _ = &mut user_data;
-                mdata_keys_for_each(&app, keys_h, user_data as *mut c_void, entry_cb, done_cb)
-            }
-
-            unwrap!(rx.recv());
-            let entries = user_data.1;
-
-            assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], key0);
-            assert_eq!(entries[1], key1);
-        }
 
         // Iteration over values
         {
@@ -763,9 +659,6 @@ mod tests {
         }
 
         // Free
-        unsafe {
-            unwrap!(call_0(|ud, cb| mdata_keys_free(&app, keys_h, ud, cb)));
-            unwrap!(call_0(|ud, cb| mdata_values_free(&app, values_h, ud, cb)))
-        }
+        unsafe { unwrap!(call_0(|ud, cb| mdata_values_free(&app, values_h, ud, cb))) }
     }
 }
