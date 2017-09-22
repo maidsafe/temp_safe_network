@@ -56,8 +56,6 @@ pub type EncryptSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataEntriesHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type MDataValuesHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
 pub type MDataEntryActionsHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataPermissionsHandle = ObjectHandle;
@@ -79,7 +77,6 @@ pub struct ObjectCache {
     encrypt_key: Store<box_::PublicKey>,
     secret_key: Store<shared_box::SecretKey>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
-    mdata_values: Store<Vec<Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
     mdata_permissions: Store<BTreeMap<User, MDataPermissionSetHandle>>,
     mdata_permission_set: Store<PermissionSet>,
@@ -98,7 +95,6 @@ impl ObjectCache {
             encrypt_key: Store::new(),
             secret_key: Store::new(),
             mdata_entries: Store::new(),
-            mdata_values: Store::new(),
             mdata_entry_actions: Store::new(),
             mdata_permissions: Store::new(),
             mdata_permission_set: Store::new(),
@@ -116,7 +112,6 @@ impl ObjectCache {
         self.encrypt_key.clear();
         self.secret_key.clear();
         self.mdata_entries.clear();
-        self.mdata_values.clear();
         self.mdata_entry_actions.clear();
         self.mdata_permissions.clear();
         self.mdata_permission_set.clear();
@@ -190,13 +185,6 @@ impl_cache!(mdata_entries,
             get_mdata_entries,
             insert_mdata_entries,
             remove_mdata_entries);
-impl_cache!(mdata_values,
-            Vec<Value>,
-            MDataValuesHandle,
-            InvalidMDataValuesHandle,
-            get_mdata_values,
-            insert_mdata_values,
-            remove_mdata_values);
 impl_cache!(mdata_entry_actions,
             BTreeMap<Vec<u8>, EntryAction>,
             MDataEntryActionsHandle,

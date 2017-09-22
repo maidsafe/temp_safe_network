@@ -23,8 +23,9 @@ use ffi::helper::send_sync;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
                 vec_clone_from_raw_parts};
 use ffi_utils::callback::Callback;
-use object_cache::{MDataEntriesHandle, MDataValuesHandle};
-use routing::{ClientError, Value};
+use object_cache::MDataEntriesHandle;
+use routing::ClientError;
+use routing::Value as RoutingValue;
 use safe_core::CoreError;
 use std::collections::BTreeMap;
 use std::os::raw::c_void;
@@ -70,7 +71,7 @@ pub unsafe extern "C" fn mdata_entries_insert(
         with_entries(app, entries_h, user_data, o_cb, |entries| {
             let _ = entries.insert(
                 key,
-                Value {
+                RoutingValue {
                     content: value,
                     entry_version: 0,
                 },
@@ -199,74 +200,6 @@ pub unsafe extern "C" fn mdata_entries_free(
     })
 }
 
-/// Returns the number of values.
-///
-/// Callback parameters: user data, error code, length
-#[no_mangle]
-pub unsafe extern "C" fn mdata_values_len(
-    app: *const App,
-    values_h: MDataValuesHandle,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, len: usize),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        with_values(app, values_h, user_data, o_cb, |values| Ok(values.len()))
-    })
-}
-
-/// Iterate over the values.
-///
-/// The `o_each_cb` callback is invoked once for each value,
-/// passing user data, pointer to value, value length and entry version.
-///
-/// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
-#[no_mangle]
-pub unsafe extern "C" fn mdata_values_for_each(
-    app: *const App,
-    values_h: MDataValuesHandle,
-    user_data: *mut c_void,
-    o_each_cb: unsafe extern "C" fn(user_data: *mut c_void,
-                                    value_ptr: *const u8,
-                                    value_len: usize,
-                                    entry_version: u64),
-    o_done_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
-) {
-    catch_unwind_cb(user_data, o_done_cb, || {
-        let user_data = OpaqueCtx(user_data);
-
-        with_values(app, values_h, user_data.0, o_done_cb, move |values| {
-            for value in values {
-                o_each_cb(
-                    user_data.0,
-                    value.content.as_safe_ptr(),
-                    value.content.len(),
-                    value.entry_version,
-                );
-            }
-
-            Ok(())
-        })
-    })
-}
-
-/// Free the values from memory.
-///
-/// Callback parameters: user data, error code
-#[no_mangle]
-pub unsafe extern "C" fn mdata_values_free(
-    app: *const App,
-    values_h: MDataValuesHandle,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_values(values_h)?;
-            Ok(())
-        })
-    })
-}
-
 // -------------- Helpers --------------------------
 
 unsafe fn with_entries<C, F>(
@@ -278,28 +211,11 @@ unsafe fn with_entries<C, F>(
 ) -> Result<(), AppError>
 where
     C: Callback + Copy + Send + 'static,
-    F: FnOnce(&mut BTreeMap<Vec<u8>, Value>) -> Result<C::Args, AppError> + Send + 'static,
+    F: FnOnce(&mut BTreeMap<Vec<u8>, RoutingValue>) -> Result<C::Args, AppError> + Send + 'static,
 {
     send_sync(app, user_data, o_cb, move |_, context| {
         let mut entries = context.object_cache().get_mdata_entries(entries_h)?;
         f(&mut *entries)
-    })
-}
-
-unsafe fn with_values<C, F>(
-    app: *const App,
-    values_h: MDataValuesHandle,
-    user_data: *mut c_void,
-    o_cb: C,
-    f: F,
-) -> Result<(), AppError>
-where
-    C: Callback + Copy + Send + 'static,
-    F: FnOnce(&Vec<Value>) -> Result<C::Args, AppError> + Send + 'static,
-{
-    send_sync(app, user_data, o_cb, move |_, context| {
-        let values = context.object_cache().get_mdata_values(values_h)?;
-        f(&*values)
     })
 }
 
@@ -310,11 +226,12 @@ mod tests {
     use ffi::mutable_data::*;
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
-    use ffi_utils::test_utils::{call_0, call_1, call_vec_vec_u8, send_via_user_data,
+    use ffi_utils::test_utils::{call_0, call_1, call_vec, call_vec_vec_u8, send_via_user_data,
                                 sender_as_user_data};
     use ffi_utils::vec_clone_from_raw_parts;
     use object_cache::MDataEntryActionsHandle;
-    use routing::Value;
+    use routing::Value as RoutingValue;
+    use safe_core::ipc::resp::Value;
     use safe_core::utils;
     use std::collections::BTreeMap;
     use std::os::raw::c_void;
@@ -330,12 +247,12 @@ mod tests {
         let key0 = b"key0".to_vec();
         let key1 = b"key1".to_vec();
 
-        let value0 = Value {
+        let value0 = RoutingValue {
             content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 0,
         };
 
-        let value1 = Value {
+        let value1 = RoutingValue {
             content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 2,
         };
@@ -385,7 +302,7 @@ mod tests {
 
         assert_eq!(len1, len2);
 
-        let (tx, rx) = mpsc::channel::<Value>();
+        let (tx, rx) = mpsc::channel::<RoutingValue>();
 
         extern "C" fn get_cb(
             user_data: *mut c_void,
@@ -398,7 +315,7 @@ mod tests {
 
             unsafe {
                 let value = vec_clone_from_raw_parts(ptr, len);
-                let value = Value {
+                let value = RoutingValue {
                     content: value,
                     entry_version: version,
                 };
@@ -437,7 +354,7 @@ mod tests {
 
         // Iteration
         let (tx, rx) = mpsc::channel::<()>();
-        let mut user_data = (tx, BTreeMap::<Vec<u8>, Value>::new());
+        let mut user_data = (tx, BTreeMap::<Vec<u8>, RoutingValue>::new());
 
         extern "C" fn entry_cb(
             user_data: *mut c_void,
@@ -449,7 +366,7 @@ mod tests {
         ) {
             unsafe {
                 let key = vec_clone_from_raw_parts(key_ptr, key_len);
-                let value = Value {
+                let value = RoutingValue {
                     content: vec_clone_from_raw_parts(value_ptr, value_len),
                     entry_version: entry_version,
                 };
@@ -461,7 +378,7 @@ mod tests {
 
         extern "C" fn done_cb(user_data: *mut c_void, res: FfiResult) {
             assert_eq!(res.error_code, 0);
-            let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, Value>);
+            let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, RoutingValue>);
 
             unsafe {
                 unwrap!((*user_data).0.send(()));
@@ -547,46 +464,52 @@ mod tests {
         assert_eq!(keys.len(), 0);
 
         // Ditto for values
-        let values_h =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
+        let values: Vec<Value> = unsafe {
+            unwrap!(call_vec(
+                |ud, cb| mdata_get_all_values(&app, &md_info, ud, cb),
+            ))
+        };
 
-        let len: usize =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_values_len(&app, values_h, ud, cb))) };
-        assert_eq!(len, 0);
+        assert_eq!(values.len(), 0);
 
         // Add entries to a public MD
         let actions_h: MDataEntryActionsHandle =
             unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(&app, ud, cb))) };
 
-        unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_entry_actions_insert(
-                    &app,
-                    actions_h,
-                    key0.as_ptr(),
-                    key0.len(),
-                    value0.content.as_ptr(),
-                    value0.content.len(),
-                    ud,
-                    cb,
-                )
-            }))
-        };
+        {
+            let value0 = value0.to_routing();
+            let value1 = value1.to_routing();
 
-        unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_entry_actions_insert(
-                    &app,
-                    actions_h,
-                    key1.as_ptr(),
-                    key1.len(),
-                    value1.content.as_ptr(),
-                    value1.content.len(),
-                    ud,
-                    cb,
-                )
-            }))
-        };
+            unsafe {
+                unwrap!(call_0(|ud, cb| {
+                    mdata_entry_actions_insert(
+                        &app,
+                        actions_h,
+                        key0.as_ptr(),
+                        key0.len(),
+                        value0.content.as_ptr(),
+                        value0.content.len(),
+                        ud,
+                        cb,
+                    )
+                }))
+            };
+
+            unsafe {
+                unwrap!(call_0(|ud, cb| {
+                    mdata_entry_actions_insert(
+                        &app,
+                        actions_h,
+                        key1.as_ptr(),
+                        key1.len(),
+                        value1.content.as_ptr(),
+                        value1.content.len(),
+                        ud,
+                        cb,
+                    )
+                }))
+            };
+        }
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
@@ -605,60 +528,14 @@ mod tests {
         assert!(keys.contains(&key0));
         assert!(keys.contains(&key1));
 
-        let values_h =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
+        let values: Vec<Value> = unsafe {
+            unwrap!(call_vec(
+                |ud, cb| mdata_get_all_values(&app, &md_info, ud, cb),
+            ))
+        };
+        assert_eq!(values.len(), 2);
 
-        let len: usize =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_values_len(&app, values_h, ud, cb))) };
-        assert_eq!(len, 2);
-
-        // Iteration over values
-        {
-            let (tx, rx) = mpsc::channel::<()>();
-            let mut user_data = (tx, Vec::<Value>::new());
-
-            extern "C" fn entry_cb(
-                user_data: *mut c_void,
-                value_ptr: *const u8,
-                value_len: usize,
-                entry_version: u64,
-            ) {
-                unsafe {
-                    let content = vec_clone_from_raw_parts(value_ptr, value_len);
-
-                    let value = Value {
-                        content: content,
-                        entry_version: entry_version,
-                    };
-
-                    let user_data = user_data as *mut (Sender<()>, Vec<_>);
-                    (*user_data).1.push(value);
-                }
-            }
-
-            extern "C" fn done_cb(user_data: *mut c_void, res: FfiResult) {
-                assert_eq!(res.error_code, 0);
-                let user_data = user_data as *mut (Sender<_>, Vec<Value>);
-
-                unsafe {
-                    unwrap!((*user_data).0.send(()));
-                }
-            }
-
-            unsafe {
-                let user_data: *mut _ = &mut user_data;
-                mdata_values_for_each(&app, values_h, user_data as *mut c_void, entry_cb, done_cb)
-            }
-
-            unwrap!(rx.recv());
-            let entries = user_data.1;
-
-            assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], value0);
-            assert_eq!(entries[1], value1);
-        }
-
-        // Free
-        unsafe { unwrap!(call_0(|ud, cb| mdata_values_free(&app, values_h, ud, cb))) }
+        assert!(values.contains(&value0));
+        assert!(values.contains(&value1));
     }
 }

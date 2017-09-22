@@ -200,3 +200,15 @@ impl Drop for MetadataResponse {
         }
     }
 }
+
+/// Represents the FFI-safe Value.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct Value {
+    /// Content pointer.
+    pub content_ptr: *const u8,
+    /// Content length.
+    pub content_len: usize,
+    /// Entry version.
+    pub entry_version: u64,
+}

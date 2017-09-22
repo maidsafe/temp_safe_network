@@ -27,6 +27,7 @@ use ipc::req::{ContainerPermissions, container_perms_from_repr_c, container_perm
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
 use routing::PermissionSet;
+use routing::Value as RoutingValue;
 use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::sign::PublicKey;
 use std::collections::HashMap;
@@ -417,6 +418,60 @@ impl ReprC for UserMetadata {
             } else {
                 Some(String::clone_from_repr_c((*repr_c).description)?)
             },
+        })
+    }
+}
+
+/// Redefine the Value from routing so that we can `impl ReprC`.
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
+pub struct Value {
+    /// Content of the entry.
+    pub content: Vec<u8>,
+    /// Version of the entry.
+    pub entry_version: u64,
+}
+
+impl Value {
+    /// Consumes the object and returns the FFI counterpart.
+    ///
+    /// You're now responsible for freeing the subobjects memory once you're
+    /// done.
+    pub fn into_repr_c(self) -> ffi::Value {
+        ffi::Value {
+            content_ptr: self.content.as_ptr(),
+            content_len: self.content.len(),
+            entry_version: self.entry_version,
+        }
+    }
+
+    /// Converts the `Value` into its routing representation.
+    pub fn to_routing(&self) -> RoutingValue {
+        let Self {
+            ref content,
+            entry_version,
+        } = *self;
+
+        RoutingValue {
+            content: content.clone(),
+            entry_version: entry_version,
+        }
+    }
+}
+
+impl ReprC for Value {
+    type C = *const ffi::Value;
+    type Error = ();
+
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+        let ffi::Value {
+            content_ptr,
+            content_len,
+            entry_version,
+        } = *c_repr;
+
+        Ok(Value {
+            content: slice::from_raw_parts(content_ptr, content_len).to_vec(),
+            entry_version: entry_version,
         })
     }
 }
