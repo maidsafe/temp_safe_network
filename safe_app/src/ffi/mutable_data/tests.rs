@@ -23,8 +23,8 @@ use ffi::mutable_data::entries::*;
 use ffi::mutable_data::entry_actions::*;
 use ffi::mutable_data::permissions::*;
 use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
-use ffi_utils::test_utils::{call_0, call_1, call_vec, call_vec_u8, call_vec_vec_u8,
-                            send_via_user_data, sender_as_user_data};
+use ffi_utils::test_utils::{call_0, call_1, call_vec, call_vec_u8, send_via_user_data,
+                            sender_as_user_data};
 use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle};
 use rust_sodium::crypto::sign;
 use std::mem;
@@ -687,11 +687,11 @@ fn entries_crud_ffi() {
         }
     }
 
-    // Check mdata_get_all_keys
+    // Check mdata_list_keys
     {
-        let keys_list: Vec<Vec<u8>> = unsafe {
-            unwrap!(call_vec_vec_u8(
-                |ud, cb| mdata_get_all_keys(&app, &md_info_priv, ud, cb),
+        let keys_list: Vec<MDataKey> = unsafe {
+            unwrap!(call_vec(
+                |ud, cb| mdata_list_keys(&app, &md_info_priv, ud, cb),
             ))
         };
         assert_eq!(keys_list.len(), 1);
@@ -700,8 +700,8 @@ fn entries_crud_ffi() {
             unwrap!(call_vec_u8(|ud, cb| {
                 mdata_info_decrypt(
                     &md_info_priv,
-                    keys_list[0].as_ptr(),
-                    keys_list[0].len(),
+                    keys_list[0].val.as_ptr(),
+                    keys_list[0].val.len(),
                     ud,
                     cb,
                 )
@@ -712,9 +712,9 @@ fn entries_crud_ffi() {
 
     // Check mdata_list_values
     {
-        let vals_list: Vec<Value> = unsafe {
+        let vals_list: Vec<MDataValue> = unsafe {
             unwrap!(call_vec(
-                |ud, cb| mdata_get_all_values(&app, &md_info_priv, ud, cb),
+                |ud, cb| mdata_list_values(&app, &md_info_priv, ud, cb),
             ))
         };
         assert_eq!(vals_list.len(), 1);

@@ -25,7 +25,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
 use ffi_utils::callback::Callback;
 use object_cache::MDataEntriesHandle;
 use routing::ClientError;
-use routing::Value as RoutingValue;
+use routing::Value;
 use safe_core::CoreError;
 use std::collections::BTreeMap;
 use std::os::raw::c_void;
@@ -71,7 +71,7 @@ pub unsafe extern "C" fn mdata_entries_insert(
         with_entries(app, entries_h, user_data, o_cb, |entries| {
             let _ = entries.insert(
                 key,
-                RoutingValue {
+                Value {
                     content: value,
                     entry_version: 0,
                 },
@@ -211,7 +211,7 @@ unsafe fn with_entries<C, F>(
 ) -> Result<(), AppError>
 where
     C: Callback + Copy + Send + 'static,
-    F: FnOnce(&mut BTreeMap<Vec<u8>, RoutingValue>) -> Result<C::Args, AppError> + Send + 'static,
+    F: FnOnce(&mut BTreeMap<Vec<u8>, Value>) -> Result<C::Args, AppError> + Send + 'static,
 {
     send_sync(app, user_data, o_cb, move |_, context| {
         let mut entries = context.object_cache().get_mdata_entries(entries_h)?;
@@ -226,12 +226,11 @@ mod tests {
     use ffi::mutable_data::*;
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
-    use ffi_utils::test_utils::{call_0, call_1, call_vec, call_vec_vec_u8, send_via_user_data,
-                                sender_as_user_data};
+    use ffi_utils::test_utils::{call_0, call_1, call_vec, send_via_user_data, sender_as_user_data};
     use ffi_utils::vec_clone_from_raw_parts;
     use object_cache::MDataEntryActionsHandle;
-    use routing::Value as RoutingValue;
-    use safe_core::ipc::resp::Value;
+    use routing::Value;
+    use safe_core::ipc::resp::MDataValue;
     use safe_core::utils;
     use std::collections::BTreeMap;
     use std::os::raw::c_void;
@@ -247,12 +246,12 @@ mod tests {
         let key0 = b"key0".to_vec();
         let key1 = b"key1".to_vec();
 
-        let value0 = RoutingValue {
+        let value0 = Value {
             content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 0,
         };
 
-        let value1 = RoutingValue {
+        let value1 = Value {
             content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 2,
         };
@@ -302,7 +301,7 @@ mod tests {
 
         assert_eq!(len1, len2);
 
-        let (tx, rx) = mpsc::channel::<RoutingValue>();
+        let (tx, rx) = mpsc::channel::<Value>();
 
         extern "C" fn get_cb(
             user_data: *mut c_void,
@@ -315,7 +314,7 @@ mod tests {
 
             unsafe {
                 let value = vec_clone_from_raw_parts(ptr, len);
-                let value = RoutingValue {
+                let value = Value {
                     content: value,
                     entry_version: version,
                 };
@@ -354,7 +353,7 @@ mod tests {
 
         // Iteration
         let (tx, rx) = mpsc::channel::<()>();
-        let mut user_data = (tx, BTreeMap::<Vec<u8>, RoutingValue>::new());
+        let mut user_data = (tx, BTreeMap::<Vec<u8>, Value>::new());
 
         extern "C" fn entry_cb(
             user_data: *mut c_void,
@@ -366,7 +365,7 @@ mod tests {
         ) {
             unsafe {
                 let key = vec_clone_from_raw_parts(key_ptr, key_len);
-                let value = RoutingValue {
+                let value = Value {
                     content: vec_clone_from_raw_parts(value_ptr, value_len),
                     entry_version: entry_version,
                 };
@@ -378,7 +377,7 @@ mod tests {
 
         extern "C" fn done_cb(user_data: *mut c_void, res: FfiResult) {
             assert_eq!(res.error_code, 0);
-            let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, RoutingValue>);
+            let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, Value>);
 
             unsafe {
                 unwrap!((*user_data).0.send(()));
@@ -413,12 +412,12 @@ mod tests {
         let key0 = b"key0".to_vec();
         let key1 = b"key1".to_vec();
 
-        let value0 = Value {
+        let value0 = MDataValue {
             content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 0,
         };
 
-        let value1 = Value {
+        let value1 = MDataValue {
             content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 0,
         };
@@ -455,20 +454,14 @@ mod tests {
         };
 
         // Get the keys handle, make sure number of keys is zero
-        let keys: Vec<Vec<u8>> = unsafe {
-            unwrap!(call_vec_vec_u8(
-                |ud, cb| mdata_get_all_keys(&app, &md_info, ud, cb),
-            ))
-        };
+        let keys: Vec<MDataKey> =
+            unsafe { unwrap!(call_vec(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
 
         assert_eq!(keys.len(), 0);
 
         // Ditto for values
-        let values: Vec<Value> = unsafe {
-            unwrap!(call_vec(
-                |ud, cb| mdata_get_all_values(&app, &md_info, ud, cb),
-            ))
-        };
+        let values: Vec<MDataValue> =
+            unsafe { unwrap!(call_vec(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
 
         assert_eq!(values.len(), 0);
 
@@ -518,21 +511,15 @@ mod tests {
         }
 
         // Get the keys and values handles again
-        let keys = unsafe {
-            unwrap!(call_vec_vec_u8(
-                |ud, cb| mdata_get_all_keys(&app, &md_info, ud, cb),
-            ))
-        };
+        let keys: Vec<MDataKey> =
+            unsafe { unwrap!(call_vec(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
         assert_eq!(keys.len(), 2);
 
-        assert!(keys.contains(&key0));
-        assert!(keys.contains(&key1));
+        assert!(keys.contains(&MDataKey { val: key0 }));
+        assert!(keys.contains(&MDataKey { val: key1 }));
 
-        let values: Vec<Value> = unsafe {
-            unwrap!(call_vec(
-                |ud, cb| mdata_get_all_values(&app, &md_info, ud, cb),
-            ))
-        };
+        let values: Vec<MDataValue> =
+            unsafe { unwrap!(call_vec(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
         assert_eq!(values.len(), 2);
 
         assert!(values.contains(&value0));

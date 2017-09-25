@@ -34,8 +34,9 @@ use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataPermissionS
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt, MDataInfo};
 use safe_core::ffi::MDataInfo as FfiMDataInfo;
-use safe_core::ffi::ipc::resp::Value as FfiValue;
-use safe_core::ipc::resp::Value;
+use safe_core::ffi::ipc::resp::MDataKey as FfiMDataKey;
+use safe_core::ffi::ipc::resp::MDataValue as FfiMDataValue;
+use safe_core::ipc::resp::{MDataKey, MDataValue};
 use std::os::raw::c_void;
 
 /// Special value that represents an empty permission set.
@@ -242,17 +243,15 @@ pub unsafe extern "C" fn mdata_list_entries(
 
 /// Get list of all keys in the mutable data.
 ///
-/// Callback parameters: user data, error code, vector of keys, vector of sizes of each key,
-/// size of vector of keys
+/// Callback parameters: user data, error code, vector of keys, vector size
 #[no_mangle]
-pub unsafe extern "C" fn mdata_get_all_keys(
+pub unsafe extern "C" fn mdata_list_keys(
     app: *const App,
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        keys: *const *const u8,
-                        key_lens: *const usize,
+                        keys: *const FfiMDataKey,
                         len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -263,10 +262,13 @@ pub unsafe extern "C" fn mdata_get_all_keys(
                 .list_mdata_keys(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |keys_set| {
-                    let keys_set = keys_set.clone();
-                    let keys: Vec<*const u8> = keys_set.iter().map(|key| key.as_ptr()).collect();
-                    let lens: Vec<usize> = keys_set.into_iter().map(|key| key.len()).collect();
-                    Ok((keys.as_ptr(), lens.as_ptr(), keys.len()))
+                    let keys: Vec<MDataKey> = keys_set
+                        .iter()
+                        .map(|key| MDataKey { val: key.clone() })
+                        .collect();
+                    let keys: Vec<FfiMDataKey> =
+                        keys.into_iter().map(|key| key.into_repr_c()).collect();
+                    Ok((keys.as_ptr(), keys.len()))
                 })
         })
     })
@@ -276,13 +278,13 @@ pub unsafe extern "C" fn mdata_get_all_keys(
 ///
 /// Callback parameters: user data, error code, vector of values, vector size
 #[no_mangle]
-pub unsafe extern "C" fn mdata_get_all_values(
+pub unsafe extern "C" fn mdata_list_values(
     app: *const App,
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        values: *const FfiValue,
+                        values: *const FfiMDataValue,
                         len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -293,15 +295,16 @@ pub unsafe extern "C" fn mdata_get_all_values(
                 .list_mdata_values(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |values_set| {
-                    let values: Vec<Value> = values_set
+                    let values: Vec<MDataValue> = values_set
                         .iter()
-                        .map(|value|
-                            Value {
+                        .map(|value| {
+                            MDataValue {
                                 content: value.content.clone(),
                                 entry_version: value.entry_version,
-                            })
+                            }
+                        })
                         .collect();
-                    let values: Vec<FfiValue> = values
+                    let values: Vec<FfiMDataValue> = values
                         .into_iter()
                         .map(|value| value.into_repr_c())
                         .collect();

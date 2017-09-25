@@ -117,23 +117,6 @@ where
     unwrap!(rx.recv())
 }
 
-/// Call a FFI function and block until its callback gets called, then copy
-/// the byte array argument and each subarray which was passed to `Vec<Vec<u8>>` and
-/// return the result.
-pub unsafe fn call_vec_vec_u8<F>(f: F) -> Result<Vec<Vec<u8>>, i32>
-where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: FfiResult,
-                         *const *const u8,
-                         *const usize,
-                         usize)),
-{
-    let (tx, rx) = mpsc::channel::<Result<Vec<Vec<u8>>, i32>>();
-    f(sender_as_user_data(&tx), callback_vec_vec_u8);
-    unwrap!(rx.recv())
-}
-
 extern "C" fn callback_0(user_data: *mut c_void, res: FfiResult) {
     unsafe { send_via_user_data(user_data, res.error_code) }
 }
@@ -206,30 +189,6 @@ extern "C" fn callback_vec_u8(user_data: *mut c_void, res: FfiResult, ptr: *cons
     unsafe {
         let result = if res.error_code == 0 {
             Ok(slice::from_raw_parts(ptr, len).to_vec())
-        } else {
-            Err(res.error_code)
-        };
-
-        send_via_user_data(user_data, result)
-    }
-}
-
-extern "C" fn callback_vec_vec_u8(
-    user_data: *mut c_void,
-    res: FfiResult,
-    ptr: *const *const u8,
-    ptr_lens: *const usize,
-    len: usize,
-) {
-    unsafe {
-        let result = if res.error_code == 0 {
-            let keys = slice::from_raw_parts(ptr, len).to_vec();
-            let lens = slice::from_raw_parts(ptr_lens, len).to_vec();
-            let result: Vec<Vec<u8>> = keys.into_iter()
-                .enumerate()
-                .map(|(i, key)| slice::from_raw_parts(key, lens[i]).to_vec())
-                .collect();
-            Ok(result)
         } else {
             Err(res.error_code)
         };
