@@ -254,10 +254,12 @@ pub unsafe extern "C" fn mdata_list_keys(
                         keys: *const FfiMDataKey,
                         len: usize),
 ) {
+    let user_data = OpaqueCtx(user_data);
+
     catch_unwind_cb(user_data, o_cb, || {
         let info = MDataInfo::clone_from_repr_c(info)?;
 
-        send(app, user_data, o_cb, move |client, _context| {
+        (*app).send(move |client, _context| {
             client
                 .list_mdata_keys(info.name, info.type_tag)
                 .map_err(AppError::from)
@@ -268,8 +270,21 @@ pub unsafe extern "C" fn mdata_list_keys(
                         .collect();
                     let keys: Vec<FfiMDataKey> =
                         keys.into_iter().map(|key| key.into_repr_c()).collect();
-                    Ok((keys.as_safe_ptr(), keys.len()))
+                    ok!(keys)
                 })
+                .then(move |result| {
+                    match result {
+                        Ok(keys) => {
+                            o_cb(user_data.0, FFI_RESULT_OK, keys.as_safe_ptr(), keys.len())
+                        }
+                        res @ Err(..) => {
+                            call_result_cb!(res, user_data, o_cb);
+                        }
+                    }
+                    Ok(())
+                })
+                .into_box()
+                .into()
         })
     })
 }
@@ -287,10 +302,12 @@ pub unsafe extern "C" fn mdata_list_values(
                         values: *const FfiMDataValue,
                         len: usize),
 ) {
+    let user_data = OpaqueCtx(user_data);
+
     catch_unwind_cb(user_data, o_cb, || {
         let info = MDataInfo::clone_from_repr_c(info)?;
 
-        send(app, user_data, o_cb, move |client, _context| {
+        (*app).send(move |client, _context| {
             client
                 .list_mdata_values(info.name, info.type_tag)
                 .map_err(AppError::from)
@@ -308,8 +325,26 @@ pub unsafe extern "C" fn mdata_list_values(
                         .into_iter()
                         .map(|value| value.into_repr_c())
                         .collect();
-                    Ok((values.as_safe_ptr(), values.len()))
+                    ok!(values)
                 })
+                .then(move |result| {
+                    match result {
+                        Ok(values) => {
+                            o_cb(
+                                user_data.0,
+                                FFI_RESULT_OK,
+                                values.as_safe_ptr(),
+                                values.len(),
+                            )
+                        }
+                        res @ Err(..) => {
+                            call_result_cb!(res, user_data, o_cb);
+                        }
+                    }
+                    Ok(())
+                })
+                .into_box()
+                .into()
         })
     })
 }
