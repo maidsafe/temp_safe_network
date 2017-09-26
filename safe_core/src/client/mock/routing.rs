@@ -116,7 +116,12 @@ impl Routing {
         dst: Authority<XorName>,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        if self.simulate_network_errors() {
+        let client_auth = self.client_auth;
+
+        if self.intercept_request(GET_ACCOUNT_INFO_DELAY_MS, dst, client_auth, || {
+            Request::GetAccountInfo(msg_id)
+        })
+        {
             return Ok(());
         }
 
@@ -138,7 +143,7 @@ impl Routing {
         self.send_response(
             GET_ACCOUNT_INFO_DELAY_MS,
             dst,
-            self.client_auth,
+            client_auth,
             Response::GetAccountInfo {
                 res: res,
                 msg_id: msg_id,
@@ -156,22 +161,16 @@ impl Routing {
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
         let data_name = *data.name();
+        let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(data_name);
 
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&Request::PutIData {
+        if self.intercept_request(PUT_IDATA_DELAY_MS, nae_auth, client_auth, || {
+            Request::PutIData {
                 data: data.clone(),
                 msg_id,
-            })
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(PUT_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
-            return Ok(());
-        }
-
-        if self.simulate_network_errors() {
+            }
+        })
+        {
             return Ok(());
         }
 
@@ -197,7 +196,7 @@ impl Routing {
         self.send_response(
             PUT_IDATA_DELAY_MS,
             nae_auth,
-            self.client_auth,
+            client_auth,
             Response::PutIData { res, msg_id },
         );
         Ok(())
@@ -210,19 +209,13 @@ impl Routing {
         name: XorName,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(name);
 
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&Request::GetIData { name, msg_id })
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(GET_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
-            return Ok(());
-        }
-
-        if self.simulate_network_errors() {
+        if self.intercept_request(GET_IDATA_DELAY_MS, nae_auth, client_auth, || {
+            Request::GetIData { name, msg_id }
+        })
+        {
             return Ok(());
         }
 
@@ -242,7 +235,7 @@ impl Routing {
         self.send_response(
             GET_IDATA_DELAY_MS,
             nae_auth,
-            self.client_auth,
+            client_auth,
             Response::GetIData { res, msg_id },
         );
         Ok(())
@@ -257,23 +250,17 @@ impl Routing {
         requester: sign::PublicKey,
     ) -> Result<(), InterfaceError> {
         let data_name = DataId::mutable(*data.name(), data.tag());
+        let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(*data_name.name());
 
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&Request::PutMData {
+        if self.intercept_request(PUT_MDATA_DELAY_MS, nae_auth, client_auth, || {
+            Request::PutMData {
                 data: data.clone(),
                 msg_id,
                 requester,
-            })
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(PUT_MDATA_DELAY_MS, nae_auth, self.client_auth, response);
-            return Ok(());
-        }
-
-        if self.simulate_network_errors() {
+            }
+        })
+        {
             return Ok(());
         }
 
@@ -312,7 +299,7 @@ impl Routing {
         self.send_response(
             PUT_MDATA_DELAY_MS,
             nae_auth,
-            self.client_auth,
+            client_auth,
             Response::PutMData { res, msg_id },
         );
         Ok(())
@@ -660,22 +647,12 @@ impl Routing {
         dst: Authority<XorName>,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&Request::ListAuthKeysAndVersion(msg_id))
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(
-                LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
-                dst,
-                self.client_auth,
-                response,
-            );
-            return Ok(());
-        }
+        let client_auth = self.client_auth;
 
-        if self.simulate_network_errors() {
+        if self.intercept_request(LIST_AUTH_KEYS_AND_VERSION_DELAY_MS, dst, client_auth, || {
+            Request::ListAuthKeysAndVersion(msg_id)
+        })
+        {
             return Ok(());
         }
 
@@ -699,7 +676,7 @@ impl Routing {
         self.send_response(
             LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
             dst,
-            self.client_auth,
+            client_auth,
             Response::ListAuthKeysAndVersion { res, msg_id },
         );
         Ok(())
@@ -713,21 +690,16 @@ impl Routing {
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&Request::InsAuthKey {
+        let client_auth = self.client_auth;
+
+        if self.intercept_request(INS_AUTH_KEY_DELAY_MS, dst, client_auth, || {
+            Request::InsAuthKey {
                 key,
                 version,
                 msg_id,
-            })
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(INS_AUTH_KEY_DELAY_MS, dst, self.client_auth, response);
-            return Ok(());
-        }
-
-        if self.simulate_network_errors() {
+            }
+        })
+        {
             return Ok(());
         }
 
@@ -751,7 +723,7 @@ impl Routing {
         self.send_response(
             INS_AUTH_KEY_DELAY_MS,
             dst,
-            self.client_auth,
+            client_auth,
             Response::InsAuthKey { res, msg_id },
         );
         Ok(())
@@ -765,21 +737,16 @@ impl Routing {
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&Request::DelAuthKey {
+        let client_auth = self.client_auth;
+
+        if self.intercept_request(DEL_AUTH_KEY_DELAY_MS, dst, client_auth, || {
+            Request::DelAuthKey {
                 key,
                 version,
                 msg_id,
-            })
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(DEL_AUTH_KEY_DELAY_MS, dst, self.client_auth, response);
-            return Ok(());
-        }
-
-        if self.simulate_network_errors() {
+            }
+        })
+        {
             return Ok(());
         }
 
@@ -802,7 +769,7 @@ impl Routing {
         self.send_response(
             DEL_AUTH_KEY_DELAY_MS,
             dst,
-            self.client_auth,
+            client_auth,
             Response::DelAuthKey { res, msg_id },
         );
         Ok(())
@@ -933,20 +900,11 @@ impl Routing {
         F: FnOnce(MutableData, &mut Vault) -> Result<R, ClientError>,
         G: FnOnce(Result<R, ClientError>) -> Response,
     {
+        let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(name);
         let msg_id = *request.message_id();
 
-        let override_response = if let Some(ref mut hook) = self.request_hook {
-            hook(&request)
-        } else {
-            None
-        };
-        if let Some(response) = override_response {
-            self.send_response(delay_ms, nae_auth, self.client_auth, response);
-            return Ok(());
-        };
-
-        if self.simulate_network_errors() {
+        if self.intercept_request(delay_ms, nae_auth, client_auth, move || request) {
             return Ok(());
         }
 
@@ -968,7 +926,7 @@ impl Routing {
             }
         };
 
-        self.send_response(delay_ms, nae_auth, self.client_auth, g(res));
+        self.send_response(delay_ms, nae_auth, client_auth, g(res));
         Ok(())
     }
 
@@ -1043,7 +1001,27 @@ impl Routing {
         })
     }
 
-    fn simulate_network_errors(&self) -> bool {
+    fn intercept_request<F>(
+        &mut self,
+        delay_ms: u64,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        request: F,
+    ) -> bool
+    where
+        F: FnOnce() -> Request,
+    {
+        let response = if let Some(ref mut hook) = self.request_hook {
+            hook(&request())
+        } else {
+            None
+        };
+
+        if let Some(response) = response {
+            self.send_response(delay_ms, src, dst, response);
+            return true;
+        }
+
         if self.timeout_simulation {
             return true;
         }
