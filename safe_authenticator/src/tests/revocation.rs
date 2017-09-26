@@ -39,16 +39,17 @@ mod mock_routing {
     use ffi::ipc::auth_flush_app_revocation_queue;
     use ffi_utils::test_utils::call_0;
     use futures::future;
-    use rand::{self, Rng};
+    use maidsafe_utilities::SeededRng;
     use routing::{ClientError, Request, Response};
     use safe_core::{Client, FutureExt};
     use safe_core::MockRouting;
     use safe_core::ipc::{IpcError, Permission};
     use safe_core::ipc::req::container_perms_into_permission_set;
+    use safe_core::utils::test_utils::Synchronizer;
     use std::collections::HashMap;
     use std::iter;
+    use std::sync::{Arc, Barrier};
     use std::thread;
-    use std::time::Duration;
     use test_utils::{get_container_from_root, register_rand_app, try_revoke};
     use tiny_keccak::sha3_256;
 
@@ -342,6 +343,8 @@ mod mock_routing {
     // Test one app being revoked by multiple authenticator concurrently.
     #[test]
     fn concurrent_revocation_of_single_app() {
+        let rng = SeededRng::new();
+
         // Number of concurrent operations.
         let concurrency = 2;
 
@@ -378,24 +381,33 @@ mod mock_routing {
 
         // Try to revoke the app concurrently using multiple authenticators (running
         // in separate threads).
-        // (NOTE: doing `collect` after every step to prevent short-circuiting)
-        let auths: Vec<_> = (0..concurrency)
-            .map(|_| {
-                // Insert random delays to prevent the operations from silently being
-                // executed sequentially due to being too quick.
-                unwrap!(login_authenticator_with_random_delays(
-                    locator.clone(),
-                    password.clone(),
-                ))
-            })
-            .collect();
 
-        let join_handles: Vec<_> = auths
-            .into_iter()
-            .map(|auth| {
+        // This barrier makes sure the revocations are started only after all
+        // the authenticators are fully initialized.
+        let barrier = Arc::new(Barrier::new(concurrency));
+        let sync = Synchronizer::new(rng);
+
+        let join_handles: Vec<_> = (0..concurrency)
+            .map(|_| {
+                let locator = locator.clone();
+                let password = password.clone();
                 let app_id = app_id_0.clone();
-                thread::spawn(move || try_revoke(&auth, &app_id))
+                let barrier = barrier.clone();
+                let sync = sync.clone();
+
+                thread::spawn(move || {
+                    let auth = unwrap!(Authenticator::login_with_hook(
+                        locator,
+                        password,
+                        |_| (),
+                        move |routing| sync.hook(routing),
+                    ));
+
+                    let _ = barrier.wait();
+                    try_revoke(&auth, &app_id)
+                })
             })
+            // Doing `collect` to prevent short-circuiting.
             .collect();
 
         let success = join_handles.into_iter().fold(
@@ -430,6 +442,11 @@ mod mock_routing {
     // Test multiple apps being revoked concurrently.
     #[test]
     fn concurrent_revocation_of_multiple_apps() {
+        let rng = SeededRng::new();
+
+        // FIXME: this test consistently fails with this seed:
+        // let rng = SeededRng::from_seed([3606423633, 1597978997, 4030243941, 3000514502]);
+
         // Create account.
         let (auth, locator, password) = create_authenticator();
 
@@ -466,22 +483,32 @@ mod mock_routing {
 
         // Revoke the first two apps, concurrently.
         let apps_to_revoke = [app_id_0.clone(), app_id_1.clone()];
-        let auths: Vec<_> = apps_to_revoke
+
+        // This barrier makes sure the revocations are started only after all
+        // the authenticators are fully initialized.
+        let barrier = Arc::new(Barrier::new(apps_to_revoke.len()));
+        let sync = Synchronizer::new(rng);
+
+        let join_handles: Vec<_> = apps_to_revoke
             .iter()
             .map(|app_id| {
-                let auth = unwrap!(login_authenticator_with_random_delays(
-                    locator.clone(),
-                    password.clone(),
-                ));
+                let locator = locator.clone();
+                let password = password.clone();
+                let app_id = app_id.to_string();
+                let barrier = barrier.clone();
+                let sync = sync.clone();
 
-                (auth, app_id.to_string())
-            })
-            .collect();
+                thread::spawn(move || {
+                    let auth = unwrap!(Authenticator::login_with_hook(
+                        locator,
+                        password,
+                        |_| (),
+                        move |routing| sync.hook(routing),
+                    ));
 
-        let join_handles: Vec<_> = auths
-            .into_iter()
-            .map(|(auth, app_id)| {
-                thread::spawn(move || try_revoke(&auth, &app_id))
+                    let _ = barrier.wait();
+                    try_revoke(&auth, &app_id)
+                })
             })
             .collect();
 
@@ -703,25 +730,6 @@ mod mock_routing {
                 future::join_all(futures).map(|_| ())
             })
             .into_box()
-    }
-
-    // Create authenticator instance that will randomly delay before each request.
-    fn login_authenticator_with_random_delays(
-        locator: String,
-        password: String,
-    ) -> Result<Authenticator, AuthError> {
-        let hook = move |mut routing: MockRouting| -> MockRouting {
-            routing.set_request_hook(move |_| {
-                let mut rng = rand::thread_rng();
-                let delay_ms = rng.gen_range(0, 200);
-                thread::sleep(Duration::from_millis(delay_ms));
-
-                None
-            });
-            routing
-        };
-
-        Authenticator::login_with_hook(locator, password, |_| (), hook)
     }
 }
 

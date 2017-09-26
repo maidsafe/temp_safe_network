@@ -32,8 +32,11 @@ use std::time::Duration;
 use tiny_keccak::sha3_256;
 
 /// Function that is used to tap into routing requests
-/// and return preconditioned responsed.
+/// and return preconditioned responses.
 pub type RequestHookFn = FnMut(&Request) -> Option<Response> + 'static;
+
+/// Function that is used to modify responses before they are sent.
+pub type ResponseHookFn = FnMut(Response) -> Response + 'static;
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
@@ -76,6 +79,7 @@ pub struct Routing {
     max_ops_countdown: Option<Cell<u64>>,
     timeout_simulation: bool,
     request_hook: Option<Box<RequestHookFn>>,
+    response_hook: Option<Box<ResponseHookFn>>,
 }
 
 impl Routing {
@@ -107,6 +111,7 @@ impl Routing {
             max_ops_countdown: None,
             timeout_simulation: false,
             request_hook: None,
+            response_hook: None,
         })
     }
 
@@ -590,10 +595,11 @@ impl Routing {
             Some(owner) if new_owners_len == 1 => owner,
             Some(_) | None => {
                 // `new_owners` must have exactly 1 element.
+                let client_auth = self.client_auth;
                 self.send_response(
                     CHANGE_MDATA_OWNER_DELAY_MS,
                     dst,
-                    self.client_auth,
+                    client_auth,
                     Response::ChangeMDataOwner {
                         res: Err(ClientError::InvalidOwners),
                         msg_id,
@@ -776,12 +782,16 @@ impl Routing {
     }
 
     fn send_response(
-        &self,
+        &mut self,
         delay_ms: u64,
         src: Authority<XorName>,
         dst: Authority<XorName>,
-        response: Response,
+        mut response: Response,
     ) {
+        if let Some(ref mut hook) = self.response_hook {
+            response = hook(response);
+        }
+
         let event = Event::Response {
             response: response,
             src: src,
@@ -1036,13 +1046,24 @@ impl Routing {
 
 #[cfg(any(feature = "testing", test))]
 impl Routing {
-    /// Set hook function to override response results for test purposes.
+    /// Set hook function to override response before request is processed,
+    /// for test purposes.
     pub fn set_request_hook<F>(&mut self, hook: F)
     where
         F: FnMut(&Request) -> Option<Response> + 'static,
     {
         let hook: Box<RequestHookFn> = Box::new(hook);
         self.request_hook = Some(hook);
+    }
+
+    /// Set hook function to override response after request is processed,
+    /// for test purposes.
+    pub fn set_response_hook<F>(&mut self, hook: F)
+    where
+        F: FnMut(Response) -> Response + 'static,
+    {
+        let hook: Box<ResponseHookFn> = Box::new(hook);
+        self.response_hook = Some(hook);
     }
 
     /// Removes hook function to override response results
