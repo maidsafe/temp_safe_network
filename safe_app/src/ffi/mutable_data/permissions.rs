@@ -21,8 +21,10 @@ use App;
 use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::mutable_data::helper;
-use ffi_utils::{FfiResult, OpaqueCtx, catch_unwind_cb};
-use object_cache::{MDataPermissionsHandle, SignKeyHandle};
+use ffi_utils::{FfiResult, catch_unwind_cb};
+use ffi_utils::SafePtr;
+use object_cache::{MDataPermissionsHandle, NULL_OBJECT_HANDLE, SignKeyHandle};
+use permissions;
 use routing::{Action, User};
 use safe_core::ffi::ipc::req::PermissionSet as FfiPermissionSet;
 use safe_core::ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
@@ -30,7 +32,7 @@ use std::os::raw::c_void;
 
 /// Special value that represents `User::Anyone` in permission sets.
 #[no_mangle]
-pub static USER_ANYONE: u64 = 0;
+pub static USER_ANYONE: u64 = NULL_OBJECT_HANDLE;
 
 /// Permission actions.
 #[repr(C)]
@@ -54,6 +56,15 @@ impl Into<Action> for MDataAction {
             MDataAction::ManagePermissions => Action::ManagePermissions,
         }
     }
+}
+
+/// FFI object representing a (User, Permission Set) pair.
+#[repr(C)]
+pub struct UserPermissionSet {
+    /// User's sign key handle.
+    pub user_h: SignKeyHandle,
+    /// User's permission set.
+    pub perm_set: FfiPermissionSet,
 }
 
 /// Create new permissions.
@@ -120,37 +131,37 @@ pub unsafe extern "C" fn mdata_permissions_get(
     })
 }
 
-/// Iterate over the permissions.
-/// The `o_each_cb` is called for each (user, permission set) pair in the permissions.
-/// The `o_done_cb` is called after the iterations is over, or in case of error.
+/// Return each (user, permission set) pair in the permissions.
+///
+/// Callback parameters: user data, error code, vector of user/permission set objects, vector size
 #[no_mangle]
-pub unsafe extern "C" fn mdata_permissions_for_each(
+pub unsafe extern "C" fn mdata_list_permission_sets(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
     user_data: *mut c_void,
-    o_each_cb: extern "C" fn(user_data: *mut c_void,
-                             sign_key_h: SignKeyHandle,
-                             perm_set: FfiPermissionSet),
-    o_done_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: FfiResult,
+                        user_perm_sets: *const UserPermissionSet,
+                        len: usize),
 ) {
-    catch_unwind_cb(user_data, o_done_cb, || {
-        let user_data = OpaqueCtx(user_data);
-
-        send_sync(app, user_data.0, o_done_cb, move |_, context| {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |_, context| {
             let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
-            for (user_key, permission_set) in &*permissions {
-                let user_h = match *user_key {
-                    User::Key(key) => context.object_cache().insert_sign_key(key),
-                    User::Anyone => USER_ANYONE,
-                };
-                o_each_cb(
-                    user_data.0,
-                    user_h,
-                    permission_set_into_repr_c(*permission_set),
-                );
-            }
+            let user_perm_sets: Vec<UserPermissionSet> = permissions
+                .iter()
+                .map(|(user_key, permission_set)| {
+                    let user_h = match *user_key {
+                        User::Key(key) => context.object_cache().insert_sign_key(key),
+                        User::Anyone => USER_ANYONE,
+                    };
+                    permissions::UserPermissionSet {
+                        user_h: user_h,
+                        perm_set: *permission_set,
+                    }.into_repr_c()
+                })
+                .collect();
 
-            Ok(())
+            Ok((user_perm_sets.as_safe_ptr(), user_perm_sets.len()))
         })
     })
 }
@@ -158,11 +169,6 @@ pub unsafe extern "C" fn mdata_permissions_for_each(
 /// Insert permission set for the given user to the permissions.
 ///
 /// To insert permissions for "Anyone", pass `USER_ANYONE` as the user handle.
-///
-/// Note: the permission sets are stored by reference, which means they must
-/// remain alive (not be disposed of with `mdata_permission_set_free`) until
-/// the whole permissions collection is no longer needed. The users, on the
-/// other hand, are stored by value (copied).
 ///
 /// Callback parameters: user data, error code
 #[no_mangle]
@@ -179,7 +185,7 @@ pub unsafe extern "C" fn mdata_permissions_insert(
             let mut permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             let _ = permissions.insert(
                 helper::get_user(context.object_cache(), user_h)?,
-                unwrap!(permission_set_clone_from_repr_c(&permission_set)),
+                permission_set_clone_from_repr_c(&permission_set)?,
             );
 
             Ok(())
@@ -188,9 +194,6 @@ pub unsafe extern "C" fn mdata_permissions_insert(
 }
 
 /// Free the permissions from memory.
-///
-/// Note: this doesn't free the individual permission sets. Those have to be
-/// disposed of manually by calling `mdata_permission_set_free`.
 ///
 /// Callback parameters: user data, error code
 #[no_mangle]

@@ -23,8 +23,10 @@ use ffi::mutable_data::entries::*;
 use ffi::mutable_data::entry_actions::*;
 use ffi::mutable_data::permissions::*;
 use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
-use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data, sender_as_user_data};
+use ffi_utils::test_utils::{call_0, call_1, call_vec, call_vec_u8, send_via_user_data,
+                            sender_as_user_data};
 use object_cache::MDataPermissionsHandle;
+use permissions;
 use routing::{Action, PermissionSet};
 use rust_sodium::crypto::sign;
 use safe_core::ffi::ipc::req::PermissionSet as FfiPermissionSet;
@@ -99,10 +101,6 @@ fn permissions_crud_ffi() {
         Action::ManagePermissions,
     );
 
-    assert_eq!(Some(true), perm_set.is_allowed(Action::Insert));
-    assert_eq!(Some(true), perm_set.is_allowed(Action::ManagePermissions));
-    assert_eq!(None, perm_set.is_allowed(Action::Update));
-
     // Create permissions
     let perms_h: MDataPermissionsHandle =
         unsafe { unwrap!(call_1(|ud, cb| mdata_permissions_new(&app, ud, cb))) };
@@ -136,13 +134,15 @@ fn permissions_crud_ffi() {
         assert_eq!(Some(true), perm_set2.is_allowed(Action::Insert));
         assert_eq!(None, perm_set2.is_allowed(Action::Update));
 
-        let result = unsafe {
-            call_permissions(|ud, iter_cb, done_cb| {
-                mdata_permissions_for_each(&app, perms_h, ud, iter_cb, done_cb)
-            })
+        let result: Vec<permissions::UserPermissionSet> = unsafe {
+            unwrap!(call_vec(
+                |ud, cb| mdata_list_permission_sets(&app, perms_h, ud, cb),
+            ))
         };
 
         assert_eq!(result.len(), 1);
+        assert_eq!(result[0].user_h, USER_ANYONE);
+        assert_eq!(result[0].perm_set, perm_set);
     }
 
     // Try to create an empty public MD
@@ -255,8 +255,6 @@ fn entries_crud_ffi() {
 
     // Create a permissions set
     let perm_set = PermissionSet::new().allow(Action::Insert);
-
-    assert_eq!(Some(true), perm_set.is_allowed(Action::Insert));
 
     // Create permissions
     let perms_h: MDataPermissionsHandle =
@@ -619,69 +617,6 @@ fn entries_crud_ffi() {
             };
 
             send_via_user_data(user_data, result);
-        }
-    }
-}
-
-// Helper function to call FFI function that iterates over permission sets in permissions.
-unsafe fn call_permissions<F>(f: F) -> Vec<(SignKeyHandle, FfiPermissionSet)>
-where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(*mut c_void, SignKeyHandle, FfiPermissionSet),
-           extern "C" fn(*mut c_void, FfiResult)),
-{
-    let mut context = PermissionEntriesContext::new();
-    f(
-        context.user_data(),
-        PermissionEntriesContext::permissions_cb,
-        PermissionEntriesContext::done_cb,
-    );
-    context.take_result()
-}
-
-struct PermissionEntriesContext {
-    tx: mpsc::Sender<()>,
-    rx: mpsc::Receiver<()>,
-    items: Vec<(SignKeyHandle, FfiPermissionSet)>,
-}
-
-impl PermissionEntriesContext {
-    fn new() -> Self {
-        let (tx, rx) = mpsc::channel();
-        PermissionEntriesContext {
-            tx,
-            rx,
-            items: Vec::new(),
-        }
-    }
-
-    fn user_data(&mut self) -> *mut c_void {
-        let ptr: *mut _ = self;
-        ptr as *mut c_void
-    }
-
-    fn take_result(&mut self) -> Vec<(SignKeyHandle, FfiPermissionSet)> {
-        unwrap!(self.rx.recv());
-        mem::replace(&mut self.items, Vec::new())
-    }
-
-    extern "C" fn permissions_cb(
-        user_data: *mut c_void,
-        sign_key_h: SignKeyHandle,
-        perm_set: FfiPermissionSet,
-    ) {
-        unsafe {
-            let data = (sign_key_h, perm_set);
-
-            let context = user_data as *mut Self;
-            (*context).items.push(data);
-        }
-    }
-
-    extern "C" fn done_cb(user_data: *mut c_void, _res: FfiResult) {
-        unsafe {
-            let context = user_data as *const Self;
-            unwrap!((*context).tx.send(()));
         }
     }
 }

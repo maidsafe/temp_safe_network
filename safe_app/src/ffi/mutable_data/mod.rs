@@ -30,7 +30,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwin
                 vec_clone_from_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle,
-                   MDataPermissionsHandle, MDataValuesHandle, SignKeyHandle};
+                   MDataPermissionsHandle, MDataValuesHandle, NULL_OBJECT_HANDLE, SignKeyHandle};
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt, MDataInfo};
 use safe_core::ffi::MDataInfo as FfiMDataInfo;
@@ -40,11 +40,11 @@ use std::os::raw::c_void;
 
 /// Special value that represents an empty permission set.
 #[no_mangle]
-pub static PERMISSIONS_EMPTY: u64 = 0;
+pub static PERMISSIONS_EMPTY: u64 = NULL_OBJECT_HANDLE;
 
 /// Special value that represents an empty entry set.
 #[no_mangle]
-pub static ENTRIES_EMPTY: u64 = 0;
+pub static ENTRIES_EMPTY: u64 = NULL_OBJECT_HANDLE;
 
 /// Create new mutable data and put it on the network.
 ///

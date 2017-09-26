@@ -32,6 +32,9 @@ use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};
 use std::u64;
 
+/// Value of handles which should receive special handling.
+pub const NULL_OBJECT_HANDLE: u64 = 0;
+
 const DEFAULT_CAPACITY: usize = 1000;
 
 /// Object handle associated with objects. In normal C API one would expect rust
@@ -258,7 +261,7 @@ struct HandleGenerator(Cell<ObjectHandle>);
 
 impl HandleGenerator {
     fn new() -> Self {
-        HandleGenerator(Cell::new(0))
+        HandleGenerator(Cell::new(NULL_OBJECT_HANDLE))
     }
 
     fn gen(&self) -> ObjectHandle {
@@ -268,7 +271,7 @@ impl HandleGenerator {
     }
 
     fn reset(&self) {
-        self.0.set(u64::MAX)
+        self.0.set(NULL_OBJECT_HANDLE)
     }
 }
 
