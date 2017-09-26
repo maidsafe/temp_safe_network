@@ -21,8 +21,7 @@ use App;
 use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::mutable_data::helper;
-use ffi_utils::{FfiResult, catch_unwind_cb};
-use ffi_utils::SafePtr;
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb};
 use object_cache::{MDataPermissionsHandle, NULL_OBJECT_HANDLE, SignKeyHandle};
 use permissions;
 use routing::{Action, User};
@@ -144,9 +143,15 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                         user_perm_sets: *const UserPermissionSet,
                         len: usize),
 ) {
+    let user_data = OpaqueCtx(user_data);
+
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+        (*app).send(move |_, context| {
+            let permissions = try_cb!(
+                context.object_cache().get_mdata_permissions(permissions_h),
+                user_data,
+                o_cb
+            );
             let user_perm_sets: Vec<UserPermissionSet> = permissions
                 .iter()
                 .map(|(user_key, permission_set)| {
@@ -161,7 +166,14 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                 })
                 .collect();
 
-            Ok((user_perm_sets.as_safe_ptr(), user_perm_sets.len()))
+            o_cb(
+                user_data.0,
+                FFI_RESULT_OK,
+                user_perm_sets.as_safe_ptr(),
+                user_perm_sets.len(),
+            );
+
+            None
         })
     })
 }
