@@ -268,7 +268,7 @@ pub unsafe extern "C" fn mdata_list_keys(
                         .collect();
                     let keys: Vec<FfiMDataKey> =
                         keys.into_iter().map(|key| key.into_repr_c()).collect();
-                    Ok((keys.as_ptr(), keys.len()))
+                    Ok((keys.as_safe_ptr(), keys.len()))
                 })
         })
     })
@@ -308,7 +308,7 @@ pub unsafe extern "C" fn mdata_list_values(
                         .into_iter()
                         .map(|value| value.into_repr_c())
                         .collect();
-                    Ok((values.as_ptr(), values.len()))
+                    Ok((values.as_safe_ptr(), values.len()))
                 })
         })
     })
