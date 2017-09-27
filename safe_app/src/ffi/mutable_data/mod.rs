@@ -269,7 +269,7 @@ pub unsafe extern "C" fn mdata_list_keys(
                         .map(|key| MDataKey { val: key.clone() })
                         .collect();
                     let keys: Vec<FfiMDataKey> =
-                        keys.into_iter().map(|key| key.into_repr_c()).collect();
+                        keys.into_iter().map(|key| key.as_repr_c()).collect();
                     ok!(keys)
                 })
                 .then(move |result| {
@@ -321,10 +321,8 @@ pub unsafe extern "C" fn mdata_list_values(
                             }
                         })
                         .collect();
-                    let values: Vec<FfiMDataValue> = values
-                        .into_iter()
-                        .map(|value| value.into_repr_c())
-                        .collect();
+                    let values: Vec<FfiMDataValue> =
+                        values.into_iter().map(|value| value.as_repr_c()).collect();
                     ok!(values)
                 })
                 .then(move |result| {

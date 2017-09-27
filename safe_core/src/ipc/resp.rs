@@ -432,11 +432,8 @@ pub struct MDataValue {
 }
 
 impl MDataValue {
-    /// Consumes the object and returns the FFI counterpart.
-    ///
-    /// You're now responsible for freeing the subobjects memory once you're
-    /// done.
-    pub fn into_repr_c(self) -> ffi::MDataValue {
+    /// Returns FFI counterpart without consuming the object.
+    pub fn as_repr_c(&self) -> ffi::MDataValue {
         ffi::MDataValue {
             content_ptr: self.content.as_ptr(),
             content_len: self.content.len(),
@@ -445,7 +442,7 @@ impl MDataValue {
     }
 
     /// Converts the `MDataValue` into its routing representation.
-    pub fn to_routing(&self) -> Value {
+    pub fn as_routing(&self) -> Value {
         Value {
             content: self.content.clone(),
             entry_version: self.entry_version,
@@ -479,11 +476,8 @@ pub struct MDataKey {
 }
 
 impl MDataKey {
-    /// Consumes the object and returns the FFI counterpart.
-    ///
-    /// You're now responsible for freeing the subobjects memory once you're
-    /// done.
-    pub fn into_repr_c(self) -> ffi::MDataKey {
+    /// Returns FFI counterpart without consuming the object.
+    pub fn as_repr_c(&self) -> ffi::MDataKey {
         ffi::MDataKey {
             val_ptr: self.val.as_ptr(),
             val_len: self.val.len(),
