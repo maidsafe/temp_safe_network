@@ -65,11 +65,11 @@ mod mock_routing {
     // 6. Verify that the `_videos` container is still accessible using the previous encryption key.
     // 7. Verify that the `_documents` container is not accessible using the current key, but is
     //    accessible using the new key.
-    // 8. Check that the app's key is not listed in MaidManagers.
+    // 8. Check that the app key is not listed in MaidManagers.
     // 9. Repeat step 1.4 (restart the revoke operation for the app) and don't interfere with the
     //    re-encryption process this time. It should pass.
     // 10. Verify that both the second and first containers aren't accessible using previous keys.
-    // 11. Verify that both the second and first containers are accesible using the new keys.
+    // 11. Verify that both the second and first containers are accessible using the new keys.
     #[test]
     fn app_revocation_recovery() {
         let (auth, locator, password) = create_authenticator();
@@ -443,9 +443,6 @@ mod mock_routing {
     #[test]
     fn concurrent_revocation_of_multiple_apps() {
         let rng = SeededRng::new();
-
-        // FIXME: this test consistently fails with this seed:
-        // let rng = SeededRng::from_seed([3606423633, 1597978997, 4030243941, 3000514502]);
 
         // Create account.
         let (auth, locator, password) = create_authenticator();
