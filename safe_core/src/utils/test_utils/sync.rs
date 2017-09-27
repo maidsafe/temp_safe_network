@@ -44,8 +44,8 @@ impl Synchronizer {
 
     /// Install necessary hooks on the given routing instance.
     pub fn hook(&self, mut routing: MockRouting) -> MockRouting {
-        let req_hook = Rc::new(Hook::new(self.inner.clone()));
-        let res_hook = req_hook.clone();
+        let req_hook = Rc::new(Hook::new(Arc::clone(&self.inner)));
+        let res_hook = Rc::clone(&req_hook);
 
         routing.set_request_hook(move |req| req_hook.request(req));
         routing.set_response_hook(move |res| res_hook.response(res));

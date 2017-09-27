@@ -91,7 +91,7 @@ impl Routing {
         _config: Option<BootstrapConfig>,
         _msg_expiry_dur: Duration,
     ) -> Result<Self, RoutingError> {
-        ::rust_sodium::init();
+        let _ = ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
         let _ = thread::named(CONNECT_THREAD_NAME, move || {
@@ -123,10 +123,10 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let client_auth = self.client_auth;
 
-        if self.intercept_request(GET_ACCOUNT_INFO_DELAY_MS, dst, client_auth, || {
+        let skip = self.intercept_request(GET_ACCOUNT_INFO_DELAY_MS, dst, client_auth, || {
             Request::GetAccountInfo(msg_id)
-        })
-        {
+        });
+        if skip {
             return Ok(());
         }
 
@@ -169,13 +169,13 @@ impl Routing {
         let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(data_name);
 
-        if self.intercept_request(PUT_IDATA_DELAY_MS, nae_auth, client_auth, || {
+        let skip = self.intercept_request(PUT_IDATA_DELAY_MS, nae_auth, client_auth, || {
             Request::PutIData {
                 data: data.clone(),
                 msg_id,
             }
-        })
-        {
+        });
+        if skip {
             return Ok(());
         }
 
@@ -217,10 +217,10 @@ impl Routing {
         let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(name);
 
-        if self.intercept_request(GET_IDATA_DELAY_MS, nae_auth, client_auth, || {
+        let skip = self.intercept_request(GET_IDATA_DELAY_MS, nae_auth, client_auth, || {
             Request::GetIData { name, msg_id }
-        })
-        {
+        });
+        if skip {
             return Ok(());
         }
 
@@ -258,14 +258,14 @@ impl Routing {
         let client_auth = self.client_auth;
         let nae_auth = Authority::NaeManager(*data_name.name());
 
-        if self.intercept_request(PUT_MDATA_DELAY_MS, nae_auth, client_auth, || {
+        let skip = self.intercept_request(PUT_MDATA_DELAY_MS, nae_auth, client_auth, || {
             Request::PutMData {
                 data: data.clone(),
                 msg_id,
                 requester,
             }
-        })
-        {
+        });
+        if skip {
             return Ok(());
         }
 
@@ -655,10 +655,11 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let client_auth = self.client_auth;
 
-        if self.intercept_request(LIST_AUTH_KEYS_AND_VERSION_DELAY_MS, dst, client_auth, || {
-            Request::ListAuthKeysAndVersion(msg_id)
-        })
-        {
+        let skip =
+            self.intercept_request(LIST_AUTH_KEYS_AND_VERSION_DELAY_MS, dst, client_auth, || {
+                Request::ListAuthKeysAndVersion(msg_id)
+            });
+        if skip {
             return Ok(());
         }
 
@@ -698,14 +699,14 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let client_auth = self.client_auth;
 
-        if self.intercept_request(INS_AUTH_KEY_DELAY_MS, dst, client_auth, || {
+        let skip = self.intercept_request(INS_AUTH_KEY_DELAY_MS, dst, client_auth, || {
             Request::InsAuthKey {
                 key,
                 version,
                 msg_id,
             }
-        })
-        {
+        });
+        if skip {
             return Ok(());
         }
 
@@ -745,14 +746,14 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let client_auth = self.client_auth;
 
-        if self.intercept_request(DEL_AUTH_KEY_DELAY_MS, dst, client_auth, || {
+        let skip = self.intercept_request(DEL_AUTH_KEY_DELAY_MS, dst, client_auth, || {
             Request::DelAuthKey {
                 key,
                 version,
                 msg_id,
             }
-        })
-        {
+        });
+        if skip {
             return Ok(());
         }
 

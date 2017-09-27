@@ -392,7 +392,7 @@ mod mock_routing {
                 let locator = locator.clone();
                 let password = password.clone();
                 let app_id = app_id_0.clone();
-                let barrier = barrier.clone();
+                let barrier = Arc::clone(&barrier);
                 let sync = sync.clone();
 
                 thread::spawn(move || {
@@ -492,7 +492,7 @@ mod mock_routing {
                 let locator = locator.clone();
                 let password = password.clone();
                 let app_id = app_id.to_string();
-                let barrier = barrier.clone();
+                let barrier = Arc::clone(&barrier);
                 let sync = sync.clone();
 
                 thread::spawn(move || {
