@@ -50,26 +50,29 @@ mod mock_routing {
     use std::iter;
     use std::sync::{Arc, Barrier};
     use std::thread;
-    use test_utils::{get_container_from_root, register_rand_app, try_revoke};
+    use test_utils::{get_container_from_authenticator_entry, register_rand_app, try_revoke};
     use tiny_keccak::sha3_256;
 
     // Test operation recovery for app revocation
     //
     // 1. Create a test app and authenticate it.
     // 2. Grant access to some of the default containers (e.g. `_video`, `_documents`).
-    // 3. Put several files with a known content in both containers (e.g. `_video/test.txt` and
-    //    `_documents/test2.txt`).
+    // 3. Put several files with a known content in both containers (e.g. `_videos/video.mp4` and
+    //    `_documents/test.doc`).
     // 4. Revoke the app access from the authenticator.
-    // 5. After re-encryption of the `_document` container is done, simulate a network failure
-    //    for the `_video` container encryption step.
-    // 6. Verify that the `_videos` container is still accessible using the previous encryption key.
-    // 7. Verify that the `_documents` container is not accessible using the current key, but is
-    //    accessible using the new key.
+    // 5. Simulate network failure during the re-encryption of the `_document` container.
+    // 6. Verify that the `_documents` container is still accessible using the previous `MDataInfo`.
+    // 7. Verify that the `_videos` container is accessible using the new `MDataInfo`
+    //    (it might or might not be still accessible using the old info, depending on whether
+    //    its re-encryption managed to run to completion before the re-encryption of
+    //    `_documents` failed).
     // 8. Check that the app key is not listed in MaidManagers.
     // 9. Repeat step 1.4 (restart the revoke operation for the app) and don't interfere with the
     //    re-encryption process this time. It should pass.
-    // 10. Verify that both the second and first containers aren't accessible using previous keys.
-    // 11. Verify that both the second and first containers are accessible using the new keys.
+    // 10. Verify that both the second and first containers aren't accessible using previous
+    //     `MDataInfo`.
+    // 11. Verify that both the second and first containers are accessible using the new
+    //     `MDataInfo`.
     #[test]
     fn app_revocation_recovery() {
         let (auth, locator, password) = create_authenticator();
@@ -100,22 +103,12 @@ mod mock_routing {
         // After re-encryption of the first container (`_video`) is done, simulate a network failure
         let docs_name = docs_md.name;
 
-        let access_container_md = run(&auth, move |client| {
-            client.access_container().map_err(AuthError::from)
-        });
-        let access_cont_name = access_container_md.name;
-
         let routing_hook = move |mut routing: MockRouting| -> MockRouting {
-            let mut fail_ac_update = false;
-
             routing.set_request_hook(move |req| {
                 match *req {
-                    // Simulate a network failure for a second request to re-encrypt containers
-                    // so that the _videos container should remain untouched
-                    Request::MutateMDataEntries { name, msg_id, .. }
-                        if name == docs_name || (name == access_cont_name && fail_ac_update) => {
-                        fail_ac_update = true;
-
+                    // Simulate a network failure for the request to re-encrypt
+                    // the `_documents` container, so it remains untouched.
+                    Request::MutateMDataEntries { name, msg_id, .. } if name == docs_name => {
                         Some(Response::MutateMDataEntries {
                             msg_id,
                             res: Err(ClientError::LowBalance),
@@ -140,29 +133,26 @@ mod mock_routing {
             x => panic!("Unexpected {:?}", x),
         }
 
-        // Verify that the `_documents` container is still accessible using the previous key.
+        // Verify that the `_documents` container is still accessible using the previous info.
         let _ = unwrap!(fetch_file(&auth, docs_md.clone(), "test.doc"));
 
-        // Verify that the `_videos` container is not accessible using the previous key,
-        // but is accessible using the new key.
-        match fetch_file(&auth, videos_md.clone(), "video.mp4") {
-            Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        // The re-encryption of `_videos` may or might not have successfully run
+        // to completion. Try to fetch a file from it using the new info first.
+        let new_videos_md = unwrap!(get_container_from_authenticator_entry(&auth, "_videos"));
+        let success = match fetch_file(&auth, new_videos_md, "video.mp4") {
+            Ok(_) => true,
+            Err(AuthError::NfsError(NfsError::FileNotFound)) => false,
             x => panic!("Unexpected {:?}", x),
+        };
+
+        // If it failed, it means the `_videos` container re-encryption has not
+        // been successfully completed. Verify that we can still access the file
+        // using the old info.
+        if !success {
+            let _ = unwrap!(fetch_file(&auth, videos_md.clone(), "video.mp4"));
         }
 
-        // We'd need to get that new key from the root container though, as the access container
-        // entry for the app hasn't been updated at this point.
-        let mut reencrypted_videos_md = unwrap!(get_container_from_root(&auth, "_videos"));
-
-        // The container has been reencrypted now, swap the old enc info
-        reencrypted_videos_md.commit_new_enc_info();
-        let _ = unwrap!(fetch_file(
-            &auth,
-            reencrypted_videos_md.clone(),
-            "video.mp4",
-        ));
-
-        // Ensure that the app's key has been removed from MaidManagers
+        // Ensure that the app key has been removed from MaidManagers
         let auth_keys = run(&auth, move |client| {
             client
                 .list_auth_keys_and_version()
@@ -182,30 +172,26 @@ mod mock_routing {
         revoke(&auth, &app_id);
 
         // Try to access both files using previous keys - they shouldn't be accessible
-        match fetch_file(&auth, docs_md.clone(), "test.doc") {
+        match fetch_file(&auth, docs_md, "test.doc") {
             Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
             x => panic!("Unexpected {:?}", x),
         }
-        match fetch_file(&auth, videos_md.clone(), "video.mp4") {
+        match fetch_file(&auth, videos_md, "video.mp4") {
             Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
             x => panic!("Unexpected {:?}", x),
         }
 
-        // Get the new encryption info from the user's root dir (as the access container has been
+        // Get the new encryption info from the authenticator entry (as the app entry has been
         // removed now). Both containers should be accessible with the new keys without any extra
         // effort
         let ac_entries = try_access_container(&auth, app_id.clone(), auth_granted.clone());
         assert!(ac_entries.is_none());
 
-        let reencrypted_docs_md = unwrap!(get_container_from_root(&auth, "_documents"));
-        let reencrypted_videos_md = unwrap!(get_container_from_root(&auth, "_videos"));
+        let new_docs_md = unwrap!(get_container_from_authenticator_entry(&auth, "_documents"));
+        let new_videos_md = unwrap!(get_container_from_authenticator_entry(&auth, "_videos"));
 
-        let _ = unwrap!(fetch_file(&auth, reencrypted_docs_md.clone(), "test.doc"));
-        let _ = unwrap!(fetch_file(
-            &auth,
-            reencrypted_videos_md.clone(),
-            "video.mp4",
-        ));
+        let _ = unwrap!(fetch_file(&auth, new_docs_md, "test.doc"));
+        let _ = unwrap!(fetch_file(&auth, new_videos_md, "video.mp4"));
     }
 
     // Test app cannot be (re)authenticated while it's being revoked.
@@ -370,12 +356,15 @@ mod mock_routing {
         let ac_entries_0 = access_container(&auth, app_id_0.clone(), auth_granted_0);
 
         // Put a file into the shared container.
-        let info = unwrap!(get_container_from_root(&auth, "_documents"));
+        let info = unwrap!(get_container_from_authenticator_entry(&auth, "_documents"));
         unwrap!(create_file(&auth, info, "shared.txt", vec![0; 10]));
 
         // Put a file into the dedicated container of each app.
         for app_id in &[&app_id_0, &app_id_1] {
-            let info = unwrap!(get_container_from_root(&auth, &app_container::name(app_id)));
+            let info = unwrap!(get_container_from_authenticator_entry(
+                &auth,
+                &app_container::name(app_id),
+            ));
             unwrap!(create_file(&auth, info, "private.txt", vec![0; 10]));
         }
 
@@ -469,12 +458,15 @@ mod mock_routing {
         let ac_entries_1 = access_container(&auth, app_id_1.clone(), auth_granted_1);
 
         // Put a file into the shared container.
-        let info = unwrap!(get_container_from_root(&auth, "_documents"));
+        let info = unwrap!(get_container_from_authenticator_entry(&auth, "_documents"));
         unwrap!(create_file(&auth, info, "shared.txt", vec![0; 10]));
 
         // Put a file into the dedicated container of each app.
         for app_id in &[&app_id_0, &app_id_1, &app_id_2] {
-            let info = unwrap!(get_container_from_root(&auth, &app_container::name(app_id)));
+            let info = unwrap!(get_container_from_authenticator_entry(
+                &auth,
+                &app_container::name(app_id),
+            ));
             unwrap!(create_file(&auth, info, "private.txt", vec![0; 10]));
         }
 

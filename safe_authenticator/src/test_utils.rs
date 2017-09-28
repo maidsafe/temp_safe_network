@@ -274,8 +274,8 @@ pub fn try_access_container<S: Into<String>>(
     })
 }
 
-/// Get the container entry from the access container root entry
-pub fn get_container_from_root(
+/// Get the container `MDataInfo` from the authenticator entry in the access container.
+pub fn get_container_from_authenticator_entry(
     authenticator: &Authenticator,
     container: &str,
 ) -> Result<MDataInfo, AuthError> {
