@@ -28,6 +28,9 @@ use safe_core::recovery;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 
+type MDataEntries = BTreeMap<Vec<u8>, Value>;
+type Containers = HashMap<String, MDataInfo>;
+
 /// Revokes app access using a revocation queue
 pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
     let app_id = app_id.to_string();
@@ -112,7 +115,7 @@ fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
         .and_then(move |app| {
             access_container::fetch_entry(&c4, &app.info.id, app.keys.clone())
                 .and_then(move |(version, ac_entry)| {
-                    let containers: HashMap<_, _> = ac_entry
+                    let containers: Containers = ac_entry
                         .ok_or(AuthError::IpcError(IpcError::UnknownApp))?
                         .into_iter()
                         .map(|(name, (mdata_info, _))| (name, mdata_info))
@@ -162,7 +165,7 @@ fn delete_app_auth_key(client: &Client<()>, key: sign::PublicKey) -> Box<AuthFut
 // Revokes containers permissions
 fn revoke_container_perms(
     client: &Client<()>,
-    containers: &HashMap<String, MDataInfo>,
+    containers: &Containers,
     sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<()>> {
     let reqs: Vec<_> = containers
@@ -215,7 +218,7 @@ fn reencrypt_containers_and_update_access_container(
         &revoked_app.keys.enc_key,
     ));
 
-    fetch_access_container_entries(client, ac_info.clone(), app_key.clone())
+    fetch_access_container_entries(client, &ac_info, app_key.clone())
         .and_then(move |ac_entries| {
             update_access_container(
                 &c2,
@@ -249,7 +252,7 @@ fn reencrypt_containers_and_update_access_container(
 // (because it doesn't need to re-encrypted).
 fn fetch_access_container_entries(
     client: &Client<()>,
-    ac_info: MDataInfo,
+    ac_info: &MDataInfo,
     revoked_app_key: Vec<u8>,
 ) -> Box<AuthFuture<BTreeMap<Vec<u8>, Value>>> {
     client
@@ -267,10 +270,10 @@ fn fetch_access_container_entries(
 fn update_access_container(
     client: &Client<()>,
     ac_info: MDataInfo,
-    mut ac_entries: BTreeMap<Vec<u8>, Value>,
+    mut ac_entries: MDataEntries,
     container_names: HashSet<String>,
     mdata_info_action: MDataInfoAction,
-) -> Box<AuthFuture<(BTreeMap<Vec<u8>, Value>, HashMap<String, MDataInfo>)>> {
+) -> Box<AuthFuture<(MDataEntries, Containers)>> {
     let c2 = client.clone();
     let c3 = client.clone();
 
@@ -287,7 +290,7 @@ fn update_access_container(
         .map(|(_, apps)| apps)
         .and_then(move |apps| {
             let mut actions = EntryActions::new();
-            let mut cache = HashMap::with_capacity(container_names.len());
+            let mut cache = Containers::with_capacity(container_names.len());
 
             // Update the authenticator entry
             if let Some(raw) = ac_entries.get_mut(&auth_key) {
@@ -349,12 +352,7 @@ enum MDataInfoAction {
 }
 
 impl MDataInfoAction {
-    fn apply(
-        &self,
-        container_name: String,
-        mdata_info: &mut MDataInfo,
-        cache: &mut HashMap<String, MDataInfo>,
-    ) {
+    fn apply(&self, container_name: String, mdata_info: &mut MDataInfo, cache: &mut Containers) {
         match cache.entry(container_name) {
             Entry::Occupied(entry) => {
                 *mdata_info = entry.get().clone();
@@ -374,10 +372,7 @@ impl MDataInfoAction {
 // Re-encrypt the given `containers` using the `new_enc_info` in the corresponding
 // `MDataInfo`. Returns modified `containers` where the enc info regeneration is either
 // committed or aborted, depending on if the re-encryption succeeded or failed.
-fn reencrypt_containers(
-    client: &Client<()>,
-    containers: HashMap<String, MDataInfo>,
-) -> Box<AuthFuture<()>> {
+fn reencrypt_containers(client: &Client<()>, containers: Containers) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
 
     let fs = containers.into_iter().map(move |(_, mdata_info)| {
