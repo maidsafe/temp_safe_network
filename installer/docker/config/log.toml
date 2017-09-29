@@ -1,0 +1,30 @@
+[appenders.async_console]
+kind    = "async_console"
+pattern = "{({l}):1.1} {d(%y-%m-%d %H:%M:%S%.6f)} {m}\n"
+
+[[appenders.async_console.filters]]
+kind  = "threshold"
+level = "%{env:SAFE_VAULT_LOG_LEVEL_ASYNC_CONSOLE_FILTERS}"
+
+[appenders.async_file]
+kind             = "async_file"
+output_file_name = "Node.log"
+pattern          = "{({l}):1.1} {d(%y-%m-%d %H:%M:%S%.6f)} [{M} #FS#{f}#FE#:{L}] {m}\n"
+append           = false
+file_timestamp   = true
+
+[root]
+level     = "%{env:SAFE_VAULT_LOG_LEVEL_ROOT}"
+appenders = ["async_console", "async_file"]
+
+[loggers."crust"]
+level = "%{env:SAFE_VAULT_LOG_LEVEL_CRUST}"
+
+[loggers."routing"]
+level = "%{env:SAFE_VAULT_LOG_LEVEL_ROUTING}"
+
+[loggers."routing_stats"]
+level = "%{env:SAFE_VAULT_LOG_LEVEL_ROUTING_STATS}"
+
+[loggers."safe_vault"]
+level = "%{env:SAFE_VAULT_LOG_LEVEL_SAFE_VAULT}"

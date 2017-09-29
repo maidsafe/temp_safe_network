@@ -6,7 +6,7 @@ container. For more information about Docker, see the [Docker documentation](htt
 ## Safe Vault image
 
 Safe Vault is available as a docker image called **msafe/vault** on Docker Hub.
-Alternatively, it's possible to build the image using the Dockerfile found in `installer/docker`.
+Alternatively, it's possible to build the image using the Dockerfile found in the root safe_vault directory.
 
 To pull the latest Safe Vault image from Docker Hub:
 
@@ -15,6 +15,7 @@ docker pull msafe/vault
 ```
 
 To build the image from source:
+Rename the `safe_vault/.env.example` file to `.env` and then build using docker.
 
 ```
 docker build -t msafe/vault path/to/safe_vault/Dockerfile
@@ -39,15 +40,25 @@ other nodes and clients can connect to this vault.
 
 ## Configuring the vault
 
-The vault can be configured using environment variables:
+The vault can be configured using environment variables set in the `safe_vault/.env` file:
 
-- `VAULT_WALLET_ADDRESS` - wallet adress
-- `VAULT_MAX_CAPACITY` - maximum storage capacity (in bytes)
+- `SAFE_VAULT_WALLET_ADDRESS` - wallet adress
+- `SAFE_VAULT_MAX_CAPACITY` - maximum storage capacity (in bytes)
 
-Example:
+Setting the environment variables via command line:
 
 ```
-docker run --rm -it -P -e "VAULT_WALLET_ADDRESS=xyz" -e "VAULT_MAX_CAPACITY=1073741824" msafe/vault
+docker run --rm -it -P -e "SAFE_VAULT_WALLET_ADDRESS=xyz" -e "SAFE_VAULT_MAX_CAPACITY=1073741824" msafe/vault
+```
+
+## Running in Docker Compose
+```
+docker-compose -p msafe/vault -f installer/docker/docker-compose.yml up --build
+```
+
+## Docker Compose in daemon mode
+```
+docker-compose -p msafe/vault -f installer/docker/docker-compose.yml up --build -d
 ```
 
 ## Deploying to cloud
@@ -97,4 +108,3 @@ docker run -d -P --name safe-vault --restart=unless-stopped msafe/vault
 ```
 
 The above command runs detached container named "safe-vault" on port 5000 and instructs it to restart automatically when the droplet reboots.
-
