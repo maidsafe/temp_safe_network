@@ -80,6 +80,8 @@ pub use ffi::nfs::*;
 
 mod errors;
 pub mod object_cache;
+pub mod permissions;
+
 #[cfg(test)]
 mod tests;
 

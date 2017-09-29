@@ -23,9 +23,8 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwin
 use futures::Future;
 use futures::future::{self, Either};
 use object_cache::FileContextHandle;
-use safe_core::FutureExt;
-use safe_core::MDataInfo as NativeMDataInfo;
-use safe_core::ffi::MDataInfo;
+use safe_core::{FutureExt, MDataInfo};
+use safe_core::ffi::MDataInfo as FfiMDataInfo;
 use safe_core::ffi::nfs::File;
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
@@ -53,7 +52,7 @@ pub static FILE_READ_TO_END: u64 = 0;
 #[no_mangle]
 pub unsafe extern "C" fn dir_fetch_file(
     app: *const App,
-    parent_info: *const MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
@@ -62,7 +61,7 @@ pub unsafe extern "C" fn dir_fetch_file(
                         version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file_name = from_c_str(file_name)?;
         let user_data = OpaqueCtx(user_data);
 
@@ -88,14 +87,14 @@ pub unsafe extern "C" fn dir_fetch_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_insert_file(
     app: *const App,
-    parent_info: *const MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     file: *const File,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
@@ -112,7 +111,7 @@ pub unsafe extern "C" fn dir_insert_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
     app: *const App,
-    parent_info: *const MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     file: *const File,
     version: u64,
@@ -120,7 +119,7 @@ pub unsafe extern "C" fn dir_update_file(
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
@@ -136,14 +135,14 @@ pub unsafe extern "C" fn dir_update_file(
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
-    parent_info: *const MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file_name: *const c_char,
     version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file_name = from_c_str(file_name)?;
 
         send(app, user_data, o_cb, move |client, _| {
@@ -158,7 +157,7 @@ pub unsafe extern "C" fn dir_delete_file(
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
-    parent_info: *const MDataInfo,
+    parent_info: *const FfiMDataInfo,
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
@@ -167,7 +166,7 @@ pub unsafe extern "C" fn file_open(
                         file_h: FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
+        let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
         let file = NativeFile::clone_from_repr_c(file)?;
 
         send(app, user_data, o_cb, move |client, context| {

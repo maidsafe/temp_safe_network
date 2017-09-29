@@ -266,10 +266,9 @@ mod tests {
     use rust_sodium::crypto::secretbox;
     use safe_core::crypto::{shared_box, shared_secretbox, shared_sign};
     use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
-    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
-                         ContainersReq, IpcMsg, IpcReq, IpcResp, Permission, ShareMData,
-                         ShareMDataReq};
-    use safe_core::ipc::resp::AccessContainerEntry;
+    use safe_core::ipc::{self, AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted,
+                         AuthReq, BootstrapConfig, ContainersReq, IpcMsg, IpcReq, IpcResp,
+                         Permission, ShareMData, ShareMDataReq};
     use safe_core::utils;
     use std::collections::HashMap;
     use std::ffi::CString;

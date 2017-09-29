@@ -131,7 +131,9 @@ mod tests {
     use ffi_utils::{ReprC, from_c_str};
     use ffi_utils::test_utils::{call_0, call_1, call_vec};
     use safe_core::{DIR_TAG, MDataInfo};
-    use safe_core::ipc::req::{ContainerPermissions, Permission, container_perms_from_repr_c};
+    use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
+    use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
+    use safe_core::ipc::req::ContainerPermissions;
     use std::collections::HashMap;
     use std::ffi::CString;
     use test_utils::{create_app_with_access, run};
@@ -185,9 +187,7 @@ mod tests {
         let perms: Vec<PermSet> =
             unsafe { unwrap!(call_vec(|ud, cb| access_container_fetch(&app, ud, cb))) };
 
-        let perms: HashMap<String, ContainerPermissions> =
-            perms.into_iter().map(|val| (val.0, val.1)).collect();
-
+        let perms: HashMap<_, _> = perms.into_iter().map(|val| (val.0, val.1)).collect();
         assert_eq!(perms["_videos"], btree_set![Permission::Read]);
         assert_eq!(perms.len(), 2);
 

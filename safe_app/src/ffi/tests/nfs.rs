@@ -312,287 +312,6 @@ fn open_file() {
     assert_eq!(returned_file, orig_file);
 }
 
-// Test reading files in chunks.
-#[test]
-fn file_read_chunks() {
-    const ORIG_SIZE: usize = 5555;
-
-    let (app, container_info) = setup();
-
-    // Create non-empty file.
-    let file = NativeFile::new(Vec::new());
-    let ffi_file = file.into_repr_c();
-
-    let file_name = "file.txt";
-    let ffi_file_name = unwrap!(CString::new(file_name));
-
-    let content = [0u8; ORIG_SIZE];
-
-    let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
-    };
-
-    let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
-        }));
-        unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
-    };
-    unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
-    }
-
-    // Fetch it back.
-    let (file, version): (NativeFile, u64) = {
-        unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
-        }
-    };
-    assert_eq!(version, 0);
-
-    // Read the content in chunks
-    let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
-    };
-
-    let size = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_h, ud, cb))) };
-    const CHUNK_SIZE: u64 = 1000;
-    let mut size_read = 0;
-    let mut result = Vec::new();
-
-    while size_read < size {
-        let to_read = if size_read + CHUNK_SIZE >= size {
-            size - size_read
-        } else {
-            CHUNK_SIZE
-        };
-
-        let mut retrieved_content = unsafe {
-            unwrap!(call_vec_u8(
-                |ud, cb| file_read(&app, read_h, size_read, to_read, ud, cb),
-            ))
-        };
-
-        size_read += retrieved_content.len() as u64;
-        result.append(&mut retrieved_content);
-    }
-
-    assert_eq!(size, size_read);
-    assert_eq!(result, vec![0u8; ORIG_SIZE]);
-
-    // Read 0 bytes, should succeed
-
-    let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(
-            |ud, cb| file_read(&app, read_h, size, 0, ud, cb),
-        ))
-    };
-    assert_eq!(retrieved_content, Vec::<u8>::new());
-
-    // Read 1 byte past end of file, should fail
-    let retrieved_content =
-        unsafe { call_vec_u8(|ud, cb| file_read(&app, read_h, size, 1, ud, cb)) };
-
-    match retrieved_content {
-        Err(code) if code == AppError::from(NfsError::InvalidRange).error_code() => (),
-        Err(x) => panic!("Unexpected: {:?}", x),
-        Ok(_) => panic!("Unexpected success"),
-    }
-}
-
-// Helper function for writing to a file in chunks.
-fn write_chunks(
-    app: &App,
-    write_h: FileContextHandle,
-    content: &[u8],
-    goal_size: usize,
-    chunk_size: usize,
-) -> NativeFile {
-    let mut size_written = 0;
-
-    while size_written < goal_size {
-        let to_write = if size_written + chunk_size > goal_size {
-            goal_size - size_written
-        } else {
-            chunk_size
-        };
-
-        println!("Writing {} bytes to file", to_write);
-        unsafe {
-            unwrap!(call_0(|ud, cb| {
-                file_write(
-                    app,
-                    write_h,
-                    content.get_unchecked(size_written),
-                    to_write,
-                    ud,
-                    cb,
-                )
-            }))
-        }
-
-        size_written += to_write;
-    }
-
-    // Write 0 bytes, should succeed.
-    unsafe {
-        println!("Writing 0 bytes to file");
-        unwrap!(call_0(|ud, cb| {
-            file_write(app, write_h, content.get_unchecked(goal_size), 0, ud, cb)
-        }));
-        unwrap!(call_1(|ud, cb| file_close(app, write_h, ud, cb)))
-    }
-}
-
-// Test writing to files in chunks.
-#[test]
-fn file_write_chunks() {
-    const GOAL_SIZE: usize = 5555;
-    const CHUNK_SIZE: usize = 1000;
-
-    let (app, container_info) = setup();
-
-    let content = [0u8; GOAL_SIZE];
-
-    // Test overwrite mode
-
-    let file = NativeFile::new(Vec::new());
-    let ffi_file = file.into_repr_c();
-
-    let file_name = "file.txt";
-    let ffi_file_name = unwrap!(CString::new(file_name));
-
-    let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
-    };
-
-    // Write in chunks.
-    let written_file = write_chunks(&app, write_h, &content, GOAL_SIZE, CHUNK_SIZE);
-
-    unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
-    }
-
-    // Fetch it back.
-    let (file, version): (NativeFile, u64) = {
-        unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
-        }
-    };
-    assert_eq!(version, 0);
-
-    // Read the content
-    let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
-    };
-
-    let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
-    };
-
-    assert_eq!(retrieved_content, vec![0u8; GOAL_SIZE]);
-
-    // Test append mode
-
-    let (file, version): (NativeFile, u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-        }))
-    };
-    assert_eq!(version, 0);
-    let ffi_file = file.into_repr_c();
-
-    let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(&app, &container_info, &ffi_file, OPEN_MODE_APPEND, ud, cb)
-        }))
-    };
-
-    let written_file = write_chunks(&app, write_h, &content, GOAL_SIZE, CHUNK_SIZE);
-
-    // Read the content
-    let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &written_file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
-    };
-
-    let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
-    };
-
-    assert_eq!(retrieved_content, vec![0u8; 2 * GOAL_SIZE]);
-}
-
 // Test that NFS functions still work after deleting and updating file contents.
 // 1. Create an empty file, open it for writing, write original contents.
 // 2. Insert file into the container.
@@ -742,6 +461,7 @@ fn delete_then_open_file() {
     assert_eq!(retrieved_content, content_new);
 }
 
+
 // Test closing files immediately after opening them in the different modes.
 // 1. Create a new file, close it, and insert it into a container.
 // 2. Fetch it, open it in READ mode, and close it.
@@ -869,4 +589,285 @@ fn open_close_file() {
     };
 
     let _: NativeFile = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, append_h, ud, cb))) };
+}
+
+// Test reading files in chunks.
+#[test]
+fn file_read_chunks() {
+    const ORIG_SIZE: usize = 5555;
+
+    let (app, container_info) = setup();
+
+    // Create non-empty file.
+    let file = NativeFile::new(Vec::new());
+    let ffi_file = file.into_repr_c();
+
+    let file_name = "file.txt";
+    let ffi_file_name = unwrap!(CString::new(file_name));
+
+    let content = [0u8; ORIG_SIZE];
+
+    let write_h = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            file_open(
+                &app,
+                &container_info,
+                &ffi_file,
+                OPEN_MODE_OVERWRITE,
+                ud,
+                cb,
+            )
+        }))
+    };
+
+    let written_file: NativeFile = unsafe {
+        unwrap!(call_0(|ud, cb| {
+            file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
+        }));
+        unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
+    };
+    unsafe {
+        unwrap!(call_0(|ud, cb| {
+            dir_insert_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                &written_file.into_repr_c(),
+                ud,
+                cb,
+            )
+        }))
+    }
+
+    // Fetch it back.
+    let (file, version): (NativeFile, u64) = {
+        unsafe {
+            unwrap!(call_2(|ud, cb| {
+                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
+            }))
+        }
+    };
+    assert_eq!(version, 0);
+
+    // Read the content in chunks
+    let read_h = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            file_open(
+                &app,
+                &container_info,
+                &file.into_repr_c(),
+                OPEN_MODE_READ,
+                ud,
+                cb,
+            )
+        }))
+    };
+
+    let size = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_h, ud, cb))) };
+    const CHUNK_SIZE: u64 = 1000;
+    let mut size_read = 0;
+    let mut result = Vec::new();
+
+    while size_read < size {
+        let to_read = if size_read + CHUNK_SIZE >= size {
+            size - size_read
+        } else {
+            CHUNK_SIZE
+        };
+
+        let mut retrieved_content = unsafe {
+            unwrap!(call_vec_u8(
+                |ud, cb| file_read(&app, read_h, size_read, to_read, ud, cb),
+            ))
+        };
+
+        size_read += retrieved_content.len() as u64;
+        result.append(&mut retrieved_content);
+    }
+
+    assert_eq!(size, size_read);
+    assert_eq!(result, vec![0u8; ORIG_SIZE]);
+
+    // Read 0 bytes, should succeed
+
+    let retrieved_content = unsafe {
+        unwrap!(call_vec_u8(
+            |ud, cb| file_read(&app, read_h, size, 0, ud, cb),
+        ))
+    };
+    assert_eq!(retrieved_content, Vec::<u8>::new());
+
+    // Read 1 byte past end of file, should fail
+    let retrieved_content =
+        unsafe { call_vec_u8(|ud, cb| file_read(&app, read_h, size, 1, ud, cb)) };
+
+    match retrieved_content {
+        Err(code) if code == AppError::from(NfsError::InvalidRange).error_code() => (),
+        Err(x) => panic!("Unexpected: {:?}", x),
+        Ok(_) => panic!("Unexpected success"),
+    }
+}
+
+// Test writing to files in chunks.
+#[test]
+fn file_write_chunks() {
+    const GOAL_SIZE: usize = 5555;
+    const CHUNK_SIZE: usize = 1000;
+
+    let (app, container_info) = setup();
+
+    let content = [0u8; GOAL_SIZE];
+
+    // Test overwrite mode
+
+    let file = NativeFile::new(Vec::new());
+    let ffi_file = file.into_repr_c();
+
+    let file_name = "file.txt";
+    let ffi_file_name = unwrap!(CString::new(file_name));
+
+    let write_h = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            file_open(
+                &app,
+                &container_info,
+                &ffi_file,
+                OPEN_MODE_OVERWRITE,
+                ud,
+                cb,
+            )
+        }))
+    };
+
+    // Write in chunks.
+    let written_file = write_chunks(&app, write_h, &content, GOAL_SIZE, CHUNK_SIZE);
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| {
+            dir_insert_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                &written_file.into_repr_c(),
+                ud,
+                cb,
+            )
+        }))
+    }
+
+    // Fetch it back.
+    let (file, version): (NativeFile, u64) = {
+        unsafe {
+            unwrap!(call_2(|ud, cb| {
+                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
+            }))
+        }
+    };
+    assert_eq!(version, 0);
+
+    // Read the content
+    let read_h = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            file_open(
+                &app,
+                &container_info,
+                &file.into_repr_c(),
+                OPEN_MODE_READ,
+                ud,
+                cb,
+            )
+        }))
+    };
+
+    let retrieved_content = unsafe {
+        unwrap!(call_vec_u8(|ud, cb| {
+            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
+        }))
+    };
+
+    assert_eq!(retrieved_content, vec![0u8; GOAL_SIZE]);
+
+    // Test append mode
+
+    let (file, version): (NativeFile, u64) = unsafe {
+        unwrap!(call_2(|ud, cb| {
+            dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
+        }))
+    };
+    assert_eq!(version, 0);
+    let ffi_file = file.into_repr_c();
+
+    let write_h = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            file_open(&app, &container_info, &ffi_file, OPEN_MODE_APPEND, ud, cb)
+        }))
+    };
+
+    let written_file = write_chunks(&app, write_h, &content, GOAL_SIZE, CHUNK_SIZE);
+
+    // Read the content
+    let read_h = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            file_open(
+                &app,
+                &container_info,
+                &written_file.into_repr_c(),
+                OPEN_MODE_READ,
+                ud,
+                cb,
+            )
+        }))
+    };
+
+    let retrieved_content = unsafe {
+        unwrap!(call_vec_u8(|ud, cb| {
+            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
+        }))
+    };
+
+    assert_eq!(retrieved_content, vec![0u8; 2 * GOAL_SIZE]);
+}
+
+// Helper function for writing to a file in chunks.
+fn write_chunks(
+    app: &App,
+    write_h: FileContextHandle,
+    content: &[u8],
+    goal_size: usize,
+    chunk_size: usize,
+) -> NativeFile {
+    let mut size_written = 0;
+
+    while size_written < goal_size {
+        let to_write = if size_written + chunk_size > goal_size {
+            goal_size - size_written
+        } else {
+            chunk_size
+        };
+
+        println!("Writing {} bytes to file", to_write);
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                file_write(
+                    app,
+                    write_h,
+                    content.get_unchecked(size_written),
+                    to_write,
+                    ud,
+                    cb,
+                )
+            }))
+        }
+
+        size_written += to_write;
+    }
+
+    // Write 0 bytes, should succeed.
+    unsafe {
+        println!("Writing 0 bytes to file");
+        unwrap!(call_0(|ud, cb| {
+            file_write(app, write_h, content.get_unchecked(goal_size), 0, ud, cb)
+        }));
+        unwrap!(call_1(|ud, cb| file_close(app, write_h, ud, cb)))
+    }
 }

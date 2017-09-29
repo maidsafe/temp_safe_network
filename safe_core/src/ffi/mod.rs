@@ -26,7 +26,7 @@ pub mod nfs;
 /// Type definitions for arrays that are FFI input params
 pub mod arrays;
 
-use self::arrays::{SymNonce, SymSecretKey, XorNameArray};
+use self::arrays::*;
 use errors::CoreError;
 use ffi_utils::ReprC;
 

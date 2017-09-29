@@ -390,7 +390,7 @@ mod tests {
     use ffi_utils::test_utils::{call_0, call_1, send_via_user_data, sender_as_user_data};
     use ffi_utils::vec_clone_from_raw_parts;
     use object_cache::MDataEntryActionsHandle;
-    use routing::Value;
+    use routing::{Action, PermissionSet, Value};
     use safe_core::utils;
     use std::collections::BTreeMap;
     use std::os::raw::c_void;
@@ -583,14 +583,7 @@ mod tests {
         };
 
         // Create a permissions set
-        let perms_set_h: MDataPermissionSetHandle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_permission_set_new(&app, ud, cb))) };
-
-        unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_permission_set_allow(&app, perms_set_h, MDataAction::Insert, ud, cb)
-            }))
-        };
+        let perms_set = PermissionSet::new().allow(Action::Insert);
 
         // Create permissions for anyone
         let perms_h: MDataPermissionsHandle =
@@ -598,7 +591,14 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                mdata_permissions_insert(&app, perms_h, USER_ANYONE, perms_set_h, ud, cb)
+                mdata_permissions_insert(
+                    &app,
+                    perms_h,
+                    USER_ANYONE,
+                    permission_set_into_repr_c(perms_set),
+                    ud,
+                    cb,
+                )
             }))
         };
 
@@ -614,22 +614,17 @@ mod tests {
         };
 
         // Get the keys handle, make sure number of keys is zero
-        let keys_handle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
+        let keys_h = unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
 
-        let len: usize =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_handle, ud, cb))) };
+        let len: usize = unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_h, ud, cb))) };
         assert_eq!(len, 0);
 
         // Ditto for values
-        let values_handle =
+        let values_h =
             unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
 
-        let len: usize = unsafe {
-            unwrap!(call_1(
-                |ud, cb| mdata_values_len(&app, values_handle, ud, cb),
-            ))
-        };
+        let len: usize =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_values_len(&app, values_h, ud, cb))) };
         assert_eq!(len, 0);
 
         // Add entries to a public MD
@@ -673,21 +668,16 @@ mod tests {
         }
 
         // Get the keys and values handles again
-        let keys_handle =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
+        let keys_h = unsafe { unwrap!(call_1(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
 
-        let len: usize =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_handle, ud, cb))) };
+        let len: usize = unsafe { unwrap!(call_1(|ud, cb| mdata_keys_len(&app, keys_h, ud, cb))) };
         assert_eq!(len, 2);
 
-        let values_handle =
+        let values_h =
             unsafe { unwrap!(call_1(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
 
-        let len: usize = unsafe {
-            unwrap!(call_1(
-                |ud, cb| mdata_values_len(&app, values_handle, ud, cb),
-            ))
-        };
+        let len: usize =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_values_len(&app, values_h, ud, cb))) };
         assert_eq!(len, 2);
 
         // Iteration over keys
@@ -715,13 +705,7 @@ mod tests {
 
             unsafe {
                 let user_data: *mut _ = &mut user_data;
-                mdata_keys_for_each(
-                    &app,
-                    keys_handle,
-                    user_data as *mut c_void,
-                    entry_cb,
-                    done_cb,
-                )
+                mdata_keys_for_each(&app, keys_h, user_data as *mut c_void, entry_cb, done_cb)
             }
 
             unwrap!(rx.recv());
@@ -767,13 +751,7 @@ mod tests {
 
             unsafe {
                 let user_data: *mut _ = &mut user_data;
-                mdata_values_for_each(
-                    &app,
-                    values_handle,
-                    user_data as *mut c_void,
-                    entry_cb,
-                    done_cb,
-                )
+                mdata_values_for_each(&app, values_h, user_data as *mut c_void, entry_cb, done_cb)
             }
 
             unwrap!(rx.recv());
@@ -786,10 +764,8 @@ mod tests {
 
         // Free
         unsafe {
-            unwrap!(call_0(|ud, cb| mdata_keys_free(&app, keys_handle, ud, cb)));
-            unwrap!(call_0(
-                |ud, cb| mdata_values_free(&app, values_handle, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| mdata_keys_free(&app, keys_h, ud, cb)));
+            unwrap!(call_0(|ud, cb| mdata_values_free(&app, values_h, ud, cb)))
         }
     }
 }

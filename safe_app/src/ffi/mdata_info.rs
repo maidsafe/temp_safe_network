@@ -260,6 +260,7 @@ mod tests {
     use routing::XOR_NAME_LEN;
     use rust_sodium::crypto::secretbox;
     use safe_core::MDataInfo;
+    use safe_core::crypto::shared_secretbox;
 
     // Test creating non-encrypted mdata info.
     #[test]
@@ -273,6 +274,7 @@ mod tests {
         assert!(info.enc_info.is_none());
     }
 
+    // Test creating encrypted mdata info.
     #[test]
     fn create_private() {
         let type_tag: u64 = rand::random();

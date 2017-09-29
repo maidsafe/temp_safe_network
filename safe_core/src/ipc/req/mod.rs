@@ -292,6 +292,7 @@ impl ReprC for AppExchangeInfo {
 #[allow(unsafe_code)]
 mod tests {
     use super::*;
+    use ffi::ipc::req::PermissionSet as FfiPermissionSet;
     use ffi_utils::ReprC;
     use std::collections::HashMap;
     use std::ffi::CStr;
