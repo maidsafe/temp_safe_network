@@ -92,18 +92,18 @@ mod codes {
     pub const ERR_NO_SUCH_CONTAINER: i32 = -1002;
     pub const ERR_INVALID_CIPHER_OPT_HANDLE: i32 = -1003;
     pub const ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE: i32 = -1004;
-    pub const ERR_INVALID_MDATA_ENTRIES_HANDLE: i32 = -1005;
-    pub const ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE: i32 = -1006;
-    pub const ERR_INVALID_MDATA_PERMISSIONS_HANDLE: i32 = -1007;
-    pub const ERR_INVALID_SELF_ENCRYPTOR_HANDLE: i32 = -1008;
-    pub const ERR_INVALID_SIGN_KEY_HANDLE: i32 = -1009;
-    pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1010;
-    pub const ERR_IO_ERROR: i32 = -1011;
-    pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1012;
-    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1013;
-    pub const ERR_INVALID_FILE_MODE: i32 = -1014;
-    pub const ERR_INVALID_MDATA_KEYS_HANDLE: i32 = -1015;
-    pub const ERR_INVALID_MDATA_VALUES_HANDLE: i32 = -1016;
+    pub const ERR_INVALID_MDATA_INFO_HANDLE: i32 = -1005;
+    pub const ERR_INVALID_MDATA_ENTRIES_HANDLE: i32 = -1006;
+    pub const ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE: i32 = -1007;
+    pub const ERR_INVALID_MDATA_PERMISSIONS_HANDLE: i32 = -1008;
+    pub const ERR_INVALID_MDATA_PERMISSION_SET_HANDLE: i32 = -1009;
+    pub const ERR_INVALID_SELF_ENCRYPTOR_HANDLE: i32 = -1010;
+    pub const ERR_INVALID_SIGN_KEY_HANDLE: i32 = -1011;
+    pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
+    pub const ERR_IO_ERROR: i32 = -1013;
+    pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
+    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
+    pub const ERR_INVALID_FILE_MODE: i32 = -1016;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -135,10 +135,6 @@ pub enum AppError {
     InvalidMDataEntriesHandle,
     /// Invalid MutableData entry actions handle
     InvalidMDataEntryActionsHandle,
-    /// Invalid MutableData keys handle
-    InvalidMDataKeysHandle,
-    /// Invalid MutableData values handle
-    InvalidMDataValuesHandle,
     /// Invalid MutableData permissions handle
     InvalidMDataPermissionsHandle,
     /// Invalid Self Encryptor handle
@@ -183,12 +179,6 @@ impl Display for AppError {
             }
             AppError::InvalidMDataEntriesHandle => {
                 write!(formatter, "Invalid MutableData entries handle")
-            }
-            AppError::InvalidMDataKeysHandle => {
-                write!(formatter, "Invalid MutableData keys handle")
-            }
-            AppError::InvalidMDataValuesHandle => {
-                write!(formatter, "Invalid MutableData values handle")
             }
             AppError::InvalidMDataEntryActionsHandle => {
                 write!(formatter, "Invalid MutableData entry actions handle")
@@ -357,8 +347,6 @@ impl ErrorCode for AppError {
             AppError::InvalidEncryptPubKeyHandle => ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE,
             AppError::InvalidMDataEntriesHandle => ERR_INVALID_MDATA_ENTRIES_HANDLE,
             AppError::InvalidMDataEntryActionsHandle => ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE,
-            AppError::InvalidMDataKeysHandle => ERR_INVALID_MDATA_KEYS_HANDLE,
-            AppError::InvalidMDataValuesHandle => ERR_INVALID_MDATA_VALUES_HANDLE,
             AppError::InvalidMDataPermissionsHandle => ERR_INVALID_MDATA_PERMISSIONS_HANDLE,
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
             AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
