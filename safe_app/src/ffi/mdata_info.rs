@@ -27,28 +27,6 @@ use safe_core::ffi::arrays::{SymNonce, SymSecretKey, XorNameArray};
 use std::os::raw::c_void;
 use std::slice;
 
-/// Create non-encrypted mdata info with explicit data name.
-///
-/// Callback parameters: user data, error code, mdata info handle
-#[no_mangle]
-pub unsafe extern "C" fn mdata_info_new_public(
-    name: *const XorNameArray,
-    type_tag: u64,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
-                        mdata_info: *const FfiMDataInfo),
-) {
-    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
-        let name = XorName(*name);
-        let info = MDataInfo::new_public(name, type_tag);
-        let info = info.into_repr_c();
-
-        o_cb(user_data, FFI_RESULT_OK, &info);
-        Ok(())
-    })
-}
-
 /// Create encrypted mdata info with explicit data name and a
 /// provided private key.
 ///

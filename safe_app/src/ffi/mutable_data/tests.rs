@@ -296,12 +296,16 @@ fn entries_crud_ffi() {
 
     // Try to create a MD instance using the same name & a different type tag - it should pass.
     let xor_name = md_info_pub.name;
-    let md_info_pub_2: MDataInfo = unsafe {
-        unwrap!(call_1(
-            |ud, cb| mdata_info_new_public(&xor_name, 10001, ud, cb),
-        ))
+    let md_info_pub_2 = FfiMDataInfo {
+        name: xor_name,
+        type_tag: 10_001,
+        has_enc_info: false,
+        enc_key: Default::default(),
+        enc_nonce: Default::default(),
+        has_new_enc_info: false,
+        new_enc_key: Default::default(),
+        new_enc_nonce: Default::default(),
     };
-    let md_info_pub_2 = md_info_pub_2.into_repr_c();
 
     unsafe {
         unwrap!(call_0(|ud, cb| {
