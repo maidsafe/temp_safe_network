@@ -432,19 +432,19 @@ pub struct MDataValue {
 }
 
 impl MDataValue {
+    /// Convert routing representation to `MDataValue`.
+    pub fn from_routing(value: Value) -> Self {
+        MDataValue {
+            content: value.content,
+            entry_version: value.entry_version,
+        }
+    }
+
     /// Returns FFI counterpart without consuming the object.
     pub fn as_repr_c(&self) -> ffi::MDataValue {
         ffi::MDataValue {
             content_ptr: self.content.as_ptr(),
             content_len: self.content.len(),
-            entry_version: self.entry_version,
-        }
-    }
-
-    /// Converts the `MDataValue` into its routing representation.
-    pub fn as_routing(&self) -> Value {
-        Value {
-            content: self.content.clone(),
             entry_version: self.entry_version,
         }
     }
@@ -476,6 +476,11 @@ pub struct MDataKey {
 }
 
 impl MDataKey {
+    /// Convert routing representation to `MDataKey`.
+    pub fn from_routing(key: Vec<u8>) -> Self {
+        MDataKey { val: key }
+    }
+
     /// Returns FFI counterpart without consuming the object.
     pub fn as_repr_c(&self) -> ffi::MDataKey {
         ffi::MDataKey {

@@ -469,9 +469,6 @@ mod tests {
             unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(&app, ud, cb))) };
 
         {
-            let value0 = value0.as_routing();
-            let value1 = value1.as_routing();
-
             unsafe {
                 unwrap!(call_0(|ud, cb| {
                     mdata_entry_actions_insert(

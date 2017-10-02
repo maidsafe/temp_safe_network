@@ -265,22 +265,22 @@ pub unsafe extern "C" fn mdata_list_keys(
             client
                 .list_mdata_keys(info.name, info.type_tag)
                 .map_err(AppError::from)
-                .and_then(move |keys_set| {
-                    let keys: Vec<MDataKey> = keys_set
-                        .iter()
-                        .map(|key| MDataKey { val: key.clone() })
-                        .collect();
-                    let keys: Vec<FfiMDataKey> =
-                        keys.into_iter().map(|key| key.as_repr_c()).collect();
-                    ok!(keys)
-                })
                 .then(move |result| {
                     match result {
                         Ok(keys) => {
-                            o_cb(user_data.0, FFI_RESULT_OK, keys.as_safe_ptr(), keys.len())
+                            let keys: Vec<_> =
+                                keys.into_iter().map(MDataKey::from_routing).collect();
+                            let repr_c: Vec<_> = keys.iter().map(MDataKey::as_repr_c).collect();
+
+                            o_cb(
+                                user_data.0,
+                                FFI_RESULT_OK,
+                                repr_c.as_safe_ptr(),
+                                repr_c.len(),
+                            )
                         }
-                        res @ Err(..) => {
-                            call_result_cb!(res, user_data, o_cb);
+                        Err(..) => {
+                            call_result_cb!(result, user_data, o_cb);
                         }
                     }
                     Ok(())
@@ -313,32 +313,22 @@ pub unsafe extern "C" fn mdata_list_values(
             client
                 .list_mdata_values(info.name, info.type_tag)
                 .map_err(AppError::from)
-                .and_then(move |values_set| {
-                    let values: Vec<MDataValue> = values_set
-                        .iter()
-                        .map(|value| {
-                            MDataValue {
-                                content: value.content.clone(),
-                                entry_version: value.entry_version,
-                            }
-                        })
-                        .collect();
-                    let values: Vec<FfiMDataValue> =
-                        values.into_iter().map(|value| value.as_repr_c()).collect();
-                    ok!(values)
-                })
                 .then(move |result| {
                     match result {
                         Ok(values) => {
+                            let values: Vec<_> =
+                                values.into_iter().map(MDataValue::from_routing).collect();
+                            let repr_c: Vec<_> = values.iter().map(MDataValue::as_repr_c).collect();
+
                             o_cb(
                                 user_data.0,
                                 FFI_RESULT_OK,
-                                values.as_safe_ptr(),
-                                values.len(),
+                                repr_c.as_safe_ptr(),
+                                repr_c.len(),
                             )
                         }
-                        res @ Err(..) => {
-                            call_result_cb!(res, user_data, o_cb);
+                        Err(..) => {
+                            call_result_cb!(result, user_data, o_cb);
                         }
                     }
                     Ok(())
