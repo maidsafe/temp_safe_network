@@ -48,7 +48,7 @@ fn test_change_owner() {
 
     // Try to create an empty public MD
     let md_info1: MDataInfo =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10_000, ud, cb))) };
     let md_info1 = md_info1.into_repr_c();
 
     let result = unsafe {
@@ -66,7 +66,7 @@ fn test_change_owner() {
 
     // Try to create a new empty public MD
     let md_info2: MDataInfo =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10_000, ud, cb))) };
     let md_info2 = md_info2.into_repr_c();
 
     let result = unsafe {
@@ -146,7 +146,7 @@ fn permissions_crud_ffi() {
 
     // Try to create an empty public MD
     let md_info_pub: MDataInfo =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10_000, ud, cb))) };
     let md_info_pub = md_info_pub.into_repr_c();
 
     unsafe {
@@ -274,7 +274,7 @@ fn entries_crud_ffi() {
 
     // Try to create an empty public MD
     let md_info_pub: MDataInfo =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10_000, ud, cb))) };
     let md_info_pub = md_info_pub.into_repr_c();
 
     unsafe {
@@ -379,7 +379,7 @@ fn entries_crud_ffi() {
 
     // Try to create a private MD
     let md_info_priv: MDataInfo =
-        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(10001, ud, cb))) };
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(10_001, ud, cb))) };
     let md_info_priv = md_info_priv.into_repr_c();
 
     unsafe {

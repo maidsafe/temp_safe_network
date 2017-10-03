@@ -443,7 +443,7 @@ mod tests {
 
         // Create an empty public mdata
         let md_info: MDataInfo =
-            unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10000, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(10_000, ud, cb))) };
         let md_info = md_info.into_repr_c();
 
         unsafe {
