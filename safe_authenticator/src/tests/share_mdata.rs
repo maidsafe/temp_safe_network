@@ -48,7 +48,7 @@ fn share_zero_mdatas() {
             mdata: vec![],
         }),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
@@ -108,7 +108,7 @@ fn share_some_mdatas() {
             mdata: mdatas.clone(),
         }),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
@@ -190,7 +190,7 @@ fn share_some_mdatas_with_valid_metadata() {
         req_id: req_id,
         req: IpcReq::ShareMData(req.clone()),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
@@ -281,7 +281,7 @@ fn share_some_mdatas_with_ownership_error() {
         req_id: req_id,
         req: IpcReq::ShareMData(req.clone()),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     match decode_ipc_msg(&authenticator, &encoded_msg) {
         Ok(..) => (),
@@ -416,7 +416,7 @@ fn auth_apps_accessing_mdatas() {
             req_id: req_id,
             req: IpcReq::ShareMData(req.clone()),
         };
-        let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+        let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
         let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
 

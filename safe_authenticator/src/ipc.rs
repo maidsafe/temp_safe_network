@@ -19,7 +19,7 @@ use super::{AuthError, AuthFuture};
 use access_container;
 use app_auth::{AppState, app_state};
 use config;
-use ffi_utils::{StringError, base64_encode};
+use ffi_utils::StringError;
 use futures::Future;
 use futures::future::{self, Either};
 use maidsafe_utilities::serialisation::deserialise;
@@ -76,7 +76,6 @@ pub fn decode_ipc_msg(
             req_id,
         } => {
             let app_id = cont_req.app.id.clone();
-            let app_id2 = app_id.clone();
 
             let c2 = client.clone();
 
@@ -102,7 +101,7 @@ pub fn decode_ipc_msg(
                                 resp: IpcResp::Auth(Err(IpcError::UnknownApp)),
                                 req_id: req_id,
                             };
-                            let resp = encode_response(&resp, &app_id2)?;
+                            let resp = encode_response(&resp)?;
 
                             Ok(Err((error_code, description, resp)))
                         }
@@ -172,9 +171,8 @@ pub fn update_container_perms(
         .into_box()
 }
 
-pub fn encode_response(msg: &IpcMsg, app_id: &str) -> Result<CString, IpcError> {
-    let app_id = base64_encode(app_id.as_bytes());
-    let resp = ipc::encode_msg(msg, &format!("safe-{}", app_id))?;
+pub fn encode_response(msg: &IpcMsg) -> Result<CString, IpcError> {
+    let resp = ipc::encode_msg(msg)?;
     Ok(CString::new(resp).map_err(StringError::from)?)
 }
 

@@ -61,21 +61,13 @@ pub enum IpcMsg {
 }
 
 /// Encode `IpcMsg` into string, using base64 encoding.
-pub fn encode_msg(msg: &IpcMsg, prefix: &str) -> Result<String, IpcError> {
-    let payload = base64_encode(&serialise(msg)?);
-    Ok(format!("{}:{}", prefix, payload))
+pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
+    Ok(base64_encode(&serialise(msg)?))
 }
 
 /// Decode `IpcMsg` encoded with base64 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
-    // strip prefix.
-    let payload = if let Some(index) = encoded.find(':') {
-        encoded.split_at(index + 1).1
-    } else {
-        encoded
-    };
-
-    Ok(deserialise(&base64_decode(payload)?)?)
+    Ok(deserialise(&base64_decode(encoded)?)?)
 }
 
 /// Generate unique request ID.
