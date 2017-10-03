@@ -22,17 +22,17 @@ use super::errors::AppError;
 use AppContext;
 use ffi::cipher_opt::CipherOpt;
 use ffi::nfs::FileContext;
-use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
-use safe_core::{MDataInfo, SelfEncryptionStorage};
+use safe_core::SelfEncryptionStorage;
 use safe_core::crypto::shared_box;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, HashMap};
 use std::u64;
 
-const DEFAULT_CAPACITY: usize = 1000;
+/// Value of handles which should receive special handling.
+pub const NULL_OBJECT_HANDLE: u64 = 0;
 
 /// Object handle associated with objects. In normal C API one would expect rust
 /// code to pass pointers to opaque object to C. C code would then need to pass
@@ -54,19 +54,11 @@ pub type EncryptPubKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type EncryptSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type MDataInfoHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
 pub type MDataEntriesHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
-pub type MDataKeysHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
-pub type MDataValuesHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataEntryActionsHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataPermissionsHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
-pub type MDataPermissionSetHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SelfEncryptorReaderHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
@@ -82,13 +74,9 @@ pub struct ObjectCache {
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
     secret_key: Store<shared_box::SecretKey>,
-    mdata_info: Store<MDataInfo>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
-    mdata_keys: Store<BTreeSet<Vec<u8>>>,
-    mdata_values: Store<Vec<Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
-    mdata_permissions: Store<BTreeMap<User, MDataPermissionSetHandle>>,
-    mdata_permission_set: Store<PermissionSet>,
+    mdata_permissions: Store<BTreeMap<User, PermissionSet>>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppContext>>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppContext>>>,
     sign_key: Store<sign::PublicKey>,
@@ -103,13 +91,9 @@ impl ObjectCache {
             cipher_opt: Store::new(),
             encrypt_key: Store::new(),
             secret_key: Store::new(),
-            mdata_info: Store::new(),
             mdata_entries: Store::new(),
-            mdata_keys: Store::new(),
-            mdata_values: Store::new(),
             mdata_entry_actions: Store::new(),
             mdata_permissions: Store::new(),
-            mdata_permission_set: Store::new(),
             se_reader: Store::new(),
             se_writer: Store::new(),
             sign_key: Store::new(),
@@ -123,13 +107,9 @@ impl ObjectCache {
         self.cipher_opt.clear();
         self.encrypt_key.clear();
         self.secret_key.clear();
-        self.mdata_info.clear();
         self.mdata_entries.clear();
-        self.mdata_keys.clear();
-        self.mdata_values.clear();
         self.mdata_entry_actions.clear();
         self.mdata_permissions.clear();
-        self.mdata_permission_set.clear();
         self.se_reader.clear();
         self.se_writer.clear();
         self.sign_key.clear();
@@ -193,15 +173,6 @@ impl_cache!(
     insert_secret_key,
     remove_secret_key
 );
-impl_cache!(
-    mdata_info,
-    MDataInfo,
-    MDataInfoHandle,
-    InvalidMDataInfoHandle,
-    get_mdata_info,
-    insert_mdata_info,
-    remove_mdata_info
-);
 impl_cache!(mdata_entries,
             BTreeMap<Vec<u8>, Value>,
             MDataEntriesHandle,
@@ -209,20 +180,6 @@ impl_cache!(mdata_entries,
             get_mdata_entries,
             insert_mdata_entries,
             remove_mdata_entries);
-impl_cache!(mdata_keys,
-            BTreeSet<Vec<u8>>,
-            MDataKeysHandle,
-            InvalidMDataKeysHandle,
-            get_mdata_keys,
-            insert_mdata_keys,
-            remove_mdata_keys);
-impl_cache!(mdata_values,
-            Vec<Value>,
-            MDataValuesHandle,
-            InvalidMDataValuesHandle,
-            get_mdata_values,
-            insert_mdata_values,
-            remove_mdata_values);
 impl_cache!(mdata_entry_actions,
             BTreeMap<Vec<u8>, EntryAction>,
             MDataEntryActionsHandle,
@@ -231,19 +188,12 @@ impl_cache!(mdata_entry_actions,
             insert_mdata_entry_actions,
             remove_mdata_entry_actions);
 impl_cache!(mdata_permissions,
-            BTreeMap<User, MDataPermissionSetHandle>,
+            BTreeMap<User, PermissionSet>,
             MDataPermissionsHandle,
             InvalidMDataPermissionsHandle,
             get_mdata_permissions,
             insert_mdata_permissions,
             remove_mdata_permissions);
-impl_cache!(mdata_permission_set,
-            PermissionSet,
-            MDataPermissionSetHandle,
-            InvalidMDataPermissionSetHandle,
-            get_mdata_permission_set,
-            insert_mdata_permission_set,
-            remove_mdata_permission_set);
 impl_cache!(se_reader,
             SelfEncryptor<SelfEncryptionStorage<AppContext>>,
             SelfEncryptorReaderHandle,
@@ -284,7 +234,7 @@ struct HandleGenerator(Cell<ObjectHandle>);
 
 impl HandleGenerator {
     fn new() -> Self {
-        HandleGenerator(Cell::new(u64::MAX))
+        HandleGenerator(Cell::new(NULL_OBJECT_HANDLE))
     }
 
     fn gen(&self) -> ObjectHandle {
@@ -294,17 +244,17 @@ impl HandleGenerator {
     }
 
     fn reset(&self) {
-        self.0.set(u64::MAX)
+        self.0.set(NULL_OBJECT_HANDLE)
     }
 }
 
 struct Store<V> {
-    inner: RefCell<LruCache<ObjectHandle, V>>,
+    inner: RefCell<HashMap<ObjectHandle, V>>,
 }
 
 impl<V> Store<V> {
     fn new() -> Self {
-        Store { inner: RefCell::new(LruCache::new(DEFAULT_CAPACITY)) }
+        Store { inner: RefCell::new(HashMap::new()) }
     }
 
     fn get(&self, handle: ObjectHandle) -> Option<RefMut<V>> {

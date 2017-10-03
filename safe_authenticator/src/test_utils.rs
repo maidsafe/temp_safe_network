@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::AccessContainerEntry;
 use Authenticator;
 use access_container;
 use app_auth;
@@ -28,11 +27,12 @@ use rand::{self, Rng};
 use revocation;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, FutureExt, MDataInfo, utils};
+use safe_core::{Client, FutureExt, MDataInfo};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
 use safe_core::ipc::req::{ContainerPermissions, container_perms_into_permission_set};
+use safe_core::ipc::resp::AccessContainerEntry;
 use safe_core::nfs::{File, Mode, file_helper};
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -50,9 +50,11 @@ macro_rules! assert_match {
 /// Creates a new random account for authenticator. Returns the `Authenticator`
 /// instance and the locator and password strings.
 pub fn create_authenticator() -> (Authenticator, String, String) {
-    let locator = unwrap!(utils::generate_random_string(10));
-    let password = unwrap!(utils::generate_random_string(10));
-    let invitation = unwrap!(utils::generate_random_string(10));
+    let mut rng = rand::thread_rng();
+
+    let locator: String = rng.gen_ascii_chars().take(10).collect();
+    let password: String = rng.gen_ascii_chars().take(10).collect();
+    let invitation: String = rng.gen_ascii_chars().take(10).collect();
 
     let auth = unwrap!(Authenticator::create_acc(
         locator.clone(),
@@ -94,16 +96,7 @@ pub fn create_account_and_login_with_hook<F>(hook: F) -> Authenticator
 where
     F: Fn(MockRouting) -> MockRouting + Send + 'static,
 {
-    let locator = unwrap!(utils::generate_random_string(10));
-    let password = unwrap!(utils::generate_random_string(10));
-    let invitation = unwrap!(utils::generate_random_string(10));
-
-    let _ = unwrap!(Authenticator::create_acc(
-        locator.clone(),
-        password.clone(),
-        invitation,
-        |_| (),
-    ));
+    let (_, locator, password) = create_authenticator();
     unwrap!(Authenticator::login_with_hook(
         locator,
         password,
@@ -281,8 +274,8 @@ pub fn try_access_container<S: Into<String>>(
     })
 }
 
-/// Get the container entry from the access container root entry
-pub fn get_container_from_root(
+/// Get the container `MDataInfo` from the authenticator entry in the access container.
+pub fn get_container_from_authenticator_entry(
     authenticator: &Authenticator,
     container: &str,
 ) -> Result<MDataInfo, AuthError> {

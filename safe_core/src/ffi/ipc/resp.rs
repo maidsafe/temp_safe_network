@@ -17,6 +17,7 @@
 
 #![allow(unsafe_code)]
 
+use ffi::MDataInfo;
 use ffi::arrays::*;
 use ffi::ipc::req::PermissionSet as FfiPermissionSet;
 use rust_sodium::crypto::sign;
@@ -26,12 +27,13 @@ use std::ptr;
 
 /// Represents the authentication response.
 #[repr(C)]
-#[derive(Clone)]
 pub struct AuthGranted {
     /// The access keys.
     pub app_keys: AppKeys,
-    /// Access container
-    pub access_container: AccessContInfo,
+    /// Access container info
+    pub access_container_info: AccessContInfo,
+    /// Access container entry
+    pub access_container_entry: AccessContainerEntry,
 
     /// Crust's bootstrap config
     pub bootstrap_config_ptr: *mut u8,
@@ -73,6 +75,7 @@ pub struct AppKeys {
     pub enc_sk: AsymSecretKey,
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(expl_impl_clone_on_copy))]
 impl Clone for AppKeys {
     // Implemented manually because:
     // error[E0277]: the trait bound `[u8; 64]: std::clone::Clone` is not satisfied
@@ -96,7 +99,7 @@ impl Clone for AppKeys {
     }
 }
 
-/// Access container
+/// Access container info.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct AccessContInfo {
@@ -106,6 +109,44 @@ pub struct AccessContInfo {
     pub tag: u64,
     /// Nonce
     pub nonce: SymNonce,
+}
+
+/// Access container entry for a single app.
+#[repr(C)]
+pub struct AccessContainerEntry {
+    /// Pointer to the array of `ContainerInfo`.
+    pub ptr: *const ContainerInfo,
+    /// Size of the array.
+    pub len: usize,
+    /// Internal field used by rust memory allocator.
+    pub cap: usize,
+}
+
+impl Drop for AccessContainerEntry {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(self.ptr as *mut ContainerInfo, self.len, self.cap);
+        }
+    }
+}
+
+/// Information about a container (name, `MDataInfo` and permissions)
+#[repr(C)]
+pub struct ContainerInfo {
+    /// Container name as UTF-8 encoded null-terminated string.
+    pub name: *const c_char,
+    /// Container's `MDataInfo`
+    pub mdata_info: MDataInfo,
+    /// App's permissions in the container.
+    pub permissions: FfiPermissionSet,
+}
+
+impl Drop for ContainerInfo {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CString::from_raw(self.name as *mut _);
+        }
+    }
 }
 
 /// Information about an application that has access to an MD through `sign_key`
@@ -118,7 +159,6 @@ pub struct AppAccess {
     /// App's user-facing name
     pub name: *const c_char,
     /// App id.
-    /// This is u8, as the app-id can contain non-printable characters.
     pub app_id: *const c_char,
 }
 
@@ -159,4 +199,26 @@ impl Drop for MetadataResponse {
             }
         }
     }
+}
+
+/// Represents the FFI-safe mutable data value.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct MDataValue {
+    /// Content pointer.
+    pub content_ptr: *const u8,
+    /// Content length.
+    pub content_len: usize,
+    /// Entry version.
+    pub entry_version: u64,
+}
+
+/// Represents an FFI-safe mutable data key.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct MDataKey {
+    /// Key value pointer.
+    pub val_ptr: *const u8,
+    /// Key length.
+    pub val_len: usize,
 }

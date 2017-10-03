@@ -92,21 +92,16 @@ use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use maidsafe_utilities::thread::{self, Joiner};
-use safe_core::{Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
-                NetworkTx, event_loop};
+use safe_core::{Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
+                event_loop};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::ipc::Permission;
-use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
 use tokio_core::reactor::{Core, Handle};
 
 /// Future type specialised with `AuthError` as an error type
 pub type AuthFuture<T> = Future<Item = T, Error = AuthError>;
-
-/// Represents an entry for a single app in the access container
-pub type AccessContainerEntry = HashMap<String, (MDataInfo, BTreeSet<Permission>)>;
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {

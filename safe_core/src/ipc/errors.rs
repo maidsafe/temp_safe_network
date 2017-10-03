@@ -21,6 +21,7 @@ use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::XorName;
 use std::error::Error;
+use std::ffi::NulError;
 use std::str::Utf8Error;
 
 /// Ipc error
@@ -75,6 +76,12 @@ impl From<SerialisationError> for IpcError {
 impl From<StringError> for IpcError {
     fn from(err: StringError) -> Self {
         IpcError::StringError(err)
+    }
+}
+
+impl From<NulError> for IpcError {
+    fn from(error: NulError) -> Self {
+        IpcError::from(error.description())
     }
 }
 

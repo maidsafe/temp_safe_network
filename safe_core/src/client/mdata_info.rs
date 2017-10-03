@@ -1,4 +1,4 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -17,6 +17,10 @@
 
 use crypto::shared_secretbox;
 use errors::CoreError;
+use ffi::MDataInfo as FfiMDataInfo;
+use ffi::arrays::{SymNonce, SymSecretKey};
+use ffi_utils::ReprC;
+use ipc::IpcError;
 use rand::{OsRng, Rng};
 use routing::{EntryAction, Value, XorName};
 use rust_sodium::crypto::secretbox;
@@ -25,7 +29,7 @@ use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
 /// Information allowing to locate and access mutable data on the network.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct MDataInfo {
     /// Name of the data where the directory is stored.
     pub name: XorName,
@@ -138,6 +142,24 @@ impl MDataInfo {
     pub fn commit_new_enc_info(&mut self) {
         if let Some(new_enc_info) = self.new_enc_info.take() {
             self.enc_info = Some(new_enc_info);
+        }
+    }
+
+    /// Convert into C-representation.
+    pub fn into_repr_c(self) -> FfiMDataInfo {
+        let (has_enc_info, enc_key, enc_nonce) = enc_info_into_repr_c(self.enc_info);
+        let (has_new_enc_info, new_enc_key, new_enc_nonce) =
+            enc_info_into_repr_c(self.new_enc_info);
+
+        FfiMDataInfo {
+            name: self.name.0,
+            type_tag: self.type_tag,
+            has_enc_info,
+            enc_key,
+            enc_nonce,
+            has_new_enc_info,
+            new_enc_key,
+            new_enc_nonce,
         }
     }
 }
@@ -256,6 +278,47 @@ fn enc_entry_key(
     symmetric_encrypt(plain_text, key, Some(&nonce))
 }
 
+impl ReprC for MDataInfo {
+    type C = *const FfiMDataInfo;
+    type Error = IpcError;
+
+    #[allow(unsafe_code)]
+    unsafe fn clone_from_repr_c(c: Self::C) -> Result<Self, Self::Error> {
+        let c = &*c;
+
+        Ok(MDataInfo {
+            name: XorName(c.name),
+            type_tag: c.type_tag,
+            enc_info: enc_info_from_repr_c(c.has_enc_info, c.enc_key, c.enc_nonce),
+            new_enc_info: enc_info_from_repr_c(c.has_new_enc_info, c.new_enc_key, c.new_enc_nonce),
+        })
+    }
+}
+
+fn enc_info_into_repr_c(
+    info: Option<(shared_secretbox::Key, secretbox::Nonce)>,
+) -> (bool, SymSecretKey, SymNonce) {
+    if let Some((key, nonce)) = info {
+        (true, key.0, nonce.0)
+    } else {
+        (false, Default::default(), Default::default())
+    }
+}
+
+fn enc_info_from_repr_c(
+    is_set: bool,
+    key: SymSecretKey,
+    nonce: SymNonce,
+) -> Option<(shared_secretbox::Key, secretbox::Nonce)> {
+    if is_set {
+        Some((
+            shared_secretbox::Key::from_raw(&key),
+            secretbox::Nonce(nonce),
+        ))
+    } else {
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {

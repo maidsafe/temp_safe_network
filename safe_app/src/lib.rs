@@ -43,7 +43,6 @@ extern crate ffi_utils;
 extern crate futures;
 #[macro_use]
 extern crate log;
-extern crate lru_cache;
 extern crate maidsafe_utilities;
 #[cfg(test)]
 extern crate rand;
@@ -80,6 +79,8 @@ pub use ffi::nfs::*;
 
 mod errors;
 pub mod object_cache;
+pub mod permissions;
+
 #[cfg(test)]
 mod tests;
 
@@ -94,15 +95,15 @@ use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
-                NetworkTx, event_loop, utils};
+use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
+                event_loop, utils};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
 use safe_core::crypto::shared_secretbox;
-use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig, Permission};
-use safe_core::ipc::resp::access_container_enc_key;
+use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
+use safe_core::ipc::resp::{AccessContainerEntry, access_container_enc_key};
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
@@ -120,9 +121,6 @@ macro_rules! try_tx {
 }
 
 type AppFuture<T> = Future<Item = T, Error = AppError>;
-
-/// Represents an entry for a single app in the access container
-type AccessContainerEntry = HashMap<String, (MDataInfo, BTreeSet<Permission>)>;
 
 /// Handle to an application instance.
 pub struct App {
@@ -175,8 +173,9 @@ impl App {
                 sign_pk,
                 sign_sk,
             },
-            access_container,
+            access_container_info,
             bootstrap_config,
+            ..
         } = auth_granted;
 
         let client_keys = ClientKeys {
@@ -196,7 +195,7 @@ impl App {
                 net_tx,
                 bootstrap_config,
             )?;
-            let context = AppContext::registered(app_id, enc_key, access_container);
+            let context = AppContext::registered(app_id, enc_key, access_container_info);
             Ok((client, context))
         })
     }
@@ -223,8 +222,9 @@ impl App {
                 sign_pk,
                 sign_sk,
             },
-            access_container,
+            access_container_info,
             bootstrap_config,
+            ..
         } = auth_granted;
 
         let client_keys = ClientKeys {
@@ -245,7 +245,7 @@ impl App {
                 bootstrap_config,
                 routing_wrapper_fn,
             )?;
-            let context = AppContext::registered(app_id, enc_key, access_container);
+            let context = AppContext::registered(app_id, enc_key, access_container_info);
             Ok((client, context))
         })
     }
@@ -376,7 +376,7 @@ impl AppContext {
 
     /// Refresh access info by fetching it from the network.
     pub fn refresh_access_info(&self, client: &Client<AppContext>) -> Box<AppFuture<()>> {
-        let reg = fry!(self.as_registered()).clone();
+        let reg = Rc::clone(fry!(self.as_registered()));
         refresh_access_info(reg, client)
     }
 
@@ -385,9 +385,9 @@ impl AppContext {
         &self,
         client: &Client<AppContext>,
     ) -> Box<AppFuture<AccessContainerEntry>> {
-        let reg = fry!(self.as_registered()).clone();
+        let reg = Rc::clone(fry!(self.as_registered()));
 
-        fetch_access_info(reg.clone(), client)
+        fetch_access_info(Rc::clone(&reg), client)
             .map(move |_| {
                 let access_info = reg.access_info.borrow();
                 access_info.clone()

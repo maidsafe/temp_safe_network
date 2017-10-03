@@ -104,8 +104,6 @@ mod codes {
     pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
     pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
     pub const ERR_INVALID_FILE_MODE: i32 = -1016;
-    pub const ERR_INVALID_MDATA_KEYS_HANDLE: i32 = -1017;
-    pub const ERR_INVALID_MDATA_VALUES_HANDLE: i32 = -1018;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -133,20 +131,12 @@ pub enum AppError {
     InvalidCipherOptHandle,
     /// Invalid encrypt (box_) key handle
     InvalidEncryptPubKeyHandle,
-    /// Invalid `MDataInfo` handle
-    InvalidMDataInfoHandle,
     /// Invalid MutableData entries handle
     InvalidMDataEntriesHandle,
     /// Invalid MutableData entry actions handle
     InvalidMDataEntryActionsHandle,
-    /// Invalid MutableData keys handle
-    InvalidMDataKeysHandle,
-    /// Invalid MutableData values handle
-    InvalidMDataValuesHandle,
     /// Invalid MutableData permissions handle
     InvalidMDataPermissionsHandle,
-    /// Invalid MutableData permission set handle
-    InvalidMDataPermissionSetHandle,
     /// Invalid Self Encryptor handle
     InvalidSelfEncryptorHandle,
     /// Invalid sign key handle
@@ -187,24 +177,14 @@ impl Display for AppError {
             AppError::InvalidEncryptPubKeyHandle => {
                 write!(formatter, "Invalid encrypt (box_) key handle")
             }
-            AppError::InvalidMDataInfoHandle => write!(formatter, "Invalid `MDataInfo` handle"),
             AppError::InvalidMDataEntriesHandle => {
                 write!(formatter, "Invalid MutableData entries handle")
-            }
-            AppError::InvalidMDataKeysHandle => {
-                write!(formatter, "Invalid MutableData keys handle")
-            }
-            AppError::InvalidMDataValuesHandle => {
-                write!(formatter, "Invalid MutableData values handle")
             }
             AppError::InvalidMDataEntryActionsHandle => {
                 write!(formatter, "Invalid MutableData entry actions handle")
             }
             AppError::InvalidMDataPermissionsHandle => {
                 write!(formatter, "Invalid MutableData permissions handle")
-            }
-            AppError::InvalidMDataPermissionSetHandle => {
-                write!(formatter, "Invalid MutableData permission set handle")
             }
             AppError::InvalidSelfEncryptorHandle => {
                 write!(formatter, "Invalid Self Encryptor handle")
@@ -365,13 +345,9 @@ impl ErrorCode for AppError {
             AppError::NoSuchContainer => ERR_NO_SUCH_CONTAINER,
             AppError::InvalidCipherOptHandle => ERR_INVALID_CIPHER_OPT_HANDLE,
             AppError::InvalidEncryptPubKeyHandle => ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE,
-            AppError::InvalidMDataInfoHandle => ERR_INVALID_MDATA_INFO_HANDLE,
             AppError::InvalidMDataEntriesHandle => ERR_INVALID_MDATA_ENTRIES_HANDLE,
             AppError::InvalidMDataEntryActionsHandle => ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE,
-            AppError::InvalidMDataKeysHandle => ERR_INVALID_MDATA_KEYS_HANDLE,
-            AppError::InvalidMDataValuesHandle => ERR_INVALID_MDATA_VALUES_HANDLE,
             AppError::InvalidMDataPermissionsHandle => ERR_INVALID_MDATA_PERMISSIONS_HANDLE,
-            AppError::InvalidMDataPermissionSetHandle => ERR_INVALID_MDATA_PERMISSION_SET_HANDLE,
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
             AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,

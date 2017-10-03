@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use app_auth::{AppState, app_state};
@@ -30,11 +29,12 @@ use routing::XorName;
 use rust_sodium::crypto::sign::PublicKey;
 use safe_core::FutureExt;
 use safe_core::ffi::arrays::XorNameArray;
-use safe_core::ffi::ipc::req::{AppExchangeInfo as FfiAppExchangeInfo, ContainerPermissions};
+use safe_core::ffi::ipc::req::{AppExchangeInfo as FfiAppExchangeInfo,
+                               ContainerPermissions as FfiContainerPermissions};
 use safe_core::ffi::ipc::resp::AppAccess as FfiAppAccess;
 use safe_core::ipc::{IpcError, access_container_enc_key};
 use safe_core::ipc::req::{AppExchangeInfo, containers_into_vec};
-use safe_core::ipc::resp::AppAccess;
+use safe_core::ipc::resp::{AccessContainerEntry, AppAccess};
 use safe_core::utils::symmetric_decrypt;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_void};
@@ -45,7 +45,7 @@ pub struct RegisteredApp {
     /// Unique application identifier
     pub app_info: FfiAppExchangeInfo,
     /// List of containers that this application has access to
-    pub containers: *const ContainerPermissions,
+    pub containers: *const FfiContainerPermissions,
     /// Length of the containers array
     pub containers_len: usize,
     /// Capacity of the containers array. Internal data required
@@ -57,7 +57,7 @@ impl Drop for RegisteredApp {
     fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(
-                self.containers as *mut ContainerPermissions,
+                self.containers as *mut FfiContainerPermissions,
                 self.containers_len,
                 self.containers_cap,
             );

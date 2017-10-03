@@ -266,9 +266,9 @@ mod tests {
     use rust_sodium::crypto::secretbox;
     use safe_core::crypto::{shared_box, shared_secretbox, shared_sign};
     use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
-    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
-                         ContainersReq, IpcMsg, IpcReq, IpcResp, Permission, ShareMData,
-                         ShareMDataReq};
+    use safe_core::ipc::{self, AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted,
+                         AuthReq, BootstrapConfig, ContainersReq, IpcMsg, IpcReq, IpcResp,
+                         Permission, ShareMData, ShareMDataReq};
     use safe_core::utils;
     use std::collections::HashMap;
     use std::ffi::CString;
@@ -404,7 +404,7 @@ mod tests {
     fn decode_ipc_msg_with_auth_granted() {
         let req_id = ipc::gen_req_id();
 
-        let access_container = AccessContInfo {
+        let access_container_info = AccessContInfo {
             id: rand::random(),
             tag: rand::random(),
             nonce: secretbox::gen_nonce(),
@@ -413,7 +413,8 @@ mod tests {
         let auth_granted = AuthGranted {
             app_keys: gen_app_keys(),
             bootstrap_config: BootstrapConfig::default(),
-            access_container: access_container,
+            access_container_info: access_container_info,
+            access_container_entry: AccessContainerEntry::default(),
         };
 
         let msg = IpcMsg::Resp {

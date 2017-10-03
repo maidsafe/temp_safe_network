@@ -18,9 +18,9 @@
 use {App, AppError};
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
 use futures::Future;
-use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
-use safe_core::ffi::ipc::req::ContainerPermissions;
+use safe_core::ffi::MDataInfo as FfiMDataInfo;
+use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
 use safe_core::ipc::req::containers_into_vec;
 use std::os::raw::{c_char, c_void};
 
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn access_container_fetch(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        container_perms_ptr: *const ContainerPermissions,
+                        container_perms_ptr: *const FfiContainerPermissions,
                         container_perms_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -98,22 +98,20 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        mdata_info_h: MDataInfoHandle),
+                        mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = from_c_str(name)?;
 
         (*app).send(move |client, context| {
-            let context = context.clone();
-
             context
                 .get_access_info(client)
-                .map(move |containers| if let Some(&(ref mdata_info, _)) =
-                    containers.get(&name)
+                .map(move |mut containers| if let Some((mdata_info, _)) =
+                    containers.remove(&name)
                 {
-                    let handle = context.object_cache().insert_mdata_info(mdata_info.clone());
-                    o_cb(user_data.0, FFI_RESULT_OK, handle);
+                    let mdata_info = mdata_info.into_repr_c();
+                    o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
                 } else {
                     call_result_cb!(Err::<(), _>(AppError::NoSuchContainer), user_data, o_cb);
                 })
@@ -132,11 +130,14 @@ mod tests {
     use ffi::access_container::*;
     use ffi_utils::{ReprC, from_c_str};
     use ffi_utils::test_utils::{call_0, call_1, call_vec};
-    use safe_core::DIR_TAG;
+    use safe_core::{DIR_TAG, MDataInfo};
+    use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
     use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
-    use std::collections::{BTreeSet, HashMap};
+    use safe_core::ipc::req::ContainerPermissions;
+    use std::collections::HashMap;
     use std::ffi::CString;
-    use test_utils::{create_app_with_access, run, run_now};
+    use std::rc::Rc;
+    use test_utils::{create_app_with_access, run};
 
     // Test refreshing access info by fetching it from the network.
     #[test]
@@ -151,7 +152,7 @@ mod tests {
         let app = create_app_with_access(container_permissions.clone());
 
         run(&app, move |_client, context| {
-            let reg = unwrap!(context.as_registered()).clone();
+            let reg = Rc::clone(unwrap!(context.as_registered()));
             assert!(reg.access_info.borrow().is_empty());
             Ok(())
         });
@@ -163,7 +164,7 @@ mod tests {
         }
 
         run(&app, move |_client, context| {
-            let reg = unwrap!(context.as_registered()).clone();
+            let reg = Rc::clone(unwrap!(context.as_registered()));
             assert!(!reg.access_info.borrow().is_empty());
 
             let access_info = reg.access_info.borrow();
@@ -187,14 +188,12 @@ mod tests {
         let perms: Vec<PermSet> =
             unsafe { unwrap!(call_vec(|ud, cb| access_container_fetch(&app, ud, cb))) };
 
-        let perms: HashMap<String, BTreeSet<Permission>> =
-            perms.into_iter().map(|val| (val.0, val.1)).collect();
-
+        let perms: HashMap<_, _> = perms.into_iter().map(|val| (val.0, val.1)).collect();
         assert_eq!(perms["_videos"], btree_set![Permission::Read]);
         assert_eq!(perms.len(), 2);
 
         // Get MD info
-        let md_info_h = {
+        let md_info: MDataInfo = {
             let videos_str = unwrap!(CString::new("_videos"));
             unsafe {
                 unwrap!(call_1(|ud, cb| {
@@ -203,16 +202,13 @@ mod tests {
             }
         };
 
-        run_now(&app, move |_, context| {
-            let info = unwrap!(context.object_cache().get_mdata_info(md_info_h));
-            assert_eq!(info.type_tag, DIR_TAG);
-        })
+        assert_eq!(md_info.type_tag, DIR_TAG);
     }
 
-    struct PermSet(String, BTreeSet<Permission>);
+    struct PermSet(String, ContainerPermissions);
 
     impl ReprC for PermSet {
-        type C = *const ContainerPermissions;
+        type C = *const FfiContainerPermissions;
         type Error = AppError;
 
         unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
