@@ -48,7 +48,7 @@ use config_file_handler;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
-use safe_core::{FutureExt, NetworkEvent};
+use safe_core::FutureExt;
 use safe_core::ffi::AccountInfo as FfiAccountInfo;
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
 use safe_core::ipc::{AuthGranted, BootstrapConfig};
@@ -58,22 +58,22 @@ use std::slice;
 
 /// Create unregistered app.
 /// The `user_data` parameter corresponds to the first parameter of the
-/// `o_cb` callback, while `network_cb_user_data` corresponds to the
-/// first parameter of `o_network_observer_cb`.
+/// `o_cb` callback, while `disconnect_cb_user_data` corresponds to the
+/// first parameter of `o_disconnect_notifier_cb`.
 ///
 /// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_ptr: *const u8,
     bootstrap_config_len: usize,
-    network_cb_user_data: *mut c_void,
+    disconnect_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_observer_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, event: i32),
+    o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
-        let network_cb_user_data = OpaqueCtx(network_cb_user_data);
+        let disconnect_cb_user_data = OpaqueCtx(disconnect_cb_user_data);
 
         let config = if bootstrap_config_len == 0 || bootstrap_config_ptr.is_null() {
             None
@@ -84,9 +84,7 @@ pub unsafe extern "C" fn app_unregistered(
         };
 
         let app = App::unregistered(
-            move |event| {
-                call_network_observer(event, network_cb_user_data.0, o_network_observer_cb)
-            },
+            move || o_disconnect_notifier_cb(disconnect_cb_user_data.0, FFI_RESULT_OK),
             config,
         )?;
 
@@ -98,27 +96,27 @@ pub unsafe extern "C" fn app_unregistered(
 
 /// Create a registered app.
 /// The `user_data` parameter corresponds to the first parameter of the
-/// `o_cb` callback, while `network_cb_user_data` corresponds to the
-/// first parameter of `o_network_observer_cb`.
+/// `o_cb` callback, while `disconnect_cb_user_data` corresponds to the
+/// first parameter of `o_disconnect_notifier_cb`.
 ///
 /// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_registered(
     app_id: *const c_char,
     auth_granted: *const FfiAuthGranted,
-    network_cb_user_data: *mut c_void,
+    disconnect_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_network_observer_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, event: i32),
+    o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
-        let network_cb_user_data = OpaqueCtx(network_cb_user_data);
+        let disconnect_cb_user_data = OpaqueCtx(disconnect_cb_user_data);
         let app_id = from_c_str(app_id)?;
         let auth_granted = AuthGranted::clone_from_repr_c(auth_granted)?;
 
-        let app = App::registered(app_id, auth_granted, move |event| {
-            call_network_observer(event, network_cb_user_data.0, o_network_observer_cb)
+        let app = App::registered(app_id, auth_granted, move || {
+            o_disconnect_notifier_cb(disconnect_cb_user_data.0, FFI_RESULT_OK)
         })?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
@@ -248,17 +246,4 @@ pub unsafe extern "C" fn app_reset_object_cache(
             None
         })
     })
-}
-
-unsafe fn call_network_observer(
-    event: Result<NetworkEvent, AppError>,
-    user_data: *mut c_void,
-    o_cb: unsafe extern "C" fn(user_data: *mut c_void, result: FfiResult, event: i32),
-) {
-    match event {
-        Ok(event) => o_cb(user_data, FFI_RESULT_OK, event.into()),
-        res @ Err(..) => {
-            call_result_cb!(res, user_data, o_cb);
-        }
-    }
 }

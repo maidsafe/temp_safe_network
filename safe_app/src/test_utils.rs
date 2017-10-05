@@ -96,7 +96,7 @@ pub fn create_app() -> App {
         },
     ));
 
-    unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
+    unwrap!(App::registered(app_id, auth_granted, || ()))
 }
 
 /// Create app and grant it access to the specified containers.
@@ -115,7 +115,7 @@ pub fn create_app_with_access(access_info: HashMap<String, ContainerPermissions>
         },
     ));
 
-    unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
+    unwrap!(App::registered(app_id, auth_granted, || ()))
 }
 
 /// Creates a random app instance for testing.

@@ -162,7 +162,7 @@ pub fn login_registered_with_low_balance() {
     let _app = unwrap!(App::registered_with_hook(
         app_id,
         auth_granted,
-        |_network_event| (),
+        || (),
         routing_hook,
     ));
 }
@@ -183,11 +183,7 @@ fn authorise_app(
         },
     ));
 
-    unwrap!(App::registered(
-        String::from(app_id),
-        auth_granted,
-        |_network_event| (),
-    ))
+    unwrap!(App::registered(String::from(app_id), auth_granted, || ()))
 }
 
 // Get the number of containers for `app`
