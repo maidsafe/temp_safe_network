@@ -41,7 +41,7 @@
                                          option_unwrap_used))]
 #![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
 
-extern crate base64 as b64;
+extern crate base64;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -51,7 +51,7 @@ extern crate unwrap;
 
 #[macro_use]
 mod macros;
-mod base64;
+mod b64;
 mod catch_unwind;
 mod repr_c;
 mod vec;
@@ -61,7 +61,7 @@ pub mod test_utils;
 pub mod string;
 pub mod header_gen;
 
-pub use self::base64::{base64_decode, base64_encode};
+pub use self::b64::{base64_decode, base64_encode};
 pub use self::catch_unwind::{catch_unwind_cb, catch_unwind_error_code};
 pub use self::repr_c::ReprC;
 pub use self::string::{StringError, from_c_str};

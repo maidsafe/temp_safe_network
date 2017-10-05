@@ -1,6 +1,6 @@
 # safe_client_libs
 
-**Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
+**Maintainer:** Nikita Baksalyar (nikita.baksalyar@maidsafe.net)
 
 |Linux/OS X|Windows|Issues|
 |:--------:|:-----:|:----:|

@@ -26,7 +26,7 @@ use config::{self, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi::ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
-use ffi_utils::{ReprC, StringError, base64_encode, from_c_str};
+use ffi_utils::{ReprC, StringError, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, sender_as_user_data};
 use futures::{Future, future};
 use safe_core::ffi::ipc::req::AppExchangeInfo as FfiAppExchangeInfo;
@@ -495,7 +495,7 @@ fn app_authentication() {
 
     // Try to send IpcResp::Auth - it should fail
     let msg = IpcMsg::Revoked { app_id: "hello".to_string() };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
     match decode_ipc_msg(&authenticator, &encoded_msg) {
         Err((ERR_INVALID_MSG, None)) => (),
         x => panic!("Unexpected {:?}", x),
@@ -517,7 +517,7 @@ fn app_authentication() {
         req: IpcReq::Auth(auth_req.clone()),
     };
 
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     let (received_req_id, received_auth_req) =
         match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
@@ -545,11 +545,6 @@ fn app_authentication() {
             )
         }))
     };
-
-    let base64_app_id = base64_encode(app_id.as_bytes());
-    assert!(encoded_auth_resp.starts_with(
-        &format!("safe-{}", base64_app_id),
-    ));
 
     let auth_granted = match unwrap!(ipc::decode_msg(&encoded_auth_resp)) {
         IpcMsg::Resp {
@@ -639,7 +634,7 @@ fn unregistered_authentication() {
             containers: create_containers_req(),
         }),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     match unregistered_decode_ipc_msg(&encoded_msg) {
         Err((ERR_OPERATION_FORBIDDEN, None)) => (),
@@ -652,7 +647,7 @@ fn unregistered_authentication() {
         req_id: req_id,
         req: IpcReq::Unregistered,
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     let received_req_id = match unwrap!(unregistered_decode_ipc_msg(&encoded_msg)) {
         (IpcMsg::Req {
@@ -673,8 +668,6 @@ fn unregistered_authentication() {
                                      cb)
         }))
     };
-    let base64_app_id = base64_encode(b"unregistered");
-    assert!(encoded_resp.starts_with(&format!("safe-{}", base64_app_id)));
 
     let bootstrap_cfg = match unwrap!(ipc::decode_msg(&encoded_resp)) {
         IpcMsg::Resp {
@@ -722,7 +715,7 @@ fn authenticated_app_can_be_authenticated_again() {
         req_id: req_id,
         req: IpcReq::Auth(auth_req.clone()),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
         (IpcMsg::Req { req: IpcReq::Auth(_), .. }, _) => (),
@@ -749,7 +742,7 @@ fn authenticated_app_can_be_authenticated_again() {
         req_id: req_id,
         req: IpcReq::Auth(auth_req),
     };
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
         (IpcMsg::Req { req: IpcReq::Auth(_), .. }, _) => (),
@@ -773,7 +766,7 @@ fn containers_unknown_app() {
     };
 
     // Serialise the request as base64 payload in "safe-auth:payload"
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     // Invoke Authenticator's decode_ipc_msg and expect to get Failure back via
     // callback with error code for IpcError::UnknownApp
@@ -800,7 +793,6 @@ fn containers_access_request() {
         containers: create_containers_req(),
     };
     let app_id = auth_req.app.id.clone();
-    let base64_app_id = base64_encode(app_id.as_bytes());
 
     let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
 
@@ -831,12 +823,6 @@ fn containers_access_request() {
             )
         }))
     };
-
-    // Check the string to contain "safe-<app-id-base64>:payload" where payload is
-    // IpcMsg::Resp(IpcResp::Auth(Containers(Ok())))".
-    assert!(encoded_containers_resp.starts_with(
-        &format!("safe-{}", base64_app_id),
-    ));
 
     match ipc::decode_msg(&encoded_containers_resp) {
         Ok(IpcMsg::Resp { resp: IpcResp::Containers(Ok(())), .. }) => (),

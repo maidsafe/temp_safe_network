@@ -114,7 +114,7 @@ pub unsafe extern "C" fn encode_share_mdata_req(
 }
 
 fn encode_ipc(req_id: u32, req: IpcReq) -> Result<CString, AppError> {
-    let encoded = ipc::encode_msg(&IpcMsg::Req { req_id, req }, "safe-auth")?;
+    let encoded = ipc::encode_msg(&IpcMsg::Req { req_id, req })?;
     Ok(CString::new(encoded)?)
 }
 
@@ -290,7 +290,6 @@ mod tests {
             unsafe { unwrap!(call_2(|ud, cb| encode_auth_req(&req_c, ud, cb))) };
 
         // Decode it and verify it's the same we encoded.
-        assert!(encoded.starts_with("safe-auth:"));
         let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
@@ -325,7 +324,6 @@ mod tests {
             unsafe { unwrap!(call_2(|ud, cb| encode_containers_req(&req_c, ud, cb))) };
 
         // Decode it and verify it's the same we encoded.
-        assert!(encoded.starts_with("safe-auth:"));
         let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
@@ -347,7 +345,6 @@ mod tests {
             unsafe { unwrap!(call_2(|ud, cb| encode_unregistered_req(ud, cb))) };
 
         // Decode it and verify it's the same we encoded.
-        assert!(encoded.starts_with("safe-auth:"));
         let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
@@ -384,7 +381,6 @@ mod tests {
             unsafe { unwrap!(call_2(|ud, cb| encode_share_mdata_req(&req_c, ud, cb))) };
 
         // Decode it and verify it's the same we encoded.
-        assert!(encoded.starts_with("safe-auth:"));
         let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
@@ -422,7 +418,7 @@ mod tests {
             resp: IpcResp::Auth(Ok(auth_granted.clone())),
         };
 
-        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
+        let encoded = unwrap!(ipc::encode_msg(&msg));
         let encoded = unwrap!(CString::new(encoded));
 
         let context = unsafe {
@@ -509,7 +505,7 @@ mod tests {
             resp: IpcResp::Containers(Ok(())),
         };
 
-        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
+        let encoded = unwrap!(ipc::encode_msg(&msg));
         let encoded = unwrap!(CString::new(encoded));
 
         let mut context = Context {
@@ -590,7 +586,7 @@ mod tests {
             resp: IpcResp::Unregistered(Ok(BootstrapConfig::default())),
         };
 
-        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
+        let encoded = unwrap!(ipc::encode_msg(&msg));
         let encoded = unwrap!(CString::new(encoded));
 
         let mut context = Context {
@@ -671,7 +667,7 @@ mod tests {
             resp: IpcResp::ShareMData(Ok(())),
         };
 
-        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
+        let encoded = unwrap!(ipc::encode_msg(&msg));
         let encoded = unwrap!(CString::new(encoded));
 
         let mut context = Context {
