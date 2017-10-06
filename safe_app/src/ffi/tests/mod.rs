@@ -58,11 +58,12 @@ fn account_info() {
 #[test]
 fn network_status_callback() {
     use App;
-    use ffi_utils::test_utils::{call_0, send_via_user_data, sender_as_user_data};
+    use ffi_utils::test_utils::{call_0, sender_as_user_data};
     use maidsafe_utilities::serialisation::serialise;
     use safe_core::ipc::BootstrapConfig;
     use std::os::raw::c_void;
     use std::sync::mpsc;
+    use std::sync::mpsc::Sender;
     use std::time::Duration;
 
     {
@@ -121,9 +122,10 @@ fn network_status_callback() {
         unsafe { app_free(app) };
     }
 
-    extern "C" fn disconnect_cb(user_data: *mut c_void, res: FfiResult) {
+    extern "C" fn disconnect_cb(user_data: *mut c_void) {
         unsafe {
-            send_via_user_data(user_data, res.error_code);
+            let tx = user_data as *mut Sender<()>;
+            unwrap!((*tx).send(()));
         }
     }
 }

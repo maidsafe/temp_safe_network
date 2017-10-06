@@ -59,7 +59,7 @@ use std::slice;
 /// Create unregistered app.
 /// The `user_data` parameter corresponds to the first parameter of the
 /// `o_cb` callback, while `disconnect_cb_user_data` corresponds to the
-/// first parameter of `o_disconnect_notifier_cb`.
+/// parameter of `o_disconnect_notifier_cb`.
 ///
 /// Callback parameters: user data, error code, app
 #[no_mangle]
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_len: usize,
     disconnect_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn app_unregistered(
         };
 
         let app = App::unregistered(
-            move || o_disconnect_notifier_cb(disconnect_cb_user_data.0, FFI_RESULT_OK),
+            move || o_disconnect_notifier_cb(disconnect_cb_user_data.0),
             config,
         )?;
 
@@ -97,7 +97,7 @@ pub unsafe extern "C" fn app_unregistered(
 /// Create a registered app.
 /// The `user_data` parameter corresponds to the first parameter of the
 /// `o_cb` callback, while `disconnect_cb_user_data` corresponds to the
-/// first parameter of `o_disconnect_notifier_cb`.
+/// parameter of `o_disconnect_notifier_cb`.
 ///
 /// Callback parameters: user data, error code, app
 #[no_mangle]
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn app_registered(
     auth_granted: *const FfiAuthGranted,
     disconnect_cb_user_data: *mut c_void,
     user_data: *mut c_void,
-    o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn app_registered(
         let auth_granted = AuthGranted::clone_from_repr_c(auth_granted)?;
 
         let app = App::registered(app_id, auth_granted, move || {
-            o_disconnect_notifier_cb(disconnect_cb_user_data.0, FFI_RESULT_OK)
+            o_disconnect_notifier_cb(disconnect_cb_user_data.0)
         })?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
