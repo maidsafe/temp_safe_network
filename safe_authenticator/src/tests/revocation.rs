@@ -123,7 +123,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login_with_hook(
             locator.clone(),
             password.clone(),
-            |_| (),
+            || (),
             routing_hook,
         ));
 
@@ -165,7 +165,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login(
             locator.clone(),
             password.clone(),
-            |_| (),
+            || (),
         ));
 
         // App revocation should succeed
@@ -296,7 +296,7 @@ mod mock_routing {
         }
 
         // Login again without simulated failures.
-        let auth = unwrap!(Authenticator::login(locator, password, |_| ()));
+        let auth = unwrap!(Authenticator::login(locator, password, || ()));
 
         // Flush the revocation queue and verify both apps get revoked.
         unsafe {
@@ -388,7 +388,7 @@ mod mock_routing {
                     let auth = unwrap!(Authenticator::login_with_hook(
                         locator,
                         password,
-                        |_| (),
+                        || (),
                         move |routing| sync.hook(routing),
                     ));
 
@@ -491,7 +491,7 @@ mod mock_routing {
                     let auth = unwrap!(Authenticator::login_with_hook(
                         locator,
                         password,
-                        |_| (),
+                        || (),
                         move |routing| sync.hook(routing),
                     ));
 
@@ -536,7 +536,7 @@ mod mock_routing {
         S: AsRef<str>,
     {
         // First, log in normally to obtain the access contained info.
-        let auth = unwrap!(Authenticator::login(locator, password, |_| ()));
+        let auth = unwrap!(Authenticator::login(locator, password, || ()));
         let ac_info = run(&auth, |client| Ok(unwrap!(client.access_container())));
 
         // Then, log in with a request hook that makes mutation of the access container
@@ -544,7 +544,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login_with_hook(
             locator,
             password,
-            |_| (),
+            || (),
             move |mut routing| {
                 let ac_info = ac_info.clone();
 

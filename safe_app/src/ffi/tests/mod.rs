@@ -63,21 +63,20 @@ fn network_status_callback() {
     use safe_core::ipc::BootstrapConfig;
     use std::os::raw::c_void;
     use std::sync::mpsc;
-    use std::sync::mpsc::Sender;
+    use std::sync::mpsc::{Receiver, Sender};
     use std::time::Duration;
 
     {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
         let bootstrap_cfg = unwrap!(serialise(&BootstrapConfig::default()));
 
         let app: *mut App = unsafe {
-            unwrap!(call_1(|ud, cb| {
+            unwrap!(call_1(|_ud, cb| {
                 app_unregistered(
                     bootstrap_cfg.as_ptr(),
                     bootstrap_cfg.len(),
                     sender_as_user_data(&tx),
-                    ud,
                     disconnect_cb,
                     cb,
                 )
@@ -92,8 +91,7 @@ fn network_status_callback() {
         }
 
         // disconnect_cb should be called.
-        let error_code: i32 = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
-        assert_eq!(error_code, 0);
+        unwrap!(rx.recv_timeout(Duration::from_secs(10)));
 
         // Reconnect with the network
         unsafe { unwrap!(call_0(|ud, cb| app_reconnect(app, ud, cb))) };
@@ -109,8 +107,7 @@ fn network_status_callback() {
         unsafe { unwrap!(call_0(|ud, cb| app_reconnect(app, ud, cb))) };
 
         // disconnect_cb should be called.
-        let error_code: i32 = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
-        assert_eq!(error_code, 0);
+        unwrap!(rx.recv_timeout(Duration::from_secs(10)));
 
         // This should time out.
         let result = rx.recv_timeout(Duration::from_secs(1));

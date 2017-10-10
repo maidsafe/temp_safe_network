@@ -58,22 +58,19 @@ use std::slice;
 
 /// Create unregistered app.
 /// The `user_data` parameter corresponds to the first parameter of the
-/// `o_cb` callback, while `disconnect_cb_user_data` corresponds to the
-/// parameter of `o_disconnect_notifier_cb`.
+/// `o_cb` and `o_disconnect_notifier_cb` callbacks.
 ///
 /// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_ptr: *const u8,
     bootstrap_config_len: usize,
-    disconnect_cb_user_data: *mut c_void,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
-        let disconnect_cb_user_data = OpaqueCtx(disconnect_cb_user_data);
 
         let config = if bootstrap_config_len == 0 || bootstrap_config_ptr.is_null() {
             None
@@ -83,10 +80,7 @@ pub unsafe extern "C" fn app_unregistered(
             Some(deserialise::<BootstrapConfig>(config_serialised)?)
         };
 
-        let app = App::unregistered(
-            move || o_disconnect_notifier_cb(disconnect_cb_user_data.0),
-            config,
-        )?;
+        let app = App::unregistered(move || o_disconnect_notifier_cb(user_data.0), config)?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
@@ -96,27 +90,24 @@ pub unsafe extern "C" fn app_unregistered(
 
 /// Create a registered app.
 /// The `user_data` parameter corresponds to the first parameter of the
-/// `o_cb` callback, while `disconnect_cb_user_data` corresponds to the
-/// parameter of `o_disconnect_notifier_cb`.
+/// `o_cb` and `o_disconnect_notifier_cb` callbacks.
 ///
 /// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_registered(
     app_id: *const c_char,
     auth_granted: *const FfiAuthGranted,
-    disconnect_cb_user_data: *mut c_void,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
-        let disconnect_cb_user_data = OpaqueCtx(disconnect_cb_user_data);
         let app_id = from_c_str(app_id)?;
         let auth_granted = AuthGranted::clone_from_repr_c(auth_granted)?;
 
         let app = App::registered(app_id, auth_granted, move || {
-            o_disconnect_notifier_cb(disconnect_cb_user_data.0)
+            o_disconnect_notifier_cb(user_data.0)
         })?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));

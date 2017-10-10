@@ -131,14 +131,14 @@ impl Authenticator {
     }
 
     /// Create a new account
-    pub fn create_acc<S, NetObs>(
+    pub fn create_acc<S, N>(
         locator: S,
         password: S,
         invitation: S,
-        network_observer: NetObs,
+        disconnect_notifier: N,
     ) -> Result<Self, AuthError>
     where
-        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        N: FnMut() + Send + 'static,
         S: Into<String>,
     {
         let locator = locator.into();
@@ -149,17 +149,17 @@ impl Authenticator {
             move |el_h, core_tx, net_tx| {
                 Client::registered(&locator, &password, &invitation, el_h, core_tx, net_tx)
             },
-            network_observer,
+            disconnect_notifier,
         )
     }
 
     /// Create a new account
-    fn create_acc_impl<F: 'static + Send, NetObs>(
+    fn create_acc_impl<F: 'static + Send, N>(
         create_client_fn: F,
-        mut network_observer: NetObs,
+        mut disconnect_notifier: N,
     ) -> Result<Self, AuthError>
     where
-        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        N: FnMut() + Send + 'static,
         F: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
     {
         let (tx, rx) = sync_channel(0);
@@ -173,7 +173,12 @@ impl Authenticator {
             let (net_tx, net_rx) = mpsc::unbounded::<NetworkEvent>();
 
             let net_obs_fut = net_rx
-                .then(move |net_event| Ok(network_observer(net_event)))
+                .then(move |net_event| {
+                    if let Ok(NetworkEvent::Disconnected) = net_event {
+                        disconnect_notifier();
+                    }
+                    ok!(())
+                })
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
@@ -214,14 +219,10 @@ impl Authenticator {
     }
 
     /// Log in to an existing account
-    pub fn login<S, NetObs>(
-        locator: S,
-        password: S,
-        network_observer: NetObs,
-    ) -> Result<Self, AuthError>
+    pub fn login<S, N>(locator: S, password: S, disconnect_notifier: N) -> Result<Self, AuthError>
     where
         S: Into<String>,
-        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        N: FnMut() + Send + 'static,
     {
 
         let locator = locator.into();
@@ -229,18 +230,18 @@ impl Authenticator {
 
         Self::login_impl(
             move |el_h, core_tx, net_tx| Client::login(&locator, &password, el_h, core_tx, net_tx),
-            network_observer,
+            disconnect_notifier,
         )
     }
 
     /// Log in to an existing account
-    pub fn login_impl<F: Send + 'static, NetObs>(
+    pub fn login_impl<F: Send + 'static, N>(
         create_client_fn: F,
-        mut network_observer: NetObs,
+        mut disconnect_notifier: N,
     ) -> Result<Self, AuthError>
     where
         F: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
-        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        N: FnMut() + Send + 'static,
     {
         let (tx, rx) = sync_channel(0);
 
@@ -253,7 +254,12 @@ impl Authenticator {
             let core_tx_clone = core_tx.clone();
 
             let net_obs_fut = net_rx
-                .then(move |net_event| Ok(network_observer(net_event)))
+                .then(move |net_event| {
+                    if let Ok(NetworkEvent::Disconnected) = net_event {
+                        disconnect_notifier();
+                    }
+                    ok!(())
+                })
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
@@ -304,16 +310,16 @@ impl Authenticator {
 #[cfg(feature = "use-mock-routing")]
 impl Authenticator {
     #[allow(unused)]
-    fn login_with_hook<F, S, NetObs>(
+    fn login_with_hook<F, S, N>(
         locator: S,
         password: S,
-        network_observer: NetObs,
+        disconnect_notifier: N,
         routing_wrapper_fn: F,
     ) -> Result<Self, AuthError>
     where
         S: Into<String>,
         F: Fn(MockRouting) -> MockRouting + Send + 'static,
-        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        N: FnMut() + Send + 'static,
     {
 
         let locator = locator.into();
@@ -330,20 +336,20 @@ impl Authenticator {
                     routing_wrapper_fn,
                 )
             },
-            network_observer,
+            disconnect_notifier,
         )
     }
 
     #[allow(unused)]
-    fn create_acc_with_hook<F, S, NetObs>(
+    fn create_acc_with_hook<F, S, N>(
         locator: S,
         password: S,
         invitation: S,
-        network_observer: NetObs,
+        disconnect_notifier: N,
         routing_wrapper_fn: F,
     ) -> Result<Self, AuthError>
     where
-        NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static,
+        N: FnMut() + Send + 'static,
         F: Fn(MockRouting) -> MockRouting + Send + 'static,
         S: Into<String>,
     {
@@ -363,7 +369,7 @@ impl Authenticator {
                     routing_wrapper_fn,
                 )
             },
-            network_observer,
+            disconnect_notifier,
         )
     }
 }
