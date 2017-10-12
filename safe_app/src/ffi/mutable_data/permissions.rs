@@ -116,16 +116,32 @@ pub unsafe extern "C" fn mdata_permissions_get(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        perm_set: FfiPermissionSet),
+                        perm_set: *const FfiPermissionSet),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
-            let permission_set = *permissions
-                .get(&helper::get_user(context.object_cache(), user_h)?)
-                .ok_or(AppError::InvalidSignKeyHandle)?;
+        let user_data = OpaqueCtx(user_data);
 
-            Ok(permission_set_into_repr_c(permission_set))
+        (*app).send(move |_, context| {
+            let permissions = try_cb!(
+                context.object_cache().get_mdata_permissions(permissions_h),
+                user_data,
+                o_cb
+            );
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
+
+            let permission_set = *try_cb!(
+                permissions.get(&user).ok_or(AppError::InvalidSignKeyHandle),
+                user_data,
+                o_cb
+            );
+            let permission_set = permission_set_into_repr_c(permission_set);
+
+            o_cb(user_data.0, FFI_RESULT_OK, &permission_set);
+            None
         })
     })
 }
@@ -188,11 +204,13 @@ pub unsafe extern "C" fn mdata_permissions_insert(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
     user_h: SignKeyHandle,
-    permission_set: FfiPermissionSet,
+    permission_set: *const FfiPermissionSet,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
+        let permission_set = *permission_set;
+
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             let _ = permissions.insert(

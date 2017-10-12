@@ -414,7 +414,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: FfiResult,
-                        perm_set: FfiPermissionSet),
+                        perm_set: *const FfiPermissionSet),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -430,7 +430,8 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
             client
                 .list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
-                    o_cb(user_data.0, FFI_RESULT_OK, permission_set_into_repr_c(set));
+                    let perm_set = permission_set_into_repr_c(set);
+                    o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
                 })
                 .map_err(AppError::from)
                 .map_err(move |err| {
@@ -452,7 +453,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
     user_h: SignKeyHandle,
-    permission_set: FfiPermissionSet,
+    permission_set: *const FfiPermissionSet,
     version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
@@ -460,6 +461,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let info = MDataInfo::clone_from_repr_c(info)?;
+        let permission_set = *permission_set;
 
         (*app).send(move |client, context| {
             let user = try_cb!(

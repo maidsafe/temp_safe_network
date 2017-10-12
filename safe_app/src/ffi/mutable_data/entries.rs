@@ -436,7 +436,7 @@ mod tests {
                     &app,
                     perms_h,
                     USER_ANYONE,
-                    permission_set_into_repr_c(perms_set),
+                    &permission_set_into_repr_c(perms_set),
                     ud,
                     cb,
                 )

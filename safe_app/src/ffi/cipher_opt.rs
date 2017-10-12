@@ -158,16 +158,14 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let pk = match context.object_cache().get_encrypt_key(peer_encrypt_key_h) {
-                Ok(pk) => *pk,
-                res @ Err(..) => {
-                    call_result_cb!(res, user_data, o_cb);
-                    return None;
-                }
-            };
+            let pk = try_cb!(
+                context.object_cache().get_encrypt_key(peer_encrypt_key_h),
+                user_data,
+                o_cb
+            );
             let handle = context.object_cache().insert_cipher_opt(
                 CipherOpt::Asymmetric {
-                    peer_encrypt_key: pk,
+                    peer_encrypt_key: *pk,
                 },
             );
             o_cb(user_data.0, FFI_RESULT_OK, handle);

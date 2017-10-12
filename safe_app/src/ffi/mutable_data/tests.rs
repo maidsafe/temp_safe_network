@@ -47,17 +47,13 @@ fn permissions_crud_ffi() {
         unsafe { unwrap!(call_1(|ud, cb| mdata_permissions_new(&app, ud, cb))) };
 
     {
+        let ffi_perm_set = permission_set_into_repr_c(perm_set);
+        assert!(ffi_perm_set.insert);
+
         // Create permissions for anyone
         let len: usize = unsafe {
             unwrap!(call_0(|ud, cb| {
-                mdata_permissions_insert(
-                    &app,
-                    perms_h,
-                    USER_ANYONE,
-                    permission_set_into_repr_c(perm_set),
-                    ud,
-                    cb,
-                )
+                mdata_permissions_insert(&app, perms_h, USER_ANYONE, &ffi_perm_set, ud, cb)
             }));
             unwrap!(call_1(
                 |ud, cb| mdata_permissions_len(&app, perms_h, ud, cb),
@@ -65,11 +61,12 @@ fn permissions_crud_ffi() {
         };
         assert_eq!(len, 1);
 
-        let perm_set2 = unsafe {
+        let perm_set2: FfiPermissionSet = unsafe {
             unwrap!(call_1(|ud, cb| {
                 mdata_permissions_get(&app, perms_h, USER_ANYONE, ud, cb)
             }))
         };
+        assert!(perm_set2.insert);
         let perm_set2 = unwrap!(permission_set_clone_from_repr_c(&perm_set2));
 
         assert_eq!(Some(true), perm_set2.is_allowed(Action::Insert));
@@ -121,7 +118,7 @@ fn permissions_crud_ffi() {
                     &app,
                     &md_info_pub,
                     USER_ANYONE,
-                    permission_set_into_repr_c(perm_set_new),
+                    &permission_set_into_repr_c(perm_set_new),
                     0,
                     ud,
                     cb,
@@ -141,7 +138,7 @@ fn permissions_crud_ffi() {
                     &app,
                     &md_info_pub,
                     USER_ANYONE,
-                    permission_set_into_repr_c(perm_set_new),
+                    &permission_set_into_repr_c(perm_set_new),
                     1,
                     ud,
                     cb,
@@ -159,7 +156,7 @@ fn permissions_crud_ffi() {
                     &app,
                     &md_info_pub,
                     USER_ANYONE,
-                    permission_set_into_repr_c(perm_set_new),
+                    &permission_set_into_repr_c(perm_set_new),
                     3,
                     ud,
                     cb,
@@ -207,7 +204,7 @@ fn entries_crud_ffi() {
                 &app,
                 perms_h,
                 USER_ANYONE,
-                permission_set_into_repr_c(perm_set),
+                &permission_set_into_repr_c(perm_set),
                 ud,
                 cb,
             )
