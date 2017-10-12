@@ -953,12 +953,13 @@ fn unregistered_decode_ipc_msg(msg: &str) -> ChannelType {
     let (tx, rx) = mpsc::channel::<ChannelType>();
 
     let ffi_msg = unwrap!(CString::new(msg));
+    let mut ud = Default::default();
 
     unsafe {
         use ffi::ipc::auth_unregistered_decode_ipc_msg;
         auth_unregistered_decode_ipc_msg(
             ffi_msg.as_ptr(),
-            sender_as_user_data(&tx),
+            sender_as_user_data(&tx, &mut ud),
             unregistered_cb,
             err_cb,
         );

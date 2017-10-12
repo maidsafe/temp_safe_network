@@ -58,7 +58,7 @@ fn account_info() {
 #[test]
 fn network_status_callback() {
     use App;
-    use ffi_utils::test_utils::{call_0, sender_as_user_data};
+    use ffi_utils::test_utils::{UserData, call_0, call_1_with_custom, send_via_user_data_custom};
     use maidsafe_utilities::serialisation::serialise;
     use safe_core::ipc::BootstrapConfig;
     use std::os::raw::c_void;
@@ -70,13 +70,16 @@ fn network_status_callback() {
         let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
         let bootstrap_cfg = unwrap!(serialise(&BootstrapConfig::default()));
+        let mut custom_ud: UserData = Default::default();
+        let ptr: *const _ = &tx;
+        custom_ud.custom = ptr as *mut c_void;
 
         let app: *mut App = unsafe {
-            unwrap!(call_1(|_ud, cb| {
+            unwrap!(call_1_with_custom(&mut custom_ud, |ud, cb| {
                 app_unregistered(
                     bootstrap_cfg.as_ptr(),
                     bootstrap_cfg.len(),
-                    sender_as_user_data(&tx),
+                    ud,
                     disconnect_cb,
                     cb,
                 )
@@ -91,7 +94,7 @@ fn network_status_callback() {
         }
 
         // disconnect_cb should be called.
-        unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+        unwrap!(rx.recv_timeout(Duration::from_secs(15)));
 
         // Reconnect with the network
         unsafe { unwrap!(call_0(|ud, cb| app_reconnect(app, ud, cb))) };
@@ -107,7 +110,7 @@ fn network_status_callback() {
         unsafe { unwrap!(call_0(|ud, cb| app_reconnect(app, ud, cb))) };
 
         // disconnect_cb should be called.
-        unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+        unwrap!(rx.recv_timeout(Duration::from_secs(15)));
 
         // This should time out.
         let result = rx.recv_timeout(Duration::from_secs(1));
@@ -121,8 +124,7 @@ fn network_status_callback() {
 
     extern "C" fn disconnect_cb(user_data: *mut c_void) {
         unsafe {
-            let tx = user_data as *mut Sender<()>;
-            unwrap!((*tx).send(()));
+            send_via_user_data_custom(user_data, ());
         }
     }
 }

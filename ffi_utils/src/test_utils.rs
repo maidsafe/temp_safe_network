@@ -21,22 +21,61 @@ use super::FfiResult;
 use repr_c::ReprC;
 use std::fmt::Debug;
 use std::os::raw::c_void;
+use std::ptr;
 use std::slice;
 use std::sync::mpsc::{self, Sender};
 
-/// Convert a `mpsc::Sender<T>` to a void ptr which can be passed as user data to
-/// ffi functions
-pub fn sender_as_user_data<T>(tx: &Sender<T>) -> *mut c_void {
-    let ptr: *const _ = tx;
+/// User data wrapper.
+pub struct UserData {
+    /// Common field, used by standard callbacks.
+    pub common: *mut c_void,
+    /// Custom field, used by additional callbacks.
+    pub custom: *mut c_void,
+}
+
+impl Default for UserData {
+    fn default() -> Self {
+        let common: *const c_void = ptr::null();
+        let custom: *const c_void = ptr::null();
+
+        UserData {
+            common: common as *mut c_void,
+            custom: custom as *mut c_void,
+        }
+    }
+}
+
+/// Convert a `UserData` to a void pointer which can be passed to ffi functions.
+pub fn user_data_as_void(ud: &UserData) -> *mut c_void {
+    let ptr: *const _ = ud;
     ptr as *mut c_void
 }
 
-/// Send through a `mpsc::Sender` pointed to by the user data pointer.
+/// Convert a `mpsc::Sender<T>` to a void ptr which is then stored in the `UserData` struct and
+/// passed to ffi functions.
+pub fn sender_as_user_data<T>(tx: &Sender<T>, ud: &mut UserData) -> *mut c_void {
+    let ptr: *const _ = tx;
+    ud.common = ptr as *mut c_void;
+    user_data_as_void(ud)
+}
+
+/// Send through a `mpsc::Sender` pointed to by the user data's common pointer.
 pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
 where
     T: Send,
 {
-    let tx = user_data as *mut Sender<T>;
+    let ud = user_data as *mut UserData;
+    let tx = (*ud).common as *mut Sender<T>;
+    unwrap!((*tx).send(value));
+}
+
+/// Send through a `mpsc::Sender` pointed to by the user data's custom pointer.
+pub unsafe fn send_via_user_data_custom<T>(user_data: *mut c_void, value: T)
+where
+    T: Send,
+{
+    let ud = user_data as *mut UserData;
+    let tx = (*ud).custom as *mut Sender<T>;
     unwrap!((*tx).send(value));
 }
 
@@ -48,8 +87,21 @@ where
     F: FnOnce(*mut c_void,
            extern "C" fn(user_data: *mut c_void, result: FfiResult)),
 {
+    let mut ud = Default::default();
+    call_0_with_custom(&mut ud, f)
+}
+
+/// Call a FFI function and block until its callback gets called.
+/// Use this if the callback accepts no arguments in addition to `user_data`
+/// and `error_code`.
+/// This version of the function takes a `UserData` with custom inner data.
+pub fn call_0_with_custom<F>(ud: &mut UserData, f: F) -> Result<(), i32>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult)),
+{
     let (tx, rx) = mpsc::channel::<i32>();
-    f(sender_as_user_data(&tx), callback_0);
+    f(sender_as_user_data(&tx, ud), callback_0);
 
     let error = unwrap!(rx.recv());
     if error == 0 { Ok(()) } else { Err(error) }
@@ -65,8 +117,23 @@ where
            extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C)),
     T: ReprC<Error = E>,
 {
+    let mut ud = Default::default();
+    call_1_with_custom(&mut ud, f)
+}
+
+/// Call an FFI function and block until its callback gets called, then return
+/// the argument which were passed to that callback.
+/// Use this if the callback accepts one argument in addition to `user_data`
+/// and `error_code`.
+/// This version of the function takes a `UserData` with custom inner data.
+pub fn call_1_with_custom<F, E: Debug, T>(ud: &mut UserData, f: F) -> Result<T, i32>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C)),
+    T: ReprC<Error = E>,
+{
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<T, i32>>>();
-    f(sender_as_user_data(&tx), callback_1::<E, T>);
+    f(sender_as_user_data(&tx, ud), callback_1::<E, T>);
     unwrap!(rx.recv()).0
 }
 
@@ -83,8 +150,29 @@ where
     T0: ReprC<Error = E0>,
     T1: ReprC<Error = E1>,
 {
+    let mut ud = Default::default();
+    call_2_with_custom(&mut ud, f)
+}
+
+/// Call a FFI function and block until its callback gets called, then return
+/// the argument which were passed to that callback.
+/// Use this if the callback accepts two arguments in addition to `user_data`
+/// and `error_code`.
+/// This version of the function takes a `UserData` with custom inner data.
+pub unsafe fn call_2_with_custom<F, E0, E1, T0, T1>(
+    ud: &mut UserData,
+    f: F,
+) -> Result<(T0, T1), i32>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, T0::C, T1::C)),
+    E0: Debug,
+    E1: Debug,
+    T0: ReprC<Error = E0>,
+    T1: ReprC<Error = E1>,
+{
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<(T0, T1), i32>>>();
-    f(sender_as_user_data(&tx), callback_2::<E0, E1, T0, T1>);
+    f(sender_as_user_data(&tx, ud), callback_2::<E0, E1, T0, T1>);
     unwrap!(rx.recv()).0
 }
 
@@ -99,9 +187,24 @@ where
     E: Debug,
     T: ReprC<C = *const U, Error = E>,
 {
-    let (tx, rx) = mpsc::channel::<SendWrapper<Result<Vec<T>, i32>>>();
+    let mut ud = Default::default();
+    call_vec_with_custom(&mut ud, f)
+}
 
-    f(sender_as_user_data(&tx), callback_vec::<E, T, U>);
+/// Call a FFI function and block until its callback gets called, then copy
+/// the array argument which was passed to `Vec<T>` and return the result.
+/// Use this if the callback accepts `*const T` and `usize` (length) arguments in addition
+/// to `user_data` and `error_code`.
+/// This version of the function takes a `UserData` with custom inner data.
+pub unsafe fn call_vec_with_custom<F, E, T, U>(ud: &mut UserData, f: F) -> Result<Vec<T>, i32>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C, usize)),
+    E: Debug,
+    T: ReprC<C = *const U, Error = E>,
+{
+    let (tx, rx) = mpsc::channel::<SendWrapper<Result<Vec<T>, i32>>>();
+    f(sender_as_user_data(&tx, ud), callback_vec::<E, T, U>);
     unwrap!(rx.recv()).0
 }
 
@@ -112,8 +215,21 @@ where
     F: FnOnce(*mut c_void,
            extern "C" fn(user_data: *mut c_void, result: FfiResult, *const u8, usize)),
 {
+    let mut ud = Default::default();
+    call_vec_u8_with_custom(&mut ud, f)
+}
+
+/// Call a FFI function and block until its callback gets called, then copy
+/// the byte array argument which was passed to `Vec<u8>` and return the result.
+/// This version of the function takes a `UserData` with custom inner data.
+/// This version of the function takes a `UserData` with custom inner data.
+pub unsafe fn call_vec_u8_with_custom<F>(ud: &mut UserData, f: F) -> Result<Vec<u8>, i32>
+where
+    F: FnOnce(*mut c_void,
+           extern "C" fn(user_data: *mut c_void, result: FfiResult, *const u8, usize)),
+{
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
-    f(sender_as_user_data(&tx), callback_vec_u8);
+    f(sender_as_user_data(&tx, ud), callback_vec_u8);
     unwrap!(rx.recv())
 }
 
@@ -197,7 +313,7 @@ extern "C" fn callback_vec_u8(user_data: *mut c_void, res: FfiResult, ptr: *cons
     }
 }
 
-// Unsafe wrapper for passing non-Send types through mpsc channels.
-// Use with caution!
-struct SendWrapper<T>(T);
+/// Unsafe wrapper for passing non-Send types through mpsc channels.
+/// Use with caution!
+pub struct SendWrapper<T>(T);
 unsafe impl<T> Send for SendWrapper<T> {}

@@ -242,7 +242,7 @@ mod tests {
                         acc_password.as_ptr(),
                         invitation.as_ptr(),
                         ud,
-                        || (),
+                        disconnect_cb,
                         cb,
                     )
                 }))
@@ -254,11 +254,21 @@ mod tests {
         {
             let auth_h: *mut Authenticator = unsafe {
                 unwrap!(call_1(|ud, cb| {
-                    login(acc_locator.as_ptr(), acc_password.as_ptr(), ud, || (), cb)
+                    login(
+                        acc_locator.as_ptr(),
+                        acc_password.as_ptr(),
+                        ud,
+                        disconnect_cb,
+                        cb,
+                    )
                 }))
             };
             assert!(!auth_h.is_null());
             unsafe { auth_free(auth_h) };
+        }
+
+        extern "C" fn disconnect_cb(_user_data: *mut c_void) {
+            panic!("Disconnect occurred")
         }
     }
 
@@ -266,11 +276,10 @@ mod tests {
     #[cfg(all(test, feature = "use-mock-routing"))]
     #[test]
     fn network_status_callback() {
-        use ffi_utils::test_utils::call_0;
-        use ffi_utils::test_utils::sender_as_user_data;
+        use ffi_utils::test_utils::{UserData, call_0, call_1_with_custom,
+                                    send_via_user_data_custom};
         use std::time::Duration;
-        use std::sync::mpsc;
-        use std::sync::mpsc::{Receiver, Sender};
+        use std::sync::mpsc::{self, Receiver, Sender};
 
         let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
         let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
@@ -279,16 +288,18 @@ mod tests {
         {
             let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
+            let mut custom_ud: UserData = Default::default();
+            let ptr: *const _ = &tx;
+            custom_ud.custom = ptr as *mut c_void;
+
             let auth: *mut Authenticator = unsafe {
-                unwrap!(call_1(|ud, cb| {
+                unwrap!(call_1_with_custom(&mut custom_ud, |ud, cb| {
                     create_acc(
                         acc_locator.as_ptr(),
                         acc_password.as_ptr(),
                         invitation.as_ptr(),
                         ud,
-                        || {
-                            unwrap!(tx.send(()));
-                        },
+                        disconnect_cb,
                         cb,
                     )
                 }))
@@ -301,8 +312,8 @@ mod tests {
                 }));
             }
 
-            // disconnect_cb should be called.
-            unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            // disconnect_cb should be Called.
+            unwrap!(rx.recv_timeout(Duration::from_secs(15)));
 
             // Reconnect with the network
             unsafe { unwrap!(call_0(|ud, cb| auth_reconnect(auth, ud, cb))) };
@@ -318,10 +329,9 @@ mod tests {
             unsafe { unwrap!(call_0(|ud, cb| auth_reconnect(auth, ud, cb))) };
 
             // disconnect_cb should be called.
-            unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            unwrap!(rx.recv_timeout(Duration::from_secs(15)));
 
             // This should time out.
-            unwrap!(rx.recv_timeout(Duration::from_secs(10)));
             let result = rx.recv_timeout(Duration::from_secs(1));
             match result {
                 Err(_) => (),
@@ -329,6 +339,12 @@ mod tests {
             }
 
             unsafe { auth_free(auth) };
+        }
+
+        extern "C" fn disconnect_cb(user_data: *mut c_void) {
+            unsafe {
+                send_via_user_data_custom(user_data, ());
+            }
         }
     }
 
@@ -346,7 +362,7 @@ mod tests {
                     acc_password.as_ptr(),
                     invitation.as_ptr(),
                     ud,
-                    || (),
+                    disconnect_cb,
                     cb,
                 )
             }))
@@ -375,5 +391,9 @@ mod tests {
         );
 
         unsafe { auth_free(auth) };
+    }
+
+    extern "C" fn disconnect_cb(_user_data: *mut c_void) {
+        panic!("Disconnect occurred")
     }
 }

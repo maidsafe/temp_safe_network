@@ -135,13 +135,14 @@ pub fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
     }
 
     let ffi_msg = unwrap!(CString::new(msg));
+    let mut ud = Default::default();
 
     unsafe {
         use ffi::ipc::auth_decode_ipc_msg;
         auth_decode_ipc_msg(
             authenticator,
             ffi_msg.as_ptr(),
-            sender_as_user_data(&tx),
+            sender_as_user_data(&tx, &mut ud),
             auth_cb,
             containers_cb,
             unregistered_cb,
