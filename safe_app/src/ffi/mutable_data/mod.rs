@@ -519,39 +519,3 @@ pub unsafe extern "C" fn mdata_del_user_permissions(
         })
     })
 }
-
-/// Change owner of the mutable data.
-///
-/// Callback parameters: user data, error code
-#[no_mangle]
-pub unsafe extern "C" fn mdata_change_owner(
-    app: *const App,
-    info: *const FfiMDataInfo,
-    new_owner_h: SignKeyHandle,
-    version: u64,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
-) {
-    catch_unwind_cb(user_data, o_cb, || {
-        let user_data = OpaqueCtx(user_data);
-        let info = MDataInfo::clone_from_repr_c(info)?;
-
-        (*app).send(move |client, context| {
-            let new_owner = *try_cb!(
-                context.object_cache().get_sign_key(new_owner_h),
-                user_data,
-                o_cb
-            );
-
-            client
-                .change_mdata_owner(info.name, info.type_tag, new_owner, version)
-                .map_err(AppError::from)
-                .then(move |result| {
-                    call_result_cb!(result, user_data, o_cb);
-                    Ok(())
-                })
-                .into_box()
-                .into()
-        })
-    })
-}
