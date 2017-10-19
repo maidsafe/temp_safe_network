@@ -5,7 +5,10 @@
 tags*
 build/
 build-tests/
-target/
+target/*
+!target/release/
+target/release/*
+!target/release/README.md
 /.idea
 /.project
 *.sublime-*
@@ -15,5 +18,7 @@ target/
 packages/
 .DS_Store
 *.back.aip
+.env
 installer/docker/safe_vault
 installer/docker/safe_vault.*.config
+installer/docker/.env
