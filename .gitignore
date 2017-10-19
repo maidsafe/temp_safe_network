@@ -6,6 +6,8 @@ tags*
 build/
 build-tests/
 target/*
+!target/release/
+target/release/*
 !target/release/README.md
 /.idea
 /.project
