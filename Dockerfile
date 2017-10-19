@@ -93,14 +93,14 @@ WORKDIR /home/maidsafe/src/safe_vault
 #
 # Copy files and folders to the current working directory
 #
-COPY src/         ./src/
-COPY tests/       ./tests/
-COPY installer/   ./installer/
-COPY target/      ./target/
-COPY Cargo.lock   .
-COPY Cargo.toml   .
-COPY build.rs     .
-COPY rustfmt.toml .
+COPY src/            ./src/
+COPY tests/          ./tests/
+COPY installer/      ./installer/
+COPY target/release/ ./target/release/
+COPY Cargo.lock      .
+COPY Cargo.toml      .
+COPY build.rs        .
+COPY rustfmt.toml    .
 
 #
 # Update permissions of safe_vault source and entrypoint script

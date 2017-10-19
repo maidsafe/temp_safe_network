@@ -6,7 +6,7 @@ tags*
 build/
 build-tests/
 target/*
-!target/README.md
+!target/release/README.md
 /.idea
 /.project
 *.sublime-*
