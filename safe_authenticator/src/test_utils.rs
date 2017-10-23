@@ -60,7 +60,7 @@ pub fn create_authenticator() -> (Authenticator, String, String) {
         locator.clone(),
         password.clone(),
         invitation,
-        |_| (),
+        || (),
     ));
 
     (auth, locator, password)
@@ -69,7 +69,7 @@ pub fn create_authenticator() -> (Authenticator, String, String) {
 /// Create a random authenticator and login using the same credentials.
 pub fn create_account_and_login() -> Authenticator {
     let (_, locator, password) = create_authenticator();
-    unwrap!(Authenticator::login(locator, password, |_| ()))
+    unwrap!(Authenticator::login(locator, password, || ()))
 }
 
 /// Revoke an app, returning an error on failure
@@ -100,7 +100,7 @@ where
     unwrap!(Authenticator::login_with_hook(
         locator,
         password,
-        |_| (),
+        || (),
         hook,
     ))
 }
