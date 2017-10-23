@@ -74,7 +74,7 @@ pub unsafe extern "C" fn mdata_permissions_new(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         perm_h: MDataPermissionsHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -94,7 +94,9 @@ pub unsafe extern "C" fn mdata_permissions_len(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, size: usize),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        size: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -115,7 +117,7 @@ pub unsafe extern "C" fn mdata_permissions_get(
     user_h: SignKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         perm_set: *const FfiPermissionSet),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -140,7 +142,7 @@ pub unsafe extern "C" fn mdata_permissions_get(
             );
             let permission_set = permission_set_into_repr_c(permission_set);
 
-            o_cb(user_data.0, FFI_RESULT_OK, &permission_set);
+            o_cb(user_data.0, &FFI_RESULT_OK, &permission_set);
             None
         })
     })
@@ -155,7 +157,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
     permissions_h: MDataPermissionsHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         user_perm_sets: *const UserPermissionSet,
                         len: usize),
 ) {
@@ -184,7 +186,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
 
             o_cb(
                 user_data.0,
-                FFI_RESULT_OK,
+                &FFI_RESULT_OK,
                 user_perm_sets.as_safe_ptr(),
                 user_perm_sets.len(),
             );
@@ -206,7 +208,7 @@ pub unsafe extern "C" fn mdata_permissions_insert(
     user_h: SignKeyHandle,
     permission_set: *const FfiPermissionSet,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let permission_set = *permission_set;
@@ -231,7 +233,7 @@ pub unsafe extern "C" fn mdata_permissions_free(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {

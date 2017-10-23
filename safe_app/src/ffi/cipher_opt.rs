@@ -103,7 +103,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         handle: CipherOptHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -113,7 +113,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
             let handle = context.object_cache().insert_cipher_opt(
                 CipherOpt::PlainText,
             );
-            o_cb(user_data.0, FFI_RESULT_OK, handle);
+            o_cb(user_data.0, &FFI_RESULT_OK, handle);
             None
         })
     });
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         handle: CipherOptHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(
             let handle = context.object_cache().insert_cipher_opt(
                 CipherOpt::Symmetric,
             );
-            o_cb(user_data.0, FFI_RESULT_OK, handle);
+            o_cb(user_data.0, &FFI_RESULT_OK, handle);
             None
         })
     })
@@ -151,7 +151,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
     peer_encrypt_key_h: EncryptPubKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         handle: CipherOptHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -168,7 +168,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
                     peer_encrypt_key: *pk,
                 },
             );
-            o_cb(user_data.0, FFI_RESULT_OK, handle);
+            o_cb(user_data.0, &FFI_RESULT_OK, handle);
             None
         })
     });
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn cipher_opt_free(
     app: *const App,
     handle: CipherOptHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
 

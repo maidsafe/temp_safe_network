@@ -85,7 +85,7 @@ where
 pub fn call_0<F>(f: F) -> Result<(), i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult)),
+           extern "C" fn(user_data: *mut c_void, result: *const FfiResult)),
 {
     let mut ud = Default::default();
     call_0_with_custom(&mut ud, f)
@@ -98,7 +98,7 @@ where
 pub fn call_0_with_custom<F>(ud: &mut UserData, f: F) -> Result<(), i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult)),
+           extern "C" fn(user_data: *mut c_void, result: *const FfiResult)),
 {
     let (tx, rx) = mpsc::channel::<i32>();
     f(sender_as_user_data(&tx, ud), callback_0);
@@ -114,7 +114,7 @@ where
 pub unsafe fn call_1<F, E: Debug, T>(f: F) -> Result<T, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C)),
+           extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C)),
     T: ReprC<Error = E>,
 {
     let mut ud = Default::default();
@@ -129,7 +129,7 @@ where
 pub fn call_1_with_custom<F, E: Debug, T>(ud: &mut UserData, f: F) -> Result<T, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C)),
+           extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C)),
     T: ReprC<Error = E>,
 {
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<T, i32>>>();
@@ -144,7 +144,10 @@ where
 pub unsafe fn call_2<F, E0, E1, T0, T1>(f: F) -> Result<(T0, T1), i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, T0::C, T1::C)),
+           extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         T0::C,
+                         T1::C)),
     E0: Debug,
     E1: Debug,
     T0: ReprC<Error = E0>,
@@ -165,7 +168,10 @@ pub unsafe fn call_2_with_custom<F, E0, E1, T0, T1>(
 ) -> Result<(T0, T1), i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, T0::C, T1::C)),
+           extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         T0::C,
+                         T1::C)),
     E0: Debug,
     E1: Debug,
     T0: ReprC<Error = E0>,
@@ -183,7 +189,10 @@ where
 pub unsafe fn call_vec<F, E, T, U>(f: F) -> Result<Vec<T>, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C, usize)),
+           extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         T::C,
+                         usize)),
     E: Debug,
     T: ReprC<C = *const U, Error = E>,
 {
@@ -199,7 +208,10 @@ where
 pub unsafe fn call_vec_with_custom<F, E, T, U>(ud: &mut UserData, f: F) -> Result<Vec<T>, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, T::C, usize)),
+           extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         T::C,
+                         usize)),
     E: Debug,
     T: ReprC<C = *const U, Error = E>,
 {
@@ -213,7 +225,10 @@ where
 pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, *const u8, usize)),
+           extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         *const u8,
+                         usize)),
 {
     let mut ud = Default::default();
     call_vec_u8_with_custom(&mut ud, f)
@@ -226,27 +241,30 @@ where
 pub unsafe fn call_vec_u8_with_custom<F>(ud: &mut UserData, f: F) -> Result<Vec<u8>, i32>
 where
     F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: FfiResult, *const u8, usize)),
+           extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         *const u8,
+                         usize)),
 {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
     f(sender_as_user_data(&tx, ud), callback_vec_u8);
     unwrap!(rx.recv())
 }
 
-extern "C" fn callback_0(user_data: *mut c_void, res: FfiResult) {
-    unsafe { send_via_user_data(user_data, res.error_code) }
+extern "C" fn callback_0(user_data: *mut c_void, res: *const FfiResult) {
+    unsafe { send_via_user_data(user_data, (*res).error_code) }
 }
 
-extern "C" fn callback_1<E, T>(user_data: *mut c_void, res: FfiResult, arg: T::C)
+extern "C" fn callback_1<E, T>(user_data: *mut c_void, res: *const FfiResult, arg: T::C)
 where
     E: Debug,
     T: ReprC<Error = E>,
 {
     unsafe {
-        let result: Result<T, i32> = if res.error_code == 0 {
+        let result: Result<T, i32> = if (*res).error_code == 0 {
             Ok(unwrap!(T::clone_from_repr_c(arg)))
         } else {
-            Err(res.error_code)
+            Err((*res).error_code)
         };
         send_via_user_data(user_data, SendWrapper(result));
     }
@@ -254,7 +272,7 @@ where
 
 extern "C" fn callback_2<E0, E1, T0, T1>(
     user_data: *mut c_void,
-    res: FfiResult,
+    res: *const FfiResult,
     arg0: T0::C,
     arg1: T1::C,
 ) where
@@ -264,13 +282,13 @@ extern "C" fn callback_2<E0, E1, T0, T1>(
     T1: ReprC<Error = E1>,
 {
     unsafe {
-        let result: Result<(T0, T1), i32> = if res.error_code == 0 {
+        let result: Result<(T0, T1), i32> = if (*res).error_code == 0 {
             Ok((
                 unwrap!(T0::clone_from_repr_c(arg0)),
                 unwrap!(T1::clone_from_repr_c(arg1)),
             ))
         } else {
-            Err(res.error_code)
+            Err((*res).error_code)
         };
         send_via_user_data(user_data, SendWrapper(result))
     }
@@ -278,7 +296,7 @@ extern "C" fn callback_2<E0, E1, T0, T1>(
 
 extern "C" fn callback_vec<E, T, U>(
     user_data: *mut c_void,
-    res: FfiResult,
+    res: *const FfiResult,
     array: *const U,
     size: usize,
 ) where
@@ -286,7 +304,7 @@ extern "C" fn callback_vec<E, T, U>(
     T: ReprC<C = *const U, Error = E>,
 {
     unsafe {
-        let result: Result<Vec<T>, i32> = if res.error_code == 0 {
+        let result: Result<Vec<T>, i32> = if (*res).error_code == 0 {
             let slice_ffi = slice::from_raw_parts(array, size);
             let mut vec = Vec::with_capacity(slice_ffi.len());
             for elt in slice_ffi {
@@ -294,19 +312,24 @@ extern "C" fn callback_vec<E, T, U>(
             }
             Ok(vec)
         } else {
-            Err(res.error_code)
+            Err((*res).error_code)
         };
 
         send_via_user_data(user_data, SendWrapper(result))
     }
 }
 
-extern "C" fn callback_vec_u8(user_data: *mut c_void, res: FfiResult, ptr: *const u8, len: usize) {
+extern "C" fn callback_vec_u8(
+    user_data: *mut c_void,
+    res: *const FfiResult,
+    ptr: *const u8,
+    len: usize,
+) {
     unsafe {
-        let result = if res.error_code == 0 {
+        let result = if (*res).error_code == 0 {
             Ok(slice::from_raw_parts(ptr, len).to_vec())
         } else {
-            Err(res.error_code)
+            Err((*res).error_code)
         };
 
         send_via_user_data(user_data, result)

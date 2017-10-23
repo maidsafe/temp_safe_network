@@ -32,7 +32,7 @@ pub unsafe extern "C" fn mdata_entry_actions_new(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         entry_actions_h: MDataEntryActionsHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(
     value_ptr: *const u8,
     value_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(
     value_len: usize,
     entry_version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(
     key_len: usize,
     entry_version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Del(entry_version)
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn mdata_entry_actions_free(
     app: *const App,
     actions_h: MDataEntryActionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -132,7 +132,7 @@ unsafe fn add_action<F>(
     key_ptr: *const u8,
     key_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
     f: F,
 ) where
     F: FnOnce() -> EntryAction,

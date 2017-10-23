@@ -71,10 +71,11 @@ macro_rules! call_result_cb {
         #[allow(unused)]
         use $crate::callback::{Callback, CallbackArgs};
         let (error_code, description) = ffi_result!($result);
-        $cb.call($user_data.into(), FfiResult {
+        let res = FfiResult {
             error_code,
             description: description.as_ptr()
-        }, CallbackArgs::default());
+        };
+        $cb.call($user_data.into(), &res, CallbackArgs::default());
     }
 }
 

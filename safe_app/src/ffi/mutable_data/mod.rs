@@ -65,7 +65,7 @@ pub unsafe extern "C" fn mdata_put(
     permissions_h: MDataPermissionsHandle,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let info = MDataInfo::clone_from_repr_c(info)?;
@@ -128,7 +128,9 @@ pub unsafe extern "C" fn mdata_get_version(
     app: *const App,
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, version: u64),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        version: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let info = MDataInfo::clone_from_repr_c(info)?;
@@ -148,7 +150,7 @@ pub unsafe extern "C" fn mdata_serialised_size(
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         serialised_size: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -181,7 +183,7 @@ pub unsafe extern "C" fn mdata_get_value(
     key_len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         content_ptr: *const u8,
                         content_len: usize,
                         version: u64),
@@ -198,7 +200,7 @@ pub unsafe extern "C" fn mdata_get_value(
                 .map(move |(content, version)| {
                     o_cb(
                         user_data.0,
-                        FFI_RESULT_OK,
+                        &FFI_RESULT_OK,
                         content.as_safe_ptr(),
                         content.len(),
                         version,
@@ -223,7 +225,7 @@ pub unsafe extern "C" fn mdata_list_entries(
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         entries_h: MDataEntriesHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -252,7 +254,7 @@ pub unsafe extern "C" fn mdata_list_keys(
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         keys: *const FfiMDataKey,
                         len: usize),
 ) {
@@ -274,7 +276,7 @@ pub unsafe extern "C" fn mdata_list_keys(
 
                             o_cb(
                                 user_data.0,
-                                FFI_RESULT_OK,
+                                &FFI_RESULT_OK,
                                 repr_c.as_safe_ptr(),
                                 repr_c.len(),
                             )
@@ -300,7 +302,7 @@ pub unsafe extern "C" fn mdata_list_values(
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         values: *const FfiMDataValue,
                         len: usize),
 ) {
@@ -322,7 +324,7 @@ pub unsafe extern "C" fn mdata_list_values(
 
                             o_cb(
                                 user_data.0,
-                                FFI_RESULT_OK,
+                                &FFI_RESULT_OK,
                                 repr_c.as_safe_ptr(),
                                 repr_c.len(),
                             )
@@ -348,7 +350,7 @@ pub unsafe extern "C" fn mdata_mutate_entries(
     info: *const FfiMDataInfo,
     actions_h: MDataEntryActionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -383,7 +385,7 @@ pub unsafe extern "C" fn mdata_list_permissions(
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         perm_h: MDataPermissionsHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -413,7 +415,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
     user_h: SignKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         perm_set: *const FfiPermissionSet),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -431,7 +433,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
                 .list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
                     let perm_set = permission_set_into_repr_c(set);
-                    o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
+                    o_cb(user_data.0, &FFI_RESULT_OK, &perm_set);
                 })
                 .map_err(AppError::from)
                 .map_err(move |err| {
@@ -456,7 +458,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
     permission_set: *const FfiPermissionSet,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -496,7 +498,7 @@ pub unsafe extern "C" fn mdata_del_user_permissions(
     user_h: SignKeyHandle,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);

@@ -51,13 +51,10 @@ where
 {
     if let Err(err) = catch_unwind_result(f) {
         let (error_code, description) = ffi_result!(Err::<(), E>(err));
-        cb.call(
-            user_data.into(),
-            FfiResult {
-                error_code,
-                description: description.as_ptr(),
-            },
-            CallbackArgs::default(),
-        );
+        let res = FfiResult {
+            error_code,
+            description: description.as_ptr(),
+        };
+        cb.call(user_data.into(), &res, CallbackArgs::default());
     }
 }

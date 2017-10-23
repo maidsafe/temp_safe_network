@@ -41,7 +41,7 @@ pub unsafe extern "C" fn idata_new_self_encryptor(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         se_h: SEWriterHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn idata_new_self_encryptor(
                 .map_err(AppError::from)
                 .map(move |se| {
                     let handle = context.object_cache().insert_se_writer(se);
-                    o_cb(user_data.0, FFI_RESULT_OK, handle);
+                    o_cb(user_data.0, &FFI_RESULT_OK, handle);
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(e), user_data, o_cb);
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(
     data: *const u8,
     size: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
     cipher_opt_h: CipherOptHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         name: *const XorNameArray),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
                 })
                 .then(move |result| {
                     match result {
-                        Ok(name) => o_cb(user_data.0, FFI_RESULT_OK, &name.0),
+                        Ok(name) => o_cb(user_data.0, &FFI_RESULT_OK, &name.0),
                         res @ Err(..) => {
                             call_result_cb!(res, user_data, o_cb);
                         }
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(
     name: *const XorNameArray,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         se_h: SEReaderHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -205,7 +205,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(
                 })
                 .map(move |se_reader| {
                     let handle = context3.object_cache().insert_se_reader(se_reader);
-                    o_cb(user_data.0, FFI_RESULT_OK, handle);
+                    o_cb(user_data.0, &FFI_RESULT_OK, handle);
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(e), user_data, o_cb);
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn idata_serialised_size(
     name: *const XorNameArray,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         serialised_size: u64),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn idata_serialised_size(
             client
                 .get_idata(name)
                 .map(move |idata| {
-                    o_cb(user_data.0, FFI_RESULT_OK, idata.serialised_size())
+                    o_cb(user_data.0, &FFI_RESULT_OK, idata.serialised_size())
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn idata_size(
     app: *const App,
     se_h: SEReaderHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, size: u64),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, size: u64),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -264,7 +264,7 @@ pub unsafe extern "C" fn idata_size(
         (*app).send(move |_, context| {
             match context.object_cache().get_se_reader(se_h) {
                 Ok(se) => {
-                    o_cb(user_data.0, FFI_RESULT_OK, se.len());
+                    o_cb(user_data.0, &FFI_RESULT_OK, se.len());
                 }
                 res @ Err(..) => {
                     call_result_cb!(res, user_data, o_cb);
@@ -286,7 +286,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
     len: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         data_ptr: *const u8,
                         data_len: usize),
 ) {
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
 
             let fut = se.read(from_pos, len)
                 .map(move |data| {
-                    o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
+                    o_cb(user_data.0, &FFI_RESULT_OK, data.as_ptr(), data.len());
                 })
                 .map_err(AppError::from)
                 .map_err(move |e| {
@@ -334,7 +334,7 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(
     app: *const App,
     handle: SEWriterHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -355,7 +355,7 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(
     app: *const App,
     handle: SEReaderHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     let user_data = OpaqueCtx(user_data);
 

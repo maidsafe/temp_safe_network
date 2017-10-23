@@ -546,16 +546,16 @@ fn entries_crud_ffi() {
 
     extern "C" fn get_value_cb(
         user_data: *mut c_void,
-        res: FfiResult,
+        res: *const FfiResult,
         val: *const u8,
         len: usize,
         _version: u64,
     ) {
         unsafe {
-            let result: Result<Vec<u8>, i32> = if res.error_code == 0 {
+            let result: Result<Vec<u8>, i32> = if (*res).error_code == 0 {
                 Ok(vec_clone_from_raw_parts(val, len))
             } else {
-                Err(res.error_code)
+                Err((*res).error_code)
             };
 
             send_via_user_data(user_data, result);

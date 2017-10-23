@@ -170,7 +170,7 @@ pub extern "C" fn unregistered_cb(user_data: *mut c_void, req_id: u32) {
     }
 }
 
-pub extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *const c_char) {
+pub extern "C" fn err_cb(user_data: *mut c_void, res: *const FfiResult, response: *const c_char) {
     unsafe {
         let ipc_resp = if response.is_null() {
             None
@@ -182,6 +182,6 @@ pub extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *cons
             }
         };
 
-        send_via_user_data::<ChannelType>(user_data, Err((res.error_code, ipc_resp)))
+        send_via_user_data::<ChannelType>(user_data, Err(((*res).error_code, ipc_resp)))
     }
 }

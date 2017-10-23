@@ -56,7 +56,7 @@ pub unsafe extern "C" fn dir_fetch_file(
     file_name: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         file: *const File,
                         version: u64),
 ) {
@@ -69,7 +69,7 @@ pub unsafe extern "C" fn dir_fetch_file(
             file_helper::fetch(client.clone(), parent_info, file_name)
                 .map(move |(version, file)| {
                     let ffi_file = file.into_repr_c();
-                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
+                    o_cb(user_data.0, &FFI_RESULT_OK, &ffi_file, version)
                 })
                 .map_err(AppError::from)
                 .map_err(move |err| {
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn dir_insert_file(
     file_name: *const c_char,
     file: *const File,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn dir_update_file(
     file: *const File,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn dir_delete_file(
     file_name: *const c_char,
     version: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = MDataInfo::clone_from_repr_c(parent_info)?;
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn file_open(
     open_mode: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         file_h: FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -220,7 +220,7 @@ pub unsafe extern "C" fn file_size(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, size: u64),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, size: u64),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -229,7 +229,7 @@ pub unsafe extern "C" fn file_size(
             let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
 
             if let Some(ref reader) = file_ctx.reader {
-                o_cb(user_data.0, FFI_RESULT_OK, reader.size());
+                o_cb(user_data.0, &FFI_RESULT_OK, reader.size());
             } else {
                 call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
             }
@@ -249,7 +249,7 @@ pub unsafe extern "C" fn file_read(
     len: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         data_ptr: *const u8,
                         data_len: usize),
 ) {
@@ -270,7 +270,7 @@ pub unsafe extern "C" fn file_read(
                         },
                     )
                     .map(move |data| {
-                        o_cb(user_data.0, FFI_RESULT_OK, data.as_safe_ptr(), data.len());
+                        o_cb(user_data.0, &FFI_RESULT_OK, data.as_safe_ptr(), data.len());
                     })
                     .map_err(move |err| {
                         call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
@@ -295,7 +295,7 @@ pub unsafe extern "C" fn file_write(
     data: *const u8,
     size: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -337,7 +337,9 @@ pub unsafe extern "C" fn file_close(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, file: *const File),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        file: *const File),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -349,7 +351,7 @@ pub unsafe extern "C" fn file_close(
                 writer
                     .close()
                     .map(move |file| {
-                        o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c());
+                        o_cb(user_data.0, &FFI_RESULT_OK, &file.into_repr_c());
                     })
                     .map_err(move |err| {
                         call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
@@ -360,7 +362,7 @@ pub unsafe extern "C" fn file_close(
                 // The reader will be dropped automatically
                 o_cb(
                     user_data.0,
-                    FFI_RESULT_OK,
+                    &FFI_RESULT_OK,
                     &file_ctx.original_file.into_repr_c(),
                 );
                 None

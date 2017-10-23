@@ -36,7 +36,7 @@ pub unsafe extern "C" fn encode_auth_req(
     req: *const FfiAuthReq,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         req_id: u32,
                         encoded_ptr: *const c_char),
 ) {
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn encode_auth_req(
         let req = AuthReq::clone_from_repr_c(req)?;
 
         let encoded = encode_ipc(req_id, IpcReq::Auth(req))?;
-        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn encode_containers_req(
     req: *const FfiContainersReq,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         req_id: u32,
                         encoded_ptr: *const c_char),
 ) {
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn encode_containers_req(
         let req = ContainersReq::clone_from_repr_c(req)?;
 
         let encoded = encode_ipc(req_id, IpcReq::Containers(req))?;
-        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -79,14 +79,14 @@ pub unsafe extern "C" fn encode_containers_req(
 pub unsafe extern "C" fn encode_unregistered_req(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         req_id: u32,
                         encoded_ptr: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
         let encoded = encode_ipc(req_id, IpcReq::Unregistered)?;
-        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn encode_share_mdata_req(
     req: *const FfiShareMDataReq,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         req_id: u32,
                         encoded_ptr: *const c_char),
 ) {
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn encode_share_mdata_req(
         let req = ShareMDataReq::clone_from_repr_c(req)?;
 
         let encoded = encode_ipc(req_id, IpcReq::ShareMData(req))?;
-        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -133,7 +133,9 @@ pub unsafe extern "C" fn decode_ipc_msg(
     o_containers: extern "C" fn(user_data: *mut c_void, req_id: u32),
     o_share_mdata: extern "C" fn(user_data: *mut c_void, req_id: u32),
     o_revoked: extern "C" fn(user_data: *mut c_void),
-    o_err: extern "C" fn(user_data: *mut c_void, result: FfiResult, req_id: u32),
+    o_err: extern "C" fn(user_data: *mut c_void,
+                         result: *const FfiResult,
+                         req_id: u32),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<_, AppError> {
         let msg = from_c_str(msg)?;
@@ -153,28 +155,22 @@ pub unsafe extern "C" fn decode_ipc_msg(
                             Err(err) => {
                                 let e = AppError::from(err);
                                 let (error_code, description) = ffi_error!(e);
-                                o_err(
-                                    user_data,
-                                    FfiResult {
-                                        error_code,
-                                        description: description.as_ptr(),
-                                    },
-                                    req_id,
-                                );
+                                let res = FfiResult {
+                                    error_code,
+                                    description: description.as_ptr(),
+                                };
+                                o_err(user_data, &res, req_id);
                             }
                         }
                     }
                     Err(err) => {
                         let e = AppError::from(err);
                         let (error_code, description) = ffi_error!(e);
-                        o_err(
-                            user_data,
-                            FfiResult {
-                                error_code,
-                                description: description.as_ptr(),
-                            },
-                            req_id,
-                        );
+                        let res = FfiResult {
+                            error_code,
+                            description: description.as_ptr(),
+                        };
+                        o_err(user_data, &res, req_id);
                     }
                 }
             }
@@ -187,14 +183,11 @@ pub unsafe extern "C" fn decode_ipc_msg(
                     Err(err) => {
                         let e = AppError::from(err);
                         let (error_code, description) = ffi_error!(e);
-                        o_err(
-                            user_data,
-                            FfiResult {
-                                error_code,
-                                description: description.as_ptr(),
-                            },
-                            req_id,
-                        );
+                        let res = FfiResult {
+                            error_code,
+                            description: description.as_ptr(),
+                        };
+                        o_err(user_data, &res, req_id);
                     }
                 }
             }
@@ -215,14 +208,11 @@ pub unsafe extern "C" fn decode_ipc_msg(
                     Err(err) => {
                         let e = AppError::from(err);
                         let (error_code, description) = ffi_error!(e);
-                        o_err(
-                            user_data,
-                            FfiResult {
-                                error_code,
-                                description: description.as_ptr(),
-                            },
-                            req_id,
-                        );
+                        let res = FfiResult {
+                            error_code,
+                            description: description.as_ptr(),
+                        };
+                        o_err(user_data, &res, req_id);
                     }
                 }
             }
@@ -235,14 +225,11 @@ pub unsafe extern "C" fn decode_ipc_msg(
                     Err(err) => {
                         let e = AppError::from(err);
                         let (error_code, description) = ffi_error!(e);
-                        o_err(
-                            user_data,
-                            FfiResult {
-                                error_code,
-                                description: description.as_ptr(),
-                            },
-                            req_id,
-                        );
+                        let res = FfiResult {
+                            error_code,
+                            description: description.as_ptr(),
+                        };
+                        o_err(user_data, &res, req_id);
                     }
                 }
             }
@@ -760,7 +747,7 @@ mod tests {
         auth_granted: Option<AuthGranted>,
     }
 
-    extern "C" fn err_cb(ctx: *mut c_void, _res: FfiResult, _req_id: u32) {
+    extern "C" fn err_cb(ctx: *mut c_void, _res: *const FfiResult, _req_id: u32) {
         unsafe {
             let ctx = ctx as *mut Context;
             (*ctx).unexpected_cb = true;

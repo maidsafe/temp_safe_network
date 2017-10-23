@@ -31,7 +31,7 @@ use std::os::raw::{c_char, c_void};
 pub unsafe extern "C" fn access_container_refresh_access_info(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         container_perms_ptr: *const FfiContainerPermissions,
                         container_perms_len: usize),
 ) {
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn access_container_fetch(
                     ))?;
                     o_cb(
                         user_data.0,
-                        FFI_RESULT_OK,
+                        &FFI_RESULT_OK,
                         ffi_containers.as_safe_ptr(),
                         ffi_containers.len(),
                     );
@@ -97,7 +97,7 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
     name: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
                     containers.remove(&name)
                 {
                     let mdata_info = mdata_info.into_repr_c();
-                    o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
+                    o_cb(user_data.0, &FFI_RESULT_OK, &mdata_info);
                 } else {
                     call_result_cb!(Err::<(), _>(AppError::NoSuchContainer), user_data, o_cb);
                 })
