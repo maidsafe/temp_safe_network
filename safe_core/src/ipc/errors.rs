@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use base64::Base64Error;
+use base64::DecodeError;
 use ffi_utils::StringError;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -61,8 +61,8 @@ impl From<Utf8Error> for IpcError {
     }
 }
 
-impl From<Base64Error> for IpcError {
-    fn from(_err: Base64Error) -> Self {
+impl From<DecodeError> for IpcError {
+    fn from(_err: DecodeError) -> Self {
         IpcError::EncodeDecodeError
     }
 }
