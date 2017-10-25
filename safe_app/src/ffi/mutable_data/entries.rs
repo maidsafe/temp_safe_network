@@ -322,6 +322,8 @@ mod tests {
             }
         }
 
+        let mut ud = Default::default();
+
         // Key 0
         unsafe {
             mdata_entries_get(
@@ -329,7 +331,7 @@ mod tests {
                 handle0,
                 key0.as_ptr(),
                 key0.len(),
-                sender_as_user_data(&tx),
+                sender_as_user_data(&tx, &mut ud),
                 get_cb,
             );
         };
@@ -343,7 +345,7 @@ mod tests {
                 handle0,
                 key1.as_ptr(),
                 key1.len(),
-                sender_as_user_data(&tx),
+                sender_as_user_data(&tx, &mut ud),
                 get_cb,
             );
         };

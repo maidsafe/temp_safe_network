@@ -283,7 +283,7 @@ fn entries_crud_ffi() {
     // Retrieve added entry
     {
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
-        let ud = sender_as_user_data(&tx);
+        let mut ud = Default::default();
 
         unsafe {
             mdata_get_value(
@@ -291,7 +291,7 @@ fn entries_crud_ffi() {
                 &md_info_pub,
                 KEY.as_ptr(),
                 KEY.len(),
-                ud,
+                sender_as_user_data(&tx, &mut ud),
                 get_value_cb,
             )
         };
@@ -394,7 +394,7 @@ fn entries_crud_ffi() {
     // Retrieve added entry from private MD
     {
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
-        let ud = sender_as_user_data(&tx);
+        let mut ud = Default::default();
 
         unsafe {
             mdata_get_value(
@@ -402,7 +402,7 @@ fn entries_crud_ffi() {
                 &md_info_priv,
                 key_enc.as_ptr(),
                 key_enc.len(),
-                ud,
+                sender_as_user_data(&tx, &mut ud),
                 get_value_cb,
             )
         };
@@ -435,7 +435,7 @@ fn entries_crud_ffi() {
 
         // Try with a fake entry key, expect error.
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
-        let ud = sender_as_user_data(&tx);
+        let mut ud = Default::default();
 
         let fake_key = vec![0];
         unsafe {
@@ -444,7 +444,7 @@ fn entries_crud_ffi() {
                 entries_list_h,
                 fake_key.as_ptr(),
                 fake_key.len(),
-                ud,
+                sender_as_user_data(&tx, &mut ud),
                 get_value_cb,
             )
         };
@@ -457,7 +457,7 @@ fn entries_crud_ffi() {
 
         // Try with the real encrypted entry key.
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
-        let ud = sender_as_user_data(&tx);
+        let mut ud = Default::default();
 
         unsafe {
             mdata_entries_get(
@@ -465,7 +465,7 @@ fn entries_crud_ffi() {
                 entries_list_h,
                 key_enc.as_ptr(),
                 key_enc.len(),
-                ud,
+                sender_as_user_data(&tx, &mut ud),
                 get_value_cb,
             )
         };

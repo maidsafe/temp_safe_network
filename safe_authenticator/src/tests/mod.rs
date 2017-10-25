@@ -110,7 +110,7 @@ mod mock_routing {
                 locator.clone(),
                 password.clone(),
                 invitation,
-                |_| (),
+                || (),
                 routing_hook,
             );
 
@@ -123,7 +123,7 @@ mod mock_routing {
         }
 
         // Log in using the same credentials
-        let authenticator = unwrap!(Authenticator::login(locator, password, |_| ()));
+        let authenticator = unwrap!(Authenticator::login(locator, password, || ()));
 
         // Make sure that all default directories have been created after log in.
         let std_dir_names: Vec<_> = DEFAULT_PRIVATE_DIRS
@@ -265,7 +265,7 @@ mod mock_routing {
             locator.clone(),
             password.clone(),
             invitation,
-            |_| (),
+            || (),
             routing_hook,
         ));
 
@@ -313,7 +313,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login_with_hook(
             locator.clone(),
             password.clone(),
-            |_| (),
+            || (),
             routing_hook,
         ));
         match register_app(&auth, &auth_req) {
@@ -342,7 +342,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login_with_hook(
             locator.clone(),
             password.clone(),
-            |_| (),
+            || (),
             routing_hook,
         ));
         match register_app(&auth, &auth_req) {
@@ -373,7 +373,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login_with_hook(
             locator.clone(),
             password.clone(),
-            |_| (),
+            || (),
             routing_hook,
         ));
         match register_app(&auth, &auth_req) {
@@ -386,7 +386,7 @@ mod mock_routing {
         let auth = unwrap!(Authenticator::login(
             locator.clone(),
             password.clone(),
-            |_| (),
+            || (),
         ));
         let auth_granted = match register_app(&auth, &auth_req) {
             Ok(auth_granted) => auth_granted,
@@ -953,12 +953,13 @@ fn unregistered_decode_ipc_msg(msg: &str) -> ChannelType {
     let (tx, rx) = mpsc::channel::<ChannelType>();
 
     let ffi_msg = unwrap!(CString::new(msg));
+    let mut ud = Default::default();
 
     unsafe {
         use ffi::ipc::auth_unregistered_decode_ipc_msg;
         auth_unregistered_decode_ipc_msg(
             ffi_msg.as_ptr(),
-            sender_as_user_data(&tx),
+            sender_as_user_data(&tx, &mut ud),
             unregistered_cb,
             err_cb,
         );

@@ -204,13 +204,15 @@ fn share_some_mdatas_with_valid_metadata() {
 
     let (tx, rx) = mpsc::channel::<Result<(), (i32, String)>>();
     let req_c = unwrap!(req.into_repr_c());
+    let mut ud = Default::default();
+
     unsafe {
         encode_share_mdata_resp(
             &authenticator,
             &req_c,
             req_id,
             true,
-            sender_as_user_data::<Result<(), (i32, String)>>(&tx),
+            sender_as_user_data::<Result<(), (i32, String)>>(&tx, &mut ud),
             encode_share_mdata_cb,
         );
     }
@@ -292,13 +294,15 @@ fn share_some_mdatas_with_ownership_error() {
 
     let (tx, rx) = mpsc::channel::<Result<(), (i32, String)>>();
     let req_c = unwrap!(req.into_repr_c());
+    let mut ud = Default::default();
+
     unsafe {
         encode_share_mdata_resp(
             &authenticator,
             &req_c,
             req_id,
             false,
-            sender_as_user_data::<Result<(), (i32, String)>>(&tx),
+            sender_as_user_data::<Result<(), (i32, String)>>(&tx, &mut ud),
             encode_share_mdata_cb,
         );
     }
@@ -433,13 +437,15 @@ fn auth_apps_accessing_mdatas() {
 
         let (tx, rx) = mpsc::channel::<Result<(), (i32, String)>>();
         let req_c = unwrap!(req.into_repr_c());
+        let mut ud = Default::default();
+
         unsafe {
             encode_share_mdata_resp(
                 &authenticator,
                 &req_c,
                 req_id,
                 true,
-                sender_as_user_data::<Result<(), (i32, String)>>(&tx),
+                sender_as_user_data::<Result<(), (i32, String)>>(&tx, &mut ud),
                 encode_share_mdata_cb,
             );
         }

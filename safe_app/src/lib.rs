@@ -131,13 +131,13 @@ pub struct App {
 impl App {
     /// Create unregistered app.
     pub fn unregistered<N>(
-        network_observer: N,
+        disconnect_notifier: N,
         config: Option<BootstrapConfig>,
     ) -> Result<Self, AppError>
     where
-        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        N: FnMut() + Send + 'static,
     {
-        Self::new(network_observer, |el_h, core_tx, net_tx| {
+        Self::new(disconnect_notifier, |el_h, core_tx, net_tx| {
             let client = Client::unregistered(el_h, core_tx, net_tx, config)?;
             let context = AppContext::unregistered();
             Ok((client, context))
@@ -148,21 +148,21 @@ impl App {
     pub fn registered<N>(
         app_id: String,
         auth_granted: AuthGranted,
-        network_observer: N,
+        disconnect_notifier: N,
     ) -> Result<Self, AppError>
     where
-        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        N: FnMut() + Send + 'static,
     {
-        Self::registered_impl(app_id, auth_granted, network_observer)
+        Self::registered_impl(app_id, auth_granted, disconnect_notifier)
     }
 
     fn registered_impl<N>(
         app_id: String,
         auth_granted: AuthGranted,
-        network_observer: N,
+        disconnect_notifier: N,
     ) -> Result<Self, AppError>
     where
-        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        N: FnMut() + Send + 'static,
     {
         let AuthGranted {
             app_keys: AppKeys {
@@ -186,7 +186,7 @@ impl App {
             enc_key: enc_key.clone(),
         };
 
-        Self::new(network_observer, move |el_h, core_tx, net_tx| {
+        Self::new(disconnect_notifier, move |el_h, core_tx, net_tx| {
             let client = Client::from_keys(
                 client_keys,
                 owner_key,
@@ -206,11 +206,11 @@ impl App {
     pub fn registered_with_hook<N, F>(
         app_id: String,
         auth_granted: AuthGranted,
-        network_observer: N,
+        disconnect_notifier: N,
         routing_wrapper_fn: F,
     ) -> Result<Self, AppError>
     where
-        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        N: FnMut() + Send + 'static,
         F: Fn(Routing) -> Routing + Send + 'static,
     {
         let AuthGranted {
@@ -235,7 +235,7 @@ impl App {
             enc_key: enc_key.clone(),
         };
 
-        Self::new(network_observer, move |el_h, core_tx, net_tx| {
+        Self::new(disconnect_notifier, move |el_h, core_tx, net_tx| {
             let client = Client::from_keys_with_hook(
                 client_keys,
                 owner_key,
@@ -250,9 +250,9 @@ impl App {
         })
     }
 
-    fn new<N, F>(mut network_observer: N, setup: F) -> Result<Self, AppError>
+    fn new<N, F>(mut disconnect_notifier: N, setup: F) -> Result<Self, AppError>
     where
-        N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+        N: FnMut() + Send + 'static,
         F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
                -> Result<(Client<AppContext>, AppContext), AppError>
             + Send
@@ -269,7 +269,9 @@ impl App {
 
             el_h.spawn(
                 net_rx
-                    .map(move |event| network_observer(Ok(event)))
+                    .map(move |event| if let NetworkEvent::Disconnected = event {
+                        disconnect_notifier()
+                    })
                     .for_each(|_| Ok(())),
             );
 
