@@ -18,7 +18,6 @@
 use CoreError;
 use config_file_handler;
 use std::ffi::OsString;
-
 #[cfg(test)]
 use std::path::PathBuf;
 

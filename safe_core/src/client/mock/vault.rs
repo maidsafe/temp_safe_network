@@ -46,7 +46,7 @@ pub struct Vault {
 // Initializes mock-vault path with the following precedence:
 // 1. `SAFE_MOCK_VAULT_PATH` env var
 // 2. DevConfig `mock_vault_path` option
-// 3. None
+// 3. default temp dir
 fn init_vault_path(devconfig: Option<&DevConfig>) -> PathBuf {
     match env::var(SAFE_MOCK_VAULT_PATH) {
         Ok(path) => PathBuf::from(path),

@@ -29,9 +29,10 @@ use futures::{Future, future};
 use rand::{Rng, SeedableRng, XorShiftRng};
 use revocation;
 use safe_core::{Client, FutureExt, MDataInfo};
-use safe_core::{config_handler, mock_vault_path};
+use safe_core::config_handler;
 use safe_core::ipc::{AccessContainerEntry, AppExchangeInfo, AuthReq, Permission};
 use safe_core::ipc::req::ContainerPermissions;
+use safe_core::mock_vault_path;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -43,7 +44,9 @@ fn write_data() {
     let (stash, vault_path) = setup();
 
     // Clear the vault store.
-    unwrap!(fs::remove_file(vault_path));
+    if vault_path.exists() {
+        unwrap!(fs::remove_file(vault_path));
+    }
 
     let auth =
         unwrap!(Authenticator::create_acc(
@@ -184,18 +187,7 @@ struct Stash {
 }
 
 fn setup() -> (Stash, PathBuf) {
-    // File store is required.
     let config = config_handler::get_config();
-    let has_file_store = config
-        .dev
-        .as_ref()
-        .map(|dev| dev.mock_in_memory_storage == false)
-        .unwrap_or(true);
-
-    assert!(
-        has_file_store,
-        "This test requires file-backed vault store."
-    );
 
     // IMPORTANT: Use constant seed for repeatability.
     let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
