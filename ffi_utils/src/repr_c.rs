@@ -75,7 +75,15 @@ impl<T> ReprC for *mut T {
     }
 }
 
-/// `XorName`
+impl ReprC for [u8; 24] {
+    type C = *const [u8; 24];
+    type Error = ();
+
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+        Ok(*c_repr)
+    }
+}
+
 impl ReprC for [u8; 32] {
     type C = *const [u8; 32];
     type Error = ();
@@ -85,9 +93,8 @@ impl ReprC for [u8; 32] {
     }
 }
 
-/// Nonce
-impl ReprC for [u8; 24] {
-    type C = *const [u8; 24];
+impl ReprC for [u8; 64] {
+    type C = *const [u8; 64];
     type Error = ();
 
     unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {

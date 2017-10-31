@@ -22,7 +22,7 @@ use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::mutable_data::helper;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb};
-use object_cache::{MDataPermissionsHandle, NULL_OBJECT_HANDLE, SignKeyHandle};
+use object_cache::{MDataPermissionsHandle, NULL_OBJECT_HANDLE, SignPubKeyHandle};
 use permissions;
 use routing::{Action, User};
 use safe_core::ffi::ipc::req::PermissionSet as FfiPermissionSet;
@@ -61,7 +61,7 @@ impl Into<Action> for MDataAction {
 #[repr(C)]
 pub struct UserPermissionSet {
     /// User's sign key handle.
-    pub user_h: SignKeyHandle,
+    pub user_h: SignPubKeyHandle,
     /// User's permission set.
     pub perm_set: FfiPermissionSet,
 }
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn mdata_permissions_len(
 pub unsafe extern "C" fn mdata_permissions_get(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn mdata_permissions_get(
             );
 
             let permission_set = *try_cb!(
-                permissions.get(&user).ok_or(AppError::InvalidSignKeyHandle),
+                permissions.get(&user).ok_or(AppError::InvalidSignPubKeyHandle),
                 user_data,
                 o_cb
             );
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                 .iter()
                 .map(|(user_key, permission_set)| {
                     let user_h = match *user_key {
-                        User::Key(key) => context.object_cache().insert_sign_key(key),
+                        User::Key(key) => context.object_cache().insert_pub_sign_key(key),
                         User::Anyone => USER_ANYONE,
                     };
                     permissions::UserPermissionSet {
@@ -205,7 +205,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
 pub unsafe extern "C" fn mdata_permissions_insert(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     permission_set: *const FfiPermissionSet,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),

@@ -30,7 +30,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwin
                 vec_clone_from_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataPermissionsHandle,
-                   NULL_OBJECT_HANDLE, SignKeyHandle};
+                   NULL_OBJECT_HANDLE, SignPubKeyHandle};
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt, MDataInfo};
 use safe_core::ffi::MDataInfo as FfiMDataInfo;
@@ -412,7 +412,7 @@ pub unsafe extern "C" fn mdata_list_permissions(
 pub unsafe extern "C" fn mdata_list_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
@@ -454,7 +454,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
 pub unsafe extern "C" fn mdata_set_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     permission_set: *const FfiPermissionSet,
     version: u64,
     user_data: *mut c_void,
@@ -495,7 +495,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
 pub unsafe extern "C" fn mdata_del_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),

@@ -100,12 +100,13 @@ mod codes {
     pub const ERR_INVALID_MDATA_PERMISSIONS_HANDLE: i32 = -1008;
     pub const ERR_INVALID_MDATA_PERMISSION_SET_HANDLE: i32 = -1009;
     pub const ERR_INVALID_SELF_ENCRYPTOR_HANDLE: i32 = -1010;
-    pub const ERR_INVALID_SIGN_KEY_HANDLE: i32 = -1011;
-    pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
-    pub const ERR_IO_ERROR: i32 = -1013;
-    pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
-    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
-    pub const ERR_INVALID_FILE_MODE: i32 = -1016;
+    pub const ERR_INVALID_SIGN_PUB_KEY_HANDLE: i32 = -1011;
+    pub const ERR_INVALID_SIGN_SEC_KEY_HANDLE: i32 = -1012;
+    pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1013;
+    pub const ERR_IO_ERROR: i32 = -1014;
+    pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1015;
+    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1016;
+    pub const ERR_INVALID_FILE_MODE: i32 = -1017;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -133,6 +134,8 @@ pub enum AppError {
     InvalidCipherOptHandle,
     /// Invalid encrypt (box_) key handle
     InvalidEncryptPubKeyHandle,
+    /// Invalid secret key handle
+    InvalidEncryptSecKeyHandle,
     /// Invalid MutableData entries handle
     InvalidMDataEntriesHandle,
     /// Invalid MutableData entry actions handle
@@ -141,10 +144,10 @@ pub enum AppError {
     InvalidMDataPermissionsHandle,
     /// Invalid Self Encryptor handle
     InvalidSelfEncryptorHandle,
-    /// Invalid sign key handle
-    InvalidSignKeyHandle,
-    /// Invalid secret key handle
-    InvalidEncryptSecKeyHandle,
+    /// Invalid public sign key handle
+    InvalidSignPubKeyHandle,
+    /// Invalid secret sign key handle
+    InvalidSignSecKeyHandle,
     /// Invalid file writer handle
     InvalidFileContextHandle,
 
@@ -191,7 +194,12 @@ impl Display for AppError {
             AppError::InvalidSelfEncryptorHandle => {
                 write!(formatter, "Invalid Self Encryptor handle")
             }
-            AppError::InvalidSignKeyHandle => write!(formatter, "Invalid sign key handle"),
+            AppError::InvalidSignPubKeyHandle => {
+                write!(formatter, "Invalid sign public key handle")
+            }
+            AppError::InvalidSignSecKeyHandle => {
+                write!(formatter, "Invalid sign secret key handle")
+            }
             AppError::InvalidEncryptSecKeyHandle => write!(formatter, "Invalid secret key handle"),
             AppError::InvalidFileContextHandle => write!(formatter, "Invalid file context handle"),
             AppError::SelfEncryption(ref error) => {
@@ -351,7 +359,8 @@ impl ErrorCode for AppError {
             AppError::InvalidMDataEntryActionsHandle => ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE,
             AppError::InvalidMDataPermissionsHandle => ERR_INVALID_MDATA_PERMISSIONS_HANDLE,
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
-            AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
+            AppError::InvalidSignPubKeyHandle => ERR_INVALID_SIGN_PUB_KEY_HANDLE,
+            AppError::InvalidSignSecKeyHandle => ERR_INVALID_SIGN_SEC_KEY_HANDLE,
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
             AppError::InvalidFileContextHandle => ERR_INVALID_FILE_CONTEXT_HANDLE,
             AppError::InvalidFileMode => ERR_INVALID_FILE_MODE,
