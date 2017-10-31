@@ -11,7 +11,7 @@ version = "0.27.0"
 build = "build.rs"
 
 [dependencies]
-base64 = "~0.4.1"
+base64 = "~0.7.0"
 chrono = { version = "~0.4.0", features = ["serde"] }
 config_file_handler = "~0.8.1"
 ffi_utils = { path = "../ffi_utils", version = "~0.3.0" }
