@@ -47,6 +47,7 @@ mod mock_routing {
     use super::utils::create_containers_req;
     use Authenticator;
     use access_container as access_container_tools;
+    use app_container;
     use errors::AuthError;
     use futures::Future;
     use routing::{ClientError, Request, Response, User};
@@ -398,7 +399,7 @@ mod mock_routing {
         let mut ac_entries = access_container(&auth, app_id.clone(), auth_granted.clone());
         let (_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
         let (_documents_md, _) = unwrap!(ac_entries.remove("_documents"));
-        let (app_container_md, _) = unwrap!(ac_entries.remove(&format!("apps/{}", app_id.clone())));
+        let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container::name(&app_id)));
 
         let app_pk = auth_granted.app_keys.sign_pk;
 
@@ -559,7 +560,7 @@ fn app_authentication() {
 
     let mut expected = create_containers_req();
     let _ = expected.insert(
-        format!("apps/{}", app_id),
+        app_container::name(&app_id),
         btree_set![
             Permission::Read,
             Permission::Insert,
@@ -583,7 +584,7 @@ fn app_authentication() {
         expected,
     );
 
-    let (app_dir_info, _) = unwrap!(access_container.remove(&format!("apps/{}", app_id)));
+    let (app_dir_info, _) = unwrap!(access_container.remove(&app_container::name(&app_id)));
 
     // Check the app info is present in the config file.
     let apps = run(&authenticator, |client| {
