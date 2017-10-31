@@ -26,6 +26,7 @@ use safe_authenticator::test_utils as authenticator;
 use safe_authenticator::test_utils::revoke;
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
+use safe_core::ffi::AccountInfo;
 use safe_core::ipc::Permission;
 use safe_core::ipc::req::AppExchangeInfo;
 use safe_core::ipc::req::AuthReq;
@@ -201,10 +202,16 @@ fn num_containers(app: &App) -> usize {
 // 2. If an app is authorised for the first time with `app_container` set to `false`,
 // then any subsequent authorisation with `app_container` set to `true` should trigger
 // the creation of the app's own container.
-// 3. Make sure that the app's own container is also created when it's re-authorised
+// 3. If an app is authorised with `app_container` set to `true`, then subsequent
+// authorisation should not use up any mutations.
+// 4. Make sure that the app's own container is also created when it's re-authorised
 // with `app_container` set to `true` after it's been revoked.
 #[test]
+#[allow(unsafe_code)]
 fn app_container_creation() {
+    use ffi::app_account_info;
+    use ffi_utils::test_utils::call_1;
+
     // Authorise an app for the first time with `app_container` set to `true`.
     let auth = authenticator::create_account_and_login();
 
@@ -219,14 +226,27 @@ fn app_container_creation() {
 
     let app_info = gen_app_exchange_info();
     let app_id = app_info.id.clone();
-    let app = authorise_app(&auth, &app_info, &app_id, false);
+    let mut app = authorise_app(&auth, &app_info, &app_id, false);
 
     assert_eq!(num_containers(&app), 0); // should be empty
 
     // Re-authorise the app with `app_container` set to `true`.
-    let app = authorise_app(&auth, &app_info, &app_id, true);
+    app = authorise_app(&auth, &app_info, &app_id, true);
 
     assert_eq!(num_containers(&app), 1); // should only contain app container
+
+    // Make sure no mutations are done when re-authorising the app now.
+    let acct_info1: AccountInfo =
+        unsafe { unwrap!(call_1(|ud, cb| app_account_info(&mut app, ud, cb))) };
+
+    app = authorise_app(&auth, &app_info, &app_id, true);
+
+    let acct_info2: AccountInfo =
+        unsafe { unwrap!(call_1(|ud, cb| app_account_info(&mut app, ud, cb))) };
+    assert_eq!(
+        acct_info1.mutations_available,
+        acct_info2.mutations_available
+    );
 
     // Authorise a new app with `app_container` set to `false`.
     let auth = authenticator::create_account_and_login();

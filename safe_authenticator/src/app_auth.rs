@@ -72,6 +72,24 @@ pub fn app_state(client: &Client<()>, apps: &Apps, app_id: &str) -> Box<AuthFutu
     }
 }
 
+/// Check whether `permissions` has an app container entry for `app_id` and that all permissions are
+/// set.
+fn app_container_exists(permissions: &AccessContainerEntry, app_id: &str) -> bool {
+    match permissions.get(&app_container::name(app_id)) {
+        Some(&(_, ref access)) => {
+            *access ==
+                btree_set![
+                    Permission::Read,
+                    Permission::Insert,
+                    Permission::Update,
+                    Permission::Delete,
+                    Permission::ManagePermissions,
+                ]
+        }
+        None => false,
+    }
+}
+
 /// Insert info about the app's dedicated container into the access container entry
 fn insert_app_container(
     mut permissions: AccessContainerEntry,
@@ -86,7 +104,7 @@ fn insert_app_container(
                     Permission::Delete,
                     Permission::ManagePermissions,
                 ];
-    let _ = permissions.insert(format!("apps/{}", app_id), (app_container_info, access));
+    let _ = permissions.insert(app_container::name(app_id), (app_container_info, access));
     permissions
 }
 
@@ -212,7 +230,7 @@ fn authenticated_app(
             let perms = perms.unwrap_or_else(AccessContainerEntry::default);
 
             // Check whether we need to create/update dedicated container
-            if app_container {
+            if app_container && !app_container_exists(&perms, &app_id) {
                 let future = app_container::fetch_or_create(&c2, &app_id, sign_pk)
                     .and_then(move |mdata_info| {
                         let perms = insert_app_container(perms, &app_id, mdata_info);
