@@ -30,24 +30,6 @@ use std::time::Duration;
 use tiny_keccak::sha3_256;
 use utils;
 
-// A global vault used by default in tests; see `setup()`.
-lazy_static! {
-    static ref TEST_VAULT: Arc<Mutex<Vault>> =
-        Arc::new(Mutex::new(Vault::new(Config {
-            dev: Some(
-                DevConfig {
-                    mock_unlimited_mutations: false,
-                    mock_in_memory_storage: true,
-                }
-            )
-        })));
-}
-
-/// Creates a thread-safe reference-counted pointer to the global test vault.
-pub fn clone_test_vault() -> Arc<Mutex<Vault>> {
-    TEST_VAULT.clone()
-}
-
 // Helper macro to receive a routing event and assert it's a response
 // success.
 macro_rules! expect_success {
@@ -1125,6 +1107,7 @@ fn low_balance_check() {
             dev: Some(DevConfig {
                 mock_unlimited_mutations: custom_vault,
                 mock_in_memory_storage: true,
+                mock_vault_path: None,
             }),
         });
         let owner_key = *full_id.public_id().signing_public_key();
@@ -1198,6 +1181,86 @@ fn low_balance_check() {
         let mdata = expect_success!(routing_rx, msg_id, Response::GetMData);
         assert!(mdata.serialised_size() > 0);
     }
+}
+
+// Test that using an invalid mock-vault path does not work.
+#[test]
+#[should_panic]
+fn invalid_config_mock_vault_path() {
+    use SAFE_MOCK_IN_MEMORY_STORAGE;
+    use std;
+
+    // Don't run this test when the env var is set.
+    if std::env::var(SAFE_MOCK_IN_MEMORY_STORAGE).is_ok() {
+        panic!("This test should run without env vars set.");
+    }
+
+    // Make sure that using a non-existant mock-vault path fails.
+    let (mut routing, routing_rx, full_id) = setup_with_config(Config {
+        dev: Some(DevConfig {
+            mock_unlimited_mutations: false,
+            mock_in_memory_storage: false,
+            mock_vault_path: Some(String::from("./this_path_should_not_exist")),
+        }),
+    });
+    let owner_key = *full_id.public_id().signing_public_key();
+
+    // This does a `put_mdata`. This should fail.
+    let _ = create_account(&mut routing, &routing_rx, owner_key);
+}
+
+// Test setting a custom mock-vault path. Make sure basic operations work as expected.
+#[test]
+fn config_mock_vault_path() {
+    use SAFE_MOCK_IN_MEMORY_STORAGE;
+    use std;
+
+    // Don't run this test when the env var is set.
+    if std::env::var(SAFE_MOCK_IN_MEMORY_STORAGE).is_ok() {
+        return;
+    }
+
+    // Create temporary directory.
+    match std::fs::create_dir("./tmp") {
+        Ok(_) => (),
+        Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+        _ => panic!("Error creating directory"),
+    }
+
+    let (mut routing, routing_rx, full_id) = setup_with_config(Config {
+        dev: Some(DevConfig {
+            mock_unlimited_mutations: false,
+            mock_in_memory_storage: false,
+            mock_vault_path: Some(String::from("./tmp")),
+        }),
+    });
+    let owner_key = *full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+
+    // Put MutableData. Should succeed.
+    let name = rand::random();
+    let tag = 1000u64;
+
+    let data = unwrap!(MutableData::new(
+        name,
+        tag,
+        Default::default(),
+        Default::default(),
+        btree_set!(owner_key),
+    ));
+    let nae_mgr = Authority::NaeManager(*data.name());
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
+
+    // Try getting MutableData back.
+    let msg_id = MessageId::new();
+    unwrap!(routing.get_mdata(nae_mgr, name, tag, msg_id));
+    let mdata = expect_success!(routing_rx, msg_id, Response::GetMData);
+    assert!(mdata.serialised_size() > 0);
+
+    unwrap!(std::fs::remove_dir_all("./tmp"));
 }
 
 // Test routing request hooks.
@@ -1293,11 +1356,9 @@ fn request_hooks() {
     expect_success!(routing_rx, msg_id, Response::MutateMDataEntries);
 }
 
-// Setup routing with a shared, global testing vault.
+// Setup routing with a shared, global vault.
 fn setup() -> (Routing, Receiver<Event>, FullId) {
-    let (mut routing, routing_rx, full_id) = setup_impl();
-
-    routing.set_vault(clone_test_vault());
+    let (routing, routing_rx, full_id) = setup_impl();
 
     (routing, routing_rx, full_id)
 }
