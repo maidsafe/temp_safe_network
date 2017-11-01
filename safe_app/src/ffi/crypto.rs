@@ -18,7 +18,8 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
+                vec_clone_from_raw_parts};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, NULL_OBJECT_HANDLE, SignPubKeyHandle,
                    SignSecKeyHandle};
@@ -60,7 +61,7 @@ pub unsafe extern "C" fn sign_generate_key_pair(
     app: *const App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         pk_h: SignPubKeyHandle,
                         sk_h: SignSecKeyHandle),
 ) {
@@ -72,7 +73,7 @@ pub unsafe extern "C" fn sign_generate_key_pair(
             let pk_h = context.object_cache().insert_pub_sign_key(ourpk);
             let sk_h = context.object_cache().insert_sec_sign_key(oursk);
 
-            o_cb(user_data.0, FFI_RESULT_OK, pk_h, sk_h);
+            o_cb(user_data.0, &FFI_RESULT_OK, pk_h, sk_h);
 
             None
         })
@@ -127,7 +128,7 @@ pub unsafe extern "C" fn sign_pub_key_free(
     app: *const App,
     handle: SignPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -146,7 +147,7 @@ pub unsafe extern "C" fn sign_sec_key_new(
     data: *const SignSecretKey,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         handle: SignSecKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -166,7 +167,7 @@ pub unsafe extern "C" fn sign_sec_key_get(
     handle: SignSecKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         pub_sign_key: *const SignSecretKey),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -369,7 +370,7 @@ pub unsafe extern "C" fn sign(
     sign_sk_h: SignSecKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         signed_data_ptr: *const u8,
                         signed_data_len: usize),
 ) {
@@ -394,13 +395,12 @@ pub unsafe extern "C" fn sign(
             };
 
             let signed_text = sign::sign(&plaintext, &sign_sk);
-
-            match serialise(&signed_text) {
-                Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
-                res @ Err(..) => {
-                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
-                }
-            }
+            o_cb(
+                user_data.0,
+                &FFI_RESULT_OK,
+                signed_text.as_safe_ptr(),
+                signed_text.len(),
+            );
 
             None
         })
@@ -419,7 +419,7 @@ pub unsafe extern "C" fn verify(
     sign_pk_h: SignPubKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         verified_data_ptr: *const u8,
                         verified_data_len: usize),
 ) {
@@ -434,22 +434,15 @@ pub unsafe extern "C" fn verify(
                 o_cb
             );
 
-            match deserialise::<Vec<u8>>(&signed) {
-                Ok(signed_data) => {
-                    let verified =
-                        try_cb!(sign::verify(&signed_data, &sign_pk)
-                                .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
-                    o_cb(
-                        user_data.0,
-                        FFI_RESULT_OK,
-                        verified.as_ptr(),
-                        verified.len(),
-                    );
-                }
-                res @ Err(..) => {
-                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
-                }
-            }
+            let verified =
+                try_cb!(sign::verify(&signed, &sign_pk)
+                        .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
+            o_cb(
+                user_data.0,
+                &FFI_RESULT_OK,
+                verified.as_safe_ptr(),
+                verified.len(),
+            );
 
             None
         })
