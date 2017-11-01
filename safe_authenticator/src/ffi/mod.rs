@@ -46,7 +46,7 @@ pub unsafe extern "C" fn create_acc(
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         authenticator: *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -65,7 +65,7 @@ pub unsafe extern "C" fn create_acc(
 
         o_cb(
             user_data.0,
-            FFI_RESULT_OK,
+            &FFI_RESULT_OK,
             Box::into_raw(Box::new(authenticator)),
         );
 
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn login(
     user_data: *mut c_void,
     o_disconnect_notifier_cb: unsafe extern "C" fn(user_data: *mut c_void),
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         authenticaor: *mut Authenticator),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn login(
 
         o_cb(
             user_data.0,
-            FFI_RESULT_OK,
+            &FFI_RESULT_OK,
             Box::into_raw(Box::new(authenticator)),
         );
 
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn login(
 pub unsafe extern "C" fn auth_reconnect(
     auth: *mut Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         let user_data = OpaqueCtx(user_data);
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn auth_reconnect(
                 user_data.0,
                 o_cb
             );
-            o_cb(user_data.0, FFI_RESULT_OK);
+            o_cb(user_data.0, &FFI_RESULT_OK);
             None
         })
     })
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn auth_account_info(
     auth: *mut Authenticator,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         account_info: *const FfiAccountInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn auth_account_info(
                         mutations_done: acc_info.mutations_done,
                         mutations_available: acc_info.mutations_available,
                     };
-                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
+                    o_cb(user_data.0, &FFI_RESULT_OK, &ffi_acc);
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(AuthError::from(e)), user_data, o_cb);
@@ -171,14 +171,14 @@ pub unsafe extern "C" fn auth_account_info(
 pub unsafe extern "C" fn auth_exe_file_stem(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         filename: *const c_char),
 ) {
 
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
             let path_c_str = CString::new(path)?;
-            o_cb(user_data, FFI_RESULT_OK, path_c_str.as_ptr());
+            o_cb(user_data, &FFI_RESULT_OK, path_c_str.as_ptr());
         } else {
             call_result_cb!(
                 Err::<(), _>(AuthError::from(
@@ -197,12 +197,12 @@ pub unsafe extern "C" fn auth_exe_file_stem(
 pub unsafe extern "C" fn auth_set_additional_search_path(
     new_path: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         let new_path = CStr::from_ptr(new_path).to_str()?;
         config_file_handler::set_additional_search_path(OsStr::new(new_path));
-        o_cb(user_data, FFI_RESULT_OK);
+        o_cb(user_data, &FFI_RESULT_OK);
         Ok(())
     });
 }

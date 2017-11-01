@@ -67,7 +67,9 @@ pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_len: usize,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -82,7 +84,7 @@ pub unsafe extern "C" fn app_unregistered(
 
         let app = App::unregistered(move || o_disconnect_notifier_cb(user_data.0), config)?;
 
-        o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
+        o_cb(user_data.0, &FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
         Ok(())
     })
@@ -99,7 +101,9 @@ pub unsafe extern "C" fn app_registered(
     auth_granted: *const FfiAuthGranted,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult, app: *mut App),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -110,7 +114,7 @@ pub unsafe extern "C" fn app_registered(
             o_disconnect_notifier_cb(user_data.0)
         })?;
 
-        o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
+        o_cb(user_data.0, &FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
         Ok(())
     })
@@ -123,7 +127,7 @@ pub unsafe extern "C" fn app_registered(
 pub unsafe extern "C" fn app_reconnect(
     app: *mut App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -133,7 +137,7 @@ pub unsafe extern "C" fn app_reconnect(
                 user_data.0,
                 o_cb
             );
-            o_cb(user_data.0, FFI_RESULT_OK);
+            o_cb(user_data.0, &FFI_RESULT_OK);
             None
         })
     })
@@ -147,7 +151,7 @@ pub unsafe extern "C" fn app_account_info(
     app: *mut App,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         account_info: *const FfiAccountInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -160,7 +164,7 @@ pub unsafe extern "C" fn app_account_info(
                         mutations_done: acc_info.mutations_done,
                         mutations_available: acc_info.mutations_available,
                     };
-                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
+                    o_cb(user_data.0, &FFI_RESULT_OK, &ffi_acc);
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
@@ -176,14 +180,14 @@ pub unsafe extern "C" fn app_account_info(
 pub unsafe extern "C" fn app_exe_file_stem(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         filename: *const c_char),
 ) {
 
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
             let path_c_str = CString::new(path)?;
-            o_cb(user_data, FFI_RESULT_OK, path_c_str.as_ptr());
+            o_cb(user_data, &FFI_RESULT_OK, path_c_str.as_ptr());
         } else {
             call_result_cb!(
                 Err::<(), _>(AppError::from(
@@ -202,12 +206,12 @@ pub unsafe extern "C" fn app_exe_file_stem(
 pub unsafe extern "C" fn app_set_additional_search_path(
     new_path: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let new_path = CStr::from_ptr(new_path).to_str()?;
         config_file_handler::set_additional_search_path(OsStr::new(new_path));
-        o_cb(user_data, FFI_RESULT_OK);
+        o_cb(user_data, &FFI_RESULT_OK);
         Ok(())
     });
 }
@@ -227,13 +231,13 @@ pub unsafe extern "C" fn app_free(app: *mut App) {
 pub unsafe extern "C" fn app_reset_object_cache(
     app: *mut App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
             context.object_cache().reset();
-            o_cb(user_data.0, FFI_RESULT_OK);
+            o_cb(user_data.0, &FFI_RESULT_OK);
             None
         })
     })

@@ -32,14 +32,14 @@ pub unsafe extern "C" fn mdata_encode_metadata(
     metadata: *const MetadataResponse,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         encoded_ptr: *const u8,
                         encoded_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let metadata = UserMetadata::clone_from_repr_c(metadata)?;
         let encoded = serialise(&metadata)?;
-        o_cb(user_data, FFI_RESULT_OK, encoded.as_ptr(), encoded.len());
+        o_cb(user_data, &FFI_RESULT_OK, encoded.as_ptr(), encoded.len());
         Ok(())
     })
 }

@@ -40,15 +40,15 @@ pub struct PermissionSet {
 }
 
 impl ReprC for PermissionSet {
-    type C = PermissionSet;
+    type C = *const PermissionSet;
     type Error = ();
 
     /// Constructs the object from a raw pointer.
     ///
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
-    unsafe fn clone_from_repr_c(raw: PermissionSet) -> Result<Self, Self::Error> {
-        Ok(raw)
+    unsafe fn clone_from_repr_c(raw: Self::C) -> Result<Self, Self::Error> {
+        Ok(*raw)
     }
 }
 

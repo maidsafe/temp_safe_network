@@ -493,13 +493,14 @@ fn auth_apps_accessing_mdatas() {
 
 extern "C" fn encode_share_mdata_cb(
     user_data: *mut c_void,
-    result: FfiResult,
+    result: *const FfiResult,
     _msg: *const c_char,
 ) {
-    let ret = if result.error_code == 0 {
+    let error_code = unsafe { (*result).error_code };
+    let ret = if error_code == 0 {
         Ok(())
     } else {
-        let c_str = unsafe { CStr::from_ptr(result.description) };
+        let c_str = unsafe { CStr::from_ptr((*result).description) };
         let msg = match c_str.to_str() {
             Ok(s) => s.to_owned(),
             Err(e) => {
@@ -510,7 +511,7 @@ extern "C" fn encode_share_mdata_cb(
                 )
             }
         };
-        Err((result.error_code, msg))
+        Err((error_code, msg))
     };
     unsafe {
         send_via_user_data::<Result<(), (i32, String)>>(user_data, ret);

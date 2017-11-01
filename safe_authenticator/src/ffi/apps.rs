@@ -73,7 +73,7 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
     auth: *const Authenticator,
     app_id: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
 
     let user_data = OpaqueCtx(user_data);
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
     auth: *const Authenticator,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         app_exchange_info_ptr: *const FfiAppExchangeInfo,
                         app_exchange_info_len: usize),
 ) {
@@ -164,7 +164,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
                         }
                     }
 
-                    o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+                    o_cb(user_data.0, &FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
                     Ok(())
                 })
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn auth_registered_apps(
     auth: *const Authenticator,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         registered_app_ptr: *const RegisteredApp,
                         registered_app_len: usize),
 ) {
@@ -246,7 +246,7 @@ pub unsafe extern "C" fn auth_registered_apps(
                         }
                     }
 
-                    o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+                    o_cb(user_data.0, &FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
                     Ok(())
                 })
@@ -272,7 +272,7 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
     md_type_tag: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         app_access_ptr: *const FfiAppAccess,
                         app_access_len: usize),
 ) {
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
 
                     o_cb(
                         user_data.0,
-                        FFI_RESULT_OK,
+                        &FFI_RESULT_OK,
                         app_access_vec.as_safe_ptr(),
                         app_access_vec.len(),
                     );

@@ -33,7 +33,7 @@ use std::os::raw::{c_char, c_void};
 pub unsafe extern "C" fn auth_init_logging(
     output_file_name_override: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AuthError> {
         if output_file_name_override.is_null() {
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn auth_init_logging(
             let output_file_name_override = from_c_str(output_file_name_override)?;
             log::init_with_output_file(false, output_file_name_override)?;
         }
-        o_cb(user_data, FFI_RESULT_OK);
+        o_cb(user_data, &FFI_RESULT_OK);
         Ok(())
     });
 }
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn auth_output_log_path(
     output_file_name: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         log_path: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AuthError> {
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn auth_output_log_path(
                 })?
                 .into_bytes(),
         )?;
-        o_cb(user_data, FFI_RESULT_OK, op_file_path.as_ptr());
+        o_cb(user_data, &FFI_RESULT_OK, op_file_path.as_ptr());
         Ok(())
     })
 }

@@ -39,7 +39,7 @@ pub unsafe extern "C" fn mdata_info_new_private(
     nonce: *const SymNonce,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -50,7 +50,7 @@ pub unsafe extern "C" fn mdata_info_new_private(
         let info = MDataInfo::new_private(name, type_tag, (sk, nonce));
         let info = info.into_repr_c();
 
-        o_cb(user_data, FFI_RESULT_OK, &info);
+        o_cb(user_data, &FFI_RESULT_OK, &info);
         Ok(())
     })
 }
@@ -63,14 +63,14 @@ pub unsafe extern "C" fn mdata_info_random_public(
     type_tag: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::random_public(type_tag)?;
         let info = info.into_repr_c();
 
-        o_cb(user_data, FFI_RESULT_OK, &info);
+        o_cb(user_data, &FFI_RESULT_OK, &info);
         Ok(())
     })
 }
@@ -83,14 +83,14 @@ pub unsafe extern "C" fn mdata_info_random_private(
     type_tag: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let info = MDataInfo::random_private(type_tag)?;
         let info = info.into_repr_c();
 
-        o_cb(user_data, FFI_RESULT_OK, &info);
+        o_cb(user_data, &FFI_RESULT_OK, &info);
         Ok(())
     })
 }
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
     input_len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         enc_entry_key_ptr: *const u8,
                         enc_entry_key_len: usize),
 ) {
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
 
         o_cb(
             user_data,
-            FFI_RESULT_OK,
+            &FFI_RESULT_OK,
             encoded.as_safe_ptr(),
             encoded.len(),
         );
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
     input_len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         enc_entry_value_ptr: *const u8,
                         enc_entry_value_len: usize),
 ) {
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
 
         o_cb(
             user_data,
-            FFI_RESULT_OK,
+            &FFI_RESULT_OK,
             encoded.as_safe_ptr(),
             encoded.len(),
         );
@@ -163,7 +163,7 @@ pub unsafe extern "C" fn mdata_info_decrypt(
     input_len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         mdata_info_decrypt_ptr: *const u8,
                         mdata_info_decrypt_len: usize),
 ) {
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn mdata_info_decrypt(
 
         o_cb(
             user_data,
-            FFI_RESULT_OK,
+            &FFI_RESULT_OK,
             decoded.as_safe_ptr(),
             decoded.len(),
         );
@@ -190,7 +190,7 @@ pub unsafe extern "C" fn mdata_info_serialise(
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         encoded_ptr: *const u8,
                         encoded_len: usize),
 ) {
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn mdata_info_serialise(
 
         o_cb(
             user_data,
-            FFI_RESULT_OK,
+            &FFI_RESULT_OK,
             encoded.as_safe_ptr(),
             encoded.len(),
         );
@@ -217,7 +217,7 @@ pub unsafe extern "C" fn mdata_info_deserialise(
     len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: FfiResult,
+                        result: *const FfiResult,
                         mdata_info: *const FfiMDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn mdata_info_deserialise(
         let info: MDataInfo = deserialise(encoded)?;
         let info = info.into_repr_c();
 
-        o_cb(user_data, FFI_RESULT_OK, &info);
+        o_cb(user_data, &FFI_RESULT_OK, &info);
         Ok(())
     })
 }
