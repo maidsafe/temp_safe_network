@@ -65,7 +65,7 @@ pub unsafe extern "C" fn create_acc(
 
         o_cb(
             user_data.0,
-            &FFI_RESULT_OK,
+            FFI_RESULT_OK,
             Box::into_raw(Box::new(authenticator)),
         );
 
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn login(
 
         o_cb(
             user_data.0,
-            &FFI_RESULT_OK,
+            FFI_RESULT_OK,
             Box::into_raw(Box::new(authenticator)),
         );
 
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn auth_reconnect(
                 user_data.0,
                 o_cb
             );
-            o_cb(user_data.0, &FFI_RESULT_OK);
+            o_cb(user_data.0, FFI_RESULT_OK);
             None
         })
     })
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn auth_account_info(
                         mutations_done: acc_info.mutations_done,
                         mutations_available: acc_info.mutations_available,
                     };
-                    o_cb(user_data.0, &FFI_RESULT_OK, &ffi_acc);
+                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(AuthError::from(e)), user_data, o_cb);
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn auth_exe_file_stem(
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
             let path_c_str = CString::new(path)?;
-            o_cb(user_data, &FFI_RESULT_OK, path_c_str.as_ptr());
+            o_cb(user_data, FFI_RESULT_OK, path_c_str.as_ptr());
         } else {
             call_result_cb!(
                 Err::<(), _>(AuthError::from(
@@ -202,7 +202,7 @@ pub unsafe extern "C" fn auth_set_additional_search_path(
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         let new_path = CStr::from_ptr(new_path).to_str()?;
         config_file_handler::set_additional_search_path(OsStr::new(new_path));
-        o_cb(user_data, &FFI_RESULT_OK);
+        o_cb(user_data, FFI_RESULT_OK);
         Ok(())
     });
 }

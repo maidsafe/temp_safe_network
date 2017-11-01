@@ -130,7 +130,7 @@ pub unsafe extern "C" fn mdata_entries_get(
 
             o_cb(
                 user_data.0,
-                &FFI_RESULT_OK,
+                FFI_RESULT_OK,
                 value.content.as_safe_ptr(),
                 value.content.len(),
                 value.entry_version,

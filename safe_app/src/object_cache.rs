@@ -25,7 +25,7 @@ use ffi::nfs::FileContext;
 use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
 use safe_core::SelfEncryptionStorage;
-use safe_core::crypto::shared_box;
+use safe_core::crypto::{shared_box, shared_sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, HashMap};
@@ -64,7 +64,9 @@ pub type SelfEncryptorReaderHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type SignKeyHandle = ObjectHandle;
+pub type SignPubKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type SignSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type FileContextHandle = ObjectHandle;
 
@@ -79,7 +81,8 @@ pub struct ObjectCache {
     mdata_permissions: Store<BTreeMap<User, PermissionSet>>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppContext>>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppContext>>>,
-    sign_key: Store<sign::PublicKey>,
+    pub_sign_key: Store<sign::PublicKey>,
+    sec_sign_key: Store<shared_sign::SecretKey>,
     file: Store<FileContext>,
 }
 
@@ -96,7 +99,8 @@ impl ObjectCache {
             mdata_permissions: Store::new(),
             se_reader: Store::new(),
             se_writer: Store::new(),
-            sign_key: Store::new(),
+            pub_sign_key: Store::new(),
+            sec_sign_key: Store::new(),
             file: Store::new(),
         }
     }
@@ -112,7 +116,8 @@ impl ObjectCache {
         self.mdata_permissions.clear();
         self.se_reader.clear();
         self.se_writer.clear();
-        self.sign_key.clear();
+        self.pub_sign_key.clear();
+        self.sec_sign_key.clear();
         self.file.clear();
     }
 }
@@ -208,13 +213,20 @@ impl_cache!(se_writer,
             get_se_writer,
             insert_se_writer,
             remove_se_writer);
-impl_cache!(sign_key,
+impl_cache!(pub_sign_key,
             sign::PublicKey,
-            SignKeyHandle,
-            InvalidSignKeyHandle,
-            get_sign_key,
-            insert_sign_key,
-            remove_sign_key);
+            SignPubKeyHandle,
+            InvalidSignPubKeyHandle,
+            get_pub_sign_key,
+            insert_pub_sign_key,
+            remove_pub_sign_key);
+impl_cache!(sec_sign_key,
+            shared_sign::SecretKey,
+            SignSecKeyHandle,
+            InvalidSignSecKeyHandle,
+            get_sec_sign_key,
+            insert_sec_sign_key,
+            remove_sec_sign_key);
 impl_cache!(file,
             FileContext,
             FileContextHandle,
@@ -291,10 +303,10 @@ mod tests {
         let object_cache = ObjectCache::new();
         let (pk, _) = sign::gen_keypair();
 
-        let handle = object_cache.insert_sign_key(pk);
-        assert!(object_cache.get_sign_key(handle).is_ok());
+        let handle = object_cache.insert_pub_sign_key(pk);
+        assert!(object_cache.get_pub_sign_key(handle).is_ok());
 
         object_cache.reset();
-        assert!(object_cache.get_sign_key(handle).is_err());
+        assert!(object_cache.get_pub_sign_key(handle).is_err());
     }
 }

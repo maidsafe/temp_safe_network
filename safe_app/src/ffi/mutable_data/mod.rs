@@ -30,7 +30,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwin
                 vec_clone_from_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataPermissionsHandle,
-                   NULL_OBJECT_HANDLE, SignKeyHandle};
+                   NULL_OBJECT_HANDLE, SignPubKeyHandle};
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt, MDataInfo};
 use safe_core::ffi::MDataInfo as FfiMDataInfo;
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn mdata_get_value(
                 .map(move |(content, version)| {
                     o_cb(
                         user_data.0,
-                        &FFI_RESULT_OK,
+                        FFI_RESULT_OK,
                         content.as_safe_ptr(),
                         content.len(),
                         version,
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn mdata_list_keys(
 
                             o_cb(
                                 user_data.0,
-                                &FFI_RESULT_OK,
+                                FFI_RESULT_OK,
                                 repr_c.as_safe_ptr(),
                                 repr_c.len(),
                             )
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn mdata_list_values(
 
                             o_cb(
                                 user_data.0,
-                                &FFI_RESULT_OK,
+                                FFI_RESULT_OK,
                                 repr_c.as_safe_ptr(),
                                 repr_c.len(),
                             )
@@ -412,7 +412,7 @@ pub unsafe extern "C" fn mdata_list_permissions(
 pub unsafe extern "C" fn mdata_list_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
@@ -433,7 +433,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
                 .list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
                     let perm_set = permission_set_into_repr_c(set);
-                    o_cb(user_data.0, &FFI_RESULT_OK, &perm_set);
+                    o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
                 })
                 .map_err(AppError::from)
                 .map_err(move |err| {
@@ -454,7 +454,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
 pub unsafe extern "C" fn mdata_set_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     permission_set: *const FfiPermissionSet,
     version: u64,
     user_data: *mut c_void,
@@ -495,7 +495,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
 pub unsafe extern "C" fn mdata_del_user_permissions(
     app: *const App,
     info: *const FfiMDataInfo,
-    user_h: SignKeyHandle,
+    user_h: SignPubKeyHandle,
     version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),

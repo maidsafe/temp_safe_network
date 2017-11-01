@@ -84,7 +84,7 @@ pub unsafe extern "C" fn app_unregistered(
 
         let app = App::unregistered(move || o_disconnect_notifier_cb(user_data.0), config)?;
 
-        o_cb(user_data.0, &FFI_RESULT_OK, Box::into_raw(Box::new(app)));
+        o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
         Ok(())
     })
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn app_registered(
             o_disconnect_notifier_cb(user_data.0)
         })?;
 
-        o_cb(user_data.0, &FFI_RESULT_OK, Box::into_raw(Box::new(app)));
+        o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
         Ok(())
     })
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn app_reconnect(
                 user_data.0,
                 o_cb
             );
-            o_cb(user_data.0, &FFI_RESULT_OK);
+            o_cb(user_data.0, FFI_RESULT_OK);
             None
         })
     })
@@ -164,7 +164,7 @@ pub unsafe extern "C" fn app_account_info(
                         mutations_done: acc_info.mutations_done,
                         mutations_available: acc_info.mutations_available,
                     };
-                    o_cb(user_data.0, &FFI_RESULT_OK, &ffi_acc);
+                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
                 })
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn app_exe_file_stem(
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
             let path_c_str = CString::new(path)?;
-            o_cb(user_data, &FFI_RESULT_OK, path_c_str.as_ptr());
+            o_cb(user_data, FFI_RESULT_OK, path_c_str.as_ptr());
         } else {
             call_result_cb!(
                 Err::<(), _>(AppError::from(
@@ -211,7 +211,7 @@ pub unsafe extern "C" fn app_set_additional_search_path(
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let new_path = CStr::from_ptr(new_path).to_str()?;
         config_file_handler::set_additional_search_path(OsStr::new(new_path));
-        o_cb(user_data, &FFI_RESULT_OK);
+        o_cb(user_data, FFI_RESULT_OK);
         Ok(())
     });
 }
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn app_reset_object_cache(
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
             context.object_cache().reset();
-            o_cb(user_data.0, &FFI_RESULT_OK);
+            o_cb(user_data.0, FFI_RESULT_OK);
             None
         })
     })

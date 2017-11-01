@@ -96,7 +96,7 @@ pub struct FfiResult {
 }
 
 /// Constant value to be used for OK result
-pub const FFI_RESULT_OK: FfiResult = FfiResult {
+pub const FFI_RESULT_OK: &'static FfiResult = &FfiResult {
     error_code: 0,
     description: 0 as *const c_char,
 };

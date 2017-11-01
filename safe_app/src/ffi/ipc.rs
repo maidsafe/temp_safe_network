@@ -45,7 +45,7 @@ pub unsafe extern "C" fn encode_auth_req(
         let req = AuthReq::clone_from_repr_c(req)?;
 
         let encoded = encode_ipc(req_id, IpcReq::Auth(req))?;
-        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn encode_containers_req(
         let req = ContainersReq::clone_from_repr_c(req)?;
 
         let encoded = encode_ipc(req_id, IpcReq::Containers(req))?;
-        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn encode_unregistered_req(
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
         let encoded = encode_ipc(req_id, IpcReq::Unregistered)?;
-        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn encode_share_mdata_req(
         let req = ShareMDataReq::clone_from_repr_c(req)?;
 
         let encoded = encode_ipc(req_id, IpcReq::ShareMData(req))?;
-        o_cb(user_data, &FFI_RESULT_OK, req_id, encoded.as_ptr());
+        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
         Ok(())
     })
 }

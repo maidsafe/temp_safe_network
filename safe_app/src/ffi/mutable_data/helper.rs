@@ -17,15 +17,15 @@
 
 use errors::AppError;
 use ffi::mutable_data::permissions::USER_ANYONE;
-use object_cache::{MDataPermissionsHandle, ObjectCache, SignKeyHandle};
+use object_cache::{MDataPermissionsHandle, ObjectCache, SignPubKeyHandle};
 use routing::{PermissionSet, User};
 use std::collections::BTreeMap;
 
 // Retrieve the sign key corresponding to the handle from the object cache and wrap it
 // in `User`. If the handle is 0, return `User::Anyone`.
-pub fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<User, AppError> {
+pub fn get_user(object_cache: &ObjectCache, handle: SignPubKeyHandle) -> Result<User, AppError> {
     let user = if handle != USER_ANYONE {
-        let sign_key = object_cache.get_sign_key(handle)?;
+        let sign_key = object_cache.get_pub_sign_key(handle)?;
         User::Key(*sign_key)
     } else {
         User::Anyone
