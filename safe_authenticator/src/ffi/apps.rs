@@ -164,7 +164,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
                         }
                     }
 
-                    o_cb(user_data.0, &FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+                    o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
                     Ok(())
                 })
@@ -246,7 +246,7 @@ pub unsafe extern "C" fn auth_registered_apps(
                         }
                     }
 
-                    o_cb(user_data.0, &FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
+                    o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
                     Ok(())
                 })
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
 
                     o_cb(
                         user_data.0,
-                        &FFI_RESULT_OK,
+                        FFI_RESULT_OK,
                         app_access_vec.as_safe_ptr(),
                         app_access_vec.len(),
                     );

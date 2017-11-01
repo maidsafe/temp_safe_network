@@ -73,7 +73,7 @@ pub unsafe extern "C" fn sign_generate_key_pair(
             let pk_h = context.object_cache().insert_pub_sign_key(ourpk);
             let sk_h = context.object_cache().insert_sec_sign_key(oursk);
 
-            o_cb(user_data.0, &FFI_RESULT_OK, pk_h, sk_h);
+            o_cb(user_data.0, FFI_RESULT_OK, pk_h, sk_h);
 
             None
         })
@@ -235,7 +235,7 @@ pub unsafe extern "C" fn enc_generate_key_pair(
             let pk_h = context.object_cache().insert_encrypt_key(ourpk);
             let sk_h = context.object_cache().insert_secret_key(oursk);
 
-            o_cb(user_data.0, &FFI_RESULT_OK, pk_h, sk_h);
+            o_cb(user_data.0, FFI_RESULT_OK, pk_h, sk_h);
 
             None
         })
@@ -397,7 +397,7 @@ pub unsafe extern "C" fn sign(
             let signed_text = sign::sign(&plaintext, &sign_sk);
             o_cb(
                 user_data.0,
-                &FFI_RESULT_OK,
+                FFI_RESULT_OK,
                 signed_text.as_safe_ptr(),
                 signed_text.len(),
             );
@@ -439,7 +439,7 @@ pub unsafe extern "C" fn verify(
                         .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
             o_cb(
                 user_data.0,
-                &FFI_RESULT_OK,
+                FFI_RESULT_OK,
                 verified.as_safe_ptr(),
                 verified.len(),
             );
@@ -483,7 +483,7 @@ pub unsafe extern "C" fn encrypt(
             let ciphertext = box_::seal(&plaintext, &nonce, &pk, &sk);
 
             match serialise(&(nonce, ciphertext)) {
-                Ok(result) => o_cb(user_data.0, &FFI_RESULT_OK, result.as_ptr(), result.len()),
+                Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
                 res @ Err(..) => {
                     call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
@@ -530,7 +530,7 @@ pub unsafe extern "C" fn decrypt(
                                 .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
                     o_cb(
                         user_data.0,
-                        &FFI_RESULT_OK,
+                        FFI_RESULT_OK,
                         plaintext.as_ptr(),
                         plaintext.len(),
                     );
@@ -575,7 +575,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
             let ciphertext = sealedbox::seal(&plaintext, &pk);
             o_cb(
                 user_data.0,
-                &FFI_RESULT_OK,
+                FFI_RESULT_OK,
                 ciphertext.as_ptr(),
                 ciphertext.len(),
             );
@@ -619,7 +619,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
                                     .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
             o_cb(
                 user_data.0,
-                &FFI_RESULT_OK,
+                FFI_RESULT_OK,
                 plaintext.as_ptr(),
                 plaintext.len(),
             );
@@ -646,7 +646,7 @@ pub unsafe extern "C" fn sha3_hash(
         let plaintext = slice::from_raw_parts(data, len);
 
         let hash = sha3_256(plaintext);
-        o_cb(user_data, &FFI_RESULT_OK, hash.as_ptr(), hash.len());
+        o_cb(user_data, FFI_RESULT_OK, hash.as_ptr(), hash.len());
 
         Ok(())
     });
@@ -664,7 +664,7 @@ pub unsafe extern "C" fn generate_nonce(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let nonce = box_::gen_nonce();
-        o_cb(user_data, &FFI_RESULT_OK, &nonce.0);
+        o_cb(user_data, FFI_RESULT_OK, &nonce.0);
 
         Ok(())
     });

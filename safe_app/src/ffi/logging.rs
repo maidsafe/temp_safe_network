@@ -42,7 +42,7 @@ pub unsafe extern "C" fn app_init_logging(
             let output_file_name_override = from_c_str(output_file_name_override)?;
             log::init_with_output_file(false, output_file_name_override)?;
         }
-        o_cb(user_data, &FFI_RESULT_OK);
+        o_cb(user_data, FFI_RESULT_OK);
         Ok(())
     });
 }
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn app_output_log_path(
                 })?
                 .into_bytes(),
         )?;
-        o_cb(user_data, &FFI_RESULT_OK, op_file_path.as_ptr());
+        o_cb(user_data, FFI_RESULT_OK, op_file_path.as_ptr());
         Ok(())
     })
 }

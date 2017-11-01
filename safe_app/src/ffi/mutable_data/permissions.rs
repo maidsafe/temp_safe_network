@@ -144,7 +144,7 @@ pub unsafe extern "C" fn mdata_permissions_get(
             );
             let permission_set = permission_set_into_repr_c(permission_set);
 
-            o_cb(user_data.0, &FFI_RESULT_OK, &permission_set);
+            o_cb(user_data.0, FFI_RESULT_OK, &permission_set);
             None
         })
     })
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
 
             o_cb(
                 user_data.0,
-                &FFI_RESULT_OK,
+                FFI_RESULT_OK,
                 user_perm_sets.as_safe_ptr(),
                 user_perm_sets.len(),
             );

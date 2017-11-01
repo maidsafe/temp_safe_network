@@ -50,7 +50,7 @@ pub unsafe extern "C" fn mdata_info_new_private(
         let info = MDataInfo::new_private(name, type_tag, (sk, nonce));
         let info = info.into_repr_c();
 
-        o_cb(user_data, &FFI_RESULT_OK, &info);
+        o_cb(user_data, FFI_RESULT_OK, &info);
         Ok(())
     })
 }
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn mdata_info_random_public(
         let info = MDataInfo::random_public(type_tag)?;
         let info = info.into_repr_c();
 
-        o_cb(user_data, &FFI_RESULT_OK, &info);
+        o_cb(user_data, FFI_RESULT_OK, &info);
         Ok(())
     })
 }
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn mdata_info_random_private(
         let info = MDataInfo::random_private(type_tag)?;
         let info = info.into_repr_c();
 
-        o_cb(user_data, &FFI_RESULT_OK, &info);
+        o_cb(user_data, FFI_RESULT_OK, &info);
         Ok(())
     })
 }
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
 
         o_cb(
             user_data,
-            &FFI_RESULT_OK,
+            FFI_RESULT_OK,
             encoded.as_safe_ptr(),
             encoded.len(),
         );
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
 
         o_cb(
             user_data,
-            &FFI_RESULT_OK,
+            FFI_RESULT_OK,
             encoded.as_safe_ptr(),
             encoded.len(),
         );
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn mdata_info_decrypt(
 
         o_cb(
             user_data,
-            &FFI_RESULT_OK,
+            FFI_RESULT_OK,
             decoded.as_safe_ptr(),
             decoded.len(),
         );
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn mdata_info_serialise(
 
         o_cb(
             user_data,
-            &FFI_RESULT_OK,
+            FFI_RESULT_OK,
             encoded.as_safe_ptr(),
             encoded.len(),
         );
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn mdata_info_deserialise(
         let info: MDataInfo = deserialise(encoded)?;
         let info = info.into_repr_c();
 
-        o_cb(user_data, &FFI_RESULT_OK, &info);
+        o_cb(user_data, FFI_RESULT_OK, &info);
         Ok(())
     })
 }

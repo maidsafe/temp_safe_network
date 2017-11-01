@@ -73,7 +73,7 @@ pub unsafe extern "C" fn access_container_fetch(
                     ))?;
                     o_cb(
                         user_data.0,
-                        &FFI_RESULT_OK,
+                        FFI_RESULT_OK,
                         ffi_containers.as_safe_ptr(),
                         ffi_containers.len(),
                     );
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
                     containers.remove(&name)
                 {
                     let mdata_info = mdata_info.into_repr_c();
-                    o_cb(user_data.0, &FFI_RESULT_OK, &mdata_info);
+                    o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
                 } else {
                     call_result_cb!(Err::<(), _>(AppError::NoSuchContainer), user_data, o_cb);
                 })

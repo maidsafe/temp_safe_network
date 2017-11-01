@@ -69,7 +69,7 @@ pub unsafe extern "C" fn dir_fetch_file(
             file_helper::fetch(client.clone(), parent_info, file_name)
                 .map(move |(version, file)| {
                     let ffi_file = file.into_repr_c();
-                    o_cb(user_data.0, &FFI_RESULT_OK, &ffi_file, version)
+                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
                 })
                 .map_err(AppError::from)
                 .map_err(move |err| {
@@ -229,7 +229,7 @@ pub unsafe extern "C" fn file_size(
             let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
 
             if let Some(ref reader) = file_ctx.reader {
-                o_cb(user_data.0, &FFI_RESULT_OK, reader.size());
+                o_cb(user_data.0, FFI_RESULT_OK, reader.size());
             } else {
                 call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
             }
@@ -270,7 +270,7 @@ pub unsafe extern "C" fn file_read(
                         },
                     )
                     .map(move |data| {
-                        o_cb(user_data.0, &FFI_RESULT_OK, data.as_safe_ptr(), data.len());
+                        o_cb(user_data.0, FFI_RESULT_OK, data.as_safe_ptr(), data.len());
                     })
                     .map_err(move |err| {
                         call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
@@ -351,7 +351,7 @@ pub unsafe extern "C" fn file_close(
                 writer
                     .close()
                     .map(move |file| {
-                        o_cb(user_data.0, &FFI_RESULT_OK, &file.into_repr_c());
+                        o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c());
                     })
                     .map_err(move |err| {
                         call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
@@ -362,7 +362,7 @@ pub unsafe extern "C" fn file_close(
                 // The reader will be dropped automatically
                 o_cb(
                     user_data.0,
-                    &FFI_RESULT_OK,
+                    FFI_RESULT_OK,
                     &file_ctx.original_file.into_repr_c(),
                 );
                 None

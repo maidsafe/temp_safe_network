@@ -200,7 +200,7 @@ pub unsafe extern "C" fn mdata_get_value(
                 .map(move |(content, version)| {
                     o_cb(
                         user_data.0,
-                        &FFI_RESULT_OK,
+                        FFI_RESULT_OK,
                         content.as_safe_ptr(),
                         content.len(),
                         version,
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn mdata_list_keys(
 
                             o_cb(
                                 user_data.0,
-                                &FFI_RESULT_OK,
+                                FFI_RESULT_OK,
                                 repr_c.as_safe_ptr(),
                                 repr_c.len(),
                             )
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn mdata_list_values(
 
                             o_cb(
                                 user_data.0,
-                                &FFI_RESULT_OK,
+                                FFI_RESULT_OK,
                                 repr_c.as_safe_ptr(),
                                 repr_c.len(),
                             )
@@ -433,7 +433,7 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
                 .list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
                     let perm_set = permission_set_into_repr_c(set);
-                    o_cb(user_data.0, &FFI_RESULT_OK, &perm_set);
+                    o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
                 })
                 .map_err(AppError::from)
                 .map_err(move |err| {

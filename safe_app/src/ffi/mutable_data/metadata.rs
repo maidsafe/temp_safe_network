@@ -39,7 +39,7 @@ pub unsafe extern "C" fn mdata_encode_metadata(
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let metadata = UserMetadata::clone_from_repr_c(metadata)?;
         let encoded = serialise(&metadata)?;
-        o_cb(user_data, &FFI_RESULT_OK, encoded.as_ptr(), encoded.len());
+        o_cb(user_data, FFI_RESULT_OK, encoded.as_ptr(), encoded.len());
         Ok(())
     })
 }

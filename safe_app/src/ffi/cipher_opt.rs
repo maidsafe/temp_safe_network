@@ -113,7 +113,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
             let handle = context.object_cache().insert_cipher_opt(
                 CipherOpt::PlainText,
             );
-            o_cb(user_data.0, &FFI_RESULT_OK, handle);
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
     });
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(
             let handle = context.object_cache().insert_cipher_opt(
                 CipherOpt::Symmetric,
             );
-            o_cb(user_data.0, &FFI_RESULT_OK, handle);
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
     })
@@ -168,7 +168,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
                     peer_encrypt_key: *pk,
                 },
             );
-            o_cb(user_data.0, &FFI_RESULT_OK, handle);
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
     });

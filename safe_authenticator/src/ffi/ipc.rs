@@ -224,7 +224,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                             ).map_err(AuthError::IpcError)?;
                             o_cb(
                                 user_data,
-                                &FFI_RESULT_OK,
+                                FFI_RESULT_OK,
                                 resp.as_ptr()
                             );
                             Ok(())
@@ -270,7 +270,7 @@ pub unsafe extern "C" fn auth_revoke_app(
             revoke_app(client, &app_id)
                 .and_then(move |_| {
                     let resp = encode_response(&IpcMsg::Revoked { app_id: app_id })?;
-                    o_cb(user_data.0, &FFI_RESULT_OK, resp.as_ptr());
+                    o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
                     Ok(())
                 })
                 .map_err(move |e| {
@@ -337,7 +337,7 @@ pub unsafe extern "C" fn encode_unregistered_resp(
                 resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
             })?;
 
-            o_cb(user_data.0, &FFI_RESULT_OK, resp.as_ptr());
+            o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
         }
         Ok(())
     })
@@ -379,7 +379,7 @@ pub unsafe extern "C" fn encode_auth_resp(
                             resp: IpcResp::Auth(Ok(auth_granted)),
                         })?;
 
-                        Ok(o_cb(user_data.0, &FFI_RESULT_OK, resp.as_ptr()))
+                        Ok(o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr()))
                     })
                     .or_else(move |e| -> Result<(), AuthError> {
                         let (error_code, description) = ffi_error!(e);
@@ -484,7 +484,7 @@ pub unsafe extern "C" fn encode_containers_resp(
                             req_id: req_id,
                             resp: IpcResp::Containers(Ok(())),
                         })?;
-                        o_cb(user_data.0, &FFI_RESULT_OK, resp.as_ptr());
+                        o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
                         Ok(())
                     })
                     .or_else(move |e| -> Result<(), AuthError> {
