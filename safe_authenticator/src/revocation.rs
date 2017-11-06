@@ -388,18 +388,13 @@ fn reencrypt_containers(client: &Client<()>, containers: Containers) -> Box<Auth
                         continue;
                     }
 
-                    let plain_key = mdata_info.decrypt(&old_key)?;
-                    let new_key = mdata_info.enc_entry_key(&plain_key)?;
-
-                    let plain_content = mdata_info.decrypt(&value.content)?;
-                    let new_content = mdata_info.enc_entry_value(&plain_content)?;
+                    let new_key = reencrypt_entry_key(&mdata_info, &old_key)?;
+                    let new_content = reencrypt_entry_value(&mdata_info, &value.content)?;
 
                     if old_key == new_key {
-                        // The entry is already re-encrypted.
+                        // The key is either not encrypted or the entry was already re-encrypted.
                         if value.content != new_content {
-                            // It's very unlikely that the key would be already re-encrypted,
-                            // but the value not. But let's handle this case anyway, just to
-                            // be sure.
+                            // The key is not encypted, but the content is.
                             actions = actions.update(new_key, new_content, value.entry_version + 1);
                         }
                     } else {
@@ -422,4 +417,29 @@ fn reencrypt_containers(client: &Client<()>, containers: Containers) -> Box<Auth
     });
 
     future::join_all(fs).map(|_| ()).into_box()
+}
+
+fn reencrypt_entry_key(mdata_info: &MDataInfo, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
+    match decrypt(mdata_info, cipher)? {
+        Some(plain) => mdata_info.enc_entry_key(&plain),
+        None => Ok(cipher.to_vec()),
+    }
+}
+
+fn reencrypt_entry_value(mdata_info: &MDataInfo, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
+    match decrypt(mdata_info, cipher)? {
+        Some(plain) => mdata_info.enc_entry_value(&plain),
+        None => Ok(cipher.to_vec()),
+    }
+}
+
+fn decrypt(mdata_info: &MDataInfo, cipher: &[u8]) -> Result<Option<Vec<u8>>, CoreError> {
+    match mdata_info.decrypt(cipher) {
+        Ok(plain) => Ok(Some(plain)),
+        Err(CoreError::EncodeDecodeError(_)) => {
+            // Not encrypted. Return unchanged.
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
 }
