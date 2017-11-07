@@ -21,12 +21,14 @@ use app_container;
 use errors::AuthError;
 use futures::Future;
 use revocation;
-use routing::{AccountInfo, User};
+use routing::{AccountInfo, EntryActions, User};
 use safe_core::{CoreError, MDataInfo};
-use safe_core::ipc::AuthReq;
+use safe_core::ipc::{AuthReq, Permission};
 use safe_core::nfs::NfsError;
+use std::collections::HashMap;
 use test_utils::{access_container, create_account_and_login, create_authenticator, create_file,
-                 fetch_file, rand_app, register_app, revoke, run, try_access_container};
+                 fetch_file, get_container_from_authenticator_entry, rand_app, register_app,
+                 register_rand_app, revoke, run, try_access_container};
 
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing {
@@ -527,7 +529,6 @@ mod mock_routing {
         });
     }
 
-
     // Try to revoke apps with the given ids, but simulate network failure so they
     // would be initiated but not finished.
     fn simulate_revocation_failure<T, S>(locator: &str, password: &str, app_ids: T)
@@ -926,6 +927,75 @@ fn flushing_empty_app_revocation_queue_does_not_mutate_network() {
 
     let account_info_3 = get_account_info(&auth);
     assert_eq!(account_info_2, account_info_3);
+}
+
+#[test]
+fn revocation_with_unencrypted_container_entries() {
+    let (auth, ..) = create_authenticator();
+
+    let mut containers_req = HashMap::new();
+    let _ = containers_req.insert(
+        "_documents".to_owned(),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+        ],
+    );
+
+    let (app_id, _) = unwrap!(register_rand_app(&auth, true, containers_req));
+
+    let shared_info = unwrap!(get_container_from_authenticator_entry(&auth, "_documents"));
+    let shared_info2 = shared_info.clone();
+    let shared_key = b"shared-key".to_vec();
+    let shared_content = b"shared-value".to_vec();
+    let shared_actions = EntryActions::new()
+        .ins(shared_key.clone(), shared_content.clone(), 0)
+        .into();
+
+    let dedicated_info = unwrap!(get_container_from_authenticator_entry(
+            &auth,
+            &app_container::name(&app_id),
+        ));
+    let dedicated_info2 = dedicated_info.clone();
+    let dedicated_key = b"dedicated-key".to_vec();
+    let dedicated_content = b"dedicated-value".to_vec();
+    let dedicated_actions = EntryActions::new()
+        .ins(dedicated_key.clone(), dedicated_content.clone(), 0)
+        .into();
+
+    // Insert unencrypted stuff into the shared container and the dedicated container.
+    run(&auth, move |client| {
+        let f0 =
+            client.mutate_mdata_entries(shared_info.name, shared_info.type_tag, shared_actions);
+        let f1 = client.mutate_mdata_entries(
+            dedicated_info.name,
+            dedicated_info.type_tag,
+            dedicated_actions,
+        );
+
+        f0.join(f1).map(|_| ()).map_err(AuthError::from)
+    });
+
+    // Revoke the app.
+    revoke(&auth, &app_id);
+
+    // Verify that the unencrypted entries remain unencrypted after the revocation.
+    run(&auth, move |client| {
+        let f0 = client.get_mdata_value(shared_info2.name, shared_info2.type_tag, shared_key);
+        let f1 = client.get_mdata_value(
+            dedicated_info2.name,
+            dedicated_info2.type_tag,
+            dedicated_key,
+        );
+
+        f0.join(f1).then(move |res| {
+            let (shared_value, dedicated_value) = unwrap!(res);
+            assert_eq!(shared_value.content, shared_content);
+            assert_eq!(dedicated_value.content, dedicated_content);
+
+            Ok(())
+        })
+    })
 }
 
 fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize {
