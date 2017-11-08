@@ -79,7 +79,7 @@ pub struct MDataInfo {
 /// Returns true if this crate was compiled against mock-routing.
 #[no_mangle]
 pub extern "C" fn is_mock_build() -> bool {
-    cfg!(use_mock_routing)
+    cfg!(feature = "use-mock-routing")
 }
 
 #[cfg(test)]
@@ -88,14 +88,14 @@ mod tests {
 
     // Test `is_mock_build` when compiled against mock-routing.
     #[test]
-    #[cfg(use_mock_routing)]
+    #[cfg(feature = "use-mock-routing")]
     fn test_mock_build() {
         assert_eq!(is_mock_build(), true);
     }
 
     // Test `is_mock_build` when not compiled against mock-routing.
     #[test]
-    #[cfg(not(use_mock_routing))]
+    #[cfg(not(feature = "use-mock-routing"))]
     fn test_not_mock_build() {
         assert_eq!(is_mock_build(), false);
     }
