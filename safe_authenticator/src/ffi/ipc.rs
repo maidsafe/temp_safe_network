@@ -19,7 +19,7 @@ use {AuthError, Authenticator};
 use access_container;
 use app_auth;
 use config;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str};
 use futures::{Future, Stream, stream};
 use ipc::{decode_ipc_msg, decode_share_mdata_req, encode_response, update_container_perms};
 use revocation::{flush_app_revocation_queue, revoke_app};
@@ -39,7 +39,7 @@ use std::os::raw::{c_char, c_void};
 pub unsafe extern "C" fn auth_unregistered_decode_ipc_msg(
     msg: *const c_char,
     user_data: *mut c_void,
-    o_unregistered: extern "C" fn(*mut c_void, u32),
+    o_unregistered: extern "C" fn(*const u8, usize, *mut c_void, u32),
     o_err: extern "C" fn(*mut c_void, *const FfiResult, *const c_char),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -50,10 +50,15 @@ pub unsafe extern "C" fn auth_unregistered_decode_ipc_msg(
 
         match msg {
             IpcMsg::Req {
-                req: IpcReq::Unregistered,
+                req: IpcReq::Unregistered(extra_data),
                 req_id,
             } => {
-                o_unregistered(user_data.0, req_id);
+                o_unregistered(
+                    extra_data.as_safe_ptr(),
+                    extra_data.len(),
+                    user_data.0,
+                    req_id,
+                );
             }
             _ => {
                 call_result_cb!(
@@ -76,7 +81,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
     user_data: *mut c_void,
     o_auth: extern "C" fn(*mut c_void, u32, *const FfiAuthReq),
     o_containers: extern "C" fn(*mut c_void, u32, *const FfiContainersReq),
-    o_unregistered: extern "C" fn(*mut c_void, u32),
+    o_unregistered: extern "C" fn(*const u8, usize, *mut c_void, u32),
     o_share_mdata: extern "C" fn(*mut c_void,
                                  u32,
                                  *const FfiShareMDataReq,
@@ -110,10 +115,15 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                         ok!(())
                     }
                     Ok(IpcMsg::Req {
-                           req: IpcReq::Unregistered,
+                           req: IpcReq::Unregistered(extra_data),
                            req_id,
                        }) => {
-                        o_unregistered(user_data.0, req_id);
+                        o_unregistered(
+                            extra_data.as_safe_ptr(),
+                            extra_data.len(),
+                            user_data.0,
+                            req_id,
+                        );
                         ok!(())
                     }
                     Ok(IpcMsg::Req {
