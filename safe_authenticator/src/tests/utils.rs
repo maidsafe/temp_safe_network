@@ -160,10 +160,10 @@ pub fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
 }
 
 pub extern "C" fn unregistered_cb(
-    extra_data: *const u8,
-    extra_data_len: usize,
     user_data: *mut c_void,
     req_id: u32,
+    extra_data: *const u8,
+    extra_data_len: usize,
 ) {
     unsafe {
         let msg = IpcMsg::Req {
