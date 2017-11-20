@@ -71,9 +71,10 @@ pub use ffi::apps::*;
 pub use ffi::ipc::*;
 pub use ffi::logging::*;
 
+pub mod app_container;
+
 mod access_container;
 mod app_auth;
-mod app_container;
 mod config;
 mod errors;
 mod ipc;

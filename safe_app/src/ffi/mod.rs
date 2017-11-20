@@ -48,6 +48,7 @@ use config_file_handler;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
+use safe_authenticator::app_container;
 use safe_core::FutureExt;
 use safe_core::ffi::AccountInfo as FfiAccountInfo;
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
@@ -201,7 +202,7 @@ pub unsafe extern "C" fn app_exe_file_stem(
     });
 }
 
-/// Sets the additional path in `config_file_handler` to to search for files
+/// Sets the additional path in `config_file_handler` to search for files
 #[no_mangle]
 pub unsafe extern "C" fn app_set_additional_search_path(
     new_path: *const c_char,
@@ -240,5 +241,21 @@ pub unsafe extern "C" fn app_reset_object_cache(
             o_cb(user_data.0, FFI_RESULT_OK);
             None
         })
+    })
+}
+
+/// Returns the name of the app's container.
+#[no_mangle]
+pub unsafe extern "C" fn app_container_name(
+    app_id: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        container_name: *const c_char),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
+        let name = CString::new(app_container::name(CStr::from_ptr(app_id).to_str()?))?;
+        o_cb(user_data, FFI_RESULT_OK, name.as_ptr());
+        Ok(())
     })
 }

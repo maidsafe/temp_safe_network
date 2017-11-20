@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! Routines to handle an apps dedicated containers
+//! Routines to handle an app's dedicated containers.
 
 use {AuthError, AuthFuture};
 use access_container;
@@ -24,9 +24,13 @@ use routing::{Action, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, nfs};
 
+/// Get name of the dedicated container of the given app.
+pub fn name(app_id: &str) -> String {
+    format!("apps/{}", app_id)
+}
+
 /// Returns an app's dedicated container if available and stored in the access container,
 /// `None` otherwise.
-#[cfg(test)]
 pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataInfo>>> {
     let app_cont_name = name(app_id);
 
@@ -143,7 +147,7 @@ pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
         .into_box()
 }
 
-/// Creates a new app's dedicated container
+// Creates a new app's dedicated container
 fn create(client: &Client<()>, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<MDataInfo>> {
     let dir = fry!(MDataInfo::random_private(DIR_TAG).map_err(AuthError::from));
     nfs::create_dir(
@@ -157,9 +161,4 @@ fn create(client: &Client<()>, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<M
                 .allow(Action::ManagePermissions)],
     ).map(move |()| dir).map_err(From::from)
         .into_box()
-}
-
-/// Get name of the dedicated container of the given app.
-pub fn name(app_id: &str) -> String {
-    format!("apps/{}", app_id)
 }

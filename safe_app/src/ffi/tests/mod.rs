@@ -18,10 +18,15 @@
 mod nfs;
 
 use super::*;
+use App;
 use ffi_utils::test_utils::call_1;
 use routing::ImmutableData;
+use safe_authenticator::test_utils as authenticator;
 use safe_core::ffi::AccountInfo;
+use safe_core::ipc::req::AuthReq;
+use std::collections::HashMap;
 use test_utils::create_app;
+use test_utils::gen_app_exchange_info;
 
 // Test account usage statistics before and after a mutation.
 #[test]
@@ -57,7 +62,6 @@ fn account_info() {
 #[cfg(all(test, feature = "use-mock-routing"))]
 #[test]
 fn network_status_callback() {
-    use App;
     use ffi_utils::test_utils::{UserData, call_0, call_1_with_custom, send_via_user_data_custom};
     use maidsafe_utilities::serialisation::serialise;
     use safe_core::ipc::BootstrapConfig;
@@ -127,4 +131,33 @@ fn network_status_callback() {
             send_via_user_data_custom(user_data, ());
         }
     }
+}
+
+// Test getting the app's container name.
+#[test]
+fn test_app_container_name() {
+    use safe_authenticator::app_container;
+
+    let auth = authenticator::create_account_and_login();
+
+    let app_info = gen_app_exchange_info();
+    let app_id = app_info.id.clone();
+
+    let auth_granted = unwrap!(authenticator::register_app(
+        &auth,
+        &AuthReq {
+            app: app_info,
+            app_container: true,
+            containers: HashMap::new(),
+        },
+    ));
+
+    let _app = unwrap!(App::registered(app_id.clone(), auth_granted, || ()));
+
+    let name: String = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            app_container_name(app_id.as_ptr() as *const c_char, ud, cb)
+        }))
+    };
+    assert_eq!(name, app_container::name(&app_id));
 }
