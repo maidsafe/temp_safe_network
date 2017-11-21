@@ -48,8 +48,7 @@ use config_file_handler;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
-use safe_authenticator::app_container;
-use safe_core::FutureExt;
+use safe_core::{self, FutureExt};
 use safe_core::ffi::AccountInfo as FfiAccountInfo;
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
 use safe_core::ipc::{AuthGranted, BootstrapConfig};
@@ -254,7 +253,9 @@ pub unsafe extern "C" fn app_container_name(
                         container_name: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
-        let name = CString::new(app_container::name(CStr::from_ptr(app_id).to_str()?))?;
+        let name = CString::new(safe_core::app_container_name(
+            CStr::from_ptr(app_id).to_str()?,
+        ))?;
         o_cb(user_data, FFI_RESULT_OK, name.as_ptr());
         Ok(())
     })

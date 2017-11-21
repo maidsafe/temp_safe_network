@@ -22,17 +22,13 @@ use access_container;
 use futures::Future;
 use routing::{Action, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, nfs};
-
-/// Get name of the dedicated container of the given app.
-pub fn name(app_id: &str) -> String {
-    format!("apps/{}", app_id)
-}
+use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, app_container_name, nfs};
 
 /// Returns an app's dedicated container if available and stored in the access container,
 /// `None` otherwise.
+#[cfg(test)]
 pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataInfo>>> {
-    let app_cont_name = name(app_id);
+    let app_cont_name = app_container_name(app_id);
 
     access_container::fetch_authenticator_entry(client)
         .and_then(move |(_, mut ac_entries)| {
@@ -50,7 +46,7 @@ pub fn fetch_or_create(
 ) -> Box<AuthFuture<MDataInfo>> {
     let c2 = client.clone();
     let c3 = client.clone();
-    let app_cont_name = name(app_id);
+    let app_cont_name = app_container_name(app_id);
 
     access_container::fetch_authenticator_entry(client)
         .and_then(move |(ac_entry_version, mut ac_entries)| {
@@ -100,7 +96,7 @@ pub fn fetch_or_create(
 /// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
 pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
     let c2 = client.clone();
-    let app_cont_name = name(app_id);
+    let app_cont_name = app_container_name(app_id);
 
     access_container::fetch_authenticator_entry(&client)
         .and_then(move |(ac_entry_version, mut ac_entries)| {

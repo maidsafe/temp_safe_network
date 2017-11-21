@@ -136,7 +136,7 @@ fn network_status_callback() {
 // Test getting the app's container name.
 #[test]
 fn test_app_container_name() {
-    use safe_authenticator::app_container;
+    use safe_core;
 
     let auth = authenticator::create_account_and_login();
 
@@ -159,5 +159,5 @@ fn test_app_container_name() {
             app_container_name(app_id.as_ptr() as *const c_char, ud, cb)
         }))
     };
-    assert_eq!(name, app_container::name(&app_id));
+    assert_eq!(name, safe_core::app_container_name(&app_id));
 }

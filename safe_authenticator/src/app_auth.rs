@@ -25,7 +25,7 @@ use futures::Future;
 use futures::future::{self, Either};
 use ipc::update_container_perms;
 use routing::ClientError;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
+use safe_core::{Client, CoreError, FutureExt, MDataInfo, app_container_name, recovery};
 use safe_core::ipc::req::{AuthReq, ContainerPermissions, Permission};
 use safe_core::ipc::resp::{AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted};
 use std::collections::HashMap;
@@ -75,7 +75,7 @@ pub fn app_state(client: &Client<()>, apps: &Apps, app_id: &str) -> Box<AuthFutu
 /// Check whether `permissions` has an app container entry for `app_id` and that all permissions are
 /// set.
 fn app_container_exists(permissions: &AccessContainerEntry, app_id: &str) -> bool {
-    match permissions.get(&app_container::name(app_id)) {
+    match permissions.get(&app_container_name(app_id)) {
         Some(&(_, ref access)) => {
             *access ==
                 btree_set![
@@ -104,7 +104,7 @@ fn insert_app_container(
                     Permission::Delete,
                     Permission::ManagePermissions,
                 ];
-    let _ = permissions.insert(app_container::name(app_id), (app_container_info, access));
+    let _ = permissions.insert(app_container_name(app_id), (app_container_info, access));
     permissions
 }
 
