@@ -137,6 +137,7 @@ fn network_status_callback() {
 #[test]
 fn test_app_container_name() {
     use safe_core;
+    use std::ffi::CString;
 
     let auth = authenticator::create_account_and_login();
 
@@ -156,7 +157,7 @@ fn test_app_container_name() {
 
     let name: String = unsafe {
         unwrap!(call_1(|ud, cb| {
-            app_container_name(app_id.as_ptr() as *const c_char, ud, cb)
+            app_container_name(unwrap!(CString::new(app_id.clone())).as_ptr(), ud, cb)
         }))
     };
     assert_eq!(name, safe_core::app_container_name(&app_id));
