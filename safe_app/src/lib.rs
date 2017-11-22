@@ -77,6 +77,7 @@ pub use ffi::mutable_data::entry_actions::*;
 pub use ffi::mutable_data::metadata::*;
 pub use ffi::mutable_data::permissions::*;
 pub use ffi::nfs::*;
+pub use ffi::object_cache::*;
 
 mod errors;
 pub mod object_cache;
