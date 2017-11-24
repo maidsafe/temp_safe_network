@@ -21,14 +21,20 @@ extern crate ffi_utils;
 #[macro_use]
 extern crate unwrap;
 
-static HEADER_NAME: &'static str = "safe_authenticator";
-static HEADER_DIRECTORY: &'static str = "../auto-gen/c-include/";
-static ROOT_FILE: &'static str = "src/lib.rs";
+use std::env;
 
 fn main() {
+    if env::var("CARGO_FEATURE_BINDINGS").is_err() {
+        return;
+    }
+
+    gen_bindings_c();
+}
+
+fn gen_bindings_c() {
     unwrap!(ffi_utils::header_gen::gen_headers(
-        HEADER_NAME,
-        HEADER_DIRECTORY,
-        ROOT_FILE,
+        &unwrap!(env::var("CARGO_PKG_NAME")),
+        "../bindings/c/",
+        "src/lib.rs",
     ));
 }
