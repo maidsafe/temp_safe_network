@@ -16,10 +16,12 @@
 // relating to use of the SAFE Network Software.
 
 use super::{App, AppContext, AppError};
+use ffi_utils::catch_unwind_error_code;
 use futures::{Future, IntoFuture};
 use safe_authenticator::AuthError;
 use safe_authenticator::test_utils as authenticator;
 use safe_core::{Client, FutureExt, utils};
+use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
 use safe_core::ipc::AppExchangeInfo;
 use safe_core::ipc::req::{AuthReq as NativeAuthReq, ContainerPermissions};
 use std::collections::HashMap;

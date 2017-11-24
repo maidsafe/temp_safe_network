@@ -78,6 +78,8 @@ pub use ffi::mutable_data::metadata::*;
 pub use ffi::mutable_data::permissions::*;
 pub use ffi::nfs::*;
 pub use ffi::object_cache::*;
+#[cfg(any(test, feature = "testing"))]
+pub use ffi::test_utils::*;
 
 mod errors;
 pub mod object_cache;
