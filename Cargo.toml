@@ -16,4 +16,4 @@
 # relating to use of the SAFE Network Software.
 
 [workspace]
-members = ["ffi_utils", "safe_app", "safe_authenticator", "safe_core"]
+members = ["ffi_utils", "safe_app", "safe_authenticator", "safe_core", "tests"]

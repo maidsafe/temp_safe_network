@@ -21,7 +21,7 @@ use std::ffi::OsString;
 #[cfg(test)]
 use std::path::PathBuf;
 
-/// Configuration for routing.
+/// Configuration for safe-core.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
     /// Developer options.
