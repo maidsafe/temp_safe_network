@@ -30,10 +30,10 @@ use ffi::ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode
 use ffi_utils::{ReprC, StringError, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, sender_as_user_data};
 use futures::{Future, future};
+use safe_core::{app_container_name, mdata_info};
 use safe_core::ffi::ipc::req::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
                      IpcResp, Permission};
-use safe_core::mdata_info;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::mpsc;
@@ -48,12 +48,10 @@ mod mock_routing {
     use super::utils::create_containers_req;
     use Authenticator;
     use access_container as access_container_tools;
-    use app_container;
     use errors::AuthError;
     use futures::Future;
     use routing::{ClientError, Request, Response, User};
-    use safe_core::CoreError;
-    use safe_core::MockRouting;
+    use safe_core::{CoreError, MockRouting, app_container_name};
     use safe_core::ipc::AuthReq;
     use safe_core::nfs::NfsError;
     use safe_core::utils::generate_random_string;
@@ -400,7 +398,7 @@ mod mock_routing {
         let mut ac_entries = access_container(&auth, app_id.clone(), auth_granted.clone());
         let (_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
         let (_documents_md, _) = unwrap!(ac_entries.remove("_documents"));
-        let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container::name(&app_id)));
+        let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container_name(&app_id)));
 
         let app_pk = auth_granted.app_keys.sign_pk;
 
@@ -561,7 +559,7 @@ fn app_authentication() {
 
     let mut expected = create_containers_req();
     let _ = expected.insert(
-        app_container::name(&app_id),
+        app_container_name(&app_id),
         btree_set![
             Permission::Read,
             Permission::Insert,
@@ -585,7 +583,7 @@ fn app_authentication() {
         expected,
     );
 
-    let (app_dir_info, _) = unwrap!(access_container.remove(&app_container::name(&app_id)));
+    let (app_dir_info, _) = unwrap!(access_container.remove(&app_container_name(&app_id)));
 
     // Check the app info is present in the config file.
     let apps = run(&authenticator, |client| {

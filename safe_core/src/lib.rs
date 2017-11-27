@@ -94,8 +94,8 @@
         unused_parens, while_true)]
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
         unused_qualifications, unused_results)]
-#![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
-         missing_debug_implementations, variant_size_differences)]
+#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
+         variant_size_differences)]
 
 #![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                          option_unwrap_used))]
@@ -180,3 +180,8 @@ pub const SAFE_MOCK_UNLIMITED_MUTATIONS: &'static str = "SAFE_MOCK_UNLIMITED_MUT
 pub const SAFE_MOCK_IN_MEMORY_STORAGE: &'static str = "SAFE_MOCK_IN_MEMORY_STORAGE";
 /// Environment variable for custom vault path (see module-level documentation).
 pub const SAFE_MOCK_VAULT_PATH: &'static str = "SAFE_MOCK_VAULT_PATH";
+
+/// Gets name of the dedicated container of the given app.
+pub fn app_container_name(app_id: &str) -> String {
+    format!("apps/{}", app_id)
+}

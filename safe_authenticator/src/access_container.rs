@@ -45,7 +45,7 @@ pub fn enc_key(
     Ok(access_container_enc_key(app_id, secret_key, nonce)?)
 }
 
-/// Decode raw authenticator entry.
+/// Decodes raw authenticator entry.
 pub fn decode_authenticator_entry(
     encoded: &[u8],
     enc_key: &secretbox::Key,
@@ -54,7 +54,7 @@ pub fn decode_authenticator_entry(
     Ok(deserialise(&plaintext)?)
 }
 
-/// Encode authenticator entry into raw mdata content.
+/// Encodes authenticator entry into raw mdata content.
 pub fn encode_authenticator_entry(
     decoded: &HashMap<String, MDataInfo>,
     enc_key: &secretbox::Key,
@@ -117,7 +117,7 @@ pub fn put_authenticator_entry<T: 'static>(
         .into_box()
 }
 
-/// Decode raw app entry.
+/// Decodes raw app entry.
 pub fn decode_app_entry(
     encoded: &[u8],
     enc_key: &secretbox::Key,
@@ -126,7 +126,7 @@ pub fn decode_app_entry(
     Ok(deserialise(&plaintext)?)
 }
 
-/// Encode app entry into raw mdata content.
+/// Encodes app entry into raw mdata content.
 pub fn encode_app_entry(
     decoded: &AccessContainerEntry,
     enc_key: &secretbox::Key,

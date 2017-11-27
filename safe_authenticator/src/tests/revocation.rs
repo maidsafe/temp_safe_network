@@ -17,12 +17,11 @@
 
 use super::utils::create_containers_req;
 use Authenticator;
-use app_container;
 use errors::AuthError;
 use futures::Future;
 use revocation;
 use routing::{AccountInfo, EntryActions, User};
-use safe_core::{CoreError, MDataInfo};
+use safe_core::{CoreError, MDataInfo, app_container_name};
 use safe_core::ipc::{AuthReq, Permission};
 use safe_core::nfs::NfsError;
 use std::collections::HashMap;
@@ -365,7 +364,7 @@ mod mock_routing {
         for app_id in &[&app_id_0, &app_id_1] {
             let info = unwrap!(get_container_from_authenticator_entry(
                 &auth,
-                &app_container::name(app_id),
+                &app_container_name(app_id),
             ));
             unwrap!(create_file(&auth, info, "private.txt", vec![0; 10]));
         }
@@ -467,7 +466,7 @@ mod mock_routing {
         for app_id in &[&app_id_0, &app_id_1, &app_id_2] {
             let info = unwrap!(get_container_from_authenticator_entry(
                 &auth,
-                &app_container::name(app_id),
+                &app_container_name(app_id),
             ));
             unwrap!(create_file(&auth, info, "private.txt", vec![0; 10]));
         }
@@ -764,7 +763,7 @@ fn app_revocation() {
         vec![1; 10],
     ));
 
-    let app_container_name = app_container::name(&app_id2);
+    let app_container_name = app_container_name(&app_id2);
     let (app_container_md, _) = unwrap!(ac_entries.remove(&app_container_name));
     unwrap!(create_file(
         &authenticator,
@@ -954,7 +953,7 @@ fn revocation_with_unencrypted_container_entries() {
 
     let dedicated_info = unwrap!(get_container_from_authenticator_entry(
             &auth,
-            &app_container::name(&app_id),
+            &app_container_name(&app_id),
         ));
     let dedicated_info2 = dedicated_info.clone();
     let dedicated_key = b"dedicated-key".to_vec();
