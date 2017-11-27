@@ -29,7 +29,6 @@ use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
@@ -47,14 +46,14 @@ pub struct Vault {
 // Initializes mock-vault path with the following precedence:
 // 1. `SAFE_MOCK_VAULT_PATH` env var
 // 2. DevConfig `mock_vault_path` option
-// 3. None
-fn init_vault_path(devconfig: Option<&DevConfig>) -> Option<String> {
+// 3. default temp dir
+fn init_vault_path(devconfig: Option<&DevConfig>) -> PathBuf {
     match env::var(SAFE_MOCK_VAULT_PATH) {
-        Ok(path) => Some(path),
+        Ok(path) => PathBuf::from(path),
         Err(_) => {
-            match devconfig {
-                Some(dev) => dev.mock_vault_path.clone(),
-                None => None,
+            match devconfig.and_then(|dev| dev.mock_vault_path.clone()) {
+                Some(path) => PathBuf::from(path),
+                None => env::temp_dir(),
             }
         }
     }
@@ -270,19 +269,12 @@ struct FileStore {
 }
 
 impl FileStore {
-    fn new(dirpath: Option<String>) -> Self {
+    fn new(path: PathBuf) -> Self {
         FileStore {
             file: None,
             sync_time: None,
-            path: match dirpath {
-                Some(dirpath) => Path::new(&dirpath).join(FILE_NAME),
-                None => env::temp_dir().join(FILE_NAME),
-            },
+            path: path.join(FILE_NAME),
         }
-    }
-
-    fn path(&self) -> PathBuf {
-        self.path.clone()
     }
 }
 
@@ -295,7 +287,7 @@ impl Store for FileStore {
                 .write(true)
                 .create(true)
                 .truncate(false)
-                .open(self.path())
+                .open(&self.path)
         );
 
         if writing {
@@ -361,4 +353,9 @@ impl Store for FileStore {
             let _ = file.unlock();
         }
     }
+}
+
+/// Path to the mock vault store file.
+pub fn file_store_path(config: &Config) -> PathBuf {
+    init_vault_path(config.dev.as_ref()).join(FILE_NAME)
 }
