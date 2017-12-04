@@ -40,7 +40,7 @@ pub enum Payload {
 pub type ChannelType = Result<(IpcMsg, Option<Payload>), (i32, Option<IpcMsg>)>;
 
 // Creates a containers request asking for "documents with permission to
-// insert", and "videos with all the permissions possible",
+// insert", and "videos with all the permissions possible".
 pub fn create_containers_req() -> HashMap<String, ContainerPermissions> {
     let mut containers = HashMap::new();
     let _ = containers.insert("_documents".to_owned(), btree_set![Permission::Insert]);

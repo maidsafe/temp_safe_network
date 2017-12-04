@@ -53,8 +53,9 @@ build_script:
   - |-
     cargo check --verbose --release --lib --tests --manifest-path=ffi_utils/Cargo.toml
     cargo check --verbose --release --features testing --lib --tests --manifest-path=safe_core/Cargo.toml
-    cargo check --verbose --features testing --release --lib --tests --manifest-path=safe_authenticator/Cargo.toml
+    cargo check --verbose --release --features testing --lib --tests --manifest-path=safe_authenticator/Cargo.toml
     cargo check --verbose --release --features testing --lib --tests --manifest-path=safe_app/Cargo.toml
+    cargo check --verbose --release --lib --tests --manifest-path=tests/Cargo.toml
 
 after_build:
   - ps: |
