@@ -192,7 +192,7 @@ pub unsafe extern "C" fn auth_exe_file_stem(
     });
 }
 
-/// Sets the additional path in `config_file_handler` to to search for files
+/// Sets the additional path in `config_file_handler` to search for files.
 #[no_mangle]
 pub unsafe extern "C" fn auth_set_additional_search_path(
     new_path: *const c_char,

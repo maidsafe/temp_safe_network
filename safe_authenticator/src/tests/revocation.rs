@@ -722,7 +722,7 @@ mod mock_routing {
     }
 }
 
-// The app revocation and re-authorization workflow.
+// The app revocation and re-authorisation workflow.
 #[test]
 fn app_revocation() {
     let authenticator = create_account_and_login();
@@ -823,7 +823,7 @@ fn app_revocation() {
     let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "1.mp4"));
     let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "2.mp4"));
 
-    // Re-authorize the first app.
+    // Re-authorise the first app.
     let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
     let mut ac_entries = access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
     let (videos_md1, _) = unwrap!(ac_entries.remove("_videos"));

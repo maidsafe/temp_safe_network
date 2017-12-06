@@ -850,8 +850,8 @@ impl ReprC for RegisteredAppId {
     type C = *const RegisteredApp;
     type Error = StringError;
 
-    unsafe fn clone_from_repr_c(ffi: *const RegisteredApp) -> Result<RegisteredAppId, StringError> {
-        Ok(RegisteredAppId(from_c_str((*ffi).app_info.id)?))
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+        Ok(RegisteredAppId(from_c_str((*c_repr).app_info.id)?))
     }
 }
 

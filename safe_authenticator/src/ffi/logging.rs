@@ -130,13 +130,13 @@ mod tests {
         debug!("{}", junk_msg);
 
         // Give some time to the async logging to flush in the background thread
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(10));
 
         let mut log_file = unwrap!(File::open(current_exe_path));
         let mut file_content = String::new();
 
-        let written = unwrap!(log_file.read_to_string(&mut file_content));
-        assert!(written > 0);
+        let num_bytes = unwrap!(log_file.read_to_string(&mut file_content));
+        assert!(num_bytes > 0);
 
         assert!(file_content.contains(&debug_msg[..]));
         assert!(!file_content.contains(&junk_msg[..]));

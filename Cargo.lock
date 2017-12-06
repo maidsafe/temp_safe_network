@@ -1049,6 +1049,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tests"
+version = "0.1.0"
+dependencies = [
+ "ffi_utils 0.3.0",
+ "safe_app 0.4.0",
+ "safe_authenticator 0.4.0",
+ "safe_core 0.27.0",
+ "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unwrap 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

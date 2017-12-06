@@ -64,6 +64,7 @@ script:
         cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_core/Cargo.toml &&
         cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_authenticator/Cargo.toml &&
         cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_app/Cargo.toml &&
+        cargo check --verbose --release --lib --tests --manifest-path=tests/Cargo.toml &&
 
         echo "--- Test against mock ---" &&
         cargo test config_mock_vault_path --verbose --release --features=use-mock-routing --manifest-path=safe_core/Cargo.toml &&
@@ -106,6 +107,7 @@ script:
         cd ../safe_core && cargo clippy --profile=test --features=testing &&
         cd ../safe_authenticator && cargo clippy --profile=test --features=testing &&
         cd ../safe_app && cargo clippy --profile=test --features=testing &&
+        cd ../tests && cargo clippy --profile=test &&
 
         echo "--- Test build for mock-routing ---" &&
         cd ../safe_core && cargo clippy --profile=test --features=use-mock-routing &&

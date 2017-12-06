@@ -141,7 +141,7 @@ fn update_access_container(
 /// Authenticate an app request.
 ///
 /// First, this function searches for an app info in the access container.
-/// If the app is found, then the `AppGranted` struct is returned based on that information.
+/// If the app is found, then the `AuthGranted` struct is returned based on that information.
 /// If the app is not found in the access container, then it will be authenticated.
 pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<AuthGranted>> {
     let app_id = auth_req.app.id.clone();

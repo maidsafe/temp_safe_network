@@ -267,7 +267,7 @@ mod tests {
     use std::os::raw::c_void;
     use test_utils::gen_app_exchange_info;
 
-    // Test encoding and decoding authorization requests.
+    // Test encoding and decoding authorisation requests.
     #[test]
     fn encode_auth_req_basics() {
         let req = AuthReq {

@@ -23,7 +23,6 @@ use futures::future::{self, Either, Loop};
 use routing::{ClientError, EntryActions, User, Value};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo};
-use safe_core::ipc::IpcError;
 use safe_core::recovery;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
@@ -31,7 +30,7 @@ use std::collections::hash_map::Entry;
 type MDataEntries = BTreeMap<Vec<u8>, Value>;
 type Containers = HashMap<String, MDataInfo>;
 
-/// Revokes app access using a revocation queue
+/// Revoke app access using a revocation queue.
 pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
     let app_id = app_id.to_string();
     let client = client.clone();
@@ -91,20 +90,17 @@ fn flush_app_revocation_queue_impl(
     }).into_box()
 }
 
-/// Revoke access for a single app
+// Revoke access for a single app
 fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
+    let c3 = client.clone();
     let c4 = client.clone();
-    let c5 = client.clone();
-    let c7 = client.clone();
-    let c8 = client.clone();
 
-    // 1. Put the provided app_id into the revocation queue
-    // 2. Delete the app key from MaidManagers
-    // 3. Remove the app key from containers permissions
-    // 4. Refresh the containers info from the user's root dir (as the access
+    // 1. Delete the app key from MaidManagers
+    // 2. Remove the app key from containers permissions
+    // 3. Refresh the containers info from the user's root dir (as the access
     //    container entry is not updated with the new keys info - so we have to
-    //    make sure that we use correct encryption keys if the previous revoke\
+    //    make sure that we use correct encryption keys if the previous revoke
     //    attempt has failed)
     // 4. Re-encrypt private containers that the app had access to
     // 5. Remove the revoked app from the access container
@@ -113,34 +109,29 @@ fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
             delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app)
         })
         .and_then(move |app| {
-            access_container::fetch_entry(&c4, &app.info.id, app.keys.clone())
+            access_container::fetch_entry(&c3, &app.info.id, app.keys.clone())
                 .and_then(move |(version, ac_entry)| {
-                    let containers: Containers = ac_entry
-                        .ok_or(AuthError::IpcError(IpcError::UnknownApp))?
-                        .into_iter()
-                        .map(|(name, (mdata_info, _))| (name, mdata_info))
-                        .collect();
+                    match ac_entry {
+                        Some(ac_entry) => {
+                            let containers: Containers = ac_entry
+                                .into_iter()
+                                .map(|(name, (mdata_info, _))| (name, mdata_info))
+                                .collect();
 
-                    Ok((app, version, containers))
+                            clear_from_access_container_entry(&c4, app, version, containers)
+                        }
+                        // If the access container entry was not found, exit without an error,
+                        // as the entry must have been deleted with the app having stayed on the
+                        // revocation queue.
+                        None => ok!(()),
+                    }
                 })
-        })
-        .and_then(move |(app, ac_entry_version, containers)| {
-            revoke_container_perms(&c5, &containers, app.keys.sign_pk)
-                .map(move |_| (app, ac_entry_version, containers))
-        })
-        .and_then(move |(app, ac_entry_version, containers)| {
-            let container_names = containers.into_iter().map(|(name, _)| name).collect();
-            reencrypt_containers_and_update_access_container(&c7, container_names, &app)
-                .map(move |_| (app, ac_entry_version))
-        })
-        .and_then(move |(app, version)| {
-            access_container::delete_entry(&c8, &app.info.id, &app.keys, version + 1)
         })
         .into_box()
 }
 
-/// Delete the app auth key from the Maid Manager - this prevents the app from
-/// performing any more mutations.
+// Delete the app auth key from the Maid Manager - this prevents the app from
+// performing any more mutations.
 fn delete_app_auth_key(client: &Client<()>, key: sign::PublicKey) -> Box<AuthFuture<()>> {
     let client = client.clone();
 
@@ -162,7 +153,29 @@ fn delete_app_auth_key(client: &Client<()>, key: sign::PublicKey) -> Box<AuthFut
         .into_box()
 }
 
-// Revokes containers permissions
+fn clear_from_access_container_entry(
+    client: &Client<()>,
+    app: AppInfo,
+    ac_entry_version: u64,
+    containers: Containers,
+) -> Box<AuthFuture<()>> {
+    let c2 = client.clone();
+    let c3 = client.clone();
+
+    revoke_container_perms(client, &containers, app.keys.sign_pk)
+        .map(move |_| (app, ac_entry_version, containers))
+        .and_then(move |(app, ac_entry_version, containers)| {
+            let container_names = containers.into_iter().map(|(name, _)| name).collect();
+            reencrypt_containers_and_update_access_container(&c2, container_names, &app)
+                .map(move |_| (app, ac_entry_version))
+        })
+        .and_then(move |(app, version)| {
+            access_container::delete_entry(&c3, &app.info.id, &app.keys, version + 1)
+        })
+        .into_box()
+}
+
+// Revoke containers permissions
 fn revoke_container_perms(
     client: &Client<()>,
     containers: &Containers,
@@ -193,7 +206,7 @@ fn revoke_container_perms(
     future::join_all(reqs).map(move |_| ()).into_box()
 }
 
-// Re-encrypts private containers for a revoked app
+// Re-encrypt private containers for a revoked app
 fn reencrypt_containers_and_update_access_container(
     client: &Client<()>,
     container_names: HashSet<String>,

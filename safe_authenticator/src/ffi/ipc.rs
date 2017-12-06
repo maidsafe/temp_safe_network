@@ -391,7 +391,7 @@ pub unsafe extern "C" fn encode_auth_resp(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        repsonse: *const c_char),
+                        response: *const c_char),
 ) {
     let user_data = OpaqueCtx(user_data);
 
