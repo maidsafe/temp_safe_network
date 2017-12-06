@@ -58,7 +58,7 @@ impl CallbackArgs for PermissionSet {
     }
 }
 
-/// Represents an authorization request
+/// Represents an authorisation request
 #[repr(C)]
 pub struct AuthReq {
     /// The application identifier for this request

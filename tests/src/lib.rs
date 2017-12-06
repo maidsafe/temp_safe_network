@@ -115,7 +115,7 @@ fn get_config() -> TestConfig {
 }
 
 #[test]
-fn authorization_and_revocation() {
+fn authorisation_and_revocation() {
     let test_acc = get_config().test_account;
     let locator = unwrap!(CString::new(test_acc.acc_locator.clone()));
     let password = unwrap!(CString::new(test_acc.acc_password.clone()));
@@ -148,7 +148,7 @@ fn authorization_and_revocation() {
         }))
     };
 
-    // Create and authorize an app
+    // Create and authorise an app
     let app_id = unwrap!(utils::generate_readable_string(10));
     let ffi_app_id = unwrap!(CString::new(app_id.clone()));
     println!("App ID: {}", app_id);
@@ -160,8 +160,8 @@ fn authorization_and_revocation() {
         vendor: unwrap!(utils::generate_readable_string(10)),
     };
 
-    println!("Authorizing app...");
-    let auth_granted = ffi_authorize_app(auth_h, &app_info);
+    println!("Authorising app...");
+    let auth_granted = ffi_authorise_app(auth_h, &app_info);
 
     // Register the app.
     println!("Registering app...");
@@ -234,9 +234,9 @@ fn authorization_and_revocation() {
         }
     }
 
-    // Re-authorize the app.
-    println!("Re-authorizing app...");
-    let auth_granted = ffi_authorize_app(auth_h, &app_info);
+    // Re-authorise the app.
+    println!("Re-authorising app...");
+    let auth_granted = ffi_authorise_app(auth_h, &app_info);
 
     println!("Re-registering app...");
     let _app: *mut App = unsafe {
@@ -282,8 +282,8 @@ fn authorization_and_revocation() {
     }
 }
 
-// Authorizes the app.
-fn ffi_authorize_app(auth_h: *mut Authenticator, app_info: &AppExchangeInfo) -> AuthGranted {
+// Authorises the app.
+fn ffi_authorise_app(auth_h: *mut Authenticator, app_info: &AppExchangeInfo) -> AuthGranted {
     let auth_req = AuthReq {
         app: app_info.clone(),
         app_container: false,

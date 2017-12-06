@@ -21,7 +21,7 @@ use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
 use ipc::errors::IpcError;
 use std::collections::HashMap;
 
-/// Represents an authorization request
+/// Represents an authorisation request
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AuthReq {
     /// The application identifier for this request
