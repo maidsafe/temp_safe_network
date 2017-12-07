@@ -217,15 +217,19 @@ pub fn access_container_entry_into_repr_c(
         })
     }
 
-    let (ptr, len, cap) = vec_into_raw_parts(vec);
-    Ok(ffi::AccessContainerEntry { ptr, len, cap })
+    let (containers_ptr, containers_len, containers_cap) = vec_into_raw_parts(vec);
+    Ok(ffi::AccessContainerEntry {
+        containers_ptr,
+        containers_len,
+        containers_cap,
+    })
 }
 
 /// Convert FFI representation of `AccessContainerEntry` to native rust representation by cloning.
 pub unsafe fn access_container_entry_clone_from_repr_c(
     entry: *const ffi::AccessContainerEntry,
 ) -> Result<AccessContainerEntry, IpcError> {
-    let input = slice::from_raw_parts((*entry).ptr, (*entry).len);
+    let input = slice::from_raw_parts((*entry).containers_ptr, (*entry).containers_len);
     let mut output = AccessContainerEntry::with_capacity(input.len());
 
     for container in input {
