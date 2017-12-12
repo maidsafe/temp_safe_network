@@ -43,7 +43,7 @@ fn main() {
 fn gen_bindings_c() {
     unwrap!(ffi_utils::header_gen::gen_headers(
         &unwrap!(env::var("CARGO_PKG_NAME")),
-        "../bindings/c/gen/",
+        "../bindings/c/",
         "src/lib.rs",
     ));
 }
