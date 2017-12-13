@@ -1,11 +1,24 @@
 #!/usr/bin/env run-cargo-script
-// cargo-deps: clap="2.29.0", toml="0.4.5", walkdir="2.0.1", zip="0.2.6"
+//! ```cargo
+//! [dependencies]
+//! clap = "=2.27.1"
+//! colored = "1.6.0"
+//! heck = "0.3.0"
+//! toml = "0.4.5"
+//! walkdir = "2.0.1"
+//! zip = "0.2.6"
+//! ```
 extern crate clap;
+extern crate colored;
+extern crate heck;
 extern crate toml;
 extern crate walkdir;
 extern crate zip;
 
 use clap::{App, Arg};
+use colored::*;
+use heck::ShoutySnakeCase;
+use std::env;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -21,42 +34,52 @@ const ARCHS: &[Arch] = &[
     Arch {
         name: "linux-x86",
         target: "i686-unknown-linux-gnu",
+        toolchain: "",
     },
     Arch {
-        name: "linux-x86_64",
+        name: "linux-x64",
         target: "x86_64-unknown-linux-gnu",
+        toolchain: "",
     },
     Arch {
         name: "osx-x86",
         target: "i686-apple-darwin",
+        toolchain: "",
     },
     Arch {
-        name: "osx-x86_64",
+        name: "osx-x64",
         target: "x86_64-apple-darwin",
+        toolchain: "",
     },
     Arch {
         name: "win-x86",
         target: "i686-pc-windows-gnu",
+        toolchain: "",
     },
     Arch {
         name: "win-x64",
         target: "x86_64-pc-windows-gnu",
+        toolchain: "",
     },
     Arch {
         name: "android-armeabiv7a",
         target: "armv7-linux-androideabi",
+        toolchain: "arm-linux-androideabi-",
     },
     Arch {
         name: "android-x86",
         target: "i686-linux-android",
+        toolchain: "i686-linux-android-",
     },
     Arch {
         name: "ios-arm64",
         target: "aarch64-apple-ios",
+        toolchain: "",
     },
     Arch {
         name: "ios-x86_64",
         target: "x86_64-apple-ios",
+        toolchain: "",
     },
 ];
 
@@ -64,11 +87,11 @@ const ARCHS: &[Arch] = &[
 #[cfg(all(target_os = "linux", target_arch = "x86"))]
 const HOST_ARCH_NAME: &str = "linux-x86";
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const HOST_ARCH_NAME: &str = "linux-x86_64";
+const HOST_ARCH_NAME: &str = "linux-x64";
 #[cfg(all(target_os = "macos", target_arch = "x86"))]
 const HOST_ARCH_NAME: &str = "osx-x86";
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const HOST_ARCH_NAME: &str = "osx-x86_64";
+const HOST_ARCH_NAME: &str = "osx-x64";
 #[cfg(all(target_os = "windows", target_arch = "x86"))]
 const HOST_ARCH_NAME: &str = "win-x86";
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
@@ -81,6 +104,7 @@ const COMMIT_HASH_LEN: usize = 7;
 fn main() {
     let arch_names: Vec<_> = ARCHS.into_iter().map(|args| args.name).collect();
 
+    // Parse command line arguments.
     let matches = App::new("safe_client_libs packaging tool")
         .arg(
             Arg::with_name("NAME")
@@ -115,15 +139,12 @@ fn main() {
             "Generates mock version of the library",
         ))
         .arg(
-            Arg::with_name("STRIP")
-                .long("strip")
+            Arg::with_name("TOOLCHAIN")
+                .short("t")
+                .long("toolchain")
                 .takes_value(true)
-                .conflicts_with("NO_STRIP")
-                .help("Path to the strip binary [default: strip]"),
+                .help("Path to the toolchain (for cross-compilation)"),
         )
-        .arg(Arg::with_name("NO_STRIP").long("no-strip").help(
-            "Do not strip the libraries",
-        ))
         .get_matches();
 
     let krate = matches.value_of("NAME").unwrap();
@@ -135,12 +156,14 @@ fn main() {
     let bindings = matches.is_present("BINDINGS");
     let lib = matches.is_present("LIB");
     let mock = matches.is_present("MOCK");
-    let strip = if matches.is_present("NO_STRIP") {
-        None
-    } else {
-        Some(matches.value_of("STRIP").unwrap_or("strip"))
-    };
 
+    let toolchain_path = matches.value_of("TOOLCHAIN");
+    let toolchain_prefix = get_toolchain_prefix(toolchain_path, arch);
+    let strip_bin = format!("{}{}", toolchain_prefix, "strip");
+
+    validate_env(arch);
+
+    // Gather features.
     let mut features = vec![];
     if mock {
         features.push("use-mock-routing");
@@ -150,6 +173,7 @@ fn main() {
         features.push("bindings");
     }
 
+    // Run the build.
     let mut command = Command::new("cargo");
     command
         .arg("build")
@@ -166,7 +190,6 @@ fn main() {
         command.arg("--target").arg(target);
     }
 
-    // Run cargo build.
     if !command.status().unwrap().success() {
         return;
     }
@@ -176,11 +199,8 @@ fn main() {
     // Create library archive.
     if lib {
         let libs = find_libs(krate, target);
-
-        if let Some(strip) = strip {
-            for path in &libs {
-                strip_lib(strip, &path);
-            }
+        for path in &libs {
+            strip_lib(&strip_bin, &path);
         }
 
         let archive_name = {
@@ -192,7 +212,7 @@ fn main() {
         let file = File::create(archive_name).unwrap();
         let mut archive = ZipWriter::new(file);
 
-        for path in  libs {
+        for path in libs {
             archive
                 .start_file(path.file_name().unwrap().to_string_lossy(), file_options)
                 .unwrap();
@@ -235,6 +255,7 @@ fn main() {
 struct Arch {
     name: &'static str,
     target: &'static str,
+    toolchain: &'static str,
 }
 
 fn get_version_string(krate: &str, commit: bool) -> String {
@@ -265,6 +286,42 @@ fn get_version_string(krate: &str, commit: bool) -> String {
             .as_str()
             .expect("failed to read package version from Cargo.toml")
             .to_string()
+    }
+}
+
+fn get_toolchain_prefix(toolchain_path: Option<&str>, arch: Option<&Arch>) -> String {
+    let mut result = PathBuf::new();
+
+    if let Some(path) = toolchain_path {
+        result.push(path);
+        result.push("bin");
+    }
+
+    result.push(arch.map(|arch| arch.toolchain).unwrap_or(""));
+    result.into_os_string().into_string().unwrap()
+}
+
+fn validate_env(arch: Option<&Arch>) {
+    if let Some(arch) = arch {
+        let name = format!("CARGO_TARGET_{}_LINKER", arch.target.to_shouty_snake_case());
+        if let Ok(value) = env::var(&name) {
+            if !Path::new(&value).exists() {
+                println!(
+                    "{}: the environment variable {} is set, but points to \
+                     non-existing file {}. This might cause linker failures.",
+                     "warning".yellow().bold(),
+                    name.bold(),
+                    value.bold(),
+                );
+            }
+        } else {
+            println!(
+                "{}: the environment variable {} is not set. \
+                 This might cause linker failure.",
+                "warning".yellow().bold(),
+                name.bold()
+            );
+        }
     }
 }
 
@@ -304,7 +361,7 @@ fn find_libs(krate: &str, target: Option<&str>) -> Vec<PathBuf> {
     result
 }
 
-fn strip_lib(strip: &str, path: &Path) {
+fn strip_lib(strip: &str, lib_path: &Path) {
     let mut command = Command::new(strip);
 
     // On OS X `strip` does not remove global symbols without this flag.
@@ -312,8 +369,9 @@ fn strip_lib(strip: &str, path: &Path) {
         command.arg("-x");
     }
 
-    command.arg(path);
-    if !command.status().unwrap().success() {
-        panic!("failed to strip {}", path.display());
+    command.arg(lib_path);
+
+    if !command.status().expect("failed to run strip").success() {
+        panic!("failed to strip {}", lib_path.display());
     }
 }
