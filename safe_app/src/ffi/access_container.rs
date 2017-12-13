@@ -137,7 +137,7 @@ mod tests {
     use std::collections::HashMap;
     use std::ffi::CString;
     use std::rc::Rc;
-    use test_utils::{create_app_with_access, run};
+    use test_utils::{create_app_by_req, create_auth_req_with_access, run};
 
     // Test refreshing access info by fetching it from the network.
     #[test]
@@ -149,7 +149,7 @@ mod tests {
             btree_set![Permission::Read, Permission::Insert],
         );
 
-        let app = create_app_with_access(container_permissions.clone());
+        let app = create_app_by_req(&create_auth_req_with_access(container_permissions.clone()));
 
         run(&app, move |_client, context| {
             let reg = Rc::clone(unwrap!(context.as_registered()));
@@ -182,7 +182,7 @@ mod tests {
     fn get_access_info() {
         let mut container_permissions = HashMap::new();
         let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
-        let app = create_app_with_access(container_permissions);
+        let app = create_app_by_req(&create_auth_req_with_access(container_permissions));
 
         // Get access container info
         let perms: Vec<PermSet> =

@@ -30,7 +30,7 @@ use safe_core::nfs::NfsError;
 use std;
 use std::collections::HashMap;
 use std::ffi::CString;
-use test_utils::{create_app_with_access, run};
+use test_utils::{create_app_by_req, create_auth_req_with_access, run};
 
 fn setup() -> (App, MDataInfo) {
     let mut container_permissions = HashMap::new();
@@ -44,7 +44,7 @@ fn setup() -> (App, MDataInfo) {
         ],
     );
 
-    let app = create_app_with_access(container_permissions);
+    let app = create_app_by_req(&create_auth_req_with_access(container_permissions));
 
     let container_info = run(&app, move |client, context| {
         context.get_access_info(client).then(move |res| {

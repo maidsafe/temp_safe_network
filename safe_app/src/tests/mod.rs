@@ -29,12 +29,11 @@ use safe_authenticator::test_utils::revoke;
 use safe_core::MockRouting;
 use safe_core::ffi::AccountInfo;
 use safe_core::ipc::Permission;
-use safe_core::ipc::req::{AppExchangeInfo, AuthReq, containers_into_vec};
-use safe_core::utils;
+use safe_core::ipc::req::{AppExchangeInfo, AuthReq};
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::rc::Rc;
-use test_utils::{create_app_with_access, run, test_create_app_with_access};
+use test_utils::{create_app_by_req, create_auth_req, create_auth_req_with_access, run,
+                 test_create_app_with_access};
 use test_utils::gen_app_exchange_info;
 
 // Test refreshing access info by fetching it from the network.
@@ -47,7 +46,7 @@ fn refresh_access_info() {
         btree_set![Permission::Read, Permission::Insert],
     );
 
-    let app = create_app_with_access(container_permissions.clone());
+    let app = create_app_by_req(&create_auth_req_with_access(container_permissions.clone()));
 
     run(&app, move |client, context| {
         let reg = Rc::clone(unwrap!(context.as_registered()));
@@ -74,20 +73,13 @@ fn get_access_info() {
     let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
     let _ = container_permissions.insert("_downloads".to_string(), btree_set![Permission::Insert]);
 
-    let containers_vec = containers_into_vec(container_permissions).unwrap();
+    let auth_req = create_auth_req(None, Some(container_permissions));
+    let auth_req_ffi = unwrap!(auth_req.into_repr_c());
 
-    let app_id = unwrap!(utils::generate_random_string(10));
-    let app_id = unwrap!(CString::new(app_id));
     let app: *mut App = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            test_create_app_with_access(
-                app_id.as_ptr(),
-                containers_vec.as_ptr(),
-                containers_vec.len(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(
+            |ud, cb| test_create_app_with_access(&auth_req_ffi, ud, cb),
+        ))
     };
 
     run(unsafe { &*app }, move |client, context| {
