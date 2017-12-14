@@ -89,7 +89,10 @@ mod tests;
 pub mod test_utils;
 
 pub use self::errors::*;
+
 use self::object_cache::ObjectCache;
+#[cfg(feature = "testing")]
+pub use ffi::test_utils::{test_create_app, test_create_app_with_access};
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -107,8 +110,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
-#[cfg(feature = "testing")]
-pub use test_utils::{test_create_app, test_create_app_with_access};
 use tokio_core::reactor::{Core, Handle};
 
 macro_rules! try_tx {

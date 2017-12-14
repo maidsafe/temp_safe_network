@@ -18,6 +18,7 @@
 mod mutable_data;
 
 use App;
+use ffi::test_utils::test_create_app_with_access;
 use ffi_utils::test_utils::call_1;
 use futures::Future;
 #[cfg(feature = "use-mock-routing")]
@@ -32,8 +33,7 @@ use safe_core::ipc::Permission;
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq};
 use std::collections::HashMap;
 use std::rc::Rc;
-use test_utils::{create_app_by_req, create_auth_req, create_auth_req_with_access, run,
-                 test_create_app_with_access};
+use test_utils::{create_app_by_req, create_auth_req, create_auth_req_with_access, run};
 use test_utils::gen_app_exchange_info;
 
 // Test refreshing access info by fetching it from the network.

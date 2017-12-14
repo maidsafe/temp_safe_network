@@ -19,24 +19,26 @@
 
 #![allow(unsafe_code)]
 
-/// Access container
+/// Access container.
 pub mod access_container;
-/// Cipher Options
+/// Cipher Options.
 pub mod cipher_opt;
-/// Low level manipulation of `ImmutableData`
+/// Low level manipulation of `ImmutableData`.
 pub mod immutable_data;
-/// IPC utilities
+/// IPC utilities.
 pub mod ipc;
-/// Logging operations
+/// Logging operations.
 pub mod logging;
-/// `MDataInfo` operations
+/// `MDataInfo` operations.
 pub mod mdata_info;
-/// Crypto-related routines
+/// Crypto-related routines.
 pub mod crypto;
-/// Low level manipulation of `MutableData`
+/// Low level manipulation of `MutableData`.
 pub mod mutable_data;
-/// NFS API
+/// NFS API.
 pub mod nfs;
+/// Testing utilities.
+pub mod test_utils;
 
 mod helper;
 #[cfg(test)]

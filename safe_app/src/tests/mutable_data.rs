@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use ffi::test_utils::test_create_app;
 use ffi_utils::test_utils::call_1;
 use futures::Future;
 use maidsafe_utilities::thread;
@@ -26,7 +27,7 @@ use safe_core::utils::test_utils::random_client;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::CString;
 use std::sync::mpsc;
-use test_utils::{create_app, run, test_create_app};
+use test_utils::{create_app, run};
 
 // MD created by App. App lists its own sign_pk in owners field: Put should
 // fail - Rejected by MaidManagers. Should pass when it lists the owner's
