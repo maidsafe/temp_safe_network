@@ -16,6 +16,27 @@ This is the project workspace. Please refer to individual members for details:
 - [safe_authenticator](safe_authenticator/README.md)
 - [safe_app](safe_app/README.md)
 
+## Testing
+
+When making changes, please run the appropriate tests, described below, before submitting a PR.
+
+### Mock routing
+
+If a change is minor or does not involve potential breakage in data or API compatibility, it is not necessary to test against the actual network. In this case, it is enough to run unit tests using mock routing and make sure that they all pass. To do this, you will have to go to the crate you wish to test (e.g. the `safe_core` directory) and execute the following:
+
+`cargo test --release --features=use-mock-routing`
+
+This will run all unit tests for the crate. We run tests in release mode (indicated by the `--release` flag) in order to catch rare FFI bugs that may not manifest themselves in debug mode. Debug mode is also unoptimized and can take an inordinate amount of time to run tests.
+
+### Real network
+
+When in doubt, perform an integration test against the real network, in addition to mock routing tests above. This will test various network operations, so please make sure you have some available account mutations. The steps:
+
+* You will need a SAFE network account. You can register one from within the [SAFE Browser](https://github.com/maidsafe/safe_browser/releases).
+* Navigate to the `tests` directory.
+* Open `tests.config` and set your account locator and password. **Do not commit this.** Alternatively, you can set the environment variables `TEST_ACC_LOCATOR` and `TEST_ACC_PASSWORD`.
+* Run `cargo test --release -- --nocapture` and make sure that no errors are reported.
+
 ## License
 
 Licensed under either of
