@@ -7,9 +7,9 @@ namespace SafeApp {
 
     public class AuthIpcMsg : IpcMsg {
         public uint ReqId;
-        public AuthGrantedNative AuthGranted;
+        public AuthGranted AuthGranted;
 
-        public AuthIpcMsg(uint reqId, ref AuthGrantedNative authGranted) {
+        public AuthIpcMsg(uint reqId, AuthGranted authGranted) {
             ReqId = reqId;
             AuthGranted = authGranted;
         }
@@ -17,13 +17,11 @@ namespace SafeApp {
 
     public class UnregisteredIpcMsg : IpcMsg {
         public uint ReqId;
-        public IntPtr SerialisedCfgPtr;
-        public ulong SerialisedCfgLen;
+        public byte[] SerialisedCfg;
 
-        public UnregisteredIpcMsg(uint reqId, IntPtr serialisedCfgPtr, ulong serialisedCfgLen) {
+        public UnregisteredIpcMsg(uint reqId, IntPtr serialisedCfgPtr, IntPtr serialisedCfgLen) {
             ReqId = reqId;
-            SerialisedCfgPtr = serialisedCfgPtr;
-            SerialisedCfgLen = serialisedCfgLen;
+            SerialisedCfg = BindingUtils.CopyToByteArray(serialisedCfgPtr, serialisedCfgLen);
         }
     }
 

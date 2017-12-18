@@ -1,7 +1,7 @@
 using System;
 
 namespace SafeApp {
-    public partial class MockAuthBindings : IMockAuthBindings {
+    public partial class MockAuthBindings {
        public IntPtr TestCreateApp() {
             var ret = TestCreateAppNative(out IntPtr app);
             if (ret != 0) {
@@ -12,7 +12,7 @@ namespace SafeApp {
         }
 
         public IntPtr TestCreateAppWithAccess(ContainerPermissions[] accessInfo) {
-            var ret = TestCreateAppWithAccessNative(accessInfo, (ulong) accessInfo.Length, out IntPtr app);
+            var ret = TestCreateAppWithAccessNative(accessInfo, (IntPtr) accessInfo.Length, out IntPtr app);
             if (ret != 0) {
                 throw new InvalidOperationException();
             }

@@ -3,7 +3,8 @@ using System.Threading.Tasks;
 
 namespace SafeApp {
     public partial interface IAppBindings {
-        Task<App> AppUnregistered(byte[] bootstrapConfig, Action oDisconnectNotifierCb);
-        Task<App> AppRegistered(String appId, ref AuthGrantedNative authGranted, Action oDisconnectNotifierCb);
+        void AppUnregistered(byte[] bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr> oCb);
+        void AppRegistered(String appId, ref AuthGranted authGranted, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr> oCb);
+        Task<IpcMsg> DecodeIpcMsgAsync(String msg);
     }
 }

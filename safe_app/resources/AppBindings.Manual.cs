@@ -2,45 +2,43 @@ using System;
 using System.Threading.Tasks;
 
 namespace SafeApp {
-    public partial class AppBindings : IAppBindings {
+    public partial class AppBindings {
         #region App Creation
 
-        public Task<App> AppUnregistered(byte[] bootstrapConfig, Action oDisconnectNotifierCb)
+        public void AppUnregistered(byte[] bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr> oCb)
         {
-            var tcs = new TaskCompletionSource<App>();
-            var userData = BindingUtils.ToHandlePtr((tcs, oDisconnectNotifierCb));
+            var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));
 
             AppUnregisteredNative(bootstrapConfig,
-                                  (ulong) bootstrapConfig.Length,
+                                  (IntPtr) bootstrapConfig.Length,
                                   userData,
                                   OnAppDisconnectCb,
                                   OnAppCreateCb);
-
-            return tcs.Task;
         }
 
-        public Task<App> AppRegistered(String appId,
-                                       ref AuthGrantedNative authGranted,
-                                       Action oDisconnectNotifierCb)
+        public void AppRegistered(String appId,
+                                  ref AuthGranted authGranted,
+                                  Action oDisconnectNotifierCb,
+                                  Action<FfiResult, IntPtr> oCb)
         {
-            var tcs = new TaskCompletionSource<App>();
-            var userData = BindingUtils.ToHandlePtr((tcs, oDisconnectNotifierCb));
+            var authGrantedNative = authGranted.ToNative();
+            var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));
 
             AppRegisteredNative(appId,
-                                ref authGranted,
+                                ref authGrantedNative,
                                 userData,
                                 OnAppDisconnectCb,
                                 OnAppCreateCb);
 
-            return tcs.Task;
+            authGrantedNative.Free();
         }
 
         #if __IOS__
         [MonoPInvokeCallback(typeof(NoneCb))]
         #endif
         private static void OnAppDisconnectCb(IntPtr userData) {
-            var (_, action) =
-                BindingUtils.FromHandlePtr<(TaskCompletionSource<App>, Action)>(
+            var (action, _) =
+                BindingUtils.FromHandlePtr<(Action, Action<FfiResult, IntPtr>)>(
                     userData, false
                 );
 
@@ -50,20 +48,20 @@ namespace SafeApp {
         #if __IOS__
         [MonoPInvokeCallback(typeof(FfiResultAppCb))]
         #endif
-        private static void OnAppCreateCb(IntPtr userData, ref FfiResult result, App app) {
-            var (tcs, _) =
-                BindingUtils.FromHandlePtr<(TaskCompletionSource<App>, Action)>(
+        private static void OnAppCreateCb(IntPtr userData, ref FfiResult result, IntPtr app) {
+            var (_, action) =
+                BindingUtils.FromHandlePtr<(Action, Action<FfiResult, IntPtr>)>(
                     userData, false
                 );
 
-            BindingUtils.CompleteTask(tcs, ref result, app);
+            action(result, app);
         }
 
         #endregion
 
         #region DecodeIpcMsg
 
-        public Task<IpcMsg> DecodeIpcMsg(String msg) {
+        public Task<IpcMsg> DecodeIpcMsgAsync(String msg) {
             var (task, userData) = BindingUtils.PrepareTask<IpcMsg>();
             DecodeIpcMsgNative(msg,
                                userData,
@@ -83,13 +81,13 @@ namespace SafeApp {
         private static void OnDecodeIpcMsgAuthCb(IntPtr userData, uint reqId, ref AuthGrantedNative authGranted)
         {
             var tcs = BindingUtils.FromHandlePtr<TaskCompletionSource<IpcMsg>>(userData);
-            tcs.SetResult(new AuthIpcMsg(reqId, ref authGranted));
+            tcs.SetResult(new AuthIpcMsg(reqId, new AuthGranted(authGranted)));
         }
 
         #if __IOS__
         [MonoPInvokeCallback(typeof(UintByteListCb))]
         #endif
-        private static void OnDecodeIpcMsgUnregisteredCb(IntPtr userData, uint reqId, IntPtr serialisedCfgPtr, ulong serialisedCfgLen)
+        private static void OnDecodeIpcMsgUnregisteredCb(IntPtr userData, uint reqId, IntPtr serialisedCfgPtr, IntPtr serialisedCfgLen)
         {
             var tcs = BindingUtils.FromHandlePtr<TaskCompletionSource<IpcMsg>>(userData);
             tcs.SetResult(new UnregisteredIpcMsg(reqId, serialisedCfgPtr, serialisedCfgLen));
