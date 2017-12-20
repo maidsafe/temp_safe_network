@@ -122,7 +122,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        app_exchange_info_ptr: *const FfiAppExchangeInfo,
+                        app_exchange_info: *const FfiAppExchangeInfo,
                         app_exchange_info_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn auth_registered_apps(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        registered_app_ptr: *const RegisteredApp,
+                        registered_app: *const RegisteredApp,
                         registered_app_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -273,7 +273,7 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        app_access_ptr: *const FfiAppAccess,
+                        app_access: *const FfiAppAccess,
                         app_access_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);

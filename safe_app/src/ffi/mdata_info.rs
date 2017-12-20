@@ -106,7 +106,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        enc_entry_key_ptr: *const u8,
+                        enc_entry_key: *const u8,
                         enc_entry_key_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        enc_entry_value_ptr: *const u8,
+                        enc_entry_value: *const u8,
                         enc_entry_value_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -164,7 +164,7 @@ pub unsafe extern "C" fn mdata_info_decrypt(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        mdata_info_decrypt_ptr: *const u8,
+                        mdata_info_decrypt: *const u8,
                         mdata_info_decrypt_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn mdata_info_serialise(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        encoded_ptr: *const u8,
+                        encoded: *const u8,
                         encoded_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {

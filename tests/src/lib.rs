@@ -387,7 +387,7 @@ extern "C" fn revoked_cb(ctx: *mut c_void) {
 extern "C" fn unregistered_cb(
     ctx: *mut c_void,
     _req_id: u32,
-    _bootstrap_cfg_ptr: *const u8,
+    _bootstrap_cfg: *const u8,
     _bootstrap_cfg_len: usize,
 ) {
     unsafe {

@@ -109,7 +109,7 @@ pub unsafe extern "C" fn mdata_entries_get(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        content_ptr: *const u8,
+                        content: *const u8,
                         content_len: usize,
                         version: u64),
 ) {
@@ -154,9 +154,9 @@ pub unsafe extern "C" fn mdata_entries_for_each(
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
     o_each_cb: extern "C" fn(user_data: *mut c_void,
-                             key_ptr: *const u8,
+                             key: *const u8,
                              key_len: usize,
-                             value_ptr: *const u8,
+                             value: *const u8,
                              value_len: usize,
                              entry_version: u64),
     o_done_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
@@ -358,16 +358,16 @@ mod tests {
 
         extern "C" fn entry_cb(
             user_data: *mut c_void,
-            key_ptr: *const u8,
+            key: *const u8,
             key_len: usize,
-            value_ptr: *const u8,
+            value: *const u8,
             value_len: usize,
             entry_version: u64,
         ) {
             unsafe {
-                let key = vec_clone_from_raw_parts(key_ptr, key_len);
+                let key = vec_clone_from_raw_parts(key, key_len);
                 let value = Value {
-                    content: vec_clone_from_raw_parts(value_ptr, value_len),
+                    content: vec_clone_from_raw_parts(value, value_len),
                     entry_version: entry_version,
                 };
 
