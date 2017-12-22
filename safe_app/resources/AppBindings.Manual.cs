@@ -1,16 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace SafeApp {
     public partial class AppBindings {
         #region App Creation
 
-        public void AppUnregistered(byte[] bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr> oCb)
+        public void AppUnregistered(List<byte> bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr> oCb)
         {
             var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));
 
-            AppUnregisteredNative(bootstrapConfig,
-                                  (IntPtr) bootstrapConfig.Length,
+            AppUnregisteredNative(bootstrapConfig.ToArray(),
+                                  (IntPtr) bootstrapConfig.Count,
                                   userData,
                                   OnAppDisconnectCb,
                                   OnAppCreateCb);

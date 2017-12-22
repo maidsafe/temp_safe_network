@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace SafeApp {
@@ -17,11 +18,11 @@ namespace SafeApp {
 
     public class UnregisteredIpcMsg : IpcMsg {
         public uint ReqId;
-        public byte[] SerialisedCfg;
+        public List<byte> SerialisedCfg;
 
         public UnregisteredIpcMsg(uint reqId, IntPtr serialisedCfgPtr, IntPtr serialisedCfgLen) {
             ReqId = reqId;
-            SerialisedCfg = BindingUtils.CopyToByteArray(serialisedCfgPtr, serialisedCfgLen);
+            SerialisedCfg = BindingUtils.CopyToByteList(serialisedCfgPtr, serialisedCfgLen);
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace SafeApp {
     public partial class MockAuthBindings {
@@ -11,8 +12,8 @@ namespace SafeApp {
             return app;
         }
 
-        public IntPtr TestCreateAppWithAccess(ContainerPermissions[] accessInfo) {
-            var ret = TestCreateAppWithAccessNative(accessInfo, (IntPtr) accessInfo.Length, out IntPtr app);
+        public IntPtr TestCreateAppWithAccess(List<ContainerPermissions> accessInfo) {
+            var ret = TestCreateAppWithAccessNative(accessInfo.ToArray(), (IntPtr) accessInfo.Count, out IntPtr app);
             if (ret != 0) {
                 throw new InvalidOperationException();
             }

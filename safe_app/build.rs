@@ -85,6 +85,7 @@ fn gen_bindings_csharp() {
 
     // Testing utilities.
     lang.set_class_name("MockAuthBindings");
+    lang.set_types_enabled(false);
     lang.set_utils_enabled(false);
 
     lang.reset_filter(FilterMode::Whitelist);

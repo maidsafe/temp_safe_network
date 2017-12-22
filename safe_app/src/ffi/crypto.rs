@@ -553,7 +553,7 @@ pub unsafe extern "C" fn decrypt(
 pub unsafe extern "C" fn encrypt_sealed_box(
     app: *const App,
     data: *const u8,
-    len: usize,
+    data_len: usize,
     pk_h: EncryptPubKeyHandle,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
@@ -562,7 +562,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
                         ciphertext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let plaintext = vec_clone_from_raw_parts(data, len);
+        let plaintext = vec_clone_from_raw_parts(data, data_len);
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |_, context| {
@@ -593,7 +593,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
 pub unsafe extern "C" fn decrypt_sealed_box(
     app: *const App,
     data: *const u8,
-    len: usize,
+    data_len: usize,
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
@@ -604,7 +604,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let plaintext = vec_clone_from_raw_parts(data, len);
+        let plaintext = vec_clone_from_raw_parts(data, data_len);
 
         (*app).send(move |_, context| {
             let pk = try_cb!(
@@ -635,7 +635,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
 #[no_mangle]
 pub unsafe extern "C" fn sha3_hash(
     data: *const u8,
-    len: usize,
+    data_len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
@@ -643,7 +643,7 @@ pub unsafe extern "C" fn sha3_hash(
                         hash_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
-        let plaintext = slice::from_raw_parts(data, len);
+        let plaintext = slice::from_raw_parts(data, data_len);
 
         let hash = sha3_256(plaintext);
         o_cb(user_data, FFI_RESULT_OK, hash.as_ptr(), hash.len());
