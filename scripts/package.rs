@@ -161,6 +161,8 @@ fn main() {
     let toolchain_prefix = get_toolchain_prefix(toolchain_path, arch);
     let strip_bin = format!("{}{}", toolchain_prefix, "strip");
 
+    let target_dir = env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string());
+
     validate_env(arch);
 
     // Gather features.
@@ -198,7 +200,11 @@ fn main() {
 
     // Create library archive.
     if lib {
-        let libs = find_libs(krate, target);
+        let libs = find_libs(krate, target, &target_dir);
+        if libs.is_empty() {
+            panic!("No libs found in {}/release", target_dir)
+        }
+
         for path in &libs {
             strip_lib(&strip_bin, &path);
         }
@@ -237,7 +243,7 @@ fn main() {
                 let entry = entry.unwrap();
                 let target_path =
                     target_prefix.join(entry.path().strip_prefix(&source_prefix).unwrap());
-                let target_path = target_path.to_string_lossy();
+                let target_path = path_into_string(target_path);
 
                 if entry.file_type().is_dir() {
                     archive.add_directory(target_path, file_options).unwrap();
@@ -325,8 +331,8 @@ fn validate_env(arch: Option<&Arch>) {
     }
 }
 
-fn find_libs(krate: &str, target: Option<&str>) -> Vec<PathBuf> {
-    let mut prefix = PathBuf::from("target");
+fn find_libs(krate: &str, target: Option<&str>, target_dir: &str) -> Vec<PathBuf> {
+    let mut prefix = PathBuf::from(target_dir);
     if let Some(target) = target {
         prefix = prefix.join(target);
     }
@@ -374,4 +380,11 @@ fn strip_lib(strip: &str, lib_path: &Path) {
     if !command.status().expect("failed to run strip").success() {
         panic!("failed to strip {}", lib_path.display());
     }
+}
+
+fn path_into_string(path: PathBuf) -> String {
+    path.into_os_string().into_string().unwrap().replace(
+        '\\',
+        "/",
+    )
 }
