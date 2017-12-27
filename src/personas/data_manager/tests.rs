@@ -27,7 +27,7 @@ use vault::Refresh as VaultRefresh;
 const CHUNK_STORE_CAPACITY: Option<u64> = Some(1024 * 1024);
 const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;
-const TEST_TAG: u64 = 12345678;
+const TEST_TAG: u64 = 12_345_678;
 
 #[test]
 fn idata_basics() {

@@ -34,7 +34,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tiny_keccak;
 
 const TEST_NET_SIZE: usize = 20;
-const TEST_TAG: u64 = 123456;
+const TEST_TAG: u64 = 123_456;
 
 #[test]
 fn handle_put_without_account() {

@@ -361,7 +361,7 @@ impl DataManager {
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
 
-        /// Send the response as a node, to allow custom accumulation.
+        // Send the response as a node, to allow custom accumulation.
         let resp_src = Authority::ManagedNode(*routing_node.id()?.name());
         let resp_dst = src;
 
@@ -556,7 +556,7 @@ impl DataManager {
                 // The shell is more recent than the data in the chunk store.
                 // Repace the data with the shell, but keep the entries.
                 for (key, value) in old_data.entries() {
-                    shell.mutate_entry_without_validation(key.clone(), value.clone());
+                    let _ = shell.mutate_entry_without_validation(key.clone(), value.clone());
                 }
 
                 false
@@ -1197,7 +1197,8 @@ impl DataManager {
                 version,
             } => {
                 self.with_mdata(name, tag, |data| {
-                    data.set_user_permissions_without_validation(user, permissions, version);
+                    let _ =
+                        data.set_user_permissions_without_validation(user, permissions, version);
                     vec![FragmentInfo::mutable_data_shell(data)]
                 })
             }
@@ -1208,7 +1209,7 @@ impl DataManager {
                 version,
             } => {
                 self.with_mdata(name, tag, |data| {
-                    data.del_user_permissions_without_validation(&user, version);
+                    let _ = data.del_user_permissions_without_validation(&user, version);
                     vec![FragmentInfo::mutable_data_shell(data)]
                 })
             }
@@ -1220,7 +1221,7 @@ impl DataManager {
             } => {
                 self.with_mdata(name, tag, |data| {
                     if let Some(new_owner) = new_owners.into_iter().next() {
-                        data.change_owner_without_validation(new_owner, version);
+                        let _ = data.change_owner_without_validation(new_owner, version);
                     }
                     vec![FragmentInfo::mutable_data_shell(data)]
                 })
@@ -1748,7 +1749,7 @@ where
     I: IntoIterator<Item = (Vec<u8>, Value)>,
 {
     for (key, value) in entries {
-        data.mutate_entry_without_validation(key, value);
+        let _ = data.mutate_entry_without_validation(key, value);
     }
 }
 

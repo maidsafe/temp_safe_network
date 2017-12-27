@@ -67,7 +67,7 @@ impl Vault {
         use_cache: bool,
         config: Config,
     ) -> Result<Self, InternalError> {
-        rust_sodium::init();
+        let _ = rust_sodium::init();
         let disable_mutation_limit = config.dev.as_ref().map_or(false, |dev_config| {
             dev_config.disable_mutation_limit
         });

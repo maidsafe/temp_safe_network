@@ -99,7 +99,7 @@ impl MutableDataCache {
     {
         self.remove_expired_entries();
 
-        let mut map = self.entry_cache.entry(id).or_insert_with(HashMap::default);
+        let map = self.entry_cache.entry(id).or_insert_with(HashMap::default);
 
         for (key, value) in entries {
             let _ = map.insert(key, (value, Instant::now()));
