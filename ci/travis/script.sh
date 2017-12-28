@@ -9,7 +9,7 @@ if [ -n "${TARGET}" ]; then
   ARG_TARGET=" --target ${TARGET}"
 fi
 
-if [ "${TRAVIS_RUST_VERSION}" = 1.19.0 ]; then
+if [ "${TRAVIS_RUST_VERSION}" = "$RUST_STABLE" ]; then
   cargo fmt -- --write-mode=diff
   # build without features
   cargo check ${ARG_TARGET} --verbose --lib --tests
