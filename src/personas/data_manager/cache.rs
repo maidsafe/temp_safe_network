@@ -267,7 +267,7 @@ impl Cache {
             return;
         }
 
-        let mut holder = self.fragment_holders.entry(holder).or_insert_with(
+        let holder = self.fragment_holders.entry(holder).or_insert_with(
             FragmentHolder::new,
         );
 

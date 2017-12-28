@@ -26,7 +26,7 @@ use vault::Refresh as VaultRefresh;
 
 const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;
-const TEST_TAG: u64 = 12345678;
+const TEST_TAG: u64 = 12_345_678;
 
 
 #[test]

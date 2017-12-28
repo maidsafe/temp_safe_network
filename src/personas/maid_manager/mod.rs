@@ -48,8 +48,8 @@ const ACCOUNT_CREATION_TIMEOUT_SECS: u64 = 90;
 /// The number of ongoing account creations we keep in memory at the same time.
 const ACCOUNT_CREATION_LIMIT: usize = 100;
 
-const INVITE_CLAIMED_KEY: &'static [u8] = b"claimed";
-const INVITE_CLAIMED_VALUE: &'static [u8] = &[1];
+const INVITE_CLAIMED_KEY: &[u8] = b"claimed";
+const INVITE_CLAIMED_VALUE: &[u8] = &[1];
 
 pub struct MaidManager {
     group_size: usize,
@@ -256,8 +256,8 @@ impl MaidManager {
             Ok(PutMDataAction::Forward(data)) => {
                 self.forward_put_mdata(
                     routing_node,
-                    src.into(),
-                    dst.into(),
+                    src,
+                    dst,
                     data,
                     msg_id,
                     requester,

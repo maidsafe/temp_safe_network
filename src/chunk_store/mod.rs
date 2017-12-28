@@ -32,7 +32,7 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use tempdir::TempDir;
 
-const CHUNK_STORE_DIR: &'static str = "safe_vault_chunk_store";
+const CHUNK_STORE_DIR: &str = "safe_vault_chunk_store";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 
 /// The max name length for a chunk file.

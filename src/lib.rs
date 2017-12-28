@@ -206,8 +206,11 @@
         unused_comparisons, unused_features, unused_parens, while_true)]
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
         unused_qualifications, unused_results)]
-#![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
-         missing_debug_implementations, variant_size_differences)]
+#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
+         variant_size_differences)]
+// FIXME: remove this when it'll be OK to change the public API, as `needless_pass_by_value`
+// requires to make changes to public functions.
+#![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 
 extern crate accumulator;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]

@@ -173,7 +173,7 @@ fn mutable_data_normal_flow() {
 
     // Put mutable data
     let mut data =
-        test_utils::gen_mutable_data(10000, num_entries, *client.signing_public_key(), &mut rng);
+        test_utils::gen_mutable_data(10_000, num_entries, *client.signing_public_key(), &mut rng);
     unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
 
     // Get the shell and entries and verify they are what we put it.
@@ -416,7 +416,7 @@ fn mutable_data_error_flow() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let mut data = test_utils::gen_mutable_data(10000, 0, *client.signing_public_key(), &mut rng);
+    let mut data = test_utils::gen_mutable_data(10_000, 0, *client.signing_public_key(), &mut rng);
     unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
 
     // Putting to the same data fails.
@@ -444,28 +444,28 @@ fn mutable_data_error_flow() {
     }
 
     assert_match!(
-        client.get_mdata_shell_response(non_existing_name, 10000, &mut nodes),
+        client.get_mdata_shell_response(non_existing_name, 10_000, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
     assert_match!(
-        client.get_mdata_version_response(non_existing_name, 10000, &mut nodes),
+        client.get_mdata_version_response(non_existing_name, 10_000, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
     assert_match!(
-        client.list_mdata_entries_response(non_existing_name, 10000, &mut nodes),
+        client.list_mdata_entries_response(non_existing_name, 10_000, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
     let key = b"key".to_vec();
     assert_match!(
-        client.get_mdata_value_response(non_existing_name, 10000, key, &mut nodes),
+        client.get_mdata_value_response(non_existing_name, 10_000, key, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
     assert_match!(
-        client.list_mdata_permissions_response(non_existing_name, 10000, &mut nodes),
+        client.list_mdata_permissions_response(non_existing_name, 10_000, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
@@ -473,7 +473,7 @@ fn mutable_data_error_flow() {
     assert_match!(
         client.list_mdata_user_permissions_response(
             non_existing_name,
-            10000,
+            10_000,
             User::Key(app_key),
             &mut nodes,
         ),
@@ -482,7 +482,7 @@ fn mutable_data_error_flow() {
 
     let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
     assert_match!(
-        client.mutate_mdata_entries_response(non_existing_name, 10000, actions, &mut nodes),
+        client.mutate_mdata_entries_response(non_existing_name, 10_000, actions, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
@@ -490,7 +490,7 @@ fn mutable_data_error_flow() {
     assert_match!(
         client.set_mdata_user_permissions_response(
             non_existing_name,
-            10000,
+            10_000,
             User::Key(app_key),
             permission_set,
             1,
@@ -502,7 +502,7 @@ fn mutable_data_error_flow() {
     assert_match!(
         client.del_mdata_user_permissions_response(
             non_existing_name,
-            10000,
+            10_000,
             User::Key(app_key),
             1,
             &mut nodes,
@@ -512,7 +512,7 @@ fn mutable_data_error_flow() {
 
     let new_owners = owner_keys(app_key);
     assert_match!(
-        client.change_mdata_owner_response(non_existing_name, 10000, new_owners, 1, &mut nodes),
+        client.change_mdata_owner_response(non_existing_name, 10_000, new_owners, 1, &mut nodes),
         Err(ClientError::NoSuchData)
     );
 
@@ -535,7 +535,7 @@ fn mutable_data_error_flow() {
         &mut rng,
     );
     assert_match!(
-        client.mutate_mdata_entries_response(*data.name(), 10000, actions, &mut nodes),
+        client.mutate_mdata_entries_response(*data.name(), 10_000, actions, &mut nodes),
         Err(ClientError::TooManyEntries)
     );
 
@@ -624,7 +624,7 @@ fn mutable_data_error_flow() {
     app.ensure_connected(&mut nodes);
 
     // Put without authorisation fails.
-    let new_data = test_utils::gen_mutable_data(10000, 0, *client.signing_public_key(), &mut rng);
+    let new_data = test_utils::gen_mutable_data(10_000, 0, *client.signing_public_key(), &mut rng);
     assert_match!(
         app.put_mdata_response(new_data, &mut nodes),
         Err(ClientError::AccessDenied)
@@ -731,7 +731,7 @@ fn mutable_data_parallel_mutations() {
 
     for _ in 0..data_count {
         let name = rng.gen();
-        let tag = rng.gen_range(10001, 20000);
+        let tag = rng.gen_range(10_001, 20_000);
 
         let mut owners = BTreeSet::new();
         let _ = owners.insert(*clients[0].signing_public_key());
@@ -882,7 +882,7 @@ fn mutable_data_concurrent_mutations() {
 
     for _ in 0..data_count {
         let name = rng.gen();
-        let tag = rng.gen_range(10001, 20000);
+        let tag = rng.gen_range(10_001, 20_000);
 
         let mut owners = BTreeSet::new();
         let _ = owners.insert(*client.signing_public_key());
@@ -1103,7 +1103,7 @@ fn mutable_data_put_and_mutate() {
                     res
                 );
                 if res.is_ok() {
-                    let mut data = unwrap!(all_data.get_mut(&data_name));
+                    let data = unwrap!(all_data.get_mut(&data_name));
                     unwrap!(data.mutate_entries(actions, client_key1));
                 }
 
@@ -1166,7 +1166,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
 
     for _ in 0..data_count {
         let name = rng.gen();
-        let tag = rng.gen_range(10001, 20000);
+        let tag = rng.gen_range(10_001, 20_000);
 
         let mut owners = BTreeSet::new();
         let _ = owners.insert(*clients[0].signing_public_key());
@@ -1306,7 +1306,7 @@ fn mutable_data_operations_with_churn() {
         for _ in 0..operation_count {
             if all_data.is_empty() || rng.gen() {
                 // Put new data.
-                let tag = rng.gen_range(10001, 20000);
+                let tag = rng.gen_range(10_001, 20_000);
                 let entry_count = rng.gen_range(0, 10);
                 let data = test_utils::gen_mutable_data(
                     tag,
