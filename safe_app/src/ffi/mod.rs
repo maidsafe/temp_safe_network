@@ -38,6 +38,7 @@ pub mod mutable_data;
 /// NFS API.
 pub mod nfs;
 /// Testing utilities.
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 mod helper;

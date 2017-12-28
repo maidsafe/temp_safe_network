@@ -1,22 +1,23 @@
 env:
   global:
     - RUST_BACKTRACE=1
+    - RUST_STABLE=1.22.1
     - PATH=$PATH:$HOME/.cargo/bin
 language: rust
 matrix:
   include:
     - os: linux
-      rust: 1.19.0
+      rust: 1.22.1
     - os: linux
-      rust: 1.19.0-i686-unknown-linux-gnu
+      rust: 1.22.1-i686-unknown-linux-gnu
       addons:
         apt:
           packages:
             - gcc-multilib
     - os: linux
-      rust: nightly-2017-07-20
+      rust: nightly-2018-01-10
     - os: osx
-      rust: 1.19.0
+      rust: 1.22.1
 sudo: false
 cache: cargo
 before_script:
@@ -42,17 +43,17 @@ before_script:
     fi
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [[ "$TRAVIS_RUST_VERSION" == 1.19.0 && $TRAVIS_EVENT_TYPE = pull_request ]]; then
+  - if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" && $TRAVIS_EVENT_TYPE = pull_request ]]; then
       bash cargo_install.sh rustfmt 0.9.0;
     elif [[ "$TRAVIS_RUST_VERSION" =~ nightly && $TRAVIS_EVENT_TYPE = pull_request ]]; then
-      bash cargo_install.sh clippy 0.0.144;
+      bash cargo_install.sh clippy 0.0.179;
     fi
 script:
   - export RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
-  - if [[ "$TRAVIS_RUST_VERSION" =~ 1.19.0 && $TRAVIS_EVENT_TYPE = pull_request ]]; then
+  - if [[ "$TRAVIS_RUST_VERSION" =~ "$RUST_STABLE" && $TRAVIS_EVENT_TYPE = pull_request ]]; then
       (
         set -x;
-        if [[ "$TRAVIS_RUST_VERSION" == 1.19.0 ]]; then
+        if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" ]]; then
           echo "--- Check format ---" &&
           cargo fmt --all -- --write-mode=diff;
         fi &&
@@ -73,7 +74,7 @@ script:
         cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml &&
         cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml &&
 
-        if [[ "$TRAVIS_OS_NAME" == "linux" && "$TRAVIS_RUST_VERSION" == 1.19.0 ]]; then
+        if [[ "$TRAVIS_OS_NAME" == "linux" && "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" ]]; then
           (
             echo "--- Test binary compatibility ---" &&
 
@@ -161,5 +162,5 @@ deploy:
   on:
     branch: master
     tags: false
-    condition: $TRAVIS_RUST_VERSION =~ 1.19.0 && $TRAVIS_EVENT_TYPE = push
+    condition: $TRAVIS_RUST_VERSION =~ $RUST_STABLE && $TRAVIS_EVENT_TYPE = push
 after_deploy: rm -rf target/deploy

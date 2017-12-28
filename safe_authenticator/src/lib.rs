@@ -39,8 +39,7 @@
 
 #![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                    option_unwrap_used))]
-// Allow `panic_params` until https://github.com/Manishearth/rust-clippy/issues/768 is resolved.
-#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments, panic_params))]
+#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate config_file_handler;
 #[macro_use]
@@ -278,7 +277,7 @@ impl Authenticator {
                             unwrap!(tx.send(Ok(core_tx2)));
                         })
                         .map_err(move |e| {
-                            unwrap!(tx2.send(Err((Some(core_tx3), AuthError::from(e)))));
+                            unwrap!(tx2.send(Err((Some(core_tx3), e))));
                         })
                         .into_box()
                         .into()

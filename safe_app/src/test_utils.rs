@@ -106,7 +106,7 @@ pub fn create_auth_req(
 
     let (app_container, containers) = match access_info {
         Some(access_info) => (true, access_info),
-        None => (false, HashMap::new()),
+        None => (false, HashMap::default()),
     };
 
     NativeAuthReq {

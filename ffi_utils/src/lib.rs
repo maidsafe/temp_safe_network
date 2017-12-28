@@ -39,7 +39,7 @@
 
 #![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                          option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
+#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate base64;
 #[macro_use]
@@ -96,7 +96,7 @@ pub struct FfiResult {
 }
 
 /// Constant value to be used for OK result
-pub const FFI_RESULT_OK: &'static FfiResult = &FfiResult {
+pub const FFI_RESULT_OK: &FfiResult = &FfiResult {
     error_code: 0,
     description: 0 as *const c_char,
 };

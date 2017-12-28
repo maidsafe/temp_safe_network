@@ -186,7 +186,7 @@ where
     trace!("Creating a writer for a file");
 
     Writer::new(
-        client.clone(),
+        &client.clone(),
         SelfEncryptionStorage::new(client),
         file,
         mode,

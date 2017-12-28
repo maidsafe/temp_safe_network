@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+#![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+
 use super::DataId;
 use super::vault::{self, Data, Vault, VaultGuard};
 use config_handler::{Config, get_config};
@@ -40,8 +42,8 @@ pub type RequestHookFn = FnMut(&Request) -> Option<Response> + 'static;
 /// Function that is used to modify responses before they are sent.
 pub type ResponseHookFn = FnMut(Response) -> Response + 'static;
 
-const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
-const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
+const CONNECT_THREAD_NAME: &str = "Mock routing connect";
+const DELAY_THREAD_NAME: &str = "Mock routing delay";
 
 const DEFAULT_DELAY_MS: u64 = 0;
 const CONNECT_DELAY_MS: u64 = DEFAULT_DELAY_MS;
@@ -133,8 +135,8 @@ impl Routing {
     }
 
     /// Sets the vault for this routing instance.
-    pub fn set_vault(&mut self, vault: Arc<Mutex<Vault>>) {
-        self.vault = vault.clone();
+    pub fn set_vault(&mut self, vault: &Arc<Mutex<Vault>>) {
+        self.vault = Arc::clone(vault);
     }
 
     /// Gets MAID account information.

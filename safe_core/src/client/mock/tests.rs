@@ -1365,7 +1365,7 @@ fn setup() -> (Routing, Receiver<Event>, FullId) {
 fn setup_with_config(config: Config) -> (Routing, Receiver<Event>, FullId) {
     let (mut routing, routing_rx, full_id) = setup_impl();
 
-    routing.set_vault(Arc::new(Mutex::new(Vault::new(config))));
+    routing.set_vault(&Arc::new(Mutex::new(Vault::new(config))));
 
     (routing, routing_rx, full_id)
 }

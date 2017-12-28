@@ -45,10 +45,10 @@ pub struct AppInfo {
 }
 
 /// Config file key under which the list of registered apps is stored.
-pub const KEY_APPS: &'static [u8] = b"apps";
+pub const KEY_APPS: &[u8] = b"apps";
 
 /// Config file key under which the revocation queue is stored.
-pub const KEY_APP_REVOCATION_QUEUE: &'static [u8] = b"revocation-queue";
+pub const KEY_APP_REVOCATION_QUEUE: &[u8] = b"revocation-queue";
 
 /// Maps from a SHA-3 hash of an app ID to app info
 pub type Apps = HashMap<[u8; 32], AppInfo>;

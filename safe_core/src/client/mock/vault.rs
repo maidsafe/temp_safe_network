@@ -34,7 +34,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use tiny_keccak::sha3_256;
 
-const FILE_NAME: &'static str = "MockVault";
+const FILE_NAME: &str = "MockVault";
 
 pub struct Vault {
     cache: Cache,
@@ -77,11 +77,11 @@ fn init_vault_store(config: &Config) -> Box<Store> {
                 }
                 Some(ref dev) => {
                     trace!("Mock vault: using file store");
-                    Box::new(FileStore::new(init_vault_path(Some(dev))))
+                    Box::new(FileStore::new(&init_vault_path(Some(dev))))
                 }
                 None => {
                     trace!("Mock vault: using file store");
-                    Box::new(FileStore::new(init_vault_path(None)))
+                    Box::new(FileStore::new(&init_vault_path(None)))
                 }
             }
         }
@@ -268,7 +268,7 @@ struct FileStore {
 }
 
 impl FileStore {
-    fn new(path: PathBuf) -> Self {
+    fn new(path: &PathBuf) -> Self {
         FileStore {
             file: None,
             sync_time: None,
