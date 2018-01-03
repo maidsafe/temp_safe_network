@@ -161,7 +161,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         user_perm_sets: *const UserPermissionSet,
-                        len: usize),
+                        user_perm_sets_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
 
