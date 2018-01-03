@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace SafeApp {
     public partial class AppBindings {
         #region App Creation
 
-        public void AppUnregistered(List<byte> bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr> oCb)
+        public void AppUnregistered(List<byte> bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr, GCHandle> oCb)
         {
             var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));
 
@@ -20,7 +21,7 @@ namespace SafeApp {
         public void AppRegistered(String appId,
                                   ref AuthGranted authGranted,
                                   Action oDisconnectNotifierCb,
-                                  Action<FfiResult, IntPtr> oCb)
+                                  Action<FfiResult, IntPtr, GCHandle> oCb)
         {
             var authGrantedNative = authGranted.ToNative();
             var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));
@@ -39,7 +40,7 @@ namespace SafeApp {
         #endif
         private static void OnAppDisconnectCb(IntPtr userData) {
             var (action, _) =
-                BindingUtils.FromHandlePtr<(Action, Action<FfiResult, IntPtr>)>(
+                BindingUtils.FromHandlePtr<(Action, Action<FfiResult, IntPtr, GCHandle>)>(
                     userData, false
                 );
 
@@ -51,11 +52,11 @@ namespace SafeApp {
         #endif
         private static void OnAppCreateCb(IntPtr userData, ref FfiResult result, IntPtr app) {
             var (_, action) =
-                BindingUtils.FromHandlePtr<(Action, Action<FfiResult, IntPtr>)>(
+                BindingUtils.FromHandlePtr<(Action, Action<FfiResult, IntPtr, GCHandle>)>(
                     userData, false
                 );
 
-            action(result, app);
+            action(result, app, GCHandle.FromIntPtr(userData));
         }
 
         #endregion
