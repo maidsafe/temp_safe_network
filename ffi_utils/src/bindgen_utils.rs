@@ -34,12 +34,19 @@ pub fn copy_files<S: AsRef<Path>, T: AsRef<Path>>(
     for entry in fs::read_dir(source)? {
         let entry = entry?;
 
-        if entry.path().is_file() && entry.path().ends_with(extension) {
-            let source_path = entry.path();
-            let target_path = source_path.strip_prefix(source).unwrap_or(&source_path);
-            let target_path = target.join(target_path);
+        if entry.path().is_file() {
+            if entry
+                .path()
+                .to_str()
+                .map(|s| s.ends_with(extension))
+                .unwrap_or(false)
+            {
+                let source_path = entry.path();
+                let target_path =
+                    target.join(source_path.strip_prefix(source).unwrap_or(&source_path));
 
-            let _ = fs::copy(entry.path(), target_path)?;
+                let _ = fs::copy(source_path, target_path)?;
+            }
         }
     }
 

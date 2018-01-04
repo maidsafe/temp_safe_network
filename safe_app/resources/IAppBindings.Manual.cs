@@ -4,9 +4,9 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace SafeApp {
-    public partial interface IAppBindings {
-        void AppUnregistered(List<byte> bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr, GCHandle> oCb);
-        void AppRegistered(String appId, ref AuthGranted authGranted, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr, GCHandle> oCb);
-        Task<IpcMsg> DecodeIpcMsgAsync(String msg);
-    }
+  public partial interface IAppBindings {
+    void AppUnregistered(List<byte> bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr, GCHandle> oCb);
+    void AppRegistered(String appId, ref AuthGranted authGranted, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr, GCHandle> oCb);
+    Task<IpcMsg> DecodeIpcMsgAsync(String msg);
+  }
 }
