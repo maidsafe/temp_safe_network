@@ -18,10 +18,18 @@
 //! Build script for generating C header files from FFI modules.
 
 extern crate ffi_utils;
+extern crate rust_sodium;
+extern crate routing;
+extern crate safe_bindgen;
 #[macro_use]
 extern crate unwrap;
 
+use routing::XOR_NAME_LEN;
+use rust_sodium::crypto::{box_, secretbox, sign};
+use safe_bindgen::{Bindgen, FilterMode, LangCSharp};
+use std::collections::HashMap;
 use std::env;
+use std::path::Path;
 
 fn main() {
     if env::var("CARGO_FEATURE_BINDINGS").is_err() {
@@ -29,6 +37,7 @@ fn main() {
     }
 
     gen_bindings_c();
+    gen_bindings_csharp();
 }
 
 fn gen_bindings_c() {
@@ -37,4 +46,46 @@ fn gen_bindings_c() {
         "../bindings/c/",
         "src/lib.rs",
     ));
+}
+
+fn gen_bindings_csharp() {
+    let target_dir = Path::new("../bindings/csharp/safe_authenticator");
+
+    let mut bindgen = unwrap!(Bindgen::new());
+    let mut lang = LangCSharp::new();
+
+    lang.set_lib_name(unwrap!(env::var("CARGO_PKG_NAME")));
+    lang.set_namespace("SafeAuth");
+    lang.set_class_name("AuthBindings");
+    lang.set_consts_class_name("AuthConstants");
+    lang.set_types_file_name("AuthTypes");
+    lang.set_utils_class_name("BindingUtils");
+    lang.add_const("ulong", "ASYM_PUBLIC_KEY_LEN", box_::PUBLICKEYBYTES);
+    lang.add_const("ulong", "ASYM_SECRET_KEY_LEN", box_::SECRETKEYBYTES);
+    lang.add_const("ulong", "ASYM_NONCE_LEN", box_::NONCEBYTES);
+    lang.add_const("ulong", "SYM_KEY_LEN", secretbox::KEYBYTES);
+    lang.add_const("ulong", "SYM_NONCE_LEN", secretbox::NONCEBYTES);
+    lang.add_const("ulong", "SIGN_PUBLIC_KEY_LEN", sign::PUBLICKEYBYTES);
+    lang.add_const("ulong", "SIGN_SECRET_KEY_LEN", sign::SECRETKEYBYTES);
+    lang.add_const("ulong", "XOR_NAME_LEN", XOR_NAME_LEN);
+    lang.add_opaque_type("Authenticator");
+
+    lang.reset_filter(FilterMode::Blacklist);
+    lang.filter("AuthFuture");
+
+    bindgen.source_file("../safe_core/src/lib.rs");
+    unwrap!(bindgen.compile(&mut lang, &mut HashMap::new(), false));
+
+    bindgen.source_file("src/lib.rs");
+    bindgen.run_build(&mut lang, target_dir);
+
+    // Hand-written code.
+    let resource_path = Path::new("resource");
+    if resource_path.is_dir() {
+        unwrap!(ffi_utils::bindgen_utils::copy_files(
+            resource_path,
+            target_dir,
+            ".cs",
+        ));
+    }
 }

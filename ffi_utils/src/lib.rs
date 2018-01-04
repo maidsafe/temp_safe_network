@@ -60,6 +60,7 @@ pub mod callback;
 pub mod test_utils;
 pub mod string;
 pub mod header_gen;
+pub mod bindgen_utils;
 
 pub use self::b64::{base64_decode, base64_encode};
 pub use self::catch_unwind::catch_unwind_cb;

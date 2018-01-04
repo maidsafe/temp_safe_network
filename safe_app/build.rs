@@ -29,7 +29,6 @@ use rust_sodium::crypto::{box_, secretbox, sign};
 use safe_bindgen::{Bindgen, FilterMode, LangCSharp};
 use std::collections::HashMap;
 use std::env;
-use std::fs;
 use std::path::Path;
 
 fn main() {
@@ -97,15 +96,9 @@ fn gen_bindings_csharp() {
     bindgen.run_build(&mut lang, target_dir);
 
     // Hand-written code.
-    for entry in unwrap!(fs::read_dir("resources")) {
-        let entry = unwrap!(entry);
-
-        if let Some(file) = entry.path().file_name() {
-            let file = unwrap!(file.to_str());
-
-            if file.ends_with(".cs") {
-                unwrap!(fs::copy(entry.path(), target_dir.join(file)));
-            }
-        }
-    }
+    unwrap!(ffi_utils::bindgen_utils::copy_files(
+        "resources",
+        target_dir,
+        ".cs",
+    ));
 }
