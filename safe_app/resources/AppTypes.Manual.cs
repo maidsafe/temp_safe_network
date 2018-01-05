@@ -49,7 +49,7 @@ namespace SafeApp {
   public class IpcMsgException : FfiException {
     public readonly uint ReqId;
 
-    public IpcMsgException(uint reqId, int code, String description)
+    public IpcMsgException(uint reqId, int code, string description)
         : base(code, description)
     {
         ReqId = reqId;

@@ -16,7 +16,7 @@ namespace SafeApp {
                             OnAppCreateCb);
     }
 
-    public void AppRegistered(String appId,
+    public void AppRegistered(string appId,
                               ref AuthGranted authGranted,
                               Action oDisconnectNotifierCb,
                               Action<FfiResult, IntPtr, GCHandle> oCb)
@@ -57,7 +57,7 @@ namespace SafeApp {
       action(Marshal.PtrToStructure<FfiResult>(result), app, GCHandle.FromIntPtr(userData));
     }
 
-    public Task<IpcMsg> DecodeIpcMsgAsync(String msg) {
+    public Task<IpcMsg> DecodeIpcMsgAsync(string msg) {
       var (task, userData) = BindingUtils.PrepareTask<IpcMsg>();
       DecodeIpcMsgNative(msg,
                          userData,
