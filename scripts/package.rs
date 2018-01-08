@@ -6,7 +6,7 @@
 //! heck = "0.3.0"
 //! toml = "0.4.5"
 //! walkdir = "2.0.1"
-//! zip = "0.2.6"
+//! zip = "=0.2.6"
 //! ```
 extern crate clap;
 extern crate colored;
