@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace SafeApp {
+namespace SafeApp.Utilities {
   public abstract class IpcMsg {
   }
 

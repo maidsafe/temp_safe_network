@@ -55,11 +55,29 @@ fn gen_bindings_csharp() {
     let mut lang = LangCSharp::new();
 
     lang.set_lib_name(unwrap!(env::var("CARGO_PKG_NAME")));
-    lang.set_namespace("SafeAuth");
-    lang.set_class_name("AuthBindings");
-    lang.set_consts_class_name("AuthConstants");
-    lang.set_types_file_name("AuthTypes");
-    lang.set_utils_class_name("BindingUtils");
+
+    lang.set_interface_section(
+        "SafeAuth.Utilities/IAuthBindings.cs",
+        "SafeAuth.Utilities",
+        "IAuthBindings",
+    );
+    lang.set_functions_section(
+        "SafeAuth.AuthBindings/AuthBindings.cs",
+        "SafeAuth.AuthBindings",
+        "AuthBindings",
+    );
+    lang.set_consts_section(
+        "SafeAuth.Utilities/AuthConstants.cs",
+        "SafeAuth.Utilities",
+        "AuthConstants",
+    );
+    lang.set_types_section("SafeAuth.Utilities/AuthTypes.cs", "SafeAuth.Utilities");
+    lang.set_utils_section(
+        "SafeAuth.Utilities/BindingUtils.cs",
+        "SafeAuth.Utilities",
+        "BindingUtils",
+    );
+
     lang.add_const("ulong", "ASYM_PUBLIC_KEY_LEN", box_::PUBLICKEYBYTES);
     lang.add_const("ulong", "ASYM_SECRET_KEY_LEN", box_::SECRETKEYBYTES);
     lang.add_const("ulong", "ASYM_NONCE_LEN", box_::NONCEBYTES);

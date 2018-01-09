@@ -20,9 +20,10 @@
 use std::fs;
 use std::io;
 use std::path::Path;
+use walkdir::WalkDir;
 
-/// Copy all files with the given extension from the source to the targt directories.
-/// Note: currently does not recurse into subdirectories.
+/// Recursively copy all files with the given extension from the source to the
+/// targt directories.
 pub fn copy_files<S: AsRef<Path>, T: AsRef<Path>>(
     source: S,
     target: T,
@@ -31,7 +32,7 @@ pub fn copy_files<S: AsRef<Path>, T: AsRef<Path>>(
     let source = source.as_ref();
     let target = target.as_ref();
 
-    for entry in fs::read_dir(source)? {
+    for entry in WalkDir::new(source) {
         let entry = entry?;
 
         if entry.path().is_file() {

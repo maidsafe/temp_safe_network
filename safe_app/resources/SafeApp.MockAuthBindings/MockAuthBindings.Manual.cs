@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using SafeApp.Utilities;
 
-namespace SafeApp {
+namespace SafeApp.MockAuthBindings {
   public partial class MockAuthBindings {
    public IntPtr TestCreateApp() {
       var ret = TestCreateAppNative(out IntPtr app);
