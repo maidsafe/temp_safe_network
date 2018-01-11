@@ -250,7 +250,7 @@ pub unsafe extern "C" fn file_read(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        data_ptr: *const u8,
+                        data: *const u8,
                         data_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {

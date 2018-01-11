@@ -184,7 +184,7 @@ pub unsafe extern "C" fn mdata_get_value(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        content_ptr: *const u8,
+                        content: *const u8,
                         content_len: usize,
                         version: u64),
 ) {

@@ -287,7 +287,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        data_ptr: *const u8,
+                        data: *const u8,
                         data_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);

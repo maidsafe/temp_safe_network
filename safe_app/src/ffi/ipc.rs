@@ -39,7 +39,7 @@ pub unsafe extern "C" fn encode_auth_req(
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         req_id: u32,
-                        encoded_ptr: *const c_char),
+                        encoded: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn encode_containers_req(
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         req_id: u32,
-                        encoded_ptr: *const c_char),
+                        encoded: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn encode_unregistered_req(
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         req_id: u32,
-                        encoded_ptr: *const c_char),
+                        encoded: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let data = vec_clone_from_raw_parts(extra_data, extra_data_len);
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn encode_share_mdata_req(
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         req_id: u32,
-                        encoded_ptr: *const c_char),
+                        encoded: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn decode_ipc_msg(
                           auth_granted: *const FfiAuthGranted),
     o_unregistered: extern "C" fn(user_data: *mut c_void,
                                   req_id: u32,
-                                  serialised_cfg_ptr: *const u8,
+                                  serialised_cfg: *const u8,
                                   serialised_cfg_len: usize),
     o_containers: extern "C" fn(user_data: *mut c_void, req_id: u32),
     o_share_mdata: extern "C" fn(user_data: *mut c_void, req_id: u32),
@@ -462,7 +462,7 @@ mod tests {
             extern "C" fn unregistered_cb(
                 ctx: *mut c_void,
                 _req_id: u32,
-                _bootstrap_cfg_ptr: *const u8,
+                _bootstrap_cfg: *const u8,
                 _bootstrap_cfg_len: usize,
             ) {
                 unsafe {
@@ -546,7 +546,7 @@ mod tests {
             extern "C" fn unregistered_cb(
                 ctx: *mut c_void,
                 _req_id: u32,
-                _bootstrap_cfg_ptr: *const u8,
+                _bootstrap_cfg: *const u8,
                 _bootstrap_cfg_len: usize,
             ) {
                 unsafe {
@@ -627,7 +627,7 @@ mod tests {
             extern "C" fn unregistered_cb(
                 ctx: *mut c_void,
                 req_id: u32,
-                _bootstrap_cfg_ptr: *const u8,
+                _bootstrap_cfg: *const u8,
                 _bootstrap_cfg_len: usize,
             ) {
                 unsafe {
@@ -708,7 +708,7 @@ mod tests {
             extern "C" fn unregistered_cb(
                 ctx: *mut c_void,
                 _req_id: u32,
-                _bootstrap_cfg_ptr: *const u8,
+                _bootstrap_cfg: *const u8,
                 _bootstrap_cfg_len: usize,
             ) {
                 unsafe {

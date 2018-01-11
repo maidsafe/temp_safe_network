@@ -371,7 +371,7 @@ pub unsafe extern "C" fn sign(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        signed_data_ptr: *const u8,
+                        signed_data: *const u8,
                         signed_data_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -420,7 +420,7 @@ pub unsafe extern "C" fn verify(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        verified_data_ptr: *const u8,
+                        verified_data: *const u8,
                         verified_data_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -463,7 +463,7 @@ pub unsafe extern "C" fn encrypt(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        ciphertext_ptr: *const u8,
+                        ciphertext: *const u8,
                         ciphertext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -508,7 +508,7 @@ pub unsafe extern "C" fn decrypt(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        plaintext_ptr: *const u8,
+                        plaintext: *const u8,
                         plaintext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -558,7 +558,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        ciphertext_ptr: *const u8,
+                        ciphertext: *const u8,
                         ciphertext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -599,7 +599,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        plaintext_ptr: *const u8,
+                        plaintext: *const u8,
                         plaintext_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -639,7 +639,7 @@ pub unsafe extern "C" fn sha3_hash(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        hash_ptr: *const u8,
+                        hash: *const u8,
                         hash_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {

@@ -58,7 +58,7 @@ pub unsafe extern "C" fn access_container_fetch(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        container_perms_ptr: *const FfiContainerPermissions,
+                        container_perms: *const FfiContainerPermissions,
                         container_perms_len: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
