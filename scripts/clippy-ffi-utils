@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cd ffi_utils && cargo clippy --profile=test && cd ..

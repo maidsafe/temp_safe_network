@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cargo build --verbose --release --manifest-path=ffi_utils/Cargo.toml
