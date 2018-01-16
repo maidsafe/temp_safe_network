@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using SafeApp.Utilities;
 
 namespace SafeApp.MockAuthBindings {
-  public partial class MockAuthBindings {
+  internal partial class MockAuthBindings {
    public IntPtr TestCreateApp() {
       var ret = TestCreateAppNative(out IntPtr app);
       if (ret != 0) {

@@ -11,7 +11,7 @@ using ObjCRuntime;
 #endif
 
 namespace SafeApp.AppBindings {
-  public partial class AppBindings {
+  internal partial class AppBindings {
     public void AppUnregistered(List<byte> bootstrapConfig, Action oDisconnectNotifierCb, Action<FfiResult, IntPtr, GCHandle> oCb)
     {
       var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));

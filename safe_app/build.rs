@@ -144,6 +144,7 @@ fn apply_patches(outputs: &mut HashMap<PathBuf, String>) {
         insert_using_utilities(content);
         insert_using_obj_c_runtime(content);
         insert_guard(content);
+        insert_resharper_disable_inconsistent_naming(content);
     }
 
     insert_internals_visible_to(fetch_mut(outputs, "SafeApp.Utilities/AppTypes.cs"));
@@ -187,6 +188,10 @@ fn insert_internals_visible_to(content: &mut String) {
         "[assembly: InternalsVisibleTo(\"SafeApp.AppBindings\")]\n\n\
          namespace SafeApp.Utilities",
     );
+}
+
+fn insert_resharper_disable_inconsistent_naming(content: &mut String) {
+    content.insert_str(0, "// ReSharper disable InconsistentNaming\n");
 }
 
 fn fix_names(content: &mut String) {
