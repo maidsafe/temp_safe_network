@@ -243,7 +243,7 @@ fn authenticated_app(
         })
         .and_then(move |perms| {
             let access_container_info = c3.access_container()?;
-            let access_container_info = AccessContInfo::from_mdata_info(access_container_info)?;
+            let access_container_info = AccessContInfo::from_mdata_info(&access_container_info)?;
 
             Ok(AuthGranted {
                 app_keys,
@@ -307,7 +307,7 @@ fn authenticate_new_app(
         })
         .and_then(move |access_container_entry| {
             let access_container_info = c6.access_container()?;
-            let access_container_info = AccessContInfo::from_mdata_info(access_container_info)?;
+            let access_container_info = AccessContInfo::from_mdata_info(&access_container_info)?;
 
             Ok(AuthGranted {
                 app_keys: app_keys_auth,

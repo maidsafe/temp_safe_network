@@ -36,7 +36,7 @@ pub struct AuthGranted {
     pub access_container_entry: AccessContainerEntry,
 
     /// Crust's bootstrap config
-    pub bootstrap_config_ptr: *mut u8,
+    pub bootstrap_config: *mut u8,
     /// `bootstrap_config`'s length
     pub bootstrap_config_len: usize,
     /// Used by Rust memory allocator
@@ -47,7 +47,7 @@ impl Drop for AuthGranted {
     fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(
-                self.bootstrap_config_ptr,
+                self.bootstrap_config,
                 self.bootstrap_config_len,
                 self.bootstrap_config_cap,
             );
@@ -115,17 +115,21 @@ pub struct AccessContInfo {
 #[repr(C)]
 pub struct AccessContainerEntry {
     /// Pointer to the array of `ContainerInfo`.
-    pub ptr: *const ContainerInfo,
+    pub containers: *const ContainerInfo,
     /// Size of the array.
-    pub len: usize,
+    pub containers_len: usize,
     /// Internal field used by rust memory allocator.
-    pub cap: usize,
+    pub containers_cap: usize,
 }
 
 impl Drop for AccessContainerEntry {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(self.ptr as *mut ContainerInfo, self.len, self.cap);
+            let _ = Vec::from_raw_parts(
+                self.containers as *mut ContainerInfo,
+                self.containers_len,
+                self.containers_cap,
+            );
         }
     }
 }
@@ -206,7 +210,7 @@ impl Drop for MetadataResponse {
 #[derive(Clone, Copy, Debug)]
 pub struct MDataValue {
     /// Content pointer.
-    pub content_ptr: *const u8,
+    pub content: *const u8,
     /// Content length.
     pub content_len: usize,
     /// Entry version.
@@ -218,7 +222,7 @@ pub struct MDataValue {
 #[derive(Clone, Copy, Debug)]
 pub struct MDataKey {
     /// Key value pointer.
-    pub val_ptr: *const u8,
+    pub val: *const u8,
     /// Key length.
     pub val_len: usize,
 }

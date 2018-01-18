@@ -33,9 +33,10 @@ maidsafe_logo.png",
        unused_qualifications, unused_results)]
 #![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
          variant_size_differences)]
-#![cfg_attr(feature = "cargo-clippy",
-           deny(clippy, unicode_not_nfc, wrong_pub_self_convention, option_unwrap_used))]
-#![cfg_attr(feature = "cargo-clippy", allow(use_debug, too_many_arguments))]
+
+#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                           option_unwrap_used))]
+#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate config_file_handler;
 #[macro_use]
@@ -89,7 +90,10 @@ mod tests;
 pub mod test_utils;
 
 pub use self::errors::*;
+
 use self::object_cache::ObjectCache;
+#[cfg(any(test, feature = "testing"))]
+pub use ffi::test_utils::{test_create_app, test_create_app_with_access};
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -107,8 +111,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
-#[cfg(feature = "testing")]
-pub use test_utils::{test_create_app, test_create_app_with_access};
 use tokio_core::reactor::{Core, Handle};
 
 macro_rules! try_tx {

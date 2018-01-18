@@ -33,7 +33,7 @@ pub mod shared_secretbox {
 
     impl Key {
         /// Create new safe-to-share key from the given regular key.
-        pub fn new(inner: secretbox::Key) -> Self {
+        pub fn new(inner: &secretbox::Key) -> Self {
             // NOTE: make sure we move the inner array, not the whole key, because
             // moving the key would leave the `inner` variable in the "moved-from"
             // state which means it's destructor wouldn't be called and the old
@@ -52,13 +52,13 @@ pub mod shared_secretbox {
 
         /// Create new key from the data in the given slice.
         pub fn from_slice(data: &[u8]) -> Option<Self> {
-            secretbox::Key::from_slice(data).map(Self::new)
+            secretbox::Key::from_slice(data).map(|key| Self::new(&key))
         }
     }
 
     /// Generate new random shared symmetric encryption key.
     pub fn gen_key() -> Key {
-        Key::new(secretbox::gen_key())
+        Key::new(&secretbox::gen_key())
     }
 
     impl Deref for Key {
@@ -72,7 +72,7 @@ pub mod shared_secretbox {
     impl<'de> Deserialize<'de> for Key {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let inner = secretbox::Key::deserialize(deserializer)?;
-            Ok(Key::new(inner))
+            Ok(Key::new(&inner))
         }
     }
 
@@ -103,7 +103,7 @@ pub mod shared_box {
 
     impl SecretKey {
         /// Create new safe-to-share key from the given regular key.
-        pub fn new(inner: box_::SecretKey) -> Self {
+        pub fn new(inner: &box_::SecretKey) -> Self {
             SecretKey(Arc::new(box_::SecretKey(inner.0)))
         }
 
@@ -119,7 +119,7 @@ pub mod shared_box {
     /// Generate new random public/secret keypair.
     pub fn gen_keypair() -> (box_::PublicKey, SecretKey) {
         let (pk, sk) = box_::gen_keypair();
-        (pk, SecretKey::new(sk))
+        (pk, SecretKey::new(&sk))
     }
 
     impl Deref for SecretKey {
@@ -133,7 +133,7 @@ pub mod shared_box {
     impl<'de> Deserialize<'de> for SecretKey {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let inner = box_::SecretKey::deserialize(deserializer)?;
-            Ok(SecretKey::new(inner))
+            Ok(SecretKey::new(&inner))
         }
     }
 
@@ -164,7 +164,7 @@ pub mod shared_sign {
 
     impl SecretKey {
         /// Create new safe-to-share key from the given regular key.
-        pub fn new(inner: sign::SecretKey) -> Self {
+        pub fn new(inner: &sign::SecretKey) -> Self {
             SecretKey(Arc::new(sign::SecretKey(inner.0)))
         }
 
@@ -180,13 +180,13 @@ pub mod shared_sign {
     /// Generate new random public/secret keypair.
     pub fn gen_keypair() -> (sign::PublicKey, SecretKey) {
         let (pk, sk) = sign::gen_keypair();
-        (pk, SecretKey::new(sk))
+        (pk, SecretKey::new(&sk))
     }
 
     /// Generate new random public/secret keypair using the given seed.
     pub fn keypair_from_seed(seed: &sign::Seed) -> (sign::PublicKey, SecretKey) {
         let (pk, sk) = sign::keypair_from_seed(seed);
-        (pk, SecretKey::new(sk))
+        (pk, SecretKey::new(&sk))
     }
 
     impl Deref for SecretKey {
@@ -200,7 +200,7 @@ pub mod shared_sign {
     impl<'de> Deserialize<'de> for SecretKey {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let inner = sign::SecretKey::deserialize(deserializer)?;
-            Ok(SecretKey::new(inner))
+            Ok(SecretKey::new(&inner))
         }
     }
 

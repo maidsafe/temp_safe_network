@@ -27,6 +27,7 @@ pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq, Permission,
                     ShareMDataReq};
 pub use self::resp::{AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted, IpcResp,
                      access_container_enc_key};
+
 use ffi_utils::{base64_decode, base64_encode};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::{self, Rng};

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+scripts/check-ffi-utils && scripts/check-real && scripts/check-mock

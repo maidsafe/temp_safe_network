@@ -112,7 +112,7 @@ pub fn decode_ipc_msg(
         IpcMsg::Resp { .. } |
         IpcMsg::Revoked { .. } |
         IpcMsg::Err(..) => {
-            return err!(AuthError::IpcError(IpcError::InvalidMsg.into()));
+            return err!(AuthError::IpcError(IpcError::InvalidMsg));
         }
     }
 }

@@ -25,6 +25,7 @@ use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
 
 /// Mode of the writer
+#[derive(Clone, Copy, Debug)]
 pub enum Mode {
     /// Will create new data
     Overwrite,
@@ -44,7 +45,7 @@ pub struct Writer<T> {
 impl<T: 'static> Writer<T> {
     /// Create new instance of Writer
     pub fn new(
-        client: Client<T>,
+        client: &Client<T>,
         storage: SelfEncryptionStorage<T>,
         file: File,
         mode: Mode,
@@ -52,7 +53,7 @@ impl<T: 'static> Writer<T> {
     ) -> Box<NfsFuture<Writer<T>>> {
         let fut = match mode {
             Mode::Append => {
-                data_map::get(&client, file.data_map_name(), encryption_key.clone())
+                data_map::get(client, file.data_map_name(), encryption_key.clone())
                     .map(Some)
                     .into_box()
             }

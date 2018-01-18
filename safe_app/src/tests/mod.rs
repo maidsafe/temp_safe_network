@@ -18,6 +18,8 @@
 mod mutable_data;
 
 use App;
+use ffi::test_utils::test_create_app_with_access;
+use ffi_utils::test_utils::call_1;
 use futures::Future;
 #[cfg(feature = "use-mock-routing")]
 use routing::{ClientError, Request, Response};
@@ -28,11 +30,10 @@ use safe_authenticator::test_utils::revoke;
 use safe_core::MockRouting;
 use safe_core::ffi::AccountInfo;
 use safe_core::ipc::Permission;
-use safe_core::ipc::req::AppExchangeInfo;
-use safe_core::ipc::req::AuthReq;
+use safe_core::ipc::req::{AppExchangeInfo, AuthReq};
 use std::collections::HashMap;
 use std::rc::Rc;
-use test_utils::{create_app_with_access, run};
+use test_utils::{create_app_by_req, create_auth_req, create_auth_req_with_access, run};
 use test_utils::gen_app_exchange_info;
 
 // Test refreshing access info by fetching it from the network.
@@ -45,7 +46,7 @@ fn refresh_access_info() {
         btree_set![Permission::Read, Permission::Insert],
     );
 
-    let app = create_app_with_access(container_permissions.clone());
+    let app = create_app_by_req(&create_auth_req_with_access(container_permissions.clone()));
 
     run(&app, move |client, context| {
         let reg = Rc::clone(unwrap!(context.as_registered()));
@@ -66,14 +67,22 @@ fn refresh_access_info() {
 
 // Test fetching containers that an app has access to.
 #[test]
+#[allow(unsafe_code)]
 fn get_access_info() {
     let mut container_permissions = HashMap::new();
     let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
     let _ = container_permissions.insert("_downloads".to_string(), btree_set![Permission::Insert]);
 
-    let app = create_app_with_access(container_permissions);
+    let auth_req = create_auth_req(None, Some(container_permissions));
+    let auth_req_ffi = unwrap!(auth_req.into_repr_c());
 
-    run(&app, move |client, context| {
+    let app: *mut App = unsafe {
+        unwrap!(call_1(
+            |ud, cb| test_create_app_with_access(&auth_req_ffi, ud, cb),
+        ))
+    };
+
+    run(unsafe { &*app }, move |client, context| {
         context.get_access_info(client).then(move |res| {
             let info = unwrap!(res);
             assert!(info.contains_key(&"_videos".to_string()));

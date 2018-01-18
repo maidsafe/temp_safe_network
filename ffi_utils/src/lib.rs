@@ -39,7 +39,7 @@
 
 #![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                          option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
+#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate base64;
 #[macro_use]
@@ -62,7 +62,7 @@ pub mod string;
 pub mod header_gen;
 
 pub use self::b64::{base64_decode, base64_encode};
-pub use self::catch_unwind::{catch_unwind_cb, catch_unwind_error_code};
+pub use self::catch_unwind::catch_unwind_cb;
 pub use self::repr_c::ReprC;
 pub use self::string::{StringError, from_c_str};
 pub use self::vec::{SafePtr, vec_clone_from_raw_parts, vec_into_raw_parts};
@@ -96,7 +96,7 @@ pub struct FfiResult {
 }
 
 /// Constant value to be used for OK result
-pub const FFI_RESULT_OK: &'static FfiResult = &FfiResult {
+pub const FFI_RESULT_OK: &FfiResult = &FfiResult {
     error_code: 0,
     description: 0 as *const c_char,
 };

@@ -1,24 +1,48 @@
 env:
   global:
     - RUST_BACKTRACE=1
+    - RUST_STABLE=1.22.1
+    - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
 language: rust
-matrix:
+stages:
+  - stable
+  - nightly-warmup
+  - nightly-tests
+jobs:
   include:
+    # Stable
+    - stage: stable
+      script: scripts/stable
+      os: linux
+      rust: 1.22.1
     - os: linux
-      rust: 1.19.0
-    - os: linux
-      rust: 1.19.0-i686-unknown-linux-gnu
+      script: scripts/stable
+      rust: 1.22.1-i686-unknown-linux-gnu
       addons:
         apt:
           packages:
             - gcc-multilib
-    - os: linux
-      rust: nightly-2017-07-20
     - os: osx
-      rust: 1.19.0
+      script: scripts/stable
+      rust: 1.22.1
+    # Nightly compiler warm-up
+    - stage: nightly-warmup
+      script: set -x; scripts/build-all
+      os: linux
+      rust: nightly-2018-01-10
+    # Nightly clippy + tests
+    - stage: nightly-tests
+      script: set -x; scripts/clippy-all
+      os: linux
+      rust: nightly-2018-01-10
+    - stage: nightly-tests
+      script: set -x; scripts/test-all
+      os: linux
+      rust: nightly-2018-01-10
 sudo: false
-cache: cargo
+cache:
+  cargo: true
 before_script:
   # Expected version change PR title format:
   # Version change: safe_app to 0.2.2; safe_authenticator to 0.2.3; safe_core to 0.26.0;
@@ -42,78 +66,10 @@ before_script:
     fi
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [[ "$TRAVIS_RUST_VERSION" == 1.19.0 && $TRAVIS_EVENT_TYPE = pull_request ]]; then
+  - if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" && $TRAVIS_EVENT_TYPE = pull_request ]]; then
       bash cargo_install.sh rustfmt 0.9.0;
     elif [[ "$TRAVIS_RUST_VERSION" =~ nightly && $TRAVIS_EVENT_TYPE = pull_request ]]; then
-      bash cargo_install.sh clippy 0.0.144;
-    fi
-script:
-  - export RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
-  - if [[ "$TRAVIS_RUST_VERSION" =~ 1.19.0 && $TRAVIS_EVENT_TYPE = pull_request ]]; then
-      (
-        set -x;
-        if [[ "$TRAVIS_RUST_VERSION" == 1.19.0 ]]; then
-          echo "--- Check format ---" &&
-          cargo fmt --all -- --write-mode=diff;
-        fi &&
-        echo "--- Test ffi_utils ---" &&
-        cargo test --verbose --release --manifest-path=ffi_utils/Cargo.toml &&
-
-        echo "--- Check compilation against actual routing ---" &&
-        cargo check --verbose --release --manifest-path=safe_core/Cargo.toml &&
-        cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_core/Cargo.toml &&
-        cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_authenticator/Cargo.toml &&
-        cargo check --verbose --features=testing --release --lib --tests --manifest-path=safe_app/Cargo.toml &&
-        cargo check --verbose --release --lib --tests --manifest-path=tests/Cargo.toml &&
-
-        echo "--- Test against mock ---" &&
-        cargo test config_mock_vault_path --verbose --release --features=use-mock-routing --manifest-path=safe_core/Cargo.toml &&
-        export SAFE_MOCK_IN_MEMORY_STORAGE=1 &&
-        cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_core/Cargo.toml &&
-        cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml &&
-        cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml &&
-
-        if [[ "$TRAVIS_OS_NAME" == "linux" && "$TRAVIS_RUST_VERSION" == 1.19.0 ]]; then
-          (
-            echo "--- Test binary compatibility ---" &&
-
-            unset SAFE_MOCK_IN_MEMORY_STORAGE &&
-            export SAFE_MOCK_VAULT_PATH=$HOME/tmp &&
-            mkdir -p $SAFE_MOCK_VAULT_PATH &&
-
-            export BASE_BRANCH_DIR=${TRAVIS_BUILD_DIR%/}-$TRAVIS_BRANCH &&
-            cp -r $TRAVIS_BUILD_DIR $BASE_BRANCH_DIR &&
-            cd $BASE_BRANCH_DIR &&
-            git checkout -qf $TRAVIS_BRANCH &&
-
-            cd $TRAVIS_BUILD_DIR &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::write_data -- --ignored &&
-
-            cd $BASE_BRANCH_DIR &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::read_data -- --ignored &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::write_data -- --ignored &&
-
-            cd $TRAVIS_BUILD_DIR &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::read_data -- --ignored
-          );
-        fi
-      );
-    elif [[ $TRAVIS_EVENT_TYPE = pull_request ]]; then
-      (
-        set -x;
-        cd ffi_utils && cargo clippy --profile=test &&
-
-        echo "--- Test build for real network ---" &&
-        cd ../safe_core && cargo clippy --profile=test --features=testing &&
-        cd ../safe_authenticator && cargo clippy --profile=test --features=testing &&
-        cd ../safe_app && cargo clippy --profile=test --features=testing &&
-        cd ../tests && cargo clippy --profile=test &&
-
-        echo "--- Test build for mock-routing ---" &&
-        cd ../safe_core && cargo clippy --profile=test --features=use-mock-routing &&
-        cd ../safe_authenticator && cargo clippy --profile=test --features=use-mock-routing &&
-        cd ../safe_app && cargo clippy --profile=test --features=use-mock-routing;
-      )
+      bash cargo_install.sh clippy 0.0.179;
     fi
 after_script:
   - if [[ $TRAVIS_EVENT_TYPE = pull_request && -n $(git diff --shortstat 2> /dev/null | tail -n1) ]]; then
@@ -161,5 +117,5 @@ deploy:
   on:
     branch: master
     tags: false
-    condition: $TRAVIS_RUST_VERSION =~ 1.19.0 && $TRAVIS_EVENT_TYPE = push
+    condition: $TRAVIS_RUST_VERSION =~ $RUST_STABLE && $TRAVIS_EVENT_TYPE = push
 after_deploy: rm -rf target/deploy

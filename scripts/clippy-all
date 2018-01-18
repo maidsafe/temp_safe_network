@@ -1,0 +1,3 @@
+#!/bin/bash
+
+scripts/clippy-ffi-utils && scripts/clippy-real && scripts/clippy-mock

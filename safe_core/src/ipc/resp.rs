@@ -93,7 +93,7 @@ impl AuthGranted {
             app_keys: app_keys.into_repr_c(),
             access_container_info: access_container_info.into_repr_c(),
             access_container_entry: access_container_entry_into_repr_c(access_container_entry)?,
-            bootstrap_config_ptr: ptr,
+            bootstrap_config: ptr,
             bootstrap_config_len: len,
             bootstrap_config_cap: cap,
         })
@@ -107,13 +107,13 @@ impl ReprC for AuthGranted {
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         let ffi::AuthGranted {
             app_keys,
-            bootstrap_config_ptr,
+            bootstrap_config,
             bootstrap_config_len,
             access_container_info,
             ref access_container_entry,
             ..
         } = *repr_c;
-        let bootstrap_config = slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
+        let bootstrap_config = slice::from_raw_parts(bootstrap_config, bootstrap_config_len);
         let bootstrap_config = deserialise(bootstrap_config)?;
         Ok(AuthGranted {
             app_keys: AppKeys::clone_from_repr_c(app_keys)?,
@@ -217,15 +217,19 @@ pub fn access_container_entry_into_repr_c(
         })
     }
 
-    let (ptr, len, cap) = vec_into_raw_parts(vec);
-    Ok(ffi::AccessContainerEntry { ptr, len, cap })
+    let (containers, containers_len, containers_cap) = vec_into_raw_parts(vec);
+    Ok(ffi::AccessContainerEntry {
+        containers,
+        containers_len,
+        containers_cap,
+    })
 }
 
 /// Convert FFI representation of `AccessContainerEntry` to native rust representation by cloning.
 pub unsafe fn access_container_entry_clone_from_repr_c(
     entry: *const ffi::AccessContainerEntry,
 ) -> Result<AccessContainerEntry, IpcError> {
-    let input = slice::from_raw_parts((*entry).ptr, (*entry).len);
+    let input = slice::from_raw_parts((*entry).containers, (*entry).containers_len);
     let mut output = AccessContainerEntry::with_capacity(input.len());
 
     for container in input {
@@ -269,7 +273,7 @@ impl AccessContInfo {
     }
 
     /// Creates an `AccessContInfo` from a given `MDataInfo`
-    pub fn from_mdata_info(md: MDataInfo) -> Result<AccessContInfo, IpcError> {
+    pub fn from_mdata_info(md: &MDataInfo) -> Result<AccessContInfo, IpcError> {
         if let Some((_, nonce)) = md.enc_info {
             Ok(AccessContInfo {
                 id: md.name,
@@ -443,7 +447,7 @@ impl MDataValue {
     /// Returns FFI counterpart without consuming the object.
     pub fn as_repr_c(&self) -> ffi::MDataValue {
         ffi::MDataValue {
-            content_ptr: self.content.as_ptr(),
+            content: self.content.as_ptr(),
             content_len: self.content.len(),
             entry_version: self.entry_version,
         }
@@ -456,13 +460,13 @@ impl ReprC for MDataValue {
 
     unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
         let ffi::MDataValue {
-            content_ptr,
+            content,
             content_len,
             entry_version,
         } = *c_repr;
 
         Ok(MDataValue {
-            content: slice::from_raw_parts(content_ptr, content_len).to_vec(),
+            content: slice::from_raw_parts(content, content_len).to_vec(),
             entry_version: entry_version,
         })
     }
@@ -484,7 +488,7 @@ impl MDataKey {
     /// Returns FFI counterpart without consuming the object.
     pub fn as_repr_c(&self) -> ffi::MDataKey {
         ffi::MDataKey {
-            val_ptr: self.val.as_ptr(),
+            val: self.val.as_ptr(),
             val_len: self.val.len(),
         }
     }
@@ -495,10 +499,10 @@ impl ReprC for MDataKey {
     type Error = ();
 
     unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
-        let ffi::MDataKey { val_ptr, val_len } = *c_repr;
+        let ffi::MDataKey { val, val_len } = *c_repr;
 
         Ok(MDataKey {
-            val: slice::from_raw_parts(val_ptr, val_len).to_vec(),
+            val: slice::from_raw_parts(val, val_len).to_vec(),
         })
     }
 }
