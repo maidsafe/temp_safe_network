@@ -29,7 +29,7 @@ use rust_sodium::crypto::{box_, secretbox, sign};
 use safe_bindgen::{Bindgen, FilterMode, LangCSharp};
 use std::collections::HashMap;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn main() {
     if env::var("CARGO_FEATURE_BINDINGS").is_err() {
@@ -92,10 +92,13 @@ fn gen_bindings_csharp() {
     lang.filter("AuthFuture");
 
     bindgen.source_file("../safe_core/src/lib.rs");
-    unwrap!(bindgen.compile(&mut lang, &mut HashMap::new(), false));
+    bindgen.compile_or_panic(&mut lang, &mut HashMap::new(), false);
 
+    let mut outputs = HashMap::new();
     bindgen.source_file("src/lib.rs");
-    bindgen.run_build(&mut lang, target_dir);
+    bindgen.compile_or_panic(&mut lang, &mut outputs, true);
+    apply_patches(&mut outputs);
+    bindgen.write_outputs_or_panic(target_dir, &outputs);
 
     // Hand-written code.
     let resource_path = Path::new("resource");
@@ -106,4 +109,39 @@ fn gen_bindings_csharp() {
             ".cs",
         ));
     }
+}
+
+fn apply_patches(outputs: &mut HashMap<PathBuf, String>) {
+    {
+        let content = fetch_mut(outputs, "SafeAuth.AuthBindings/AuthBindings.cs");
+        insert_using_utilities(content);
+        insert_using_obj_c_runtime(content);
+        insert_guard(content);
+    }
+
+    for content in outputs.values_mut() {
+        fix_names(content);
+    }
+}
+
+fn insert_using_utilities(content: &mut String) {
+    content.insert_str(0, "using SafeAuth.Utilities;\n");
+}
+
+fn insert_using_obj_c_runtime(content: &mut String) {
+    content.insert_str(0, "#if __IOS__\nusing ObjCRuntime;\n#endif\n");
+}
+
+fn insert_guard(content: &mut String) {
+    content.insert_str(0, "#if !NETSTANDARD1_2 || __DESKTOP__\n");
+    content.push_str("#endif\n");
+}
+
+fn fix_names(content: &mut String) {
+    *content = content.replace("Idata", "IData").replace("Mdata", "MData");
+}
+
+fn fetch_mut<T: AsRef<Path>>(outputs: &mut HashMap<PathBuf, String>, key: T) -> &mut String {
+    let key = key.as_ref();
+    unwrap!(outputs.get_mut(key), "key {:?} not found in outputs", key)
 }
