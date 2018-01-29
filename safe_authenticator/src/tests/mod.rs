@@ -24,7 +24,7 @@ use self::utils::{ChannelType, create_containers_req, decode_ipc_msg, err_cb, un
 use access_container as access_container_tools;
 use app_container;
 use config::{self, KEY_APPS};
-use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
+use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNEXPECTED, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi::ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
 use ffi_utils::{ReprC, StringError, from_c_str};
@@ -615,6 +615,52 @@ fn app_authentication() {
     });
 
     assert!(auth_keys.contains(&app_sign_pk));
+}
+
+// Try to authenticate with invalid container names.
+#[test]
+fn invalid_container_authentication() {
+    let authenticator = create_account_and_login();
+    let req_id = ipc::gen_req_id();
+    let app_exchange_info = rand_app();
+
+    // Permissions for invalid container name
+    let mut containers = HashMap::new();
+    let _ = containers.insert(
+        "_app".to_owned(),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+            Permission::ManagePermissions,
+        ],
+    );
+
+    let auth_req = AuthReq {
+        app: app_exchange_info.clone(),
+        app_container: true,
+        containers,
+    };
+
+    // Try to send IpcReq::Auth - it should fail
+    let result: Result<String, i32> = unsafe {
+        call_1(|ud, cb| {
+            let auth_req = unwrap!(auth_req.into_repr_c());
+            encode_auth_resp(
+                &authenticator,
+                &auth_req,
+                req_id,
+                true, // is_granted
+                ud,
+                cb,
+            )
+        })
+    };
+    match result {
+        Err(ERR_UNEXPECTED) => (),
+        x => panic!("Unexpected {:?}", x),
+    };
 }
 
 // Test unregistered client authentication.
