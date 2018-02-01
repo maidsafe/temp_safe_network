@@ -19,14 +19,36 @@ mod nfs;
 
 use super::*;
 use App;
+use ffi::ipc::decode_ipc_msg;
 use ffi_utils::test_utils::call_1;
 use routing::ImmutableData;
-use safe_authenticator::test_utils as authenticator;
+use safe_authenticator::ffi::ipc::encode_auth_resp;
+use safe_authenticator::test_utils;
 use safe_core::ffi::AccountInfo;
-use safe_core::ipc::req::AuthReq;
+use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
+use safe_core::ipc::{AuthGranted, Permission, gen_req_id};
+use safe_core::ipc::req::{AuthReq, ContainerPermissions};
 use std::collections::HashMap;
 use test_utils::create_app;
 use test_utils::gen_app_exchange_info;
+
+// Creates a containers request asking for "documents with permission to
+// insert", and "videos with all the permissions possible".
+fn create_containers_req() -> HashMap<String, ContainerPermissions> {
+    let mut containers = HashMap::new();
+    let _ = containers.insert("_documents".to_owned(), btree_set![Permission::Insert]);
+    let _ = containers.insert(
+        "_videos".to_owned(),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+            Permission::ManagePermissions,
+        ],
+    );
+    containers
+}
 
 // Test account usage statistics before and after a mutation.
 #[test]
@@ -139,12 +161,12 @@ fn test_app_container_name() {
     use safe_core;
     use std::ffi::CString;
 
-    let auth = authenticator::create_account_and_login();
+    let auth = test_utils::create_account_and_login();
 
     let app_info = gen_app_exchange_info();
     let app_id = app_info.id.clone();
 
-    let auth_granted = unwrap!(authenticator::register_app(
+    let auth_granted = unwrap!(test_utils::register_app(
         &auth,
         &AuthReq {
             app: app_info,
@@ -161,4 +183,128 @@ fn test_app_container_name() {
         }))
     };
     assert_eq!(name, safe_core::app_container_name(&app_id));
+}
+
+// Test app authentication using only FFI.
+#[test]
+fn app_authentication() {
+    let auth = test_utils::create_account_and_login();
+
+    let app_exchange_info = test_utils::rand_app();
+    let app_id = app_exchange_info.id.clone();
+
+    let containers = create_containers_req();
+    let auth_req = AuthReq {
+        app: app_exchange_info.clone(),
+        app_container: true,
+        containers,
+    };
+    let auth_req = unwrap!(auth_req.into_repr_c());
+
+    let req_id = gen_req_id();
+    let encoded: String = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            encode_auth_resp(&auth, &auth_req, req_id, true, ud, cb)
+        }))
+    };
+    let encoded = unwrap!(CString::new(encoded));
+
+    let mut context = Context {
+        unexpected_cb: false,
+        req_id: 0,
+        auth_granted: None,
+    };
+
+    let context = unsafe {
+        extern "C" fn auth_cb(ctx: *mut c_void, req_id: u32, auth_granted: *const FfiAuthGranted) {
+            unsafe {
+                let auth_granted = unwrap!(AuthGranted::clone_from_repr_c(auth_granted));
+
+                let ctx = ctx as *mut Context;
+                (*ctx).req_id = req_id;
+                (*ctx).auth_granted = Some(auth_granted);
+            }
+        }
+
+        extern "C" fn containers_cb(ctx: *mut c_void, _req_id: u32) {
+            unsafe {
+                let ctx = ctx as *mut Context;
+                (*ctx).unexpected_cb = true;
+            }
+        }
+
+        extern "C" fn share_mdata_cb(ctx: *mut c_void, _req_id: u32) {
+            unsafe {
+                let ctx = ctx as *mut Context;
+                (*ctx).unexpected_cb = true;
+            }
+        }
+
+        extern "C" fn revoked_cb(ctx: *mut c_void) {
+            unsafe {
+                let ctx = ctx as *mut Context;
+                (*ctx).unexpected_cb = true;
+            }
+        }
+
+        extern "C" fn unregistered_cb(
+            ctx: *mut c_void,
+            _req_id: u32,
+            _bootstrap_cfg: *const u8,
+            _bootstrap_cfg_len: usize,
+        ) {
+            unsafe {
+                let ctx = ctx as *mut Context;
+                (*ctx).unexpected_cb = true;
+            }
+        }
+
+        let context_ptr: *mut Context = &mut context;
+
+        decode_ipc_msg(
+            encoded.as_ptr(),
+            context_ptr as *mut c_void,
+            auth_cb,
+            unregistered_cb,
+            containers_cb,
+            share_mdata_cb,
+            revoked_cb,
+            err_cb,
+        );
+
+        context
+    };
+
+    assert!(!context.unexpected_cb);
+
+    let auth_granted = unwrap!(context.auth_granted);
+
+    let mut expected = create_containers_req();
+    let _ = expected.insert(
+        safe_core::app_container_name(&app_id),
+        btree_set![
+            Permission::Read,
+            Permission::Insert,
+            Permission::Update,
+            Permission::Delete,
+            Permission::ManagePermissions,
+        ],
+    );
+    for (container, permissions) in expected.clone() {
+        let perms = unwrap!(auth_granted.access_container_entry.get(&container));
+        assert_eq!((*perms).1, permissions);
+    }
+}
+
+struct Context {
+    unexpected_cb: bool,
+    req_id: u32,
+    auth_granted: Option<AuthGranted>,
+}
+
+extern "C" fn err_cb(ctx: *mut c_void, _res: *const FfiResult, _req_id: u32) {
+    unsafe {
+        let ctx = ctx as *mut Context;
+        (*ctx).unexpected_cb = true;
+    }
 }

@@ -506,10 +506,11 @@ fn app_authentication() {
     let app_exchange_info = rand_app();
     let app_id = app_exchange_info.id.clone();
 
+    let containers = create_containers_req();
     let auth_req = AuthReq {
         app: app_exchange_info.clone(),
         app_container: true,
-        containers: create_containers_req(),
+        containers,
     };
 
     let msg = IpcMsg::Req {
@@ -568,6 +569,10 @@ fn app_authentication() {
             Permission::ManagePermissions,
         ],
     );
+    for (container, permissions) in expected.clone() {
+        let perms = unwrap!(auth_granted.access_container_entry.get(&container));
+        assert_eq!((*perms).1, permissions);
+    }
 
     let mut access_container =
         access_container(&authenticator, app_id.clone(), auth_granted.clone());

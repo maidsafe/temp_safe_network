@@ -322,7 +322,7 @@ pub fn compare_access_container_entries(
         future::join_all(reqs).map_err(AuthError::from)
     });
 
-    // Check the permission on the the mutable data for each of the above directories.
+    // Check the permission on the mutable data for each of the above directories.
     for (perms, expected) in results {
         assert_eq!(perms, expected);
     }
