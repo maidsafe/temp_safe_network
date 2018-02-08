@@ -118,11 +118,11 @@ fn gen_bindings_csharp() {
     lang.set_consts_enabled(false);
     lang.set_types_enabled(false);
     lang.set_utils_enabled(false);
+    lang.add_opaque_type("App");
 
     lang.reset_filter(FilterMode::Whitelist);
     for &ident in &test_idents {
         lang.filter(ident);
-        lang.blacklist_wrapper_function(ident);
     }
 
     outputs.clear();
@@ -158,6 +158,11 @@ fn apply_patches_testing(outputs: &mut HashMap<PathBuf, String>) {
     insert_using_utilities(fetch_mut(
         outputs,
         "SafeApp.MockAuthBindings/MockAuthBindings.cs",
+    ));
+
+    insert_using_utilities(fetch_mut(
+        outputs,
+        "SafeApp.MockAuthBindings/IMockAuthBindings.cs",
     ));
 
     for content in outputs.values_mut() {

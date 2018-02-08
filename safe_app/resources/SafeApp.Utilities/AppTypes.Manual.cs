@@ -20,7 +20,7 @@ namespace SafeApp.Utilities {
     public uint ReqId;
     public List<byte> SerialisedCfg;
 
-    public UnregisteredIpcMsg(uint reqId, IntPtr serialisedCfgPtr, ulong serialisedCfgLen) {
+    public UnregisteredIpcMsg(uint reqId, IntPtr serialisedCfgPtr, IntPtr serialisedCfgLen) {
         ReqId = reqId;
         SerialisedCfg = BindingUtils.CopyToByteList(serialisedCfgPtr, (int) serialisedCfgLen);
     }
