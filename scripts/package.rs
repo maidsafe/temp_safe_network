@@ -167,7 +167,7 @@ fn main() {
 
     let file_options = FileOptions::default();
 
-    validate_env(arch);
+    setup_env(toolchain_path, arch);
 
     // Gather features.
     let mut features = vec![];
@@ -309,7 +309,7 @@ fn get_version_string(krate: &str, commit: bool) -> String {
     }
 }
 
-fn get_toolchain_prefix(toolchain_path: Option<&str>, arch: Option<&Arch>) -> String {
+fn get_toolchain_bin(toolchain_path: Option<&str>, arch: Option<&Arch>, bin: &str) -> String {
     let mut result = PathBuf::new();
 
     if let Some(path) = toolchain_path {
@@ -317,7 +317,9 @@ fn get_toolchain_prefix(toolchain_path: Option<&str>, arch: Option<&Arch>) -> St
         result.push("bin");
     }
 
-    result.push(arch.map(|arch| arch.toolchain).unwrap_or(""));
+    let prefix = arch.map(|arch| arch.toolchain).unwrap_or("");
+
+    result.push(format!("{}{}", prefix, bin));
     result.into_os_string().into_string().unwrap()
 }
 
@@ -325,27 +327,44 @@ fn find_arch(name: &str) -> Option<&Arch> {
     ARCHS.into_iter().find(|arch| arch.name == name)
 }
 
-fn validate_env(arch: Option<&Arch>) {
-    if let Some(arch) = arch {
-        let name = format!("CARGO_TARGET_{}_LINKER", arch.target.to_shouty_snake_case());
-        if let Ok(value) = env::var(&name) {
-            if !Path::new(&value).exists() {
-                println!(
-                    "{}: the environment variable {} is set, but points to \
-                     non-existing file {}. This might cause linker failures.",
-                     "warning".yellow().bold(),
-                    name.bold(),
-                    value.bold(),
-                );
-            }
-        } else {
+fn setup_env(toolchain_path: Option<&str>, arch: Option<&Arch>) {
+    let arch = if let Some(arch) = arch { arch } else { return };
+
+    let name = format!("CARGO_TARGET_{}_LINKER", arch.target.to_shouty_snake_case());
+
+    let value = if let Some(toolchain_path) = toolchain_path {
+        let value = get_toolchain_bin(Some(toolchain_path), Some(arch), "gcc");
+
+        println!(
+            "{}: setting environment variable {} to {}",
+            "notice".green().bold(),
+            name.bold(),
+            value.bold()
+        );
+
+        env::set_var(&name, &value);
+        Some(value)
+    } else {
+        env::var(&name).ok()
+    };
+
+    if let Some(value) = value {
+        if !Path::new(&value).exists() {
             println!(
-                "{}: the environment variable {} is not set. \
-                 This might cause linker failure.",
-                "warning".yellow().bold(),
-                name.bold()
+                "{}: the environment variable {} is set, but points to \
+                 non-existing file {}. This might cause linker failures.",
+                 "warning".yellow().bold(),
+                name.bold(),
+                value.bold(),
             );
         }
+    } else {
+        println!(
+            "{}: the environment variable {} is not set. \
+             This might cause linker failure.",
+            "warning".yellow().bold(),
+            name.bold()
+        );
     }
 }
 
@@ -409,8 +428,7 @@ fn find_libs(krate: &str, target: Option<&str>, target_dir: &str) -> Vec<PathBuf
 }
 
 fn strip_libs(toolchain_path: Option<&str>, arch: Option<&Arch>, libs: &[PathBuf]) {
-    let prefix = get_toolchain_prefix(toolchain_path, arch);
-    let strip_bin = format!("{}{}", prefix, "strip");
+    let strip_bin = get_toolchain_bin(toolchain_path, arch, "strip");
 
     for path in libs {
         strip_lib(&strip_bin, path);
