@@ -17,7 +17,7 @@ namespace SafeApp.AppBindings {
       var userData = BindingUtils.ToHandlePtr((oDisconnectNotifierCb, oCb));
 
       AppUnregisteredNative(bootstrapConfig.ToArray(),
-                            (IntPtr) bootstrapConfig.Count,
+                            (UIntPtr) bootstrapConfig.Count,
                             userData,
                             OnAppDisconnectCb,
                             OnAppCreateCb);
@@ -93,7 +93,7 @@ namespace SafeApp.AppBindings {
     #if __IOS__
     [MonoPInvokeCallback(typeof(UintByteListCb))]
     #endif
-    private static void OnDecodeIpcMsgUnregisteredCb(IntPtr userData, uint reqId, IntPtr serialisedCfgPtr, IntPtr serialisedCfgLen)
+    private static void OnDecodeIpcMsgUnregisteredCb(IntPtr userData, uint reqId, IntPtr serialisedCfgPtr, UIntPtr serialisedCfgLen)
     {
       var tcs = BindingUtils.FromHandlePtr<TaskCompletionSource<IpcMsg>>(userData);
       tcs.SetResult(new UnregisteredIpcMsg(reqId, serialisedCfgPtr, serialisedCfgLen));

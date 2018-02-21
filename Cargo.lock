@@ -978,7 +978,7 @@ dependencies = [
  "routing 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_authenticator 0.6.0",
- "safe_bindgen 0.5.0",
+ "safe_bindgen 0.5.0 (git+https://github.com/madadam/safe_bindgen.git?branch=csharp)",
  "safe_core 0.29.0",
  "self_encryption 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1013,19 +1013,6 @@ dependencies = [
 name = "safe_bindgen"
 version = "0.5.0"
 source = "git+https://github.com/madadam/safe_bindgen.git?branch=csharp#aea16c01376acd53162d1168a25f73e517743e0f"
-dependencies = [
- "Inflector 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap 2.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "jni 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
- "syntex_errors 0.58.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "syntex_syntax 0.58.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "safe_bindgen"
-version = "0.5.0"
 dependencies = [
  "Inflector 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
