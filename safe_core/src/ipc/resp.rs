@@ -507,6 +507,39 @@ impl ReprC for MDataKey {
     }
 }
 
+/// Mutable data entry.
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
+pub struct MDataEntry {
+    /// Key.
+    pub key: MDataKey,
+    /// Value.
+    pub value: MDataValue,
+}
+
+impl MDataEntry {
+    /// Returns FFI counterpart without consuming the object.
+    pub fn as_repr_c(&self) -> ffi::MDataEntry {
+        ffi::MDataEntry {
+            key: self.key.as_repr_c(),
+            value: self.value.as_repr_c(),
+        }
+    }
+}
+
+impl ReprC for MDataEntry {
+    type C = *const ffi::MDataEntry;
+    type Error = ();
+
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+        let ffi::MDataEntry { key, value } = *c_repr;
+
+        Ok(MDataEntry {
+            key: MDataKey::clone_from_repr_c(&key)?,
+            value: MDataValue::clone_from_repr_c(&value)?,
+        })
+    }
+}
+
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {

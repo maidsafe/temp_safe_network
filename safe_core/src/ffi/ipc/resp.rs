@@ -205,6 +205,16 @@ impl Drop for MetadataResponse {
     }
 }
 
+/// Represents an FFI-safe mutable data key.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct MDataKey {
+    /// Key value pointer.
+    pub val: *const u8,
+    /// Key length.
+    pub val_len: usize,
+}
+
 /// Represents the FFI-safe mutable data value.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -217,12 +227,12 @@ pub struct MDataValue {
     pub entry_version: u64,
 }
 
-/// Represents an FFI-safe mutable data key.
+/// Represents an FFI-safe mutable data (key, value) entry.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct MDataKey {
-    /// Key value pointer.
-    pub val: *const u8,
-    /// Key length.
-    pub val_len: usize,
+pub struct MDataEntry {
+    /// Mutable data key.
+    pub key: MDataKey,
+    /// Mutable data value.
+    pub value: MDataValue,
 }

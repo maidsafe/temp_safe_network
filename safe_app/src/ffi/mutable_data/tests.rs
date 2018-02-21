@@ -422,13 +422,10 @@ fn entries_crud_ffi() {
         assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
     }
 
-    // Check mdata_list_entries
+    // Check mdata_entries
     {
-        let entries_list_h = unsafe {
-            unwrap!(call_1(
-                |ud, cb| mdata_list_entries(&app, &md_info_priv, ud, cb),
-            ))
-        };
+        let entries_h =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_entries(&app, &md_info_priv, ud, cb))) };
 
         // Try with a fake entry key, expect error.
         let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
@@ -438,7 +435,7 @@ fn entries_crud_ffi() {
         unsafe {
             mdata_entries_get(
                 &app,
-                entries_list_h,
+                entries_h,
                 fake_key.as_ptr(),
                 fake_key.len(),
                 sender_as_user_data(&tx, &mut ud),
@@ -459,7 +456,7 @@ fn entries_crud_ffi() {
         unsafe {
             mdata_entries_get(
                 &app,
-                entries_list_h,
+                entries_h,
                 key_enc.as_ptr(),
                 key_enc.len(),
                 sender_as_user_data(&tx, &mut ud),
@@ -484,11 +481,7 @@ fn entries_crud_ffi() {
         };
         assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
 
-        unsafe {
-            unwrap!(call_0(
-                |ud, cb| mdata_entries_free(&app, entries_list_h, ud, cb),
-            ))
-        }
+        unsafe { unwrap!(call_0(|ud, cb| mdata_entries_free(&app, entries_h, ud, cb))) }
     }
 
     // Check mdata_list_keys
