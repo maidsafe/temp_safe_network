@@ -24,10 +24,10 @@ use self::utils::{ChannelType, create_containers_req, decode_ipc_msg, err_cb, un
 use access_container as access_container_tools;
 use app_container;
 use config::{self, KEY_APPS};
-use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNEXPECTED, ERR_UNKNOWN_APP};
+use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi::ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
-use ffi_utils::{ReprC, StringError, from_c_str};
+use ffi_utils::{ErrorCode, ReprC, StringError, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, sender_as_user_data};
 use futures::{Future, future};
 use safe_core::{app_container_name, mdata_info};
@@ -663,7 +663,7 @@ fn invalid_container_authentication() {
         })
     };
     match result {
-        Err(ERR_UNEXPECTED) => (),
+        Err(error) if error == AuthError::NoSuchContainer("_app".into()).error_code() => (),
         x => panic!("Unexpected {:?}", x),
     };
 }
