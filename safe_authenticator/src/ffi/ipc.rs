@@ -409,7 +409,8 @@ pub unsafe extern "C" fn encode_auth_resp(
                             resp: IpcResp::Auth(Ok(auth_granted)),
                         })?;
 
-                        Ok(o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr()))
+                        o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
+                        Ok(())
                     })
                     .or_else(move |e| -> Result<(), AuthError> {
                         let (error_code, description) = ffi_error!(e);
@@ -421,7 +422,8 @@ pub unsafe extern "C" fn encode_auth_resp(
                             error_code,
                             description: description.as_ptr(),
                         };
-                        Ok(o_cb(user_data.0, &res, resp.as_ptr()))
+                        o_cb(user_data.0, &res, resp.as_ptr());
+                        Ok(())
                     })
                     .map_err(move |e| {
                         call_result_cb!(Err::<(), _>(e), user_data, o_cb);
@@ -527,7 +529,8 @@ pub unsafe extern "C" fn encode_containers_resp(
                             error_code,
                             description: description.as_ptr(),
                         };
-                        Ok(o_cb(user_data.0, &res, resp.as_ptr()))
+                        o_cb(user_data.0, &res, resp.as_ptr());
+                        Ok(())
                     })
                     .map_err(move |e| debug!("Unexpected error: {:?}", e))
                     .into_box()

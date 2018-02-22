@@ -137,11 +137,12 @@ where
     let (net_tx, net_rx) = mpsc::unbounded();
     let client = unwrap!(c(el_h.clone(), core_tx.clone(), net_tx));
 
-    let net_fut = net_rx.for_each(move |net_event| Ok(n(net_event))).map_err(
-        |e| {
-            panic!("Network event stream error: {:?}", e)
-        },
-    );
+    let net_fut = net_rx
+        .for_each(move |net_event| {
+            n(net_event);
+            Ok(())
+        })
+        .map_err(|e| panic!("Network event stream error: {:?}", e));
     el_h.spawn(net_fut);
 
     let core_tx_clone = core_tx.clone();

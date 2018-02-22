@@ -26,6 +26,8 @@ use ffi_utils::callback::Callback;
 use object_cache::MDataEntriesHandle;
 use routing::{ClientError, Value};
 use safe_core::CoreError;
+use safe_core::ffi::ipc::resp::{MDataEntry as FfiMDataEntry, MDataKey as FfiMDataKey,
+                                MDataValue as FfiMDataValue};
 use std::collections::BTreeMap;
 use std::os::raw::c_void;
 
@@ -118,8 +120,11 @@ pub unsafe extern "C" fn mdata_entries_get(
         let key = vec_clone_from_raw_parts(key, key_len);
 
         (*app).send(move |_, context| {
-            let entries = context.object_cache().get_mdata_entries(entries_h);
-            let entries = try_cb!(entries, user_data, o_cb);
+            let entries = try_cb!(
+                context.object_cache().get_mdata_entries(entries_h),
+                user_data,
+                o_cb
+            );
 
             let value = entries
                 .get(&key)
@@ -149,34 +154,50 @@ pub unsafe extern "C" fn mdata_entries_get(
 ///
 /// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_entries_for_each(
+pub unsafe extern "C" fn mdata_list_entries(
     app: *const App,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_each_cb: extern "C" fn(user_data: *mut c_void,
-                             key: *const u8,
-                             key_len: usize,
-                             value: *const u8,
-                             value_len: usize,
-                             entry_version: u64),
-    o_done_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
+    o_cb: extern "C" fn(user_data: *mut c_void,
+                        result: *const FfiResult,
+                        entries: *const FfiMDataEntry,
+                        len: usize),
 ) {
-    catch_unwind_cb(user_data, o_done_cb, || {
-        let user_data = OpaqueCtx(user_data);
+    let user_data = OpaqueCtx(user_data);
 
-        with_entries(app, entries_h, user_data.0, o_done_cb, move |entries| {
-            for (key, value) in entries {
-                o_each_cb(
-                    user_data.0,
-                    key.as_safe_ptr(),
-                    key.len(),
-                    value.content.as_safe_ptr(),
-                    value.content.len(),
-                    value.entry_version,
-                );
-            }
+    catch_unwind_cb(user_data, o_cb, || {
+        (*app).send(move |_client, context| {
+            let entries = try_cb!(
+                context.object_cache().get_mdata_entries(entries_h),
+                user_data.0,
+                o_cb
+            );
 
-            Ok(())
+            let entries_vec: Vec<FfiMDataEntry> = entries
+                .iter()
+                .map(|(key, value)| {
+                    FfiMDataEntry {
+                        key: FfiMDataKey {
+                            val: key.as_safe_ptr(),
+                            val_len: key.len(),
+                        },
+                        value: FfiMDataValue {
+                            content: value.content.as_safe_ptr(),
+                            content_len: value.content.len(),
+                            entry_version: value.entry_version,
+                        },
+                    }
+                })
+                .collect();
+
+            o_cb(
+                user_data.0,
+                FFI_RESULT_OK,
+                entries_vec.as_safe_ptr(),
+                entries_vec.len(),
+            );
+
+            None
         })
     })
 }
@@ -229,11 +250,10 @@ mod tests {
     use ffi_utils::vec_clone_from_raw_parts;
     use object_cache::MDataEntryActionsHandle;
     use routing::{Action, PermissionSet, Value};
-    use safe_core::ipc::resp::MDataValue;
+    use safe_core::ipc::resp::{MDataEntry, MDataKey, MDataValue};
     use safe_core::utils;
-    use std::collections::BTreeMap;
     use std::os::raw::c_void;
-    use std::sync::mpsc::{self, Sender};
+    use std::sync::mpsc;
     use test_utils::{create_app, run_now};
 
     // Test mdata entries operations.
@@ -352,52 +372,20 @@ mod tests {
         let value = unwrap!(rx.recv());
         assert_eq!(value, value1);
 
-        // Iteration
-        let (tx, rx) = mpsc::channel::<()>();
-        let mut user_data = (tx, BTreeMap::<Vec<u8>, Value>::new());
-
-        extern "C" fn entry_cb(
-            user_data: *mut c_void,
-            key: *const u8,
-            key_len: usize,
-            value: *const u8,
-            value_len: usize,
-            entry_version: u64,
-        ) {
-            unsafe {
-                let key = vec_clone_from_raw_parts(key, key_len);
-                let value = Value {
-                    content: vec_clone_from_raw_parts(value, value_len),
-                    entry_version: entry_version,
-                };
-
-                let user_data = user_data as *mut (Sender<()>, BTreeMap<_, _>);
-                let _ = (*user_data).1.insert(key, value);
-            }
-        }
-
-        extern "C" fn done_cb(user_data: *mut c_void, res: *const FfiResult) {
-            unsafe {
-                assert_eq!((*res).error_code, 0);
-            }
-            let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, Value>);
-
-            unsafe {
-                unwrap!((*user_data).0.send(()));
-            }
-        }
-
-        unsafe {
-            let user_data: *mut _ = &mut user_data;
-            mdata_entries_for_each(&app, handle0, user_data as *mut c_void, entry_cb, done_cb)
-        }
-
-        unwrap!(rx.recv());
-        let entries = user_data.1;
+        // Get list of entries, verify number of entries
+        let entries: Vec<MDataEntry> =
+            unsafe { unwrap!(call_vec(|ud, cb| mdata_list_entries(&app, handle0, ud, cb))) };
 
         assert_eq!(entries.len(), 2);
-        assert_eq!(*unwrap!(entries.get(&key0)), value0);
-        assert_eq!(*unwrap!(entries.get(&key1)), value1);
+
+        assert!(entries.contains(&MDataEntry {
+            key: MDataKey { val: key0 },
+            value: MDataValue::from_routing(value0),
+        }));
+        assert!(entries.contains(&MDataEntry {
+            key: MDataKey { val: key1 },
+            value: MDataValue::from_routing(value1),
+        }));
 
         // Free
         unsafe {
@@ -456,7 +444,7 @@ mod tests {
             }))
         };
 
-        // Get the keys handle, make sure number of keys is zero
+        // Get list of keys, verify number of keys
         let keys: Vec<MDataKey> =
             unsafe { unwrap!(call_vec(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
 

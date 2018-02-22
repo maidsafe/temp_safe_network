@@ -35,8 +35,7 @@ use routing::MutableData;
 use safe_core::{CoreError, FutureExt, MDataInfo};
 use safe_core::ffi::MDataInfo as FfiMDataInfo;
 use safe_core::ffi::ipc::req::PermissionSet as FfiPermissionSet;
-use safe_core::ffi::ipc::resp::MDataKey as FfiMDataKey;
-use safe_core::ffi::ipc::resp::MDataValue as FfiMDataValue;
+use safe_core::ffi::ipc::resp::{MDataKey as FfiMDataKey, MDataValue as FfiMDataValue};
 use safe_core::ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
 use safe_core::ipc::resp::{MDataKey, MDataValue};
 use std::os::raw::c_void;
@@ -216,11 +215,11 @@ pub unsafe extern "C" fn mdata_get_value(
     })
 }
 
-/// Get complete list of entries in the mutable data.
+/// Get a handle to the complete list of entries in the mutable data.
 ///
 /// Callback parameters: user data, error code, entries handle
 #[no_mangle]
-pub unsafe extern "C" fn mdata_list_entries(
+pub unsafe extern "C" fn mdata_entries(
     app: *const App,
     info: *const FfiMDataInfo,
     user_data: *mut c_void,
