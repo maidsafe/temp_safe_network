@@ -159,7 +159,7 @@ impl<'a> FromJava<JString<'a>> for *mut c_char {
 
 impl<'a> ToJava<'a, JString<'a>> for *mut c_char {
     fn to_java(&self, env: &'a JNIEnv) -> JString<'a> {
-        (*self as *const _).to_java(env)
+        (*self as *const c_char).to_java(env)
     }
 }
 
