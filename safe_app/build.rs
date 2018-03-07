@@ -29,8 +29,7 @@ use rust_sodium::crypto::{box_, secretbox, sign};
 use safe_bindgen::{Bindgen, FilterMode, LangCSharp, LangJava};
 use std::collections::HashMap;
 use std::env;
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn main() {
     if env::var("CARGO_FEATURE_BINDINGS").is_err() {
@@ -108,11 +107,29 @@ fn gen_bindings_csharp() {
     let mut lang = LangCSharp::new();
 
     lang.set_lib_name(unwrap!(env::var("CARGO_PKG_NAME")));
-    lang.set_namespace("SafeApp");
-    lang.set_class_name("AppBindings");
-    lang.set_consts_class_name("AppConstants");
-    lang.set_types_file_name("AppTypes");
-    lang.set_utils_class_name("BindingUtils");
+
+    lang.set_interface_section(
+        "SafeApp.Utilities/IAppBindings.cs",
+        "SafeApp.Utilities",
+        "IAppBindings",
+    );
+    lang.set_functions_section(
+        "SafeApp.AppBindings/AppBindings.cs",
+        "SafeApp.AppBindings",
+        "AppBindings",
+    );
+    lang.set_consts_section(
+        "SafeApp.Utilities/AppConstants.cs",
+        "SafeApp.Utilities",
+        "AppConstants",
+    );
+    lang.set_types_section("SafeApp.Utilities/AppTypes.cs", "SafeApp.Utilities");
+    lang.set_utils_section(
+        "SafeApp.Utilities/BindingUtils.cs",
+        "SafeApp.Utilities",
+        "BindingUtils",
+    );
+
     lang.add_const("ulong", "ASYM_PUBLIC_KEY_LEN", box_::PUBLICKEYBYTES);
     lang.add_const("ulong", "ASYM_SECRET_KEY_LEN", box_::SECRETKEYBYTES);
     lang.add_const("ulong", "ASYM_NONCE_LEN", box_::NONCEBYTES);
@@ -128,37 +145,116 @@ fn gen_bindings_csharp() {
         lang.filter(ident);
     }
 
-    let mut outputs = HashMap::new();
     bindgen.source_file("../safe_core/src/lib.rs");
-    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
+    bindgen.compile_or_panic(&mut lang, &mut HashMap::new(), false);
 
+    let mut outputs = HashMap::new();
     bindgen.source_file("src/lib.rs");
-    unwrap!(bindgen.compile(&mut lang, &mut outputs, true));
-
-    unwrap!(bindgen.write_outputs(target_dir, &outputs));
+    bindgen.compile_or_panic(&mut lang, &mut outputs, true);
+    apply_patches(&mut outputs);
+    bindgen.write_outputs_or_panic(target_dir, &outputs);
 
     // Testing utilities.
-    lang.set_class_name("MockAuthBindings");
+    lang.set_interface_section(
+        "SafeApp.MockAuthBindings/IMockAuthBindings.cs",
+        "SafeApp.MockAuthBindings",
+        "IMockAuthBindings",
+    );
+    lang.set_functions_section(
+        "SafeApp.MockAuthBindings/MockAuthBindings.cs",
+        "SafeApp.MockAuthBindings",
+        "MockAuthBindings",
+    );
+
+    lang.set_consts_enabled(false);
+    lang.set_types_enabled(false);
     lang.set_utils_enabled(false);
+    lang.add_opaque_type("App");
 
     lang.reset_filter(FilterMode::Whitelist);
     for &ident in &test_idents {
         lang.filter(ident);
-        lang.blacklist_wrapper_function(ident);
     }
 
-    bindgen.run_build(&mut lang, target_dir);
+    outputs.clear();
+    bindgen.compile_or_panic(&mut lang, &mut outputs, true);
+    apply_patches_testing(&mut outputs);
+    bindgen.write_outputs_or_panic(target_dir, &outputs);
 
     // Hand-written code.
-    for entry in unwrap!(fs::read_dir("resources")) {
-        let entry = unwrap!(entry);
+    unwrap!(ffi_utils::bindgen_utils::copy_files(
+        "resources",
+        target_dir,
+        ".cs",
+    ));
+}
 
-        if let Some(file) = entry.path().file_name() {
-            let file = unwrap!(file.to_str());
-
-            if file.ends_with(".cs") {
-                unwrap!(fs::copy(entry.path(), target_dir.join(file)));
-            }
-        }
+fn apply_patches(outputs: &mut HashMap<PathBuf, String>) {
+    {
+        let content = fetch_mut(outputs, "SafeApp.AppBindings/AppBindings.cs");
+        insert_using_utilities(content);
+        insert_using_obj_c_runtime(content);
+        insert_guard(content);
+        insert_resharper_disable_inconsistent_naming(content);
     }
+
+    insert_internals_visible_to(fetch_mut(outputs, "SafeApp.Utilities/AppTypes.cs"));
+
+    for content in outputs.values_mut() {
+        fix_names(content);
+    }
+}
+
+fn apply_patches_testing(outputs: &mut HashMap<PathBuf, String>) {
+    insert_using_utilities(fetch_mut(
+        outputs,
+        "SafeApp.MockAuthBindings/MockAuthBindings.cs",
+    ));
+
+    insert_using_utilities(fetch_mut(
+        outputs,
+        "SafeApp.MockAuthBindings/IMockAuthBindings.cs",
+    ));
+
+    for content in outputs.values_mut() {
+        fix_names(content);
+    }
+}
+
+fn insert_guard(content: &mut String) {
+    content.insert_str(0, "#if !NETSTANDARD1_2 || __DESKTOP__\n");
+    content.push_str("#endif\n");
+}
+
+
+fn insert_using_utilities(content: &mut String) {
+    content.insert_str(0, "using SafeApp.Utilities;\n");
+}
+
+fn insert_using_obj_c_runtime(content: &mut String) {
+    content.insert_str(0, "#if __IOS__\nusing ObjCRuntime;\n#endif\n");
+}
+
+fn insert_internals_visible_to(content: &mut String) {
+    content.insert_str(0, "using System.Runtime.CompilerServices;\n");
+
+    // HACK: The [assembly: ...] annotation must go after all using declaration.
+    *content = content.replace(
+        "namespace SafeApp.Utilities",
+        "[assembly: InternalsVisibleTo(\"SafeApp.AppBindings\")]\n\n\
+         namespace SafeApp.Utilities",
+    );
+}
+
+fn insert_resharper_disable_inconsistent_naming(content: &mut String) {
+    content.insert_str(0, "// ReSharper disable InconsistentNaming\n");
+}
+
+fn fix_names(content: &mut String) {
+    *content = content.replace("Idata", "IData").replace("Mdata", "MData");
+}
+
+fn fetch_mut<T: AsRef<Path>>(outputs: &mut HashMap<PathBuf, String>, key: T) -> &mut String {
+    let key = key.as_ref();
+    unwrap!(outputs.get_mut(key), "key {:?} not found in outputs", key)
 }
