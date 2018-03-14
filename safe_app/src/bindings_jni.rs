@@ -5,7 +5,8 @@ use super::*;
 use ffi::object_cache::*;
 use ffi_utils::*;
 use jni::{self, JNIEnv, JavaVM};
-use jni::objects::{DetachedGlobalRef, GlobalRef, JClass, JObject, JString};
+use jni::errors::{Error as JniError, ErrorKind};
+use jni::objects::{GlobalRef, JClass, JObject, JString};
 use jni::strings::JNIStr;
 use jni::sys::{jbyte, jbyteArray, jint, jlong, jobject, jsize};
 use safe_core;
@@ -20,6 +21,8 @@ use std::ffi::{CStr, CString};
 use std::mem;
 use std::os::raw::{c_char, c_void};
 use std::slice;
+
+type JniResult<T> = Result<T, JniError>;
 
 /// Generates a `user_data` context containing a reference to a single or several Java callbacks
 macro_rules! gen_ctx {
@@ -55,14 +58,14 @@ macro_rules! gen_ctx {
 macro_rules! gen_primitive_type_converter {
     ($native_type:ty, $java_type:ty) => {
         impl FromJava<$java_type> for $native_type {
-            fn from_java(_env: &JNIEnv, input: $java_type) -> Self {
-                input as Self
+            fn from_java(_env: &JNIEnv, input: $java_type) -> JniResult<Self> {
+                Ok(input as Self)
             }
         }
 
         impl<'a> ToJava<'a, $java_type> for $native_type {
-            fn to_java(&self, _env: &JNIEnv) -> $java_type {
-                *self as $java_type
+            fn to_java(&self, _env: &JNIEnv) -> JniResult<$java_type> {
+                Ok(*self as $java_type)
             }
         }
     }
@@ -71,30 +74,41 @@ macro_rules! gen_primitive_type_converter {
 macro_rules! gen_byte_array_converter {
     ($arr_type:ty, $size:expr) => {
         impl<'a> FromJava<JObject<'a>> for [$arr_type; $size] {
-            fn from_java(env: &JNIEnv, input: JObject) -> Self {
+            fn from_java(env: &JNIEnv, input: JObject) -> JniResult<Self> {
                 let input = input.into_inner() as jbyteArray;
                 let mut output = [0; $size];
-                env.get_byte_array_region(input, 0, &mut output).unwrap();
+                env.get_byte_array_region(input, 0, &mut output)?;
 
-                unsafe { mem::transmute(output) }
+                Ok(unsafe { mem::transmute(output) })
             }
         }
 
         impl<'a> ToJava<'a, JObject<'a>> for [$arr_type; $size] {
-            fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-                let output = env.new_byte_array(self.len() as jsize).unwrap();
+            fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+                let output = env.new_byte_array(self.len() as jsize)?;
                 env.set_byte_array_region(output, 0, unsafe {
                     slice::from_raw_parts(self.as_ptr() as *const i8, self.len())
-                }).unwrap();
-                JObject::from(output as jobject)
+                })?;
+                Ok(JObject::from(output as jobject))
             }
         }
     }
 }
 
+macro_rules! jni_unwrap {
+    ($res:expr) => {{
+        let res: Result<_, JniError> = $res;
+        if let Err(JniError(ErrorKind::JavaException, _)) = res {
+            return;
+        } else {
+            res.unwrap()
+        }
+    }}
+}
+
 /// Converts `user_data` back into a Java callback object
 unsafe fn convert_cb_from_java(env: &JNIEnv, ctx: *mut c_void) -> GlobalRef {
-    DetachedGlobalRef::new(unwrap!(env.get_java_vm()), ctx as jobject).attach(env)
+    GlobalRef::from_raw(unwrap!(env.get_java_vm()), ctx as jobject)
 }
 
 static mut JVM: Option<JavaVM> = None;
@@ -107,13 +121,15 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut jni::sys::JavaVM, _reserved: *mut c
 }
 
 // Trait for conversion of rust value to java value.
-trait ToJava<'a, T: 'a> {
-    fn to_java(&self, env: &'a JNIEnv) -> T;
+trait ToJava<'a, T: Sized + 'a> {
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<T>;
 }
 
 // Trait for conversion of java value to rust value.
 trait FromJava<T> {
-    fn from_java(env: &JNIEnv, input: T) -> Self;
+    fn from_java(env: &JNIEnv, input: T) -> JniResult<Self>
+    where
+        Self: Sized;
 }
 
 gen_primitive_type_converter!(u8, jbyte);
@@ -128,121 +144,119 @@ gen_byte_array_converter!(u8, 32);
 gen_byte_array_converter!(u8, 64);
 
 impl<'a> ToJava<'a, bool> for bool {
-    fn to_java(&self, _env: &JNIEnv) -> bool {
-        *self
+    fn to_java(&self, _env: &JNIEnv) -> JniResult<bool> {
+        Ok(*self)
     }
 }
 
 impl<'a> ToJava<'a, jlong> for usize {
-    fn to_java(&self, _env: &JNIEnv) -> jlong {
-        *self as jlong
+    fn to_java(&self, _env: &JNIEnv) -> JniResult<jlong> {
+        Ok(*self as jlong)
     }
 }
 
 impl<'a> FromJava<JString<'a>> for *const c_char {
-    fn from_java(env: &JNIEnv, input: JString) -> Self {
-        CString::from_java(env, input).into_raw()
+    fn from_java(env: &JNIEnv, input: JString) -> JniResult<Self> {
+        Ok(CString::from_java(env, input)?.into_raw())
     }
 }
 
 impl<'a> ToJava<'a, JString<'a>> for *const c_char {
-    fn to_java(&self, env: &'a JNIEnv) -> JString<'a> {
-        unsafe { unwrap!(env.new_string(JNIStr::from_ptr(*self).to_owned())) }
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JString<'a>> {
+        Ok(unsafe {
+            unwrap!(env.new_string(JNIStr::from_ptr(*self).to_owned()))
+        })
     }
 }
 
 impl<'a> FromJava<JString<'a>> for *mut c_char {
-    fn from_java(env: &JNIEnv, input: JString) -> Self {
-        <*const _>::from_java(env, input) as *mut _
+    fn from_java(env: &JNIEnv, input: JString) -> JniResult<Self> {
+        Ok(<*const _>::from_java(env, input)? as *mut _)
     }
 }
 
 impl<'a> ToJava<'a, JString<'a>> for *mut c_char {
-    fn to_java(&self, env: &'a JNIEnv) -> JString<'a> {
-        (*self as *const c_char).to_java(env)
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JString<'a>> {
+        Ok((*self as *const c_char).to_java(env)?)
     }
 }
 
 
 impl<'a> FromJava<JString<'a>> for CString {
-    fn from_java(env: &JNIEnv, input: JString) -> Self {
+    fn from_java(env: &JNIEnv, input: JString) -> JniResult<Self> {
         let tmp: &CStr = &*unwrap!(env.get_string(input));
-        tmp.to_owned()
+        Ok(tmp.to_owned())
     }
 }
 
 // TODO: implement this for all primitive types (consider defining a `PrimitiveType`
 // trait and implement it for all rust types that correspond to primitive java types)
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [i32] {
-    fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-        let output = unwrap!(env.new_int_array(self.len() as jsize));
-        unwrap!(env.set_int_array_region(output, 0, self));
-        JObject::from(output as jobject)
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_int_array(self.len() as jsize)?;
+        env.set_int_array_region(output, 0, self)?;
+        Ok(JObject::from(output as jobject))
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [u8] {
-    fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-        let output = env.new_byte_array(self.len() as jsize).unwrap();
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_byte_array(self.len() as jsize)?;
         env.set_byte_array_region(output, 0, unsafe {
             slice::from_raw_parts(self.as_ptr() as *const i8, self.len())
-        }).unwrap();
-        JObject::from(output as jobject)
+        })?;
+        Ok(JObject::from(output as jobject))
     }
 }
 
 impl<'a> FromJava<JObject<'a>> for Vec<u8> {
-    fn from_java(env: &JNIEnv, input: JObject) -> Self {
+    fn from_java(env: &JNIEnv, input: JObject) -> JniResult<Self> {
         let input = input.into_inner() as jbyteArray;
-        env.convert_byte_array(input).unwrap()
+        Ok(env.convert_byte_array(input)?)
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataKey] {
-    fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-        let output = unwrap!(env.new_object_array(
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
             self.len() as jsize,
             "MDataKey",
             JObject::null(),
-        ));
-
-        JObject::from(output as jobject)
+        )?;
+        Ok(JObject::from(output as jobject))
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataValue] {
-    fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-        let output = unwrap!(env.new_object_array(
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
             self.len() as jsize,
             "MDataValue",
             JObject::null(),
-        ));
-
-        JObject::from(output as jobject)
+        )?;
+        Ok(JObject::from(output as jobject))
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [UserPermissionSet] {
-    fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-        let output = unwrap!(env.new_object_array(
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
             self.len() as jsize,
             "UserPermissionSet",
             JObject::null(),
-        ));
-
-        JObject::from(output as jobject)
+        )?;
+        Ok(JObject::from(output as jobject))
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [ContainerPermissions] {
-    fn to_java(&self, env: &'a JNIEnv) -> JObject<'a> {
-        let output = unwrap!(env.new_object_array(
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
             self.len() as jsize,
             "ContainerPermissions",
             JObject::null(),
-        ));
-
-        JObject::from(output as jobject)
+        )?;
+        Ok(JObject::from(output as jobject))
     }
 }
 

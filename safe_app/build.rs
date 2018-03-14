@@ -81,6 +81,7 @@ fn gen_bindings_java() {
     let mut lang = LangJava::new(type_map);
 
     lang.set_namespace("net.maidsafe.safe_app");
+    lang.set_model_namespace("net.maidsafe.safe_app");
 
     let mut outputs = HashMap::new();
 
