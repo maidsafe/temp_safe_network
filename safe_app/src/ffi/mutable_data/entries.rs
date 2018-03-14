@@ -26,8 +26,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
 use ffi_utils::callback::Callback;
 use routing::{ClientError, Value};
 use safe_core::CoreError;
-use safe_core::ffi::ipc::resp::{MDataEntry as FfiMDataEntry, MDataKey as FfiMDataKey,
-                                MDataValue as FfiMDataValue};
+use safe_core::ffi::ipc::resp::{MDataEntry, MDataKey, MDataValue};
 use std::collections::BTreeMap;
 use std::os::raw::c_void;
 
@@ -160,7 +159,7 @@ pub unsafe extern "C" fn mdata_list_entries(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
-                        entries: *const FfiMDataEntry,
+                        entries: *const MDataEntry,
                         len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
@@ -173,15 +172,15 @@ pub unsafe extern "C" fn mdata_list_entries(
                 o_cb
             );
 
-            let entries_vec: Vec<FfiMDataEntry> = entries
+            let entries_vec: Vec<MDataEntry> = entries
                 .iter()
                 .map(|(key, value)| {
-                    FfiMDataEntry {
-                        key: FfiMDataKey {
+                    MDataEntry {
+                        key: MDataKey {
                             val: key.as_safe_ptr(),
                             val_len: key.len(),
                         },
-                        value: FfiMDataValue {
+                        value: MDataValue {
                             content: value.content.as_safe_ptr(),
                             content_len: value.content.len(),
                             entry_version: value.entry_version,

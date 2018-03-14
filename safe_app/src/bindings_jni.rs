@@ -15,7 +15,8 @@ use safe_core::ffi::*;
 use safe_core::ffi::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq,
                                PermissionSet, ShareMData, ShareMDataReq};
 use safe_core::ffi::ipc::resp::{AccessContInfo, AccessContainerEntry, AppAccess, AppKeys,
-                                AuthGranted, ContainerInfo, MDataKey, MDataValue, MetadataResponse};
+                                AuthGranted, ContainerInfo, MDataEntry, MDataKey, MDataValue,
+                                MetadataResponse};
 use safe_core::ffi::nfs::File;
 use std::ffi::{CStr, CString};
 use std::mem;
@@ -243,6 +244,17 @@ impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [UserPermissionSet] {
         let output = env.new_object_array(
             self.len() as jsize,
             "UserPermissionSet",
+            JObject::null(),
+        )?;
+        Ok(JObject::from(output as jobject))
+    }
+}
+
+impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataEntry] {
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
+            self.len() as jsize,
+            "MDataEntry",
             JObject::null(),
         )?;
         Ok(JObject::from(output as jobject))

@@ -43,10 +43,6 @@ pub mod object_cache;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
-#[cfg(any(test, feature = "testing"))]
-/// Utility functions to test apps functionality
-pub mod test_utils;
-
 mod helper;
 #[cfg(test)]
 mod tests;
