@@ -19,6 +19,8 @@
 
 use App;
 use errors::AppError;
+#[cfg(feature = "use-mock-routing")]
+use ffi::helper::send_sync;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb, from_c_str};
 use safe_core::ffi::ipc::req::AuthReq;
 use safe_core::ipc::req::AuthReq as NativeAuthReq;
@@ -27,7 +29,6 @@ use test_utils::{create_app_by_req, create_auth_req};
 
 /// Creates a random app instance for testing.
 #[no_mangle]
-#[allow(unsafe_code)]
 pub unsafe extern "C" fn test_create_app(
     app_id: *const c_char,
     user_data: *mut c_void,
@@ -52,7 +53,6 @@ pub unsafe extern "C" fn test_create_app(
 
 /// Create a random app instance for testing, with access to containers.
 #[no_mangle]
-#[allow(unsafe_code)]
 pub unsafe extern "C" fn test_create_app_with_access(
     auth_req: *const AuthReq,
     user_data: *mut c_void,
@@ -71,6 +71,22 @@ pub unsafe extern "C" fn test_create_app_with_access(
             }
         }
         Ok(())
+    })
+}
+
+/// Simulate a network disconnect when testing.
+#[cfg(feature = "use-mock-routing")]
+#[no_mangle]
+pub unsafe extern "C" fn test_simulate_network_disconnect(
+    app: *mut App,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
+) {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, |client, _| {
+            client.simulate_network_disconnect();
+            Ok(())
+        })
     })
 }
 
@@ -103,5 +119,42 @@ mod tests {
             Err(error) if error == AppError::NoSuchContainer("_app".into()).error_code() => (),
             x => panic!("Unexpected {:?}", x),
         }
+    }
+
+    // Test simulating network disconnects.
+    #[cfg(feature = "use-mock-routing")]
+    #[test]
+    fn simulate_network_disconnect() {
+        use super::test_simulate_network_disconnect;
+        use safe_authenticator::test_utils as authenticator;
+        use std::sync::mpsc;
+        use std::time::Duration;
+        use test_utils::create_auth_req;
+        use safe_core::utils;
+        use ffi_utils::test_utils::call_0;
+
+        let app_id = unwrap!(utils::generate_random_string(10));
+        let auth_req = create_auth_req(Some(app_id), None);
+        let auth = authenticator::create_account_and_login();
+        let auth_granted = unwrap!(authenticator::register_app(&auth, &auth_req));
+
+        // Use `sync_channel` as `App::registered` requires `Send`.
+        let (tx, rx) = mpsc::sync_channel::<()>(0);
+
+        let mut app = unwrap!(App::registered(
+            auth_req.app.id.clone(),
+            auth_granted,
+            move || {
+                unwrap!(tx.send(()));
+            },
+        ));
+
+        unsafe {
+            unwrap!(call_0(
+                |ud, cb| test_simulate_network_disconnect(&mut app, ud, cb),
+            ));
+        }
+
+        unwrap!(rx.recv_timeout(Duration::from_secs(10)));
     }
 }
