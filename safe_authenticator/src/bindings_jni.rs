@@ -18,8 +18,8 @@
 #![allow(non_snake_case, missing_docs, unsafe_code, unused_results, trivial_casts,
          trivial_numeric_casts, unused, unused_qualifications)]
 
+
 use super::*;
-use ffi::object_cache::*;
 use ffi_utils::*;
 use jni::{self, JNIEnv, JavaVM};
 use jni::errors::{Error as JniError, ErrorKind};
@@ -234,6 +234,39 @@ impl<'a> FromJava<JObject<'a>> for Vec<u8> {
     }
 }
 
+impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppExchangeInfo] {
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
+            self.len() as jsize,
+            "AppExchangeInfo",
+            JObject::null(),
+        )?;
+        Ok(JObject::from(output as jobject))
+    }
+}
+
+impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [RegisteredApp] {
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
+            self.len() as jsize,
+            "AppExchangeInfo",
+            JObject::null(),
+        )?;
+        Ok(JObject::from(output as jobject))
+    }
+}
+
+impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppAccess] {
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        let output = env.new_object_array(
+            self.len() as jsize,
+            "AppExchangeInfo",
+            JObject::null(),
+        )?;
+        Ok(JObject::from(output as jobject))
+    }
+}
+
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataKey] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
         let output = env.new_object_array(
@@ -250,17 +283,6 @@ impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataValue] {
         let output = env.new_object_array(
             self.len() as jsize,
             "MDataValue",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [UserPermissionSet] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "UserPermissionSet",
             JObject::null(),
         )?;
         Ok(JObject::from(output as jobject))
@@ -289,4 +311,4 @@ impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [ContainerPermissions] {
     }
 }
 
-include!("../../bindings/java/safe_app/jni.rs");
+include!("../../bindings/java/safe_authenticator/jni.rs");
