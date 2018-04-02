@@ -190,7 +190,8 @@ fn insert_internals_visible_to(content: &mut String) {
     // HACK: The [assembly: ...] annotation must go after all using declaration.
     *content = content.replace(
         "namespace SafeApp.Utilities",
-        "[assembly: InternalsVisibleTo(\"SafeApp.AppBindings\")]\n\n\
+        "[assembly: InternalsVisibleTo(\"SafeApp.AppBindings\")]\n\
+         [assembly: InternalsVisibleTo(\"SafeApp.MockAuthBindings\")]\n\n\
          namespace SafeApp.Utilities",
     );
 }

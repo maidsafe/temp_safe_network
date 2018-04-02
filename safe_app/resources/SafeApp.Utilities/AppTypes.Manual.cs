@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+using JetBrains.Annotations;
 
 namespace SafeApp.Utilities {
+  [PublicAPI]
   public abstract class IpcMsg {
   }
 
+  [PublicAPI]
   public class AuthIpcMsg : IpcMsg {
     public uint ReqId;
     public AuthGranted AuthGranted;
@@ -16,6 +18,7 @@ namespace SafeApp.Utilities {
     }
   }
 
+  [PublicAPI]
   public class UnregisteredIpcMsg : IpcMsg {
     public uint ReqId;
     public List<byte> SerialisedCfg;
@@ -26,6 +29,7 @@ namespace SafeApp.Utilities {
     }
   }
 
+  [PublicAPI]
   public class ContainersIpcMsg : IpcMsg {
     public uint ReqId;
 
@@ -34,6 +38,7 @@ namespace SafeApp.Utilities {
     }
   }
 
+  [PublicAPI]
   public class ShareMDataIpcMsg : IpcMsg {
     public uint ReqId;
 
@@ -42,10 +47,12 @@ namespace SafeApp.Utilities {
     }
   }
 
+  [PublicAPI]
   public class RevokedIpcMsg : IpcMsg {
 
   }
 
+  [PublicAPI]
   public class IpcMsgException : FfiException {
     public readonly uint ReqId;
 

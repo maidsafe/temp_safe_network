@@ -79,7 +79,7 @@ namespace SafeApp.AppBindings {
     }
 
     #if __IOS__
-    [MonoPInvokeCallback(typeof(UintAuthGrantedNativeCb))]
+    [MonoPInvokeCallback(typeof(UIntAuthGrantedCb))]
     #endif
     private static void OnDecodeIpcMsgAuthCb(IntPtr userData, uint reqId, IntPtr authGranted)
     {
@@ -91,7 +91,7 @@ namespace SafeApp.AppBindings {
     }
 
     #if __IOS__
-    [MonoPInvokeCallback(typeof(UintByteListCb))]
+    [MonoPInvokeCallback(typeof(UIntByteListCb))]
     #endif
     private static void OnDecodeIpcMsgUnregisteredCb(IntPtr userData, uint reqId, IntPtr serialisedCfgPtr, UIntPtr serialisedCfgLen)
     {
@@ -100,7 +100,7 @@ namespace SafeApp.AppBindings {
     }
 
     #if __IOS__
-    [MonoPInvokeCallback(typeof(UintCb))]
+    [MonoPInvokeCallback(typeof(UIntCb))]
     #endif
     private static void OnDecodeIpcMsgContainersCb(IntPtr userData, uint reqId)
     {
@@ -109,7 +109,7 @@ namespace SafeApp.AppBindings {
     }
 
     #if __IOS__
-    [MonoPInvokeCallback(typeof(UintCb))]
+    [MonoPInvokeCallback(typeof(UIntCb))]
     #endif
     private static void OnDecodeIpcMsgShareMdataCb(IntPtr userData, uint reqId)
     {
@@ -127,7 +127,7 @@ namespace SafeApp.AppBindings {
     }
 
     #if __IOS__
-    [MonoPInvokeCallback(typeof(FfiResultUintCb))]
+    [MonoPInvokeCallback(typeof(FfiResultUIntCb))]
     #endif
     private static void OnDecodeIpcMsgErrCb(IntPtr userData, IntPtr result, uint reqId)
     {
