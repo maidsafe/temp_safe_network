@@ -1012,7 +1012,7 @@ dependencies = [
 [[package]]
 name = "safe_bindgen"
 version = "0.5.0"
-source = "git+https://github.com/madadam/safe_bindgen.git?branch=csharp#aea16c01376acd53162d1168a25f73e517743e0f"
+source = "git+https://github.com/madadam/safe_bindgen.git?branch=csharp#338b4e4adbb69e0102554f169e0ee0762815bd6a"
 dependencies = [
  "Inflector 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
