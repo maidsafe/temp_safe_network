@@ -101,10 +101,10 @@ fn gen_bindings_csharp() {
     bindgen.write_outputs_or_panic(target_dir, &outputs);
 
     // Hand-written code.
-    let resource_path = Path::new("resource");
-    if resource_path.is_dir() {
+    let resources_path = Path::new("resources");
+    if resources_path.is_dir() {
         unwrap!(ffi_utils::bindgen_utils::copy_files(
-            resource_path,
+            resources_path,
             target_dir,
             ".cs",
         ));
