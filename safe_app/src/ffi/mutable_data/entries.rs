@@ -160,7 +160,7 @@ pub unsafe extern "C" fn mdata_list_entries(
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         entries: *const MDataEntry,
-                        len: usize),
+                        entries_len: usize),
 ) {
     let user_data = OpaqueCtx(user_data);
 
