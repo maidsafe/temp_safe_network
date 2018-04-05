@@ -35,10 +35,9 @@ use safe_core::ffi::ipc::resp::{AccessContInfo, AccessContainerEntry, AppAccess,
                                 AuthGranted, ContainerInfo, MDataEntry, MDataKey, MDataValue,
                                 MetadataResponse};
 use safe_core::ffi::nfs::File;
+use std::{cmp, mem, slice};
 use std::ffi::{CStr, CString};
-use std::mem;
 use std::os::raw::{c_char, c_void};
-use std::slice;
 
 type JniResult<T> = Result<T, JniError>;
 
@@ -95,7 +94,9 @@ macro_rules! gen_byte_array_converter {
             fn from_java(env: &JNIEnv, input: JObject) -> JniResult<Self> {
                 let input = input.into_inner() as jbyteArray;
                 let mut output = [0; $size];
-                env.get_byte_array_region(input, 0, &mut output)?;
+
+                let len = env.get_array_length(input)? as usize;
+                env.get_byte_array_region(input, 0, &mut output[0..cmp::min(len, $size)])?;
 
                 Ok(unsafe { mem::transmute(output) })
             }
