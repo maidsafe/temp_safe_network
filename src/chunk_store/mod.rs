@@ -21,7 +21,7 @@
 #[cfg(test)]
 mod tests;
 
-use hex::{FromHex, ToHex};
+use hex::{FromHex, encode};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -235,7 +235,7 @@ impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
     }
 
     fn file_path<I: ChunkId<K>>(&self, id: &I) -> Result<PathBuf, Error> {
-        let filename = serialisation::serialise(&id.to_key())?.to_hex();
+        let filename = encode(serialisation::serialise(&id.to_key())?);
         let path_name = Path::new(&filename);
         Ok(self.root_dir.path().join(path_name))
     }

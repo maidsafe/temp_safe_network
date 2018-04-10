@@ -18,7 +18,7 @@
 use super::poll;
 use chunk_store::Error as ChunkStoreError;
 use config_handler::Config;
-use hex::ToHex;
+use hex::encode;
 use itertools::Itertools;
 use personas::data_manager::DataId;
 use rand::{self, Rng};
@@ -60,13 +60,9 @@ impl TestNode {
         // Note: using non-deterministic rng here to prevent multiple threads to
         // set the same chunk store root which would cause crash when running tests
         // in parallel.
-        let chunk_store_root = temp_root.join(
-            rand::thread_rng()
-                .gen_iter()
-                .take(8)
-                .collect::<Vec<u8>>()
-                .to_hex(),
-        );
+        let chunk_store_root = temp_root.join(encode(
+            rand::thread_rng().gen_iter().take(8).collect::<Vec<u8>>(),
+        ));
         let vault_config = match config {
             Some(config) => {
                 Config {
