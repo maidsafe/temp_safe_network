@@ -234,81 +234,70 @@ impl<'a> FromJava<JObject<'a>> for Vec<u8> {
     }
 }
 
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppExchangeInfo] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "AppExchangeInfo",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
-    }
-}
-
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [RegisteredApp] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "AppExchangeInfo",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
+        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/RegisteredApp")
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppAccess] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "AppExchangeInfo",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
+        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/AppAccess")
+    }
+}
+
+impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppExchangeInfo] {
+    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
+        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/AppExchangeInfo")
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataKey] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "MDataKey",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
+        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/MDataKey")
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataValue] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "MDataValue",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
+        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/MDataValue")
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataEntry] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "MDataEntry",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
+        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/MDataEntry")
     }
 }
 
 impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [ContainerPermissions] {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        let output = env.new_object_array(
-            self.len() as jsize,
-            "ContainerPermissions",
-            JObject::null(),
-        )?;
-        Ok(JObject::from(output as jobject))
+        object_array_to_java(
+            self,
+            env,
+            "net/maidsafe/safe_authenticator/ContainerPermissions",
+        )
     }
+}
+
+/// Converts object arrays into Java arrays
+fn object_array_to_java<'a, T: ToJava<'a, U>, U: Into<JObject<'a>> + 'a>(
+    list: &[T],
+    env: &'a JNIEnv,
+    class: &str,
+) -> JniResult<JObject<'a>> {
+    let output = env.new_object_array(
+        list.len() as jsize,
+        class,
+        JObject::null(),
+    )?;
+
+    for (idx, entry) in list.iter().enumerate() {
+        let jentry = entry.to_java(env)?.into();
+        env.set_object_array_element(output, idx as i32, jentry);
+    }
+
+    Ok(JObject::from(output as jobject))
 }
 
 include!("../../bindings/java/safe_authenticator/jni.rs");
