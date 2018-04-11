@@ -569,21 +569,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "jni"
-version = "0.9.3"
-source = "git+https://github.com/prevoty/jni-rs#a42e318cf45b567724c0038a1f9378382a58aa2f"
-dependencies = [
- "cesu8 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "combine 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "jni-sys 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "walkdir 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "jni"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.10.0"
+source = "git+https://github.com/nbaksalyar/jni-rs.git#548d240c798876a78440a776290d0fc77cbecb2e"
 dependencies = [
  "cesu8 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "combine 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1113,14 +1100,14 @@ dependencies = [
  "config_file_handler 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ffi_utils 0.5.0",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "jni 0.9.3 (git+https://github.com/prevoty/jni-rs)",
+ "jni 0.10.0 (git+https://github.com/nbaksalyar/jni-rs.git)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "maidsafe_utilities 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "routing 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_authenticator 0.6.0",
- "safe_bindgen 0.5.0 (git+https://github.com/maidsafe/safe_bindgen.git)",
+ "safe_bindgen 0.5.0 (git+https://github.com/nbaksalyar/safe_bindgen.git)",
  "safe_core 0.29.0",
  "self_encryption 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1137,13 +1124,13 @@ dependencies = [
  "config_file_handler 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ffi_utils 0.5.0",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "jni 0.9.3 (git+https://github.com/prevoty/jni-rs)",
+ "jni 0.10.0 (git+https://github.com/nbaksalyar/jni-rs.git)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "maidsafe_utilities 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "routing 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "safe_bindgen 0.5.0 (git+https://github.com/maidsafe/safe_bindgen.git)",
+ "safe_bindgen 0.5.0 (git+https://github.com/nbaksalyar/safe_bindgen.git)",
  "safe_core 0.29.0",
  "serde 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1155,11 +1142,11 @@ dependencies = [
 [[package]]
 name = "safe_bindgen"
 version = "0.5.0"
-source = "git+https://github.com/maidsafe/safe_bindgen.git#a483667557c3e1cc30d27ac19862527aefd856b4"
+source = "git+https://github.com/nbaksalyar/safe_bindgen.git#09cda7cab5e309d811d231f9a6ce53f40d38676f"
 dependencies = [
  "Inflector 0.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "jni 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jni 0.10.0 (git+https://github.com/nbaksalyar/jni-rs.git)",
  "quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustfmt 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "syntex_errors 0.58.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1900,8 +1887,7 @@ dependencies = [
 "checksum iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dbe6e417e7d0975db6512b90796e8ce223145ac4e33c377e4a42882a0e88bb08"
 "checksum itertools 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)" = "d3f2be4da1690a039e9ae5fd575f706a63ad5a2120f161b1d653c9da3930dd21"
 "checksum itoa 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8324a32baf01e2ae060e9de58ed0bc2320c9a2833491ee36cd3b4c414de4db8c"
-"checksum jni 0.9.3 (git+https://github.com/prevoty/jni-rs)" = "<none>"
-"checksum jni 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ef6a7c128e004695664548814f96ea78b458d94e52eb88c42a3b1d4e9a14ac1e"
+"checksum jni 0.10.0 (git+https://github.com/nbaksalyar/jni-rs.git)" = "<none>"
 "checksum jni-sys 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
@@ -1959,7 +1945,7 @@ dependencies = [
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 "checksum rustc_version 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a54aa04a10c68c1c4eacb4337fd883b435997ede17a9385784b990777686b09a"
 "checksum rustfmt 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ec940eed814db0fb7ab928c5f5025f97dc55d1c0e345e39dda2ce9f945557500"
-"checksum safe_bindgen 0.5.0 (git+https://github.com/maidsafe/safe_bindgen.git)" = "<none>"
+"checksum safe_bindgen 0.5.0 (git+https://github.com/nbaksalyar/safe_bindgen.git)" = "<none>"
 "checksum safemem 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e27a8b19b835f7aea908818e871f5cc3a5a186550c30773be987e155e8163d8f"
 "checksum same-file 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "cfb6eded0b06a0b512c8ddbcf04089138c9b4362c2f696f3c3d76039d68f3637"
 "checksum scoped-tls 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8674d439c964889e2476f474a3bf198cc9e199e77499960893bac5de7e9218a4"
