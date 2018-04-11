@@ -17,6 +17,7 @@
 
 //! Build script for generating C header files from FFI modules.
 
+extern crate jni;
 extern crate ffi_utils;
 extern crate rust_sodium;
 extern crate routing;
@@ -24,6 +25,7 @@ extern crate safe_bindgen;
 #[macro_use]
 extern crate unwrap;
 
+use jni::signature::{JavaType, Primitive};
 use routing::XOR_NAME_LEN;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use safe_bindgen::{Bindgen, FilterMode, LangCSharp, LangJava};
@@ -53,29 +55,65 @@ fn gen_bindings_java() {
     let target_dir = Path::new("../bindings/java/safe_authenticator");
 
     let mut type_map = HashMap::new();
-    type_map.insert("XorNameArray", "byte[]");
-    type_map.insert("SignSecretKey", "byte[]");
-    type_map.insert("SignPublicKey", "byte[]");
-    type_map.insert("SymSecretKey", "byte[]");
-    type_map.insert("SymNonce", "byte[]");
-    type_map.insert("AsymPublicKey", "byte[]");
-    type_map.insert("AsymSecretKey", "byte[]");
-    type_map.insert("AsymNonce", "byte[]");
-    type_map.insert("CipherOptHandle", "long");
-    type_map.insert("EncryptPubKeyHandle", "long");
-    type_map.insert("EncryptSecKeyHandle", "long");
-    type_map.insert("MDataEntriesHandle", "long");
-    type_map.insert("MDataEntryActionsHandle", "long");
-    type_map.insert("MDataPermissionsHandle", "long");
-    type_map.insert("SelfEncryptorReaderHandle", "long");
-    type_map.insert("SelfEncryptorWriterHandle", "long");
-    type_map.insert("SEReaderHandle", "long");
-    type_map.insert("SEWriterHandle", "long");
-    type_map.insert("SignPubKeyHandle", "long");
-    type_map.insert("SignSecKeyHandle", "long");
-    type_map.insert("FileContextHandle", "long");
-    type_map.insert("App", "long");
-    type_map.insert("Authenticator", "long");
+    type_map.insert(
+        "XorNameArray",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "SignSecretKey",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "SignPublicKey",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "SymSecretKey",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "SymNonce",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "AsymPublicKey",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "AsymSecretKey",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert(
+        "AsymNonce",
+        JavaType::Array(Box::new(JavaType::Primitive(Primitive::Byte))),
+    );
+    type_map.insert("CipherOptHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("EncryptPubKeyHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("EncryptSecKeyHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("MDataEntriesHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert(
+        "MDataEntryActionsHandle",
+        JavaType::Primitive(Primitive::Long),
+    );
+    type_map.insert(
+        "MDataPermissionsHandle",
+        JavaType::Primitive(Primitive::Long),
+    );
+    type_map.insert(
+        "SelfEncryptorReaderHandle",
+        JavaType::Primitive(Primitive::Long),
+    );
+    type_map.insert(
+        "SelfEncryptorWriterHandle",
+        JavaType::Primitive(Primitive::Long),
+    );
+    type_map.insert("SEReaderHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("SEWriterHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("SignPubKeyHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("SignSecKeyHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("FileContextHandle", JavaType::Primitive(Primitive::Long));
+    type_map.insert("App", JavaType::Primitive(Primitive::Long));
+    type_map.insert("Authenticator", JavaType::Primitive(Primitive::Long));
 
     let mut bindgen = unwrap!(Bindgen::new());
     let mut lang = LangJava::new(type_map);
