@@ -1,12 +1,12 @@
 #!/usr/bin/env run-cargo-script
 //! ```cargo
 //! [dependencies]
-//! clap = "2.29.0"
+//! clap = "=2.27.1"
 //! colored = "1.6.0"
 //! heck = "0.3.0"
 //! toml = "0.4.5"
 //! walkdir = "2.0.1"
-//! zip = "0.2.6"
+//! zip = "=0.2.6"
 //! ```
 extern crate clap;
 extern crate colored;
@@ -21,6 +21,7 @@ use heck::ShoutySnakeCase;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -102,7 +103,11 @@ const BINDINGS_LANGS: &[&str] = &["csharp"];
 const COMMIT_HASH_LEN: usize = 7;
 
 fn main() {
-    let arch_names: Vec<_> = ARCHS.into_iter().map(|args| args.name).collect();
+    let arch_names: Vec<_> = ARCHS
+        .into_iter()
+        .map(|args| args.name)
+        .chain(iter::once("ios"))
+        .collect();
 
     // Parse command line arguments.
     let matches = App::new("safe_client_libs packaging tool")
@@ -149,19 +154,20 @@ fn main() {
 
     let krate = matches.value_of("NAME").unwrap();
     let version_string = get_version_string(krate, matches.is_present("COMMIT"));
-    let arch = matches.value_of("ARCH").and_then(|name| {
-        ARCHS.into_iter().find(|arch| arch.name == name)
-    });
+
+    let arch_name = matches.value_of("ARCH").unwrap_or(HOST_ARCH_NAME);
+    let arch = find_arch(arch_name);
 
     let bindings = matches.is_present("BINDINGS");
     let lib = matches.is_present("LIB");
     let mock = matches.is_present("MOCK");
 
     let toolchain_path = matches.value_of("TOOLCHAIN");
-    let toolchain_prefix = get_toolchain_prefix(toolchain_path, arch);
-    let strip_bin = format!("{}{}", toolchain_prefix, "strip");
+    let target_dir = env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string());
 
-    validate_env(arch);
+    let file_options = FileOptions::default();
+
+    setup_env(toolchain_path, arch);
 
     // Gather features.
     let mut features = vec![];
@@ -174,38 +180,52 @@ fn main() {
     }
 
     // Run the build.
-    let mut command = Command::new("cargo");
-    command
-        .arg("build")
-        .arg("--release")
-        .arg("--manifest-path")
-        .arg(format!("{}/Cargo.toml", krate));
+    let mut libs = Vec::new();
+    if arch_name == "ios" {
+        // iOS fat library.
+        let mut arch_libs = ["ios-arm64", "ios-x86_64"]
+            .into_iter()
+            .flat_map(|arch_name| {
+                let arch = find_arch(arch_name).unwrap();
+                let target = &arch.target;
 
-    if !features.is_empty() {
-        command.arg("--features").arg(features.join(","));
-    }
+                if !build(krate, &features, Some(target)) {
+                    return Vec::new();
+                }
 
-    let target = arch.map(|arch| arch.target);
-    if let Some(target) = target {
-        command.arg("--target").arg(target);
-    }
+                if !lib {
+                    return Vec::new();
+                }
 
-    if !command.status().unwrap().success() {
-        return;
-    }
+                let libs = find_libs(krate, Some(target), &target_dir);
+                strip_libs(toolchain_path, Some(arch), &libs);
+                libs
+            })
+            .peekable();
 
-    let file_options = FileOptions::default();
-
-    // Create library archive.
-    if lib {
-        let libs = find_libs(krate, target);
-        for path in &libs {
-            strip_lib(&strip_bin, &path);
+        if arch_libs.peek().is_some() {
+            let lib_name = format!("lib{}.a", krate);
+            lipo(arch_libs, &lib_name);
+            libs.push(PathBuf::from(lib_name));
+        }
+    } else {
+        // Normal library
+        let target = arch.map(|arch| arch.target);
+        if !build(krate, &features, target) {
+            return;
         }
 
+        if lib {
+            let arch_libs = find_libs(krate, target, &target_dir);
+            strip_libs(toolchain_path, arch, &arch_libs);
+            libs.extend_from_slice(&arch_libs)
+        }
+    }
+
+    // Create library archive.
+    if !libs.is_empty() {
         let archive_name = {
             let mock = if mock { "-mock" } else { "" };
-            let arch_name = arch.map(|arch| arch.name).unwrap_or(HOST_ARCH_NAME);
             format!("{}{}-{}-{}.zip", krate, mock, version_string, arch_name)
         };
 
@@ -237,7 +257,7 @@ fn main() {
                 let entry = entry.unwrap();
                 let target_path =
                     target_prefix.join(entry.path().strip_prefix(&source_prefix).unwrap());
-                let target_path = target_path.to_string_lossy();
+                let target_path = path_into_string(target_path);
 
                 if entry.file_type().is_dir() {
                     archive.add_directory(target_path, file_options).unwrap();
@@ -289,7 +309,7 @@ fn get_version_string(krate: &str, commit: bool) -> String {
     }
 }
 
-fn get_toolchain_prefix(toolchain_path: Option<&str>, arch: Option<&Arch>) -> String {
+fn get_toolchain_bin(toolchain_path: Option<&str>, arch: Option<&Arch>, bin: &str) -> String {
     let mut result = PathBuf::new();
 
     if let Some(path) = toolchain_path {
@@ -297,36 +317,78 @@ fn get_toolchain_prefix(toolchain_path: Option<&str>, arch: Option<&Arch>) -> St
         result.push("bin");
     }
 
-    result.push(arch.map(|arch| arch.toolchain).unwrap_or(""));
+    let prefix = arch.map(|arch| arch.toolchain).unwrap_or("");
+
+    result.push(format!("{}{}", prefix, bin));
     result.into_os_string().into_string().unwrap()
 }
 
-fn validate_env(arch: Option<&Arch>) {
-    if let Some(arch) = arch {
-        let name = format!("CARGO_TARGET_{}_LINKER", arch.target.to_shouty_snake_case());
-        if let Ok(value) = env::var(&name) {
-            if !Path::new(&value).exists() {
-                println!(
-                    "{}: the environment variable {} is set, but points to \
-                     non-existing file {}. This might cause linker failures.",
-                     "warning".yellow().bold(),
-                    name.bold(),
-                    value.bold(),
-                );
-            }
-        } else {
+fn find_arch(name: &str) -> Option<&Arch> {
+    ARCHS.into_iter().find(|arch| arch.name == name)
+}
+
+fn setup_env(toolchain_path: Option<&str>, arch: Option<&Arch>) {
+    let arch = if let Some(arch) = arch { arch } else { return };
+
+    let name = format!("CARGO_TARGET_{}_LINKER", arch.target.to_shouty_snake_case());
+
+    let value = if let Some(toolchain_path) = toolchain_path {
+        let value = get_toolchain_bin(Some(toolchain_path), Some(arch), "gcc");
+
+        println!(
+            "{}: setting environment variable {} to {}",
+            "notice".green().bold(),
+            name.bold(),
+            value.bold()
+        );
+
+        env::set_var(&name, &value);
+        Some(value)
+    } else {
+        env::var(&name).ok()
+    };
+
+    if let Some(value) = value {
+        if !Path::new(&value).exists() {
             println!(
-                "{}: the environment variable {} is not set. \
-                 This might cause linker failure.",
-                "warning".yellow().bold(),
-                name.bold()
+                "{}: the environment variable {} is set, but points to \
+                 non-existing file {}. This might cause linker failures.",
+                 "warning".yellow().bold(),
+                name.bold(),
+                value.bold(),
             );
         }
+    } else {
+        println!(
+            "{}: the environment variable {} is not set. \
+             This might cause linker failure.",
+            "warning".yellow().bold(),
+            name.bold()
+        );
     }
 }
 
-fn find_libs(krate: &str, target: Option<&str>) -> Vec<PathBuf> {
-    let mut prefix = PathBuf::from("target");
+fn build(krate: &str, features: &[&str], target: Option<&str>) -> bool {
+    let mut command = Command::new("cargo");
+    command
+        .arg("build")
+        .arg("--release")
+        .arg("--manifest-path")
+        .arg(format!("{}/Cargo.toml", krate));
+
+    if !features.is_empty() {
+        command.arg("--features").arg(features.join(","));
+    }
+
+    if let Some(target) = target {
+        command.arg("--target").arg(target);
+    }
+
+    command.status().unwrap().success()
+}
+
+fn find_libs(krate: &str, target: Option<&str>, target_dir: &str) -> Vec<PathBuf> {
+    let mut prefix = PathBuf::from(target_dir);
     if let Some(target) = target {
         prefix = prefix.join(target);
     }
@@ -358,11 +420,23 @@ fn find_libs(krate: &str, target: Option<&str>) -> Vec<PathBuf> {
         result.push(path);
     }
 
+    if result.is_empty() {
+        panic!("No libs found in {}/release", target_dir)
+    }
+
     result
 }
 
-fn strip_lib(strip: &str, lib_path: &Path) {
-    let mut command = Command::new(strip);
+fn strip_libs(toolchain_path: Option<&str>, arch: Option<&Arch>, libs: &[PathBuf]) {
+    let strip_bin = get_toolchain_bin(toolchain_path, arch, "strip");
+
+    for path in libs {
+        strip_lib(&strip_bin, path);
+    }
+}
+
+fn strip_lib(strip_bin: &str, lib_path: &Path) {
+    let mut command = Command::new(strip_bin);
 
     // On OS X `strip` does not remove global symbols without this flag.
     if cfg!(target_os = "macos") {
@@ -374,4 +448,30 @@ fn strip_lib(strip: &str, lib_path: &Path) {
     if !command.status().expect("failed to run strip").success() {
         panic!("failed to strip {}", lib_path.display());
     }
+}
+
+fn lipo<I: IntoIterator<Item = PathBuf>>(libs: I, output: &str) {
+    let mut command = Command::new("lipo");
+    command.arg("-create");
+
+    for lib in libs {
+        command.arg(lib);
+    }
+
+    if !command
+        .arg("-output")
+        .arg(output)
+        .status()
+        .expect("failed to run lipo")
+        .success()
+    {
+        panic!("failed to run lipo");
+    }
+}
+
+fn path_into_string(path: PathBuf) -> String {
+    path.into_os_string().into_string().unwrap().replace(
+        '\\',
+        "/",
+    )
 }

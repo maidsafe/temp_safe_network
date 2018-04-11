@@ -213,15 +213,15 @@ pub unsafe extern "C" fn mdata_info_serialise(
 /// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_deserialise(
-    ptr: *const u8,
-    len: usize,
+    encoded_ptr: *const u8,
+    encoded_len: usize,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void,
                         result: *const FfiResult,
                         mdata_info: *const MDataInfo),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
-        let encoded = slice::from_raw_parts(ptr, len);
+        let encoded = slice::from_raw_parts(encoded_ptr, encoded_len);
         let info: NativeMDataInfo = deserialise(encoded)?;
         let info = info.into_repr_c();
 
