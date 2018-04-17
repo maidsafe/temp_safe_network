@@ -50,9 +50,9 @@ pub const KEY_APPS: &[u8] = b"apps";
 /// Config file key under which the revocation queue is stored.
 pub const KEY_APP_REVOCATION_QUEUE: &[u8] = b"revocation-queue";
 
-/// Maps from a SHA-3 hash of an app ID to app info
+/// Maps from a SHA-3 hash of an app ID to app info.
 pub type Apps = HashMap<[u8; 32], AppInfo>;
-/// Contains a queue of revocations that are currently running or have failed
+/// Contains a queue of revocations that are currently running or have failed.
 /// String refers to `app_id`.
 pub type RevocationQueue = VecDeque<String>;
 
@@ -61,7 +61,7 @@ pub fn next_version(version: Option<u64>) -> u64 {
     version.map(|v| v + 1).unwrap_or(0)
 }
 
-/// Retrieves apps registered with the authenticator
+/// Retrieves apps registered with the authenticator.
 pub fn list_apps(client: &Client<()>) -> Box<AuthFuture<(Option<u64>, Apps)>> {
     get_entry(client, KEY_APPS)
 }
@@ -121,8 +121,11 @@ pub fn push_to_app_revocation_queue(
     client: &Client<()>,
     queue: RevocationQueue,
     new_version: u64,
-    app_id: String,
+    app_id: &str,
 ) -> Box<AuthFuture<(u64, RevocationQueue)>> {
+    trace!("Pushing app to revocation queue with ID {}...", app_id);
+
+    let app_id = app_id.to_string();
     mutate_entry(
         client,
         KEY_APP_REVOCATION_QUEUE,
@@ -143,8 +146,11 @@ pub fn remove_from_app_revocation_queue(
     client: &Client<()>,
     queue: RevocationQueue,
     new_version: u64,
-    app_id: String,
+    app_id: &str,
 ) -> Box<AuthFuture<(u64, RevocationQueue)>> {
+    trace!("Removing app from revocation queue with ID {}...", app_id);
+
+    let app_id = app_id.to_string();
     mutate_entry(
         client,
         KEY_APP_REVOCATION_QUEUE,
@@ -165,8 +171,9 @@ pub fn repush_to_app_revocation_queue(
     client: &Client<()>,
     queue: RevocationQueue,
     new_version: u64,
-    app_id: String,
+    app_id: &str,
 ) -> Box<AuthFuture<(u64, RevocationQueue)>> {
+    let app_id = app_id.to_string();
     mutate_entry(
         client,
         KEY_APP_REVOCATION_QUEUE,

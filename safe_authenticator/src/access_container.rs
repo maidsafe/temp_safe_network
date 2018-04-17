@@ -144,8 +144,13 @@ pub fn fetch_entry<T>(
 where
     T: 'static,
 {
+    trace!(
+        "Fetching access container entry for app with ID {}...",
+        app_id
+    );
     let access_container = fry!(client.access_container());
     let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
+    trace!("Fetching entry using entry key {:?}", key);
 
     client
         .get_mdata_value(access_container.name, access_container.type_tag, key)
@@ -173,6 +178,8 @@ pub fn put_entry<T>(
 where
     T: 'static,
 {
+    trace!("Putting access container entry for app {}...", app_id);
+
     let access_container = fry!(client.access_container());
     let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
     let ciphertext = fry!(encode_app_entry(permissions, &app_keys.enc_key));

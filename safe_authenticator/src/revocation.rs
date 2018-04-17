@@ -42,7 +42,7 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
                 &client,
                 queue,
                 config::next_version(version),
-                app_id,
+                &app_id,
             )
         })
         .and_then(move |(version, queue)| {
@@ -89,16 +89,14 @@ fn flush_app_revocation_queue_impl(
             let f = revoke_single_app(&c2, &app_id)
                 .then(move |result| match result {
                     Ok(_) => {
-                        config::remove_from_app_revocation_queue(&c3, queue, version, app_id)
+                        config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
                             .map(|(version, queue)| (version, queue, moved_apps))
                             .into_box()
                     }
                     Err(AuthError::CoreError(CoreError::SymmetricDecipherFailure)) => {
                         // The app entry can't be decrypted. No way to revoke app, so just remove
-                        // it from the queue.
-
-                        // Remove it from the revocation queue.
-                        config::remove_from_app_revocation_queue(&c3, queue, version, app_id)
+                        // it from the queue and return an error.
+                        config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
                             .and_then(|_| {
                                 err!(AuthError::CoreError(CoreError::SymmetricDecipherFailure))
                             })
@@ -112,7 +110,7 @@ fn flush_app_revocation_queue_impl(
                         } else {
                             // Move the app to the end of the queue.
                             moved_apps.push(app_id.clone());
-                            config::repush_to_app_revocation_queue(&c3, queue, version, app_id)
+                            config::repush_to_app_revocation_queue(&c3, queue, version, &app_id)
                                 .map(|(version, queue)| (version, queue, moved_apps))
                                 .into_box()
                         }
@@ -130,6 +128,8 @@ fn flush_app_revocation_queue_impl(
 
 // Revoke access for a single app
 fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
+    trace!("Revoking app with ID {}...", app_id);
+
     let c2 = client.clone();
     let c3 = client.clone();
     let c4 = client.clone();

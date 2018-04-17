@@ -115,10 +115,11 @@ fn update_access_container(
 ) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
 
-    let app_info = app.info.clone();
+    let app_id = app.info.id.clone();
     let app_keys = app.keys.clone();
 
-    access_container::fetch_entry(client, &app_info.id, app_keys.clone())
+    trace!("Updating access container entry for app {}...", app_id);
+    access_container::fetch_entry(client, &app_id, app_keys.clone())
         .then(move |res| {
             let version = match res {
                 // Updating an existing entry
@@ -130,10 +131,10 @@ fn update_access_container(
                 // Error has occurred while trying to get an existing entry
                 Err(e) => return Err(e),
             };
-            Ok((version, app_info, app_keys, permissions))
+            Ok((version, app_keys, permissions))
         })
-        .and_then(move |(version, app_info, app_keys, permissions)| {
-            access_container::put_entry(&c2, &app_info.id, &app_keys, &permissions, version)
+        .and_then(move |(version, app_keys, permissions)| {
+            access_container::put_entry(&c2, &app_id, &app_keys, &permissions, version)
         })
         .into_box()
 }
