@@ -61,12 +61,6 @@ extern crate tokio_core;
 extern crate unwrap;
 #[cfg(any(test, feature = "testing"))]
 extern crate rand;
-#[cfg(feature = "bindings-jni")]
-extern crate jni;
-#[cfg(feature = "bindings-jni")]
-mod bindings_jni;
-#[cfg(feature = "bindings-jni")]
-pub use bindings_jni::*;
 
 /// FFI routines
 pub mod ffi;

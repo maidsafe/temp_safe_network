@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 #![allow(non_snake_case, missing_docs, unsafe_code, unused_results, trivial_casts,
-        trivial_numeric_casts, unused, unused_qualifications)]
+         trivial_numeric_casts, unused, unused_qualifications)]
 
 extern crate jni;
 extern crate safe_app;
@@ -69,8 +69,8 @@ pub trait FromJava<T> {
         Self: Sized;
 }
 
-#[no_mangle]
 // This is called when `loadLibrary` is called on the Java side.
+#[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut jni::sys::JavaVM, _reserved: *mut c_void) -> jint {
     JVM = Some(unwrap!(JavaVM::from_raw(vm)));
     jni::sys::JNI_VERSION_1_4

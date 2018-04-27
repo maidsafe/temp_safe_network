@@ -18,15 +18,22 @@
 #![allow(non_snake_case, missing_docs, unsafe_code, unused_results, trivial_casts,
          trivial_numeric_casts, unused, unused_qualifications)]
 
+#[macro_use]
+extern crate ffi_utils;
+extern crate jni;
+extern crate safe_authenticator;
+extern crate safe_core;
+#[macro_use]
+extern crate unwrap;
 
-use super::*;
 use ffi_utils::*;
-use jni::{self, JNIEnv, JavaVM};
+use ffi_utils::java::{JniResult, convert_cb_from_java, object_array_to_java};
+use jni::{JNIEnv, JavaVM};
 use jni::errors::{Error as JniError, ErrorKind};
 use jni::objects::{GlobalRef, JClass, JObject, JString};
 use jni::strings::JNIStr;
 use jni::sys::{jbyte, jbyteArray, jint, jlong, jobject, jsize};
-use safe_core;
+use safe_authenticator::*;
 use safe_core::arrays::*;
 use safe_core::ffi::*;
 use safe_core::ffi::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq,
@@ -35,104 +42,17 @@ use safe_core::ffi::ipc::resp::{AccessContInfo, AccessContainerEntry, AppAccess,
                                 AuthGranted, ContainerInfo, MDataEntry, MDataKey, MDataValue,
                                 MetadataResponse};
 use safe_core::ffi::nfs::File;
+use std::{cmp, mem, slice};
 use std::ffi::{CStr, CString};
-use std::mem;
 use std::os::raw::{c_char, c_void};
-use std::slice;
 
-type JniResult<T> = Result<T, JniError>;
-
-/// Generates a `user_data` context containing a reference to a single or several Java callbacks
-macro_rules! gen_ctx {
-    ($env:ident, $cb:ident) => {
-        {
-            let ctx = $env.new_global_ref($cb).unwrap();
-            $env.delete_local_ref($cb).unwrap();
-            let ptr = *ctx.as_obj() as *mut c_void;
-            mem::forget(ctx);
-            ptr
-        }
-    };
-
-    ($env:ident, $cb0:ident, $($cb_rest:ident),+ ) => {
-        {
-            let ctx = [
-                Some($env.new_global_ref($cb0).unwrap()),
-                $(
-                    Some($env.new_global_ref($cb_rest).unwrap()),
-                )+
-            ];
-            let ctx = Box::into_raw(Box::new(ctx)) as *mut c_void;
-            $env.delete_local_ref($cb0).unwrap();
-            $(
-                $env.delete_local_ref($cb_rest).unwrap();
-            )+
-            ctx
-        }
-    }
-}
-
-/// Generates primitive type converters
-macro_rules! gen_primitive_type_converter {
-    ($native_type:ty, $java_type:ty) => {
-        impl FromJava<$java_type> for $native_type {
-            fn from_java(_env: &JNIEnv, input: $java_type) -> JniResult<Self> {
-                Ok(input as Self)
-            }
-        }
-
-        impl<'a> ToJava<'a, $java_type> for $native_type {
-            fn to_java(&self, _env: &JNIEnv) -> JniResult<$java_type> {
-                Ok(*self as $java_type)
-            }
-        }
-    }
-}
-
-macro_rules! gen_byte_array_converter {
-    ($arr_type:ty, $size:expr) => {
-        impl<'a> FromJava<JObject<'a>> for [$arr_type; $size] {
-            fn from_java(env: &JNIEnv, input: JObject) -> JniResult<Self> {
-                let input = input.into_inner() as jbyteArray;
-                let mut output = [0; $size];
-                env.get_byte_array_region(input, 0, &mut output)?;
-
-                Ok(unsafe { mem::transmute(output) })
-            }
-        }
-
-        impl<'a> ToJava<'a, JObject<'a>> for [$arr_type; $size] {
-            fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-                let output = env.new_byte_array(self.len() as jsize)?;
-                env.set_byte_array_region(output, 0, unsafe {
-                    slice::from_raw_parts(self.as_ptr() as *const i8, self.len())
-                })?;
-                Ok(JObject::from(output as jobject))
-            }
-        }
-    }
-}
-
-macro_rules! jni_unwrap {
-    ($res:expr) => {{
-        let res: Result<_, JniError> = $res;
-        if let Err(JniError(ErrorKind::JavaException, _)) = res {
-            return;
-        } else {
-            res.unwrap()
-        }
-    }}
-}
-
-/// Converts `user_data` back into a Java callback object
-unsafe fn convert_cb_from_java(env: &JNIEnv, ctx: *mut c_void) -> GlobalRef {
-    GlobalRef::from_raw(unwrap!(env.get_java_vm()), ctx as jobject)
-}
+#[repr(C)]
+struct Authenticator(*mut c_void);
 
 static mut JVM: Option<JavaVM> = None;
 
-#[no_mangle]
 // This is called when `loadLibrary` is called on the Java side.
+#[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut jni::sys::JavaVM, _reserved: *mut c_void) -> jint {
     JVM = Some(unwrap!(JavaVM::from_raw(vm)));
     jni::sys::JNI_VERSION_1_4
@@ -234,70 +154,21 @@ impl<'a> FromJava<JObject<'a>> for Vec<u8> {
     }
 }
 
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [RegisteredApp] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/RegisteredApp")
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppAccess] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/AppAccess")
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [AppExchangeInfo] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/AppExchangeInfo")
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataKey] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/MDataKey")
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataValue] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/MDataValue")
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [MDataEntry] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(self, env, "net/maidsafe/safe_authenticator/MDataEntry")
-    }
-}
-
-impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [ContainerPermissions] {
-    fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-        object_array_to_java(
-            self,
-            env,
-            "net/maidsafe/safe_authenticator/ContainerPermissions",
-        )
-    }
-}
-
-/// Converts object arrays into Java arrays
-fn object_array_to_java<'a, T: ToJava<'a, U>, U: Into<JObject<'a>> + 'a>(
-    list: &[T],
-    env: &'a JNIEnv,
-    class: &str,
-) -> JniResult<JObject<'a>> {
-    let output = env.new_object_array(
-        list.len() as jsize,
-        class,
-        JObject::null(),
-    )?;
-
-    for (idx, entry) in list.iter().enumerate() {
-        let jentry = entry.to_java(env)?.into();
-        env.set_object_array_element(output, idx as i32, jentry);
-    }
-
-    Ok(JObject::from(output as jobject))
-}
+gen_object_array_converter!(
+    RegisteredApp,
+    "net/maidsafe/safe_authenticator/RegisteredApp"
+);
+gen_object_array_converter!(AppAccess, "net/maidsafe/safe_authenticator/AppAccess");
+gen_object_array_converter!(
+    AppExchangeInfo,
+    "net/maidsafe/safe_authenticator/AppExchangeInfo"
+);
+gen_object_array_converter!(MDataKey, "net/maidsafe/safe_authenticator/MDataKey");
+gen_object_array_converter!(MDataValue, "net/maidsafe/safe_authenticator/MDataValue");
+gen_object_array_converter!(MDataEntry, "net/maidsafe/safe_authenticator/MDataEntry");
+gen_object_array_converter!(
+    ContainerPermissions,
+    "net/maidsafe/safe_authenticator/ContainerPermissions"
+);
 
 include!("../../bindings/java/safe_authenticator/jni.rs");
