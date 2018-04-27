@@ -37,6 +37,24 @@ When in doubt, perform an integration test against the real network, in addition
 * Open `tests.config` and set your account locator and password. **Do not commit this.** Alternatively, you can set the environment variables `TEST_ACC_LOCATOR` and `TEST_ACC_PASSWORD`.
 * Run `cargo test --release -- --nocapture` and make sure that no errors are reported.
 
+### Viewing debug logs
+
+The codebase contains instrumentation statements that log potentially useful debugging information, at different priorities. Such statements include the macros `debug!` and `trace!`, and more can be found at the documentation for the [log crate](https://docs.rs/log). Feel free to add trace calls to the code when debugging.
+
+In order to view the output of trace calls you will need to initialize logging at the beginning of your test:
+
+```rust
+unwrap!(maidsafe_utilities::log::init(true));
+```
+
+Then you will need to set the `RUST_LOG` environment variable to the desired logging level for the desired modules or crates. To view trace calls for `safe_authenticator`, for example, you may do this:
+
+```shell
+export RUST_LOG=safe_authenticator=trace
+```
+
+You could also set `RUST_LOG=trace` which will output *all* trace logs, but this may produce far more data than desired. For more information please see the documentation for the `log` module in our crate [maidsafe_utilities](https://docs.rs/maidsafe_utilities).
+
 ## License
 
 Licensed under either of
