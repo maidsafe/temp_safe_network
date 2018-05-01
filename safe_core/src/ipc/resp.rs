@@ -131,7 +131,7 @@ impl ReprC for AuthGranted {
 pub struct AppKeys {
     /// Owner signing public key.
     pub owner_key: PublicKey,
-    /// Data symmetric encryption key
+    /// Data symmetric encryption key.
     pub enc_key: shared_secretbox::Key,
     /// Asymmetric sign public key.
     ///
