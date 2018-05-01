@@ -16,11 +16,14 @@
 // relating to use of the SAFE Network Software.
 
 use {AuthFuture, Authenticator};
+use access_container::{fetch_authenticator_entry, put_authenticator_entry};
 use ffi_utils::{FfiResult, ReprC, vec_clone_from_raw_parts};
 use ffi_utils::test_utils::{send_via_user_data, sender_as_user_data};
 use futures::Future;
 use routing::XorName;
+use rust_sodium::crypto::secretbox;
 use safe_core::{Client, FutureExt};
+use safe_core::crypto::shared_secretbox;
 use safe_core::ffi::ipc::req::{AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq,
                                ShareMDataReq as FfiShareMDataReq};
 use safe_core::ffi::ipc::resp::MetadataResponse as FfiUserMetadata;
@@ -60,13 +63,8 @@ pub fn create_containers_req() -> HashMap<String, ContainerPermissions> {
 }
 
 /// Corrupt an access container entry by overriding its secret key.
-#[cfg(any(test, features = "testing"))]
 pub fn corrupt_container(client: &Client<()>, container_id: &str) -> Box<AuthFuture<()>> {
     trace!("Corrupting access container entry {}...", container_id);
-
-    use rust_sodium::crypto::secretbox;
-    use access_container::{fetch_authenticator_entry, put_authenticator_entry};
-    use safe_core::crypto::shared_secretbox;
 
     let c2 = client.clone();
     let container_id = container_id.to_owned();
