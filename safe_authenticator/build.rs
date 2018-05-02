@@ -28,10 +28,20 @@ extern crate unwrap;
 use jni::signature::{JavaType, Primitive};
 use routing::XOR_NAME_LEN;
 use rust_sodium::crypto::{box_, secretbox, sign};
-use safe_bindgen::{Bindgen, FilterMode, LangCSharp, LangJava};
+use safe_bindgen::{Bindgen, FilterMode, LangC, LangCSharp, LangJava};
 use std::collections::HashMap;
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+const BSD_MIT_LICENSE: &str = "// Copyright 2018 MaidSafe.net limited.\n\
+//\n\
+// This SAFE Network Software is licensed to you under the MIT license\n\
+// <LICENSE-MIT or http://opensource.org/licenses/MIT> or the Modified\n\
+// BSD license <LICENSE-BSD or https://opensource.org/licenses/BSD-3-Clause>,\n\
+// at your option. This file may not be copied, modified, or distributed\n\
+// except according to those terms. Please review the Licences for the\n\
+// specific language governing permissions and limitations relating to use\n\
+// of the SAFE Network Software.";
 
 fn main() {
     if env::var("CARGO_FEATURE_BINDINGS").is_err() {
@@ -44,11 +54,27 @@ fn main() {
 }
 
 fn gen_bindings_c() {
-    unwrap!(ffi_utils::header_gen::gen_headers(
-        &unwrap!(env::var("CARGO_PKG_NAME")),
-        "../bindings/c/",
-        "src/lib.rs",
-    ));
+    let target_dir = Path::new("../bindings/c/safe_authenticator");
+    let mut outputs = HashMap::new();
+
+    let mut bindgen = unwrap!(Bindgen::new());
+    let mut lang = LangC::new();
+
+    lang.set_lib_name("ffi_utils");
+    bindgen.source_file("../ffi_utils/src/lib.rs");
+    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
+
+    lang.set_lib_name("safe_core");
+    bindgen.source_file("../safe_core/src/lib.rs");
+    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
+
+    lang.add_custom_code("typedef void* Authenticator;\n");
+    lang.set_lib_name(unwrap!(env::var("CARGO_PKG_NAME")));
+    bindgen.source_file("../safe_authenticator/src/lib.rs");
+    unwrap!(bindgen.compile(&mut lang, &mut outputs, true));
+
+    add_license_headers(&mut outputs);
+    unwrap!(bindgen.write_outputs(target_dir, &outputs));
 }
 
 fn gen_bindings_java() {
@@ -135,6 +161,7 @@ fn gen_bindings_java() {
     lang.set_lib_name(unwrap!(env::var("CARGO_PKG_NAME")));
     unwrap!(bindgen.compile(&mut lang, &mut outputs, true));
 
+    add_license_headers(&mut outputs);
     unwrap!(bindgen.write_outputs(target_dir, &outputs));
 }
 
@@ -188,6 +215,7 @@ fn gen_bindings_csharp() {
     bindgen.source_file("src/lib.rs");
     bindgen.compile_or_panic(&mut lang, &mut outputs, true);
     apply_patches(&mut outputs);
+    add_license_headers(&mut outputs);
     bindgen.write_outputs_or_panic(target_dir, &outputs);
 
     // Hand-written code.
@@ -201,7 +229,17 @@ fn gen_bindings_csharp() {
     }
 }
 
-fn apply_patches(outputs: &mut HashMap<PathBuf, String>) {
+fn add_license_headers(outputs: &mut HashMap<String, String>) {
+    for content in outputs.values_mut() {
+        add_license_header(content);
+    }
+}
+
+fn add_license_header(content: &mut String) {
+    *content = format!("{}\n{}", BSD_MIT_LICENSE, content);
+}
+
+fn apply_patches(outputs: &mut HashMap<String, String>) {
     {
         let content = fetch_mut(outputs, "SafeAuth.AuthBindings/AuthBindings.cs");
         insert_using_utilities(content);
@@ -231,7 +269,6 @@ fn fix_names(content: &mut String) {
     *content = content.replace("Idata", "IData").replace("Mdata", "MData");
 }
 
-fn fetch_mut<T: AsRef<Path>>(outputs: &mut HashMap<PathBuf, String>, key: T) -> &mut String {
-    let key = key.as_ref();
+fn fetch_mut<'a>(outputs: &'a mut HashMap<String, String>, key: &str) -> &'a mut String {
     unwrap!(outputs.get_mut(key), "key {:?} not found in outputs", key)
 }

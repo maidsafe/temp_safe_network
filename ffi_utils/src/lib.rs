@@ -61,7 +61,6 @@ mod vec;
 pub mod callback;
 pub mod test_utils;
 pub mod string;
-pub mod header_gen;
 pub mod bindgen_utils;
 pub mod java;
 
