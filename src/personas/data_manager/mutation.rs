@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
-use log::LogLevel;
+use log::Level;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
 use rust_sodium::crypto::sign;
@@ -106,7 +106,7 @@ impl Mutation {
         let data_id = DataId::Mutable(data.id());
         if data_id != self.data_id() {
             log_or_panic!(
-                LogLevel::Error,
+                Level::Error,
                 "invalid data for mutation ({:?} instead of {:?})",
                 data_id,
                 self.data_id()
@@ -140,7 +140,7 @@ impl Mutation {
             }
             _ => {
                 log_or_panic!(
-                    LogLevel::Error,
+                    Level::Error,
                     "incompatible mutation ({:?})",
                     self.mutation_type()
                 )

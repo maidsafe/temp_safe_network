@@ -1268,12 +1268,7 @@ impl MaidManager {
         routing_node: &RoutingNode,
         account_name: XorName,
     ) -> Option<&mut Account> {
-        if routing_node
-            .close_group(account_name, self.group_size)
-            .is_none()
-        {
-            return None;
-        }
+        let _ = routing_node.close_group(account_name, self.group_size)?;
 
         let accounts_len = self.accounts.len();
         let disable_mutation_limit = self.disable_mutation_limit;

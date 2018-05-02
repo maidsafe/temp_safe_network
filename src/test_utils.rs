@@ -18,7 +18,7 @@
 #[cfg(not(feature = "use-mock-crust"))]
 use authority::ClientAuthority;
 use authority::ClientManagerAuthority;
-use rand::{self, Rand, Rng};
+use rand::{Rand, Rng, seq};
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::Config as RoutingConfig;
@@ -119,7 +119,11 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
     let modify_count = cmp::min(rng.gen_range(0, count + 1), data.keys().len());
     let insert_count = count - modify_count;
 
-    let keys_to_modify = rand::sample(rng, data.keys().into_iter().cloned(), modify_count);
+    let keys_to_modify = unwrap!(seq::sample_iter(
+        rng,
+        data.keys().into_iter().cloned(),
+        modify_count,
+    ));
     for key in keys_to_modify {
         let version = unwrap!(data.get(&key)).entry_version + 1;
 
@@ -148,6 +152,8 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
 #[cfg(not(feature = "use-mock-crust"))]
 pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
     use routing::FullId;
+    use rand;
+
     let full_id = FullId::new();
 
     let client = ClientAuthority {
