@@ -106,7 +106,7 @@ COPY rustfmt.toml    .
 # Update permissions of safe_vault source and entrypoint script
 #
 RUN sudo chown -R maidsafe:maidsafe /home/maidsafe/src && \
-         chmod +x installer/docker/docker-entrypoint.sh
+         sudo chmod +x installer/docker/docker-entrypoint.sh
 
 #
 # Run the safe vault application
