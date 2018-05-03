@@ -15,8 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::utils::create_containers_req;
+use super::utils::{corrupt_container, create_containers_req};
 use Authenticator;
+use config::{self, get_app_revocation_queue, push_to_app_revocation_queue};
 use errors::AuthError;
 use futures::Future;
 use revocation;
@@ -27,7 +28,7 @@ use safe_core::nfs::NfsError;
 use std::collections::HashMap;
 use test_utils::{access_container, create_account_and_login, create_authenticator, create_file,
                  fetch_file, get_container_from_authenticator_entry, rand_app, register_app,
-                 register_rand_app, revoke, run, try_access_container};
+                 register_rand_app, revoke, run, try_access_container, try_revoke};
 
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing {
@@ -789,11 +790,11 @@ fn app_revocation() {
     // re-encrypted entries.
     assert_eq!(count_mdata_entries(&authenticator, videos_md1.clone()), 4);
 
-    // The first app is no longer be in the access container.
+    // The first app is no longer in the access container.
     let ac = try_access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
     assert!(ac.is_none());
 
-    // Container permissions includes only the second app.
+    // Container permissions include only the second app.
     let (name, tag) = (videos_md2.name, videos_md2.type_tag);
     let perms = run(&authenticator, move |client| {
         client.list_mdata_permissions(name, tag).map_err(From::from)
@@ -884,6 +885,128 @@ fn app_revocation() {
     ));
 
     revoke(&authenticator, &app_id2);
+}
+
+// Test that corrupting an app's entry before trying to revoke it results in a
+// `SymmetricDecipherFailure` error and immediate return, without revoking more apps.
+#[test]
+fn revocation_symmetric_decipher_failure() {
+    let authenticator = create_account_and_login();
+
+    // Create a containers request for the entry to be corrupted
+    let mut corrupt_containers = HashMap::new();
+    let _ = corrupt_containers.insert(
+        "_downloads".to_owned(),
+        btree_set![Permission::Read, Permission::Insert],
+    );
+
+    // Create and authorise three apps, which we will put on the revocation queue.
+    let auth_req1 = AuthReq {
+        app: rand_app(),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+    let app_id1 = auth_req1.app.id.clone();
+    debug!("Registering app 1 with ID {}...", app_id1);
+    let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
+
+    let auth_req2 = AuthReq {
+        app: rand_app(),
+        app_container: true,
+        containers: corrupt_containers,
+    };
+    let app_id2 = auth_req2.app.id.clone();
+    debug!("Registering app 2 with ID {}...", app_id2);
+    let auth_granted2 = unwrap!(register_app(&authenticator, &auth_req2));
+
+    let auth_req3 = AuthReq {
+        app: rand_app(),
+        app_container: false,
+        containers: create_containers_req(),
+    };
+    let app_id3 = auth_req3.app.id.clone();
+    debug!("Registering app 3 with ID {}...", app_id3);
+    let auth_granted3 = unwrap!(register_app(&authenticator, &auth_req3));
+
+    // Put a file into the _downloads container.
+    let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
+    let (downloads_md, _) = unwrap!(ac_entries.remove("_downloads"));
+
+    unwrap!(create_file(
+            &authenticator,
+            downloads_md.clone(),
+            "video.mp4",
+            vec![1; 10],
+        ));
+
+    // Push apps 1 and 2 to the revocation queue.
+    {
+        let app_id1 = app_id1.clone();
+        let app_id2 = app_id2.clone();
+        let app_id2_clone = app_id2.clone();
+
+        run(&authenticator, move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+
+            get_app_revocation_queue(client)
+                .map(move |(version, queue)| {
+                    let _ = push_to_app_revocation_queue(
+                        &c2,
+                        queue,
+                        config::next_version(version),
+                        &app_id1,
+                    );
+                })
+                .and_then(move |_| {
+                    get_app_revocation_queue(&c3).map(move |(version, queue)| {
+                        let _ = push_to_app_revocation_queue(
+                            &c4,
+                            queue,
+                            config::next_version(version),
+                            &app_id2_clone,
+                        );
+                    })
+                })
+                .and_then(move |_| corrupt_container(&c5, "_downloads"))
+        });
+    }
+
+    // Try to revoke app3.
+    match try_revoke(&authenticator, &app_id3) {
+        Ok(_) => panic!("Revocation succeeded with corrupted encryption key!"),
+        Err(AuthError::CoreError(CoreError::SymmetricDecipherFailure)) => (),
+        Err(x) => panic!("An unexpected error occurred: {:?}", x),
+    }
+
+    let queue = run(&authenticator, move |client| {
+        get_app_revocation_queue(client).map(|(_, queue)| queue)
+    });
+
+    // Verify app1 was revoked, app2 is not in the revocation queue,
+    // app3 is still in the revocation queue.
+    let ac = try_access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
+    assert!(ac.is_none());
+    assert!(!queue.contains(&app_id1));
+    assert!(!queue.contains(&app_id2));
+    assert!(queue.contains(&app_id3));
+
+    // Try to revoke app3 again.
+    match try_revoke(&authenticator, &app_id3) {
+        Ok(_) => (),
+        Err(x) => panic!("An unexpected error occurred: {:?}", x),
+    }
+
+    let queue = run(&authenticator, move |client| {
+        get_app_revocation_queue(client).map(|(_, queue)| queue)
+    });
+
+    // Verify app3 was revoked this time.
+    let ac = try_access_container(&authenticator, app_id3.clone(), auth_granted3.clone());
+    assert!(ac.is_none());
+    assert!(!queue.contains(&app_id3));
 }
 
 // Test that flushing app revocation queue that is empty does not cause any

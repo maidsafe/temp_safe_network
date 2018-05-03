@@ -91,14 +91,14 @@ mod codes {
     pub const ERR_FILE_NOT_FOUND: i32 = -301;
     pub const ERR_INVALID_RANGE: i32 = -302;
 
-    // Authenticator errors
+    // Authenticator errors.
     pub const ERR_IO_ERROR: i32 = -1013;
     pub const ERR_ACCOUNT_CONTAINERS_CREATION: i32 = -1014;
     pub const ERR_NO_SUCH_CONTAINER: i32 = -1015;
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
 
-/// Authenticator errors
+/// Authenticator errors.
 #[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 #[derive(Debug)]
 pub enum AuthError {
