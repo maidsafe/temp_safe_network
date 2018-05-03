@@ -1,24 +1,15 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2018 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
-//
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
-// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
-//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.
-//
-// Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
 
 #[cfg(not(feature = "use-mock-crust"))]
 use authority::ClientAuthority;
 use authority::ClientManagerAuthority;
-use rand::{self, Rand, Rng};
+use rand::{Rand, Rng, seq};
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::Config as RoutingConfig;
@@ -119,7 +110,11 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
     let modify_count = cmp::min(rng.gen_range(0, count + 1), data.keys().len());
     let insert_count = count - modify_count;
 
-    let keys_to_modify = rand::sample(rng, data.keys().into_iter().cloned(), modify_count);
+    let keys_to_modify = unwrap!(seq::sample_iter(
+        rng,
+        data.keys().into_iter().cloned(),
+        modify_count,
+    ));
     for key in keys_to_modify {
         let version = unwrap!(data.get(&key)).entry_version + 1;
 
@@ -148,6 +143,8 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
 #[cfg(not(feature = "use-mock-crust"))]
 pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
     use routing::FullId;
+    use rand;
+
     let full_id = FullId::new();
 
     let client = ClientAuthority {
