@@ -19,41 +19,11 @@
 
 use ffi::MDataInfo;
 use ffi::arrays::*;
-use ffi::ipc::req::PermissionSet as FfiPermissionSet;
+use ffi::ipc::req::PermissionSet;
 use rust_sodium::crypto::sign;
 use std::ffi::CString;
 use std::os::raw::c_char;
 use std::ptr;
-
-/// Represents the authentication response.
-#[repr(C)]
-pub struct AuthGranted {
-    /// The access keys.
-    pub app_keys: AppKeys,
-    /// Access container info
-    pub access_container_info: AccessContInfo,
-    /// Access container entry
-    pub access_container_entry: AccessContainerEntry,
-
-    /// Crust's bootstrap config
-    pub bootstrap_config: *mut u8,
-    /// `bootstrap_config`'s length
-    pub bootstrap_config_len: usize,
-    /// Used by Rust memory allocator
-    pub bootstrap_config_cap: usize,
-}
-
-impl Drop for AuthGranted {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = Vec::from_raw_parts(
-                self.bootstrap_config,
-                self.bootstrap_config_len,
-                self.bootstrap_config_cap,
-            );
-        }
-    }
-}
 
 /// Represents the needed keys to work with the data.
 #[repr(C)]
@@ -111,6 +81,25 @@ pub struct AccessContInfo {
     pub nonce: SymNonce,
 }
 
+/// Information about a container (name, `MDataInfo` and permissions)
+#[repr(C)]
+pub struct ContainerInfo {
+    /// Container name as UTF-8 encoded null-terminated string.
+    pub name: *const c_char,
+    /// Container's `MDataInfo`
+    pub mdata_info: MDataInfo,
+    /// App's permissions in the container.
+    pub permissions: PermissionSet,
+}
+
+impl Drop for ContainerInfo {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CString::from_raw(self.name as *mut _);
+        }
+    }
+}
+
 /// Access container entry for a single app.
 #[repr(C)]
 pub struct AccessContainerEntry {
@@ -134,21 +123,32 @@ impl Drop for AccessContainerEntry {
     }
 }
 
-/// Information about a container (name, `MDataInfo` and permissions)
+/// Represents the authentication response.
 #[repr(C)]
-pub struct ContainerInfo {
-    /// Container name as UTF-8 encoded null-terminated string.
-    pub name: *const c_char,
-    /// Container's `MDataInfo`
-    pub mdata_info: MDataInfo,
-    /// App's permissions in the container.
-    pub permissions: FfiPermissionSet,
+pub struct AuthGranted {
+    /// The access keys.
+    pub app_keys: AppKeys,
+    /// Access container info
+    pub access_container_info: AccessContInfo,
+    /// Access container entry
+    pub access_container_entry: AccessContainerEntry,
+
+    /// Crust's bootstrap config
+    pub bootstrap_config: *mut u8,
+    /// `bootstrap_config`'s length
+    pub bootstrap_config_len: usize,
+    /// Used by Rust memory allocator
+    pub bootstrap_config_cap: usize,
 }
 
-impl Drop for ContainerInfo {
+impl Drop for AuthGranted {
     fn drop(&mut self) {
         unsafe {
-            let _ = CString::from_raw(self.name as *mut _);
+            let _ = Vec::from_raw_parts(
+                self.bootstrap_config,
+                self.bootstrap_config_len,
+                self.bootstrap_config_cap,
+            );
         }
     }
 }
@@ -159,7 +159,7 @@ pub struct AppAccess {
     /// App's or user's public key
     pub sign_key: SignPublicKey,
     /// A list of permissions
-    pub permissions: FfiPermissionSet,
+    pub permissions: PermissionSet,
     /// App's user-facing name
     pub name: *const c_char,
     /// App id.

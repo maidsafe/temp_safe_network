@@ -15,11 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use ffi::arrays::XorNameArray;
 use ffi_utils::ReprC;
 use ffi_utils::callback::CallbackArgs;
 use ipc::req::permission_set_into_repr_c;
 use routing;
-use routing::XorName;
 use std::ffi::CString;
 use std::os::raw::c_char;
 
@@ -55,6 +55,56 @@ impl ReprC for PermissionSet {
 impl CallbackArgs for PermissionSet {
     fn default() -> Self {
         permission_set_into_repr_c(routing::PermissionSet::new())
+    }
+}
+
+/// Represents an application ID in the process of asking permissions
+#[repr(C)]
+pub struct AppExchangeInfo {
+    /// UTF-8 encoded id
+    pub id: *const c_char,
+
+    /// Reserved by the frontend
+    ///
+    /// null if not present
+    pub scope: *const c_char,
+
+    /// UTF-8 encoded application friendly-name.
+    pub name: *const c_char,
+
+    /// UTF-8 encoded application provider/vendor (e.g. MaidSafe)
+    pub vendor: *const c_char,
+}
+
+impl Drop for AppExchangeInfo {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CString::from_raw(self.id as *mut _);
+            if !self.scope.is_null() {
+                let _ = CString::from_raw(self.scope as *mut _);
+            }
+            let _ = CString::from_raw(self.name as *mut _);
+            let _ = CString::from_raw(self.vendor as *mut _);
+        }
+    }
+}
+
+/// Represents the set of permissions for a given container
+#[repr(C)]
+pub struct ContainerPermissions {
+    /// The UTF-8 encoded id
+    pub cont_name: *const c_char,
+    /// The requested permission set
+    pub access: PermissionSet,
+}
+
+impl Drop for ContainerPermissions {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CString::from_raw(self.cont_name as *mut _);
+        }
     }
 }
 
@@ -118,54 +168,15 @@ impl Drop for ContainersReq {
     }
 }
 
-/// Represents an application ID in the process of asking permissions
 #[repr(C)]
-pub struct AppExchangeInfo {
-    /// UTF-8 encoded id
-    pub id: *const c_char,
-
-    /// Reserved by the frontend
-    ///
-    /// null if not present
-    pub scope: *const c_char,
-
-    /// UTF-8 encoded application friendly-name.
-    pub name: *const c_char,
-
-    /// UTF-8 encoded application provider/vendor (e.g. MaidSafe)
-    pub vendor: *const c_char,
-}
-
-impl Drop for AppExchangeInfo {
-    #[allow(unsafe_code)]
-    fn drop(&mut self) {
-        unsafe {
-            let _ = CString::from_raw(self.id as *mut _);
-            if !self.scope.is_null() {
-                let _ = CString::from_raw(self.scope as *mut _);
-            }
-            let _ = CString::from_raw(self.name as *mut _);
-            let _ = CString::from_raw(self.vendor as *mut _);
-        }
-    }
-}
-
-/// Represents the set of permissions for a given container
-#[repr(C)]
-pub struct ContainerPermissions {
-    /// The UTF-8 encoded id
-    pub cont_name: *const c_char,
-    /// The requested permission set
-    pub access: PermissionSet,
-}
-
-impl Drop for ContainerPermissions {
-    #[allow(unsafe_code)]
-    fn drop(&mut self) {
-        unsafe {
-            let _ = CString::from_raw(self.cont_name as *mut _);
-        }
-    }
+/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
+pub struct ShareMData {
+    /// The mutable data type.
+    pub type_tag: u64,
+    /// The mutable data name.
+    pub name: XorNameArray,
+    /// The permissions being requested.
+    pub perms: PermissionSet,
 }
 
 #[repr(C)]
@@ -192,15 +203,4 @@ impl Drop for ShareMDataReq {
             );
         }
     }
-}
-
-#[repr(C)]
-/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
-pub struct ShareMData {
-    /// The mutable data type.
-    pub type_tag: u64,
-    /// The mutable data name.
-    pub name: XorName,
-    /// The permissions being requested.
-    pub perms: PermissionSet,
 }

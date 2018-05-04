@@ -42,12 +42,14 @@
 #![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate base64;
+extern crate jni;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate unwrap;
+extern crate walkdir;
 
 #[macro_use]
 mod macros;
@@ -59,7 +61,8 @@ mod vec;
 pub mod callback;
 pub mod test_utils;
 pub mod string;
-pub mod header_gen;
+pub mod bindgen_utils;
+pub mod java;
 
 pub use self::b64::{base64_decode, base64_encode};
 pub use self::catch_unwind::catch_unwind_cb;
