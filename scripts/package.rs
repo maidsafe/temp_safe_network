@@ -29,57 +29,68 @@ use walkdir::WalkDir;
 use zip::ZipWriter;
 use zip::write::FileOptions;
 
+const TARGET_LINUX_X86: &str = "i686-unknown-linux-gnu";
+const TARGET_LINUX_X64: &str = "x86_64-unknown-linux-gnu";
+const TARGET_OSX_X86: &str = "i686-apple-darwin";
+const TARGET_OSX_X64: &str = "x86_64-apple-darwin";
+const TARGET_WINDOWS_X86: &str = "i686-pc-windows-gnu";
+const TARGET_WINDOWS_X64: &str = "x86_64-pc-windows-gnu";
+const TARGET_IOS_X64: &str = "x86_64-apple-ios";
+const TARGET_IOS_ARM64: &str = "aarch64-apple-ios";
+const TARGET_ANDROID_X86: &str = "i686-linux-android";
+const TARGET_ANDROID_ARMEABIV7A: &str = "armv7-linux-androideabi";
+
 const CRATES: &[&str] = &["safe_app", "safe_authenticator"];
 
 const ARCHS: &[Arch] = &[
     Arch {
         name: "linux-x86",
-        target: "i686-unknown-linux-gnu",
+        target: TARGET_LINUX_X86,
         toolchain: "",
     },
     Arch {
         name: "linux-x64",
-        target: "x86_64-unknown-linux-gnu",
+        target: TARGET_LINUX_X64,
         toolchain: "",
     },
     Arch {
         name: "osx-x86",
-        target: "i686-apple-darwin",
+        target: TARGET_OSX_X86,
         toolchain: "",
     },
     Arch {
         name: "osx-x64",
-        target: "x86_64-apple-darwin",
+        target: TARGET_OSX_X64,
         toolchain: "",
     },
     Arch {
         name: "win-x86",
-        target: "i686-pc-windows-gnu",
+        target: TARGET_WINDOWS_X86,
         toolchain: "",
     },
     Arch {
         name: "win-x64",
-        target: "x86_64-pc-windows-gnu",
+        target: TARGET_WINDOWS_X64,
         toolchain: "",
     },
     Arch {
         name: "android-armeabiv7a",
-        target: "armv7-linux-androideabi",
+        target: TARGET_ANDROID_ARMEABIV7A,
         toolchain: "arm-linux-androideabi-",
     },
     Arch {
         name: "android-x86",
-        target: "i686-linux-android",
+        target: TARGET_ANDROID_X86,
         toolchain: "i686-linux-android-",
     },
     Arch {
         name: "ios-arm64",
-        target: "aarch64-apple-ios",
+        target: TARGET_IOS_ARM64,
         toolchain: "",
     },
     Arch {
         name: "ios-x86_64",
-        target: "x86_64-apple-ios",
+        target: TARGET_IOS_X64,
         toolchain: "",
     },
 ];
@@ -150,6 +161,13 @@ fn main() {
                 .takes_value(true)
                 .help("Path to the toolchain (for cross-compilation)"),
         )
+        .arg(
+            Arg::with_name("DEST")
+                .short("d")
+                .long("dest")
+                .takes_value(true)
+                .help("Destination directory (uses current dir by default)"),
+        )
         .get_matches();
 
     let krate = matches.value_of("NAME").unwrap();
@@ -158,6 +176,7 @@ fn main() {
     let arch_name = matches.value_of("ARCH").unwrap_or(HOST_ARCH_NAME);
     let arch = find_arch(arch_name);
 
+    let dest_dir = matches.value_of("DEST").unwrap_or(".");
     let bindings = matches.is_present("BINDINGS");
     let lib = matches.is_present("LIB");
     let mock = matches.is_present("MOCK");
@@ -228,8 +247,9 @@ fn main() {
             let mock = if mock { "-mock" } else { "" };
             format!("{}{}-{}-{}.zip", krate, mock, version_string, arch_name)
         };
+        let path: PathBuf = [dest_dir, &archive_name].iter().collect();
 
-        let file = File::create(archive_name).unwrap();
+        let file = File::create(path).unwrap();
         let mut archive = ZipWriter::new(file);
 
         for path in libs {
@@ -245,8 +265,9 @@ fn main() {
     // Create bindings archive.
     if bindings {
         let archive_name = format!("{}-bindings-{}.zip", krate, version_string);
+        let path: PathBuf = [dest_dir, &archive_name].iter().collect();
 
-        let file = File::create(archive_name).unwrap();
+        let file = File::create(path).unwrap();
         let mut archive = ZipWriter::new(file);
 
         for lang in BINDINGS_LANGS {
@@ -372,6 +393,7 @@ fn build(krate: &str, features: &[&str], target: Option<&str>) -> bool {
     let mut command = Command::new("cargo");
     command
         .arg("build")
+        .arg("--verbose")
         .arg("--release")
         .arg("--manifest-path")
         .arg(format!("{}/Cargo.toml", krate));
@@ -398,7 +420,7 @@ fn find_libs(krate: &str, target: Option<&str>, target_dir: &str) -> Vec<PathBuf
 
     // linux,osx - static
     let path = prefix.join(format!("lib{}.a", krate));
-    if path.exists() {
+    if path.exists() && is_static_lib_required(target) {
         result.push(path);
     }
 
@@ -474,4 +496,12 @@ fn path_into_string(path: PathBuf) -> String {
         '\\',
         "/",
     )
+}
+
+fn is_static_lib_required(target: Option<&str>) -> bool {
+    match target {
+        Some(TARGET_IOS_ARM64) |
+        Some(TARGET_IOS_X64) => true,
+        Some(_) | None => false,
+    }
 }
