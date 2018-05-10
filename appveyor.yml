@@ -73,20 +73,13 @@ test_script:
     cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
 
 before_deploy:
-  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml
-  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
-  - strip target\release\safe_authenticator.dll target\release\safe_app.dll
-  - 7z a -mx9 safe_authenticator-mock-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_authenticator.dll
-  - 7z a -mx9 safe_app-mock-%SAFE_APP_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_app.dll
-  - appveyor PushArtifact safe_authenticator-mock-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip
-  - appveyor PushArtifact safe_app-mock-%SAFE_APP_VERSION%-win-%PLATFORM%.zip
-  - cargo build --verbose --release --manifest-path=safe_authenticator/Cargo.toml
-  - cargo build --verbose --release --manifest-path=safe_app/Cargo.toml
-  - strip target\release\safe_authenticator.dll target\release\safe_app.dll
-  - 7z a -mx9 safe_authenticator-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_authenticator.dll
-  - 7z a -mx9 safe_app-%SAFE_APP_VERSION%-win-%PLATFORM%.zip %APPVEYOR_BUILD_FOLDER%\target\release\safe_app.dll
-  - appveyor PushArtifact safe_authenticator-%SAFE_AUTHENTICATOR_VERSION%-win-%PLATFORM%.zip
-  - appveyor PushArtifact safe_app-%SAFE_APP_VERSION%-win-%PLATFORM%.zip
+  - cargo install cargo-script --vers=0.2.8
+  - ps: New-Item -Path ".\target\deploy" -ItemType directory
+  - cargo script -- ./scripts/package.rs --lib --name safe_app -d target/deploy --mock
+  - cargo script -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy --mock
+  - cargo script -- ./scripts/package.rs --lib --name safe_app -d target/deploy
+  - cargo script -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy
+  - ps: $root = Resolve-Path .\target\deploy; [IO.Directory]::GetFiles($root.Path, '*.zip') | % { Push-AppveyorArtifact $_ -FileName $_.Substring($root.Path.Length + 1) }
 
 deploy:
   provider: S3
