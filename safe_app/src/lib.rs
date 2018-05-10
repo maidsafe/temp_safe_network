@@ -53,7 +53,17 @@ extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 
+// Re-export functions used in FFI so that they are accessible through the Rust API.
+
+pub use routing::{Action, ClientError, EntryAction, ImmutableData, MutableData, PermissionSet,
+                  User, Value, XOR_NAME_LEN, XorName};
+pub use safe_core::*;
+
+// Export FFI interface.
+
 pub mod ffi;
+
+// Required for moz_cheddar to work.
 
 pub use ffi::*;
 pub use ffi::access_container::*;
@@ -74,13 +84,14 @@ pub use ffi::object_cache::*;
 pub use ffi::test_utils::*;
 
 mod errors;
+pub mod cipher_opt;
 pub mod object_cache;
 pub mod permissions;
 
 #[cfg(test)]
 mod tests;
 
-/// Utility functions to test apps functionality
+/// Utility functions to test apps functionality.
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
