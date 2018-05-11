@@ -34,6 +34,7 @@ jobs:
       os: linux
       rust: nightly-2018-02-05
     - script: set -x; scripts/clippy-ffi-utils && scripts/clippy-real
+      if: type = pull_request
       os: linux
       rust: nightly-2018-02-05
     # Nightly tests + clippy
@@ -42,6 +43,7 @@ jobs:
       os: linux
       rust: nightly-2018-02-05
     - script: set -x; scripts/clippy-mock
+      if: type = pull_request
       os: linux
       rust: nightly-2018-02-05
 sudo: false
@@ -84,30 +86,14 @@ after_script:
 before_cache:
   - cargo prune
 before_deploy:
+  - bash cargo_install.sh cargo-script 0.2.8
   - mkdir -p target/deploy
-  - if [[ "$TRAVIS_RUST_VERSION" =~ i686 ]]; then
-      ARCH=x86;
-    else
-      ARCH=x64;
-    fi
-  # We need to use `-x` on OS X since `strip` fails to remove global symbols from release builds on OS X.
-  - if [[ "$TRAVIS_OS_NAME" = linux ]]; then
-      SUFFIX=so;
-    else
-      SUFFIX=dylib STRIP_ARG=-x;
-    fi
   # Build for mock.
-  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml
-  - cargo build --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
-  - strip $STRIP_ARG target/release/libsafe_authenticator.$SUFFIX target/release/libsafe_app.$SUFFIX
-  - zip -j target/deploy/safe_authenticator-mock-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
-  - zip -j target/deploy/safe_app-mock-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX
+  - ./scripts/package.rs --lib --name safe_app -d target/deploy --mock
+  - ./scripts/package.rs --lib --name safe_authenticator -d target/deploy --mock
   # Build for production.
-  - cargo build --verbose --release --manifest-path=safe_authenticator/Cargo.toml
-  - cargo build --verbose --release --manifest-path=safe_app/Cargo.toml
-  - strip $STRIP_ARG target/release/libsafe_authenticator.$SUFFIX target/release/libsafe_app.$SUFFIX
-  - zip -j target/deploy/safe_authenticator-$SAFE_AUTHENTICATOR_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_authenticator.$SUFFIX
-  - zip -j target/deploy/safe_app-$SAFE_APP_VERSION-$TRAVIS_OS_NAME-$ARCH.zip target/release/libsafe_app.$SUFFIX
+  - ./scripts/package.rs --lib --name safe_app -d target/deploy
+  - ./scripts/package.rs --lib --name safe_authenticator -d target/deploy
 deploy:
   provider: s3
   access_key_id: AKIAIA2TXTG7EV5VIG2Q
