@@ -12,7 +12,7 @@
 
 use super::errors::AppError;
 use AppContext;
-use ffi::cipher_opt::CipherOpt;
+use cipher_opt::CipherOpt;
 use ffi::nfs::FileContext;
 use ffi::object_cache::*;
 use routing::{EntryAction, PermissionSet, User, Value};

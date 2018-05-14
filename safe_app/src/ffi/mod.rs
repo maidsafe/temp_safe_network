@@ -13,7 +13,7 @@
 
 /// Access container.
 pub mod access_container;
-/// Cipher Options.
+/// Cipher options operations.
 pub mod cipher_opt;
 /// Low level manipulation of `ImmutableData`.
 pub mod immutable_data;
@@ -29,7 +29,7 @@ pub mod crypto;
 pub mod mutable_data;
 /// NFS API.
 pub mod nfs;
-/// `ObjectCache` handles
+/// `ObjectCache` handles.
 pub mod object_cache;
 /// Testing utilities.
 #[cfg(any(test, feature = "testing"))]
