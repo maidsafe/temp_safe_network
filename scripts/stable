@@ -1,41 +1,17 @@
 #!/bin/bash
 
-if [[ $TRAVIS_EVENT_TYPE = pull_request ]]; then
-  (
-    set -x;
+set -x;
 
-      echo "--- Test ffi_utils ---" &&
-      scripts/test-ffi-utils &&
+if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" ]]; then
+  echo "--- Check format ---" &&
+    cargo fmt --all -- --write-mode=diff;
+fi &&
 
-      echo "--- Check compilation against actual routing ---" &&
-      scripts/check-real &&
+  echo "--- Test ffi_utils ---" &&
+  scripts/test-ffi-utils &&
 
-      echo "--- Test against mock ---" &&
-      scripts/test-mock &&
+  echo "--- Check compilation against actual routing ---" &&
+  scripts/check-real &&
 
-      if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-        (
-          echo "--- Test binary compatibility ---" &&
-
-            unset SAFE_MOCK_IN_MEMORY_STORAGE &&
-            export SAFE_MOCK_VAULT_PATH=$HOME/tmp &&
-            mkdir -p $SAFE_MOCK_VAULT_PATH &&
-
-            export BASE_BRANCH_DIR=${TRAVIS_BUILD_DIR%/}-$TRAVIS_BRANCH &&
-            cp -r $TRAVIS_BUILD_DIR $BASE_BRANCH_DIR &&
-            cd $BASE_BRANCH_DIR &&
-            git checkout -qf $TRAVIS_BRANCH &&
-
-            cd $TRAVIS_BUILD_DIR &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::write_data -- --ignored &&
-
-            cd $BASE_BRANCH_DIR &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::read_data -- --ignored &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::write_data -- --ignored &&
-
-            cd $TRAVIS_BUILD_DIR &&
-            cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml serialisation::read_data -- --ignored
-        );
-      fi
-  )
-fi
+  echo "--- Test against mock ---" &&
+  scripts/test-mock

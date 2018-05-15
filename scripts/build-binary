@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -x;
+
+echo "--- Building the binary compatibility test ---" &&
+
+export BASE_BRANCH_DIR="${TRAVIS_BUILD_DIR}-$TRAVIS_BRANCH" &&
+rsync -av --exclude="target" "${TRAVIS_BUILD_DIR}/" "$BASE_BRANCH_DIR" &&
+cp -r "$TRAVIS_BUILD_DIR" "$BASE_BRANCH_DIR" &&
+
+cd "$BASE_BRANCH_DIR" &&
+git checkout -qf "$TRAVIS_BRANCH" &&
+
+cargo build --verbose --features="testing use-mock-routing" --release --lib --tests --manifest-path=safe_authenticator/Cargo.toml
