@@ -14,6 +14,7 @@ stages:
   - warmup-real
   - warmup-mock
   - tests
+  - clippy
 jobs:
   allow_failures:
     - rust: *stable-i686
@@ -37,7 +38,7 @@ jobs:
       rust: *nightly
     # Cache warm-ups
     - stage: warmup-mock
-      script: set -x; scripts/build-mock && scripts/build-binary
+      script: set -x; scripts/build-mock
       if: type = pull_request
       os: linux
       rust: *stable
@@ -52,6 +53,18 @@ jobs:
     - script: set -x; scripts/build-mock
       os: linux
       rust: *nightly
+    - script: set -x; scripts/build-binary
+      if: type = push
+      os: linux
+      rust: *stable
+    - script: set -x; scripts/build-binary
+      if: type = push
+      os: linux
+      rust: *stable-i686
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
     # Stable + nightly tests
     - stage: tests
       script: set -x; scripts/stable && scripts/test-binary
@@ -70,14 +83,21 @@ jobs:
       if: type = pull_request
       os: osx
       rust: *stable
-    - script: set -x; scripts/test-all && scripts/clippy-all
+    - script: set -x; scripts/test-all
+      os: linux
+      rust: *nightly
+      # Clippy
+    - stage: clippy
+      script: set -x; scripts/clippy-all
       os: linux
       rust: *nightly
 sudo: false
 cache:
+  # Double the default timeout. We cache a lot!
+  timeout: 360
   cargo: true
   directories:
-    - "${TRAVIS_BUILD_DIR%/}-$TRAVIS_BRANCH/target"
+    - "${HOME}/.cache/master"
 before_script:
   # Expected version change PR title format:
   # Version change: safe_app to 0.2.2; safe_authenticator to 0.2.3; safe_core to 0.26.0;
