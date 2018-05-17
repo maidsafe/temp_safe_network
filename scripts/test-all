@@ -1,8 +1,3 @@
 #!/bin/bash
 
-if [[ "$TRAVIS_RUST_VERSION" == "$RUST_NIGHTLY" ]]; then
-  echo "--- Check format ---" &&
-    cargo fmt --all -- --check;
-fi &&
-
-  scripts/test-ffi-utils && scripts/test-mock
+scripts/test-ffi-utils && scripts/test-mock

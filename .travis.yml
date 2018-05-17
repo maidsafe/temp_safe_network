@@ -7,19 +7,21 @@ env:
     - RUST_BACKTRACE=1
     - RUST_STABLE=1.26.1
     - RUST_NIGHTLY=nightly-2018-05-29
+    - RUST_RUSTFMT=0.8.2
+    - RUST_CLIPPY=0.0.206
     - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
 language: rust
 stages:
   - warmup-real
   - warmup-mock
-  - tests
-  - clippy
+  - tests-stable
+  - tests-nightly
 jobs:
   allow_failures:
     - rust: *stable-i686
   include:
-    # Cache warm-ups
+    # Warm up the cache for a real build
     - stage: warmup-real
       script: set -x; scripts/build-ffi-utils && scripts/build-real
       if: type = pull_request
@@ -33,10 +35,10 @@ jobs:
         apt:
           packages:
             - gcc-multilib
-    - script: set -x; scripts/build-ffi-utils && scripts/build-real
+    - script: set -x; scripts/rustfmt && scripts/build-ffi-utils && scripts/build-real
       os: linux
       rust: *nightly
-    # Cache warm-ups
+    # Warm up the cache for a mock build
     - stage: warmup-mock
       script: set -x; scripts/build-mock
       if: type = pull_request
@@ -65,8 +67,8 @@ jobs:
         apt:
           packages:
             - gcc-multilib
-    # Stable + nightly tests
-    - stage: tests
+    # Stable + nightly clippy
+    - stage: tests-stable
       script: set -x; scripts/stable && scripts/test-binary
       if: type = pull_request
       os: linux
@@ -83,17 +85,17 @@ jobs:
       if: type = pull_request
       os: osx
       rust: *stable
-    - script: set -x; scripts/test-all
+    - script: set -x; scripts/check-debug-all; scripts/clippy-all
       os: linux
       rust: *nightly
-      # Clippy
-    - stage: clippy
-      script: set -x; scripts/clippy-all
+    # Nightly tests
+    - stage: tests-nightly
+      script: set -x; scripts/test-all
       os: linux
       rust: *nightly
 sudo: false
 cache:
-  # Double the default timeout. We cache a lot!
+  # Double the default timeout.
   timeout: 360
   cargo: true
   directories:
@@ -122,8 +124,8 @@ before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
   - if [ "$TRAVIS_RUST_VERSION" = $RUST_NIGHTLY ] && [ "$TRAVIS_OS_NAME" = linux ]; then
-      bash cargo_install.sh rustfmt-nightly 0.8.2;
-      bash cargo_install.sh clippy 0.0.206;
+      bash cargo_install.sh rustfmt-nightly "$RUST_RUSTFMT";
+      bash cargo_install.sh clippy "$RUST_CLIPPY";
     fi
 after_script:
   - if [[ $TRAVIS_EVENT_TYPE = pull_request && -n $(git diff --shortstat 2> /dev/null | tail -n1) ]]; then

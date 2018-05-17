@@ -2,16 +2,11 @@
 
 set -x;
 
-if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" ]]; then
-    echo "--- Check format ---" &&
-        cargo fmt --all -- --write-mode=diff;
-fi &&
+echo "--- Test ffi_utils ---" &&
+  scripts/test-ffi-utils &&
 
-    echo "--- Test ffi_utils ---" &&
-    scripts/test-ffi-utils &&
+  echo "--- Check compilation against actual routing ---" &&
+  scripts/check-real &&
 
-    echo "--- Check compilation against actual routing ---" &&
-    scripts/check-real &&
-
-    echo "--- Test against mock ---" &&
-    scripts/test-mock
+  echo "--- Test against mock ---" &&
+  scripts/test-mock
