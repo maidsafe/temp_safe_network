@@ -21,6 +21,7 @@ use rust_sodium::crypto::sign;
 use safe_core::{Client, FutureExt, MDataInfo};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
+use safe_core::crypto::shared_secretbox;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
 use safe_core::ipc::req::{ContainerPermissions, container_perms_into_permission_set};
 use safe_core::ipc::resp::AccessContainerEntry;
@@ -200,10 +201,10 @@ pub fn rand_app() -> AppExchangeInfo {
 }
 
 /// Create file in the given container, with the given name and content.
-pub fn create_file<T: Into<String>>(
+pub fn create_file<S: Into<String>>(
     authenticator: &Authenticator,
     container_info: MDataInfo,
-    name: T,
+    name: S,
     content: Vec<u8>,
 ) -> Result<(), AuthError> {
     let name = name.into();
@@ -226,16 +227,65 @@ pub fn create_file<T: Into<String>>(
     })
 }
 
-/// Fetches file from the given directory by given name
-pub fn fetch_file<T: Into<String>>(
+/// Fetches file from the given directory by given name.
+pub fn fetch_file<S: Into<String>>(
     authenticator: &Authenticator,
     container_info: MDataInfo,
-    name: T,
+    name: S,
 ) -> Result<File, AuthError> {
     let name = name.into();
     try_run(authenticator, |client| {
         file_helper::fetch(client.clone(), container_info, name)
             .map(|(_, file)| file)
+            .map_err(From::from)
+    })
+}
+
+/// Reads from the given file.
+pub fn read_file(
+    authenticator: &Authenticator,
+    file: File,
+    encryption_key: Option<shared_secretbox::Key>,
+) -> Result<Vec<u8>, AuthError> {
+    try_run(authenticator, move |client| {
+        file_helper::read(client.clone(), &file, encryption_key)
+            .then(|res| {
+                let reader = unwrap!(res);
+                reader.read(0, reader.size())
+            })
+            .map_err(From::from)
+    })
+}
+
+/// Deletes file from the given directory by given name.
+pub fn delete_file<S: Into<String>>(
+    authenticator: &Authenticator,
+    container_info: MDataInfo,
+    name: S,
+    version: u64,
+) -> Result<(), AuthError> {
+    let name = name.into();
+    try_run(authenticator, move |client| {
+        file_helper::delete(client, &container_info, name, version).map_err(From::from)
+    })
+}
+
+/// Writes to the given file.
+pub fn write_file(
+    authenticator: &Authenticator,
+    file: File,
+    mode: Mode,
+    encryption_key: Option<shared_secretbox::Key>,
+    content: Vec<u8>,
+) -> Result<(), AuthError> {
+    try_run(authenticator, move |client| {
+        file_helper::write(client.clone(), file, mode, encryption_key)
+            .then(move |res| {
+                let writer = unwrap!(res);
+                writer.write(&content).and_then(
+                    move |_| writer.close().map(|_| ()),
+                )
+            })
             .map_err(From::from)
     })
 }

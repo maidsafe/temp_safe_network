@@ -55,7 +55,7 @@ use safe_core::{CoreError, utils};
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
 use safe_core::ipc::{AuthGranted, Permission};
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions};
-use safe_core::nfs::NfsError;
+use safe_core::nfs::{Mode, NfsError};
 use std::collections::HashMap;
 use std::env;
 use std::ffi::CString;
@@ -63,6 +63,9 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::os::raw::c_void;
+
+static READ_WRITE_APP_ID: &str = "0123456789";
+static READ_WRITE_FILE_NAME: &str = "test.mp4";
 
 // Configuration for tests.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -101,12 +104,8 @@ fn get_config() -> TestConfig {
     }
 }
 
-#[test]
-fn authorisation_and_revocation() {
-    let test_acc = get_config().test_account;
-    let locator = unwrap!(CString::new(test_acc.acc_locator.clone()));
-    let password = unwrap!(CString::new(test_acc.acc_password.clone()));
-
+// Copies over crust.config and logs into the Authenticator.
+fn setup_test() -> *mut Authenticator {
     // Copy crust.config file to <exe>.crust.config
     {
         let exe_path = unwrap!(env::current_exe());
@@ -123,7 +122,11 @@ fn authorisation_and_revocation() {
         unwrap!(write_file_str(&crust_config_file, &config_contents));
     }
 
-    // Login to the Authenticator
+    let test_acc = get_config().test_account;
+    let locator = unwrap!(CString::new(test_acc.acc_locator.clone()));
+    let password = unwrap!(CString::new(test_acc.acc_password.clone()));
+
+    // Login to the Authenticator.
     println!(
         "Logging in\n... locator: {}\n... password: {}",
         test_acc.acc_locator,
@@ -134,8 +137,143 @@ fn authorisation_and_revocation() {
             login(locator.as_ptr(), password.as_ptr(), ud, disconnect_cb, cb)
         }))
     };
+    auth_h
+}
 
-    // Create and authorise an app
+// Write data for the `read_data` step. This must be run before `read_data`.
+//
+// This test in conjunction with `read_data` is useful for verifying data compatibility after
+// making possibly breaking changes.
+#[ignore]
+#[test]
+fn write_data() {
+    let auth_h = setup_test();
+
+    let app_id = READ_WRITE_APP_ID;
+    let file_name = READ_WRITE_FILE_NAME;
+
+    let ffi_app_id = unwrap!(CString::new(app_id));
+    println!("App ID: {}", app_id);
+
+    let app_info = AppExchangeInfo {
+        id: app_id.to_string(),
+        scope: None,
+        // Use ID for name so the app is easier to find in Browser.
+        name: app_id.to_string(),
+        vendor: app_id.to_string(),
+    };
+
+    println!("Authorising app...");
+    let auth_granted = ffi_authorise_app(auth_h, &app_info);
+
+    // Register the app.
+    println!("Registering app...");
+    let _app: *mut App = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            app_registered(
+                ffi_app_id.as_ptr(),
+                &unwrap!(auth_granted.clone().into_repr_c()),
+                ud,
+                disconnect_cb,
+                cb,
+            )
+        }))
+    };
+
+    // Put file into container.
+    println!("File name: {}", file_name);
+
+    unsafe {
+        let mut ac_entries = access_container(&*auth_h, app_id, auth_granted.clone());
+        let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+
+        match fetch_file(&*auth_h, videos_md.clone(), file_name) {
+            Ok(file) => {
+                println!("Writing to file...");
+
+                unwrap!(write_file(
+                    &*auth_h,
+                    file,
+                    Mode::Overwrite,
+                    videos_md.enc_key().cloned(),
+                    vec![1; 10],
+                ));
+            }
+            Err(e) => {
+                println!("Could not fetch file: {:?}", e);
+                println!("Creating file...");
+
+                unwrap!(create_file(
+                    &*auth_h,
+                    videos_md.clone(),
+                    file_name,
+                    vec![1; 10],
+                ));
+            }
+        }
+    }
+
+    println!("Data written successfully.");
+}
+
+// Test that data written during the `write_data` step can be read successfully. `write_data` must
+// be run first.
+//
+// This test in conjunction with `write_data` is useful for verifying data compatibility after
+// making possibly breaking changes.
+#[ignore]
+#[test]
+fn read_data() {
+    let auth_h = setup_test();
+
+    let app_id = READ_WRITE_APP_ID;
+    let file_name = READ_WRITE_FILE_NAME;
+
+    let _ffi_app_id = unwrap!(CString::new(app_id));
+    println!("App ID: {}", app_id);
+
+    let app_info = AppExchangeInfo {
+        id: app_id.to_string(),
+        scope: None,
+        name: app_id.to_string(),
+        vendor: app_id.to_string(),
+    };
+
+    // Authorise the app.
+    println!("Authorising app...");
+    let auth_granted = ffi_authorise_app(auth_h, &app_info);
+
+    // Get a list of registered apps, confirm our app is in it.
+    let registered_apps: Vec<RegisteredAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(auth_h, ud, cb))) };
+    let any = registered_apps.iter().any(|registered_app_id| {
+        registered_app_id.0 == app_id
+    });
+    assert!(any);
+
+    let videos_md = unsafe {
+        let mut ac_entries = access_container(&*auth_h, app_id, auth_granted.clone());
+        let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+        videos_md
+    };
+
+    // The app can access the file.
+    println!("Confirming we can read written data...");
+    unsafe {
+        let file = unwrap!(fetch_file(&*auth_h, videos_md.clone(), file_name));
+
+        let content = unwrap!(read_file(&*auth_h, file, videos_md.enc_key().cloned()));
+        assert_eq!(content, vec![1; 10]);
+    }
+
+    println!("Data read successfully.");
+}
+
+#[test]
+fn authorisation_and_revocation() {
+    let auth_h = setup_test();
+
+    // Create and authorise an app.
     let app_id = unwrap!(utils::generate_readable_string(10));
     let ffi_app_id = unwrap!(CString::new(app_id.clone()));
     println!("App ID: {}", app_id);
@@ -144,7 +282,7 @@ fn authorisation_and_revocation() {
         id: app_id.clone(),
         scope: None,
         name: app_id.clone(), // Use ID for name so the app is easier to find in Browser.
-        vendor: unwrap!(utils::generate_readable_string(10)),
+        vendor: app_id.clone(),
     };
 
     println!("Authorising app...");
@@ -323,7 +461,7 @@ fn ffi_authorise_app(auth_h: *mut Authenticator, app_info: &AppExchangeInfo) -> 
 }
 
 // Creates a containers request asking for "videos with all the permissions possible".
-pub fn create_containers_req() -> HashMap<String, ContainerPermissions> {
+fn create_containers_req() -> HashMap<String, ContainerPermissions> {
     let mut containers = HashMap::new();
     let _ = containers.insert(
         "_videos".to_owned(),

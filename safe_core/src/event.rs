@@ -50,7 +50,7 @@ pub enum CoreEvent {
     RateLimitExceeded,
 }
 
-/// Netowork Events that Client Modules need to deal with
+/// Network Events that Client Modules need to deal with.
 #[derive(Debug)]
 pub enum NetworkEvent {
     /// The core engine is connected to atleast one peer
