@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cargo check --verbose --features=use-mock-routing --manifest-path=safe_core/Cargo.toml &&
+cargo check --verbose --features="testing use-mock-routing" --lib --tests --manifest-path=safe_core/Cargo.toml &&
+cargo check --verbose --features="testing use-mock-routing" --lib --tests --manifest-path=safe_authenticator/Cargo.toml &&
+cargo check --verbose --features="testing use-mock-routing" --lib --tests --manifest-path=safe_app/Cargo.toml &&
+cargo check --verbose --lib --tests --manifest-path=tests/Cargo.toml

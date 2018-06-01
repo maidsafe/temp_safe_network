@@ -1,7 +1,12 @@
+vars:
+  - &stable "1.26.1"
+  - &stable-i686 "1.26.1-i686-unknown-linux-gnu"
+  - &nightly "nightly-2018-05-29"
 env:
   global:
     - RUST_BACKTRACE=1
-    - RUST_STABLE=1.24.0
+    - RUST_STABLE=1.26.1
+    - RUST_NIGHTLY=nightly-2018-05-29
     - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
 language: rust
@@ -11,41 +16,41 @@ stages:
   - nightly-tests
 jobs:
   allow_failures:
-    - rust: 1.24.0-i686-unknown-linux-gnu
+    - rust: *stable-i686
   include:
     # Stable
     - stage: stable
       script: set -x; scripts/stable
       os: linux
-      rust: 1.24.0
+      rust: *stable
     - os: linux
       script: set -x; scripts/stable
-      rust: 1.24.0-i686-unknown-linux-gnu
+      rust: *stable-i686
       addons:
         apt:
           packages:
             - gcc-multilib
     - os: osx
       script: set -x; scripts/stable
-      rust: 1.24.0
+      rust: *stable
     # Nightly compiler warm-up + clippy
     - stage: nightly-warmup
       script: set -x; scripts/build-all
       os: linux
-      rust: nightly-2018-02-05
-    - script: set -x; scripts/clippy-ffi-utils && scripts/clippy-real
+      rust: *nightly
+    - script: set -x; scripts/check-debug-ffi-utils && scripts/clippy-ffi-utils && scripts/check-debug-real && scripts/clippy-real
       if: type = pull_request
       os: linux
-      rust: nightly-2018-02-05
+      rust: *nightly
     # Nightly tests + clippy
     - stage: nightly-tests
       script: set -x; scripts/test-all
       os: linux
-      rust: nightly-2018-02-05
-    - script: set -x; scripts/clippy-mock
+      rust: *nightly
+    - script: set -x; scripts/check-debug-mock && scripts/clippy-mock
       if: type = pull_request
       os: linux
-      rust: nightly-2018-02-05
+      rust: *nightly
 sudo: false
 cache:
   cargo: true
@@ -72,10 +77,9 @@ before_script:
     fi
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" && $TRAVIS_EVENT_TYPE = pull_request ]]; then
-      bash cargo_install.sh rustfmt 0.9.0;
-    elif [[ "$TRAVIS_RUST_VERSION" =~ nightly && $TRAVIS_EVENT_TYPE = pull_request ]]; then
-      bash cargo_install.sh clippy 0.0.186;
+  - if [ "$TRAVIS_RUST_VERSION" = $RUST_NIGHTLY ] && [ "$TRAVIS_OS_NAME" = linux ]; then
+      bash cargo_install.sh rustfmt-nightly 0.8.2;
+      bash cargo_install.sh clippy 0.0.206;
     fi
 after_script:
   - if [[ $TRAVIS_EVENT_TYPE = pull_request && -n $(git diff --shortstat 2> /dev/null | tail -n1) ]]; then
