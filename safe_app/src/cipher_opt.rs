@@ -48,8 +48,8 @@ impl CipherOpt {
                 let nonce = secretbox::gen_nonce();
                 let cipher_text = secretbox::seal(plain_text, &nonce, app_ctx.sym_enc_key()?);
                 let wire_format = WireFormat::Symmetric {
-                    nonce: nonce,
-                    cipher_text: cipher_text,
+                    nonce,
+                    cipher_text,
                 };
 
                 Ok(serialise(&wire_format)?)

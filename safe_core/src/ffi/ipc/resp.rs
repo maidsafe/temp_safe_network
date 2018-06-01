@@ -52,8 +52,8 @@ impl Clone for AppKeys {
         AppKeys {
             owner_key: self.owner_key,
             enc_key: self.enc_key,
-            sign_pk: sign_pk,
-            sign_sk: sign_sk,
+            sign_pk,
+            sign_sk,
             enc_pk: self.enc_pk,
             enc_sk: self.enc_sk,
         }

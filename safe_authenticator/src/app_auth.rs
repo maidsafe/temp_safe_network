@@ -162,7 +162,7 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
                     let keys = AppKeys::random(owner_key);
                     let app = AppInfo {
                         info: auth_req.app,
-                        keys: keys,
+                        keys,
                     };
                     config::insert_app(
                         &c3,

@@ -172,7 +172,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                         User::Anyone => USER_ANYONE,
                     };
                     permissions::UserPermissionSet {
-                        user_h: user_h,
+                        user_h,
                         perm_set: *permission_set,
                     }.into_repr_c()
                 })

@@ -364,9 +364,9 @@ impl AppContext {
     ) -> Self {
         AppContext::Registered(Rc::new(Registered {
             object_cache: ObjectCache::new(),
-            app_id: app_id,
-            sym_enc_key: sym_enc_key,
-            access_container_info: access_container_info,
+            app_id,
+            sym_enc_key,
+            access_container_info,
             access_info: RefCell::new(HashMap::new()),
         }))
     }

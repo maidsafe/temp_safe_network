@@ -396,12 +396,12 @@ mod tests {
         let auth_granted = AuthGranted {
             app_keys: gen_app_keys(),
             bootstrap_config: BootstrapConfig::default(),
-            access_container_info: access_container_info,
+            access_container_info,
             access_container_entry: AccessContainerEntry::default(),
         };
 
         let msg = IpcMsg::Resp {
-            req_id: req_id,
+            req_id,
             resp: IpcResp::Auth(Ok(auth_granted.clone())),
         };
 
@@ -488,7 +488,7 @@ mod tests {
         let req_id = ipc::gen_req_id();
 
         let msg = IpcMsg::Resp {
-            req_id: req_id,
+            req_id,
             resp: IpcResp::Containers(Ok(())),
         };
 
@@ -569,7 +569,7 @@ mod tests {
         let req_id = ipc::gen_req_id();
 
         let msg = IpcMsg::Resp {
-            req_id: req_id,
+            req_id,
             resp: IpcResp::Unregistered(Ok(BootstrapConfig::default())),
         };
 
@@ -650,7 +650,7 @@ mod tests {
         let req_id = ipc::gen_req_id();
 
         let msg = IpcMsg::Resp {
-            req_id: req_id,
+            req_id,
             resp: IpcResp::ShareMData(Ok(())),
         };
 
@@ -732,12 +732,12 @@ mod tests {
         let (enc_pk, enc_sk) = shared_box::gen_keypair();
 
         AppKeys {
-            owner_key: owner_key,
-            enc_key: enc_key,
-            sign_pk: sign_pk,
-            sign_sk: sign_sk,
-            enc_pk: enc_pk,
-            enc_sk: enc_sk,
+            owner_key,
+            enc_key,
+            sign_pk,
+            sign_sk,
+            enc_pk,
+            enc_sk,
         }
     }
 

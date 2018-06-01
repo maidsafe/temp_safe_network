@@ -46,7 +46,7 @@ impl ReprC for UserPermissionSet {
         let FfiUserPermissionSet { user_h, perm_set } = *c_repr;
 
         Ok(UserPermissionSet {
-            user_h: user_h,
+            user_h,
             perm_set: permission_set_clone_from_repr_c(&perm_set)?,
         })
     }

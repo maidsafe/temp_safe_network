@@ -35,8 +35,8 @@ impl<T: 'static> Reader<T> {
                 let self_encryptor = SelfEncryptor::new(storage, data_map)?;
 
                 Ok(Reader {
-                    client: client,
-                    self_encryptor: self_encryptor,
+                    client,
+                    self_encryptor,
                 })
             })
             .into_box()

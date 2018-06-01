@@ -75,7 +75,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(
     add_action(app, actions_h, key, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
             content: vec_clone_from_raw_parts(value, value_len),
-            entry_version: entry_version,
+            entry_version,
         })
     })
 }

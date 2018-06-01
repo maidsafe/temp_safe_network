@@ -31,7 +31,7 @@ impl File {
             size: 0,
             created: Utc::now(),
             modified: Utc::now(),
-            user_metadata: user_metadata,
+            user_metadata,
             data_map_name: XorName::default(),
         }
     }
@@ -49,9 +49,9 @@ impl File {
             created_nsec: self.created_time().timestamp_subsec_nanos(),
             modified_sec: self.modified_time().timestamp(),
             modified_nsec: self.modified_time().timestamp_subsec_nanos(),
-            user_metadata_ptr: user_metadata_ptr,
-            user_metadata_len: user_metadata_len,
-            user_metadata_cap: user_metadata_cap,
+            user_metadata_ptr,
+            user_metadata_len,
+            user_metadata_cap,
             data_map_name: self.data_map_name().0,
         }
     }

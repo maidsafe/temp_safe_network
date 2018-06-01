@@ -401,7 +401,7 @@ mod tests {
         };
 
         let a = AuthReq {
-            app: app,
+            app,
             app_container: false,
             containers: HashMap::new(),
         };
@@ -432,7 +432,7 @@ mod tests {
         };
 
         let a = ContainersReq {
-            app: app,
+            app,
             containers: HashMap::new(),
         };
 

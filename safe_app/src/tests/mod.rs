@@ -182,7 +182,7 @@ fn authorise_app(
         auth,
         &AuthReq {
             app: app_info.clone(),
-            app_container: app_container,
+            app_container,
             containers: HashMap::new(),
         },
     ));

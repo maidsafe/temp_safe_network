@@ -40,7 +40,7 @@ pub fn decode_ipc_msg(
             // Ok status should be returned for all app states (including
             // Revoked and Authenticated).
             ok!(Ok(IpcMsg::Req {
-                req_id: req_id,
+                req_id,
                 req: IpcReq::Auth(auth_req),
             }))
         }
@@ -49,7 +49,7 @@ pub fn decode_ipc_msg(
             req_id,
         } => {
             ok!(Ok(IpcMsg::Req {
-                req_id: req_id,
+                req_id,
                 req: IpcReq::Unregistered(extra_data),
             }))
         }
@@ -58,7 +58,7 @@ pub fn decode_ipc_msg(
             req_id,
         } => {
             ok!(Ok(IpcMsg::Req {
-                req_id: req_id,
+                req_id,
                 req: IpcReq::ShareMData(share_mdata_req),
             }))
         }
@@ -78,7 +78,7 @@ pub fn decode_ipc_msg(
                     match app_state {
                         AppState::Authenticated => {
                             Ok(Ok(IpcMsg::Req {
-                                req_id: req_id,
+                                req_id,
                                 req: IpcReq::Containers(cont_req),
                             }))
                         }
@@ -90,7 +90,7 @@ pub fn decode_ipc_msg(
 
                             let resp = IpcMsg::Resp {
                                 resp: IpcResp::Auth(Err(IpcError::UnknownApp)),
-                                req_id: req_id,
+                                req_id,
                             };
                             let resp = encode_response(&resp)?;
 

@@ -235,7 +235,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                         .and_then(move |()| {
                             let resp = encode_response(
                                 &IpcMsg::Resp {
-                                    req_id: req_id,
+                                    req_id,
                                     resp: IpcResp::ShareMData(Ok(())),
                                 }
                             ).map_err(AuthError::IpcError)?;
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
             })?;
         } else {
             let resp = encode_response(&IpcMsg::Resp {
-                req_id: req_id,
+                req_id,
                 resp: IpcResp::ShareMData(Err(IpcError::ShareMDataDenied)),
             })?;
             let (error_code, description) = ffi_error!(AuthError::from(IpcError::ShareMDataDenied));
@@ -290,7 +290,7 @@ pub unsafe extern "C" fn auth_revoke_app(
         (*auth).send(move |client| {
             revoke_app(client, &app_id)
                 .and_then(move |_| {
-                    let resp = encode_response(&IpcMsg::Revoked { app_id: app_id })?;
+                    let resp = encode_response(&IpcMsg::Revoked { app_id })?;
                     o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
                     Ok(())
                 })
@@ -346,7 +346,7 @@ pub unsafe extern "C" fn encode_unregistered_resp(
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
-                req_id: req_id,
+                req_id,
                 resp: IpcResp::Unregistered(Err(IpcError::AuthDenied)),
             })?;
 
@@ -355,7 +355,7 @@ pub unsafe extern "C" fn encode_unregistered_resp(
             let bootstrap_cfg = Client::<()>::bootstrap_config()?;
 
             let resp = encode_response(&IpcMsg::Resp {
-                req_id: req_id,
+                req_id,
                 resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
             })?;
 
@@ -386,7 +386,7 @@ pub unsafe extern "C" fn encode_auth_resp(
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
-                req_id: req_id,
+                req_id,
                 resp: IpcResp::Auth(Err(IpcError::AuthDenied)),
             })?;
 
@@ -396,7 +396,7 @@ pub unsafe extern "C" fn encode_auth_resp(
                 app_auth::authenticate(client, auth_req)
                     .and_then(move |auth_granted| {
                         let resp = encode_response(&IpcMsg::Resp {
-                            req_id: req_id,
+                            req_id,
                             resp: IpcResp::Auth(Ok(auth_granted)),
                         })?;
 
@@ -406,7 +406,7 @@ pub unsafe extern "C" fn encode_auth_resp(
                     .or_else(move |e| -> Result<(), AuthError> {
                         let (error_code, description) = ffi_error!(e);
                         let resp = encode_response(&IpcMsg::Resp {
-                            req_id: req_id,
+                            req_id,
                             resp: IpcResp::Auth(Err(e.into())),
                         })?;
                         let res = FfiResult {
@@ -449,7 +449,7 @@ pub unsafe extern "C" fn encode_containers_resp(
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
-                req_id: req_id,
+                req_id,
                 resp: IpcResp::Containers(Err(IpcError::AuthDenied)),
             })?;
 
@@ -504,7 +504,7 @@ pub unsafe extern "C" fn encode_containers_resp(
                     })
                     .and_then(move |_| {
                         let resp = encode_response(&IpcMsg::Resp {
-                            req_id: req_id,
+                            req_id,
                             resp: IpcResp::Containers(Ok(())),
                         })?;
                         o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
@@ -513,7 +513,7 @@ pub unsafe extern "C" fn encode_containers_resp(
                     .or_else(move |e| -> Result<(), AuthError> {
                         let (error_code, description) = ffi_error!(e);
                         let resp = encode_response(&IpcMsg::Resp {
-                            req_id: req_id,
+                            req_id,
                             resp: IpcResp::Containers(Err(e.into())),
                         })?;
                         let res = FfiResult {

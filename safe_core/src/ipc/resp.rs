@@ -108,7 +108,7 @@ impl ReprC for AuthGranted {
         let bootstrap_config = deserialise(bootstrap_config)?;
         Ok(AuthGranted {
             app_keys: AppKeys::clone_from_repr_c(app_keys)?,
-            bootstrap_config: bootstrap_config,
+            bootstrap_config,
             access_container_info: AccessContInfo::clone_from_repr_c(access_container_info)?,
             access_container_entry: access_container_entry_clone_from_repr_c(
                 access_container_entry,
@@ -143,12 +143,12 @@ impl AppKeys {
         let (sign_pk, sign_sk) = shared_sign::gen_keypair();
 
         AppKeys {
-            owner_key: owner_key,
+            owner_key,
             enc_key: shared_secretbox::gen_key(),
-            sign_pk: sign_pk,
-            sign_sk: sign_sk,
-            enc_pk: enc_pk,
-            enc_sk: enc_sk,
+            sign_pk,
+            sign_sk,
+            enc_pk,
+            enc_sk,
         }
     }
 
@@ -253,7 +253,7 @@ impl AccessContInfo {
         let AccessContInfo { id, tag, nonce } = self;
         ffi::AccessContInfo {
             id: id.0,
-            tag: tag,
+            tag,
             nonce: nonce.0,
         }
     }
@@ -269,7 +269,7 @@ impl AccessContInfo {
             Ok(AccessContInfo {
                 id: md.name,
                 tag: md.type_tag,
-                nonce: nonce,
+                nonce,
             })
         } else {
             Err(IpcError::Unexpected(
@@ -346,8 +346,8 @@ impl AppAccess {
         Ok(ffi::AppAccess {
             sign_key: sign_key.0,
             permissions: permission_set_into_repr_c(permissions),
-            name: name,
-            app_id: app_id,
+            name,
+            app_id,
         })
     }
 }
@@ -392,7 +392,7 @@ impl UserMetadata {
                 None => ptr::null(),
             },
             xor_name: xor_name.0,
-            type_tag: type_tag,
+            type_tag,
         })
     }
 }
@@ -458,7 +458,7 @@ impl ReprC for MDataValue {
 
         Ok(MDataValue {
             content: slice::from_raw_parts(content, content_len).to_vec(),
-            entry_version: entry_version,
+            entry_version,
         })
     }
 }
@@ -636,7 +636,7 @@ mod tests {
         let a = AccessContInfo {
             id: XorName([2; XOR_NAME_LEN]),
             tag: 681,
-            nonce: nonce,
+            nonce,
         };
 
         let ffi = a.into_repr_c();

@@ -115,9 +115,9 @@ impl Routing {
 
         Ok(Routing {
             vault: clone_vault(),
-            sender: sender,
+            sender,
             full_id: id.unwrap_or_else(FullId::new),
-            client_auth: client_auth,
+            client_auth,
             max_ops_countdown: None,
             timeout_simulation: false,
             request_hook: None,
@@ -165,8 +165,8 @@ impl Routing {
             dst,
             client_auth,
             Response::GetAccountInfo {
-                res: res,
-                msg_id: msg_id,
+                res,
+                msg_id,
             },
         );
 
@@ -813,9 +813,9 @@ impl Routing {
         }
 
         let event = Event::Response {
-            response: response,
-            src: src,
-            dst: dst,
+            response,
+            src,
+            dst,
         };
 
         self.send_event(delay_ms, event)

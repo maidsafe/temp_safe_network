@@ -505,7 +505,7 @@ fn app_authentication() {
     };
 
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::Auth(auth_req.clone()),
     };
 
@@ -687,7 +687,7 @@ fn unregistered_authentication() {
     let test_data = vec![0u8; 10];
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::Unregistered(test_data.clone()),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -759,7 +759,7 @@ fn authenticated_app_can_be_authenticated_again() {
 
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::Auth(auth_req.clone()),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -786,7 +786,7 @@ fn authenticated_app_can_be_authenticated_again() {
     // Second authentication should also return the correct result.
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::Auth(auth_req),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -805,7 +805,7 @@ fn containers_unknown_app() {
     // Create IpcMsg::Req { req: IpcReq::Containers } for a random App (random id, name, vendor etc)
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::Containers(ContainersReq {
             app: rand_app(),
             containers: create_containers_req(),

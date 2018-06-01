@@ -140,7 +140,7 @@ impl ClientKeys {
             sign_sk: sign.1,
             enc_pk: enc.0,
             enc_sk: enc.1,
-            enc_key: enc_key,
+            enc_key,
         }
     }
 }

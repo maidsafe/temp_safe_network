@@ -117,7 +117,7 @@ pub fn register_app(
 ) -> Result<AuthGranted, AuthError> {
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::Auth(auth_req.clone()),
     };
 
@@ -142,7 +142,7 @@ pub fn register_rand_app(
 ) -> Result<(String, AuthGranted), AuthError> {
     let auth_req = AuthReq {
         app: rand_app(),
-        app_container: app_container,
+        app_container,
         containers: containers_req,
     };
 

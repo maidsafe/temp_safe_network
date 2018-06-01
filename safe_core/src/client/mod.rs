@@ -141,16 +141,16 @@ impl<T: 'static> Client<T> {
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
+            el_handle,
+            routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::unreg(config),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
+            joiner,
             session_packet_version: 0,
-            net_tx: net_tx,
-            core_tx: core_tx,
+            net_tx,
+            core_tx,
         }))
     }
 
@@ -291,16 +291,16 @@ impl<T: 'static> Client<T> {
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
+            el_handle,
+            routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
+            joiner,
             session_packet_version: 0,
-            net_tx: net_tx,
-            core_tx: core_tx,
+            net_tx,
+            core_tx,
         }))
     }
 
@@ -411,16 +411,16 @@ impl<T: 'static> Client<T> {
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
+            el_handle,
+            routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
+            joiner,
             session_packet_version: acc_version,
-            net_tx: net_tx,
-            core_tx: core_tx,
+            net_tx,
+            core_tx,
         }))
     }
 
@@ -465,16 +465,16 @@ impl<T: 'static> Client<T> {
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
+            el_handle,
+            routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::from_keys(keys, owner, config),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
+            joiner,
             session_packet_version: 0,
-            net_tx: net_tx,
-            core_tx: core_tx,
+            net_tx,
+            core_tx,
         }))
     }
 
@@ -1220,8 +1220,8 @@ struct UserCred {
 impl UserCred {
     fn new(password: Vec<u8>, pin: Vec<u8>) -> UserCred {
         UserCred {
-            pin: pin,
-            password: password,
+            pin,
+            password,
         }
     }
 }

@@ -86,7 +86,7 @@ fn share_some_mdatas() {
 
         mdatas.push(ShareMData {
             type_tag: tag,
-            name: name,
+            name,
             perms: PermissionSet::new().allow(Action::Insert),
         });
         metadatas.push((None, name, tag));
@@ -166,8 +166,8 @@ fn share_some_mdatas_with_valid_metadata() {
 
         mdatas.push(ShareMData {
             type_tag: tag,
-            name: name,
-            perms: perms,
+            name,
+            perms,
         });
         metadatas.push((Some(metadata), name, tag));
     }
@@ -178,7 +178,7 @@ fn share_some_mdatas_with_valid_metadata() {
         mdata: mdatas.clone(),
     };
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::ShareMData(req.clone()),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -260,7 +260,7 @@ fn share_some_mdatas_with_ownership_error() {
 
         mdatas.push(ShareMData {
             type_tag: 0,
-            name: name,
+            name,
             perms: PermissionSet::new().allow(Action::Insert),
         });
     }
@@ -271,7 +271,7 @@ fn share_some_mdatas_with_ownership_error() {
         mdata: mdatas.clone(),
     };
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::ShareMData(req.clone()),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -380,8 +380,8 @@ fn auth_apps_accessing_mdatas() {
 
         mdatas.push(ShareMData {
             type_tag: tag,
-            name: name,
-            perms: perms,
+            name,
+            perms,
         });
         metadatas.push((metadata, name, tag));
     }
@@ -408,7 +408,7 @@ fn auth_apps_accessing_mdatas() {
             mdata: mdatas.clone(),
         };
         let msg = IpcMsg::Req {
-            req_id: req_id,
+            req_id,
             req: IpcReq::ShareMData(req.clone()),
         };
         let encoded_msg = unwrap!(ipc::encode_msg(&msg));

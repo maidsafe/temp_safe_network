@@ -22,7 +22,7 @@ pub struct SelfEncryptionStorage<T> {
 impl<T> SelfEncryptionStorage<T> {
     /// Create a new SelfEncryptionStorage instance
     pub fn new(client: Client<T>) -> Self {
-        SelfEncryptionStorage { client: client }
+        SelfEncryptionStorage { client }
     }
 }
 

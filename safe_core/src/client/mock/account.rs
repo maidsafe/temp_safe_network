@@ -31,7 +31,7 @@ impl Account {
             },
             auth_keys: Default::default(),
             version: 0,
-            config: config,
+            config,
         }
     }
 

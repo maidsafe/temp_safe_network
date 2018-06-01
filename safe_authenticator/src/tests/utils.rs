@@ -86,7 +86,7 @@ pub fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
             };
 
             let msg = IpcMsg::Req {
-                req_id: req_id,
+                req_id,
                 req: IpcReq::Auth(req),
             };
 
@@ -102,7 +102,7 @@ pub fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
             };
 
             let msg = IpcMsg::Req {
-                req_id: req_id,
+                req_id,
                 req: IpcReq::Containers(req),
             };
 
@@ -138,7 +138,7 @@ pub fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
                 .collect();
 
             let msg = IpcMsg::Req {
-                req_id: req_id,
+                req_id,
                 req: IpcReq::ShareMData(req),
             };
 
@@ -182,7 +182,7 @@ pub extern "C" fn unregistered_cb(
 ) {
     unsafe {
         let msg = IpcMsg::Req {
-            req_id: req_id,
+            req_id,
             req: IpcReq::Unregistered(vec_clone_from_raw_parts(extra_data, extra_data_len)),
         };
 
