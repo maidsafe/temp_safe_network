@@ -234,9 +234,9 @@ impl Node {
         let prev = self.sent_requests.insert(
             request_id(&request),
             RequestWrapper {
-                src: src,
-                dst: dst,
-                request: request,
+                src,
+                dst,
+                request,
             },
         );
         assert!(prev.is_none());
@@ -252,9 +252,9 @@ impl Node {
         let prev = self.sent_responses.insert(
             response_id(&response),
             ResponseWrapper {
-                src: src,
-                dst: dst,
-                response: response,
+                src,
+                dst,
+                response,
             },
         );
         assert!(prev.is_none());
@@ -303,7 +303,7 @@ impl NodeBuilder {
             .unwrap_or(DEFAULT_GROUP_SIZE);
 
         Ok(Node {
-            id: id,
+            id,
             routing_table: RoutingTable::new(*id.name(), group_size),
             sent_requests: Default::default(),
             sent_responses: Default::default(),

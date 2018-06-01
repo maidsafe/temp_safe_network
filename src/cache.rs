@@ -36,7 +36,7 @@ impl RoutingCache for Cache {
             self.store.borrow_mut().get(&name).map(|data| {
                 Response::GetIData {
                     res: Ok(data.clone()),
-                    msg_id: msg_id,
+                    msg_id,
                 }
             })
         } else {

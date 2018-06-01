@@ -736,7 +736,7 @@ fn limits() {
         let _ = bad_data.mutate_entry_without_validation(
             key,
             Value {
-                content: content,
+                content,
                 entry_version: 0,
             },
         );
@@ -760,7 +760,7 @@ fn limits() {
     let res = bad_data.mutate_entry_without_validation(
         key,
         Value {
-            content: content,
+            content,
             entry_version: 0,
         },
     );

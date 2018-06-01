@@ -60,7 +60,7 @@ impl MutableDataCache {
         for (key, value) in entries {
             let entry_key = EntryKey {
                 id: data_id,
-                key: key,
+                key,
                 hash: utils::secure_hash(&value),
             };
 

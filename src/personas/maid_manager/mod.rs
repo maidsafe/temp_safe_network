@@ -68,7 +68,7 @@ impl MaidManager {
                 Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS),
             ),
             request_cache: HashMap::default(),
-            invite_key: invite_key,
+            invite_key,
             account_creation_cache: LruCache::with_expiry_duration_and_capacity(
                 Duration::from_secs(ACCOUNT_CREATION_TIMEOUT_SECS),
                 ACCOUNT_CREATION_LIMIT,
@@ -890,9 +890,9 @@ impl MaidManager {
             );
 
             let item = CachedAccountCreation {
-                src: src,
-                dst: dst,
-                data: data,
+                src,
+                dst,
+                data,
             };
             if let Some(old) = self.account_creation_cache.insert(msg_id, item) {
                 debug!(
@@ -999,7 +999,7 @@ impl MaidManager {
                     dst.into(),
                     Refresh::UpdateKeys {
                         name: *src.name(),
-                        keys: keys,
+                        keys,
                         ops_count: version,
                     },
                     msg_id,

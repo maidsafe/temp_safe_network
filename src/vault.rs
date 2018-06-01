@@ -80,7 +80,7 @@ impl Vault {
                 config.chunk_store_root,
                 config.max_capacity,
             )?,
-            routing_node: routing_node,
+            routing_node,
         })
     }
 

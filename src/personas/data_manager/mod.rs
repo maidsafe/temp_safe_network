@@ -788,8 +788,8 @@ impl DataManager {
         requester: sign::PublicKey,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::MutateMDataEntries {
-            name: name,
-            tag: tag,
+            name,
+            tag,
             actions: actions.clone(),
         };
         let res = self.fetch_mdata(name, tag).and_then(|data| {
@@ -861,11 +861,11 @@ impl DataManager {
         requester: sign::PublicKey,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::SetMDataUserPermissions {
-            name: name,
-            tag: tag,
-            user: user,
-            permissions: permissions,
-            version: version,
+            name,
+            tag,
+            user,
+            permissions,
+            version,
         };
         let res = self.fetch_mdata(name, tag).and_then(|data| {
             data.clone().set_user_permissions(
@@ -893,10 +893,10 @@ impl DataManager {
         requester: sign::PublicKey,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::DelMDataUserPermissions {
-            name: name,
-            tag: tag,
-            user: user,
-            version: version,
+            name,
+            tag,
+            user,
+            version,
         };
         let res = self.fetch_mdata(name, tag).and_then(|data| {
             data.clone().del_user_permissions(&user, version, requester)?;
@@ -918,10 +918,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::ChangeMDataOwner {
-            name: name,
-            tag: tag,
+            name,
+            tag,
             new_owners: new_owners.clone(),
-            version: version,
+            version,
         };
 
         let res = self.fetch_mdata(name, tag).and_then(|data| {

@@ -81,9 +81,9 @@ impl TestNode {
         });
 
         TestNode {
-            handle: handle,
-            vault: vault,
-            chunk_store_root: chunk_store_root,
+            handle,
+            vault,
+            chunk_store_root,
         }
     }
     /// Empty the event queue for this node on the mock network

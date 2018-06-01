@@ -100,8 +100,8 @@ impl TestClient {
         TestClient {
             _handle: handle,
             routing_client: client,
-            full_id: full_id,
-            client_manager: client_manager,
+            full_id,
+            client_manager,
             rng: network.new_rng(),
         }
     }
@@ -188,7 +188,7 @@ impl TestClient {
         let entries = iter::once((
             ACC_LOGIN_ENTRY_KEY.to_vec(),
             Value {
-                content: content,
+                content,
                 entry_version: 0,
             },
         )).collect();

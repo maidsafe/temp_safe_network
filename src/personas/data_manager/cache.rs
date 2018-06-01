@@ -405,21 +405,21 @@ impl Cache {
             .entry(data_id)
             .or_insert_with(Vec::new)
             .push(PendingWrite {
-                hash: hash,
-                mutation: mutation,
+                hash,
+                mutation,
                 timestamp: Instant::now(),
-                src: src,
-                dst: dst,
+                src,
+                dst,
                 message_id: msg_id,
-                rejected: rejected,
+                rejected,
             });
 
         if rejected {
             None
         } else {
             Some(MutationVote {
-                data_id: data_id,
-                hash: hash,
+                data_id,
+                hash,
             })
         }
     }
@@ -666,7 +666,7 @@ impl FragmentInfo {
             name: *data.name(),
             tag: data.tag(),
             version: data.version(),
-            hash: hash,
+            hash,
         }
     }
 
@@ -677,9 +677,9 @@ impl FragmentInfo {
         FragmentInfo::MutableDataEntry {
             name: *data.name(),
             tag: data.tag(),
-            key: key,
+            key,
             version: value.entry_version,
-            hash: hash,
+            hash,
         }
     }
 
@@ -789,7 +789,7 @@ struct FragmentRequest {
 impl FragmentRequest {
     fn new(fragment: FragmentInfo) -> Self {
         FragmentRequest {
-            fragment: fragment,
+            fragment,
             timestamp: Instant::now(),
         }
     }
@@ -836,8 +836,8 @@ struct ChunkRequest {
 impl ChunkRequest {
     fn new(data_id: MutableDataId, msg_id: MessageId) -> Self {
         ChunkRequest {
-            data_id: data_id,
-            msg_id: msg_id,
+            data_id,
+            msg_id,
             successes: HashSet::default(),
             failures: HashSet::default(),
             timestamp: Instant::now(),
