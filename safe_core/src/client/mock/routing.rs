@@ -8,21 +8,23 @@
 
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
-use super::DataId;
 use super::vault::{self, Data, Vault, VaultGuard};
-use config_handler::{Config, get_config};
+use super::DataId;
+use config_handler::{get_config, Config};
 use maidsafe_utilities::thread;
 use rand;
-use routing::{Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
-              InterfaceError, MessageId, MutableData, PermissionSet, Request, Response,
-              RoutingError, TYPE_TAG_SESSION_PACKET, User, XorName};
+use routing::{
+    Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
+    InterfaceError, MessageId, MutableData, PermissionSet, Request, Response, RoutingError, User,
+    XorName, TYPE_TAG_SESSION_PACKET,
+};
 use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tiny_keccak::sha3_256;
 
@@ -69,12 +71,10 @@ pub fn clone_vault() -> Arc<Mutex<Vault>> {
 pub fn unlimited_muts(config: &Config) -> bool {
     match env::var("SAFE_MOCK_UNLIMITED_MUTATIONS") {
         Ok(_) => true,
-        Err(_) => {
-            match config.dev {
-                Some(ref dev) => dev.mock_unlimited_mutations,
-                None => false,
-            }
-        }
+        Err(_) => match config.dev {
+            Some(ref dev) => dev.mock_unlimited_mutations,
+            None => false,
+        },
     }
 }
 
@@ -164,10 +164,7 @@ impl Routing {
             GET_ACCOUNT_INFO_DELAY_MS,
             dst,
             client_auth,
-            Response::GetAccountInfo {
-                res,
-                msg_id,
-            },
+            Response::GetAccountInfo { res, msg_id },
         );
 
         Ok(())
@@ -310,11 +307,13 @@ impl Routing {
                 vault
                     .authorise_mutation(&dst, self.client_key())
                     .and_then(|_| Self::verify_owner(&dst, data.owners()))
-                    .and_then(|_| if vault.contains_data(&data_name) {
-                        Err(ClientError::DataExists)
-                    } else {
-                        vault.insert_data(data_name, Data::Mutable(data));
-                        Ok(())
+                    .and_then(|_| {
+                        if vault.contains_data(&data_name) {
+                            Err(ClientError::DataExists)
+                        } else {
+                            vault.insert_data(data_name, Data::Mutable(data));
+                            Ok(())
+                        }
                     })
                     .map(|_| vault.commit_mutation(&dst))
             }
@@ -337,14 +336,16 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::GetMDataVersion { name, tag, msg_id },
-                        "get_mdata_version",
-                        GET_MDATA_VERSION_DELAY_MS,
-                        |data| Ok(data.version()),
-                        |res| Response::GetMDataVersion { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::GetMDataVersion { name, tag, msg_id },
+            "get_mdata_version",
+            GET_MDATA_VERSION_DELAY_MS,
+            |data| Ok(data.version()),
+            |res| Response::GetMDataVersion { res, msg_id },
+        )
     }
 
     /// Fetches a complete MutableData object.
@@ -355,14 +356,16 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::GetMData { name, tag, msg_id },
-                        "get_mdata",
-                        GET_MDATA_DELAY_MS,
-                        Ok,
-                        |res| Response::GetMData { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::GetMData { name, tag, msg_id },
+            "get_mdata",
+            GET_MDATA_DELAY_MS,
+            Ok,
+            |res| Response::GetMData { res, msg_id },
+        )
     }
 
     /// Fetches a shell of given MutableData.
@@ -373,14 +376,16 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::GetMDataShell { name, tag, msg_id },
-                        "get_mdata_shell",
-                        GET_MDATA_SHELL_DELAY_MS,
-                        |data| Ok(data.shell()),
-                        |res| Response::GetMDataShell { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::GetMDataShell { name, tag, msg_id },
+            "get_mdata_shell",
+            GET_MDATA_SHELL_DELAY_MS,
+            |data| Ok(data.shell()),
+            |res| Response::GetMDataShell { res, msg_id },
+        )
     }
 
     /// Fetches a list of entries (keys + values).
@@ -391,14 +396,16 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::ListMDataEntries { name, tag, msg_id },
-                        "list_mdata_entries",
-                        GET_MDATA_ENTRIES_DELAY_MS,
-                        |data| Ok(data.entries().clone()),
-                        |res| Response::ListMDataEntries { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::ListMDataEntries { name, tag, msg_id },
+            "list_mdata_entries",
+            GET_MDATA_ENTRIES_DELAY_MS,
+            |data| Ok(data.entries().clone()),
+            |res| Response::ListMDataEntries { res, msg_id },
+        )
     }
 
     /// Fetches a list of keys in MutableData.
@@ -409,17 +416,19 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::ListMDataKeys { name, tag, msg_id },
-                        "list_mdata_keys",
-                        GET_MDATA_ENTRIES_DELAY_MS,
-                        |data| {
-                            let keys = data.keys().into_iter().cloned().collect();
-                            Ok(keys)
-                        },
-                        |res| Response::ListMDataKeys { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::ListMDataKeys { name, tag, msg_id },
+            "list_mdata_keys",
+            GET_MDATA_ENTRIES_DELAY_MS,
+            |data| {
+                let keys = data.keys().into_iter().cloned().collect();
+                Ok(keys)
+            },
+            |res| Response::ListMDataKeys { res, msg_id },
+        )
     }
 
     /// Fetches a list of values in MutableData.
@@ -430,17 +439,19 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::ListMDataValues { name, tag, msg_id },
-                        "list_mdata_values",
-                        GET_MDATA_ENTRIES_DELAY_MS,
-                        |data| {
-                            let values = data.values().into_iter().cloned().collect();
-                            Ok(values)
-                        },
-                        |res| Response::ListMDataValues { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::ListMDataValues { name, tag, msg_id },
+            "list_mdata_values",
+            GET_MDATA_ENTRIES_DELAY_MS,
+            |data| {
+                let values = data.values().into_iter().cloned().collect();
+                Ok(values)
+            },
+            |res| Response::ListMDataValues { res, msg_id },
+        )
     }
 
     /// Fetches a single value from MutableData
@@ -452,19 +463,21 @@ impl Routing {
         key: Vec<u8>,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::GetMDataValue {
-                            name,
-                            tag,
-                            key: key.clone(),
-                            msg_id,
-                        },
-                        "get_mdata_value",
-                        GET_MDATA_ENTRIES_DELAY_MS,
-                        |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry),
-                        |res| Response::GetMDataValue { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::GetMDataValue {
+                name,
+                tag,
+                key: key.clone(),
+                msg_id,
+            },
+            "get_mdata_value",
+            GET_MDATA_ENTRIES_DELAY_MS,
+            |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry),
+            |res| Response::GetMDataValue { res, msg_id },
+        )
     }
 
     /// Updates MutableData entries in bulk.
@@ -479,21 +492,23 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let actions2 = actions.clone();
 
-        self.mutate_mdata(dst,
-                          name,
-                          tag,
-                          Request::MutateMDataEntries {
-                              name,
-                              tag,
-                              msg_id,
-                              actions,
-                              requester,
-                          },
-                          requester,
-                          "mutate_mdata_entries",
-                          SET_MDATA_ENTRIES_DELAY_MS,
-                          |data| data.mutate_entries(actions2, requester),
-                          |res| Response::MutateMDataEntries { res, msg_id })
+        self.mutate_mdata(
+            dst,
+            name,
+            tag,
+            Request::MutateMDataEntries {
+                name,
+                tag,
+                msg_id,
+                actions,
+                requester,
+            },
+            requester,
+            "mutate_mdata_entries",
+            SET_MDATA_ENTRIES_DELAY_MS,
+            |data| data.mutate_entries(actions2, requester),
+            |res| Response::MutateMDataEntries { res, msg_id },
+        )
     }
 
     /// Fetches a complete list of permissions.
@@ -504,14 +519,16 @@ impl Routing {
         tag: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::ListMDataPermissions { name, tag, msg_id },
-                        "list_mdata_permissions",
-                        GET_MDATA_PERMISSIONS_DELAY_MS,
-                        |data| Ok(data.permissions().clone()),
-                        |res| Response::ListMDataPermissions { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::ListMDataPermissions { name, tag, msg_id },
+            "list_mdata_permissions",
+            GET_MDATA_PERMISSIONS_DELAY_MS,
+            |data| Ok(data.permissions().clone()),
+            |res| Response::ListMDataPermissions { res, msg_id },
+        )
     }
 
     /// Fetches a list of permissions for a particular User.
@@ -523,19 +540,21 @@ impl Routing {
         user: User,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
-        self.read_mdata(dst,
-                        name,
-                        tag,
-                        Request::ListMDataUserPermissions {
-                            name,
-                            tag,
-                            user,
-                            msg_id,
-                        },
-                        "list_mdata_user_permissions",
-                        GET_MDATA_PERMISSIONS_DELAY_MS,
-                        |data| data.user_permissions(&user).map(|p| *p),
-                        |res| Response::ListMDataUserPermissions { res, msg_id })
+        self.read_mdata(
+            dst,
+            name,
+            tag,
+            Request::ListMDataUserPermissions {
+                name,
+                tag,
+                user,
+                msg_id,
+            },
+            "list_mdata_user_permissions",
+            GET_MDATA_PERMISSIONS_DELAY_MS,
+            |data| data.user_permissions(&user).map(|p| *p),
+            |res| Response::ListMDataUserPermissions { res, msg_id },
+        )
     }
 
     /// Updates or inserts a list of permissions for a particular User in the given
@@ -551,23 +570,25 @@ impl Routing {
         msg_id: MessageId,
         requester: sign::PublicKey,
     ) -> Result<(), InterfaceError> {
-        self.mutate_mdata(dst,
-                          name,
-                          tag,
-                          Request::SetMDataUserPermissions {
-                              name,
-                              tag,
-                              user,
-                              permissions,
-                              version,
-                              msg_id,
-                              requester,
-                          },
-                          requester,
-                          "set_mdata_user_permissions",
-                          SET_MDATA_PERMISSIONS_DELAY_MS,
-                          |data| data.set_user_permissions(user, permissions, version, requester),
-                          |res| Response::SetMDataUserPermissions { res, msg_id })
+        self.mutate_mdata(
+            dst,
+            name,
+            tag,
+            Request::SetMDataUserPermissions {
+                name,
+                tag,
+                user,
+                permissions,
+                version,
+                msg_id,
+                requester,
+            },
+            requester,
+            "set_mdata_user_permissions",
+            SET_MDATA_PERMISSIONS_DELAY_MS,
+            |data| data.set_user_permissions(user, permissions, version, requester),
+            |res| Response::SetMDataUserPermissions { res, msg_id },
+        )
     }
 
     /// Deletes a list of permissions for a particular User in the given MutableData.
@@ -581,22 +602,24 @@ impl Routing {
         msg_id: MessageId,
         requester: sign::PublicKey,
     ) -> Result<(), InterfaceError> {
-        self.mutate_mdata(dst,
-                          name,
-                          tag,
-                          Request::DelMDataUserPermissions {
-                              name,
-                              tag,
-                              user,
-                              version,
-                              msg_id,
-                              requester,
-                          },
-                          requester,
-                          "del_mdata_user_permissions",
-                          SET_MDATA_PERMISSIONS_DELAY_MS,
-                          |data| data.del_user_permissions(&user, version, requester),
-                          |res| Response::DelMDataUserPermissions { res, msg_id })
+        self.mutate_mdata(
+            dst,
+            name,
+            tag,
+            Request::DelMDataUserPermissions {
+                name,
+                tag,
+                user,
+                version,
+                msg_id,
+                requester,
+            },
+            requester,
+            "del_mdata_user_permissions",
+            SET_MDATA_PERMISSIONS_DELAY_MS,
+            |data| data.del_user_permissions(&user, version, requester),
+            |res| Response::DelMDataUserPermissions { res, msg_id },
+        )
     }
 
     /// Changes an owner of the given MutableData. Only the current owner can perform this action.
@@ -631,39 +654,41 @@ impl Routing {
         let requester = *self.client_key();
         let requester_name = XorName(sha3_256(&requester[..]));
 
-        self.mutate_mdata(dst,
-                          name,
-                          tag,
-                          Request::ChangeMDataOwner {
-                              name,
-                              tag,
-                              new_owners: btree_set![new_owner],
-                              version,
-                              msg_id,
-                          },
-                          requester,
-                          "change_mdata_owner",
-                          CHANGE_MDATA_OWNER_DELAY_MS,
-                          |data| {
-            let dst_name = match dst {
-                Authority::ClientManager(name) => name,
-                _ => return Err(ClientError::InvalidOwners),
-            };
+        self.mutate_mdata(
+            dst,
+            name,
+            tag,
+            Request::ChangeMDataOwner {
+                name,
+                tag,
+                new_owners: btree_set![new_owner],
+                version,
+                msg_id,
+            },
+            requester,
+            "change_mdata_owner",
+            CHANGE_MDATA_OWNER_DELAY_MS,
+            |data| {
+                let dst_name = match dst {
+                    Authority::ClientManager(name) => name,
+                    _ => return Err(ClientError::InvalidOwners),
+                };
 
-            // Only the current owner can change ownership for MD
-            match Self::verify_owner(&dst, data.owners()) {
-                Err(ClientError::InvalidOwners) => return Err(ClientError::AccessDenied),
-                Err(e) => return Err(e),
-                Ok(_) => (),
-            }
+                // Only the current owner can change ownership for MD
+                match Self::verify_owner(&dst, data.owners()) {
+                    Err(ClientError::InvalidOwners) => return Err(ClientError::AccessDenied),
+                    Err(e) => return Err(e),
+                    Ok(_) => (),
+                }
 
-            if requester_name != dst_name {
-                Err(ClientError::AccessDenied)
-            } else {
-                data.change_owner(new_owner, version)
-            }
-        },
-                          |res| Response::ChangeMDataOwner { res, msg_id })
+                if requester_name != dst_name {
+                    Err(ClientError::AccessDenied)
+                } else {
+                    data.change_owner(new_owner, version)
+                }
+            },
+            |res| Response::ChangeMDataOwner { res, msg_id },
+        )
     }
 
     /// Fetches a list of authorised keys and version in MaidManager
@@ -674,30 +699,32 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let client_auth = self.client_auth;
 
-        let skip =
-            self.intercept_request(LIST_AUTH_KEYS_AND_VERSION_DELAY_MS, dst, client_auth, || {
-                Request::ListAuthKeysAndVersion(msg_id)
-            });
+        let skip = self.intercept_request(
+            LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
+            dst,
+            client_auth,
+            || Request::ListAuthKeysAndVersion(msg_id),
+        );
         if skip {
             return Ok(());
         }
 
-        let res =
-            if let Err(err) = self.verify_network_limits(msg_id, "list_auth_keys_and_version") {
-                Err(err)
-            } else {
-                let name = match dst {
-                    Authority::ClientManager(name) => name,
-                    x => panic!("Unexpected authority: {:?}", x),
-                };
-
-                let vault = self.lock_vault(false);
-                if let Some(account) = vault.get_account(&name) {
-                    Ok((account.auth_keys().clone(), account.version()))
-                } else {
-                    Err(ClientError::NoSuchAccount)
-                }
+        let res = if let Err(err) = self.verify_network_limits(msg_id, "list_auth_keys_and_version")
+        {
+            Err(err)
+        } else {
+            let name = match dst {
+                Authority::ClientManager(name) => name,
+                x => panic!("Unexpected authority: {:?}", x),
             };
+
+            let vault = self.lock_vault(false);
+            if let Some(account) = vault.get_account(&name) {
+                Ok((account.auth_keys().clone(), account.version()))
+            } else {
+                Err(ClientError::NoSuchAccount)
+            }
+        };
 
         self.send_response(
             LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
@@ -744,7 +771,6 @@ impl Routing {
                 Err(ClientError::NoSuchAccount)
             }
         };
-
 
         self.send_response(
             INS_AUTH_KEY_DELAY_MS,
@@ -812,11 +838,7 @@ impl Routing {
             response = hook(response);
         }
 
-        let event = Event::Response {
-            response,
-            src,
-            dst,
-        };
+        let event = Event::Response { response, src, dst };
 
         self.send_event(delay_ms, event)
     }
@@ -903,7 +925,6 @@ impl Routing {
         self.with_mdata(
             name,
             tag,
-
             request,
             Some(requester),
             log_label,
@@ -1027,10 +1048,9 @@ impl Routing {
     }
 
     fn network_limits_reached(&self) -> bool {
-        self.max_ops_countdown.as_ref().map_or(
-            false,
-            |count| count.get() == 0,
-        )
+        self.max_ops_countdown
+            .as_ref()
+            .map_or(false, |count| count.get() == 0)
     }
 
     fn update_network_limits(&self) -> Option<u64> {

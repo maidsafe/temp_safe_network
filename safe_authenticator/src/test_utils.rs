@@ -6,28 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use Authenticator;
 use access_container;
 use app_auth;
 use config;
 use errors::AuthError;
-use futures::{Future, IntoFuture};
 use futures::future;
+use futures::{Future, IntoFuture};
 use ipc::decode_ipc_msg;
 use rand::{self, Rng};
 use revocation;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, FutureExt, MDataInfo};
+use safe_core::crypto::shared_secretbox;
+use safe_core::ipc::req::{container_perms_into_permission_set, ContainerPermissions};
+use safe_core::ipc::resp::AccessContainerEntry;
+use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
+use safe_core::nfs::{file_helper, File, Mode};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::crypto::shared_secretbox;
-use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
-use safe_core::ipc::req::{ContainerPermissions, container_perms_into_permission_set};
-use safe_core::ipc::resp::AccessContainerEntry;
-use safe_core::nfs::{File, Mode, file_helper};
+use safe_core::{Client, FutureExt, MDataInfo};
 use std::collections::HashMap;
 use std::sync::mpsc;
+use Authenticator;
 
 #[macro_export]
 macro_rules! assert_match {
@@ -36,7 +36,7 @@ macro_rules! assert_match {
             $p => (),
             x => panic!("Unexpected {:?} (expecting {})", x, stringify!($p)),
         }
-    }
+    };
 }
 
 /// Creates a new random account for authenticator. Returns the `Authenticator`
@@ -104,10 +104,9 @@ pub fn get_app_or_err(
 ) -> Result<config::AppInfo, AuthError> {
     let app_id = app_id.to_string();
 
-    try_run(
-        authenticator,
-        move |client| config::get_app(client, &app_id),
-    )
+    try_run(authenticator, move |client| {
+        config::get_app(client, &app_id)
+    })
 }
 
 /// Registers a mock application using a given `AuthReq`.
@@ -124,7 +123,10 @@ pub fn register_app(
     // Invoke `decode_ipc_msg` and expect to get AuthReq back.
     let ipc_req = run(authenticator, move |client| decode_ipc_msg(client, msg));
     match ipc_req {
-        Ok(IpcMsg::Req { req: IpcReq::Auth(_), .. }) => (),
+        Ok(IpcMsg::Req {
+            req: IpcReq::Auth(_),
+            ..
+        }) => (),
         x => return Err(AuthError::Unexpected(format!("Unexpected {:?}", x))),
     }
 
@@ -220,9 +222,7 @@ pub fn create_file<S: Into<String>>(
             let writer = unwrap!(res);
             writer.write(&content).and_then(move |_| writer.close())
         })
-            .then(move |file| {
-                file_helper::insert(c2, container_info, name, &unwrap!(file))
-            })
+            .then(move |file| file_helper::insert(c2, container_info, name, &unwrap!(file)))
             .map_err(From::from)
     })
 }
@@ -282,9 +282,9 @@ pub fn write_file(
         file_helper::write(client.clone(), file, mode, encryption_key)
             .then(move |res| {
                 let writer = unwrap!(res);
-                writer.write(&content).and_then(
-                    move |_| writer.close().map(|_| ()),
-                )
+                writer
+                    .write(&content)
+                    .and_then(move |_| writer.close().map(|_| ()))
             })
             .map_err(From::from)
     })

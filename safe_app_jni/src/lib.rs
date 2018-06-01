@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#![allow(non_snake_case, missing_docs, unsafe_code, unused_results, trivial_casts,
-         trivial_numeric_casts, unused, unused_qualifications)]
+#![allow(
+    non_snake_case, missing_docs, unsafe_code, unused_results, trivial_casts, trivial_numeric_casts,
+    unused, unused_qualifications
+)]
 
 extern crate jni;
 extern crate safe_app;
@@ -18,26 +20,29 @@ extern crate ffi_utils;
 #[macro_use]
 extern crate unwrap;
 
+use ffi_utils::java::{convert_cb_from_java, object_array_to_java, JniResult};
 use ffi_utils::*;
-use ffi_utils::java::{JniResult, convert_cb_from_java, object_array_to_java};
-use jni::{JNIEnv, JavaVM};
 use jni::errors::{Error as JniError, ErrorKind};
 use jni::objects::{GlobalRef, JClass, JObject, JString};
 use jni::strings::JNIStr;
 use jni::sys::{jbyte, jbyteArray, jint, jlong, jobject, jsize};
-use safe_app::UserPermissionSet;
+use jni::{JNIEnv, JavaVM};
 use safe_app::ffi::object_cache::*;
+use safe_app::UserPermissionSet;
 use safe_core::arrays::*;
-use safe_core::ffi::*;
-use safe_core::ffi::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq,
-                               PermissionSet, ShareMData, ShareMDataReq};
-use safe_core::ffi::ipc::resp::{AccessContInfo, AccessContainerEntry, AppAccess, AppKeys,
-                                AuthGranted, ContainerInfo, MDataEntry, MDataKey, MDataValue,
-                                MetadataResponse};
+use safe_core::ffi::ipc::req::{
+    AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq, PermissionSet, ShareMData,
+    ShareMDataReq,
+};
+use safe_core::ffi::ipc::resp::{
+    AccessContInfo, AccessContainerEntry, AppAccess, AppKeys, AuthGranted, ContainerInfo,
+    MDataEntry, MDataKey, MDataValue, MetadataResponse,
+};
 use safe_core::ffi::nfs::File;
-use std::{cmp, mem, slice};
+use safe_core::ffi::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
+use std::{cmp, mem, slice};
 
 #[repr(C)]
 struct App(*mut c_void);
@@ -99,9 +104,7 @@ impl<'a> FromJava<JString<'a>> for *const c_char {
 
 impl<'a> ToJava<'a, JString<'a>> for *const c_char {
     fn to_java(&self, env: &'a JNIEnv) -> JniResult<JString<'a>> {
-        Ok(unsafe {
-            unwrap!(env.new_string(JNIStr::from_ptr(*self).to_owned()))
-        })
+        Ok(unsafe { unwrap!(env.new_string(JNIStr::from_ptr(*self).to_owned())) })
     }
 }
 
@@ -116,7 +119,6 @@ impl<'a> ToJava<'a, JString<'a>> for *mut c_char {
         Ok((*self as *const c_char).to_java(env)?)
     }
 }
-
 
 impl<'a> FromJava<JString<'a>> for CString {
     fn from_java(env: &JNIEnv, input: JString) -> JniResult<Self> {

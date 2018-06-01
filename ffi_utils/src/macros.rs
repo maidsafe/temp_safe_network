@@ -14,7 +14,7 @@ macro_rules! ffi_error {
         let err_code = ffi_error_code!($error);
         let err_desc = format!("{}", $error);
         (err_code, unwrap!(::std::ffi::CString::new(err_desc)))
-    }}
+    }};
 }
 
 /// Converts a result into a pair of `(error_code: i32, description: CString)`
@@ -24,9 +24,9 @@ macro_rules! ffi_result {
     ($res:expr) => {
         match $res {
             Ok(_) => (0, ::std::ffi::CString::default()),
-            Err(error) => ffi_error!(error)
+            Err(error) => ffi_error!(error),
         }
-    }
+    };
 }
 
 #[macro_export]
@@ -36,7 +36,7 @@ macro_rules! ffi_result_code {
             Ok(_) => 0,
             Err(error) => ffi_error_code!(error),
         }
-    }
+    };
 }
 
 #[macro_export]
@@ -52,7 +52,7 @@ macro_rules! ffi_error_code {
 
         debug!("**ERRNO: {}** {}", err_code, err_str);
         err_code
-    }}
+    }};
 }
 
 #[macro_export]
@@ -64,10 +64,10 @@ macro_rules! call_result_cb {
         let (error_code, description) = ffi_result!($result);
         let res = FfiResult {
             error_code,
-            description: description.as_ptr()
+            description: description.as_ptr(),
         };
         $cb.call($user_data.into(), &res, CallbackArgs::default());
-    }
+    };
 }
 
 #[macro_export]
@@ -80,5 +80,5 @@ macro_rules! try_cb {
                 return None;
             }
         }
-    }
+    };
 }

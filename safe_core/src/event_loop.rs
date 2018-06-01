@@ -8,9 +8,9 @@
 
 use client::Client;
 use errors::CoreError;
-use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
+use futures::Future;
 use tokio_core::reactor::Core;
 
 /// Transmitter of messages to be run in the core event loop.
@@ -37,12 +37,12 @@ impl<T> CoreMsg<T> {
         F: FnOnce(&Client<T>, &T) -> Option<TailFuture> + Send + 'static,
     {
         let mut f = Some(f);
-        CoreMsg(Some(
-            Box::new(move |client, context| -> Option<TailFuture> {
+        CoreMsg(Some(Box::new(
+            move |client, context| -> Option<TailFuture> {
                 let f = unwrap!(f.take());
                 f(client, context)
-            }),
-        ))
+            },
+        )))
     }
 
     /// Construct a new message which when processed by the event loop will

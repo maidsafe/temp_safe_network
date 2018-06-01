@@ -8,7 +8,7 @@
 
 use super::{Client, CoreError, FutureExt};
 use futures::{self, Future};
-use routing::{ImmutableData, XOR_NAME_LEN, XorName};
+use routing::{ImmutableData, XorName, XOR_NAME_LEN};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

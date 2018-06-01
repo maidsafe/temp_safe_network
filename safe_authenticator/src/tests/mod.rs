@@ -11,44 +11,50 @@ mod serialisation;
 mod share_mdata;
 mod utils;
 
-use self::utils::{ChannelType, create_containers_req, decode_ipc_msg, err_cb, unregistered_cb};
+use self::utils::{create_containers_req, decode_ipc_msg, err_cb, unregistered_cb, ChannelType};
 use access_container as access_container_tools;
 use app_container;
 use config::{self, KEY_APPS};
 use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use ffi::apps::*;
-use ffi::ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp};
-use ffi_utils::{ErrorCode, ReprC, StringError, from_c_str};
+use ffi::ipc::{
+    auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp,
+};
 use ffi_utils::test_utils::{call_1, call_vec, sender_as_user_data};
-use futures::{Future, future};
-use safe_core::{app_container_name, mdata_info};
+use ffi_utils::{from_c_str, ErrorCode, ReprC, StringError};
+use futures::{future, Future};
 use safe_core::ffi::ipc::req::AppExchangeInfo as FfiAppExchangeInfo;
-use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
-                     IpcResp, Permission};
+use safe_core::ipc::{
+    self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp, Permission,
+};
+use safe_core::{app_container_name, mdata_info};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::mpsc;
 use std::time::Duration;
 use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
-use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
-                 rand_app, register_app, run};
+use test_utils::{
+    access_container, compare_access_container_entries, create_account_and_login, rand_app,
+    register_app, run,
+};
 use tiny_keccak::sha3_256;
 
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing {
     use super::utils::create_containers_req;
-    use Authenticator;
     use access_container as access_container_tools;
     use errors::AuthError;
     use futures::Future;
     use routing::{ClientError, Request, Response, User};
-    use safe_core::{CoreError, MockRouting, app_container_name};
     use safe_core::ipc::AuthReq;
     use safe_core::nfs::NfsError;
     use safe_core::utils::generate_random_string;
+    use safe_core::{app_container_name, CoreError, MockRouting};
     use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
-    use test_utils::{access_container, create_account_and_login_with_hook, rand_app, register_app,
-                     run};
+    use test_utils::{
+        access_container, create_account_and_login_with_hook, rand_app, register_app, run,
+    };
+    use Authenticator;
 
     // Test operation recovery for std dirs creation.
     // 1. Try to create a new user's account using `safe_authenticator::Authenticator::create_acc`
@@ -78,7 +84,10 @@ mod mock_routing {
 
                 routing.set_request_hook(move |req| {
                     match *req {
-                        Request::PutMData { ref data, msg_id, .. } if data.tag() == DIR_TAG => {
+                        Request::PutMData {
+                            ref data, msg_id, ..
+                        } if data.tag() == DIR_TAG =>
+                        {
                             put_mdata_counter += 1;
 
                             if put_mdata_counter > 4 {
@@ -142,18 +151,14 @@ mod mock_routing {
         let routing_hook = move |mut routing: MockRouting| -> MockRouting {
             routing.set_request_hook(move |req| {
                 match *req {
-                    Request::PutIData { msg_id, .. } => {
-                        Some(Response::PutIData {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
-                    Request::PutMData { msg_id, .. } => {
-                        Some(Response::PutMData {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
+                    Request::PutIData { msg_id, .. } => Some(Response::PutIData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
+                    Request::PutMData { msg_id, .. } => Some(Response::PutMData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
                     Request::MutateMDataEntries { msg_id, .. } => {
                         Some(Response::MutateMDataEntries {
                             res: Err(ClientError::LowBalance),
@@ -172,24 +177,18 @@ mod mock_routing {
                             msg_id,
                         })
                     }
-                    Request::ChangeMDataOwner { msg_id, .. } => {
-                        Some(Response::ChangeMDataOwner {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
-                    Request::InsAuthKey { msg_id, .. } => {
-                        Some(Response::InsAuthKey {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
-                    Request::DelAuthKey { msg_id, .. } => {
-                        Some(Response::DelAuthKey {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
+                    Request::ChangeMDataOwner { msg_id, .. } => Some(Response::ChangeMDataOwner {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
+                    Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
+                    Request::DelAuthKey { msg_id, .. } => Some(Response::DelAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
                     // Pass-through
                     _ => None,
                 }
@@ -240,12 +239,10 @@ mod mock_routing {
                     // Simulate a network failure after
                     // the `mutate_mdata_entries` operation (relating to
                     // the addition of the app to the user's config dir)
-                    Request::InsAuthKey { msg_id, .. } => {
-                        Some(Response::InsAuthKey {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
+                    Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
                     // Pass-through
                     _ => None,
                 }
@@ -318,12 +315,10 @@ mod mock_routing {
         let routing_hook = move |mut routing: MockRouting| -> MockRouting {
             routing.set_request_hook(move |req| {
                 match *req {
-                    Request::PutMData { msg_id, .. } => {
-                        Some(Response::PutMData {
-                            res: Err(ClientError::LowBalance),
-                            msg_id,
-                        })
-                    }
+                    Request::PutMData { msg_id, .. } => Some(Response::PutMData {
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    }),
                     // Pass-through
                     _ => None,
                 }
@@ -337,8 +332,9 @@ mod mock_routing {
             routing_hook,
         ));
         match register_app(&auth, &auth_req) {
-            Err(AuthError::NfsError(NfsError::CoreError(
-                CoreError::RoutingClientError(ClientError::LowBalance)))) => (),
+            Err(AuthError::NfsError(NfsError::CoreError(CoreError::RoutingClientError(
+                ClientError::LowBalance,
+            )))) => (),
             x => panic!("Unexpected {:?}", x),
         }
 
@@ -353,7 +349,6 @@ mod mock_routing {
                             res: Err(ClientError::LowBalance),
                             msg_id,
                         })
-
                     }
                     // Pass-through
                     _ => None,
@@ -485,7 +480,9 @@ fn app_authentication() {
     let authenticator = create_account_and_login();
 
     // Try to send IpcResp::Auth - it should fail
-    let msg = IpcMsg::Revoked { app_id: "hello".to_string() };
+    let msg = IpcMsg::Revoked {
+        app_id: "hello".to_string(),
+    };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
     match decode_ipc_msg(&authenticator, &encoded_msg) {
         Err((ERR_INVALID_MSG, None)) => (),
@@ -513,11 +510,13 @@ fn app_authentication() {
 
     let (received_req_id, received_auth_req) =
         match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
-            (IpcMsg::Req {
-                 req_id,
-                 req: IpcReq::Auth(req),
-             },
-             _) => (req_id, req),
+            (
+                IpcMsg::Req {
+                    req_id,
+                    req: IpcReq::Auth(req),
+                },
+                _,
+            ) => (req_id, req),
             x => panic!("Unexpected {:?}", x),
         };
 
@@ -692,25 +691,29 @@ fn unregistered_authentication() {
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
-    let (received_req_id, received_data) =
-        match unwrap!(unregistered_decode_ipc_msg(&encoded_msg)) {
-            (IpcMsg::Req {
-                 req_id,
-                 req: IpcReq::Unregistered(extra_data),
-             },
-             _) => (req_id, extra_data),
-            x => panic!("Unexpected {:?}", x),
-        };
+    let (received_req_id, received_data) = match unwrap!(unregistered_decode_ipc_msg(&encoded_msg))
+    {
+        (
+            IpcMsg::Req {
+                req_id,
+                req: IpcReq::Unregistered(extra_data),
+            },
+            _,
+        ) => (req_id, extra_data),
+        x => panic!("Unexpected {:?}", x),
+    };
 
     assert_eq!(received_req_id, req_id);
     assert_eq!(received_data, test_data);
 
     let encoded_resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
-            encode_unregistered_resp(req_id,
-                                     true, // is_granted
-                                     ud,
-                                     cb)
+            encode_unregistered_resp(
+                req_id,
+                true, // is_granted
+                ud,
+                cb,
+            )
         }))
     };
 
@@ -732,11 +735,13 @@ fn unregistered_authentication() {
 
     let (received_req_id, received_data) =
         match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
-            (IpcMsg::Req {
-                 req_id,
-                 req: IpcReq::Unregistered(extra_data),
-             },
-             _) => (req_id, extra_data),
+            (
+                IpcMsg::Req {
+                    req_id,
+                    req: IpcReq::Unregistered(extra_data),
+                },
+                _,
+            ) => (req_id, extra_data),
             x => panic!("Unexpected {:?}", x),
         };
 
@@ -765,7 +770,13 @@ fn authenticated_app_can_be_authenticated_again() {
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
-        (IpcMsg::Req { req: IpcReq::Auth(_), .. }, _) => (),
+        (
+            IpcMsg::Req {
+                req: IpcReq::Auth(_),
+                ..
+            },
+            _,
+        ) => (),
         x => panic!("Unexpected {:?}", x),
     };
 
@@ -792,7 +803,13 @@ fn authenticated_app_can_be_authenticated_again() {
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
-        (IpcMsg::Req { req: IpcReq::Auth(_), .. }, _) => (),
+        (
+            IpcMsg::Req {
+                req: IpcReq::Auth(_),
+                ..
+            },
+            _,
+        ) => (),
         x => panic!("Unexpected {:?}", x),
     };
 }
@@ -820,8 +837,16 @@ fn containers_unknown_app() {
     // Check that the returned string is "safe_<app-id-base64>:payload" where payload is
     // IpcMsg::Resp(IpcResp::Auth(Err(UnknownApp)))"
     match decode_ipc_msg(&authenticator, &encoded_msg) {
-        Err((code, Some(IpcMsg::Resp { resp: IpcResp::Auth(Err(IpcError::UnknownApp)), .. })))
-            if code == ERR_UNKNOWN_APP => (),
+        Err((
+            code,
+            Some(IpcMsg::Resp {
+                resp: IpcResp::Auth(Err(IpcError::UnknownApp)),
+                ..
+            }),
+        )) if code == ERR_UNKNOWN_APP =>
+        {
+            ()
+        }
         x => panic!("Unexpected {:?}", x),
     };
 }
@@ -872,7 +897,10 @@ fn containers_access_request() {
     };
 
     match ipc::decode_msg(&encoded_containers_resp) {
-        Ok(IpcMsg::Resp { resp: IpcResp::Containers(Ok(())), .. }) => (),
+        Ok(IpcMsg::Resp {
+            resp: IpcResp::Containers(Ok(())),
+            ..
+        }) => (),
         x => panic!("Unexpected {:?}", x),
     }
 
@@ -920,9 +948,11 @@ fn lists_of_registered_and_revoked_apps() {
 
     // Initially, there are no registered or revoked apps.
     let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(
-            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
-        ))
+        unwrap!(call_vec(|ud, cb| auth_registered_apps(
+            &authenticator,
+            ud,
+            cb
+        ),))
     };
 
     let revoked: Vec<RevokedAppId> =
@@ -949,9 +979,11 @@ fn lists_of_registered_and_revoked_apps() {
 
     // There are now two registered apps, but no revoked apps.
     let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(
-            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
-        ))
+        unwrap!(call_vec(|ud, cb| auth_registered_apps(
+            &authenticator,
+            ud,
+            cb
+        ),))
     };
 
     let revoked: Vec<RevokedAppId> =
@@ -963,16 +995,21 @@ fn lists_of_registered_and_revoked_apps() {
     // Revoke the first app.
     let id_str = unwrap!(CString::new(auth_req1.app.id.clone()));
     let _: String = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            auth_revoke_app(&authenticator, id_str.as_ptr(), ud, cb)
-        }))
+        unwrap!(call_1(|ud, cb| auth_revoke_app(
+            &authenticator,
+            id_str.as_ptr(),
+            ud,
+            cb
+        )))
     };
 
     // There is now one registered and one revoked app.
     let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(
-            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
-        ))
+        unwrap!(call_vec(|ud, cb| auth_registered_apps(
+            &authenticator,
+            ud,
+            cb
+        ),))
     };
 
     let revoked: Vec<RevokedAppId> =
@@ -985,9 +1022,11 @@ fn lists_of_registered_and_revoked_apps() {
     let _ = unwrap!(register_app(&authenticator, &auth_req1));
 
     let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(
-            |ud, cb| auth_registered_apps(&authenticator, ud, cb),
-        ))
+        unwrap!(call_vec(|ud, cb| auth_registered_apps(
+            &authenticator,
+            ud,
+            cb
+        ),))
     };
     let revoked: Vec<RevokedAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };

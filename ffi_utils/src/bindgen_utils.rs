@@ -26,8 +26,8 @@ pub fn copy_files<S: AsRef<Path>, T: AsRef<Path>>(
     for entry in WalkDir::new(source) {
         let entry = entry?;
 
-        if entry.path().is_file() &&
-            entry
+        if entry.path().is_file()
+            && entry
                 .path()
                 .to_str()
                 .map(|s| s.ends_with(extension))

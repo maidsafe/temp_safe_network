@@ -6,27 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use {AuthFuture, Authenticator};
 use access_container::{fetch_authenticator_entry, put_authenticator_entry};
-use ffi_utils::{FfiResult, ReprC, vec_clone_from_raw_parts};
 use ffi_utils::test_utils::{send_via_user_data, sender_as_user_data};
+use ffi_utils::{vec_clone_from_raw_parts, FfiResult, ReprC};
 use futures::Future;
 use routing::XorName;
 use rust_sodium::crypto::secretbox;
-use safe_core::{Client, FutureExt};
 use safe_core::crypto::shared_secretbox;
-use safe_core::ffi::ipc::req::{AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq,
-                               ShareMDataReq as FfiShareMDataReq};
+use safe_core::ffi::ipc::req::{
+    AuthReq as FfiAuthReq, ContainersReq as FfiContainersReq, ShareMDataReq as FfiShareMDataReq,
+};
 use safe_core::ffi::ipc::resp::MetadataResponse as FfiUserMetadata;
-use safe_core::ipc::{self, AuthReq, ContainersReq, IpcMsg, IpcReq, Permission, ShareMDataReq};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_core::ipc::resp::UserMetadata;
+use safe_core::ipc::{self, AuthReq, ContainersReq, IpcMsg, IpcReq, Permission, ShareMDataReq};
+use safe_core::{Client, FutureExt};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::slice;
 use std::sync::mpsc;
 use std::time::Duration;
+use {AuthFuture, Authenticator};
 
 #[derive(Debug)]
 pub enum Payload {

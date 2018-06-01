@@ -14,10 +14,12 @@ pub mod resp;
 mod errors;
 
 pub use self::errors::IpcError;
-pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq, Permission, ShareMData,
-                    ShareMDataReq};
-pub use self::resp::{AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted, IpcResp,
-                     access_container_enc_key};
+pub use self::req::{
+    AppExchangeInfo, AuthReq, ContainersReq, IpcReq, Permission, ShareMData, ShareMDataReq,
+};
+pub use self::resp::{
+    access_container_enc_key, AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted, IpcResp,
+};
 
 use ffi_utils::{base64_decode, base64_encode};
 use maidsafe_utilities::serialisation::{deserialise, serialise};

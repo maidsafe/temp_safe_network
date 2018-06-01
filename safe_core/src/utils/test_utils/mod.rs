@@ -11,19 +11,19 @@ mod sync;
 
 #[cfg(feature = "use-mock-routing")]
 pub use self::sync::Synchronizer;
-use Client;
 use errors::CoreError;
 use event::{NetworkEvent, NetworkTx};
 use event_loop::{self, CoreMsg, CoreMsgTx};
-use futures::{Future, IntoFuture};
 use futures::stream::Stream;
 use futures::sync::mpsc;
+use futures::{Future, IntoFuture};
 use rust_sodium::crypto::sign;
-use std::{iter, u8};
 use std::fmt::Debug;
 use std::sync::mpsc as std_mpsc;
+use std::{iter, u8};
 use tokio_core::reactor::{Core, Handle};
 use utils::{self, FutureExt};
+use Client;
 
 /// Generates random public keys
 pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
@@ -140,7 +140,8 @@ where
     let (result_tx, result_rx) = std_mpsc::channel();
 
     unwrap!(core_tx.unbounded_send(CoreMsg::new(move |client, &()| {
-        let fut = r(client).into_future()
+        let fut = r(client)
+            .into_future()
             .map_err(|e| panic!("{:?}", e))
             .map(move |value| {
                 unwrap!(result_tx.send(value));

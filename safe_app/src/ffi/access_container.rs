@@ -7,14 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use {App, AppError};
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
+use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, SafePtr, FFI_RESULT_OK};
 use futures::Future;
-use safe_core::FutureExt;
-use safe_core::ffi::MDataInfo;
 use safe_core::ffi::ipc::req::ContainerPermissions;
+use safe_core::ffi::MDataInfo;
 use safe_core::ipc::req::containers_into_vec;
+use safe_core::FutureExt;
 use std::os::raw::{c_char, c_void};
+use {App, AppError};
 
 /// Fetch access info from the network.
 ///
@@ -48,10 +48,12 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        container_perms: *const ContainerPermissions,
-                        container_perms_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        container_perms: *const ContainerPermissions,
+        container_perms_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -60,9 +62,9 @@ pub unsafe extern "C" fn access_container_fetch(
             context
                 .get_access_info(client)
                 .and_then(move |containers| {
-                    let ffi_containers = containers_into_vec(containers.into_iter().map(
-                        |(key, (_, value))| (key, value),
-                    ))?;
+                    let ffi_containers = containers_into_vec(
+                        containers.into_iter().map(|(key, (_, value))| (key, value)),
+                    )?;
                     o_cb(
                         user_data.0,
                         FFI_RESULT_OK,
@@ -88,9 +90,11 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
     app: *const App,
     name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        mdata_info: *const MDataInfo),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        mdata_info: *const MDataInfo,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -99,17 +103,17 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
         (*app).send(move |client, context| {
             context
                 .get_access_info(client)
-                .map(move |mut containers| if let Some((mdata_info, _)) =
-                    containers.remove(&name)
-                {
-                    let mdata_info = mdata_info.into_repr_c();
-                    o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
-                } else {
-                    call_result_cb!(
-                        Err::<(), _>(AppError::NoSuchContainer(name)),
-                        user_data,
-                        o_cb
-                    );
+                .map(move |mut containers| {
+                    if let Some((mdata_info, _)) = containers.remove(&name) {
+                        let mdata_info = mdata_info.into_repr_c();
+                        o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
+                    } else {
+                        call_result_cb!(
+                            Err::<(), _>(AppError::NoSuchContainer(name)),
+                            user_data,
+                            o_cb
+                        );
+                    }
                 })
                 .map_err(move |err| {
                     call_result_cb!(Err::<(), _>(err), user_data, o_cb);
@@ -124,12 +128,12 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
 mod tests {
     use errors::AppError;
     use ffi::access_container::*;
-    use ffi_utils::{ReprC, from_c_str};
     use ffi_utils::test_utils::{call_0, call_1, call_vec};
-    use safe_core::{DIR_TAG, MDataInfo};
+    use ffi_utils::{from_c_str, ReprC};
     use safe_core::ffi::ipc::req::ContainerPermissions as FfiContainerPermissions;
-    use safe_core::ipc::req::{Permission, container_perms_from_repr_c};
     use safe_core::ipc::req::ContainerPermissions;
+    use safe_core::ipc::req::{container_perms_from_repr_c, Permission};
+    use safe_core::{MDataInfo, DIR_TAG};
     use std::collections::HashMap;
     use std::ffi::CString;
     use std::rc::Rc;
@@ -145,9 +149,9 @@ mod tests {
             btree_set![Permission::Read, Permission::Insert],
         );
 
-        let app = unwrap!(create_app_by_req(
-            &create_auth_req_with_access(container_permissions.clone()),
-        ));
+        let app = unwrap!(create_app_by_req(&create_auth_req_with_access(
+            container_permissions.clone()
+        ),));
 
         run(&app, move |_client, context| {
             let reg = Rc::clone(unwrap!(context.as_registered()));
@@ -156,9 +160,9 @@ mod tests {
         });
 
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| access_container_refresh_access_info(&app, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| access_container_refresh_access_info(
+                &app, ud, cb
+            ),))
         }
 
         run(&app, move |_client, context| {
@@ -180,9 +184,9 @@ mod tests {
     fn get_access_info() {
         let mut container_permissions = HashMap::new();
         let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
-        let app = unwrap!(create_app_by_req(
-            &create_auth_req_with_access(container_permissions),
-        ));
+        let app = unwrap!(create_app_by_req(&create_auth_req_with_access(
+            container_permissions
+        ),));
 
         // Get access container info
         let perms: Vec<PermSet> =
@@ -196,9 +200,12 @@ mod tests {
         let md_info: MDataInfo = {
             let videos_str = unwrap!(CString::new("_videos"));
             unsafe {
-                unwrap!(call_1(|ud, cb| {
-                    access_container_get_container_mdata_info(&app, videos_str.as_ptr(), ud, cb)
-                }))
+                unwrap!(call_1(|ud, cb| access_container_get_container_mdata_info(
+                    &app,
+                    videos_str.as_ptr(),
+                    ud,
+                    cb
+                )))
             }
         };
 

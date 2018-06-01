@@ -8,8 +8,8 @@
 
 use crypto::shared_secretbox;
 use errors::CoreError;
-use ffi::MDataInfo as FfiMDataInfo;
 use ffi::arrays::{SymNonce, SymSecretKey};
+use ffi::MDataInfo as FfiMDataInfo;
 use ffi_utils::ReprC;
 use ipc::IpcError;
 use rand::{OsRng, Rng};

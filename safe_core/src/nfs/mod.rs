@@ -9,9 +9,9 @@
 /// `FileHelper` provides functions for CRUD on file
 pub mod file_helper;
 
-mod errors;
 mod data_map;
 mod dir;
+mod errors;
 mod file;
 mod reader;
 #[cfg(test)]

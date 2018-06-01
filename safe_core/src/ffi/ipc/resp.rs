@@ -8,9 +8,9 @@
 
 #![allow(unsafe_code)]
 
-use ffi::MDataInfo;
 use ffi::arrays::*;
 use ffi::ipc::req::PermissionSet;
+use ffi::MDataInfo;
 use rust_sodium::crypto::sign;
 use std::ffi::CString;
 use std::os::raw::c_char;

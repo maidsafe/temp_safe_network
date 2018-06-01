@@ -24,8 +24,7 @@ pub fn create_dir<T: 'static>(
     let pub_key = fry!(client.owner_key().map_err(NfsError::from));
     let owners = btree_set![pub_key];
     let dir_md = fry!(
-        MutableData::new(dir.name, dir.type_tag, perms, contents, owners)
-            .map_err(CoreError::from)
+        MutableData::new(dir.name, dir.type_tag, perms, contents, owners).map_err(CoreError::from)
     );
     client
         .put_mdata(dir_md)

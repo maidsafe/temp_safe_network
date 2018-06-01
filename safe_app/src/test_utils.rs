@@ -9,11 +9,11 @@
 
 use super::{App, AppContext, AppError};
 use futures::{Future, IntoFuture};
-use safe_authenticator::AuthError;
 use safe_authenticator::test_utils as authenticator;
-use safe_core::{Client, FutureExt, utils};
-use safe_core::ipc::AppExchangeInfo;
+use safe_authenticator::AuthError;
 use safe_core::ipc::req::{AuthReq as NativeAuthReq, ContainerPermissions};
+use safe_core::ipc::AppExchangeInfo;
+use safe_core::{utils, Client, FutureExt};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
@@ -78,14 +78,10 @@ pub fn create_app() -> App {
 /// Create a random app given an app authorisation request
 pub fn create_app_by_req(auth_req: &NativeAuthReq) -> Result<App, AppError> {
     let auth = authenticator::create_account_and_login();
-    let auth_granted = authenticator::register_app(&auth, auth_req).map_err(
-        |error| {
-            match error {
-                AuthError::NoSuchContainer(name) => AppError::NoSuchContainer(name),
-                _ => AppError::Unexpected(format!("{}", error)),
-            }
-        },
-    )?;
+    let auth_granted = authenticator::register_app(&auth, auth_req).map_err(|error| match error {
+        AuthError::NoSuchContainer(name) => AppError::NoSuchContainer(name),
+        _ => AppError::Unexpected(format!("{}", error)),
+    })?;
     App::registered(auth_req.app.id.clone(), auth_granted, || ())
 }
 

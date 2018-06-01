@@ -7,11 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use App;
 use cipher_opt::CipherOpt;
 use ffi::object_cache::{CipherOptHandle, EncryptPubKeyHandle};
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use std::os::raw::c_void;
+use App;
 
 /// Construct `CipherOpt::PlainText` handle.
 ///
@@ -20,17 +20,15 @@ use std::os::raw::c_void;
 pub unsafe extern "C" fn cipher_opt_new_plaintext(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        handle: CipherOptHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, handle: CipherOptHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let handle = context.object_cache().insert_cipher_opt(
-                CipherOpt::PlainText,
-            );
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::PlainText);
             o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
@@ -44,16 +42,14 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
 pub unsafe extern "C" fn cipher_opt_new_symmetric(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        handle: CipherOptHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, handle: CipherOptHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
-            let handle = context.object_cache().insert_cipher_opt(
-                CipherOpt::Symmetric,
-            );
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::Symmetric);
             o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
@@ -68,9 +64,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
     app: *const App,
     peer_encrypt_key_h: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        handle: CipherOptHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, handle: CipherOptHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -81,11 +75,11 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
                 user_data,
                 o_cb
             );
-            let handle = context.object_cache().insert_cipher_opt(
-                CipherOpt::Asymmetric {
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::Asymmetric {
                     peer_encrypt_key: *pk,
-                },
-            );
+                });
             o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
@@ -116,14 +110,14 @@ pub unsafe extern "C" fn cipher_opt_free(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {App, AppContext};
     use errors::AppError;
     use ffi::object_cache::CipherOptHandle;
-    use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1};
+    use ffi_utils::ErrorCode;
     use rust_sodium::crypto::box_;
-    use safe_core::{Client, utils};
+    use safe_core::{utils, Client};
     use test_utils::{create_app, run_now};
+    use {App, AppContext};
 
     // Test plaintext "encryption" and decryption.
     #[test]
@@ -262,9 +256,12 @@ mod tests {
                 call_1(|ud, cb| cipher_opt_new_asymmetric(&app, 29_293_290, ud, cb));
             assert_eq!(unwrap!(res.err()), err_code);
 
-            unwrap!(call_1(|ud, cb| {
-                cipher_opt_new_asymmetric(&app, peer_encrypt_key_handle, ud, cb)
-            }))
+            unwrap!(call_1(|ud, cb| cipher_opt_new_asymmetric(
+                &app,
+                peer_encrypt_key_handle,
+                ud,
+                cb
+            )))
         };
 
         run_now(&app, move |_, context| {
@@ -307,9 +304,7 @@ mod tests {
 
     fn assert_free(app_ptr: *const App, cipher_opt_handle: CipherOptHandle, expected: i32) {
         let res = unsafe {
-            call_0(|user_data, cb| {
-                cipher_opt_free(app_ptr, cipher_opt_handle, user_data, cb)
-            })
+            call_0(|user_data, cb| cipher_opt_free(app_ptr, cipher_opt_handle, user_data, cb))
         };
         match res {
             Ok(()) => assert_eq!(expected, 0),

@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{AuthError, AuthFuture};
-use futures::Future;
 use futures::future::{self, Either, Loop};
+use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{ClientError, EntryActions, EntryError};
-use safe_core::{Client, CoreError, FutureExt};
-use safe_core::ipc::IpcError;
 use safe_core::ipc::req::AppExchangeInfo;
 use safe_core::ipc::resp::AppKeys;
-use serde::Serialize;
+use safe_core::ipc::IpcError;
+use safe_core::{Client, CoreError, FutureExt};
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use tiny_keccak::sha3_256;
 
@@ -62,9 +62,10 @@ pub fn get_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<AppInfo>> {
     let app_id_hash = sha3_256(app_id.as_bytes());
     list_apps(client)
         .and_then(move |(_, config)| {
-            config.get(&app_id_hash).cloned().ok_or_else(|| {
-                AuthError::IpcError(IpcError::UnknownApp)
-            })
+            config
+                .get(&app_id_hash)
+                .cloned()
+                .ok_or_else(|| AuthError::IpcError(IpcError::UnknownApp))
         })
         .into_box()
 }
@@ -122,11 +123,13 @@ pub fn push_to_app_revocation_queue(
         KEY_APP_REVOCATION_QUEUE,
         queue,
         new_version,
-        move |queue| if !queue.contains(&app_id) {
-            queue.push_back(app_id.clone());
-            true
-        } else {
-            false
+        move |queue| {
+            if !queue.contains(&app_id) {
+                queue.push_back(app_id.clone());
+                true
+            } else {
+                false
+            }
         },
     )
 }
@@ -147,11 +150,13 @@ pub fn remove_from_app_revocation_queue(
         KEY_APP_REVOCATION_QUEUE,
         queue,
         new_version,
-        move |queue| if let Some(index) = queue.iter().position(|item| *item == app_id) {
-            let _ = queue.remove(index);
-            true
-        } else {
-            false
+        move |queue| {
+            if let Some(index) = queue.iter().position(|item| *item == app_id) {
+                let _ = queue.remove(index);
+                true
+            } else {
+                false
+            }
         },
     )
 }
@@ -170,16 +175,18 @@ pub fn repush_to_app_revocation_queue(
         KEY_APP_REVOCATION_QUEUE,
         queue,
         new_version,
-        move |queue| if let Some(index) = queue.iter().position(|item| *item == app_id) {
-            match queue.remove(index) {
-                Some(app_id) => {
-                    queue.push_back(app_id);
-                    true
+        move |queue| {
+            if let Some(index) = queue.iter().position(|item| *item == app_id) {
+                match queue.remove(index) {
+                    Some(app_id) => {
+                        queue.push_back(app_id);
+                        true
+                    }
+                    None => false,
                 }
-                None => false,
+            } else {
+                false
             }
-        } else {
-            false
         },
     )
 }
@@ -204,9 +211,9 @@ where
             Ok((Some(value.entry_version), decoded))
         })
         .or_else(|error| match error {
-            CoreError::RoutingClientError(ClientError::NoSuchEntry) => Ok(
-                (None, Default::default()),
-            ),
+            CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
+                Ok((None, Default::default()))
+            }
             _ => Err(AuthError::from(error)),
         })
         .into_box()
@@ -243,8 +250,8 @@ where
             {
                 if let Some(error) = errors.get(&key) {
                     match *error {
-                        EntryError::InvalidSuccessor(version) |
-                        EntryError::EntryExists(version) => {
+                        EntryError::InvalidSuccessor(version)
+                        | EntryError::EntryExists(version) => {
                             return Err(CoreError::RoutingClientError(
                                 ClientError::InvalidSuccessor(version),
                             ));
@@ -275,30 +282,30 @@ where
     let client = client.clone();
     let key = key.to_vec();
 
-    future::loop_fn((key, new_version, item), move |(key,
-           new_version,
-           mut item)| {
-        let c2 = client.clone();
-        let c3 = client.clone();
+    future::loop_fn(
+        (key, new_version, item),
+        move |(key, new_version, mut item)| {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-        if f(&mut item) {
-            let f = update_entry(&c2, &key, &item, new_version)
-                .map(move |_| Loop::Break((new_version, item)))
-                .or_else(move |error| match error {
-                    AuthError::CoreError(
-                        CoreError::RoutingClientError(ClientError::InvalidSuccessor(_))
-                    ) => {
-                        let f = get_entry(&c3, &key)
-                            .map(move |(version, item)| {
+            if f(&mut item) {
+                let f = update_entry(&c2, &key, &item, new_version)
+                    .map(move |_| Loop::Break((new_version, item)))
+                    .or_else(move |error| match error {
+                        AuthError::CoreError(CoreError::RoutingClientError(
+                            ClientError::InvalidSuccessor(_),
+                        )) => {
+                            let f = get_entry(&c3, &key).map(move |(version, item)| {
                                 Loop::Continue((key, next_version(version), item))
                             });
-                        Either::A(f)
-                    }
-                    _ => Either::B(future::err(error)),
-                });
-            Either::A(f)
-        } else {
-            Either::B(future::ok(Loop::Break((new_version - 1, item))))
-        }
-    }).into_box()
+                            Either::A(f)
+                        }
+                        _ => Either::B(future::err(error)),
+                    });
+                Either::A(f)
+            } else {
+                Either::B(future::ok(Loop::Break((new_version - 1, item))))
+            }
+        },
+    ).into_box()
 }

@@ -10,7 +10,7 @@
 
 use client::Client;
 use crypto::shared_secretbox;
-use futures::{Future, future};
+use futures::{future, Future};
 use immutable_data;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::NfsFuture;
@@ -43,9 +43,7 @@ pub fn put<T: 'static>(
 
     future::result(serialise(&data_map))
         .map_err(From::from)
-        .and_then(move |encoded| {
-            immutable_data::create(&client, &encoded, encryption_key)
-        })
+        .and_then(move |encoded| immutable_data::create(&client, &encoded, encryption_key))
         .and_then(move |data| {
             let name = *data.name();
             client2.put_idata(data).map(move |_| name)

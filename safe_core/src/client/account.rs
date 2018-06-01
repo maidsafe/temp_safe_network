@@ -6,15 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use DIR_TAG;
 use client::MDataInfo;
 use crypto::{shared_box, shared_secretbox, shared_sign};
 use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{FullId, XOR_NAME_LEN, XorName};
-use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
+use routing::{FullId, XorName, XOR_NAME_LEN};
 use rust_sodium::crypto::sign::Seed;
+use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
 use tiny_keccak::sha3_256;
+use DIR_TAG;
 
 /// Representing the User Account information on the network
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -55,9 +55,8 @@ impl Account {
     /// Credentials are passed through key-derivation-function first
     pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Self, CoreError> {
         let (key, nonce) = Self::generate_crypto_keys(password, pin)?;
-        let decrypted_self = secretbox::open(encrypted_self, &nonce, &key).map_err(|_| {
-            CoreError::SymmetricDecipherFailure
-        })?;
+        let decrypted_self = secretbox::open(encrypted_self, &nonce, &key)
+            .map_err(|_| CoreError::SymmetricDecipherFailure)?;
 
         Ok(deserialise(&decrypted_self)?)
     }

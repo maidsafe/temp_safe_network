@@ -9,24 +9,24 @@
 
 mod mutable_data;
 
-use App;
 use ffi::test_utils::test_create_app_with_access;
 use ffi_utils::test_utils::call_1;
 use futures::Future;
 #[cfg(feature = "use-mock-routing")]
 use routing::{ClientError, Request, Response};
-use safe_authenticator::Authenticator;
 use safe_authenticator::test_utils as authenticator;
 use safe_authenticator::test_utils::revoke;
+use safe_authenticator::Authenticator;
+use safe_core::ffi::AccountInfo;
+use safe_core::ipc::req::{AppExchangeInfo, AuthReq};
+use safe_core::ipc::Permission;
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::ffi::AccountInfo;
-use safe_core::ipc::Permission;
-use safe_core::ipc::req::{AppExchangeInfo, AuthReq};
 use std::collections::HashMap;
 use std::rc::Rc;
-use test_utils::{create_app_by_req, create_auth_req, create_auth_req_with_access, run};
 use test_utils::gen_app_exchange_info;
+use test_utils::{create_app_by_req, create_auth_req, create_auth_req_with_access, run};
+use App;
 
 // Test refreshing access info by fetching it from the network.
 #[test]
@@ -38,9 +38,9 @@ fn refresh_access_info() {
         btree_set![Permission::Read, Permission::Insert],
     );
 
-    let app = unwrap!(create_app_by_req(
-        &create_auth_req_with_access(container_permissions.clone()),
-    ));
+    let app = unwrap!(create_app_by_req(&create_auth_req_with_access(
+        container_permissions.clone()
+    ),));
 
     run(&app, move |client, context| {
         let reg = Rc::clone(unwrap!(context.as_registered()));
@@ -71,9 +71,11 @@ fn get_access_info() {
     let auth_req_ffi = unwrap!(auth_req.into_repr_c());
 
     let app: *mut App = unsafe {
-        unwrap!(call_1(
-            |ud, cb| test_create_app_with_access(&auth_req_ffi, ud, cb),
-        ))
+        unwrap!(call_1(|ud, cb| test_create_app_with_access(
+            &auth_req_ffi,
+            ud,
+            cb
+        ),))
     };
 
     run(unsafe { &*app }, move |client, context| {
@@ -110,12 +112,10 @@ pub fn login_registered_with_low_balance() {
                     res: Err(ClientError::LowBalance),
                     msg_id,
                 }),
-                Request::MutateMDataEntries { msg_id, .. } => {
-                    Some(Response::MutateMDataEntries {
-                        res: Err(ClientError::LowBalance),
-                        msg_id,
-                    })
-                }
+                Request::MutateMDataEntries { msg_id, .. } => Some(Response::MutateMDataEntries {
+                    res: Err(ClientError::LowBalance),
+                    msg_id,
+                }),
                 Request::SetMDataUserPermissions { msg_id, .. } => {
                     Some(Response::SetMDataUserPermissions {
                         res: Err(ClientError::LowBalance),

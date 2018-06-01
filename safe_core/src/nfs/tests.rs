@@ -6,20 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use DIR_TAG;
 use client::{Client, MDataInfo};
 use crypto::shared_secretbox;
 use errors::CoreError;
-use futures::Future;
 use futures::future::{self, Loop};
-use nfs::{File, Mode, NfsError, NfsFuture, create_dir, file_helper};
+use futures::Future;
 use nfs::reader::Reader;
 use nfs::writer::Writer;
+use nfs::{create_dir, file_helper, File, Mode, NfsError, NfsFuture};
 use rand::{self, Rng};
 use rust_sodium::crypto::secretbox;
 use std;
-use utils::FutureExt;
 use utils::test_utils::random_client;
+use utils::FutureExt;
+use DIR_TAG;
 
 const APPEND_SIZE: usize = 10;
 const ORIG_SIZE: usize = 5555;
@@ -45,9 +45,9 @@ fn create_test_file(client: &Client<()>) -> Box<NfsFuture<(MDataInfo, File)>> {
         .then(move |res| {
             let writer = unwrap!(res);
 
-            writer.write(&[0u8; ORIG_SIZE]).and_then(
-                move |_| writer.close(),
-            )
+            writer
+                .write(&[0u8; ORIG_SIZE])
+                .and_then(move |_| writer.close())
         })
         .then(move |res| {
             let file = unwrap!(res);
@@ -91,9 +91,9 @@ fn file_fetch_public_md() {
             .then(move |res| {
                 let writer = unwrap!(res);
 
-                writer.write(&[0u8; ORIG_SIZE]).and_then(
-                    move |_| writer.close(),
-                )
+                writer
+                    .write(&[0u8; ORIG_SIZE])
+                    .and_then(move |_| writer.close())
             })
             .then(move |res| {
                 let file = unwrap!(res);
@@ -108,9 +108,8 @@ fn file_fetch_public_md() {
             .then(move |res| {
                 let (dir, file) = unwrap!(res);
 
-                file_helper::read(c5, &file, dir.enc_key().cloned()).map(
-                    move |reader| (reader, dir),
-                )
+                file_helper::read(c5, &file, dir.enc_key().cloned())
+                    .map(move |reader| (reader, dir))
             })
             .then(move |res| {
                 let (reader, dir) = unwrap!(res);
@@ -131,9 +130,8 @@ fn file_fetch_public_md() {
             .then(move |res| {
                 let (dir, file) = unwrap!(res);
 
-                file_helper::read(c7, &file, dir.enc_key().cloned()).map(
-                    move |reader| (reader, dir),
-                )
+                file_helper::read(c7, &file, dir.enc_key().cloned())
+                    .map(move |reader| (reader, dir))
             })
             .then(move |res| {
                 let (reader, _dir) = unwrap!(res);
@@ -158,9 +156,8 @@ fn file_read() {
                 let (dir, file) = unwrap!(res);
                 let creation_time = *file.created_time();
 
-                file_helper::read(c2, &file, dir.enc_key().cloned()).map(
-                    move |reader| (reader, file, creation_time),
-                )
+                file_helper::read(c2, &file, dir.enc_key().cloned())
+                    .map(move |reader| (reader, file, creation_time))
             })
             .then(|res| {
                 let (reader, file, creation_time) = unwrap!(res);
@@ -202,28 +199,29 @@ fn file_read_chunks() {
                 let result = Vec::new();
 
                 // Read chunks in a loop
-                future::loop_fn((reader, size_read, result), move |(reader,
-                       mut size_read,
-                       mut result)| {
-                    let to_read = if size_read + CHUNK_SIZE >= size {
-                        size - size_read
-                    } else {
-                        CHUNK_SIZE
-                    };
-                    println!("reading {} bytes", to_read);
-                    reader.read(size_read, to_read).then(move |res| {
-                        let mut data = unwrap!(res);
-
-                        size_read += data.len() as u64;
-                        result.append(&mut data);
-
-                        if size_read < size {
-                            Ok(Loop::Continue((reader, size_read, result)))
+                future::loop_fn(
+                    (reader, size_read, result),
+                    move |(reader, mut size_read, mut result)| {
+                        let to_read = if size_read + CHUNK_SIZE >= size {
+                            size - size_read
                         } else {
-                            Ok(Loop::Break((reader, size_read, result)))
-                        }
-                    })
-                }).then(move |res: Result<(Reader<()>, u64, Vec<u8>), NfsError>| {
+                            CHUNK_SIZE
+                        };
+                        println!("reading {} bytes", to_read);
+                        reader.read(size_read, to_read).then(move |res| {
+                            let mut data = unwrap!(res);
+
+                            size_read += data.len() as u64;
+                            result.append(&mut data);
+
+                            if size_read < size {
+                                Ok(Loop::Continue((reader, size_read, result)))
+                            } else {
+                                Ok(Loop::Break((reader, size_read, result)))
+                            }
+                        })
+                    },
+                ).then(move |res: Result<(Reader<()>, u64, Vec<u8>), NfsError>| {
                     let (reader, size_read, result) = unwrap!(res);
 
                     assert_eq!(size, size_read);
@@ -302,9 +300,9 @@ fn file_write_chunks() {
             .then(move |res: Result<(Writer<()>, MDataInfo), NfsError>| {
                 let (writer, dir) = unwrap!(res);
                 // Write 0 bytes, should succeed
-                writer.write(&content[GOAL_SIZE..GOAL_SIZE]).map(move |_| {
-                    (writer, dir)
-                })
+                writer
+                    .write(&content[GOAL_SIZE..GOAL_SIZE])
+                    .map(move |_| (writer, dir))
             })
             .then(move |res| {
                 let (writer, dir) = unwrap!(res);
@@ -346,9 +344,9 @@ fn file_write_chunks() {
             .then(move |res: Result<(Writer<()>, MDataInfo), NfsError>| {
                 let (writer, dir) = unwrap!(res);
                 // Write 0 bytes, should succeed
-                writer.write(&content[GOAL_SIZE..GOAL_SIZE]).map(move |_| {
-                    (writer, dir)
-                })
+                writer
+                    .write(&content[GOAL_SIZE..GOAL_SIZE])
+                    .map(move |_| (writer, dir))
             })
             .then(move |res| {
                 let (writer, dir) = unwrap!(res);
@@ -405,9 +403,8 @@ fn file_update_overwrite() {
             })
             .then(move |res| {
                 let (dir, creation_time) = unwrap!(res);
-                file_helper::fetch(c4, dir.clone(), "hello.txt").map(
-                    move |(_version, file)| (dir, file, creation_time),
-                )
+                file_helper::fetch(c4, dir.clone(), "hello.txt")
+                    .map(move |(_version, file)| (dir, file, creation_time))
             })
             .then(move |res| {
                 let (dir, file, creation_time) = unwrap!(res);
@@ -480,8 +477,7 @@ fn file_update_metadata() {
                 let (dir, mut file) = unwrap!(res);
 
                 file.set_user_metadata(vec![12u8; 10]);
-                file_helper::update(c2, dir.clone(), "hello.txt", &file, 1)
-                    .map(move |()| dir)
+                file_helper::update(c2, dir.clone(), "hello.txt", &file, 1).map(move |()| dir)
             })
             .then(move |res| {
                 let dir = unwrap!(res);
@@ -502,8 +498,7 @@ fn file_delete() {
         create_test_file(client)
             .then(move |res| {
                 let (dir, _file) = unwrap!(res);
-                file_helper::delete(&c2, &dir, "hello.txt", 1)
-                    .map(move |()| dir)
+                file_helper::delete(&c2, &dir, "hello.txt", 1).map(move |()| dir)
             })
             .then(move |res| {
                 let dir = unwrap!(res);
@@ -557,9 +552,8 @@ fn file_delete_then_add() {
             })
             .then(move |res| {
                 let dir = unwrap!(res);
-                file_helper::fetch(c5, dir.clone(), "hello.txt").map(
-                    move |(version, file)| (version, file, dir),
-                )
+                file_helper::fetch(c5, dir.clone(), "hello.txt")
+                    .map(move |(version, file)| (version, file, dir))
             })
             .then(move |res| {
                 let (version, file, dir) = unwrap!(res);
@@ -591,9 +585,8 @@ fn file_open_close() {
             .then(move |res| {
                 let (dir, file) = unwrap!(res);
                 // Open the file for reading
-                file_helper::read(c2, &file, dir.enc_key().cloned()).map(
-                    move |reader| (reader, file, dir),
-                )
+                file_helper::read(c2, &file, dir.enc_key().cloned())
+                    .map(move |reader| (reader, file, dir))
             })
             .then(move |res| {
                 // The reader should get dropped implicitly

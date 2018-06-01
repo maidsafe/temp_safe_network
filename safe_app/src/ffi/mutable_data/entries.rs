@@ -9,18 +9,19 @@
 
 //! FFI for mutable data entries, keys and values.
 
-use App;
 use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::object_cache::MDataEntriesHandle;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
-                vec_clone_from_raw_parts};
 use ffi_utils::callback::Callback;
+use ffi_utils::{
+    catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, SafePtr, FFI_RESULT_OK,
+};
 use routing::{ClientError, Value};
-use safe_core::CoreError;
 use safe_core::ffi::ipc::resp::{MDataEntry, MDataKey, MDataValue};
+use safe_core::CoreError;
 use std::collections::BTreeMap;
 use std::os::raw::c_void;
+use App;
 
 /// Create new empty entries.
 ///
@@ -29,15 +30,17 @@ use std::os::raw::c_void;
 pub unsafe extern "C" fn mdata_entries_new(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        entries_h: MDataEntriesHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        entries_h: MDataEntriesHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
-            Ok(context.object_cache().insert_mdata_entries(
-                Default::default(),
-            ))
+            Ok(context
+                .object_cache()
+                .insert_mdata_entries(Default::default()))
         })
     })
 }
@@ -100,11 +103,13 @@ pub unsafe extern "C" fn mdata_entries_get(
     key: *const u8,
     key_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        content: *const u8,
-                        content_len: usize,
-                        version: u64),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        content: *const u8,
+        content_len: usize,
+        version: u64,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -149,10 +154,12 @@ pub unsafe extern "C" fn mdata_list_entries(
     app: *const App,
     entries_h: MDataEntriesHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        entries: *const MDataEntry,
-                        entries_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        entries: *const MDataEntry,
+        entries_len: usize,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -166,18 +173,16 @@ pub unsafe extern "C" fn mdata_list_entries(
 
             let entries_vec: Vec<MDataEntry> = entries
                 .iter()
-                .map(|(key, value)| {
-                    MDataEntry {
-                        key: MDataKey {
-                            val: key.as_safe_ptr(),
-                            val_len: key.len(),
-                        },
-                        value: MDataValue {
-                            content: value.content.as_safe_ptr(),
-                            content_len: value.content.len(),
-                            entry_version: value.entry_version,
-                        },
-                    }
+                .map(|(key, value)| MDataEntry {
+                    key: MDataKey {
+                        val: key.as_safe_ptr(),
+                        val_len: key.len(),
+                    },
+                    value: MDataValue {
+                        content: value.content.as_safe_ptr(),
+                        content_len: value.content.len(),
+                        entry_version: value.entry_version,
+                    },
                 })
                 .collect();
 
@@ -234,11 +239,13 @@ where
 mod tests {
     use super::*;
     use ffi::mdata_info::*;
-    use ffi::mutable_data::*;
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
+    use ffi::mutable_data::*;
     use ffi::object_cache::MDataEntryActionsHandle;
-    use ffi_utils::test_utils::{call_0, call_1, call_vec, send_via_user_data, sender_as_user_data};
+    use ffi_utils::test_utils::{
+        call_0, call_1, call_vec, send_via_user_data, sender_as_user_data,
+    };
     use ffi_utils::vec_clone_from_raw_parts;
     use routing::{Action, PermissionSet, Value};
     use safe_core::ipc::resp::{MDataEntry, MDataKey, MDataValue};
@@ -266,8 +273,7 @@ mod tests {
             entry_version: 2,
         };
 
-        let entries =
-            btree_map![key0.clone() => value0.clone(),
+        let entries = btree_map![key0.clone() => value0.clone(),
                                  key1.clone() => value1.clone()];
 
         let handle0 = run_now(&app, move |_, context| {
@@ -279,30 +285,26 @@ mod tests {
 
         let handle1 = unsafe {
             let handle = unwrap!(call_1(|ud, cb| mdata_entries_new(&app, ud, cb)));
-            unwrap!(call_0(|ud, cb| {
-                mdata_entries_insert(
-                    &app,
-                    handle,
-                    key0.as_ptr(),
-                    key0.len(),
-                    value0.content.as_ptr(),
-                    value0.content.len(),
-                    ud,
-                    cb,
-                )
-            }));
-            unwrap!(call_0(|ud, cb| {
-                mdata_entries_insert(
-                    &app,
-                    handle,
-                    key1.as_ptr(),
-                    key1.len(),
-                    value1.content.as_ptr(),
-                    value1.content.len(),
-                    ud,
-                    cb,
-                )
-            }));
+            unwrap!(call_0(|ud, cb| mdata_entries_insert(
+                &app,
+                handle,
+                key0.as_ptr(),
+                key0.len(),
+                value0.content.as_ptr(),
+                value0.content.len(),
+                ud,
+                cb,
+            )));
+            unwrap!(call_0(|ud, cb| mdata_entries_insert(
+                &app,
+                handle,
+                key1.as_ptr(),
+                key1.len(),
+                value1.content.as_ptr(),
+                value1.content.len(),
+                ud,
+                cb,
+            )));
             handle
         };
 
@@ -412,16 +414,14 @@ mod tests {
             unsafe { unwrap!(call_1(|ud, cb| mdata_permissions_new(&app, ud, cb))) };
 
         unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_permissions_insert(
-                    &app,
-                    perms_h,
-                    USER_ANYONE,
-                    &permission_set_into_repr_c(perms_set),
-                    ud,
-                    cb,
-                )
-            }))
+            unwrap!(call_0(|ud, cb| mdata_permissions_insert(
+                &app,
+                perms_h,
+                USER_ANYONE,
+                &permission_set_into_repr_c(perms_set),
+                ud,
+                cb,
+            )))
         };
 
         // Create an empty public mdata
@@ -430,9 +430,14 @@ mod tests {
         let md_info = md_info.into_repr_c();
 
         unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_put(&app, &md_info, perms_h, ENTRIES_EMPTY, ud, cb)
-            }))
+            unwrap!(call_0(|ud, cb| mdata_put(
+                &app,
+                &md_info,
+                perms_h,
+                ENTRIES_EMPTY,
+                ud,
+                cb
+            )))
         };
 
         // Get list of keys, verify number of keys
@@ -453,40 +458,36 @@ mod tests {
 
         {
             unsafe {
-                unwrap!(call_0(|ud, cb| {
-                    mdata_entry_actions_insert(
-                        &app,
-                        actions_h,
-                        key0.as_ptr(),
-                        key0.len(),
-                        value0.content.as_ptr(),
-                        value0.content.len(),
-                        ud,
-                        cb,
-                    )
-                }))
+                unwrap!(call_0(|ud, cb| mdata_entry_actions_insert(
+                    &app,
+                    actions_h,
+                    key0.as_ptr(),
+                    key0.len(),
+                    value0.content.as_ptr(),
+                    value0.content.len(),
+                    ud,
+                    cb,
+                )))
             };
 
             unsafe {
-                unwrap!(call_0(|ud, cb| {
-                    mdata_entry_actions_insert(
-                        &app,
-                        actions_h,
-                        key1.as_ptr(),
-                        key1.len(),
-                        value1.content.as_ptr(),
-                        value1.content.len(),
-                        ud,
-                        cb,
-                    )
-                }))
+                unwrap!(call_0(|ud, cb| mdata_entry_actions_insert(
+                    &app,
+                    actions_h,
+                    key1.as_ptr(),
+                    key1.len(),
+                    value1.content.as_ptr(),
+                    value1.content.len(),
+                    ud,
+                    cb,
+                )))
             };
         }
 
         unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_mutate_entries(&app, &md_info, actions_h, ud, cb)
-            }))
+            unwrap!(call_0(|ud, cb| mdata_mutate_entries(
+                &app, &md_info, actions_h, ud, cb
+            )))
         }
 
         // Get the keys and values handles again

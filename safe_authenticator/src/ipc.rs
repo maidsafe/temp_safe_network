@@ -8,20 +8,21 @@
 
 use super::{AuthError, AuthFuture};
 use access_container;
-use app_auth::{AppState, app_state};
+use app_auth::{app_state, AppState};
 use config;
 use ffi_utils::StringError;
-use futures::Future;
 use futures::future::{self, Either};
+use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
 use routing::{ClientError, User, XorName};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, recovery};
 use safe_core::ffi::ipc::resp::MetadataResponse as FfiUserMetadata;
+use safe_core::ipc::req::{
+    container_perms_into_permission_set, ContainerPermissions, IpcReq, ShareMDataReq,
+};
+use safe_core::ipc::resp::{AccessContainerEntry, IpcResp, UserMetadata, METADATA_KEY};
 use safe_core::ipc::{self, IpcError, IpcMsg};
-use safe_core::ipc::req::{ContainerPermissions, IpcReq, ShareMDataReq,
-                          container_perms_into_permission_set};
-use safe_core::ipc::resp::{AccessContainerEntry, IpcResp, METADATA_KEY, UserMetadata};
+use safe_core::{recovery, Client, CoreError, FutureExt};
 use std::collections::HashMap;
 use std::ffi::CString;
 
@@ -47,21 +48,17 @@ pub fn decode_ipc_msg(
         IpcMsg::Req {
             req: IpcReq::Unregistered(extra_data),
             req_id,
-        } => {
-            ok!(Ok(IpcMsg::Req {
-                req_id,
-                req: IpcReq::Unregistered(extra_data),
-            }))
-        }
+        } => ok!(Ok(IpcMsg::Req {
+            req_id,
+            req: IpcReq::Unregistered(extra_data),
+        })),
         IpcMsg::Req {
             req: IpcReq::ShareMData(share_mdata_req),
             req_id,
-        } => {
-            ok!(Ok(IpcMsg::Req {
-                req_id,
-                req: IpcReq::ShareMData(share_mdata_req),
-            }))
-        }
+        } => ok!(Ok(IpcMsg::Req {
+            req_id,
+            req: IpcReq::ShareMData(share_mdata_req),
+        })),
         IpcMsg::Req {
             req: IpcReq::Containers(cont_req),
             req_id,
@@ -71,19 +68,14 @@ pub fn decode_ipc_msg(
             let c2 = client.clone();
 
             config::list_apps(client)
-                .and_then(move |(_config_version, config)| {
-                    app_state(&c2, &config, &app_id)
-                })
+                .and_then(move |(_config_version, config)| app_state(&c2, &config, &app_id))
                 .and_then(move |app_state| {
                     match app_state {
-                        AppState::Authenticated => {
-                            Ok(Ok(IpcMsg::Req {
-                                req_id,
-                                req: IpcReq::Containers(cont_req),
-                            }))
-                        }
-                        AppState::Revoked |
-                        AppState::NotAuthenticated => {
+                        AppState::Authenticated => Ok(Ok(IpcMsg::Req {
+                            req_id,
+                            req: IpcReq::Containers(cont_req),
+                        })),
+                        AppState::Revoked | AppState::NotAuthenticated => {
                             // App is not authenticated
                             let (error_code, description) =
                                 ffi_error!(AuthError::from(IpcError::UnknownApp));
@@ -100,9 +92,7 @@ pub fn decode_ipc_msg(
                 })
                 .into_box()
         }
-        IpcMsg::Resp { .. } |
-        IpcMsg::Revoked { .. } |
-        IpcMsg::Err(..) => {
+        IpcMsg::Resp { .. } | IpcMsg::Revoked { .. } | IpcMsg::Err(..) => {
             return err!(AuthError::IpcError(IpcError::InvalidMsg));
         }
     }
@@ -123,9 +113,11 @@ pub fn update_container_perms(
 
             for (container_key, access) in permissions {
                 let c2 = client.clone();
-                let mdata_info = fry!(root_containers.remove(&container_key).ok_or_else(|| {
-                    AuthError::NoSuchContainer(container_key.clone())
-                }));
+                let mdata_info = fry!(
+                    root_containers
+                        .remove(&container_key)
+                        .ok_or_else(|| AuthError::NoSuchContainer(container_key.clone()))
+                );
                 let perm_set = container_perms_into_permission_set(&access);
 
                 let fut = client
@@ -150,9 +142,7 @@ pub fn update_container_perms(
         .map(|perms| {
             perms
                 .into_iter()
-                .map(|(container_key, dir, access)| {
-                    (container_key, (dir, access))
-                })
+                .map(|(container_key, dir, access)| (container_key, (dir, access)))
                 .collect()
         })
         .map_err(AuthError::from)
@@ -182,44 +172,43 @@ pub fn decode_share_mdata_req(
         let name = mdata.name;
         let type_tag = mdata.type_tag;
 
-        let future =
-            client
-                .get_mdata_shell(name, type_tag)
-                .and_then(move |shell| if shell.owners().contains(&user) {
+        let future = client
+            .get_mdata_shell(name, type_tag)
+            .and_then(move |shell| {
+                if shell.owners().contains(&user) {
                     let future_metadata = client
-                    .get_mdata_value(name, type_tag, METADATA_KEY.into())
-                    .then(move |res| match res {
-                        Ok(value) => Ok(
-                            deserialise::<UserMetadata>(&value.content)
-                            .map_err(|_| { ShareMDataError::InvalidMetadata })
-                            .and_then(move |metadata| {
-                                match metadata.into_md_response(name, type_tag) {
-                                    Ok(meta) => Ok(meta),
-                                    Err(_) => Err(ShareMDataError::InvalidMetadata)
-                                }
-                            }) )
-                        ,
-                        Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) =>
-                        {
-                            // Allow requesting shared access to arbitrary Mutable Data objects even
-                            // if they don't have metadata.
-                            let user_metadata = UserMetadata { name: None, description: None };
-                            let user_md_response = user_metadata
-                                .into_md_response(name, type_tag)
-                                .map_err(|_| {
-                                    ShareMDataError::InvalidMetadata
-                                });
-                            Ok(user_md_response)
-                        }
-                        Err(error) => Err(error),
-                    });
+                        .get_mdata_value(name, type_tag, METADATA_KEY.into())
+                        .then(move |res| match res {
+                            Ok(value) => Ok(deserialise::<UserMetadata>(&value.content)
+                                .map_err(|_| ShareMDataError::InvalidMetadata)
+                                .and_then(move |metadata| {
+                                    match metadata.into_md_response(name, type_tag) {
+                                        Ok(meta) => Ok(meta),
+                                        Err(_) => Err(ShareMDataError::InvalidMetadata),
+                                    }
+                                })),
+                            Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
+                                // Allow requesting shared access to arbitrary Mutable Data objects even
+                                // if they don't have metadata.
+                                let user_metadata = UserMetadata {
+                                    name: None,
+                                    description: None,
+                                };
+                                let user_md_response = user_metadata
+                                    .into_md_response(name, type_tag)
+                                    .map_err(|_| ShareMDataError::InvalidMetadata);
+                                Ok(user_md_response)
+                            }
+                            Err(error) => Err(error),
+                        });
                     Either::A(future_metadata)
                 } else {
-                    Either::B(future::ok(
-                        Err(ShareMDataError::InvalidOwner(name, type_tag)),
-                    ))
-                })
-                .map_err(AuthError::from);
+                    Either::B(future::ok(Err(ShareMDataError::InvalidOwner(
+                        name, type_tag,
+                    ))))
+                }
+            })
+            .map_err(AuthError::from);
 
         futures.push(future);
     }

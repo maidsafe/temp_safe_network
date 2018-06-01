@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{AppExchangeInfo, ContainerPermissions, containers_from_repr_c, containers_into_vec};
+use super::{containers_from_repr_c, containers_into_vec, AppExchangeInfo, ContainerPermissions};
 use ffi::ipc::req as ffi;
-use ffi_utils::{ReprC, StringError, vec_into_raw_parts};
+use ffi_utils::{vec_into_raw_parts, ReprC, StringError};
 use ipc::errors::IpcError;
 use std::collections::HashMap;
 

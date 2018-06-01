@@ -9,8 +9,8 @@
 use config_file_handler;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
-use routing::{ClientError, InterfaceError, RoutingError};
 use routing::messaging;
+use routing::{ClientError, InterfaceError, RoutingError};
 use self_encryption::SelfEncryptionError;
 use self_encryption_storage::SelfEncryptionStorageError;
 use std::error::Error;
@@ -198,13 +198,11 @@ impl Debug for CoreError {
 impl Display for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match *self {
-            CoreError::EncodeDecodeError(ref error) => {
-                write!(
-                    formatter,
-                    "Error while serialising/deserialising: {}",
-                    error
-                )
-            }
+            CoreError::EncodeDecodeError(ref error) => write!(
+                formatter,
+                "Error while serialising/deserialising: {}",
+                error
+            ),
             CoreError::AsymmetricDecipherFailure => {
                 write!(formatter, "Asymmetric decryption failed")
             }
@@ -214,12 +212,10 @@ impl Display for CoreError {
             CoreError::VersionCacheMiss => {
                 write!(formatter, "No such data found in local version cache")
             }
-            CoreError::RootDirectoryExists => {
-                write!(
-                    formatter,
-                    "Cannot overwrite a root directory if it already exists"
-                )
-            }
+            CoreError::RootDirectoryExists => write!(
+                formatter,
+                "Cannot overwrite a root directory if it already exists"
+            ),
             CoreError::RandomDataGenerationFailure => {
                 write!(formatter, "Unable to obtain generator for random data")
             }
@@ -236,18 +232,14 @@ impl Display for CoreError {
             CoreError::RoutingClientError(ref error) => {
                 write!(formatter, "Routing client error -> {}", error)
             }
-            CoreError::UnsupportedSaltSizeForPwHash => {
-                write!(
-                    formatter,
-                    "Unable to pack into or operate with size of Salt"
-                )
-            }
-            CoreError::UnsuccessfulPwHash => {
-                write!(
-                    formatter,
-                    "Unable to complete computation for password hashing"
-                )
-            }
+            CoreError::UnsupportedSaltSizeForPwHash => write!(
+                formatter,
+                "Unable to pack into or operate with size of Salt"
+            ),
+            CoreError::UnsuccessfulPwHash => write!(
+                formatter,
+                "Unable to complete computation for password hashing"
+            ),
             CoreError::OperationAborted => write!(formatter, "Blocking operation was cancelled"),
             CoreError::MpidMessagingError(ref error) => {
                 write!(formatter, "Mpid messaging error: {}", error)

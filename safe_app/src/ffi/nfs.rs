@@ -7,20 +7,22 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use {App, AppContext};
 use errors::AppError;
 use ffi::helper::send;
 use ffi::object_cache::FileContextHandle;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, SafePtr, catch_unwind_cb, from_c_str,
-                vec_clone_from_raw_parts};
-use futures::Future;
+use ffi_utils::{
+    catch_unwind_cb, from_c_str, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, SafePtr,
+    FFI_RESULT_OK,
+};
 use futures::future::{self, Either};
-use safe_core::{FutureExt, MDataInfo as NativeMDataInfo};
-use safe_core::ffi::MDataInfo;
+use futures::Future;
 use safe_core::ffi::nfs::File;
-use safe_core::nfs::{Mode, Reader, Writer, file_helper};
+use safe_core::ffi::MDataInfo;
 use safe_core::nfs::File as NativeFile;
+use safe_core::nfs::{file_helper, Mode, Reader, Writer};
+use safe_core::{FutureExt, MDataInfo as NativeMDataInfo};
 use std::os::raw::{c_char, c_void};
+use {App, AppContext};
 
 /// Holds context for file operations, depending on the mode.
 pub struct FileContext {
@@ -47,10 +49,12 @@ pub unsafe extern "C" fn dir_fetch_file(
     parent_info: *const MDataInfo,
     file_name: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        file: *const File,
-                        version: u64),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        file: *const File,
+        version: u64,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
@@ -153,9 +157,11 @@ pub unsafe extern "C" fn file_open(
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        file_h: FileContextHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        file_h: FileContextHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let parent_info = NativeMDataInfo::clone_from_repr_c(parent_info)?;
@@ -240,10 +246,12 @@ pub unsafe extern "C" fn file_read(
     position: u64,
     len: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        data: *const u8,
-                        data_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        data: *const u8,
+        data_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -329,9 +337,7 @@ pub unsafe extern "C" fn file_close(
     app: *const App,
     file_h: FileContextHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        file: *const File),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, file: *const File),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);

@@ -6,18 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use {AuthError, AuthFuture};
 use access_container::{self, AUTHENTICATOR_ENTRY};
 use config::KEY_APPS;
-use futures::{Future, future};
+use futures::{future, Future};
 use maidsafe_utilities::serialisation::serialise;
 use routing::{ClientError, Value};
-use safe_core::{Client, CoreError, DIR_TAG, FutureExt, MDataInfo};
 use safe_core::ipc::access_container_enc_key;
 use safe_core::mdata_info;
 use safe_core::nfs::create_dir;
 use safe_core::utils::symmetric_encrypt;
+use safe_core::{Client, CoreError, FutureExt, MDataInfo, DIR_TAG};
 use std::collections::HashMap;
+use {AuthError, AuthFuture};
 
 /// Default Directories to be created at registration
 pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
@@ -49,17 +49,17 @@ pub fn create(client: &Client<()>) -> Box<AuthFuture<()>> {
                     // Make sure that all default dirs have been created
                     create_std_dirs(&c3, &default_containers)
                 }
-                Err(AuthError::CoreError(
-                    CoreError::RoutingClientError(ClientError::NoSuchData))) => {
+                Err(AuthError::CoreError(CoreError::RoutingClientError(
+                    ClientError::NoSuchData,
+                ))) => {
                     // Access container hasn't been created yet
                     let access_cont_value = fry!(random_std_dirs())
                         .into_iter()
                         .map(|(name, md_info)| (String::from(name), md_info))
                         .collect();
                     let std_dirs_fut = create_std_dirs(&c3, &access_cont_value);
-                    let access_cont_fut = create_access_container(&c3,
-                                                                  &access_container,
-                                                                  &access_cont_value);
+                    let access_cont_fut =
+                        create_access_container(&c3, &access_container, &access_cont_value);
 
                     future::join_all(vec![std_dirs_fut, access_cont_fut])
                         .map(|_| ())
@@ -104,9 +104,9 @@ fn create_access_container(
         access_container_enc_key(
             AUTHENTICATOR_ENTRY,
             &enc_key,
-            fry!(access_container.nonce().ok_or_else(|| {
-                AuthError::from("Expected to have nonce on access container MDataInfo")
-            })),
+            fry!(access_container.nonce().ok_or_else(|| AuthError::from(
+                "Expected to have nonce on access container MDataInfo"
+            ))),
         ).map_err(AuthError::from)
     );
     let access_cont_value = fry!(symmetric_encrypt(
@@ -130,12 +130,12 @@ fn create_access_container(
 /// Returns a collection of standard dirs along with respective `MDataInfo`s.
 /// Doesn't actually put data onto the network.
 pub fn random_std_dirs() -> Result<Vec<(&'static str, MDataInfo)>, CoreError> {
-    let pub_dirs = DEFAULT_PUBLIC_DIRS.iter().map(|name| {
-        MDataInfo::random_public(DIR_TAG).map(|dir| (*name, dir))
-    });
-    let priv_dirs = DEFAULT_PRIVATE_DIRS.iter().map(|name| {
-        MDataInfo::random_private(DIR_TAG).map(|dir| (*name, dir))
-    });
+    let pub_dirs = DEFAULT_PUBLIC_DIRS
+        .iter()
+        .map(|name| MDataInfo::random_public(DIR_TAG).map(|dir| (*name, dir)));
+    let priv_dirs = DEFAULT_PRIVATE_DIRS
+        .iter()
+        .map(|name| MDataInfo::random_private(DIR_TAG).map(|dir| (*name, dir)));
     priv_dirs.chain(pub_dirs).collect()
 }
 
@@ -187,9 +187,9 @@ mod tests {
                         DEFAULT_PUBLIC_DIRS.len() + DEFAULT_PRIVATE_DIRS.len()
                     );
 
-                    for key in DEFAULT_PUBLIC_DIRS.iter().chain(
-                        DEFAULT_PRIVATE_DIRS.iter(),
-                    )
+                    for key in DEFAULT_PUBLIC_DIRS
+                        .iter()
+                        .chain(DEFAULT_PRIVATE_DIRS.iter())
                     {
                         // let's check whether all our entries have been created properly
                         assert!(mdata_entries.contains_key(*key));

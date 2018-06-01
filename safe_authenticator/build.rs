@@ -8,10 +8,10 @@
 
 //! Build script for generating C header files from FFI modules.
 
-extern crate jni;
 extern crate ffi_utils;
-extern crate rust_sodium;
+extern crate jni;
 extern crate routing;
+extern crate rust_sodium;
 extern crate safe_bindgen;
 #[macro_use]
 extern crate unwrap;
@@ -24,15 +24,16 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 
-const BSD_MIT_LICENSE: &str = "// Copyright 2018 MaidSafe.net limited.\n\
-//\n\
-// This SAFE Network Software is licensed to you under the MIT license\n\
-// <LICENSE-MIT or http://opensource.org/licenses/MIT> or the Modified\n\
-// BSD license <LICENSE-BSD or https://opensource.org/licenses/BSD-3-Clause>,\n\
-// at your option. This file may not be copied, modified, or distributed\n\
-// except according to those terms. Please review the Licences for the\n\
-// specific language governing permissions and limitations relating to use\n\
-// of the SAFE Network Software.";
+const BSD_MIT_LICENSE: &str =
+    "// Copyright 2018 MaidSafe.net limited.\n\
+     //\n\
+     // This SAFE Network Software is licensed to you under the MIT license\n\
+     // <LICENSE-MIT or http://opensource.org/licenses/MIT> or the Modified\n\
+     // BSD license <LICENSE-BSD or https://opensource.org/licenses/BSD-3-Clause>,\n\
+     // at your option. This file may not be copied, modified, or distributed\n\
+     // except according to those terms. Please review the Licences for the\n\
+     // specific language governing permissions and limitations relating to use\n\
+     // of the SAFE Network Software.";
 
 fn main() {
     if env::var("CARGO_FEATURE_BINDINGS").is_err() {

@@ -8,7 +8,7 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use ffi::nfs::File as FfiFile;
-use ffi_utils::{ReprC, vec_into_raw_parts};
+use ffi_utils::{vec_into_raw_parts, ReprC};
 use nfs::errors::NfsError;
 use routing::XorName;
 use std::slice;
@@ -133,11 +133,8 @@ impl ReprC for File {
 
 #[inline]
 fn convert_date_time(sec: i64, nsec: u32) -> Result<DateTime<Utc>, NfsError> {
-    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec).ok_or_else(
-        || {
-            NfsError::Unexpected("Invalid date format".to_string())
-        },
-    )?;
+    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec)
+        .ok_or_else(|| NfsError::Unexpected("Invalid date format".to_string()))?;
     Ok(DateTime::<Utc>::from_utc(naive, Utc))
 }
 

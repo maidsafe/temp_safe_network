@@ -75,8 +75,7 @@ where
 /// and `error_code`.
 pub fn call_0<F>(f: F) -> Result<(), i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: *const FfiResult)),
+    F: FnOnce(*mut c_void, extern "C" fn(user_data: *mut c_void, result: *const FfiResult)),
 {
     let mut ud = Default::default();
     call_0_with_custom(&mut ud, f)
@@ -88,14 +87,17 @@ where
 /// This version of the function takes a `UserData` with custom inner data.
 pub fn call_0_with_custom<F>(ud: &mut UserData, f: F) -> Result<(), i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: *const FfiResult)),
+    F: FnOnce(*mut c_void, extern "C" fn(user_data: *mut c_void, result: *const FfiResult)),
 {
     let (tx, rx) = mpsc::channel::<i32>();
     f(sender_as_user_data(&tx, ud), callback_0);
 
     let error = unwrap!(rx.recv());
-    if error == 0 { Ok(()) } else { Err(error) }
+    if error == 0 {
+        Ok(())
+    } else {
+        Err(error)
+    }
 }
 
 /// Call an FFI function and block until its callback gets called, then return
@@ -104,8 +106,7 @@ where
 /// and `error_code`.
 pub unsafe fn call_1<F, E: Debug, T>(f: F) -> Result<T, i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C)),
+    F: FnOnce(*mut c_void, extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C)),
     T: ReprC<Error = E>,
 {
     let mut ud = Default::default();
@@ -119,8 +120,7 @@ where
 /// This version of the function takes a `UserData` with custom inner data.
 pub fn call_1_with_custom<F, E: Debug, T>(ud: &mut UserData, f: F) -> Result<T, i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C)),
+    F: FnOnce(*mut c_void, extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C)),
     T: ReprC<Error = E>,
 {
     let (tx, rx) = mpsc::channel::<SendWrapper<Result<T, i32>>>();
@@ -134,11 +134,10 @@ where
 /// and `error_code`.
 pub unsafe fn call_2<F, E0, E1, T0, T1>(f: F) -> Result<(T0, T1), i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         T0::C,
-                         T1::C)),
+    F: FnOnce(
+        *mut c_void,
+        extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T0::C, T1::C),
+    ),
     E0: Debug,
     E1: Debug,
     T0: ReprC<Error = E0>,
@@ -158,11 +157,10 @@ pub unsafe fn call_2_with_custom<F, E0, E1, T0, T1>(
     f: F,
 ) -> Result<(T0, T1), i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         T0::C,
-                         T1::C)),
+    F: FnOnce(
+        *mut c_void,
+        extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T0::C, T1::C),
+    ),
     E0: Debug,
     E1: Debug,
     T0: ReprC<Error = E0>,
@@ -179,11 +177,10 @@ where
 /// to `user_data` and `error_code`.
 pub unsafe fn call_vec<F, E, T, U>(f: F) -> Result<Vec<T>, i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         T::C,
-                         usize)),
+    F: FnOnce(
+        *mut c_void,
+        extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C, usize),
+    ),
     E: Debug,
     T: ReprC<C = *const U, Error = E>,
 {
@@ -198,11 +195,10 @@ where
 /// This version of the function takes a `UserData` with custom inner data.
 pub unsafe fn call_vec_with_custom<F, E, T, U>(ud: &mut UserData, f: F) -> Result<Vec<T>, i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         T::C,
-                         usize)),
+    F: FnOnce(
+        *mut c_void,
+        extern "C" fn(user_data: *mut c_void, result: *const FfiResult, T::C, usize),
+    ),
     E: Debug,
     T: ReprC<C = *const U, Error = E>,
 {
@@ -215,11 +211,10 @@ where
 /// the byte array argument which was passed to `Vec<u8>` and return the result.
 pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         *const u8,
-                         usize)),
+    F: FnOnce(
+        *mut c_void,
+        extern "C" fn(user_data: *mut c_void, result: *const FfiResult, *const u8, usize),
+    ),
 {
     let mut ud = Default::default();
     call_vec_u8_with_custom(&mut ud, f)
@@ -231,11 +226,10 @@ where
 /// This version of the function takes a `UserData` with custom inner data.
 pub unsafe fn call_vec_u8_with_custom<F>(ud: &mut UserData, f: F) -> Result<Vec<u8>, i32>
 where
-    F: FnOnce(*mut c_void,
-           extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         *const u8,
-                         usize)),
+    F: FnOnce(
+        *mut c_void,
+        extern "C" fn(user_data: *mut c_void, result: *const FfiResult, *const u8, usize),
+    ),
 {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
     f(sender_as_user_data(&tx, ud), callback_vec_u8);

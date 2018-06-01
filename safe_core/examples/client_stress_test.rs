@@ -11,42 +11,50 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.
 // com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(bad_style, exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
-          unknown_crate_types, warnings)]
-#![deny(deprecated, improper_ctypes, missing_docs,
-        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
-        private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
-        unknown_lints, unsafe_code, unused, unused_allocation, unused_attributes,
-        unused_comparisons, unused_features, unused_parens, while_true)]
-#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-        unused_qualifications, unused_results)]
-#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
-         variant_size_differences)]
-
-#![cfg_attr(feature="cargo-clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="cargo-clippy", allow(use_debug, print_stdout, missing_docs_in_private_items))]
+#![forbid(
+    bad_style, exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types,
+    warnings
+)]
+#![deny(
+    deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns, overflowing_literals,
+    plugin_as_library, private_no_mangle_fns, private_no_mangle_statics, stable_features,
+    unconditional_recursion, unknown_lints, unsafe_code, unused, unused_allocation,
+    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+)]
+#![warn(
+    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+    unused_qualifications, unused_results
+)]
+#![allow(
+    box_pointers, missing_copy_implementations, missing_debug_implementations,
+    variant_size_differences
+)]
+#![cfg_attr(feature = "cargo-clippy", deny(clippy, clippy_pedantic))]
+#![cfg_attr(
+    feature = "cargo-clippy", allow(use_debug, print_stdout, missing_docs_in_private_items)
+)]
 
 extern crate docopt;
-extern crate rand;
-extern crate rustc_serialize;
 extern crate futures;
+extern crate rand;
 extern crate routing;
 extern crate rust_sodium;
+extern crate rustc_serialize;
 #[macro_use]
 extern crate safe_core;
-extern crate tokio_core;
 extern crate maidsafe_utilities;
+extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 
 use docopt::Docopt;
-use futures::Future;
 use futures::stream::{self, Stream};
 use futures::sync::mpsc;
+use futures::Future;
 use rand::{Rng, SeedableRng};
 use routing::{ImmutableData, MutableData};
 use rust_sodium::crypto::sign::PublicKey;
-use safe_core::{Client, CoreMsg, FutureExt, event_loop};
+use safe_core::{event_loop, Client, CoreMsg, FutureExt};
 use tokio_core::reactor::Core;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -104,14 +112,12 @@ fn main() {
     let mutable_data_count = unwrap!(args.flag_mutable);
     let mut rng = rand::XorShiftRng::from_seed(match args.flag_seed {
         Some(seed) => [0, 0, 0, seed],
-        None => {
-            [
-                rand::random(),
-                rand::random(),
-                rand::random(),
-                rand::random(),
-            ]
-        }
+        None => [
+            rand::random(),
+            rand::random(),
+            rand::random(),
+            rand::random(),
+        ],
     });
 
     let el = unwrap!(Core::new());
@@ -178,97 +184,101 @@ fn main() {
         println!("\n\t{}\n\t{}", message, underline);
 
         stream::iter_ok(stored_data.into_iter().enumerate())
-            .fold((client.clone(), args, rng), |(client, args, rng),
-             (i, data)| {
-                let c2 = client.clone();
-                let c3 = client.clone();
-                let c4 = client.clone();
+            .fold(
+                (client.clone(), args, rng),
+                |(client, args, rng), (i, data)| {
+                    let c2 = client.clone();
+                    let c3 = client.clone();
+                    let c4 = client.clone();
 
-                match data {
-                    Data::Immutable(data) => {
-                        let fut = if args.flag_get_only {
-                            futures::finished(data).into_box()
-                        } else {
-                            // Put the data to the network
-                            c2.put_idata(data.clone())
-                                .and_then(move |_| {
-                                    println!("Put ImmutableData chunk #{}: {:?}", i, data.name());
+                    match data {
+                        Data::Immutable(data) => {
+                            let fut = if args.flag_get_only {
+                                futures::finished(data).into_box()
+                            } else {
+                                // Put the data to the network
+                                c2.put_idata(data.clone())
+                                    .and_then(move |_| {
+                                        println!(
+                                            "Put ImmutableData chunk #{}: {:?}",
+                                            i,
+                                            data.name()
+                                        );
 
-                                    // Get the data
-                                    c3.get_idata(*data.name()).map(move |retrieved_data| {
-                                        assert_eq!(data, retrieved_data);
-                                        retrieved_data
-                                    })
-                                })
-                                .and_then(move |retrieved_data| {
-                                    println!(
-                                        "Retrieved ImmutableData chunk #{}: {:?}",
-                                        i,
-                                        retrieved_data.name()
-                                    );
-                                    Ok(retrieved_data)
-                                })
-                                .into_box()
-                        };
-
-                        fut.and_then(move |data| {
-                            // Get all the chunks again
-                            c4.get_idata(*data.name()).map(move |retrieved_data| {
-                                assert_eq!(data, retrieved_data);
-                                println!("Retrieved chunk #{}: {:?}", i, data.name());
-                                (args, rng)
-                            })
-                        }).map(move |(args, rng)| (client, args, rng))
-                            .map_err(|e| println!("Error: {:?}", e))
-                            .into_box()
-                    }
-                    Data::Mutable(data) => {
-                        let fut = if args.flag_get_only {
-                            futures::finished(data).into_box()
-                        } else {
-                            // Put the data to the network
-                            c2.put_mdata(data.clone())
-                                .and_then(move |_| {
-                                    println!("Put MutableData chunk #{}: {:?}", i, data.name());
-
-                                    // Get the data
-                                    c3.get_mdata_shell(*data.name(), data.tag()).map(
-                                        move |retrieved_data| {
+                                        // Get the data
+                                        c3.get_idata(*data.name()).map(move |retrieved_data| {
                                             assert_eq!(data, retrieved_data);
                                             retrieved_data
-                                        },
-                                    )
-                                })
-                                .and_then(move |retrieved_data| {
-                                    println!(
-                                        "Retrieved MutableData chunk #{}: {:?}",
-                                        i,
-                                        retrieved_data.name()
-                                    );
-                                    Ok(retrieved_data)
-                                })
-                                .into_box()
-                        };
+                                        })
+                                    })
+                                    .and_then(move |retrieved_data| {
+                                        println!(
+                                            "Retrieved ImmutableData chunk #{}: {:?}",
+                                            i,
+                                            retrieved_data.name()
+                                        );
+                                        Ok(retrieved_data)
+                                    })
+                                    .into_box()
+                            };
 
-                        // TODO(nbaksalyar): stress test mutate_mdata and get_mdata_value here
-                        fut.and_then(move |data| {
-                            // Get all the chunks again
-                            c4.get_mdata_shell(*data.name(), data.tag()).map(
-                                move |retrieved_data| {
+                            fut.and_then(move |data| {
+                                // Get all the chunks again
+                                c4.get_idata(*data.name()).map(move |retrieved_data| {
                                     assert_eq!(data, retrieved_data);
                                     println!("Retrieved chunk #{}: {:?}", i, data.name());
                                     (args, rng)
-                                },
-                            )
-                        }).map(move |(args, rng)| (client, args, rng))
-                            .map_err(|e| println!("Error: {:?}", e))
-                            .into_box()
+                                })
+                            }).map(move |(args, rng)| (client, args, rng))
+                                .map_err(|e| println!("Error: {:?}", e))
+                                .into_box()
+                        }
+                        Data::Mutable(data) => {
+                            let fut = if args.flag_get_only {
+                                futures::finished(data).into_box()
+                            } else {
+                                // Put the data to the network
+                                c2.put_mdata(data.clone())
+                                    .and_then(move |_| {
+                                        println!("Put MutableData chunk #{}: {:?}", i, data.name());
+
+                                        // Get the data
+                                        c3.get_mdata_shell(*data.name(), data.tag()).map(
+                                            move |retrieved_data| {
+                                                assert_eq!(data, retrieved_data);
+                                                retrieved_data
+                                            },
+                                        )
+                                    })
+                                    .and_then(move |retrieved_data| {
+                                        println!(
+                                            "Retrieved MutableData chunk #{}: {:?}",
+                                            i,
+                                            retrieved_data.name()
+                                        );
+                                        Ok(retrieved_data)
+                                    })
+                                    .into_box()
+                            };
+
+                            // TODO(nbaksalyar): stress test mutate_mdata and get_mdata_value here
+                            fut.and_then(move |data| {
+                                // Get all the chunks again
+                                c4.get_mdata_shell(*data.name(), data.tag()).map(
+                                    move |retrieved_data| {
+                                        assert_eq!(data, retrieved_data);
+                                        println!("Retrieved chunk #{}: {:?}", i, data.name());
+                                        (args, rng)
+                                    },
+                                )
+                            }).map(move |(args, rng)| (client, args, rng))
+                                .map_err(|e| println!("Error: {:?}", e))
+                                .into_box()
+                        }
                     }
-                }
-            })
-            .map(move |_| {
-                unwrap!(core_tx_clone.unbounded_send(CoreMsg::build_terminator()))
-            })
+                },
+            )
+            .map(move |_| unwrap!(core_tx_clone.unbounded_send(CoreMsg::build_terminator())))
             .into_box()
             .into()
     })));

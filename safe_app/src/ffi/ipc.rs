@@ -10,13 +10,16 @@
 //! App-related IPC utilities.
 
 use errors::AppError;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb, from_c_str,
-                vec_clone_from_raw_parts};
+use ffi_utils::{
+    catch_unwind_cb, from_c_str, vec_clone_from_raw_parts, FfiResult, ReprC, FFI_RESULT_OK,
+};
 use maidsafe_utilities::serialisation::serialise;
 use safe_core::ffi::ipc::req::{AuthReq, ContainersReq, ShareMDataReq};
 use safe_core::ffi::ipc::resp::AuthGranted;
-use safe_core::ipc::{self, AuthReq as NativeAuthReq, ContainersReq as NativeContainersReq,
-                     IpcError, IpcMsg, IpcReq, IpcResp, ShareMDataReq as NativeShareMDataReq};
+use safe_core::ipc::{
+    self, AuthReq as NativeAuthReq, ContainersReq as NativeContainersReq, IpcError, IpcMsg, IpcReq,
+    IpcResp, ShareMDataReq as NativeShareMDataReq,
+};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -27,10 +30,12 @@ use std::os::raw::{c_char, c_void};
 pub unsafe extern "C" fn encode_auth_req(
     req: *const AuthReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        req_id: u32,
-                        encoded: *const c_char),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        req_id: u32,
+        encoded: *const c_char,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -49,10 +54,12 @@ pub unsafe extern "C" fn encode_auth_req(
 pub unsafe extern "C" fn encode_containers_req(
     req: *const ContainersReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        req_id: u32,
-                        encoded: *const c_char),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        req_id: u32,
+        encoded: *const c_char,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -72,10 +79,12 @@ pub unsafe extern "C" fn encode_unregistered_req(
     extra_data: *const u8,
     extra_data_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        req_id: u32,
-                        encoded: *const c_char),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        req_id: u32,
+        encoded: *const c_char,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let data = vec_clone_from_raw_parts(extra_data, extra_data_len);
@@ -94,10 +103,12 @@ pub unsafe extern "C" fn encode_unregistered_req(
 pub unsafe extern "C" fn encode_share_mdata_req(
     req: *const ShareMDataReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        req_id: u32,
-                        encoded: *const c_char),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        req_id: u32,
+        encoded: *const c_char,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
@@ -119,19 +130,17 @@ fn encode_ipc(req_id: u32, req: IpcReq) -> Result<CString, AppError> {
 pub unsafe extern "C" fn decode_ipc_msg(
     msg: *const c_char,
     user_data: *mut c_void,
-    o_auth: extern "C" fn(user_data: *mut c_void,
-                          req_id: u32,
-                          auth_granted: *const AuthGranted),
-    o_unregistered: extern "C" fn(user_data: *mut c_void,
-                                  req_id: u32,
-                                  serialised_cfg: *const u8,
-                                  serialised_cfg_len: usize),
+    o_auth: extern "C" fn(user_data: *mut c_void, req_id: u32, auth_granted: *const AuthGranted),
+    o_unregistered: extern "C" fn(
+        user_data: *mut c_void,
+        req_id: u32,
+        serialised_cfg: *const u8,
+        serialised_cfg_len: usize,
+    ),
     o_containers: extern "C" fn(user_data: *mut c_void, req_id: u32),
     o_share_mdata: extern "C" fn(user_data: *mut c_void, req_id: u32),
     o_revoked: extern "C" fn(user_data: *mut c_void),
-    o_err: extern "C" fn(user_data: *mut c_void,
-                         result: *const FfiResult,
-                         req_id: u32),
+    o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, req_id: u32),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<_, AppError> {
         let msg = from_c_str(msg)?;
@@ -141,23 +150,10 @@ pub unsafe extern "C" fn decode_ipc_msg(
             IpcMsg::Resp {
                 resp: IpcResp::Auth(res),
                 req_id,
-            } => {
-                match res {
+            } => match res {
+                Ok(auth_granted) => match auth_granted.into_repr_c() {
                     Ok(auth_granted) => {
-                        match auth_granted.into_repr_c() {
-                            Ok(auth_granted) => {
-                                o_auth(user_data, req_id, &auth_granted);
-                            }
-                            Err(err) => {
-                                let e = AppError::from(err);
-                                let (error_code, description) = ffi_error!(e);
-                                let res = FfiResult {
-                                    error_code,
-                                    description: description.as_ptr(),
-                                };
-                                o_err(user_data, &res, req_id);
-                            }
-                        }
+                        o_auth(user_data, req_id, &auth_granted);
                     }
                     Err(err) => {
                         let e = AppError::from(err);
@@ -168,67 +164,70 @@ pub unsafe extern "C" fn decode_ipc_msg(
                         };
                         o_err(user_data, &res, req_id);
                     }
+                },
+                Err(err) => {
+                    let e = AppError::from(err);
+                    let (error_code, description) = ffi_error!(e);
+                    let res = FfiResult {
+                        error_code,
+                        description: description.as_ptr(),
+                    };
+                    o_err(user_data, &res, req_id);
                 }
-            }
+            },
             IpcMsg::Resp {
                 resp: IpcResp::Containers(res),
                 req_id,
-            } => {
-                match res {
-                    Ok(()) => o_containers(user_data, req_id),
-                    Err(err) => {
-                        let e = AppError::from(err);
-                        let (error_code, description) = ffi_error!(e);
-                        let res = FfiResult {
-                            error_code,
-                            description: description.as_ptr(),
-                        };
-                        o_err(user_data, &res, req_id);
-                    }
+            } => match res {
+                Ok(()) => o_containers(user_data, req_id),
+                Err(err) => {
+                    let e = AppError::from(err);
+                    let (error_code, description) = ffi_error!(e);
+                    let res = FfiResult {
+                        error_code,
+                        description: description.as_ptr(),
+                    };
+                    o_err(user_data, &res, req_id);
                 }
-            }
+            },
             IpcMsg::Resp {
                 resp: IpcResp::Unregistered(res),
                 req_id,
-            } => {
-                match res {
-                    Ok(bootstrap_cfg) => {
-                        let serialised_cfg = serialise(&bootstrap_cfg)?;
-                        o_unregistered(
-                            user_data,
-                            req_id,
-                            serialised_cfg.as_ptr(),
-                            serialised_cfg.len(),
-                        );
-                    }
-                    Err(err) => {
-                        let e = AppError::from(err);
-                        let (error_code, description) = ffi_error!(e);
-                        let res = FfiResult {
-                            error_code,
-                            description: description.as_ptr(),
-                        };
-                        o_err(user_data, &res, req_id);
-                    }
+            } => match res {
+                Ok(bootstrap_cfg) => {
+                    let serialised_cfg = serialise(&bootstrap_cfg)?;
+                    o_unregistered(
+                        user_data,
+                        req_id,
+                        serialised_cfg.as_ptr(),
+                        serialised_cfg.len(),
+                    );
                 }
-            }
+                Err(err) => {
+                    let e = AppError::from(err);
+                    let (error_code, description) = ffi_error!(e);
+                    let res = FfiResult {
+                        error_code,
+                        description: description.as_ptr(),
+                    };
+                    o_err(user_data, &res, req_id);
+                }
+            },
             IpcMsg::Resp {
                 resp: IpcResp::ShareMData(res),
                 req_id,
-            } => {
-                match res {
-                    Ok(()) => o_share_mdata(user_data, req_id),
-                    Err(err) => {
-                        let e = AppError::from(err);
-                        let (error_code, description) = ffi_error!(e);
-                        let res = FfiResult {
-                            error_code,
-                            description: description.as_ptr(),
-                        };
-                        o_err(user_data, &res, req_id);
-                    }
+            } => match res {
+                Ok(()) => o_share_mdata(user_data, req_id),
+                Err(err) => {
+                    let e = AppError::from(err);
+                    let (error_code, description) = ffi_error!(e);
+                    let res = FfiResult {
+                        error_code,
+                        description: description.as_ptr(),
+                    };
+                    o_err(user_data, &res, req_id);
                 }
-            }
+            },
             IpcMsg::Revoked { .. } => o_revoked(user_data),
             _ => {
                 return Err(IpcError::InvalidMsg.into());
@@ -242,16 +241,17 @@ pub unsafe extern "C" fn decode_ipc_msg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::ReprC;
     use ffi_utils::test_utils::call_2;
+    use ffi_utils::ReprC;
     use rand;
     use routing::{Action, PermissionSet};
     use rust_sodium::crypto::secretbox;
     use safe_core::crypto::{shared_box, shared_secretbox, shared_sign};
     use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
-    use safe_core::ipc::{self, AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted,
-                         AuthReq, BootstrapConfig, ContainersReq, IpcMsg, IpcReq, IpcResp,
-                         Permission, ShareMData, ShareMDataReq};
+    use safe_core::ipc::{
+        self, AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
+        ContainersReq, IpcMsg, IpcReq, IpcResp, Permission, ShareMData, ShareMDataReq,
+    };
     use safe_core::utils;
     use std::collections::HashMap;
     use std::ffi::CString;
@@ -326,9 +326,12 @@ mod tests {
     fn encode_unregistered_req_basics() {
         let test_data = vec![1u8, 10];
         let (req_id, encoded): (u32, String) = unsafe {
-            unwrap!(call_2(|ud, cb| {
-                encode_unregistered_req(test_data.as_ptr(), test_data.len(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| encode_unregistered_req(
+                test_data.as_ptr(),
+                test_data.len(),
+                ud,
+                cb
+            )))
         };
 
         // Decode it and verify it's the same we encoded.
@@ -351,15 +354,13 @@ mod tests {
     fn encode_share_mdata_basics() {
         let req = ShareMDataReq {
             app: gen_app_exchange_info(),
-            mdata: vec![
-                ShareMData {
-                    type_tag: rand::random(),
-                    name: rand::random(),
-                    perms: PermissionSet::new().allow(Action::Insert).allow(
-                        Action::Update
-                    ),
-                },
-            ],
+            mdata: vec![ShareMData {
+                type_tag: rand::random(),
+                name: rand::random(),
+                perms: PermissionSet::new()
+                    .allow(Action::Insert)
+                    .allow(Action::Update),
+            }],
         };
 
         let req_c = unwrap!(req.clone().into_repr_c());

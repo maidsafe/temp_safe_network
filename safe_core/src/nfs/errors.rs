@@ -66,20 +66,16 @@ impl fmt::Display for NfsError {
 
             NfsError::InvalidRange => write!(f, "Invalid byte range specified"),
             NfsError::Unexpected(ref error) => write!(f, "Unexpected error - {:?}", error),
-            NfsError::EncodeDecodeError(ref error) => {
-                write!(
-                    f,
-                    "Unsuccessful Serialisation or Deserialisation: {:?}",
-                    error
-                )
-            }
-            NfsError::SelfEncryption(ref error) => {
-                write!(
-                    f,
-                    "Error while self-encrypting/-decrypting data: {:?}",
-                    error
-                )
-            }
+            NfsError::EncodeDecodeError(ref error) => write!(
+                f,
+                "Unsuccessful Serialisation or Deserialisation: {:?}",
+                error
+            ),
+            NfsError::SelfEncryption(ref error) => write!(
+                f,
+                "Error while self-encrypting/-decrypting data: {:?}",
+                error
+            ),
         }
     }
 }

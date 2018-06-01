@@ -10,24 +10,24 @@
 
 #![cfg(feature = "use-mock-routing")]
 
-use AuthError;
-use AuthFuture;
-use Authenticator;
 use access_container;
 use app_auth::{self, AppState};
 use config;
-use futures::{Future, future};
+use futures::{future, Future};
 use rand::{Rng, SeedableRng, XorShiftRng};
 use revocation;
-use safe_core::{Client, FutureExt, MDataInfo};
 use safe_core::config_handler;
-use safe_core::ipc::{AccessContainerEntry, AppExchangeInfo, AuthReq, Permission};
 use safe_core::ipc::req::ContainerPermissions;
+use safe_core::ipc::{AccessContainerEntry, AppExchangeInfo, AuthReq, Permission};
 use safe_core::mock_vault_path;
+use safe_core::{Client, FutureExt, MDataInfo};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
+use AuthError;
+use AuthFuture;
+use Authenticator;
 
 #[test]
 #[ignore]
@@ -39,8 +39,7 @@ fn write_data() {
         unwrap!(fs::remove_file(vault_path));
     }
 
-    let auth =
-        unwrap!(Authenticator::create_acc(
+    let auth = unwrap!(Authenticator::create_acc(
         stash.locator.clone(),
         stash.password.clone(),
         stash.invitation.clone(),
@@ -99,9 +98,8 @@ fn read_data() {
             })
             .then(move |res| {
                 let client = unwrap!(res);
-                config::get_app(&client, &stash.auth_req0.app.id).map(
-                    move |app_info| (client, stash, app_info),
-                )
+                config::get_app(&client, &stash.auth_req0.app.id)
+                    .map(move |app_info| (client, stash, app_info))
             })
             .then(move |res| {
                 let (client, stash, app_info) = unwrap!(res);

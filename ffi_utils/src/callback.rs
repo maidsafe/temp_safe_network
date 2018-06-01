@@ -31,7 +31,8 @@ impl Callback for extern "C" fn(user_data: *mut c_void, result: *const FfiResult
 }
 
 impl<T: CallbackArgs> Callback
-    for extern "C" fn(user_data: *mut c_void, result: *const FfiResult, a: T) {
+    for extern "C" fn(user_data: *mut c_void, result: *const FfiResult, a: T)
+{
     type Args = T;
     fn call(&self, user_data: *mut c_void, error: *const FfiResult, args: Self::Args) {
         self(user_data, error, args)
@@ -39,7 +40,8 @@ impl<T: CallbackArgs> Callback
 }
 
 impl<T: CallbackArgs> Callback
-    for unsafe extern "C" fn(user_data: *mut c_void, result: *const FfiResult, a: T) {
+    for unsafe extern "C" fn(user_data: *mut c_void, result: *const FfiResult, a: T)
+{
     type Args = T;
     fn call(&self, user_data: *mut c_void, error: *const FfiResult, args: Self::Args) {
         unsafe { self(user_data, error, args) }
@@ -47,10 +49,8 @@ impl<T: CallbackArgs> Callback
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs> Callback
-    for extern "C" fn(user_data: *mut c_void,
-                  result: *const FfiResult,
-                  a0: T0,
-                  a1: T1) {
+    for extern "C" fn(user_data: *mut c_void, result: *const FfiResult, a0: T0, a1: T1)
+{
     type Args = (T0, T1);
     fn call(&self, user_data: *mut c_void, error: *const FfiResult, args: Self::Args) {
         self(user_data, error, args.0, args.1)
@@ -58,11 +58,8 @@ impl<T0: CallbackArgs, T1: CallbackArgs> Callback
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
-    for extern "C" fn(user_data: *mut c_void,
-                  result: *const FfiResult,
-                  a0: T0,
-                  a1: T1,
-                  a2: T2) {
+    for extern "C" fn(user_data: *mut c_void, result: *const FfiResult, a0: T0, a1: T1, a2: T2)
+{
     type Args = (T0, T1, T2);
     fn call(&self, user_data: *mut c_void, error: *const FfiResult, args: Self::Args) {
         self(user_data, error, args.0, args.1, args.2)
@@ -153,7 +150,8 @@ impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> CallbackArgs for (T0,
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> CallbackArgs
-    for (T0, T1, T2, T3) {
+    for (T0, T1, T2, T3)
+{
     fn default() -> Self {
         (
             CallbackArgs::default(),

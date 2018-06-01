@@ -17,7 +17,7 @@ pub use self::futures::FutureExt;
 use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;
-use rust_sodium::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
+use rust_sodium::crypto::hash::sha512::{self, Digest, DIGESTBYTES};
 use rust_sodium::crypto::secretbox;
 
 #[macro_export]
@@ -99,13 +99,11 @@ pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
         error!("{:?}", error);
         CoreError::RandomDataGenerationFailure
     })?;
-    Ok(
-        os_rng
-            .gen_iter::<char>()
-            .filter(|c| *c != '\u{0}')
-            .take(length)
-            .collect(),
-    )
+    Ok(os_rng
+        .gen_iter::<char>()
+        .filter(|c| *c != '\u{0}')
+        .take(length)
+        .collect())
 }
 
 /// Generates a readable `String` using only ASCII characters.

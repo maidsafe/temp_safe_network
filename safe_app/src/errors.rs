@@ -13,9 +13,9 @@ use ffi_utils::{ErrorCode, StringError};
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::ClientError;
-use safe_core::{CoreError, SelfEncryptionStorageError};
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
+use safe_core::{CoreError, SelfEncryptionStorageError};
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
 use std::ffi::NulError;
@@ -166,13 +166,11 @@ impl Display for AppError {
                 write!(formatter, "'{}' not found in the access container", name)
             }
             AppError::InvalidCipherOptHandle => write!(formatter, "Invalid CipherOpt handle"),
-            AppError::InvalidFileMode => {
-                write!(
-                    formatter,
-                    "Invalid file mode (e.g. trying to write when \
-                       file is opened for reading only)"
-                )
-            }
+            AppError::InvalidFileMode => write!(
+                formatter,
+                "Invalid file mode (e.g. trying to write when \
+                 file is opened for reading only)"
+            ),
             AppError::InvalidEncryptPubKeyHandle => {
                 write!(formatter, "Invalid encrypt (box_) key handle")
             }
@@ -199,15 +197,13 @@ impl Display for AppError {
             AppError::SelfEncryption(ref error) => {
                 write!(formatter, "Self-encryption error: {}", error)
             }
-            AppError::InvalidSelfEncryptorReadOffsets => {
-                write!(
-                    formatter,
-                    "Invalid offsets (from-position \
-                        and length combination) provided for \
-                        reading form SelfEncryptor. Would have \
-                        probably caused an overflow."
-                )
-            }
+            AppError::InvalidSelfEncryptorReadOffsets => write!(
+                formatter,
+                "Invalid offsets (from-position \
+                 and length combination) provided for \
+                 reading form SelfEncryptor. Would have \
+                 probably caused an overflow."
+            ),
             AppError::IoError(ref error) => write!(formatter, "I/O error: {}", error),
             AppError::Unexpected(ref error) => {
                 write!(formatter, "Unexpected (probably a logic error): {}", error)
@@ -320,36 +316,31 @@ impl From<RecvTimeoutError> for AppError {
     }
 }
 
-
 impl ErrorCode for AppError {
     fn error_code(&self) -> i32 {
         match *self {
             AppError::CoreError(ref err) => core_error_code(err),
-            AppError::IpcError(ref err) => {
-                match *err {
-                    IpcError::AuthDenied => ERR_AUTH_DENIED,
-                    IpcError::ContainersDenied => ERR_CONTAINERS_DENIED,
-                    IpcError::InvalidMsg => ERR_INVALID_MSG,
-                    IpcError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
-                    IpcError::AlreadyAuthorised => ERR_ALREADY_AUTHORISED,
-                    IpcError::UnknownApp => ERR_UNKNOWN_APP,
-                    IpcError::Unexpected(_) => ERR_UNEXPECTED,
-                    IpcError::StringError(_) => ERR_STRING_ERROR,
-                    IpcError::ShareMDataDenied => ERR_SHARE_MDATA_DENIED,
-                    IpcError::InvalidOwner(..) => ERR_INVALID_OWNER,
-                }
-            }
-            AppError::NfsError(ref err) => {
-                match *err {
-                    NfsError::CoreError(ref err) => core_error_code(err),
-                    NfsError::FileExists => ERR_FILE_EXISTS,
-                    NfsError::FileNotFound => ERR_FILE_NOT_FOUND,
-                    NfsError::InvalidRange => ERR_INVALID_RANGE,
-                    NfsError::EncodeDecodeError(_) => ERR_ENCODE_DECODE_ERROR,
-                    NfsError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
-                    NfsError::Unexpected(_) => ERR_UNEXPECTED,
-                }
-            }
+            AppError::IpcError(ref err) => match *err {
+                IpcError::AuthDenied => ERR_AUTH_DENIED,
+                IpcError::ContainersDenied => ERR_CONTAINERS_DENIED,
+                IpcError::InvalidMsg => ERR_INVALID_MSG,
+                IpcError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
+                IpcError::AlreadyAuthorised => ERR_ALREADY_AUTHORISED,
+                IpcError::UnknownApp => ERR_UNKNOWN_APP,
+                IpcError::Unexpected(_) => ERR_UNEXPECTED,
+                IpcError::StringError(_) => ERR_STRING_ERROR,
+                IpcError::ShareMDataDenied => ERR_SHARE_MDATA_DENIED,
+                IpcError::InvalidOwner(..) => ERR_INVALID_OWNER,
+            },
+            AppError::NfsError(ref err) => match *err {
+                NfsError::CoreError(ref err) => core_error_code(err),
+                NfsError::FileExists => ERR_FILE_EXISTS,
+                NfsError::FileNotFound => ERR_FILE_NOT_FOUND,
+                NfsError::InvalidRange => ERR_INVALID_RANGE,
+                NfsError::EncodeDecodeError(_) => ERR_ENCODE_DECODE_ERROR,
+                NfsError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
+                NfsError::Unexpected(_) => ERR_UNEXPECTED,
+            },
             AppError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
             AppError::OperationForbidden => ERR_OPERATION_FORBIDDEN,
             AppError::NoSuchContainer(_) => ERR_NO_SUCH_CONTAINER,
@@ -385,28 +376,26 @@ fn core_error_code(err: &CoreError) -> i32 {
         CoreError::OperationForbidden => ERR_OPERATION_FORBIDDEN,
         CoreError::RoutingError(_) => ERR_ROUTING_ERROR,
         CoreError::RoutingInterfaceError(_) => ERR_ROUTING_INTERFACE_ERROR,
-        CoreError::RoutingClientError(ref err) => {
-            match *err {
-                ClientError::AccessDenied => ERR_ACCESS_DENIED,
-                ClientError::NoSuchAccount => ERR_NO_SUCH_ACCOUNT,
-                ClientError::AccountExists => ERR_ACCOUNT_EXISTS,
-                ClientError::NoSuchData => ERR_NO_SUCH_DATA,
-                ClientError::DataExists => ERR_DATA_EXISTS,
-                ClientError::DataTooLarge => ERR_DATA_TOO_LARGE,
-                ClientError::NoSuchEntry => ERR_NO_SUCH_ENTRY,
-                ClientError::InvalidEntryActions(..) => ERR_INVALID_ENTRY_ACTIONS,
-                ClientError::TooManyEntries => ERR_TOO_MANY_ENTRIES,
-                ClientError::NoSuchKey => ERR_NO_SUCH_KEY,
-                ClientError::InvalidOwners => ERR_INVALID_OWNERS,
-                ClientError::InvalidSuccessor(..) => ERR_INVALID_SUCCESSOR,
-                ClientError::InvalidOperation => ERR_INVALID_OPERATION,
-                ClientError::LowBalance => ERR_LOW_BALANCE,
-                ClientError::NetworkFull => ERR_NETWORK_FULL,
-                ClientError::NetworkOther(_) => ERR_NETWORK_OTHER,
-                ClientError::InvalidInvitation => ERR_INVALID_INVITATION,
-                ClientError::InvitationAlreadyClaimed => ERR_INVITATION_ALREADY_CLAIMED,
-            }
-        }
+        CoreError::RoutingClientError(ref err) => match *err {
+            ClientError::AccessDenied => ERR_ACCESS_DENIED,
+            ClientError::NoSuchAccount => ERR_NO_SUCH_ACCOUNT,
+            ClientError::AccountExists => ERR_ACCOUNT_EXISTS,
+            ClientError::NoSuchData => ERR_NO_SUCH_DATA,
+            ClientError::DataExists => ERR_DATA_EXISTS,
+            ClientError::DataTooLarge => ERR_DATA_TOO_LARGE,
+            ClientError::NoSuchEntry => ERR_NO_SUCH_ENTRY,
+            ClientError::InvalidEntryActions(..) => ERR_INVALID_ENTRY_ACTIONS,
+            ClientError::TooManyEntries => ERR_TOO_MANY_ENTRIES,
+            ClientError::NoSuchKey => ERR_NO_SUCH_KEY,
+            ClientError::InvalidOwners => ERR_INVALID_OWNERS,
+            ClientError::InvalidSuccessor(..) => ERR_INVALID_SUCCESSOR,
+            ClientError::InvalidOperation => ERR_INVALID_OPERATION,
+            ClientError::LowBalance => ERR_LOW_BALANCE,
+            ClientError::NetworkFull => ERR_NETWORK_FULL,
+            ClientError::NetworkOther(_) => ERR_NETWORK_OTHER,
+            ClientError::InvalidInvitation => ERR_INVALID_INVITATION,
+            ClientError::InvitationAlreadyClaimed => ERR_INVITATION_ALREADY_CLAIMED,
+        },
         CoreError::UnsupportedSaltSizeForPwHash => ERR_UNSUPPORTED_SALT_SIZE_FOR_PW_HASH,
         CoreError::UnsuccessfulPwHash => ERR_UNSUCCESSFUL_PW_HASH,
         CoreError::OperationAborted => ERR_OPERATION_ABORTED,

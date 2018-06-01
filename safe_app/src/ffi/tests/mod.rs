@@ -10,19 +10,19 @@
 mod nfs;
 
 use super::*;
-use App;
 use ffi::ipc::decode_ipc_msg;
 use ffi_utils::test_utils::call_1;
 use routing::ImmutableData;
 use safe_authenticator::ffi::ipc::encode_auth_resp;
 use safe_authenticator::test_utils;
-use safe_core::ffi::AccountInfo;
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
-use safe_core::ipc::{AuthGranted, Permission, gen_req_id};
+use safe_core::ffi::AccountInfo;
 use safe_core::ipc::req::{AuthReq, ContainerPermissions};
+use safe_core::ipc::{gen_req_id, AuthGranted, Permission};
 use std::collections::HashMap;
 use test_utils::create_app;
 use test_utils::gen_app_exchange_info;
+use App;
 
 // Creates a containers request asking for "documents with permission to
 // insert", and "videos with all the permissions possible".
@@ -76,7 +76,7 @@ fn account_info() {
 #[cfg(all(test, feature = "use-mock-routing"))]
 #[test]
 fn network_status_callback() {
-    use ffi_utils::test_utils::{UserData, call_0, call_1_with_custom, send_via_user_data_custom};
+    use ffi_utils::test_utils::{call_0, call_1_with_custom, send_via_user_data_custom, UserData};
     use maidsafe_utilities::serialisation::serialise;
     use safe_core::ipc::BootstrapConfig;
     use std::os::raw::c_void;
@@ -170,9 +170,11 @@ fn test_app_container_name() {
     let _app = unwrap!(App::registered(app_id.clone(), auth_granted, || ()));
 
     let name: String = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            app_container_name(unwrap!(CString::new(app_id.clone())).as_ptr(), ud, cb)
-        }))
+        unwrap!(call_1(|ud, cb| app_container_name(
+            unwrap!(CString::new(app_id.clone())).as_ptr(),
+            ud,
+            cb
+        )))
     };
     assert_eq!(name, safe_core::app_container_name(&app_id));
 }
@@ -195,9 +197,9 @@ fn app_authentication() {
 
     let req_id = gen_req_id();
     let encoded: String = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            encode_auth_resp(&auth, &auth_req, req_id, true, ud, cb)
-        }))
+        unwrap!(call_1(|ud, cb| encode_auth_resp(
+            &auth, &auth_req, req_id, true, ud, cb
+        )))
     };
     let encoded = unwrap!(CString::new(encoded));
 

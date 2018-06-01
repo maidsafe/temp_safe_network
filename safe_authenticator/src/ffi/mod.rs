@@ -8,20 +8,20 @@
 
 /// Apps management
 pub mod apps;
-/// Logging utilities
-pub mod logging;
 /// Authenticator communication with apps
 pub mod ipc;
+/// Logging utilities
+pub mod logging;
 
-use Authenticator;
 use config_file_handler;
 use errors::AuthError;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, from_c_str};
+use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use futures::Future;
-use safe_core::FutureExt;
 use safe_core::ffi::AccountInfo;
+use safe_core::FutureExt;
 use std::ffi::{CStr, CString, OsStr};
 use std::os::raw::{c_char, c_void};
+use Authenticator;
 
 /// Create a registered client. This or any one of the other companion
 /// functions to get an authenticator instance must be called before initiating any
@@ -36,9 +36,11 @@ pub unsafe extern "C" fn create_acc(
     invitation: *const c_char,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        authenticator: *mut Authenticator),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        authenticator: *mut Authenticator,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -76,9 +78,11 @@ pub unsafe extern "C" fn login(
     account_password: *const c_char,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: unsafe extern "C" fn(user_data: *mut c_void),
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        authenticaor: *mut Authenticator),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        authenticaor: *mut Authenticator,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -132,9 +136,11 @@ pub unsafe extern "C" fn auth_reconnect(
 pub unsafe extern "C" fn auth_account_info(
     auth: *mut Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        account_info: *const AccountInfo),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        account_info: *const AccountInfo,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         let user_data = OpaqueCtx(user_data);
@@ -161,11 +167,8 @@ pub unsafe extern "C" fn auth_account_info(
 #[no_mangle]
 pub unsafe extern "C" fn auth_exe_file_stem(
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        filename: *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, filename: *const c_char),
 ) {
-
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
             let path_c_str = CString::new(path)?;
@@ -210,13 +213,13 @@ pub unsafe extern "C" fn auth_free(auth: *mut Authenticator) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Authenticator;
     use ffi_utils::test_utils::call_1;
     use routing::ImmutableData;
     use safe_core::ffi::AccountInfo;
     use safe_core::utils;
     use std::ffi::CString;
     use std::os::raw::c_void;
+    use Authenticator;
 
     // Test creating an account and logging in.
     #[test]
@@ -227,16 +230,14 @@ mod tests {
 
         {
             let auth_h: *mut Authenticator = unsafe {
-                unwrap!(call_1(|ud, cb| {
-                    create_acc(
-                        acc_locator.as_ptr(),
-                        acc_password.as_ptr(),
-                        invitation.as_ptr(),
-                        ud,
-                        disconnect_cb,
-                        cb,
-                    )
-                }))
+                unwrap!(call_1(|ud, cb| create_acc(
+                    acc_locator.as_ptr(),
+                    acc_password.as_ptr(),
+                    invitation.as_ptr(),
+                    ud,
+                    disconnect_cb,
+                    cb,
+                )))
             };
             assert!(!auth_h.is_null());
             unsafe { auth_free(auth_h) };
@@ -244,15 +245,13 @@ mod tests {
 
         {
             let auth_h: *mut Authenticator = unsafe {
-                unwrap!(call_1(|ud, cb| {
-                    login(
-                        acc_locator.as_ptr(),
-                        acc_password.as_ptr(),
-                        ud,
-                        disconnect_cb,
-                        cb,
-                    )
-                }))
+                unwrap!(call_1(|ud, cb| login(
+                    acc_locator.as_ptr(),
+                    acc_password.as_ptr(),
+                    ud,
+                    disconnect_cb,
+                    cb,
+                )))
             };
             assert!(!auth_h.is_null());
             unsafe { auth_free(auth_h) };
@@ -267,10 +266,11 @@ mod tests {
     #[cfg(all(test, feature = "use-mock-routing"))]
     #[test]
     fn network_status_callback() {
-        use ffi_utils::test_utils::{UserData, call_0, call_1_with_custom,
-                                    send_via_user_data_custom};
-        use std::time::Duration;
+        use ffi_utils::test_utils::{
+            call_0, call_1_with_custom, send_via_user_data_custom, UserData,
+        };
         use std::sync::mpsc::{self, Receiver, Sender};
+        use std::time::Duration;
 
         let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
         let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
@@ -284,16 +284,14 @@ mod tests {
             custom_ud.custom = ptr as *mut c_void;
 
             let auth: *mut Authenticator = unsafe {
-                unwrap!(call_1_with_custom(&mut custom_ud, |ud, cb| {
-                    create_acc(
-                        acc_locator.as_ptr(),
-                        acc_password.as_ptr(),
-                        invitation.as_ptr(),
-                        ud,
-                        disconnect_cb,
-                        cb,
-                    )
-                }))
+                unwrap!(call_1_with_custom(&mut custom_ud, |ud, cb| create_acc(
+                    acc_locator.as_ptr(),
+                    acc_password.as_ptr(),
+                    invitation.as_ptr(),
+                    ud,
+                    disconnect_cb,
+                    cb,
+                )))
             };
 
             unsafe {
@@ -347,16 +345,14 @@ mod tests {
         let invitation = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
 
         let auth: *mut Authenticator = unsafe {
-            unwrap!(call_1(|ud, cb| {
-                create_acc(
-                    acc_locator.as_ptr(),
-                    acc_password.as_ptr(),
-                    invitation.as_ptr(),
-                    ud,
-                    disconnect_cb,
-                    cb,
-                )
-            }))
+            unwrap!(call_1(|ud, cb| create_acc(
+                acc_locator.as_ptr(),
+                acc_password.as_ptr(),
+                invitation.as_ptr(),
+                ud,
+                disconnect_cb,
+                cb,
+            )))
         };
 
         let orig_stats: AccountInfo =
