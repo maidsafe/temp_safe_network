@@ -1,6 +1,6 @@
-sudo: false
-
-language: rust
+vars:
+  - &stable "1.26.1"
+  - &nightly "nightly-2018-05-29"
 
 # Env variables:
 #
@@ -15,7 +15,12 @@ env:
     - PROJECT_NAME=safe_vault
     - PATH=$PATH:$HOME/.cargo/bin:$HOME/musl/bin
     - RUST_BACKTRACE=1
-    - RUST_STABLE=1.24.0
+    - RUST_STABLE=1.26.1
+    - RUST_NIGHTLY=nightly-2018-05-29
+
+sudo: false
+
+language: rust
 
 matrix:
   include:
@@ -39,7 +44,7 @@ matrix:
 
     - os: linux
     # TODO: Remove this once the musl build works again.
-      rust: 1.24.0
+      rust: *stable
       env: >
         PLATFORM=linux-x64
       sudo: required
@@ -50,7 +55,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: 1.24.0
+      rust: *stable
       env: >
         PLATFORM=linux-x86
         TARGET=i686-unknown-linux-gnu
@@ -63,7 +68,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: 1.24.0
+      rust: *stable
       env: >
         PLATFORM=armv7
         TARGET=armv7-unknown-linux-gnueabihf
@@ -78,14 +83,14 @@ matrix:
             - libc6-dev-armhf-cross
 
     - os: osx
-      rust: 1.24.0
+      rust: *stable
       env: >
         PLATFORM=osx-x64
         SKIP_SIGN_PACKAGE=1
 
     # For running `cargo clippy`
     - os: linux
-      rust: nightly-2018-02-05
+      rust: *nightly
 
 cache:
   cargo: true
@@ -102,10 +107,9 @@ install:
 before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [ "${TRAVIS_RUST_VERSION}" = "$RUST_STABLE" ]; then
-      bash cargo_install.sh rustfmt 0.9.0;
-    elif [ -z "${TARGET}" ] && [ "${TRAVIS_OS_NAME}" = linux ]; then
-      bash cargo_install.sh clippy 0.0.186;
+  - if [ "$TRAVIS_RUST_VERSION" = $RUST_NIGHTLY ] && [ "$TRAVIS_OS_NAME" = linux ]; then
+      bash cargo_install.sh rustfmt-nightly 0.8.2;
+      bash cargo_install.sh clippy 0.0.206;
     fi
 
 script:
@@ -135,7 +139,7 @@ deploy:
     draft: true
     tag_name: ${PROJECT_VERSION}
     on:
-      rust: 1.24.0
+      rust: *stable
       condition: -n "$PROJECT_VERSION"
 
 # TODO - verify and renable following block
