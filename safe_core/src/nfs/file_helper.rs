@@ -50,7 +50,7 @@ where
         .into_box()
 }
 
-/// Gets a file from the directory
+/// Get a file from the directory.
 pub fn fetch<S, T>(client: Client<T>, parent: MDataInfo, name: S) -> Box<NfsFuture<(u64, File)>>
 where
     S: AsRef<str>,
@@ -73,7 +73,7 @@ where
         .into_box()
 }
 
-/// Returns a reader for reading the file contents
+/// Return a Reader for reading the file contents.
 pub fn read<T: 'static>(
     client: Client<T>,
     file: &File,
@@ -88,7 +88,10 @@ pub fn read<T: 'static>(
     )
 }
 
-/// Delete a file from the Directory
+/// Delete a file from the Directory.
+// Allow pass by value for consistency with other functions.
+#[allow(unknown_lints)]
+#[allow(needless_pass_by_value)]
 pub fn delete<S, T>(
     client: &Client<T>,
     parent: &MDataInfo,
@@ -114,7 +117,7 @@ where
         .into_box()
 }
 
-/// Updates the file.
+/// Update the file.
 /// If `version` is 0, the current version is first retrieved from the network,
 /// and that version incremented by one is then used as the actual version.
 pub fn update<S, T>(
@@ -161,10 +164,10 @@ where
         .into_box()
 }
 
-/// Helper function to Update content of a file in a directory. A writer
+/// Helper function to update content of a file in a directory. A Writer
 /// object is returned, through which the data for the file can be written to
 /// the network. The file is actually saved in the directory listing only after
-/// `writer.close()` is invoked
+/// `writer.close()` is invoked.
 pub fn write<T>(
     client: Client<T>,
     file: File,
