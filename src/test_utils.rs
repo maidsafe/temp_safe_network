@@ -9,12 +9,12 @@
 #[cfg(not(feature = "use-mock-crust"))]
 use authority::ClientAuthority;
 use authority::ClientManagerAuthority;
-use rand::{Rand, Rng, seq};
-use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
+use rand::{seq, Rand, Rng};
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::Config as RoutingConfig;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::DevConfig as RoutingDevConfig;
+use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
 use rust_sodium::crypto::sign;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,7 +33,7 @@ macro_rules! assert_match {
 
     ($e:expr, $p:pat) => {
         assert_match!($e, $p => ())
-    }
+    };
 }
 
 /// Toggle iterations for quick test environment variable
@@ -142,8 +142,8 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
 /// Generate random `Client` authority and return it together with its client key.
 #[cfg(not(feature = "use-mock-crust"))]
 pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
-    use routing::FullId;
     use rand;
+    use routing::FullId;
 
     let full_id = FullId::new();
 

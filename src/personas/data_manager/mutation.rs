@@ -48,10 +48,10 @@ impl Mutation {
         match *self {
             Mutation::PutIData(ref data) => DataId::Immutable(data.id()),
             Mutation::PutMData(ref data) => DataId::Mutable(data.id()),
-            Mutation::MutateMDataEntries { name, tag, .. } |
-            Mutation::SetMDataUserPermissions { name, tag, .. } |
-            Mutation::DelMDataUserPermissions { name, tag, .. } |
-            Mutation::ChangeMDataOwner { name, tag, .. } => DataId::mutable(name, tag),
+            Mutation::MutateMDataEntries { name, tag, .. }
+            | Mutation::SetMDataUserPermissions { name, tag, .. }
+            | Mutation::DelMDataUserPermissions { name, tag, .. }
+            | Mutation::ChangeMDataOwner { name, tag, .. } => DataId::mutable(name, tag),
         }
     }
 
@@ -70,16 +70,18 @@ impl Mutation {
     /// mutations cannot be applied concurrently.
     pub fn conflicts_with(&self, other: &Self) -> bool {
         match (self, other) {
-            (&Mutation::MutateMDataEntries {
-                 name: name0,
-                 tag: tag0,
-                 actions: ref actions0,
-             },
-             &Mutation::MutateMDataEntries {
-                 name: name1,
-                 tag: tag1,
-                 actions: ref actions1,
-             }) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
+            (
+                &Mutation::MutateMDataEntries {
+                    name: name0,
+                    tag: tag0,
+                    actions: ref actions0,
+                },
+                &Mutation::MutateMDataEntries {
+                    name: name1,
+                    tag: tag1,
+                    actions: ref actions1,
+                },
+            ) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
             (_, _) => {
                 if let (DataId::Mutable(id0), DataId::Mutable(id1)) =
                     (self.data_id(), other.data_id())
@@ -117,7 +119,9 @@ impl Mutation {
             } => {
                 let _ = data.set_user_permissions_without_validation(user, permissions, version);
             }
-            Mutation::DelMDataUserPermissions { ref user, version, .. } => {
+            Mutation::DelMDataUserPermissions {
+                ref user, version, ..
+            } => {
                 let _ = data.del_user_permissions_without_validation(user, version);
             }
             Mutation::ChangeMDataOwner {
@@ -129,13 +133,11 @@ impl Mutation {
                     let _ = data.change_owner_without_validation(*owner, version);
                 }
             }
-            _ => {
-                log_or_panic!(
-                    Level::Error,
-                    "incompatible mutation ({:?})",
-                    self.mutation_type()
-                )
-            }
+            _ => log_or_panic!(
+                Level::Error,
+                "incompatible mutation ({:?})",
+                self.mutation_type()
+            ),
         }
     }
 }
@@ -182,13 +184,12 @@ where
     let prev = data.entries().len() as u64;
     let diff: u64 = mutations
         .into_iter()
-        .map(|mutation| if let Mutation::MutateMDataEntries {
-            ref actions, ..
-        } = *mutation
-        {
-            count_inserts(actions)
-        } else {
-            0
+        .map(|mutation| {
+            if let Mutation::MutateMDataEntries { ref actions, .. } = *mutation {
+                count_inserts(actions)
+            } else {
+                0
+            }
         })
         .filter(|count| *count > 0)
         .sum();
@@ -200,10 +201,12 @@ where
 fn count_inserts(actions: &BTreeMap<Vec<u8>, EntryAction>) -> u64 {
     actions
         .iter()
-        .filter(|&(_, action)| if let EntryAction::Ins(_) = *action {
-            true
-        } else {
-            false
+        .filter(|&(_, action)| {
+            if let EntryAction::Ins(_) = *action {
+                true
+            } else {
+                false
+            }
         })
         .count() as u64
 }

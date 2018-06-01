@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::*;
-use maidsafe_utilities::SeededRng;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
+use maidsafe_utilities::SeededRng;
 use mock_routing::RequestWrapper;
 use rand::{self, Rng};
-use routing::{Action, EntryActions, MAX_MUTABLE_DATA_ENTRIES, Request, Response, User};
+use routing::{Action, EntryActions, Request, Response, User, MAX_MUTABLE_DATA_ENTRIES};
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
@@ -35,13 +35,7 @@ fn idata_basics() {
 
     // Get non-existent data fails.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_get_idata(
-        &mut node,
-        client.into(),
-        nae_manager,
-        *data.name(),
-        msg_id,
-    ));
+    unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id,));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
@@ -50,11 +44,13 @@ fn idata_basics() {
 
     // Put immutable data sends refresh to the NAE manager.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_put_idata(&mut node,
-                                client_manager.into(),
-                                nae_manager,
-                                data.clone(),
-                                msg_id));
+    unwrap!(dm.handle_put_idata(
+        &mut node,
+        client_manager.into(),
+        nae_manager,
+        data.clone(),
+        msg_id
+    ));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -91,12 +87,14 @@ fn mdata_basics() {
 
     // Attempt to list entries of non-existent data fails.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                         client.into(),
-                                         nae_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         msg_id));
+    unwrap!(dm.handle_list_mdata_entries(
+        &mut node,
+        client.into(),
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        msg_id
+    ));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
             message.response,
@@ -104,12 +102,14 @@ fn mdata_basics() {
 
     // Put mutable data sends refresh to the NAE manager.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_put_mdata(&mut node,
-                                client_manager.into(),
-                                nae_manager,
-                                data,
-                                msg_id,
-                                client_key));
+    unwrap!(dm.handle_put_mdata(
+        &mut node,
+        client_manager.into(),
+        nae_manager,
+        data,
+        msg_id,
+        client_key
+    ));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -123,12 +123,14 @@ fn mdata_basics() {
 
     // Now list the data entries - should successfuly respond with empty list.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                         client.into(),
-                                         nae_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         msg_id));
+    unwrap!(dm.handle_list_mdata_entries(
+        &mut node,
+        client.into(),
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        msg_id
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let entries = assert_match!(
@@ -156,12 +158,14 @@ fn mdata_mutations() {
 
     // Initially, the entries should be empty.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                         client.into(),
-                                         nae_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         msg_id));
+    unwrap!(dm.handle_list_mdata_entries(
+        &mut node,
+        client.into(),
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        msg_id
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let entries = assert_match!(
@@ -181,14 +185,16 @@ fn mdata_mutations() {
         .ins(key_1.clone(), content_1.clone(), 0)
         .into();
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager.into(),
-                                           nae_manager,
-                                           data_name,
-                                           TEST_TAG,
-                                           actions,
-                                           msg_id,
-                                           client_key));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager.into(),
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        actions,
+        msg_id,
+        client_key
+    ));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -199,12 +205,14 @@ fn mdata_mutations() {
 
     // The data should now contain the previously inserted two entries.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                         client.into(),
-                                         nae_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         msg_id));
+    unwrap!(dm.handle_list_mdata_entries(
+        &mut node,
+        client.into(),
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        msg_id
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let entries = assert_match!(
@@ -220,7 +228,12 @@ fn mdata_mutations() {
         entry_version: 0,
     };
 
-    assert_eq!(entries, vec![(key_0, value_0), (key_1, value_1)].into_iter().collect());
+    assert_eq!(
+        entries,
+        vec![(key_0, value_0), (key_1, value_1)]
+            .into_iter()
+            .collect()
+    );
 }
 
 #[test]
@@ -250,14 +263,16 @@ fn mdata_change_owner() {
     let _ = new_owners.insert(client_key_2);
 
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_change_mdata_owner(&mut node,
-                                         client_manager_1,
-                                         nae_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         new_owners.clone(),
-                                         1,
-                                         msg_id));
+    unwrap!(dm.handle_change_mdata_owner(
+        &mut node,
+        client_manager_1,
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        new_owners.clone(),
+        1,
+        msg_id
+    ));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
             message.response,
@@ -267,14 +282,16 @@ fn mdata_change_owner() {
 
     // Changing the owner by the current owner succeeds.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_change_mdata_owner(&mut node,
-                                         client_manager_0,
-                                         nae_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         new_owners,
-                                         1,
-                                         msg_id));
+    unwrap!(dm.handle_change_mdata_owner(
+        &mut node,
+        client_manager_0,
+        nae_manager,
+        data_name,
+        TEST_TAG,
+        new_owners,
+        1,
+        msg_id
+    ));
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
     unwrap!(dm.handle_group_refresh(&mut node, refresh));
@@ -309,7 +326,10 @@ fn handle_node_added() {
 
     let (_, message) = unwrap!(node.sent_requests.drain().next());
 
-    assert_eq!(message.src, Authority::ManagedNode(*unwrap!(node.id()).name()));
+    assert_eq!(
+        message.src,
+        Authority::ManagedNode(*unwrap!(node.id()).name())
+    );
     assert_eq!(message.dst, Authority::ManagedNode(new_node_name));
 
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -326,7 +346,10 @@ fn handle_node_added() {
 
     let check = refreshes.iter().any(|refresh| match *refresh {
         Refresh::Chunk(MutableDataId(ref name, tag))
-            if name == data1.name() && tag == data1.tag() => true,
+            if name == data1.name() && tag == data1.tag() =>
+        {
+            true
+        }
         _ => false,
     });
     assert!(check);
@@ -396,7 +419,11 @@ fn idata_with_churn() {
     let bad_data = test_utils::gen_immutable_data(10, &mut rng);
     let bad_data_name = *bad_data.name();
     unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, bad_data));
-    assert!(new_dm.get_from_chunk_store(&ImmutableDataId(bad_data_name)).is_none());
+    assert!(
+        new_dm
+            .get_from_chunk_store(&ImmutableDataId(bad_data_name))
+            .is_none()
+    );
     let dst = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // ...
@@ -464,9 +491,10 @@ fn mdata_with_churn_with_partial_accumulation() {
     // None of the groups reaches quorum for their data, but the nodes together do reach
     // quorum for the shell and some of the entries. Only the entries that reached
     // quorum are written to the chunk store.
-    let mut entries = data.entries().into_iter().map(|(key, value)| {
-        (key.clone(), value.clone())
-    });
+    let mut entries = data
+        .entries()
+        .into_iter()
+        .map(|(key, value)| (key.clone(), value.clone()));
     let (key0, value0) = unwrap!(entries.next());
     let (key1, value1) = unwrap!(entries.next());
     let (key2, value2) = unwrap!(entries.next());
@@ -480,17 +508,21 @@ fn mdata_with_churn_with_partial_accumulation() {
     assert!(partial_data1.mutate_entry_without_validation(key2, value2));
 
     for node_name in other_node_names.iter().take(QUORUM - 1) {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
-                                                *node_name,
-                                                partial_data0.clone(),
-                                                msg_id));
+        unwrap!(new_dm.handle_get_mdata_success(
+            &mut new_node,
+            *node_name,
+            partial_data0.clone(),
+            msg_id
+        ));
     }
 
     for node_name in other_node_names.iter().skip(QUORUM - 1).take(QUORUM - 1) {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
-                                                *node_name,
-                                                partial_data1.clone(),
-                                                msg_id));
+        unwrap!(new_dm.handle_get_mdata_success(
+            &mut new_node,
+            *node_name,
+            partial_data1.clone(),
+            msg_id
+        ));
     }
 
     let stored_data = unwrap!(new_dm.get_from_chunk_store(&data.id()));
@@ -524,10 +556,12 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
     assert!(data_with_bad_shell.change_owner_without_validation(other_key, 1));
 
     let node_name = unwrap!(other_node_names.get(QUORUM - 1));
-    unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
-                                            *node_name,
-                                            data_with_bad_shell,
-                                            msg_id));
+    unwrap!(new_dm.handle_get_mdata_success(
+        &mut new_node,
+        *node_name,
+        data_with_bad_shell,
+        msg_id
+    ));
 
     // The remaining nodes send data with the correct shell but no entries.
     // The shell accumulates now and the entries are aleady accumulated.
@@ -553,13 +587,17 @@ fn mdata_non_conflicting_parallel_mutations() {
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
     let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
-    unwrap!(data.set_user_permissions(User::Anyone,
-                                      PermissionSet::new()
-                                          .allow(Action::Insert)
-                                          .allow(Action::Update)
-                                          .allow(Action::Delete),
-                                      1,
-                                      client_key_0));
+    unwrap!(
+        data.set_user_permissions(
+            User::Anyone,
+            PermissionSet::new()
+                .allow(Action::Insert)
+                .allow(Action::Update)
+                .allow(Action::Delete),
+            1,
+            client_key_0
+        )
+    );
 
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
@@ -570,27 +608,31 @@ fn mdata_non_conflicting_parallel_mutations() {
         .ins(b"key0".to_vec(), b"value 0".to_vec(), 0)
         .into();
     let msg_id_0 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions,
-                                           msg_id_0,
-                                           client_key_0));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_0.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions,
+        msg_id_0,
+        client_key_0
+    ));
 
     let actions = EntryActions::new()
         .ins(b"key1".to_vec(), b"value 1".to_vec(), 0)
         .into();
     let msg_id_1 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions,
-                                           msg_id_1,
-                                           client_key_1));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_1.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions,
+        msg_id_1,
+        client_key_1
+    ));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -630,14 +672,17 @@ fn mdata_conflicting_parallel_mutations() {
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
     let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
-    unwrap!(data.set_user_permissions(User::Anyone,
-                                      PermissionSet::new()
-                                          .allow(Action::Insert)
-                                          .allow(Action::Update)
-                                          .allow(Action::Delete),
-                                      1,
-                                      client_key_0));
-
+    unwrap!(
+        data.set_user_permissions(
+            User::Anyone,
+            PermissionSet::new()
+                .allow(Action::Insert)
+                .allow(Action::Update)
+                .allow(Action::Delete),
+            1,
+            client_key_0
+        )
+    );
 
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
@@ -649,27 +694,31 @@ fn mdata_conflicting_parallel_mutations() {
         .ins(b"key".to_vec(), b"value 0".to_vec(), 0)
         .into();
     let msg_id_0 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions,
-                                           msg_id_0,
-                                           client_key_0));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_0.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions,
+        msg_id_0,
+        client_key_0
+    ));
 
     let actions = EntryActions::new()
         .ins(b"key".to_vec(), b"value 1".to_vec(), 0)
         .into();
     let msg_id_1 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions,
-                                           msg_id_1,
-                                           client_key_1));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_1.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions,
+        msg_id_1,
+        client_key_1
+    ));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -701,14 +750,17 @@ fn mdata_parallel_mutations_limits() {
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
     let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
-    unwrap!(data.set_user_permissions(User::Anyone,
-                                      PermissionSet::new()
-                                          .allow(Action::Insert)
-                                          .allow(Action::Update)
-                                          .allow(Action::Delete),
-                                      1,
-                                      client_key_0));
-
+    unwrap!(
+        data.set_user_permissions(
+            User::Anyone,
+            PermissionSet::new()
+                .allow(Action::Insert)
+                .allow(Action::Update)
+                .allow(Action::Delete),
+            1,
+            client_key_0
+        )
+    );
 
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
@@ -723,14 +775,16 @@ fn mdata_parallel_mutations_limits() {
         index += 1;
     }
     let msg_id_0 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions.into(),
-                                           msg_id_0,
-                                           client_key_0));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_0.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions.into(),
+        msg_id_0,
+        client_key_0
+    ));
 
     let mut actions = EntryActions::new();
     for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 4) {
@@ -738,14 +792,16 @@ fn mdata_parallel_mutations_limits() {
         index += 1;
     }
     let msg_id_1 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions.into(),
-                                           msg_id_1,
-                                           client_key_1));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_1.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions.into(),
+        msg_id_1,
+        client_key_1
+    ));
 
     // Refresh both mutations.
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
@@ -773,14 +829,16 @@ fn mdata_parallel_mutations_limits() {
         index += 1;
     }
     let msg_id_0 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions.into(),
-                                           msg_id_0,
-                                           client_key_0));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_0.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions.into(),
+        msg_id_0,
+        client_key_0
+    ));
 
     let mut actions = EntryActions::new();
     for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 8 + 1) {
@@ -788,14 +846,16 @@ fn mdata_parallel_mutations_limits() {
         index += 1;
     }
     let msg_id_1 = MessageId::new();
-    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1.into(),
-                                           nae_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           actions.into(),
-                                           msg_id_1,
-                                           client_key_1));
+    unwrap!(dm.handle_mutate_mdata_entries(
+        &mut node,
+        client_manager_1.into(),
+        nae_manager,
+        *data.name(),
+        data.tag(),
+        actions.into(),
+        msg_id_1,
+        client_key_1
+    ));
 
     // Only the first mutation should result in refresh being sent.
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
@@ -867,13 +927,10 @@ fn take_request<F>(node: &mut RoutingNode, mut f: F) -> (MessageId, RequestWrapp
 where
     F: FnMut(&RequestWrapper) -> bool,
 {
-    let msg_id = node.sent_requests
+    let msg_id = node
+        .sent_requests
         .iter()
-        .filter_map(|(msg_id, message)| if f(message) {
-            Some(*msg_id)
-        } else {
-            None
-        })
+        .filter_map(|(msg_id, message)| if f(message) { Some(*msg_id) } else { None })
         .next();
     let msg_id = unwrap!(msg_id);
     (msg_id, unwrap!(node.sent_requests.remove(&msg_id)))

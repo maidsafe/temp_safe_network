@@ -14,8 +14,8 @@ mod tests;
 
 use hex::{self, FromHex};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::cmp;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};

@@ -17,11 +17,12 @@ use maidsafe_utilities::serialisation;
 pub use mock_routing::Node as RoutingNode;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use mock_routing::NodeBuilder;
-use personas::data_manager::{self, DataManager};
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::DataId;
+use personas::data_manager::{self, DataManager};
 use personas::maid_manager::{self, MaidManager};
-use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 #[cfg(feature = "use-mock-crust")]
 use routing::Config as RoutingConfig;
 pub use routing::Event;
@@ -29,8 +30,7 @@ pub use routing::Event;
 pub use routing::Node as RoutingNode;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 use routing::NodeBuilder;
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
+use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
 use rust_sodium::crypto::sign;
@@ -59,9 +59,10 @@ impl Vault {
         config: Config,
     ) -> Result<Self, InternalError> {
         let _ = rust_sodium::init();
-        let disable_mutation_limit = config.dev.as_ref().map_or(false, |dev_config| {
-            dev_config.disable_mutation_limit
-        });
+        let disable_mutation_limit = config
+            .dev
+            .as_ref()
+            .map_or(false, |dev_config| dev_config.disable_mutation_limit);
         let routing_node = if use_cache {
             builder.cache(Box::new(Cache::new())).create()
         } else {
@@ -121,10 +122,7 @@ impl Vault {
                 res = EventResult::Terminate;
                 Ok(())
             }
-            Event::SectionSplit(_) |
-            Event::SectionMerge(_) |
-            Event::Connected |
-            Event::Tick => {
+            Event::SectionSplit(_) | Event::SectionMerge(_) | Event::Connected | Event::Tick => {
                 res = EventResult::Ignored;
                 Ok(())
             }
@@ -146,391 +144,381 @@ impl Vault {
     ) -> Result<(), InternalError> {
         match (src, dst, request) {
             // ================== Refresh ==================
-            (Authority::ClientManager(_),
-             Authority::ClientManager(_),
-             Request::Refresh(serialised_msg, msg_id)) |
-            (Authority::ClientManager(_),
-             Authority::ManagedNode(_),
-             Request::Refresh(serialised_msg, msg_id)) => {
-                self.maid_manager.handle_serialised_refresh(
+            (
+                Authority::ClientManager(_),
+                Authority::ClientManager(_),
+                Request::Refresh(serialised_msg, msg_id),
+            )
+            | (
+                Authority::ClientManager(_),
+                Authority::ManagedNode(_),
+                Request::Refresh(serialised_msg, msg_id),
+            ) => self.maid_manager.handle_serialised_refresh(
+                &mut self.routing_node,
+                &serialised_msg,
+                msg_id,
+                None,
+            ),
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Request::Refresh(serialised_msg, msg_id),
+            ) => match serialisation::deserialise::<Refresh>(&serialised_msg)? {
+                Refresh::MaidManager(refresh) => self.maid_manager.handle_refresh(
                     &mut self.routing_node,
-                    &serialised_msg,
+                    refresh,
                     msg_id,
-                    None,
-                )
-            }
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Request::Refresh(serialised_msg, msg_id)) => {
-                match serialisation::deserialise::<Refresh>(&serialised_msg)? {
-                    Refresh::MaidManager(refresh) => {
-                        self.maid_manager.handle_refresh(
-                            &mut self.routing_node,
-                            refresh,
-                            msg_id,
-                            Some(src_name),
-                        )
-                    }
-                    Refresh::DataManager(refreshes) => {
-                        self.data_manager.handle_refreshes(
-                            &mut self.routing_node,
-                            src_name,
-                            refreshes,
-                        )
-                    }
+                    Some(src_name),
+                ),
+                Refresh::DataManager(refreshes) => {
+                    self.data_manager
+                        .handle_refreshes(&mut self.routing_node, src_name, refreshes)
                 }
-            }
-            (Authority::ManagedNode(src_name),
-             Authority::NaeManager(_),
-             Request::Refresh(serialised_msg, _)) => {
-                self.data_manager.handle_serialised_refresh(
-                    &mut self.routing_node,
-                    src_name,
-                    &serialised_msg,
-                )
-            }
-            (Authority::NaeManager(_),
-             Authority::NaeManager(_),
-             Request::Refresh(serialised_msg, _)) => {
-                self.data_manager.handle_group_refresh(
-                    &mut self.routing_node,
-                    serialised_msg,
-                )
-            }
+            },
+            (
+                Authority::ManagedNode(src_name),
+                Authority::NaeManager(_),
+                Request::Refresh(serialised_msg, _),
+            ) => self.data_manager.handle_serialised_refresh(
+                &mut self.routing_node,
+                src_name,
+                &serialised_msg,
+            ),
+            (
+                Authority::NaeManager(_),
+                Authority::NaeManager(_),
+                Request::Refresh(serialised_msg, _),
+            ) => self
+                .data_manager
+                .handle_group_refresh(&mut self.routing_node, serialised_msg),
             // ========== GetAccountInfo ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::GetAccountInfo(msg_id)) => {
-                self.maid_manager.handle_get_account_info(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::GetAccountInfo(msg_id),
+            ) => self.maid_manager.handle_get_account_info(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                msg_id,
+            ),
             // ========== GetIData ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::GetIData { name, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::GetIData { name, msg_id }) => {
-                self.data_manager.handle_get_idata(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::GetIData { name, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::GetIData { name, msg_id },
+            ) => self
+                .data_manager
+                .handle_get_idata(&mut self.routing_node, src, dst, name, msg_id),
             // ========== PutIData ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::PutIData { data, msg_id }) => {
-                self.maid_manager.handle_put_idata(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
-                    data,
-                    msg_id,
-                )
-            }
-            (Authority::ClientManager(_),
-             Authority::NaeManager(_),
-             Request::PutIData { data, msg_id }) => {
-                self.data_manager.handle_put_idata(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    data,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::PutIData { data, msg_id },
+            ) => self.maid_manager.handle_put_idata(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                data,
+                msg_id,
+            ),
+            (
+                Authority::ClientManager(_),
+                Authority::NaeManager(_),
+                Request::PutIData { data, msg_id },
+            ) => self
+                .data_manager
+                .handle_put_idata(&mut self.routing_node, src, dst, data, msg_id),
             // ========== PutMData ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::PutMData {
-                 data,
-                 msg_id,
-                 requester,
-             }) => {
-                self.maid_manager.handle_put_mdata(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::PutMData {
                     data,
                     msg_id,
                     requester,
-                )
-            }
-            (Authority::ClientManager(_),
-             Authority::NaeManager(_),
-             Request::PutMData {
-                 data,
-                 msg_id,
-                 requester,
-             }) => {
-                self.data_manager.handle_put_mdata(
-                    &mut self.routing_node,
-                    src,
-                    dst,
+                },
+            ) => self.maid_manager.handle_put_mdata(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                data,
+                msg_id,
+                requester,
+            ),
+            (
+                Authority::ClientManager(_),
+                Authority::NaeManager(_),
+                Request::PutMData {
                     data,
                     msg_id,
                     requester,
-                )
-            }
+                },
+            ) => self.data_manager.handle_put_mdata(
+                &mut self.routing_node,
+                src,
+                dst,
+                data,
+                msg_id,
+                requester,
+            ),
             // ========== GetMData ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::GetMData { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::NaeManager(_),
-             Request::GetMData { name, tag, msg_id }) => {
-                self.data_manager.handle_get_mdata(
-                    &mut self.routing_node,
-                    src,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::GetMData { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::NaeManager(_),
+                Request::GetMData { name, tag, msg_id },
+            ) => self
+                .data_manager
+                .handle_get_mdata(&mut self.routing_node, src, name, tag, msg_id),
             // ========== GetMDataShell ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::GetMDataShell { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::GetMDataShell { name, tag, msg_id }) => {
-                self.data_manager.handle_get_mdata_shell(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::GetMDataShell { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::GetMDataShell { name, tag, msg_id },
+            ) => self.data_manager.handle_get_mdata_shell(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            ),
             // ========== GetMDataVersion ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::GetMDataVersion { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::GetMDataVersion { name, tag, msg_id }) => {
-                self.data_manager.handle_get_mdata_version(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::GetMDataVersion { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::GetMDataVersion { name, tag, msg_id },
+            ) => self.data_manager.handle_get_mdata_version(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            ),
             // ========== ListMDataEntries ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::ListMDataEntries { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::ListMDataEntries { name, tag, msg_id }) => {
-                self.data_manager.handle_list_mdata_entries(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::ListMDataEntries { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::ListMDataEntries { name, tag, msg_id },
+            ) => self.data_manager.handle_list_mdata_entries(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            ),
             // ========== ListMDataKeys ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::ListMDataKeys { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::ListMDataKeys { name, tag, msg_id }) => {
-                self.data_manager.handle_list_mdata_keys(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::ListMDataKeys { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::ListMDataKeys { name, tag, msg_id },
+            ) => self.data_manager.handle_list_mdata_keys(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            ),
             // ========== ListMDataValues ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::ListMDataValues { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::ListMDataValues { name, tag, msg_id }) => {
-                self.data_manager.handle_list_mdata_values(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::ListMDataValues { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::ListMDataValues { name, tag, msg_id },
+            ) => self.data_manager.handle_list_mdata_values(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            ),
             // ========== GetMDataValue ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::GetMDataValue {
-                 name,
-                 tag,
-                 key,
-                 msg_id,
-             }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::GetMDataValue {
-                 name,
-                 tag,
-                 key,
-                 msg_id,
-             }) => {
-                self.data_manager.handle_get_mdata_value(
-                    &mut self.routing_node,
-                    src,
-                    dst,
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::GetMDataValue {
                     name,
                     tag,
                     key,
                     msg_id,
-                )
-            }
+                },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::GetMDataValue {
+                    name,
+                    tag,
+                    key,
+                    msg_id,
+                },
+            ) => self.data_manager.handle_get_mdata_value(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                key,
+                msg_id,
+            ),
             // ========== MutateMDataEntries ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::MutateMDataEntries {
-                 name,
-                 tag,
-                 actions,
-                 msg_id,
-                 requester,
-             }) => {
-                self.maid_manager.handle_mutate_mdata_entries(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::MutateMDataEntries {
                     name,
                     tag,
                     actions,
                     msg_id,
                     requester,
-                )
-            }
-            (Authority::ClientManager(_),
-             Authority::NaeManager(_),
-             Request::MutateMDataEntries {
-                 name,
-                 tag,
-                 actions,
-                 msg_id,
-                 requester,
-             }) => {
-                self.data_manager.handle_mutate_mdata_entries(
-                    &mut self.routing_node,
-                    src,
-                    dst,
+                },
+            ) => self.maid_manager.handle_mutate_mdata_entries(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                name,
+                tag,
+                actions,
+                msg_id,
+                requester,
+            ),
+            (
+                Authority::ClientManager(_),
+                Authority::NaeManager(_),
+                Request::MutateMDataEntries {
                     name,
                     tag,
                     actions,
                     msg_id,
                     requester,
-                )
-            }
+                },
+            ) => self.data_manager.handle_mutate_mdata_entries(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                actions,
+                msg_id,
+                requester,
+            ),
             // ========== ListMDataPermissions ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::ListMDataPermissions { name, tag, msg_id }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::ListMDataPermissions { name, tag, msg_id }) => {
-                self.data_manager.handle_list_mdata_permissions(
-                    &mut self.routing_node,
-                    src,
-                    dst,
-                    name,
-                    tag,
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::ListMDataPermissions { name, tag, msg_id },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::ListMDataPermissions { name, tag, msg_id },
+            ) => self.data_manager.handle_list_mdata_permissions(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            ),
             // ========== ListMDataUserPermissions ==========
-            (Authority::Client { .. },
-             Authority::NaeManager(_),
-             Request::ListMDataUserPermissions {
-                 name,
-                 tag,
-                 user,
-                 msg_id,
-             }) |
-            (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
-             Request::ListMDataUserPermissions {
-                 name,
-                 tag,
-                 user,
-                 msg_id,
-             }) => {
-                self.data_manager.handle_list_mdata_user_permissions(
-                    &mut self.routing_node,
-                    src,
-                    dst,
+            (
+                Authority::Client { .. },
+                Authority::NaeManager(_),
+                Request::ListMDataUserPermissions {
                     name,
                     tag,
                     user,
                     msg_id,
-                )
-            }
+                },
+            )
+            | (
+                Authority::ManagedNode(_),
+                Authority::ManagedNode(_),
+                Request::ListMDataUserPermissions {
+                    name,
+                    tag,
+                    user,
+                    msg_id,
+                },
+            ) => self.data_manager.handle_list_mdata_user_permissions(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                user,
+                msg_id,
+            ),
             // ========== SetMDataUserPermissions ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::SetMDataUserPermissions {
-                 name,
-                 tag,
-                 user,
-                 permissions,
-                 version,
-                 msg_id,
-                 requester,
-             }) => {
-                self.maid_manager.handle_set_mdata_user_permissions(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::SetMDataUserPermissions {
                     name,
                     tag,
                     user,
@@ -538,23 +526,26 @@ impl Vault {
                     version,
                     msg_id,
                     requester,
-                )
-            }
-            (Authority::ClientManager(_),
-             Authority::NaeManager(_),
-             Request::SetMDataUserPermissions {
-                 name,
-                 tag,
-                 user,
-                 permissions,
-                 version,
-                 msg_id,
-                 requester,
-             }) => {
-                self.data_manager.handle_set_mdata_user_permissions(
-                    &mut self.routing_node,
-                    src,
-                    dst,
+                },
+            ) => self.maid_manager.handle_set_mdata_user_permissions(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                name,
+                tag,
+                user,
+                permissions,
+                version,
+                msg_id,
+                requester,
+            ),
+            (
+                Authority::ClientManager(_),
+                Authority::NaeManager(_),
+                Request::SetMDataUserPermissions {
                     name,
                     tag,
                     user,
@@ -562,169 +553,180 @@ impl Vault {
                     version,
                     msg_id,
                     requester,
-                )
-            }
+                },
+            ) => self.data_manager.handle_set_mdata_user_permissions(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                user,
+                permissions,
+                version,
+                msg_id,
+                requester,
+            ),
             // ========== DelMDataUserPermissions ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::DelMDataUserPermissions {
-                 name,
-                 tag,
-                 user,
-                 version,
-                 msg_id,
-                 requester,
-             }) => {
-                self.maid_manager.handle_del_mdata_user_permissions(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::DelMDataUserPermissions {
                     name,
                     tag,
                     user,
                     version,
                     msg_id,
                     requester,
-                )
-            }
-            (Authority::ClientManager(_),
-             Authority::NaeManager(_),
-             Request::DelMDataUserPermissions {
-                 name,
-                 tag,
-                 user,
-                 version,
-                 msg_id,
-                 requester,
-             }) => {
-                self.data_manager.handle_del_mdata_user_permissions(
-                    &mut self.routing_node,
-                    src,
-                    dst,
+                },
+            ) => self.maid_manager.handle_del_mdata_user_permissions(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                name,
+                tag,
+                user,
+                version,
+                msg_id,
+                requester,
+            ),
+            (
+                Authority::ClientManager(_),
+                Authority::NaeManager(_),
+                Request::DelMDataUserPermissions {
                     name,
                     tag,
                     user,
                     version,
                     msg_id,
                     requester,
-                )
-            }
+                },
+            ) => self.data_manager.handle_del_mdata_user_permissions(
+                &mut self.routing_node,
+                src,
+                dst,
+                name,
+                tag,
+                user,
+                version,
+                msg_id,
+                requester,
+            ),
             // ========== ChangeMDataOwner ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::ChangeMDataOwner {
-                 name,
-                 tag,
-                 new_owners,
-                 version,
-                 msg_id,
-             }) => {
-                self.maid_manager.handle_change_mdata_owner(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::ChangeMDataOwner {
                     name,
                     tag,
                     new_owners,
                     version,
                     msg_id,
-                )
-            }
-            (Authority::ClientManager(src_name),
-             Authority::NaeManager(_),
-             Request::ChangeMDataOwner {
-                 name,
-                 tag,
-                 new_owners,
-                 version,
-                 msg_id,
-             }) => {
-                self.data_manager.handle_change_mdata_owner(
-                    &mut self.routing_node,
-                    ClientManagerAuthority(src_name),
-                    dst,
+                },
+            ) => self.maid_manager.handle_change_mdata_owner(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                name,
+                tag,
+                new_owners,
+                version,
+                msg_id,
+            ),
+            (
+                Authority::ClientManager(src_name),
+                Authority::NaeManager(_),
+                Request::ChangeMDataOwner {
                     name,
                     tag,
                     new_owners,
                     version,
                     msg_id,
-                )
-            }
+                },
+            ) => self.data_manager.handle_change_mdata_owner(
+                &mut self.routing_node,
+                ClientManagerAuthority(src_name),
+                dst,
+                name,
+                tag,
+                new_owners,
+                version,
+                msg_id,
+            ),
             // ========== ListAuthKeysAndVersion ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::ListAuthKeysAndVersion(msg_id)) => {
-                self.maid_manager.handle_list_auth_keys_and_version(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
-                    msg_id,
-                )
-            }
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::ListAuthKeysAndVersion(msg_id),
+            ) => self.maid_manager.handle_list_auth_keys_and_version(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                msg_id,
+            ),
             // ========== InsAuthKey ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::InsAuthKey {
-                 key,
-                 version,
-                 msg_id,
-             }) => {
-                self.maid_manager.handle_ins_auth_key(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::InsAuthKey {
                     key,
                     version,
                     msg_id,
-                )
-            }
+                },
+            ) => self.maid_manager.handle_ins_auth_key(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                key,
+                version,
+                msg_id,
+            ),
             // ========== DelAuthKey ==========
-            (Authority::Client {
-                 client_id,
-                 proxy_node_name,
-             },
-             Authority::ClientManager(dst_name),
-             Request::DelAuthKey {
-                 key,
-                 version,
-                 msg_id,
-             }) => {
-                self.maid_manager.handle_del_auth_key(
-                    &mut self.routing_node,
-                    ClientAuthority {
-                        client_id,
-                        proxy_node_name,
-                    },
-                    ClientManagerAuthority(dst_name),
+            (
+                Authority::Client {
+                    client_id,
+                    proxy_node_name,
+                },
+                Authority::ClientManager(dst_name),
+                Request::DelAuthKey {
                     key,
                     version,
                     msg_id,
-                )
-            }
+                },
+            ) => self.maid_manager.handle_del_auth_key(
+                &mut self.routing_node,
+                ClientAuthority {
+                    client_id,
+                    proxy_node_name,
+                },
+                ClientManagerAuthority(dst_name),
+                key,
+                version,
+                msg_id,
+            ),
 
             // ========== Invalid Request ==========
             (_, _, request) => Err(InternalError::UnknownRequestType(request)),
@@ -739,143 +741,135 @@ impl Vault {
     ) -> Result<(), InternalError> {
         match (src, dst, response) {
             // ================== GetIData success ==================
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetIData { res: Ok(data), .. }) => {
-                self.data_manager.handle_get_idata_success(
-                    &mut self.routing_node,
-                    src_name,
-                    data,
-                )
-            }
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetIData { res: Ok(data), .. },
+            ) => self
+                .data_manager
+                .handle_get_idata_success(&mut self.routing_node, src_name, data),
             // ================== GetIData failure ==================
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetIData { res: Err(_), .. }) => {
-                self.data_manager.handle_get_idata_failure(
-                    &mut self.routing_node,
-                    src_name,
-                )
-            }
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetIData { res: Err(_), .. },
+            ) => self
+                .data_manager
+                .handle_get_idata_failure(&mut self.routing_node, src_name),
             // ================== PutIData ==================
-            (Authority::NaeManager(_),
-             Authority::ClientManager(_),
-             Response::PutIData { res, msg_id }) => {
-                self.maid_manager.handle_put_idata_response(
-                    &mut self.routing_node,
-                    res,
-                    msg_id,
-                )
-            }
+            (
+                Authority::NaeManager(_),
+                Authority::ClientManager(_),
+                Response::PutIData { res, msg_id },
+            ) => self
+                .maid_manager
+                .handle_put_idata_response(&mut self.routing_node, res, msg_id),
             // ================== PutMData ==================
-            (Authority::NaeManager(_),
-             Authority::ClientManager(_),
-             Response::PutMData { res, msg_id }) => {
-                self.maid_manager.handle_put_mdata_response(
-                    &mut self.routing_node,
-                    res,
-                    msg_id,
-                )
-            }
+            (
+                Authority::NaeManager(_),
+                Authority::ClientManager(_),
+                Response::PutMData { res, msg_id },
+            ) => self
+                .maid_manager
+                .handle_put_mdata_response(&mut self.routing_node, res, msg_id),
             // ================== GetMData success =============
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetMData {
-                 res: Ok(data),
-                 msg_id,
-             }) => {
-                self.data_manager.handle_get_mdata_success(
-                    &mut self.routing_node,
-                    src_name,
-                    data,
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetMData {
+                    res: Ok(data),
                     msg_id,
-                )
-            }
+                },
+            ) => self.data_manager.handle_get_mdata_success(
+                &mut self.routing_node,
+                src_name,
+                data,
+                msg_id,
+            ),
             // ================== GetMData failure =============
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetMData {
-                 res: Err(_),
-                 msg_id,
-             }) => {
-                self.data_manager.handle_get_mdata_failure(
-                    &mut self.routing_node,
-                    src_name,
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetMData {
+                    res: Err(_),
                     msg_id,
-                )
+                },
+            ) => {
+                self.data_manager
+                    .handle_get_mdata_failure(&mut self.routing_node, src_name, msg_id)
             }
             // ================== GetMDataShell success =============
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetMDataShell { res: Ok(shell), .. }) => {
-                self.data_manager.handle_get_mdata_shell_success(
-                    &mut self.routing_node,
-                    src_name,
-                    shell,
-                )
-            }
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetMDataShell { res: Ok(shell), .. },
+            ) => self.data_manager.handle_get_mdata_shell_success(
+                &mut self.routing_node,
+                src_name,
+                shell,
+            ),
             // ================== GetMDataShell failure =============
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetMDataShell { res: Err(_), .. }) => {
-                self.data_manager.handle_get_mdata_shell_failure(
-                    &mut self.routing_node,
-                    src_name,
-                )
-            }
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetMDataShell { res: Err(_), .. },
+            ) => self
+                .data_manager
+                .handle_get_mdata_shell_failure(&mut self.routing_node, src_name),
             // ================== GetMDataValue success =============
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetMDataValue { res: Ok(value), .. }) => {
-                self.data_manager.handle_get_mdata_value_success(
-                    &mut self.routing_node,
-                    src_name,
-                    value,
-                )
-            }
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetMDataValue { res: Ok(value), .. },
+            ) => self.data_manager.handle_get_mdata_value_success(
+                &mut self.routing_node,
+                src_name,
+                value,
+            ),
             // ================== GetMDataValue failure =============
-            (Authority::ManagedNode(src_name),
-             Authority::ManagedNode(_),
-             Response::GetMDataValue { res: Err(_), .. }) => {
-                self.data_manager.handle_get_mdata_value_failure(
-                    &mut self.routing_node,
-                    src_name,
-                )
-            }
+            (
+                Authority::ManagedNode(src_name),
+                Authority::ManagedNode(_),
+                Response::GetMDataValue { res: Err(_), .. },
+            ) => self
+                .data_manager
+                .handle_get_mdata_value_failure(&mut self.routing_node, src_name),
             // ================== MutateMDataEntries ==================
-            (Authority::NaeManager(_),
-             Authority::ClientManager(_),
-             Response::MutateMDataEntries { res, msg_id }) => {
-                self.maid_manager.handle_mutate_mdata_entries_response(
-                    &mut self.routing_node,
-                    res,
-                    msg_id,
-                )
-            }
+            (
+                Authority::NaeManager(_),
+                Authority::ClientManager(_),
+                Response::MutateMDataEntries { res, msg_id },
+            ) => self.maid_manager.handle_mutate_mdata_entries_response(
+                &mut self.routing_node,
+                res,
+                msg_id,
+            ),
             // ================== SetMDataUserPermissions ==================
-            (Authority::NaeManager(_),
-             Authority::ClientManager(_),
-             Response::SetMDataUserPermissions { res, msg_id }) => {
-                self.maid_manager
-                    .handle_set_mdata_user_permissions_response(&mut self.routing_node, res, msg_id)
-            }
+            (
+                Authority::NaeManager(_),
+                Authority::ClientManager(_),
+                Response::SetMDataUserPermissions { res, msg_id },
+            ) => self
+                .maid_manager
+                .handle_set_mdata_user_permissions_response(&mut self.routing_node, res, msg_id),
             // ================== DelMDataUserPermissions ==================
-            (Authority::NaeManager(_),
-             Authority::ClientManager(_),
-             Response::DelMDataUserPermissions { res, msg_id }) => {
-                self.maid_manager
-                    .handle_del_mdata_user_permissions_response(&mut self.routing_node, res, msg_id)
-            }
+            (
+                Authority::NaeManager(_),
+                Authority::ClientManager(_),
+                Response::DelMDataUserPermissions { res, msg_id },
+            ) => self
+                .maid_manager
+                .handle_del_mdata_user_permissions_response(&mut self.routing_node, res, msg_id),
             // ================== ChangeMDataOwner ==================
-            (Authority::NaeManager(_),
-             Authority::ClientManager(_),
-             Response::ChangeMDataOwner { res, msg_id }) => {
-                self.maid_manager.handle_change_mdata_owner_response(
-                    &mut self.routing_node,
-                    res,
-                    msg_id,
-                )
-            }
+            (
+                Authority::NaeManager(_),
+                Authority::ClientManager(_),
+                Response::ChangeMDataOwner { res, msg_id },
+            ) => self.maid_manager.handle_change_mdata_owner_response(
+                &mut self.routing_node,
+                res,
+                msg_id,
+            ),
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),
         }
@@ -886,16 +880,10 @@ impl Vault {
         node_added: XorName,
         routing_table: RoutingTable<XorName>,
     ) -> Result<(), InternalError> {
-        self.maid_manager.handle_node_added(
-            &mut self.routing_node,
-            &node_added,
-            &routing_table,
-        )?;
-        self.data_manager.handle_node_added(
-            &mut self.routing_node,
-            &node_added,
-            &routing_table,
-        )?;
+        self.maid_manager
+            .handle_node_added(&mut self.routing_node, &node_added, &routing_table)?;
+        self.data_manager
+            .handle_node_added(&mut self.routing_node, &node_added, &routing_table)?;
         Ok(())
     }
 
@@ -904,16 +892,10 @@ impl Vault {
         node_lost: XorName,
         routing_table: RoutingTable<XorName>,
     ) -> Result<(), InternalError> {
-        self.maid_manager.handle_node_lost(
-            &mut self.routing_node,
-            &node_lost,
-            &routing_table,
-        )?;
-        self.data_manager.handle_node_lost(
-            &mut self.routing_node,
-            &node_lost,
-            &routing_table,
-        )?;
+        self.maid_manager
+            .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table)?;
+        self.data_manager
+            .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table)?;
         Ok(())
     }
 }
@@ -928,9 +910,9 @@ impl Vault {
         routing_config: RoutingConfig,
     ) -> Result<Self, InternalError> {
         Self::vault_with_config(
-            RoutingNode::builder().first(first_vault).config(
-                routing_config,
-            ),
+            RoutingNode::builder()
+                .first(first_vault)
+                .config(routing_config),
             use_cache,
             config,
         )
@@ -973,10 +955,8 @@ impl Vault {
     /// Set whether `DataManager` group refreshes should be delayed or not on this vault.
     /// Any un-handled delayed group refreshes in the cache will be handled and purged.
     pub fn delay_group_refreshes(&mut self, delayed: bool) {
-        self.data_manager.delay_group_refreshes(
-            &mut self.routing_node,
-            delayed,
-        )
+        self.data_manager
+            .delay_group_refreshes(&mut self.routing_node, delayed)
     }
 }
 

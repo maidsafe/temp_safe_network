@@ -5,22 +5,24 @@ mod mutation;
 #[cfg(all(test, feature = "use-mock-routing"))]
 mod tests;
 
-use self::cache::{Cache, FragmentInfo, MutationVote, PendingWrite};
 #[cfg(feature = "use-mock-crust")]
 pub use self::cache::PENDING_WRITE_TIMEOUT_SECS;
+use self::cache::{Cache, FragmentInfo, MutationVote, PendingWrite};
 pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
 use self::mutable_data_cache::MutableDataCache;
 use self::mutation::{Mutation, MutationType};
 use accumulator::Accumulator;
 use authority::ClientManagerAuthority;
-use chunk_store::{Chunk, ChunkId, ChunkStore};
 #[cfg(feature = "use-mock-crust")]
 use chunk_store::Error as ChunkStoreError;
+use chunk_store::{Chunk, ChunkId, ChunkStore};
 use error::InternalError;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
-              PermissionSet, QUORUM_DENOMINATOR, QUORUM_NUMERATOR, RoutingTable,
-              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+use routing::{
+    Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
+    RoutingTable, User, Value, XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR,
+    TYPE_TAG_SESSION_PACKET,
+};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
@@ -43,7 +45,7 @@ macro_rules! log_status {
             $dm.logging_time = Instant::now();
             info!("{:?}", $dm);
         }
-    }
+    };
 }
 
 impl Chunk<DataId> for ImmutableData {
@@ -179,13 +181,7 @@ impl DataManager {
         } = write;
 
         let mutation_type = mutation.mutation_type();
-        let fragments = self.commit_pending_mutation(
-            routing_node,
-            src,
-            dst,
-            mutation,
-            message_id,
-        )?;
+        let fragments = self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)?;
 
         if fragments.is_empty() {
             // The commit wasn't successful.
@@ -209,10 +205,8 @@ impl DataManager {
 
         if let Some(group) = routing_node.close_group(*data_id.name(), self.group_size) {
             for node in &group {
-                self.cache.register_needed_data_with_another_holder(
-                    &data_id,
-                    *node,
-                );
+                self.cache
+                    .register_needed_data_with_another_holder(&data_id, *node);
             }
 
             self.request_needed_data(routing_node)?;
@@ -233,20 +227,10 @@ impl DataManager {
 
         if let Ok(data) = self.chunk_store.get(&ImmutableDataId(name)) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
-            routing_node.send_get_idata_response(
-                dst,
-                src,
-                Ok(data),
-                msg_id,
-            )?;
+            routing_node.send_get_idata_response(dst, src, Ok(data), msg_id)?;
         } else {
             trace!("DM sending get_idata_failure of {:?}", name);
-            routing_node.send_get_idata_response(
-                dst,
-                src,
-                Err(ClientError::NoSuchData),
-                msg_id,
-            )?;
+            routing_node.send_get_idata_response(dst, src, Err(ClientError::NoSuchData), msg_id)?;
         }
 
         Ok(())
@@ -319,12 +303,7 @@ impl DataManager {
                 "DM sending PutIData success for data {:?}, it already exists.",
                 data.name()
             );
-            routing_node.send_put_idata_response(
-                dst,
-                src,
-                Ok(()),
-                msg_id,
-            )?;
+            routing_node.send_put_idata_response(dst, src, Ok(()), msg_id)?;
             return Ok(());
         }
 
@@ -332,12 +311,7 @@ impl DataManager {
 
         if self.chunk_store_full() {
             let err = ClientError::NetworkFull;
-            routing_node.send_put_idata_response(
-                dst,
-                src,
-                Err(err.clone()),
-                msg_id,
-            )?;
+            routing_node.send_put_idata_response(dst, src, Err(err.clone()), msg_id)?;
             return Err(From::from(err));
         }
 
@@ -373,12 +347,7 @@ impl DataManager {
             name,
             resp_dst
         );
-        routing_node.send_get_mdata_response(
-            resp_src,
-            resp_dst,
-            res,
-            msg_id,
-        )?;
+        routing_node.send_get_mdata_response(resp_src, resp_dst, res, msg_id)?;
 
         Ok(())
     }
@@ -390,11 +359,8 @@ impl DataManager {
         data: MutableData,
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
-        self.cache.handle_needed_mutable_chunk_success(
-            data.id(),
-            src,
-            msg_id,
-        );
+        self.cache
+            .handle_needed_mutable_chunk_success(data.id(), src, msg_id);
         self.request_needed_data(routing_node)?;
 
         // If we're no longer in the close group, return.
@@ -480,12 +446,7 @@ impl DataManager {
                 data_id,
                 error
             );
-            routing_node.send_put_mdata_response(
-                dst,
-                src,
-                Err(error),
-                msg_id,
-            )?;
+            routing_node.send_put_mdata_response(dst, src, Err(error), msg_id)?;
             true
         } else {
             false
@@ -505,12 +466,7 @@ impl DataManager {
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
         let res = self.fetch_mdata(name, tag).map(|data| data.shell());
-        routing_node.send_get_mdata_shell_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        routing_node.send_get_mdata_shell_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -607,12 +563,7 @@ impl DataManager {
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
         let res = self.fetch_mdata(name, tag).map(|data| data.version());
-        routing_node.send_get_mdata_version_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        routing_node.send_get_mdata_version_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -626,15 +577,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag).map(
-            |data| data.entries().clone(),
-        );
-        routing_node.send_list_mdata_entries_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        let res = self
+            .fetch_mdata(name, tag)
+            .map(|data| data.entries().clone());
+        routing_node.send_list_mdata_entries_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -648,15 +594,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag).map(|data| {
-            data.entries().keys().cloned().collect()
-        });
-        routing_node.send_list_mdata_keys_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        let res = self
+            .fetch_mdata(name, tag)
+            .map(|data| data.entries().keys().cloned().collect());
+        routing_node.send_list_mdata_keys_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -670,15 +611,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag).map(|data| {
-            data.entries().values().cloned().collect()
-        });
-        routing_node.send_list_mdata_values_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        let res = self
+            .fetch_mdata(name, tag)
+            .map(|data| data.entries().values().cloned().collect());
+        routing_node.send_list_mdata_values_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -694,15 +630,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag).and_then(|data| {
-            data.get(&key).cloned().ok_or(ClientError::NoSuchEntry)
-        });
-        routing_node.send_get_mdata_value_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        let res = self
+            .fetch_mdata(name, tag)
+            .and_then(|data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
+        routing_node.send_get_mdata_value_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -722,7 +653,8 @@ impl DataManager {
                     ref key,
                     hash,
                     ..
-                } if hash == actual_hash => {
+                } if hash == actual_hash =>
+                {
                     self.cache.remove_needed_fragment(&fragment);
                     Some((name, tag, key.clone()))
                 }
@@ -810,15 +742,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag).map(
-            |data| data.permissions().clone(),
-        );
-        routing_node.send_list_mdata_permissions_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        let res = self
+            .fetch_mdata(name, tag)
+            .map(|data| data.permissions().clone());
+        routing_node.send_list_mdata_permissions_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -834,15 +761,10 @@ impl DataManager {
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag).and_then(|data| {
-            data.user_permissions(&user).map(|p| *p)
-        });
-        routing_node.send_list_mdata_user_permissions_response(
-            dst,
-            src,
-            res,
-            msg_id,
-        )?;
+        let res = self
+            .fetch_mdata(name, tag)
+            .and_then(|data| data.user_permissions(&user).map(|p| *p));
+        routing_node.send_list_mdata_user_permissions_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -868,12 +790,8 @@ impl DataManager {
             version,
         };
         let res = self.fetch_mdata(name, tag).and_then(|data| {
-            data.clone().set_user_permissions(
-                user,
-                permissions,
-                version,
-                requester,
-            )?;
+            data.clone()
+                .set_user_permissions(user, permissions, version, requester)?;
             self.validate_concurrent_mutations(Some(&data), &mutation)
         });
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
@@ -899,7 +817,8 @@ impl DataManager {
             version,
         };
         let res = self.fetch_mdata(name, tag).and_then(|data| {
-            data.clone().del_user_permissions(&user, version, requester)?;
+            data.clone()
+                .del_user_permissions(&user, version, requester)?;
             self.validate_concurrent_mutations(Some(&data), &mutation)
         });
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
@@ -959,8 +878,8 @@ impl DataManager {
 
                     match data_id {
                         DataId::Immutable(idata_id) => {
-                            if self.chunk_store.has(&idata_id) &&
-                                !self.cache.is_in_unneeded(&idata_id)
+                            if self.chunk_store.has(&idata_id)
+                                && !self.cache.is_in_unneeded(&idata_id)
                             {
                                 self.immutable_data_count -= 1;
                                 has_pruned_data = true;
@@ -1029,9 +948,10 @@ impl DataManager {
                     // than the lost node, the lost node was not in the group in the first place.
                     if let Some(&outer_node) = close_group.get(self.group_size.saturating_sub(2)) {
                         if data_id.name().closer(node_name, outer_node) {
-                            refreshes.entry(*outer_node).or_insert_with(Vec::new).push(
-                                Refresh::from_data_id(data_id),
-                            )
+                            refreshes
+                                .entry(*outer_node)
+                                .or_insert_with(Vec::new)
+                                .push(Refresh::from_data_id(data_id))
                         }
                     }
                 }
@@ -1101,20 +1021,11 @@ impl DataManager {
         }
 
         let data_id = mutation.data_id();
-        if let Some(refresh) = self.cache.insert_pending_write(
-            mutation,
-            src,
-            dst,
-            message_id,
-            rejected,
-        )
+        if let Some(refresh) = self
+            .cache
+            .insert_pending_write(mutation, src, dst, message_id, rejected)
         {
-            self.send_group_refresh(
-                routing_node,
-                *data_id.name(),
-                refresh,
-                message_id,
-            )?;
+            self.send_group_refresh(routing_node, *data_id.name(), refresh, message_id)?;
         }
 
         Ok(())
@@ -1132,14 +1043,7 @@ impl DataManager {
         let mutation_type = mutation.mutation_type();
         let data_id = mutation.data_id();
 
-        self.update_pending_writes(
-            routing_node,
-            mutation,
-            src,
-            dst,
-            msg_id,
-            res.is_err(),
-        )?;
+        self.update_pending_writes(routing_node, mutation, src, dst, msg_id, res.is_err())?;
 
         if let Err(error) = res {
             self.send_mutation_response(
@@ -1182,9 +1086,8 @@ impl DataManager {
                     data.mutate_entries_without_validation(actions);
                     keys.into_iter()
                         .filter_map(|key| {
-                            data.get(&key).map(|value| {
-                                FragmentInfo::mutable_data_entry(data, key, value)
-                            })
+                            data.get(&key)
+                                .map(|value| FragmentInfo::mutable_data_entry(data, key, value))
                         })
                         .collect()
                 })
@@ -1195,37 +1098,30 @@ impl DataManager {
                 user,
                 permissions,
                 version,
-            } => {
-                self.with_mdata(name, tag, |data| {
-                    let _ =
-                        data.set_user_permissions_without_validation(user, permissions, version);
-                    vec![FragmentInfo::mutable_data_shell(data)]
-                })
-            }
+            } => self.with_mdata(name, tag, |data| {
+                let _ = data.set_user_permissions_without_validation(user, permissions, version);
+                vec![FragmentInfo::mutable_data_shell(data)]
+            }),
             Mutation::DelMDataUserPermissions {
                 name,
                 tag,
                 user,
                 version,
-            } => {
-                self.with_mdata(name, tag, |data| {
-                    let _ = data.del_user_permissions_without_validation(&user, version);
-                    vec![FragmentInfo::mutable_data_shell(data)]
-                })
-            }
+            } => self.with_mdata(name, tag, |data| {
+                let _ = data.del_user_permissions_without_validation(&user, version);
+                vec![FragmentInfo::mutable_data_shell(data)]
+            }),
             Mutation::ChangeMDataOwner {
                 name,
                 tag,
                 new_owners,
                 version,
-            } => {
-                self.with_mdata(name, tag, |data| {
-                    if let Some(new_owner) = new_owners.into_iter().next() {
-                        let _ = data.change_owner_without_validation(new_owner, version);
-                    }
-                    vec![FragmentInfo::mutable_data_shell(data)]
-                })
-            }
+            } => self.with_mdata(name, tag, |data| {
+                if let Some(new_owner) = new_owners.into_iter().next() {
+                    let _ = data.change_owner_without_validation(new_owner, version);
+                }
+                vec![FragmentInfo::mutable_data_shell(data)]
+            }),
         };
 
         let (res, fragments) = match res {
@@ -1233,15 +1129,7 @@ impl DataManager {
             Err(error) => (Err(error), Vec::new()),
         };
 
-        self.send_mutation_response(
-            routing_node,
-            src,
-            dst,
-            mutation_type,
-            data_id,
-            res,
-            msg_id,
-        )?;
+        self.send_mutation_response(routing_node, src, dst, mutation_type, data_id, res, msg_id)?;
         Ok(fragments)
     }
 
@@ -1276,12 +1164,7 @@ impl DataManager {
                     res_string,
                     data_id
                 );
-                routing_node.send_mutate_mdata_entries_response(
-                    dst,
-                    src,
-                    res,
-                    msg_id,
-                )?
+                routing_node.send_mutate_mdata_entries_response(dst, src, res, msg_id)?
             }
             MutationType::SetMDataUserPermissions => {
                 trace!(
@@ -1289,12 +1172,7 @@ impl DataManager {
                     res_string,
                     data_id
                 );
-                routing_node.send_set_mdata_user_permissions_response(
-                    dst,
-                    src,
-                    res,
-                    msg_id,
-                )?
+                routing_node.send_set_mdata_user_permissions_response(dst, src, res, msg_id)?
             }
             MutationType::DelMDataUserPermissions => {
                 trace!(
@@ -1302,12 +1180,7 @@ impl DataManager {
                     res_string,
                     data_id
                 );
-                routing_node.send_del_mdata_user_permissions_response(
-                    dst,
-                    src,
-                    res,
-                    msg_id,
-                )?
+                routing_node.send_del_mdata_user_permissions_response(dst, src, res, msg_id)?
             }
             MutationType::ChangeMDataOwner => {
                 trace!(
@@ -1315,12 +1188,7 @@ impl DataManager {
                     res_string,
                     data_id
                 );
-                routing_node.send_change_mdata_owner_response(
-                    dst,
-                    src,
-                    res,
-                    msg_id,
-                )?
+                routing_node.send_change_mdata_owner_response(dst, src, res, msg_id)?
             }
         }
 
@@ -1340,8 +1208,7 @@ impl DataManager {
                 if let Err(error) = self.chunk_store.delete(&data_id) {
                     warn!(
                         "DM failed to delete unneeded chunk {:?}: {:?}",
-                        data_id,
-                        error
+                        data_id, error
                     );
                     break;
                 }
@@ -1356,17 +1223,18 @@ impl DataManager {
         src: XorName,
         fragment: FragmentInfo,
     ) -> Result<(), InternalError> {
-        if self.cache.register_needed_fragment_with_another_holder(
-            fragment.clone(),
-            src,
-        )
+        if self
+            .cache
+            .register_needed_fragment_with_another_holder(fragment.clone(), src)
         {
             return Ok(());
         }
 
-        let holders = match self.fragment_refresh_accumulator
+        let holders = match self
+            .fragment_refresh_accumulator
             .add(fragment.clone(), src)
-            .cloned() {
+            .cloned()
+        {
             Some(holders) => {
                 self.fragment_refresh_accumulator.delete(&fragment);
                 holders
@@ -1376,12 +1244,12 @@ impl DataManager {
 
         let needed = match fragment {
             FragmentInfo::ImmutableData(name) => !self.chunk_store.has(&ImmutableDataId(name)),
-            FragmentInfo::MutableDataShell { name, tag, version, .. } => {
-                match self.chunk_store.get(&MutableDataId(name, tag)) {
-                    Err(_) => true,
-                    Ok(data) => data.version() < version,
-                }
-            }
+            FragmentInfo::MutableDataShell {
+                name, tag, version, ..
+            } => match self.chunk_store.get(&MutableDataId(name, tag)) {
+                Err(_) => true,
+                Ok(data) => data.version() < version,
+            },
             FragmentInfo::MutableDataEntry {
                 name,
                 tag,
@@ -1436,12 +1304,7 @@ impl DataManager {
             serialisation::serialise(&refreshes)?
         };
         trace!("DM sending refresh to {:?}.", dst);
-        routing_node.send_refresh_request(
-            src,
-            dst,
-            payload,
-            MessageId::new(),
-        )?;
+        routing_node.send_refresh_request(src, dst, payload, MessageId::new())?;
         Ok(())
     }
 
@@ -1479,17 +1342,9 @@ impl DataManager {
             let dst = Authority::NaeManager(name);
             let msg_id = MessageId::new();
 
-            routing_node.send_get_mdata_request(
-                src,
-                dst,
-                name,
-                tag,
-                msg_id,
-            )?;
-            self.cache.start_needed_mutable_chunk_request(
-                data_id,
-                msg_id,
-            );
+            routing_node.send_get_mdata_request(src, dst, name, tag, msg_id)?;
+            self.cache
+                .start_needed_mutable_chunk_request(data_id, msg_id);
         }
 
         Ok(())
@@ -1529,24 +1384,12 @@ impl DataManager {
                         break;
                     }
                     FragmentInfo::MutableDataShell { name, tag, .. } => {
-                        routing_node.send_get_mdata_shell_request(
-                            src,
-                            dst,
-                            name,
-                            tag,
-                            msg_id,
-                        )?;
+                        routing_node.send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
                         break;
                     }
                     FragmentInfo::MutableDataEntry { name, tag, key, .. } => {
-                        routing_node.send_get_mdata_value_request(
-                            src,
-                            dst,
-                            name,
-                            tag,
-                            key,
-                            msg_id,
-                        )?;
+                        routing_node
+                            .send_get_mdata_value_request(src, dst, name, tag, key, msg_id)?;
                         break;
                     }
                 }
@@ -1581,10 +1424,9 @@ impl DataManager {
         existing_data: Option<&MutableData>,
         new_mutation: &Mutation,
     ) -> Result<(), ClientError> {
-        if self.cache.validate_concurrent_mutations(
-            existing_data,
-            new_mutation,
-        )
+        if self
+            .cache
+            .validate_concurrent_mutations(existing_data, new_mutation)
         {
             Ok(())
         } else {
@@ -1643,7 +1485,8 @@ impl DataManager {
         use maidsafe_utilities::SeededRng;
         use rand::Rng;
 
-        let _ = self._delayed_group_refresh_cache
+        let _ = self
+            ._delayed_group_refresh_cache
             .as_ref()
             .and_then(|cache| {
                 let mut rng = SeededRng::thread_rng();
@@ -1654,9 +1497,7 @@ impl DataManager {
                     None
                 }
             })
-            .map(|delayed_refresh| {
-                self.handle_group_refresh(routing_node, delayed_refresh)
-            });
+            .map(|delayed_refresh| self.handle_group_refresh(routing_node, delayed_refresh));
     }
 
     fn get_version(&self, data_id: &DataId) -> Result<u64, ChunkStoreError> {
@@ -1697,7 +1538,7 @@ impl Debug for DataManager {
         write!(
             formatter,
             "This vault has received {} Client Get requests. Chunks stored: Immutable: {}, \
-                Mutable: {}. Total stored: {} bytes.",
+             Mutable: {}. Total stored: {} bytes.",
             self.client_get_requests,
             self.immutable_data_count,
             self.mutable_data_count,

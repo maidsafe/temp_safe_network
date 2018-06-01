@@ -9,13 +9,13 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
-use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-use routing::{BootstrapConfig, ImmutableData, MutableData, QUORUM_DENOMINATOR, QUORUM_NUMERATOR};
+use rand::Rng;
 use routing::mock_crust::Network;
-use safe_vault::{Config, test_utils};
-use safe_vault::mock_crust_detail::{poll, test_node};
+use routing::{BootstrapConfig, ImmutableData, MutableData, QUORUM_DENOMINATOR, QUORUM_NUMERATOR};
 use safe_vault::mock_crust_detail::test_client::TestClient;
+use safe_vault::mock_crust_detail::{poll, test_node};
+use safe_vault::{test_utils, Config};
 
 // Keeps storing data till network is full. Then keeps adding nodes till network can store a new
 // chunk again.
@@ -89,9 +89,9 @@ fn fill_network() {
 
         match client.put_idata_may_response(data, &mut nodes) {
             Ok(()) => {
-                    trace!("Stored {}", data_id);
-                    return;
-                }
+                trace!("Stored {}", data_id);
+                return;
+            }
             Err(error) => {
                 trace!("Failed storing {}, reason: {:?}", data_id, error);
             }

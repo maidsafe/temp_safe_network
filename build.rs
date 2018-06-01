@@ -19,8 +19,8 @@ extern crate hyper;
 
 #[cfg(feature = "generate-diagrams")]
 mod generate_diagrams {
-    use hyper::Client;
     use hyper::client::IntoUrl;
+    use hyper::Client;
     use std::fs::{self, File};
     use std::io;
     use std::path::{Path, PathBuf};

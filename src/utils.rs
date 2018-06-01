@@ -9,7 +9,7 @@
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 pub use fake_clock::FakeClock as Instant;
 use maidsafe_utilities::serialisation;
-use routing::{MutableData, Value, XorName, sha3};
+use routing::{sha3, MutableData, Value, XorName};
 use rust_sodium::crypto::sign;
 use serde::Serialize;
 use std::collections;
@@ -21,7 +21,8 @@ use std::hash::BuildHasherDefault;
 pub use std::time::Instant;
 use tiny_keccak;
 
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize,
+         Deserialize)]
 pub struct SecureHash(sha3::Digest256);
 
 /// Compute secure hash of the given value.
