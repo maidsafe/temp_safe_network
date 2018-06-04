@@ -7,16 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 macro_rules! assert_err {
-    ($cond : expr, $error : pat) => {
+    ($cond:expr, $error:pat) => {
         match $cond {
             Err($error) => (),
-            result => panic!(concat!("Expecting ", stringify!($error), " got {:?}"), result),
+            result => panic!(
+                concat!("Expecting ", stringify!($error), " got {:?}"),
+                result
+            ),
         }
-    }
+    };
 }
 
 use chunk_store::{Chunk, ChunkId, ChunkStore, Error};
-use maidsafe_utilities::{SeededRng, serialisation};
+use maidsafe_utilities::{serialisation, SeededRng};
 use rand::Rng;
 use tempdir::TempDir;
 

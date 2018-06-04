@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::ACCUMULATOR_TIMEOUT_SECS;
 use super::data::{Data, MutableDataId};
+use super::ACCUMULATOR_TIMEOUT_SECS;
 use accumulator::Accumulator;
-use routing::{MutableData, QUORUM_DENOMINATOR, QUORUM_NUMERATOR, Value, XorName};
+use routing::{MutableData, Value, XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR};
 use std::time::Duration;
 use utils::{self, HashMap, Instant, SecureHash};
 
@@ -60,7 +60,7 @@ impl MutableDataCache {
         for (key, value) in entries {
             let entry_key = EntryKey {
                 id: data_id,
-                key: key,
+                key,
                 hash: utils::secure_hash(&value),
             };
 
@@ -77,7 +77,8 @@ impl MutableDataCache {
     pub fn insert_entry(&mut self, id: MutableDataId, key: Vec<u8>, value: Value) {
         self.remove_expired_entries();
 
-        let _ = self.entry_cache
+        let _ = self
+            .entry_cache
             .entry(id)
             .or_insert_with(HashMap::default)
             .insert(key, (value, Instant::now()));
@@ -99,7 +100,8 @@ impl MutableDataCache {
 
     // Returns and removes all cached entries of the given mutable data.
     pub fn take_entries(&mut self, id: &MutableDataId) -> HashMap<Vec<u8>, Value> {
-        let result = self.entry_cache
+        let result = self
+            .entry_cache
             .remove(id)
             .unwrap_or_else(Default::default)
             .into_iter()
@@ -117,12 +119,12 @@ impl MutableDataCache {
         for (data_id, entries) in &mut self.entry_cache {
             let expired_keys: Vec<_> = entries
                 .iter()
-                .filter_map(|(key, &(_, instant))| if instant.elapsed().as_secs() >
-                    ENTRY_CACHE_TIMEOUT_SECS
-                {
-                    Some(key.clone())
-                } else {
-                    None
+                .filter_map(|(key, &(_, instant))| {
+                    if instant.elapsed().as_secs() > ENTRY_CACHE_TIMEOUT_SECS {
+                        Some(key.clone())
+                    } else {
+                        None
+                    }
                 })
                 .collect();
 

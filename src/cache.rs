@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use lru_time_cache::LruCache;
-use routing::{ImmutableData, Request, Response, XorName};
 use routing::Cache as RoutingCache;
+use routing::{ImmutableData, Request, Response, XorName};
 use std::cell::RefCell;
 use std::time::Duration;
 
@@ -33,12 +33,13 @@ impl Cache {
 impl RoutingCache for Cache {
     fn get(&self, request: &Request) -> Option<Response> {
         if let Request::GetIData { name, msg_id } = *request {
-            self.store.borrow_mut().get(&name).map(|data| {
-                Response::GetIData {
+            self.store
+                .borrow_mut()
+                .get(&name)
+                .map(|data| Response::GetIData {
                     res: Ok(data.clone()),
-                    msg_id: msg_id,
-                }
-            })
+                    msg_id,
+                })
         } else {
             None
         }
@@ -54,8 +55,8 @@ impl RoutingCache for Cache {
 #[cfg(test)]
 mod tests {
     use super::Cache;
-    use routing::{ImmutableData, MessageId, Request, Response};
     use routing::Cache as RoutingCache;
+    use routing::{ImmutableData, MessageId, Request, Response};
 
     #[test]
     fn put_and_get() {
@@ -79,9 +80,9 @@ mod tests {
 
         match cache.get(&request) {
             Some(Response::GetIData {
-                     res: Ok(cached_data),
-                     msg_id: cached_message_id,
-                 }) => {
+                res: Ok(cached_data),
+                msg_id: cached_message_id,
+            }) => {
                 assert_eq!(cached_data, data);
                 assert_eq!(cached_message_id, request_message_id);
             }

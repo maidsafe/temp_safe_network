@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use routing::{AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream, FullId,
-              ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId,
-              Request, Response, RoutingError, RoutingTable, User, Value, XorName};
 use routing::Config as RoutingConfig;
+use routing::{
+    AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream, FullId,
+    ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId, Request,
+    Response, RoutingError, RoutingTable, User, Value, XorName,
+};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
@@ -115,12 +117,14 @@ impl Node {
                       requester: sign::PublicKey,
                   });
 
-    impl_request!(send_get_mdata_shell_request,
-                  GetMDataShell {
-                      name: XorName,
-                      tag: u64,
-                      msg_id: MessageId,
-                  });
+    impl_request!(
+        send_get_mdata_shell_request,
+        GetMDataShell {
+            name: XorName,
+            tag: u64,
+            msg_id: MessageId,
+        }
+    );
 
     impl_request!(send_get_mdata_value_request,
                   GetMDataValue {
@@ -130,26 +134,30 @@ impl Node {
                       msg_id: MessageId
                   });
 
-    impl_request!(send_set_mdata_user_permissions_request,
-                  SetMDataUserPermissions {
-                      name: XorName,
-                      tag: u64,
-                      user: User,
-                      permissions: PermissionSet,
-                      version: u64,
-                      msg_id: MessageId,
-                      requester: sign::PublicKey,
-                  });
+    impl_request!(
+        send_set_mdata_user_permissions_request,
+        SetMDataUserPermissions {
+            name: XorName,
+            tag: u64,
+            user: User,
+            permissions: PermissionSet,
+            version: u64,
+            msg_id: MessageId,
+            requester: sign::PublicKey,
+        }
+    );
 
-    impl_request!(send_del_mdata_user_permissions_request,
-                  DelMDataUserPermissions {
-                      name: XorName,
-                      tag: u64,
-                      user: User,
-                      version: u64,
-                      msg_id: MessageId,
-                      requester: sign::PublicKey,
-                  });
+    impl_request!(
+        send_del_mdata_user_permissions_request,
+        DelMDataUserPermissions {
+            name: XorName,
+            tag: u64,
+            user: User,
+            version: u64,
+            msg_id: MessageId,
+            requester: sign::PublicKey,
+        }
+    );
 
     impl_request!(send_change_mdata_owner_request,
                   ChangeMDataOwner {
@@ -177,35 +185,47 @@ impl Node {
     impl_response!(send_put_mdata_response, PutMData);
     impl_response!(send_get_mdata_version_response, GetMDataVersion, u64);
     impl_response!(send_get_mdata_shell_response, GetMDataShell, MutableData);
-    impl_response!(send_list_mdata_entries_response,
-                   ListMDataEntries, BTreeMap<Vec<u8>, Value>);
-    impl_response!(send_list_mdata_keys_response,
-                   ListMDataKeys, BTreeSet<Vec<u8>>);
-    impl_response!(send_list_mdata_values_response,
-                   ListMDataValues, Vec<Value>);
-    impl_response!(send_get_mdata_value_response,
-                   GetMDataValue, Value);
+    impl_response!(
+        send_list_mdata_entries_response,
+        ListMDataEntries,
+        BTreeMap<Vec<u8>, Value>
+    );
+    impl_response!(
+        send_list_mdata_keys_response,
+        ListMDataKeys,
+        BTreeSet<Vec<u8>>
+    );
+    impl_response!(send_list_mdata_values_response, ListMDataValues, Vec<Value>);
+    impl_response!(send_get_mdata_value_response, GetMDataValue, Value);
     impl_response!(send_mutate_mdata_entries_response, MutateMDataEntries);
     impl_response!(send_list_mdata_permissions_response,
                    ListMDataPermissions, BTreeMap<User, PermissionSet>);
-    impl_response!(send_list_mdata_user_permissions_response,
-                   ListMDataUserPermissions, PermissionSet);
-    impl_response!(send_set_mdata_user_permissions_response,
-                   SetMDataUserPermissions);
-    impl_response!(send_list_auth_keys_and_version_response,
-                   ListAuthKeysAndVersion, (BTreeSet<sign::PublicKey>, u64));
+    impl_response!(
+        send_list_mdata_user_permissions_response,
+        ListMDataUserPermissions,
+        PermissionSet
+    );
+    impl_response!(
+        send_set_mdata_user_permissions_response,
+        SetMDataUserPermissions
+    );
+    impl_response!(
+        send_list_auth_keys_and_version_response,
+        ListAuthKeysAndVersion,
+        (BTreeSet<sign::PublicKey>, u64)
+    );
     impl_response!(send_ins_auth_key_response, InsAuthKey);
     impl_response!(send_del_auth_key_response, DelAuthKey);
-    impl_response!(send_del_mdata_user_permissions_response,
-                   DelMDataUserPermissions);
+    impl_response!(
+        send_del_mdata_user_permissions_response,
+        DelMDataUserPermissions
+    );
     impl_response!(send_change_mdata_owner_response, ChangeMDataOwner);
 
     pub fn close_group(&self, name: XorName, count: usize) -> Option<Vec<XorName>> {
-        self.routing_table.closest_names(&name, count).map(
-            |names| {
-                names.into_iter().cloned().collect()
-            },
-        )
+        self.routing_table
+            .closest_names(&name, count)
+            .map(|names| names.into_iter().cloned().collect())
     }
 
     pub fn id(&self) -> Result<PublicId, RoutingError> {
@@ -231,14 +251,9 @@ impl Node {
         dst: Authority<XorName>,
         request: Request,
     ) -> Result<(), InterfaceError> {
-        let prev = self.sent_requests.insert(
-            request_id(&request),
-            RequestWrapper {
-                src: src,
-                dst: dst,
-                request: request,
-            },
-        );
+        let prev = self
+            .sent_requests
+            .insert(request_id(&request), RequestWrapper { src, dst, request });
         assert!(prev.is_none());
         Ok(())
     }
@@ -251,11 +266,7 @@ impl Node {
     ) -> Result<(), InterfaceError> {
         let prev = self.sent_responses.insert(
             response_id(&response),
-            ResponseWrapper {
-                src: src,
-                dst: dst,
-                response: response,
-            },
+            ResponseWrapper { src, dst, response },
         );
         assert!(prev.is_none());
         Ok(())
@@ -292,18 +303,21 @@ impl NodeBuilder {
     }
 
     pub fn config(self, routing_config: RoutingConfig) -> NodeBuilder {
-        NodeBuilder { config: Some(routing_config) }
+        NodeBuilder {
+            config: Some(routing_config),
+        }
     }
 
     pub fn create(self) -> Result<Node, RoutingError> {
         let id = *FullId::new().public_id();
-        let group_size = self.config
+        let group_size = self
+            .config
             .and_then(|config| config.dev)
             .and_then(|dev_config| dev_config.min_section_size)
             .unwrap_or(DEFAULT_GROUP_SIZE);
 
         Ok(Node {
-            id: id,
+            id,
             routing_table: RoutingTable::new(*id.name(), group_size),
             sent_requests: Default::default(),
             sent_responses: Default::default(),
@@ -329,51 +343,51 @@ pub struct RequestWrapper {
 
 fn request_id(request: &Request) -> MessageId {
     match *request {
-        Request::Refresh(_, msg_id) |
-        Request::GetAccountInfo(msg_id) |
-        Request::PutIData { msg_id, .. } |
-        Request::GetIData { msg_id, .. } |
-        Request::PutMData { msg_id, .. } |
-        Request::GetMData { msg_id, .. } |
-        Request::GetMDataShell { msg_id, .. } |
-        Request::GetMDataVersion { msg_id, .. } |
-        Request::ListMDataEntries { msg_id, .. } |
-        Request::ListMDataKeys { msg_id, .. } |
-        Request::ListMDataValues { msg_id, .. } |
-        Request::GetMDataValue { msg_id, .. } |
-        Request::MutateMDataEntries { msg_id, .. } |
-        Request::ListMDataPermissions { msg_id, .. } |
-        Request::ListMDataUserPermissions { msg_id, .. } |
-        Request::SetMDataUserPermissions { msg_id, .. } |
-        Request::DelMDataUserPermissions { msg_id, .. } |
-        Request::ChangeMDataOwner { msg_id, .. } |
-        Request::ListAuthKeysAndVersion(msg_id) |
-        Request::InsAuthKey { msg_id, .. } |
-        Request::DelAuthKey { msg_id, .. } => msg_id,
+        Request::Refresh(_, msg_id)
+        | Request::GetAccountInfo(msg_id)
+        | Request::PutIData { msg_id, .. }
+        | Request::GetIData { msg_id, .. }
+        | Request::PutMData { msg_id, .. }
+        | Request::GetMData { msg_id, .. }
+        | Request::GetMDataShell { msg_id, .. }
+        | Request::GetMDataVersion { msg_id, .. }
+        | Request::ListMDataEntries { msg_id, .. }
+        | Request::ListMDataKeys { msg_id, .. }
+        | Request::ListMDataValues { msg_id, .. }
+        | Request::GetMDataValue { msg_id, .. }
+        | Request::MutateMDataEntries { msg_id, .. }
+        | Request::ListMDataPermissions { msg_id, .. }
+        | Request::ListMDataUserPermissions { msg_id, .. }
+        | Request::SetMDataUserPermissions { msg_id, .. }
+        | Request::DelMDataUserPermissions { msg_id, .. }
+        | Request::ChangeMDataOwner { msg_id, .. }
+        | Request::ListAuthKeysAndVersion(msg_id)
+        | Request::InsAuthKey { msg_id, .. }
+        | Request::DelAuthKey { msg_id, .. } => msg_id,
     }
 }
 
 fn response_id(response: &Response) -> MessageId {
     match *response {
-        Response::GetAccountInfo { msg_id, .. } |
-        Response::PutIData { msg_id, .. } |
-        Response::GetIData { msg_id, .. } |
-        Response::PutMData { msg_id, .. } |
-        Response::GetMData { msg_id, .. } |
-        Response::GetMDataShell { msg_id, .. } |
-        Response::GetMDataVersion { msg_id, .. } |
-        Response::ListMDataEntries { msg_id, .. } |
-        Response::ListMDataKeys { msg_id, .. } |
-        Response::ListMDataValues { msg_id, .. } |
-        Response::GetMDataValue { msg_id, .. } |
-        Response::MutateMDataEntries { msg_id, .. } |
-        Response::ListMDataPermissions { msg_id, .. } |
-        Response::ListMDataUserPermissions { msg_id, .. } |
-        Response::SetMDataUserPermissions { msg_id, .. } |
-        Response::DelMDataUserPermissions { msg_id, .. } |
-        Response::ChangeMDataOwner { msg_id, .. } |
-        Response::ListAuthKeysAndVersion { msg_id, .. } |
-        Response::InsAuthKey { msg_id, .. } |
-        Response::DelAuthKey { msg_id, .. } => msg_id,
+        Response::GetAccountInfo { msg_id, .. }
+        | Response::PutIData { msg_id, .. }
+        | Response::GetIData { msg_id, .. }
+        | Response::PutMData { msg_id, .. }
+        | Response::GetMData { msg_id, .. }
+        | Response::GetMDataShell { msg_id, .. }
+        | Response::GetMDataVersion { msg_id, .. }
+        | Response::ListMDataEntries { msg_id, .. }
+        | Response::ListMDataKeys { msg_id, .. }
+        | Response::ListMDataValues { msg_id, .. }
+        | Response::GetMDataValue { msg_id, .. }
+        | Response::MutateMDataEntries { msg_id, .. }
+        | Response::ListMDataPermissions { msg_id, .. }
+        | Response::ListMDataUserPermissions { msg_id, .. }
+        | Response::SetMDataUserPermissions { msg_id, .. }
+        | Response::DelMDataUserPermissions { msg_id, .. }
+        | Response::ChangeMDataOwner { msg_id, .. }
+        | Response::ListAuthKeysAndVersion { msg_id, .. }
+        | Response::InsAuthKey { msg_id, .. }
+        | Response::DelAuthKey { msg_id, .. } => msg_id,
     }
 }

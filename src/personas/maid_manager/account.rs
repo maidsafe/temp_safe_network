@@ -55,8 +55,8 @@ impl Account {
     }
 
     pub fn has_balance(&self) -> bool {
-        self.disable_mutation_limit ||
-            self.data_ops_msg_ids.len() as u64 + self.keys_ops_count < DEFAULT_MAX_OPS_COUNT
+        self.disable_mutation_limit
+            || self.data_ops_msg_ids.len() as u64 + self.keys_ops_count < DEFAULT_MAX_OPS_COUNT
     }
 }
 

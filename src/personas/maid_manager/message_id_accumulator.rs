@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use lru_time_cache::LruCache;
-use routing::{QUORUM_DENOMINATOR, QUORUM_NUMERATOR, XorName};
+use routing::{XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR};
 use std::collections::BTreeSet;
 use std::time::Duration;
 

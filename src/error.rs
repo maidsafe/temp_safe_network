@@ -9,9 +9,9 @@
 use chunk_store;
 use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
-use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
-use routing::ClientError;
 use routing::messaging;
+use routing::ClientError;
+use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
 use serde_json;
 use std::io;
 

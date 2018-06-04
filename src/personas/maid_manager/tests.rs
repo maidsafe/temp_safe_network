@@ -6,19 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::*;
 use super::account::DEFAULT_MAX_OPS_COUNT;
+use super::*;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand;
-use routing::{AccountInfo, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
-              MAX_MUTABLE_DATA_SIZE_IN_BYTES, Request, Response, Value};
+use routing::{
+    AccountInfo, Request, Response, Value, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
+    MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES,
+};
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
 const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;
 const TEST_TAG: u64 = 12_345_678;
-
 
 #[test]
 fn account_basics() {
@@ -57,13 +58,7 @@ fn idata_basics() {
     // Put immutable data.
     let data = test_utils::gen_immutable_data(10, &mut rand::thread_rng());
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_idata(
-        &mut node,
-        client,
-        client_manager,
-        data.clone(),
-        msg_id,
-    ));
+    unwrap!(mm.handle_put_idata(&mut node, client, client_manager, data.clone(), msg_id,));
 
     // Verify it gets forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -87,10 +82,14 @@ fn idata_basics() {
 
     // Verify the mutation was accounted for.
     let account_info_1 = unwrap!(get_account_info(&mut node, &mut mm, client, client_manager));
-    assert_eq!(account_info_1.mutations_done,
-               account_info_0.mutations_done + 1);
-    assert_eq!(account_info_1.mutations_available,
-               account_info_0.mutations_available - 1);
+    assert_eq!(
+        account_info_1.mutations_done,
+        account_info_0.mutations_done + 1
+    );
+    assert_eq!(
+        account_info_1.mutations_available,
+        account_info_0.mutations_available - 1
+    );
 }
 
 #[test]
@@ -110,12 +109,14 @@ fn mdata_basics() {
     let data = test_utils::gen_mutable_data(tag, 0, client_key, &mut rand::thread_rng());
 
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                client,
-                                client_manager,
-                                data.clone(),
-                                msg_id,
-                                client_key));
+    unwrap!(mm.handle_put_mdata(
+        &mut node,
+        client,
+        client_manager,
+        data.clone(),
+        msg_id,
+        client_key
+    ));
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -138,21 +139,27 @@ fn mdata_basics() {
 
     // Verify the mutation was accounted for.
     let account_info_1 = unwrap!(get_account_info(&mut node, &mut mm, client, client_manager));
-    assert_eq!(account_info_1.mutations_done,
-               account_info_0.mutations_done + 1);
-    assert_eq!(account_info_1.mutations_available,
-               account_info_0.mutations_available - 1);
+    assert_eq!(
+        account_info_1.mutations_done,
+        account_info_0.mutations_done + 1
+    );
+    assert_eq!(
+        account_info_1.mutations_available,
+        account_info_0.mutations_available - 1
+    );
 
     // Mutate the data.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_mutate_mdata_entries(&mut node,
-                                           client,
-                                           client_manager,
-                                           *data.name(),
-                                           data.tag(),
-                                           Default::default(),
-                                           msg_id,
-                                           client_key));
+    unwrap!(mm.handle_mutate_mdata_entries(
+        &mut node,
+        client,
+        client_manager,
+        *data.name(),
+        data.tag(),
+        Default::default(),
+        msg_id,
+        client_key
+    ));
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -172,10 +179,14 @@ fn mdata_basics() {
 
     // Verify the mutation was accounted for.
     let account_info_2 = unwrap!(get_account_info(&mut node, &mut mm, client, client_manager));
-    assert_eq!(account_info_2.mutations_done,
-               account_info_0.mutations_done + 2);
-    assert_eq!(account_info_2.mutations_available,
-               account_info_0.mutations_available - 2);
+    assert_eq!(
+        account_info_2.mutations_done,
+        account_info_0.mutations_done + 2
+    );
+    assert_eq!(
+        account_info_2.mutations_available,
+        account_info_0.mutations_available - 2
+    );
 }
 
 #[test]
@@ -194,12 +205,7 @@ fn mdata_permissions_and_owners() {
     let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let data_name = *data.name();
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                client,
-                                client_manager,
-                                data,
-                                msg_id,
-                                client_key));
+    unwrap!(mm.handle_put_mdata(&mut node, client, client_manager, data, msg_id, client_key));
     // Simulate forwarding it to the NAE manager, receiving response and refresh.
     assert!(node.sent_requests.remove(&msg_id).is_some());
     unwrap!(mm.handle_put_mdata_response(&mut node, Ok(()), msg_id));
@@ -209,16 +215,18 @@ fn mdata_permissions_and_owners() {
 
     // Set user permissions
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_set_mdata_user_permissions(&mut node,
-                                                 client,
-                                                 client_manager,
-                                                 data_name,
-                                                 TEST_TAG,
-                                                 User::Key(app_key),
-                                                 PermissionSet::new(),
-                                                 1,
-                                                 msg_id,
-                                                 client_key));
+    unwrap!(mm.handle_set_mdata_user_permissions(
+        &mut node,
+        client,
+        client_manager,
+        data_name,
+        TEST_TAG,
+        User::Key(app_key),
+        PermissionSet::new(),
+        1,
+        msg_id,
+        client_key
+    ));
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -238,15 +246,17 @@ fn mdata_permissions_and_owners() {
 
     // Delete user permissions
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_del_mdata_user_permissions(&mut node,
-                                                 client,
-                                                 client_manager,
-                                                 data_name,
-                                                 TEST_TAG,
-                                                 User::Key(app_key),
-                                                 2,
-                                                 msg_id,
-                                                 client_key));
+    unwrap!(mm.handle_del_mdata_user_permissions(
+        &mut node,
+        client,
+        client_manager,
+        data_name,
+        TEST_TAG,
+        User::Key(app_key),
+        2,
+        msg_id,
+        client_key
+    ));
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -268,14 +278,16 @@ fn mdata_permissions_and_owners() {
     let mut new_owners = BTreeSet::new();
     let _ = new_owners.insert(app_key);
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_change_mdata_owner(&mut node,
-                                         app,
-                                         client_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         new_owners.clone(),
-                                         3,
-                                         msg_id));
+    unwrap!(mm.handle_change_mdata_owner(
+        &mut node,
+        app,
+        client_manager,
+        data_name,
+        TEST_TAG,
+        new_owners.clone(),
+        3,
+        msg_id
+    ));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
                   Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
@@ -290,28 +302,32 @@ fn mdata_permissions_and_owners() {
 
     // Attempt to change owner by authorised app still fails.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_change_mdata_owner(&mut node,
-                                         app,
-                                         client_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         new_owners.clone(),
-                                         3,
-                                         msg_id));
+    unwrap!(mm.handle_change_mdata_owner(
+        &mut node,
+        app,
+        client_manager,
+        data_name,
+        TEST_TAG,
+        new_owners.clone(),
+        3,
+        msg_id
+    ));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
                   Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
 
     // Only the client can change owner
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_change_mdata_owner(&mut node,
-                                         client,
-                                         client_manager,
-                                         data_name,
-                                         TEST_TAG,
-                                         new_owners,
-                                         3,
-                                         msg_id));
+    unwrap!(mm.handle_change_mdata_owner(
+        &mut node,
+        client,
+        client_manager,
+        data_name,
+        TEST_TAG,
+        new_owners,
+        3,
+        msg_id
+    ));
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -332,12 +348,7 @@ fn mdata_permissions_and_owners() {
     // App cannot put data with itself as the owner.
     let data = test_utils::gen_mutable_data(TEST_TAG, 0, app_key, &mut rng);
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                app,
-                                client_manager,
-                                data,
-                                msg_id,
-                                app_key));
+    unwrap!(mm.handle_put_mdata(&mut node, app, client_manager, data, msg_id, app_key));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
                   Response::PutMData { res: Err(ClientError::InvalidOwners), .. });
@@ -357,10 +368,12 @@ fn auth_keys() {
 
     // The initial auth keys should be empty, and the version should be 0.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_list_auth_keys_and_version(&mut node,
-                                                 owner_client,
-                                                 owner_client_manager,
-                                                 msg_id));
+    unwrap!(mm.handle_list_auth_keys_and_version(
+        &mut node,
+        owner_client,
+        owner_client_manager,
+        msg_id
+    ));
     let (auth_keys, version) = assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                       Response::ListAuthKeysAndVersion { res: Ok(ok), .. } => ok);
 
@@ -369,12 +382,14 @@ fn auth_keys() {
 
     // Attempt to insert new auth key with incorrect version fails.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_ins_auth_key(&mut node,
-                                   owner_client,
-                                   owner_client_manager,
-                                   app_key,
-                                   0,
-                                   msg_id));
+    unwrap!(mm.handle_ins_auth_key(
+        &mut node,
+        owner_client,
+        owner_client_manager,
+        app_key,
+        0,
+        msg_id
+    ));
 
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                   Response::InsAuthKey { res: Err(ClientError::InvalidSuccessor(0)), .. });
@@ -382,24 +397,28 @@ fn auth_keys() {
     // Attempt to insert new auth key by non-owner fails.
     let (evil_client, _) = test_utils::gen_client_authority();
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_ins_auth_key(&mut node,
-                                   evil_client,
-                                   owner_client_manager,
-                                   app_key,
-                                   1,
-                                   msg_id));
+    unwrap!(mm.handle_ins_auth_key(
+        &mut node,
+        evil_client,
+        owner_client_manager,
+        app_key,
+        1,
+        msg_id
+    ));
 
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                   Response::InsAuthKey { res: Err(ClientError::AccessDenied), .. });
 
     // Insert the auth key with proper version bump.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_ins_auth_key(&mut node,
-                                   owner_client,
-                                   owner_client_manager,
-                                   app_key,
-                                   1,
-                                   msg_id));
+    unwrap!(mm.handle_ins_auth_key(
+        &mut node,
+        owner_client,
+        owner_client_manager,
+        app_key,
+        1,
+        msg_id
+    ));
 
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                   Response::InsAuthKey { res: Ok(()), .. });
@@ -410,10 +429,12 @@ fn auth_keys() {
     // Retrieve the auth keys again - should contain one element and have
     // bumped version.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_list_auth_keys_and_version(&mut node,
-                                                 owner_client,
-                                                 owner_client_manager,
-                                                 msg_id));
+    unwrap!(mm.handle_list_auth_keys_and_version(
+        &mut node,
+        owner_client,
+        owner_client_manager,
+        msg_id
+    ));
     let (auth_keys, version) = assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                       Response::ListAuthKeysAndVersion { res: Ok(ok), .. } => ok);
 
@@ -441,11 +462,13 @@ fn mutation_authorisation() {
     let idata_nae_manager = Authority::NaeManager(*idata.name());
 
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_idata(&mut node,
-                                app_client,
-                                owner_client_manager,
-                                idata.clone(),
-                                msg_id));
+    unwrap!(mm.handle_put_idata(
+        &mut node,
+        app_client,
+        owner_client_manager,
+        idata.clone(),
+        msg_id
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
@@ -458,12 +481,14 @@ fn mutation_authorisation() {
     let mdata_nae_manager = Authority::NaeManager(mdata_name);
 
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                app_client,
-                                owner_client_manager,
-                                mdata.clone(),
-                                msg_id,
-                                app_key));
+    unwrap!(mm.handle_put_mdata(
+        &mut node,
+        app_client,
+        owner_client_manager,
+        mdata.clone(),
+        msg_id,
+        app_key
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
@@ -471,12 +496,14 @@ fn mutation_authorisation() {
 
     // Put by the owner is ok.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                owner_client,
-                                owner_client_manager,
-                                mdata,
-                                msg_id,
-                                owner_key));
+    unwrap!(mm.handle_put_mdata(
+        &mut node,
+        owner_client,
+        owner_client_manager,
+        mdata,
+        msg_id,
+        owner_key
+    ));
 
     // Verify the request is forwarded to the NaeManager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -490,27 +517,31 @@ fn mutation_authorisation() {
 
     // Attemp to mutate by unauthorised client fails.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_mutate_mdata_entries(&mut node,
-                                           app_client,
-                                           owner_client_manager,
-                                           mdata_name,
-                                           tag,
-                                           Default::default(),
-                                           msg_id,
-                                           app_key));
+    unwrap!(mm.handle_mutate_mdata_entries(
+        &mut node,
+        app_client,
+        owner_client_manager,
+        mdata_name,
+        tag,
+        Default::default(),
+        msg_id,
+        app_key
+    ));
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                   Response::MutateMDataEntries { res: Err(ClientError::AccessDenied), .. });
 
     // Mutation by the owner succeeds.
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_mutate_mdata_entries(&mut node,
-                                           owner_client,
-                                           owner_client_manager,
-                                           mdata_name,
-                                           tag,
-                                           Default::default(),
-                                           msg_id,
-                                           owner_key));
+    unwrap!(mm.handle_mutate_mdata_entries(
+        &mut node,
+        owner_client,
+        owner_client_manager,
+        mdata_name,
+        tag,
+        Default::default(),
+        msg_id,
+        owner_key
+    ));
 
     // Verify the request is forwarded to the NaeManager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -525,12 +556,14 @@ fn mutation_authorisation() {
     // Authorise the app.
     {
         let msg_id = MessageId::new();
-        unwrap!(mm.handle_ins_auth_key(&mut node,
-                                       owner_client,
-                                       owner_client_manager,
-                                       app_key,
-                                       1,
-                                       msg_id));
+        unwrap!(mm.handle_ins_auth_key(
+            &mut node,
+            owner_client,
+            owner_client_manager,
+            app_key,
+            1,
+            msg_id
+        ));
         assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                   Response::InsAuthKey { res: Ok(()), .. });
         simulate_refresh(&mut node, &mut mm, msg_id, 1);
@@ -564,12 +597,14 @@ fn mutation_authorisation() {
         let mdata_nae_manager = Authority::NaeManager(*mdata.name());
 
         let msg_id = MessageId::new();
-        unwrap!(mm.handle_put_mdata(&mut node,
-                                    app_client,
-                                    owner_client_manager,
-                                    mdata,
-                                    msg_id,
-                                    app_key));
+        unwrap!(mm.handle_put_mdata(
+            &mut node,
+            app_client,
+            owner_client_manager,
+            mdata,
+            msg_id,
+            app_key
+        ));
 
         // Verify the request is forwarded to the NaeManager.
         let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -591,14 +626,16 @@ fn mutation_authorisation() {
     // Mutation by authorised app succeeds.
     {
         let msg_id = MessageId::new();
-        unwrap!(mm.handle_mutate_mdata_entries(&mut node,
-                                               app_client,
-                                               owner_client_manager,
-                                               mdata_name,
-                                               tag,
-                                               Default::default(),
-                                               msg_id,
-                                               app_key));
+        unwrap!(mm.handle_mutate_mdata_entries(
+            &mut node,
+            app_client,
+            owner_client_manager,
+            mdata_name,
+            tag,
+            Default::default(),
+            msg_id,
+            app_key
+        ));
 
         // Verify the request is forwarded to the NaeManager.
         let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -621,14 +658,16 @@ fn mutation_authorisation() {
     // key fails.
     {
         let msg_id = MessageId::new();
-        unwrap!(mm.handle_mutate_mdata_entries(&mut node,
-                                               app_client,
-                                               owner_client_manager,
-                                               mdata_name,
-                                               tag,
-                                               Default::default(),
-                                               msg_id,
-                                               owner_key));
+        unwrap!(mm.handle_mutate_mdata_entries(
+            &mut node,
+            app_client,
+            owner_client_manager,
+            mdata_name,
+            tag,
+            Default::default(),
+            msg_id,
+            owner_key
+        ));
         let message = unwrap!(node.sent_responses.remove(&msg_id));
         assert_match!(message.response,
                       Response::MutateMDataEntries { res: Err(ClientError::AccessDenied), .. });
@@ -644,7 +683,12 @@ fn account_replication_during_churn() {
     let mut old_mm = MaidManager::new(GROUP_SIZE, None, false);
 
     let op_msg_id = create_account(&mut old_node, &mut old_mm, client, client_manager);
-    let old_info = unwrap!(get_account_info(&mut old_node, &mut old_mm, client, client_manager));
+    let old_info = unwrap!(get_account_info(
+        &mut old_node,
+        &mut old_mm,
+        client,
+        client_manager
+    ));
 
     let mut new_node = test_utils::new_routing_node(GROUP_SIZE);
     let mut new_mm = MaidManager::new(GROUP_SIZE, None, false);
@@ -679,10 +723,12 @@ fn account_replication_during_churn() {
 
     // QUORUM not yet reached.
     for _ in 0..(QUORUM - 1) {
-        unwrap!(new_mm.handle_serialised_refresh(&mut new_node,
-                                                 &serialised_refresh,
-                                                 msg_id,
-                                                 Some(XorName(rand::random()))));
+        unwrap!(new_mm.handle_serialised_refresh(
+            &mut new_node,
+            &serialised_refresh,
+            msg_id,
+            Some(XorName(rand::random()))
+        ));
     }
 
     // Refresh not yet reached.
@@ -690,12 +736,19 @@ fn account_replication_during_churn() {
     assert_match!(res, Err(ClientError::NoSuchAccount));
 
     // QUORUM reached.
-    unwrap!(new_mm.handle_serialised_refresh(&mut new_node,
-                                             &serialised_refresh,
-                                             msg_id,
-                                             Some(XorName(rand::random()))));
+    unwrap!(new_mm.handle_serialised_refresh(
+        &mut new_node,
+        &serialised_refresh,
+        msg_id,
+        Some(XorName(rand::random()))
+    ));
 
-    let new_info = unwrap!(get_account_info(&mut new_node, &mut new_mm, client, client_manager));
+    let new_info = unwrap!(get_account_info(
+        &mut new_node,
+        &mut new_mm,
+        client,
+        client_manager
+    ));
     assert_eq!(new_info, old_info);
 }
 
@@ -713,15 +766,10 @@ fn limits() {
     let bad_data =
         test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_idata(&mut node,
-                                client,
-                                client_manager,
-                                bad_data,
-                                msg_id));
+    unwrap!(mm.handle_put_idata(&mut node, client, client_manager, bad_data, msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
                   Response::PutIData { res: Err(ClientError::DataTooLarge), .. });
-
 
     // Attempt to put mutable data with too many entries fails.
     let mut bad_data = test_utils::gen_mutable_data(
@@ -736,19 +784,21 @@ fn limits() {
         let _ = bad_data.mutate_entry_without_validation(
             key,
             Value {
-                content: content,
+                content,
                 entry_version: 0,
             },
         );
     }
 
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                client,
-                                client_manager,
-                                bad_data,
-                                msg_id,
-                                client_key));
+    unwrap!(mm.handle_put_mdata(
+        &mut node,
+        client,
+        client_manager,
+        bad_data,
+        msg_id,
+        client_key
+    ));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
                   Response::PutMData { res: Err(ClientError::TooManyEntries), .. });
@@ -760,19 +810,21 @@ fn limits() {
     let res = bad_data.mutate_entry_without_validation(
         key,
         Value {
-            content: content,
+            content,
             entry_version: 0,
         },
     );
     assert!(res);
 
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_mdata(&mut node,
-                                client,
-                                client_manager,
-                                bad_data,
-                                msg_id,
-                                client_key));
+    unwrap!(mm.handle_put_mdata(
+        &mut node,
+        client,
+        client_manager,
+        bad_data,
+        msg_id,
+        client_key
+    ));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response,
                   Response::PutMData { res: Err(ClientError::DataTooLarge), .. });
@@ -864,10 +916,12 @@ fn simulate_refresh(node: &mut RoutingNode, mm: &mut MaidManager, msg_id: Messag
         let refresh: VaultRefresh = unwrap!(deserialise(&refresh));
         let refresh = assert_match!(refresh, VaultRefresh::MaidManager(refresh) => refresh);
         for _ in 0..count {
-            unwrap!(mm.handle_refresh(node,
-                                      refresh.clone(),
-                                      msg_id,
-                                      Some(XorName(rand::random()))));
+            unwrap!(mm.handle_refresh(
+                node,
+                refresh.clone(),
+                msg_id,
+                Some(XorName(rand::random()))
+            ));
         }
     } else {
         unwrap!(mm.handle_serialised_refresh(node, &refresh, msg_id, None));

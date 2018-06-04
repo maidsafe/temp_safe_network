@@ -11,16 +11,17 @@
 
 use fake_clock::FakeClock;
 use rand::Rng;
-use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
-              MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
-              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId, MutableData, PermissionSet, Response,
-              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
 use routing::rate_limiter_consts::{MIN_CLIENT_CAPACITY, RATE};
+use routing::{
+    AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId, MessageId, MutableData,
+    PermissionSet, Response, User, Value, XorName, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
+    MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, TYPE_TAG_SESSION_PACKET,
+};
 use rust_sodium::crypto::sign;
-use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE, test_utils};
-use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
+use safe_vault::mock_crust_detail::{self, poll, test_node, Data};
+use safe_vault::{test_utils, Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tiny_keccak;
 
@@ -53,11 +54,9 @@ fn handle_put_without_account() {
         })
         .count();
     assert_eq!(
-        count,
-        0,
+        count, 0,
         "mutations count {} found with {} nodes",
-        count,
-        node_count
+        count, node_count
     );
 }
 
@@ -100,11 +99,9 @@ fn handle_put_with_account() {
         })
         .count();
     assert_eq!(
-        count,
-        group_size,
+        count, group_size,
         "client account count {} found on {} nodes",
-        count,
-        node_count
+        count, node_count
     );
 
     mock_crust_detail::check_data(vec![Data::Immutable(data)], &nodes, group_size);
@@ -199,7 +196,6 @@ fn put_oversized_data() {
         x => panic!("Unexpected response: {:?}", x),
     }
 }
-
 
 #[test]
 fn create_account_twice() {
@@ -356,10 +352,7 @@ fn invite() {
     );
 
     // Create account using valid invite code.
-    unwrap!(client1.create_account_with_invitation_response(
-        invite_code,
-        &mut nodes,
-    ));
+    unwrap!(client1.create_account_with_invitation_response(invite_code, &mut nodes,));
 
     // Attempt to put an invite by non-admin client fails.
     let name = XorName(tiny_keccak::sha3_256(b"fake invite"));
@@ -480,11 +473,9 @@ fn account_balance_with_successful_mutations_with_churn() {
 
         for &(_, count) in &node_count_stats {
             assert_eq!(
-                count,
-                mutation_count,
+                count, mutation_count,
                 "Expected {} mutations, got: {:?}",
-                mutation_count,
-                node_count_stats
+                mutation_count, node_count_stats
             );
         }
 
@@ -562,12 +553,10 @@ fn account_balance_with_failed_mutations_with_churn() {
         let expected_mutation_count = chunks_per_iter * (i / 2 + 1) + 1;
         for &(_, count) in &node_count_stats {
             assert_eq!(
-                count,
-                expected_mutation_count,
+                count, expected_mutation_count,
                 "Unexpected mutation count: {:?}",
                 node_count_stats
             );
-
         }
     }
 }
@@ -626,10 +615,20 @@ fn account_concurrent_keys_mutation() {
         while let Ok(event) = client.try_recv() {
             match event {
                 Event::Response {
-                    response: Response::InsAuthKey { res: Ok(()), msg_id, }, ..
+                    response:
+                        Response::InsAuthKey {
+                            res: Ok(()),
+                            msg_id,
+                        },
+                    ..
                 } => ins_successes.push(msg_id),
                 Event::Response {
-                    response: Response::DelAuthKey { res: Ok(()), msg_id, }, ..
+                    response:
+                        Response::DelAuthKey {
+                            res: Ok(()),
+                            msg_id,
+                        },
+                    ..
                 } => del_successes.push(msg_id),
                 _ => (),
             }
@@ -702,8 +701,10 @@ fn account_concurrent_insert_key_put_data() {
 
         // TODO: advance clock and create another event to trigger expiration check.
         while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::InsAuthKey { res, .. }, .. } =
-                event.clone()
+            if let Event::Response {
+                response: Response::InsAuthKey { res, .. },
+                ..
+            } = event.clone()
             {
                 match res {
                     Ok(()) => {
@@ -719,7 +720,11 @@ fn account_concurrent_insert_key_put_data() {
                     }
                 }
             }
-            if let Event::Response { response: Response::PutIData { res, .. }, .. } = event {
+            if let Event::Response {
+                response: Response::PutIData { res, .. },
+                ..
+            } = event
+            {
                 match res {
                     Ok(()) => mutate_count += 1,
                     Err(error) => {
@@ -779,11 +784,7 @@ fn reusing_msg_ids() {
     let data1 = test_utils::gen_immutable_data(10, &mut rng);
     let msg_id = MessageId::new();
 
-    unwrap!(client.put_idata_response_with_msg_id(
-        data0.clone(),
-        msg_id,
-        &mut nodes,
-    ));
+    unwrap!(client.put_idata_response_with_msg_id(data0.clone(), msg_id, &mut nodes,));
     match client.put_idata_response_with_msg_id(data1.clone(), msg_id, &mut nodes) {
         Err(ClientError::InvalidOperation) => (),
         Err(error) => panic!("Unexpected error: {:?}", error),
@@ -814,7 +815,11 @@ fn reusing_msg_ids() {
 
     let mut successes = 0;
     while let Ok(event) = client.try_recv() {
-        if let Event::Response { response: Response::PutIData { res: Ok(()), .. }, .. } = event {
+        if let Event::Response {
+            response: Response::PutIData { res: Ok(()), .. },
+            ..
+        } = event
+        {
             successes += 1;
         }
     }
@@ -899,7 +904,11 @@ fn claiming_invitation_concurrently() {
     let mut succeeded = 0;
     for client in &mut clients {
         while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::PutMData { res, .. }, .. } = event {
+            if let Event::Response {
+                response: Response::PutMData { res, .. },
+                ..
+            } = event
+            {
                 match res {
                     Ok(()) => succeeded += 1,
                     Err(error) => {
@@ -922,8 +931,7 @@ fn claiming_invitation_concurrently() {
     match client3.create_account_with_invitation_response(invite_code, &mut nodes) {
         Ok(()) => panic!("re-claiming a used invitation shall not succeed."),
         // `Err(NetworkOther("Error claiming invitation: Conflicting concurrent mutation"))`
-        Err(ClientError::NetworkOther(_)) |
-        Err(ClientError::InvitationAlreadyClaimed) => {}
+        Err(ClientError::NetworkOther(_)) | Err(ClientError::InvitationAlreadyClaimed) => {}
         Err(err) => panic!("Received unexpected error: {:?}", err),
     }
 }

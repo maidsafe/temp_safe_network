@@ -13,10 +13,10 @@ use hex;
 use itertools::Itertools;
 use personas::data_manager::DataId;
 use rand::{self, Rng};
-use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
+use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use routing::Config as RoutingConfig;
 use routing::DevConfig as RoutingDevConfig;
-use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
+use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -55,21 +55,17 @@ impl TestNode {
             rand::thread_rng().gen_iter().take(8).collect::<Vec<u8>>(),
         ));
         let vault_config = match config {
-            Some(config) => {
-                Config {
-                    chunk_store_root: Some(format!("{}", chunk_store_root.display())),
-                    ..config
-                }
-            }
-            None => {
-                Config {
-                    wallet_address: None,
-                    max_capacity: None,
-                    chunk_store_root: Some(format!("{}", chunk_store_root.display())),
-                    invite_key: None,
-                    dev: None,
-                }
-            }
+            Some(config) => Config {
+                chunk_store_root: Some(format!("{}", chunk_store_root.display())),
+                ..config
+            },
+            None => Config {
+                wallet_address: None,
+                max_capacity: None,
+                chunk_store_root: Some(format!("{}", chunk_store_root.display())),
+                invite_key: None,
+                dev: None,
+            },
         };
         let vault = mock_crust::make_current(&handle, || {
             unwrap!(Vault::new_with_configs(
@@ -81,9 +77,9 @@ impl TestNode {
         });
 
         TestNode {
-            handle: handle,
-            vault: vault,
-            chunk_store_root: chunk_store_root,
+            handle,
+            vault,
+            chunk_store_root,
         }
     }
     /// Empty the event queue for this node on the mock network
@@ -225,9 +221,9 @@ pub fn closest_to<'a, 'b>(
     name: &'b XorName,
     count: usize,
 ) -> Vec<&'a TestNode> {
-    let mut sorted = nodes.iter().sorted_by(|left, right| {
-        name.cmp_distance(&left.name(), &right.name())
-    });
+    let mut sorted = nodes
+        .iter()
+        .sorted_by(|left, right| name.cmp_distance(&left.name(), &right.name()));
     sorted.truncate(count);
     sorted
 }
