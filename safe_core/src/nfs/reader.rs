@@ -9,7 +9,7 @@
 use client::Client;
 use crypto::shared_secretbox;
 use futures::Future;
-use nfs::{File, NfsError, NfsFuture, data_map};
+use nfs::{data_map, File, NfsError, NfsFuture};
 use self_encryption::SelfEncryptor;
 use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
@@ -35,8 +35,8 @@ impl<T: 'static> Reader<T> {
                 let self_encryptor = SelfEncryptor::new(storage, data_map)?;
 
                 Ok(Reader {
-                    client: client,
-                    self_encryptor: self_encryptor,
+                    client,
+                    self_encryptor,
                 })
             })
             .into_box()

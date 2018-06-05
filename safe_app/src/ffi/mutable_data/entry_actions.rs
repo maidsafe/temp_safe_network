@@ -9,12 +9,12 @@
 
 //! FFI for mutable data entry actions.
 
-use App;
 use ffi::helper::send_sync;
 use ffi::object_cache::MDataEntryActionsHandle;
-use ffi_utils::{FfiResult, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{catch_unwind_cb, vec_clone_from_raw_parts, FfiResult};
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
+use App;
 
 /// Create new entry actions.
 ///
@@ -23,9 +23,11 @@ use std::os::raw::c_void;
 pub unsafe extern "C" fn mdata_entry_actions_new(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        entry_actions_h: MDataEntryActionsHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        entry_actions_h: MDataEntryActionsHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -75,7 +77,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(
     add_action(app, actions_h, key, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
             content: vec_clone_from_raw_parts(value, value_len),
-            entry_version: entry_version,
+            entry_version,
         })
     })
 }
@@ -110,7 +112,9 @@ pub unsafe extern "C" fn mdata_entry_actions_free(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_entry_actions(actions_h)?;
+            let _ = context
+                .object_cache()
+                .remove_mdata_entry_actions(actions_h)?;
             Ok(())
         })
     })
@@ -172,44 +176,38 @@ mod tests {
         let version2 = 8;
 
         unsafe {
-            unwrap!(call_0(|ud, cb| {
-                mdata_entry_actions_insert(
-                    &app,
-                    handle,
-                    key0.as_ptr(),
-                    key0.len(),
-                    value0.as_ptr(),
-                    value0.len(),
-                    ud,
-                    cb,
-                )
-            }));
+            unwrap!(call_0(|ud, cb| mdata_entry_actions_insert(
+                &app,
+                handle,
+                key0.as_ptr(),
+                key0.len(),
+                value0.as_ptr(),
+                value0.len(),
+                ud,
+                cb,
+            )));
 
-            unwrap!(call_0(|ud, cb| {
-                mdata_entry_actions_update(
-                    &app,
-                    handle,
-                    key1.as_ptr(),
-                    key1.len(),
-                    value1.as_ptr(),
-                    value1.len(),
-                    version1,
-                    ud,
-                    cb,
-                )
-            }));
+            unwrap!(call_0(|ud, cb| mdata_entry_actions_update(
+                &app,
+                handle,
+                key1.as_ptr(),
+                key1.len(),
+                value1.as_ptr(),
+                value1.len(),
+                version1,
+                ud,
+                cb,
+            )));
 
-            unwrap!(call_0(|ud, cb| {
-                mdata_entry_actions_delete(
-                    &app,
-                    handle,
-                    key2.as_ptr(),
-                    key2.len(),
-                    version2,
-                    ud,
-                    cb,
-                )
-            }));
+            unwrap!(call_0(|ud, cb| mdata_entry_actions_delete(
+                &app,
+                handle,
+                key2.as_ptr(),
+                key2.len(),
+                version2,
+                ud,
+                cb,
+            )));
         }
 
         run_now(&app, move |_, context| {
@@ -218,17 +216,23 @@ mod tests {
 
             match *unwrap!(actions.get(&key0)) {
                 EntryAction::Ins(Value {
-                                     ref content,
-                                     entry_version: 0,
-                                 }) if *content == value0 => (),
+                    ref content,
+                    entry_version: 0,
+                }) if *content == value0 =>
+                {
+                    ()
+                }
                 _ => panic!("Unexpected action"),
             }
 
             match *unwrap!(actions.get(&key1)) {
                 EntryAction::Update(Value {
-                                        ref content,
-                                        entry_version,
-                                    }) if *content == value1 && entry_version == version1 => (),
+                    ref content,
+                    entry_version,
+                }) if *content == value1 && entry_version == version1 =>
+                {
+                    ()
+                }
                 _ => panic!("Unexpected action"),
             }
 
@@ -239,9 +243,9 @@ mod tests {
         });
 
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| mdata_entry_actions_free(&app, handle, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| mdata_entry_actions_free(
+                &app, handle, ud, cb
+            ),))
         };
 
         run_now(&app, move |_, context| {

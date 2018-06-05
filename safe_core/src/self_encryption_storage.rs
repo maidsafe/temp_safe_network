@@ -8,7 +8,7 @@
 
 use super::{Client, CoreError, FutureExt};
 use futures::{self, Future};
-use routing::{ImmutableData, XOR_NAME_LEN, XorName};
+use routing::{ImmutableData, XorName, XOR_NAME_LEN};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -22,7 +22,7 @@ pub struct SelfEncryptionStorage<T> {
 impl<T> SelfEncryptionStorage<T> {
     /// Create a new SelfEncryptionStorage instance
     pub fn new(client: Client<T>) -> Self {
-        SelfEncryptionStorage { client: client }
+        SelfEncryptionStorage { client }
     }
 }
 

@@ -15,10 +15,10 @@ use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
 use rust_sodium::crypto::secretbox;
-use safe_core::{Client, FutureExt, MDataInfo, recovery};
+use safe_core::ipc::resp::{access_container_enc_key, AccessContainerEntry};
 use safe_core::ipc::AppKeys;
-use safe_core::ipc::resp::{AccessContainerEntry, access_container_enc_key};
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
+use safe_core::{recovery, Client, FutureExt, MDataInfo};
 use std::collections::HashMap;
 
 /// Key of the authenticator entry in the access container
@@ -30,9 +30,9 @@ pub fn enc_key(
     app_id: &str,
     secret_key: &secretbox::Key,
 ) -> Result<Vec<u8>, AuthError> {
-    let nonce = access_container.nonce().ok_or_else(|| {
-        AuthError::from("No valid nonce for access container")
-    })?;
+    let nonce = access_container
+        .nonce()
+        .ok_or_else(|| AuthError::from("No valid nonce for access container"))?;
     Ok(access_container_enc_key(app_id, secret_key, nonce)?)
 }
 
@@ -71,9 +71,8 @@ pub fn fetch_authenticator_entry<T: 'static>(
         .map_err(From::from)
         .and_then(move |value| {
             let enc_key = c2.secret_symmetric_key()?;
-            decode_authenticator_entry(&value.content, &enc_key).map(
-                |decoded| (value.entry_version, decoded),
-            )
+            decode_authenticator_entry(&value.content, &enc_key)
+                .map(|decoded| (value.entry_version, decoded))
         })
         .into_box()
 }

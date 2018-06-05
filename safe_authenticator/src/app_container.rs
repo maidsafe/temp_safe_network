@@ -8,12 +8,12 @@
 
 //! Routines to handle an app's dedicated containers.
 
-use {AuthError, AuthFuture};
 use access_container;
 use futures::Future;
 use routing::{Action, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, DIR_TAG, FutureExt, MDataInfo, app_container_name, nfs};
+use safe_core::{app_container_name, nfs, Client, FutureExt, MDataInfo, DIR_TAG};
+use {AuthError, AuthFuture};
 
 /// Returns an app's dedicated container if available and stored in the access container,
 /// `None` otherwise.
@@ -22,9 +22,7 @@ pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataIn
     let app_cont_name = app_container_name(app_id);
 
     access_container::fetch_authenticator_entry(client)
-        .and_then(move |(_, mut ac_entries)| {
-            Ok(ac_entries.remove(&app_cont_name))
-        })
+        .and_then(move |(_, mut ac_entries)| Ok(ac_entries.remove(&app_cont_name)))
         .into_box()
 }
 
@@ -102,10 +100,12 @@ pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
                     c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
                         .and_then(move |entries| {
                             // Remove all entries in MData
-                            let actions = entries.iter().fold(EntryActions::new(), |actions,
-                             (entry_name, val)| {
-                                actions.del(entry_name.clone(), val.entry_version + 1)
-                            });
+                            let actions = entries.iter().fold(
+                                EntryActions::new(),
+                                |actions, (entry_name, val)| {
+                                    actions.del(entry_name.clone(), val.entry_version + 1)
+                                },
+                            );
 
                             c3.mutate_mdata_entries(
                                 mdata_info.name,
@@ -146,6 +146,7 @@ fn create(client: &Client<()>, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<M
                 .allow(Action::Update)
                 .allow(Action::Delete)
                 .allow(Action::ManagePermissions)],
-    ).map(move |()| dir).map_err(From::from)
+    ).map(move |()| dir)
+        .map_err(From::from)
         .into_box()
 }

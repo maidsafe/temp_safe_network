@@ -47,82 +47,62 @@ where
 
 fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
     Ok(match res {
-        Response::ChangeMDataOwner { res, msg_id } |
-        Response::DelMDataUserPermissions { res, msg_id } |
-        Response::SetMDataUserPermissions { res, msg_id } |
-        Response::MutateMDataEntries { res, msg_id } |
-        Response::PutMData { res, msg_id } |
-        Response::PutIData { res, msg_id } |
-        Response::InsAuthKey { res, msg_id } |
-        Response::DelAuthKey { res, msg_id } => {
+        Response::ChangeMDataOwner { res, msg_id }
+        | Response::DelMDataUserPermissions { res, msg_id }
+        | Response::SetMDataUserPermissions { res, msg_id }
+        | Response::MutateMDataEntries { res, msg_id }
+        | Response::PutMData { res, msg_id }
+        | Response::PutIData { res, msg_id }
+        | Response::InsAuthKey { res, msg_id }
+        | Response::DelAuthKey { res, msg_id } => {
             (msg_id, CoreEvent::Mutation(res.map_err(CoreError::from)))
         }
-        Response::GetAccountInfo { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::GetAccountInfo(res.map_err(CoreError::from)),
-            )
-        }
+        Response::GetAccountInfo { res, msg_id } => (
+            msg_id,
+            CoreEvent::GetAccountInfo(res.map_err(CoreError::from)),
+        ),
         Response::GetIData { res, msg_id } => {
             (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
         }
         Response::GetMData { res, msg_id } => {
             (msg_id, CoreEvent::GetMData(res.map_err(CoreError::from)))
         }
-        Response::GetMDataValue { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::GetMDataValue(res.map_err(CoreError::from)),
-            )
-        }
-        Response::GetMDataVersion { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::GetMDataVersion(res.map_err(CoreError::from)),
-            )
-        }
-        Response::GetMDataShell { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::GetMDataShell(res.map_err(CoreError::from)),
-            )
-        }
-        Response::ListMDataEntries { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::ListMDataEntries(res.map_err(CoreError::from)),
-            )
-        }
-        Response::ListMDataKeys { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::ListMDataKeys(res.map_err(CoreError::from)),
-            )
-        }
-        Response::ListMDataValues { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::ListMDataValues(res.map_err(CoreError::from)),
-            )
-        }
-        Response::ListMDataPermissions { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::ListMDataPermissions(res.map_err(CoreError::from)),
-            )
-        }
-        Response::ListMDataUserPermissions { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::ListMDataUserPermissions(res.map_err(CoreError::from)),
-            )
-        }
-        Response::ListAuthKeysAndVersion { res, msg_id } => {
-            (
-                msg_id,
-                CoreEvent::ListAuthKeysAndVersion(res.map_err(CoreError::from)),
-            )
-        }
+        Response::GetMDataValue { res, msg_id } => (
+            msg_id,
+            CoreEvent::GetMDataValue(res.map_err(CoreError::from)),
+        ),
+        Response::GetMDataVersion { res, msg_id } => (
+            msg_id,
+            CoreEvent::GetMDataVersion(res.map_err(CoreError::from)),
+        ),
+        Response::GetMDataShell { res, msg_id } => (
+            msg_id,
+            CoreEvent::GetMDataShell(res.map_err(CoreError::from)),
+        ),
+        Response::ListMDataEntries { res, msg_id } => (
+            msg_id,
+            CoreEvent::ListMDataEntries(res.map_err(CoreError::from)),
+        ),
+        Response::ListMDataKeys { res, msg_id } => (
+            msg_id,
+            CoreEvent::ListMDataKeys(res.map_err(CoreError::from)),
+        ),
+        Response::ListMDataValues { res, msg_id } => (
+            msg_id,
+            CoreEvent::ListMDataValues(res.map_err(CoreError::from)),
+        ),
+        Response::ListMDataPermissions { res, msg_id } => (
+            msg_id,
+            CoreEvent::ListMDataPermissions(res.map_err(CoreError::from)),
+        ),
+        Response::ListMDataUserPermissions { res, msg_id } => (
+            msg_id,
+            CoreEvent::ListMDataUserPermissions(res.map_err(CoreError::from)),
+        ),
+        Response::ListAuthKeysAndVersion { res, msg_id } => (
+            msg_id,
+            CoreEvent::ListAuthKeysAndVersion(res.map_err(CoreError::from)),
+        ),
     })
 }
 

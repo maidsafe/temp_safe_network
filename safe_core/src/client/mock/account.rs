@@ -31,7 +31,7 @@ impl Account {
             },
             auth_keys: Default::default(),
             version: 0,
-            config: config,
+            config,
         }
     }
 
@@ -76,7 +76,6 @@ impl Account {
         let unlimited_muts = unlimited_muts(&self.config);
         if self.account_info.mutations_available > 0 && !unlimited_muts {
             self.account_info.mutations_available -= 1;
-
         }
         self.version += 1;
     }

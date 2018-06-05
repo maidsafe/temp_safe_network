@@ -9,11 +9,11 @@
 
 //! Cipher options.
 
-use AppContext;
 use errors::AppError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use safe_core::{Client, CoreError};
+use AppContext;
 
 /// Cipher Options
 #[derive(Debug)]
@@ -47,14 +47,13 @@ impl CipherOpt {
             CipherOpt::Symmetric => {
                 let nonce = secretbox::gen_nonce();
                 let cipher_text = secretbox::seal(plain_text, &nonce, app_ctx.sym_enc_key()?);
-                let wire_format = WireFormat::Symmetric {
-                    nonce: nonce,
-                    cipher_text: cipher_text,
-                };
+                let wire_format = WireFormat::Symmetric { nonce, cipher_text };
 
                 Ok(serialise(&wire_format)?)
             }
-            CipherOpt::Asymmetric { ref peer_encrypt_key } => {
+            CipherOpt::Asymmetric {
+                ref peer_encrypt_key,
+            } => {
                 let cipher_text = sealedbox::seal(plain_text, peer_encrypt_key);
                 Ok(serialise(&WireFormat::Asymmetric(cipher_text))?)
             }
@@ -74,8 +73,10 @@ impl CipherOpt {
         match deserialise::<WireFormat>(cipher_text)? {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
-                Ok(secretbox::open(&cipher_text, &nonce, app_ctx.sym_enc_key()?)
-                    .map_err(|()| CoreError::SymmetricDecipherFailure)?)
+                Ok(
+                    secretbox::open(&cipher_text, &nonce, app_ctx.sym_enc_key()?)
+                        .map_err(|()| CoreError::SymmetricDecipherFailure)?,
+                )
             }
             WireFormat::Asymmetric(cipher_text) => {
                 let (asym_pk, asym_sk) = client.encryption_keypair()?;

@@ -15,6 +15,8 @@
 pub mod access_container;
 /// Cipher options operations.
 pub mod cipher_opt;
+/// Crypto-related routines.
+pub mod crypto;
 /// Low level manipulation of `ImmutableData`.
 pub mod immutable_data;
 /// IPC utilities.
@@ -23,8 +25,6 @@ pub mod ipc;
 pub mod logging;
 /// `MDataInfo` operations.
 pub mod mdata_info;
-/// Crypto-related routines.
-pub mod crypto;
 /// Low level manipulation of `MutableData`.
 pub mod mutable_data;
 /// NFS API.
@@ -39,16 +39,16 @@ mod helper;
 #[cfg(test)]
 mod tests;
 
-use super::App;
 use super::errors::AppError;
+use super::App;
 use config_file_handler;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
+use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
-use safe_core::{self, FutureExt};
-use safe_core::ffi::AccountInfo;
 use safe_core::ffi::ipc::resp::AuthGranted;
+use safe_core::ffi::AccountInfo;
 use safe_core::ipc::{AuthGranted as NativeAuthGranted, BootstrapConfig};
+use safe_core::{self, FutureExt};
 use std::ffi::{CStr, CString, OsStr};
 use std::os::raw::{c_char, c_void};
 use std::slice;
@@ -64,9 +64,7 @@ pub unsafe extern "C" fn app_unregistered(
     bootstrap_config_len: usize,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        app: *mut App),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -97,9 +95,7 @@ pub unsafe extern "C" fn app_registered(
     auth_granted: *const AuthGranted,
     user_data: *mut c_void,
     o_disconnect_notifier_cb: extern "C" fn(user_data: *mut c_void),
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        app: *mut App),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -146,9 +142,11 @@ pub unsafe extern "C" fn app_reconnect(
 pub unsafe extern "C" fn app_account_info(
     app: *mut App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        account_info: *const AccountInfo),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        account_info: *const AccountInfo,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
@@ -175,11 +173,8 @@ pub unsafe extern "C" fn app_account_info(
 #[no_mangle]
 pub unsafe extern "C" fn app_exe_file_stem(
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        filename: *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, filename: *const c_char),
 ) {
-
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         if let Ok(path) = config_file_handler::exe_file_stem()?.into_string() {
             let path_c_str = CString::new(path)?;
@@ -244,9 +239,11 @@ pub unsafe extern "C" fn app_reset_object_cache(
 pub unsafe extern "C" fn app_container_name(
     app_id: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        container_name: *const c_char),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        container_name: *const c_char,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let name = CString::new(safe_core::app_container_name(

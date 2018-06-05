@@ -8,10 +8,10 @@
 
 //! Java/JNI utilities.
 
-use jni::JNIEnv;
 use jni::errors::Error as JniError;
 use jni::objects::{GlobalRef, JObject};
 use jni::sys::{jobject, jsize};
+use jni::JNIEnv;
 use std::os::raw::c_void;
 
 /// Result returning JNI errors
@@ -28,7 +28,7 @@ macro_rules! jni_unwrap {
         } else {
             res.unwrap()
         }
-    }}
+    }};
 }
 
 /// Generates a `user_data` context containing a reference to a single or several Java callbacks
@@ -77,7 +77,7 @@ macro_rules! gen_primitive_type_converter {
                 Ok(*self as $java_type)
             }
         }
-    }
+    };
 }
 
 #[macro_export]
@@ -85,15 +85,10 @@ macro_rules! gen_object_array_converter {
     ($native_type:ident, $java_ty_name:expr) => {
         impl<'a, 'b> ToJava<'a, JObject<'a>> for &'b [$native_type] {
             fn to_java(&self, env: &'a JNIEnv) -> JniResult<JObject<'a>> {
-                object_array_to_java(
-                    $native_type::to_java,
-                    self,
-                    env,
-                    $java_ty_name,
-                )
+                object_array_to_java($native_type::to_java, self, env, $java_ty_name)
             }
         }
-    }
+    };
 }
 
 #[macro_export]
@@ -120,7 +115,7 @@ macro_rules! gen_byte_array_converter {
                 Ok(JObject::from(output as jobject))
             }
         }
-    }
+    };
 }
 
 /// Converts object arrays into Java arrays
@@ -135,11 +130,7 @@ pub fn object_array_to_java<
     env: &'a JNIEnv,
     class: &str,
 ) -> JniResult<JObject<'a>> {
-    let output = env.new_object_array(
-        list.len() as jsize,
-        class,
-        JObject::null(),
-    )?;
+    let output = env.new_object_array(list.len() as jsize, class, JObject::null())?;
 
     for (idx, entry) in list.iter().enumerate() {
         let jentry = transform_fn(entry, env)?.into();

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+scripts/check-debug-ffi-utils && scripts/check-debug-real && scripts/check-debug-mock

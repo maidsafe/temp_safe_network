@@ -3,10 +3,6 @@
 if [[ $TRAVIS_EVENT_TYPE = pull_request ]]; then
   (
     set -x;
-    if [[ "$TRAVIS_RUST_VERSION" == "$RUST_STABLE" ]]; then
-      echo "--- Check format ---" &&
-        cargo fmt --all -- --write-mode=diff;
-    fi &&
 
       echo "--- Test ffi_utils ---" &&
       scripts/test-ffi-utils &&

@@ -9,17 +9,17 @@
 
 //! FFI for mutable data permissions and permission sets.
 
-use App;
 use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::mutable_data::helper;
-use ffi::object_cache::{MDataPermissionsHandle, NULL_OBJECT_HANDLE, SignPubKeyHandle};
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb};
+use ffi::object_cache::{MDataPermissionsHandle, SignPubKeyHandle, NULL_OBJECT_HANDLE};
+use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, SafePtr, FFI_RESULT_OK};
 use permissions;
 use routing::{Action, User};
 use safe_core::ffi::ipc::req::PermissionSet;
 use safe_core::ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
 use std::os::raw::c_void;
+use App;
 
 /// Special value that represents `User::Anyone` in permission sets.
 #[no_mangle]
@@ -65,15 +65,17 @@ pub struct UserPermissionSet {
 pub unsafe extern "C" fn mdata_permissions_new(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        perm_h: MDataPermissionsHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        perm_h: MDataPermissionsHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
-            Ok(context.object_cache().insert_mdata_permissions(
-                Default::default(),
-            ))
+            Ok(context
+                .object_cache()
+                .insert_mdata_permissions(Default::default()))
         })
     })
 }
@@ -86,9 +88,7 @@ pub unsafe extern "C" fn mdata_permissions_len(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        size: usize),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, size: usize),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -108,9 +108,11 @@ pub unsafe extern "C" fn mdata_permissions_get(
     permissions_h: MDataPermissionsHandle,
     user_h: SignPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        perm_set: *const PermissionSet),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        perm_set: *const PermissionSet,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -128,9 +130,9 @@ pub unsafe extern "C" fn mdata_permissions_get(
             );
 
             let permission_set = *try_cb!(
-                permissions.get(&user).ok_or(
-                    AppError::InvalidSignPubKeyHandle,
-                ),
+                permissions
+                    .get(&user,)
+                    .ok_or(AppError::InvalidSignPubKeyHandle,),
                 user_data,
                 o_cb
             );
@@ -150,10 +152,12 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
     app: *const App,
     permissions_h: MDataPermissionsHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        user_perm_sets: *const UserPermissionSet,
-                        user_perm_sets_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        user_perm_sets: *const UserPermissionSet,
+        user_perm_sets_len: usize,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -172,7 +176,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                         User::Anyone => USER_ANYONE,
                     };
                     permissions::UserPermissionSet {
-                        user_h: user_h,
+                        user_h,
                         perm_set: *permission_set,
                     }.into_repr_c()
                 })
@@ -231,9 +235,9 @@ pub unsafe extern "C" fn mdata_permissions_free(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_permissions(
-                permissions_h,
-            )?;
+            let _ = context
+                .object_cache()
+                .remove_mdata_permissions(permissions_h)?;
             Ok(())
         })
     })

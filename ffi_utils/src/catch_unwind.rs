@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{ErrorCode, FfiResult};
 use super::callback::{Callback, CallbackArgs};
+use super::{ErrorCode, FfiResult};
 use std::fmt::{Debug, Display};
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};

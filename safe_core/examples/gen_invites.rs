@@ -10,17 +10,24 @@
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(bad_style, exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
-          unknown_crate_types, warnings)]
-#![deny(deprecated, improper_ctypes, missing_docs,
-        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
-        private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
-        unknown_lints, unsafe_code, unused, unused_allocation, unused_attributes,
-        unused_comparisons, unused_features, unused_parens, while_true)]
-#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-        unused_qualifications, unused_results)]
-#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
-         variant_size_differences)]
+#![forbid(
+    bad_style, exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types,
+    warnings
+)]
+#![deny(
+    deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns, overflowing_literals,
+    plugin_as_library, private_no_mangle_fns, private_no_mangle_statics, stable_features,
+    unconditional_recursion, unknown_lints, unsafe_code, unused, unused_allocation,
+    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+)]
+#![warn(
+    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+    unused_qualifications, unused_results
+)]
+#![allow(
+    box_pointers, missing_copy_implementations, missing_debug_implementations,
+    variant_size_differences
+)]
 
 #[macro_use]
 extern crate unwrap;
@@ -37,12 +44,12 @@ extern crate tiny_keccak;
 extern crate tokio_core;
 
 use docopt::Docopt;
-use futures::Future;
 use futures::stream::{self, Stream};
 use futures::sync::mpsc;
-use rand::{Rng, thread_rng};
+use futures::Future;
+use rand::{thread_rng, Rng};
 use routing::{Action, MutableData, PermissionSet, User, XorName};
-use safe_core::{Client, CoreMsg, FutureExt, event_loop};
+use safe_core::{event_loop, Client, CoreMsg, FutureExt};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::time::UNIX_EPOCH;
@@ -109,9 +116,9 @@ fn main() {
     let (core_tx, core_rx) = mpsc::unbounded();
     let (net_tx, net_rx) = mpsc::unbounded();
 
-    let net_fut = net_rx.for_each(move |_net_event| Ok(())).map_err(|e| {
-        panic!("Network event stream error: {:?}", e)
-    });
+    let net_fut = net_rx
+        .for_each(move |_net_event| Ok(()))
+        .map_err(|e| panic!("Network event stream error: {:?}", e));
     el_h.spawn(net_fut);
 
     let core_tx_clone = core_tx.clone();
@@ -128,7 +135,8 @@ fn main() {
         unwrap!(core_tx.unbounded_send(CoreMsg::new(move |client, &()| {
             let id = XorName(sha3_256(invite.as_bytes()));
 
-            client.get_mdata_version(id, INVITE_TOKEN_TYPE_TAG)
+            client
+                .get_mdata_version(id, INVITE_TOKEN_TYPE_TAG)
                 .then(move |res| -> Result<(), ()> {
                     match res {
                         Ok(version) => println!("Invite version: {}", version),
@@ -160,13 +168,13 @@ fn main() {
     let cl = unwrap!(if flag_create {
         println!(
             "\nTrying to create an account \
-                                   using given seed from file..."
+             using given seed from file..."
         );
         Client::registered_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
     } else {
         println!(
             "\nTrying to log into the created \
-                                   account using given seed from file..."
+             account using given seed from file..."
         );
         Client::login_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
     });
@@ -198,19 +206,19 @@ fn main() {
                                        .allow(Action::ManagePermissions)];
                 let data = btree_map![];
 
-                let md = unwrap!(MutableData::new(id,
-                                                  INVITE_TOKEN_TYPE_TAG,
-                                                  perms,
-                                                  data,
-                                                  btree_set![owner_key]));
+                let md = unwrap!(MutableData::new(
+                    id,
+                    INVITE_TOKEN_TYPE_TAG,
+                    perms,
+                    data,
+                    btree_set![owner_key]
+                ));
 
-                client2.clone()
-                    .put_mdata(md)
-                    .and_then(move |_| {
-                                  unwrap!(write!(output2, "{}\n", invitation));
-                                  println!("Generated {} / {}", i + 1, num_invites);
-                                  Ok(())
-                              })
+                client2.clone().put_mdata(md).and_then(move |_| {
+                    unwrap!(write!(output2, "{}\n", invitation));
+                    println!("Generated {} / {}", i + 1, num_invites);
+                    Ok(())
+                })
             })
             .map(move |_| unwrap!(core_tx_clone.unbounded_send(CoreMsg::build_terminator())))
             .map_err(|e| panic!("{:?}", e))

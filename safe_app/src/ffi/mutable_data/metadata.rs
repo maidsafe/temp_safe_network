@@ -9,12 +9,12 @@
 
 //! FFI routines for handling mutable data metadata.
 
-use AppError;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb};
+use ffi_utils::{catch_unwind_cb, FfiResult, ReprC, FFI_RESULT_OK};
 use maidsafe_utilities::serialisation::serialise;
 use safe_core::ffi::ipc::resp::MetadataResponse;
 use safe_core::ipc::resp::UserMetadata;
 use std::os::raw::c_void;
+use AppError;
 
 /// Serialize metadata.
 ///
@@ -23,10 +23,12 @@ use std::os::raw::c_void;
 pub unsafe extern "C" fn mdata_encode_metadata(
     metadata: *const MetadataResponse,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        encoded: *const u8,
-                        encoded_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        encoded: *const u8,
+        encoded_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let metadata = UserMetadata::clone_from_repr_c(metadata)?;
@@ -57,9 +59,11 @@ mod tests {
         };
 
         let serialised = unsafe {
-            unwrap!(call_vec_u8(
-                |ud, cb| mdata_encode_metadata(&metadata_resp, ud, cb),
-            ))
+            unwrap!(call_vec_u8(|ud, cb| mdata_encode_metadata(
+                &metadata_resp,
+                ud,
+                cb
+            ),))
         };
 
         let metadata2 = unwrap!(deserialise::<UserMetadata>(&serialised));

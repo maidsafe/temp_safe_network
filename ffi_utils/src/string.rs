@@ -61,8 +61,7 @@ impl From<IntoStringError> for StringError {
 pub unsafe fn from_c_str(ptr: *const c_char) -> Result<String, StringError> {
     if ptr.is_null() {
         return Err(StringError::Null(
-            "String could not be constructed from C null pointer"
-                .to_owned(),
+            "String could not be constructed from C null pointer".to_owned(),
         ));
     }
     Ok(CStr::from_ptr(ptr).to_str()?.to_owned())

@@ -14,8 +14,8 @@ use maidsafe_utilities::thread;
 use rand::{OsRng, Rng};
 use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value, XorName};
 use rust_sodium::crypto::sign;
-use safe_core::{CoreError, DIR_TAG, FutureExt, utils};
 use safe_core::utils::test_utils::random_client;
+use safe_core::{utils, CoreError, FutureExt, DIR_TAG};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::CString;
 use std::sync::mpsc;
@@ -237,7 +237,8 @@ fn md_created_by_app_3() {
             let cl2 = client.clone();
             let cl3 = client.clone();
 
-            client.list_auth_keys_and_version()
+            client
+                .list_auth_keys_and_version()
                 .then(move |res| {
                     let (_, version) = unwrap!(res);
                     cl2.ins_auth_key(app_sign_pk, version + 1)
@@ -286,7 +287,8 @@ fn md_created_by_app_4() {
         let name3 = name;
         let name4 = name;
         let name5 = name;
-        client.mutate_mdata_entries(name, DIR_TAG, actions)
+        client
+            .mutate_mdata_entries(name, DIR_TAG, actions)
             .then(move |res| {
                 match res {
                     Ok(()) => panic!("It should fail"),
@@ -294,11 +296,13 @@ fn md_created_by_app_4() {
                     Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![1, 8, 3, 4],
-                                       EntryAction::Update(Value {
-                                           content: vec![2, 8, 5],
-                                           entry_version: 2,
-                                       }));
+                let _ = actions.insert(
+                    vec![1, 8, 3, 4],
+                    EntryAction::Update(Value {
+                        content: vec![2, 8, 5],
+                        entry_version: 2,
+                    }),
+                );
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
@@ -308,28 +312,33 @@ fn md_created_by_app_4() {
                     Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let user = User::Key(sign_pk);
-                let permissions = PermissionSet::new().allow(Action::Insert).allow(Action::Delete);
-                cl3.set_mdata_user_permissions(name2, DIR_TAG, user,
-                                               permissions, 1)
+                let permissions = PermissionSet::new()
+                    .allow(Action::Insert)
+                    .allow(Action::Delete);
+                cl3.set_mdata_user_permissions(name2, DIR_TAG, user, permissions, 1)
             })
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![1, 2, 3, 4],
-                                       EntryAction::Ins(Value {
-                                           content: vec![2, 3, 5],
-                                           entry_version: 1,
-                                       }));
+                let _ = actions.insert(
+                    vec![1, 2, 3, 4],
+                    EntryAction::Ins(Value {
+                        content: vec![2, 3, 5],
+                        entry_version: 1,
+                    }),
+                );
                 cl4.mutate_mdata_entries(name3, DIR_TAG, actions)
             })
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![1, 2, 3, 4],
-                                       EntryAction::Update(Value {
-                                           content: vec![2, 8, 5],
-                                           entry_version: 2,
-                                       }));
+                let _ = actions.insert(
+                    vec![1, 2, 3, 4],
+                    EntryAction::Update(Value {
+                        content: vec![2, 8, 5],
+                        entry_version: 2,
+                    }),
+                );
                 cl5.mutate_mdata_entries(name4, DIR_TAG, actions)
             })
             .then(move |res| {
@@ -339,8 +348,7 @@ fn md_created_by_app_4() {
                     Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let mut actions = BTreeMap::new();
-                let _ = actions.insert(vec![1, 2, 3, 4],
-                                       EntryAction::Del(2));
+                let _ = actions.insert(vec![1, 2, 3, 4], EntryAction::Del(2));
                 cl6.mutate_mdata_entries(name5, DIR_TAG, actions)
             })
             .map(move |()| unwrap!(tx.send(())))
@@ -377,7 +385,8 @@ fn md_created_by_app_4() {
             let cl2 = client.clone();
             let cl3 = client.clone();
 
-            client.list_auth_keys_and_version()
+            client
+                .list_auth_keys_and_version()
                 .then(move |res| {
                     let (_, version) = unwrap!(res);
                     cl2.ins_auth_key(app_sign_pk, version + 1)
@@ -442,9 +451,8 @@ fn multiple_apps() {
                 unwrap!(res);
                 unwrap!(name_tx.send(name));
                 let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
-                cl2.get_mdata_value(name, DIR_TAG, entry_key.clone()).map(
-                    move |v| (v, entry_key),
-                )
+                cl2.get_mdata_value(name, DIR_TAG, entry_key.clone())
+                    .map(move |v| (v, entry_key))
             })
             .then(move |res| {
                 let (value, entry_key) = unwrap!(res);
@@ -462,9 +470,8 @@ fn multiple_apps() {
                 let entry_key = unwrap!(res);
                 unwrap!(mutate_again_tx.send(()));
                 unwrap!(final_check_rx.recv());
-                cl4.list_mdata_keys(name3, DIR_TAG).map(
-                    move |x| (x, entry_key),
-                )
+                cl4.list_mdata_keys(name3, DIR_TAG)
+                    .map(move |x| (x, entry_key))
             })
             .then(move |res| -> Result<_, ()> {
                 let (keys, entry_key) = unwrap!(res);
@@ -598,9 +605,8 @@ fn permissions_and_version() {
                     None
                 );
                 assert_eq!(
-                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
-                        Action::ManagePermissions,
-                    ),
+                    unwrap!(permissions.get(&User::Key(sign_pk)))
+                        .is_allowed(Action::ManagePermissions),
                     Some(true)
                 );
                 assert_eq!(
@@ -646,9 +652,8 @@ fn permissions_and_version() {
                     None
                 );
                 assert_eq!(
-                    unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
-                        Action::ManagePermissions,
-                    ),
+                    unwrap!(permissions.get(&User::Key(sign_pk)))
+                        .is_allowed(Action::ManagePermissions),
                     Some(true)
                 );
             })
@@ -701,9 +706,9 @@ fn permissions_crud() {
             .put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
-                let permissions = PermissionSet::new().allow(Action::Insert).allow(
-                    Action::Delete,
-                );
+                let permissions = PermissionSet::new()
+                    .allow(Action::Insert)
+                    .allow(Action::Delete);
                 cl2.set_mdata_user_permissions(
                     name,
                     DIR_TAG,
@@ -733,9 +738,8 @@ fn permissions_crud() {
                         None
                     );
                     assert_eq!(
-                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
-                            Action::ManagePermissions,
-                        ),
+                        unwrap!(permissions.get(&User::Key(sign_pk)))
+                            .is_allowed(Action::ManagePermissions),
                         Some(true)
                     );
                     assert_eq!(
@@ -790,9 +794,8 @@ fn permissions_crud() {
                         None
                     );
                     assert_eq!(
-                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
-                            Action::ManagePermissions,
-                        ),
+                        unwrap!(permissions.get(&User::Key(sign_pk)))
+                            .is_allowed(Action::ManagePermissions),
                         Some(true)
                     );
                     assert_eq!(
@@ -871,9 +874,8 @@ fn permissions_crud() {
                         None
                     );
                     assert_eq!(
-                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
-                            Action::ManagePermissions,
-                        ),
+                        unwrap!(permissions.get(&User::Key(sign_pk)))
+                            .is_allowed(Action::ManagePermissions),
                         Some(true)
                     );
                     assert_eq!(
@@ -898,9 +900,9 @@ fn permissions_crud() {
                     );
                 }
 
-                let permissions = PermissionSet::new().deny(Action::Insert).deny(
-                    Action::Delete,
-                );
+                let permissions = PermissionSet::new()
+                    .deny(Action::Insert)
+                    .deny(Action::Delete);
                 cl9.set_mdata_user_permissions(
                     name,
                     DIR_TAG,
@@ -930,9 +932,8 @@ fn permissions_crud() {
                         None
                     );
                     assert_eq!(
-                        unwrap!(permissions.get(&User::Key(sign_pk))).is_allowed(
-                            Action::ManagePermissions,
-                        ),
+                        unwrap!(permissions.get(&User::Key(sign_pk)))
+                            .is_allowed(Action::ManagePermissions),
                         Some(true)
                     );
                     assert_eq!(

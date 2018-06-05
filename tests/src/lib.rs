@@ -9,26 +9,31 @@
 //! Integration tests for Safe Client Libs.
 
 #![cfg(test)]
-
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.
 // com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
-          unknown_crate_types, warnings)]
-#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
-        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
-        private_no_mangle_fns, private_no_mangle_statics, stable_features,
-        unconditional_recursion, unknown_lints, unused,
-        unused_allocation, unused_attributes, unused_comparisons, unused_features,
-        unused_parens, while_true)]
-#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-        unused_qualifications, unused_results)]
-#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
-         variant_size_differences)]
-
-#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                         option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
+#![forbid(
+    exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types, warnings
+)]
+#![deny(
+    bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
+    overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
+    stable_features, unconditional_recursion, unknown_lints, unused, unused_allocation,
+    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+)]
+#![warn(
+    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+    unused_qualifications, unused_results
+)]
+#![allow(
+    box_pointers, missing_copy_implementations, missing_debug_implementations,
+    variant_size_differences
+)]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    deny(clippy, unicode_not_nfc, wrong_pub_self_convention, option_unwrap_used)
+)]
+#![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate ffi_utils;
 extern crate safe_app;
@@ -41,21 +46,21 @@ extern crate serde_json;
 #[macro_use]
 extern crate unwrap;
 
-use ffi_utils::{FfiResult, ReprC, StringError, from_c_str};
 use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec};
-use safe_app::App;
+use ffi_utils::{from_c_str, FfiResult, ReprC, StringError};
 use safe_app::ffi::app_registered;
 use safe_app::ffi::ipc::*;
-use safe_authenticator::{AuthError, Authenticator};
-use safe_authenticator::ffi::*;
+use safe_app::App;
 use safe_authenticator::ffi::apps::*;
 use safe_authenticator::ffi::ipc::*;
+use safe_authenticator::ffi::*;
 use safe_authenticator::test_utils::*;
-use safe_core::{CoreError, utils};
+use safe_authenticator::{AuthError, Authenticator};
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
-use safe_core::ipc::{AuthGranted, Permission};
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions};
+use safe_core::ipc::{AuthGranted, Permission};
 use safe_core::nfs::{Mode, NfsError};
+use safe_core::{utils, CoreError};
 use std::collections::HashMap;
 use std::env;
 use std::ffi::CString;
@@ -89,14 +94,12 @@ fn get_config() -> TestConfig {
     let env = env_locator.iter().zip(env_password.iter()).next();
 
     match env {
-        Some((acc_locator, acc_password)) => {
-            TestConfig {
-                test_account: AccountConfig {
-                    acc_locator: acc_locator.clone(),
-                    acc_password: acc_password.clone(),
-                },
-            }
-        }
+        Some((acc_locator, acc_password)) => TestConfig {
+            test_account: AccountConfig {
+                acc_locator: acc_locator.clone(),
+                acc_password: acc_password.clone(),
+            },
+        },
         None => {
             let file = unwrap!(File::open("tests.config"));
             unwrap!(serde_json::from_reader(file))
@@ -129,13 +132,16 @@ fn setup_test() -> *mut Authenticator {
     // Login to the Authenticator.
     println!(
         "Logging in\n... locator: {}\n... password: {}",
-        test_acc.acc_locator,
-        test_acc.acc_password
+        test_acc.acc_locator, test_acc.acc_password
     );
     let auth_h: *mut Authenticator = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            login(locator.as_ptr(), password.as_ptr(), ud, disconnect_cb, cb)
-        }))
+        unwrap!(call_1(|ud, cb| login(
+            locator.as_ptr(),
+            password.as_ptr(),
+            ud,
+            disconnect_cb,
+            cb
+        )))
     };
     auth_h
 }
@@ -169,15 +175,13 @@ fn write_data() {
     // Register the app.
     println!("Registering app...");
     let _app: *mut App = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            app_registered(
-                ffi_app_id.as_ptr(),
-                &unwrap!(auth_granted.clone().into_repr_c()),
-                ud,
-                disconnect_cb,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| app_registered(
+            ffi_app_id.as_ptr(),
+            &unwrap!(auth_granted.clone().into_repr_c()),
+            ud,
+            disconnect_cb,
+            cb,
+        )))
     };
 
     // Put file into container.
@@ -246,9 +250,9 @@ fn read_data() {
     // Get a list of registered apps, confirm our app is in it.
     let registered_apps: Vec<RegisteredAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(auth_h, ud, cb))) };
-    let any = registered_apps.iter().any(|registered_app_id| {
-        registered_app_id.0 == app_id
-    });
+    let any = registered_apps
+        .iter()
+        .any(|registered_app_id| registered_app_id.0 == app_id);
     assert!(any);
 
     let videos_md = unsafe {
@@ -291,23 +295,21 @@ fn authorisation_and_revocation() {
     // Register the app.
     println!("Registering app...");
     let _app: *mut App = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            app_registered(
-                ffi_app_id.as_ptr(),
-                &unwrap!(auth_granted.clone().into_repr_c()),
-                ud,
-                disconnect_cb,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| app_registered(
+            ffi_app_id.as_ptr(),
+            &unwrap!(auth_granted.clone().into_repr_c()),
+            ud,
+            disconnect_cb,
+            cb,
+        )))
     };
 
     // Get a list of registered apps, confirm our app is in it.
     let registered_apps: Vec<RegisteredAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(auth_h, ud, cb))) };
-    let any = registered_apps.iter().any(|registered_app_id| {
-        registered_app_id.0 == app_id
-    });
+    let any = registered_apps
+        .iter()
+        .any(|registered_app_id| registered_app_id.0 == app_id);
     assert!(any);
 
     // Put file into container.
@@ -335,17 +337,22 @@ fn authorisation_and_revocation() {
     // Revoke our app.
     println!("Revoking app...");
     let _: String = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            auth_revoke_app(auth_h, ffi_app_id.as_ptr(), ud, cb)
-        }))
+        unwrap!(call_1(|ud, cb| auth_revoke_app(
+            auth_h,
+            ffi_app_id.as_ptr(),
+            ud,
+            cb
+        )))
     };
 
     // Get list of revoked apps, confirm our app is in it.
     let revoked_apps: Vec<AppExchangeInfo> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(auth_h, ud, cb))) };
-    assert!(revoked_apps.iter().any(
-        |revoked_app| revoked_app.id == app_id,
-    ));
+    assert!(
+        revoked_apps
+            .iter()
+            .any(|revoked_app| revoked_app.id == app_id,)
+    );
 
     // The app is no longer in the access container.
     unsafe {
@@ -365,23 +372,21 @@ fn authorisation_and_revocation() {
 
     println!("Re-registering app...");
     let _app: *mut App = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            app_registered(
-                ffi_app_id.as_ptr(),
-                &unwrap!(auth_granted.clone().into_repr_c()),
-                ud,
-                disconnect_cb,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| app_registered(
+            ffi_app_id.as_ptr(),
+            &unwrap!(auth_granted.clone().into_repr_c()),
+            ud,
+            disconnect_cb,
+            cb,
+        )))
     };
 
     // Get a list of registered apps, confirm our app is in it.
     let registered_apps: Vec<RegisteredAppId> =
         unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(auth_h, ud, cb))) };
-    let any = registered_apps.iter().any(|registered_app_id| {
-        registered_app_id.0 == app_id
-    });
+    let any = registered_apps
+        .iter()
+        .any(|registered_app_id| registered_app_id.0 == app_id);
     assert!(any);
 
     // The app can access the file again.
@@ -394,16 +399,22 @@ fn authorisation_and_revocation() {
     // Revoke our app.
     println!("Revoking app...");
     let _: String = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            auth_revoke_app(auth_h, ffi_app_id.as_ptr(), ud, cb)
-        }))
+        unwrap!(call_1(|ud, cb| auth_revoke_app(
+            auth_h,
+            ffi_app_id.as_ptr(),
+            ud,
+            cb
+        )))
     };
 
     // Remove the revoked app
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            auth_rm_revoked_app(auth_h, ffi_app_id.as_ptr(), ud, cb)
-        }))
+        unwrap!(call_0(|ud, cb| auth_rm_revoked_app(
+            auth_h,
+            ffi_app_id.as_ptr(),
+            ud,
+            cb
+        )))
     }
 }
 

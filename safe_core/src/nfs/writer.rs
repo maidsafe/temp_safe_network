@@ -10,7 +10,7 @@ use chrono::Utc;
 use client::Client;
 use crypto::shared_secretbox;
 use futures::Future;
-use nfs::{File, NfsFuture, data_map};
+use nfs::{data_map, File, NfsFuture};
 use self_encryption::SequentialEncryptor;
 use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
@@ -43,23 +43,19 @@ impl<T: 'static> Writer<T> {
         encryption_key: Option<shared_secretbox::Key>,
     ) -> Box<NfsFuture<Writer<T>>> {
         let fut = match mode {
-            Mode::Append => {
-                data_map::get(client, file.data_map_name(), encryption_key.clone())
-                    .map(Some)
-                    .into_box()
-            }
+            Mode::Append => data_map::get(client, file.data_map_name(), encryption_key.clone())
+                .map(Some)
+                .into_box(),
             Mode::Overwrite => ok!(None),
         };
         let client = client.clone();
         fut.and_then(move |data_map| {
             SequentialEncryptor::new(storage, data_map).map_err(From::from)
-        }).map(move |self_encryptor| {
-                Writer {
-                    client,
-                    file,
-                    self_encryptor,
-                    encryption_key,
-                }
+        }).map(move |self_encryptor| Writer {
+                client,
+                file,
+                self_encryptor,
+                encryption_key,
             })
             .map_err(From::from)
             .into_box()
@@ -91,9 +87,7 @@ impl<T: 'static> Writer<T> {
         self.self_encryptor
             .close()
             .map_err(From::from)
-            .and_then(move |(data_map, _)| {
-                data_map::put(&client, &data_map, encryption_key)
-            })
+            .and_then(move |(data_map, _)| data_map::put(&client, &data_map, encryption_key))
             .map(move |data_map_name| {
                 file.set_data_map_name(data_map_name);
                 file.set_modified_time(Utc::now());

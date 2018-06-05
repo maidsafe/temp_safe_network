@@ -16,15 +16,16 @@ pub use self::auth::AuthReq;
 pub use self::containers::ContainersReq;
 pub use self::share_mdata::{ShareMData, ShareMDataReq};
 
-use ffi::ipc::req::{AppExchangeInfo as FfiAppExchangeInfo,
-                    ContainerPermissions as FfiContainerPermissions,
-                    PermissionSet as FfiPermissionSet};
-use ffi_utils::{ReprC, StringError, from_c_str};
+use ffi::ipc::req::{
+    AppExchangeInfo as FfiAppExchangeInfo, ContainerPermissions as FfiContainerPermissions,
+    PermissionSet as FfiPermissionSet,
+};
+use ffi_utils::{from_c_str, ReprC, StringError};
 use ipc::errors::IpcError;
 use routing::{Action, PermissionSet};
-use std::{ptr, slice};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CString, NulError};
+use std::{ptr, slice};
 
 /// Permission enum - use for internal storage only
 #[repr(C)]
@@ -401,7 +402,7 @@ mod tests {
         };
 
         let a = AuthReq {
-            app: app,
+            app,
             app_container: false,
             containers: HashMap::new(),
         };
@@ -432,7 +433,7 @@ mod tests {
         };
 
         let a = ContainersReq {
-            app: app,
+            app,
             containers: HashMap::new(),
         };
 

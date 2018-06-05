@@ -7,44 +7,46 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::utils::{corrupt_container, create_containers_req};
-use Authenticator;
 use config::{self, get_app_revocation_queue, push_to_app_revocation_queue};
 use errors::AuthError;
 use futures::Future;
 use revocation;
 use routing::{AccountInfo, EntryActions, User};
-use safe_core::{CoreError, MDataInfo, app_container_name};
 use safe_core::ipc::{AuthReq, Permission};
 use safe_core::nfs::NfsError;
+use safe_core::{app_container_name, CoreError, MDataInfo};
 use std::collections::HashMap;
-use test_utils::{access_container, create_account_and_login, create_authenticator, create_file,
-                 fetch_file, get_container_from_authenticator_entry, rand_app, register_app,
-                 register_rand_app, revoke, run, try_access_container, try_revoke};
+use test_utils::{
+    access_container, create_account_and_login, create_authenticator, create_file, fetch_file,
+    get_container_from_authenticator_entry, rand_app, register_app, register_rand_app, revoke, run,
+    try_access_container, try_revoke,
+};
+use Authenticator;
 
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing {
     use super::*;
-    use AuthFuture;
     use access_container;
-    use app_auth::{AppState, app_state};
+    use app_auth::{app_state, AppState};
     use config;
     use ffi::ipc::auth_flush_app_revocation_queue;
     use ffi_utils::test_utils::call_0;
     use futures::future;
     use maidsafe_utilities::SeededRng;
     use routing::{ClientError, Request, Response};
-    use safe_core::{Client, FutureExt};
-    use safe_core::MockRouting;
-    use safe_core::ipc::{IpcError, Permission};
     use safe_core::ipc::req::container_perms_into_permission_set;
     use safe_core::ipc::resp::AccessContainerEntry;
+    use safe_core::ipc::{IpcError, Permission};
     use safe_core::utils::test_utils::Synchronizer;
+    use safe_core::MockRouting;
+    use safe_core::{Client, FutureExt};
     use std::collections::HashMap;
     use std::iter;
     use std::sync::{Arc, Barrier};
     use std::thread;
     use test_utils::{get_container_from_authenticator_entry, register_rand_app, try_revoke};
     use tiny_keccak::sha3_256;
+    use AuthFuture;
 
     // Test operation recovery for app revocation
     //
@@ -293,9 +295,9 @@ mod mock_routing {
 
         // Flush the revocation queue and verify both apps get revoked.
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| auth_flush_app_revocation_queue(&auth, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| auth_flush_app_revocation_queue(
+                &auth, ud, cb
+            ),))
         }
 
         run(&auth, |client| {
@@ -335,11 +337,11 @@ mod mock_routing {
         let _ = containers_req.insert(
             "_documents".to_owned(),
             btree_set![
-            Permission::Read,
-            Permission::Insert,
-            Permission::Update,
-            Permission::Delete,
-        ],
+                Permission::Read,
+                Permission::Insert,
+                Permission::Update,
+                Permission::Delete,
+            ],
         );
 
         let (app_id_0, auth_granted_0) =
@@ -392,16 +394,12 @@ mod mock_routing {
             // Doing `collect` to prevent short-circuiting.
             .collect();
 
-        let success = join_handles.into_iter().fold(
-            false,
-            |success, handle| match unwrap!(
-                handle.join()
-            ) {
-                Ok(_) |
-                Err(AuthError::IpcError(IpcError::UnknownApp)) => true,
+        let success = join_handles.into_iter().fold(false, |success, handle| {
+            match unwrap!(handle.join()) {
+                Ok(_) | Err(AuthError::IpcError(IpcError::UnknownApp)) => true,
                 _ => success,
-            },
-        );
+            }
+        });
 
         // If none of the concurrently running revocations succeeded, let's give it
         // one more try, but this time using only one authenticator.
@@ -434,11 +432,11 @@ mod mock_routing {
         let _ = containers_req.insert(
             "_documents".to_owned(),
             btree_set![
-            Permission::Read,
-            Permission::Insert,
-            Permission::Update,
-            Permission::Delete,
-        ],
+                Permission::Read,
+                Permission::Insert,
+                Permission::Update,
+                Permission::Delete,
+            ],
         );
 
         let (app_id_0, auth_granted_0) =
@@ -503,8 +501,7 @@ mod mock_routing {
         for (app_id, result) in apps_to_revoke.iter().zip(results) {
             if result.is_err() {
                 match try_revoke(&auth, app_id) {
-                    Ok(_) |
-                    Err(AuthError::IpcError(IpcError::UnknownApp)) => (),
+                    Ok(_) | Err(AuthError::IpcError(IpcError::UnknownApp)) => (),
                     Err(error) => panic!("Unexpected revocation failure: {:?}", error),
                 }
             }
@@ -541,7 +538,9 @@ mod mock_routing {
                 let ac_info = ac_info.clone();
 
                 routing.set_request_hook(move |request| match *request {
-                    Request::MutateMDataEntries { name, tag, msg_id, .. } => {
+                    Request::MutateMDataEntries {
+                        name, tag, msg_id, ..
+                    } => {
                         if name == ac_info.name && tag == ac_info.type_tag {
                             Some(Response::MutateMDataEntries {
                                 res: Err(ClientError::LowBalance),
@@ -585,9 +584,9 @@ mod mock_routing {
                 let app_hash = sha3_256(app_id.as_bytes());
                 let app_key = unwrap!(apps.get(&app_hash)).keys.sign_pk;
 
-                auth_keys.join(state).map(move |((auth_keys, _), state)| {
-                    (auth_keys, app_key, state)
-                })
+                auth_keys
+                    .join(state)
+                    .map(move |((auth_keys, _), state)| (auth_keys, app_key, state))
             })
             .then(move |res| -> Result<_, AuthError> {
                 let (auth_keys, app_key, state) = unwrap!(res);
@@ -605,20 +604,22 @@ mod mock_routing {
                 let app_key = unwrap!(res);
                 let futures = prev_ac_entry.into_iter().map(move |(_, (mdata_info, _))| {
                     // Verify the app has no permissions in the containers.
-                    let perms = c1.list_mdata_user_permissions(
-                        mdata_info.name,
-                        mdata_info.type_tag,
-                        User::Key(app_key),
-                    ).then(|res| {
+                    let perms =
+                        c1.list_mdata_user_permissions(
+                            mdata_info.name,
+                            mdata_info.type_tag,
+                            User::Key(app_key),
+                        ).then(|res| {
                             assert_match!(
-                            res,
-                            Err(CoreError::RoutingClientError(ClientError::NoSuchKey))
-                        );
+                                res,
+                                Err(CoreError::RoutingClientError(ClientError::NoSuchKey))
+                            );
                             Ok(())
                         });
 
                     // Verify the app can't decrypt the content of the containers.
-                    let entries = c1.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
+                    let entries = c1
+                        .list_mdata_entries(mdata_info.name, mdata_info.type_tag)
                         .then(move |res| {
                             let entries = unwrap!(res);
                             for (key, value) in entries {
@@ -665,31 +666,30 @@ mod mock_routing {
                 assert!(auth_keys.contains(&app_key));
 
                 // Fetch the access container entry
-                access_container::fetch_entry(&c1, &app_id, app_keys).map(
-                    move |(_, entry)| (app_key, entry),
-                )
+                access_container::fetch_entry(&c1, &app_id, app_keys)
+                    .map(move |(_, entry)| (app_key, entry))
             })
             .then(move |res| {
                 let (app_key, ac_entry) = unwrap!(res);
                 let user = User::Key(app_key);
                 let ac_entry = unwrap!(ac_entry);
 
-                let futures = ac_entry.into_iter().map(
-                    move |(_, (mdata_info, permissions))| {
+                let futures = ac_entry
+                    .into_iter()
+                    .map(move |(_, (mdata_info, permissions))| {
                         // Verify the app has the permissions set according to the access container.
                         let expected_perms = container_perms_into_permission_set(&permissions);
-                        let perms = c2.list_mdata_user_permissions(
-                            mdata_info.name,
-                            mdata_info.type_tag,
-                            user,
-                        ).then(move |res| {
+                        let perms = c2
+                            .list_mdata_user_permissions(mdata_info.name, mdata_info.type_tag, user)
+                            .then(move |res| {
                                 let perms = unwrap!(res);
                                 assert_eq!(perms, expected_perms);
                                 Ok(())
                             });
 
                         // Verify the app can decrypt the content of the containers.
-                        let entries = c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
+                        let entries = c2
+                            .list_mdata_entries(mdata_info.name, mdata_info.type_tag)
                             .then(move |res| {
                                 let entries = unwrap!(res);
                                 for (key, value) in entries {
@@ -705,8 +705,7 @@ mod mock_routing {
                             });
 
                         perms.join(entries).map(|_| ())
-                    },
-                );
+                    });
 
                 future::join_all(futures).map(|_| ())
             })
@@ -790,12 +789,8 @@ fn app_revocation() {
     let perms = run(&authenticator, move |client| {
         client.list_mdata_permissions(name, tag).map_err(From::from)
     });
-    assert!(!perms.contains_key(
-        &User::Key(auth_granted1.app_keys.sign_pk),
-    ));
-    assert!(perms.contains_key(
-        &User::Key(auth_granted2.app_keys.sign_pk),
-    ));
+    assert!(!perms.contains_key(&User::Key(auth_granted1.app_keys.sign_pk),));
+    assert!(perms.contains_key(&User::Key(auth_granted2.app_keys.sign_pk),));
 
     // The first app can no longer access the files.
     match fetch_file(&authenticator, videos_md1.clone(), "1.mp4") {
@@ -924,11 +919,11 @@ fn revocation_symmetric_decipher_failure() {
     let (downloads_md, _) = unwrap!(ac_entries.remove("_downloads"));
 
     unwrap!(create_file(
-            &authenticator,
-            downloads_md.clone(),
-            "video.mp4",
-            vec![1; 10],
-        ));
+        &authenticator,
+        downloads_md.clone(),
+        "video.mp4",
+        vec![1; 10],
+    ));
 
     // Push apps 1 and 2 to the revocation queue.
     {
@@ -1010,10 +1005,9 @@ fn flushing_empty_app_revocation_queue_does_not_mutate_network() {
     let account_info_0 = get_account_info(&auth);
 
     // There are no apps, so the queue is empty.
-    run(
-        &auth,
-        |client| revocation::flush_app_revocation_queue(client),
-    );
+    run(&auth, |client| {
+        revocation::flush_app_revocation_queue(client)
+    });
 
     let account_info_1 = get_account_info(&auth);
     assert_eq!(account_info_0, account_info_1);
@@ -1033,10 +1027,9 @@ fn flushing_empty_app_revocation_queue_does_not_mutate_network() {
     let account_info_2 = get_account_info(&auth);
 
     // The queue is empty again.
-    run(
-        &auth,
-        |client| revocation::flush_app_revocation_queue(client),
-    );
+    run(&auth, |client| {
+        revocation::flush_app_revocation_queue(client)
+    });
 
     let account_info_3 = get_account_info(&auth);
     assert_eq!(account_info_2, account_info_3);
@@ -1049,10 +1042,7 @@ fn revocation_with_unencrypted_container_entries() {
     let mut containers_req = HashMap::new();
     let _ = containers_req.insert(
         "_documents".to_owned(),
-        btree_set![
-            Permission::Read,
-            Permission::Insert,
-        ],
+        btree_set![Permission::Read, Permission::Insert,],
     );
 
     let (app_id, _) = unwrap!(register_rand_app(&auth, true, containers_req));
@@ -1066,9 +1056,9 @@ fn revocation_with_unencrypted_container_entries() {
         .into();
 
     let dedicated_info = unwrap!(get_container_from_authenticator_entry(
-            &auth,
-            &app_container_name(&app_id),
-        ));
+        &auth,
+        &app_container_name(&app_id),
+    ));
     let dedicated_info2 = dedicated_info.clone();
     let dedicated_key = b"dedicated-key".to_vec();
     let dedicated_content = b"dedicated-value".to_vec();

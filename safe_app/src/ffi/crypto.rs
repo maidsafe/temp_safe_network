@@ -7,20 +7,25 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi::object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, NULL_OBJECT_HANDLE,
-                        SignPubKeyHandle, SignSecKeyHandle};
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
-                vec_clone_from_raw_parts};
+use ffi::object_cache::{
+    EncryptPubKeyHandle, EncryptSecKeyHandle, SignPubKeyHandle, SignSecKeyHandle,
+    NULL_OBJECT_HANDLE,
+};
+use ffi_utils::{
+    catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, SafePtr, FFI_RESULT_OK,
+};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, sign};
 use safe_core::crypto::{shared_box, shared_sign};
-use safe_core::ffi::arrays::{AsymNonce, AsymPublicKey, AsymSecretKey, SignPublicKey, SignSecretKey};
+use safe_core::ffi::arrays::{
+    AsymNonce, AsymPublicKey, AsymSecretKey, SignPublicKey, SignSecretKey,
+};
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
+use App;
 
 /// Special value that represents that a message should be signed by the app.
 #[no_mangle]
@@ -33,9 +38,7 @@ pub static SIGN_WITH_APP: u64 = NULL_OBJECT_HANDLE;
 pub unsafe extern "C" fn app_pub_sign_key(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        handle: SignPubKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, handle: SignPubKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
@@ -52,10 +55,12 @@ pub unsafe extern "C" fn app_pub_sign_key(
 pub unsafe extern "C" fn sign_generate_key_pair(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pk_h: SignPubKeyHandle,
-                        sk_h: SignSecKeyHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pk_h: SignPubKeyHandle,
+        sk_h: SignSecKeyHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let (ourpk, oursk) = shared_sign::gen_keypair();
@@ -80,9 +85,7 @@ pub unsafe extern "C" fn sign_pub_key_new(
     app: *const App,
     data: *const SignPublicKey,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        handle: SignPubKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, handle: SignPubKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = sign::PublicKey(*data);
@@ -100,9 +103,11 @@ pub unsafe extern "C" fn sign_pub_key_get(
     app: *const App,
     handle: SignPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pub_sign_key: *const SignPublicKey),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pub_sign_key: *const SignPublicKey,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -138,9 +143,7 @@ pub unsafe extern "C" fn sign_sec_key_new(
     app: *const App,
     data: *const SignSecretKey,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        handle: SignSecKeyHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, handle: SignSecKeyHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = shared_sign::SecretKey::from_raw(&*data);
@@ -158,9 +161,11 @@ pub unsafe extern "C" fn sign_sec_key_get(
     app: *const App,
     handle: SignSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pub_sign_key: *const SignSecretKey),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pub_sign_key: *const SignSecretKey,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -195,9 +200,11 @@ pub unsafe extern "C" fn sign_sec_key_free(
 pub unsafe extern "C" fn app_pub_enc_key(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pk_h: EncryptPubKeyHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pk_h: EncryptPubKeyHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
@@ -214,10 +221,12 @@ pub unsafe extern "C" fn app_pub_enc_key(
 pub unsafe extern "C" fn enc_generate_key_pair(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pk_h: EncryptPubKeyHandle,
-                        sk_h: EncryptSecKeyHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pk_h: EncryptPubKeyHandle,
+        sk_h: EncryptSecKeyHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let (ourpk, oursk) = shared_box::gen_keypair();
@@ -242,9 +251,11 @@ pub unsafe extern "C" fn enc_pub_key_new(
     app: *const App,
     data: *const AsymPublicKey,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pk_h: EncryptPubKeyHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pk_h: EncryptPubKeyHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = box_::PublicKey(*data);
@@ -262,9 +273,11 @@ pub unsafe extern "C" fn enc_pub_key_get(
     app: *const App,
     handle: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        pub_enc_key: *const AsymPublicKey),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        pub_enc_key: *const AsymPublicKey,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -300,9 +313,11 @@ pub unsafe extern "C" fn enc_secret_key_new(
     app: *const App,
     data: *const AsymSecretKey,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        sk_h: EncryptSecKeyHandle),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        sk_h: EncryptSecKeyHandle,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = shared_box::SecretKey::from_raw(&*data);
@@ -320,9 +335,11 @@ pub unsafe extern "C" fn enc_secret_key_get(
     app: *const App,
     handle: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        sec_enc_key: *const AsymSecretKey),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        sec_enc_key: *const AsymSecretKey,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -361,10 +378,12 @@ pub unsafe extern "C" fn sign(
     data_len: usize,
     sign_sk_h: SignSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        signed_data: *const u8,
-                        signed_data_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        signed_data: *const u8,
+        signed_data_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -410,10 +429,12 @@ pub unsafe extern "C" fn verify(
     signed_data_len: usize,
     sign_pk_h: SignPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        verified_data: *const u8,
-                        verified_data_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        verified_data: *const u8,
+        verified_data_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -426,9 +447,11 @@ pub unsafe extern "C" fn verify(
                 o_cb
             );
 
-            let verified =
-                try_cb!(sign::verify(&signed, &sign_pk)
-                        .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
+            let verified = try_cb!(
+                sign::verify(&signed, &sign_pk).map_err(|()| AppError::EncodeDecodeError),
+                user_data,
+                o_cb
+            );
             o_cb(
                 user_data.0,
                 FFI_RESULT_OK,
@@ -453,10 +476,12 @@ pub unsafe extern "C" fn encrypt(
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        ciphertext: *const u8,
-                        ciphertext_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        ciphertext: *const u8,
+        ciphertext_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -498,10 +523,12 @@ pub unsafe extern "C" fn decrypt(
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        plaintext: *const u8,
-                        plaintext_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        plaintext: *const u8,
+        plaintext_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -517,9 +544,12 @@ pub unsafe extern "C" fn decrypt(
 
             match deserialise::<(box_::Nonce, Vec<u8>)>(&encrypted_text) {
                 Ok((nonce, ciphertext)) => {
-                    let plaintext =
-                        try_cb!(box_::open(&ciphertext, &nonce, &pk, &sk)
-                                .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
+                    let plaintext = try_cb!(
+                        box_::open(&ciphertext, &nonce, &pk, &sk)
+                            .map_err(|()| AppError::EncodeDecodeError),
+                        user_data,
+                        o_cb
+                    );
                     o_cb(
                         user_data.0,
                         FFI_RESULT_OK,
@@ -548,10 +578,12 @@ pub unsafe extern "C" fn encrypt_sealed_box(
     data_len: usize,
     pk_h: EncryptPubKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        ciphertext: *const u8,
-                        ciphertext_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        ciphertext: *const u8,
+        ciphertext_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let plaintext = vec_clone_from_raw_parts(data, data_len);
@@ -589,10 +621,12 @@ pub unsafe extern "C" fn decrypt_sealed_box(
     pk_h: EncryptPubKeyHandle,
     sk_h: EncryptSecKeyHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        plaintext: *const u8,
-                        plaintext_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        plaintext: *const u8,
+        plaintext_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -606,9 +640,11 @@ pub unsafe extern "C" fn decrypt_sealed_box(
             );
             let sk = try_cb!(context.object_cache().get_secret_key(sk_h), user_data, o_cb);
 
-            let plaintext =
-                try_cb!(sealedbox::open(&plaintext, &pk, &sk)
-                                    .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
+            let plaintext = try_cb!(
+                sealedbox::open(&plaintext, &pk, &sk).map_err(|()| AppError::EncodeDecodeError),
+                user_data,
+                o_cb
+            );
             o_cb(
                 user_data.0,
                 FFI_RESULT_OK,
@@ -629,10 +665,12 @@ pub unsafe extern "C" fn sha3_hash(
     data: *const u8,
     data_len: usize,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        hash: *const u8,
-                        hash_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        hash: *const u8,
+        hash_len: usize,
+    ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let plaintext = slice::from_raw_parts(data, data_len);
@@ -650,9 +688,7 @@ pub unsafe extern "C" fn sha3_hash(
 #[no_mangle]
 pub unsafe extern "C" fn generate_nonce(
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        nonce: *const AsymNonce),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, nonce: *const AsymNonce),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let nonce = box_::gen_nonce();
@@ -689,25 +725,40 @@ mod tests {
         // Trying to sign a message from app1
         let data = b"hi there";
         let signed = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                sign(&app1, data.as_ptr(), data.len(), app1_sk_h, ud, cb)
-            }))
+            unwrap!(call_vec_u8(|ud, cb| sign(
+                &app1,
+                data.as_ptr(),
+                data.len(),
+                app1_sk_h,
+                ud,
+                cb
+            )))
         };
 
         // Trying to verify the message in app2
         let verified = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                verify(&app2, signed.as_ptr(), signed.len(), app2_pk_h, ud, cb)
-            }))
+            unwrap!(call_vec_u8(|ud, cb| verify(
+                &app2,
+                signed.as_ptr(),
+                signed.len(),
+                app2_pk_h,
+                ud,
+                cb
+            )))
         };
 
         assert_eq!(&verified, data);
 
         // Trying to sign a message from app1 using its secret sign key
         let signed = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                sign(&app1, data.as_ptr(), data.len(), SIGN_WITH_APP, ud, cb)
-            }))
+            unwrap!(call_vec_u8(|ud, cb| sign(
+                &app1,
+                data.as_ptr(),
+                data.len(),
+                SIGN_WITH_APP,
+                ud,
+                cb
+            )))
         };
 
         // Trying to verify the message in app2
@@ -719,9 +770,14 @@ mod tests {
         let app2_pk2_h =
             unsafe { unwrap!(call_1(|ud, cb| sign_pub_key_new(&app2, &pk_raw, ud, cb))) };
         let verified = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                verify(&app2, signed.as_ptr(), signed.len(), app2_pk2_h, ud, cb)
-            }))
+            unwrap!(call_vec_u8(|ud, cb| verify(
+                &app2,
+                signed.as_ptr(),
+                signed.len(),
+                app2_pk2_h,
+                ud,
+                cb
+            )))
         };
 
         assert_eq!(&verified, data);
@@ -753,32 +809,28 @@ mod tests {
         // Trying to encrypt a message for app2 from app1
         let data = b"hi there";
         let encrypted = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                encrypt(
-                    &app1,
-                    data.as_ptr(),
-                    data.len(),
-                    app1_pk2_h,
-                    app1_sk1_h,
-                    ud,
-                    cb,
-                )
-            }))
+            unwrap!(call_vec_u8(|ud, cb| encrypt(
+                &app1,
+                data.as_ptr(),
+                data.len(),
+                app1_pk2_h,
+                app1_sk1_h,
+                ud,
+                cb,
+            )))
         };
 
         // Trying to decrypt the message in app2
         let decrypted = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                decrypt(
-                    &app2,
-                    encrypted.as_ptr(),
-                    encrypted.len(),
-                    app2_pk1_h,
-                    app2_sk2_h,
-                    ud,
-                    cb,
-                )
-            }))
+            unwrap!(call_vec_u8(|ud, cb| decrypt(
+                &app2,
+                encrypted.as_ptr(),
+                encrypted.len(),
+                app2_pk1_h,
+                app2_sk2_h,
+                ud,
+                cb,
+            )))
         };
 
         assert_eq!(&decrypted, data);
@@ -804,24 +856,27 @@ mod tests {
         // Trying to encrypt a message for app2 from app1
         let data = b"sealed box message";
         let encrypted = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                encrypt_sealed_box(&app1, data.as_ptr(), data.len(), app1_pk2_h, ud, cb)
-            }))
+            unwrap!(call_vec_u8(|ud, cb| encrypt_sealed_box(
+                &app1,
+                data.as_ptr(),
+                data.len(),
+                app1_pk2_h,
+                ud,
+                cb
+            )))
         };
 
         // Trying to decrypt the message in app2
         let decrypted = unsafe {
-            unwrap!(call_vec_u8(|ud, cb| {
-                decrypt_sealed_box(
-                    &app2,
-                    encrypted.as_ptr(),
-                    encrypted.len(),
-                    app2_pk2_h,
-                    app2_sk2_h,
-                    ud,
-                    cb,
-                )
-            }))
+            unwrap!(call_vec_u8(|ud, cb| decrypt_sealed_box(
+                &app2,
+                encrypted.as_ptr(),
+                encrypted.len(),
+                app2_pk2_h,
+                app2_sk2_h,
+                ud,
+                cb,
+            )))
         };
 
         assert_eq!(&decrypted, data);
@@ -842,15 +897,21 @@ mod tests {
         });
 
         let app_sign_key1_raw: SignPublicKey = unsafe {
-            unwrap!(call_1(
-                |ud, cb| sign_pub_key_get(&app, app_sign_key1_h, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| sign_pub_key_get(
+                &app,
+                app_sign_key1_h,
+                ud,
+                cb
+            ),))
         };
 
         let app_sign_key2_h = unsafe {
-            unwrap!(call_1(
-                |ud, cb| sign_pub_key_new(&app, &app_sign_key1_raw, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| sign_pub_key_new(
+                &app,
+                &app_sign_key1_raw,
+                ud,
+                cb
+            ),))
         };
 
         let app_sign_key2 = run_now(&app, move |_, context| {
@@ -860,9 +921,12 @@ mod tests {
         assert_eq!(app_sign_key1, app_sign_key2);
 
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| sign_pub_key_free(&app, app_sign_key2_h, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| sign_pub_key_free(
+                &app,
+                app_sign_key2_h,
+                ud,
+                cb
+            ),))
         }
     }
 
@@ -878,21 +942,30 @@ mod tests {
         });
 
         let app_sign_key1_h = unsafe {
-            unwrap!(call_1(
-                |ud, cb| sign_sec_key_new(&app, &app_sign_key1.0, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| sign_sec_key_new(
+                &app,
+                &app_sign_key1.0,
+                ud,
+                cb
+            ),))
         };
 
         let app_sign_key1_raw: SignSecretKey = unsafe {
-            unwrap!(call_1(
-                |ud, cb| sign_sec_key_get(&app, app_sign_key1_h, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| sign_sec_key_get(
+                &app,
+                app_sign_key1_h,
+                ud,
+                cb
+            ),))
         };
 
         let app_sign_key2_h = unsafe {
-            unwrap!(call_1(
-                |ud, cb| sign_sec_key_new(&app, &app_sign_key1_raw, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| sign_sec_key_new(
+                &app,
+                &app_sign_key1_raw,
+                ud,
+                cb
+            ),))
         };
 
         run_now(&app, move |_, context| {
@@ -900,11 +973,13 @@ mod tests {
             assert_eq!(*app_sign_key1, *sign_key.clone());
         });
 
-
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| sign_sec_key_free(&app, app_sign_key2_h, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| sign_sec_key_free(
+                &app,
+                app_sign_key2_h,
+                ud,
+                cb
+            ),))
         }
     }
 
@@ -923,15 +998,21 @@ mod tests {
         });
 
         let app_enc_key1_raw: AsymPublicKey = unsafe {
-            unwrap!(call_1(
-                |ud, cb| enc_pub_key_get(&app, app_enc_key1_h, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| enc_pub_key_get(
+                &app,
+                app_enc_key1_h,
+                ud,
+                cb
+            ),))
         };
 
         let app_enc_key2_h = unsafe {
-            unwrap!(call_1(
-                |ud, cb| enc_pub_key_new(&app, &app_enc_key1_raw, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| enc_pub_key_new(
+                &app,
+                &app_enc_key1_raw,
+                ud,
+                cb
+            ),))
         };
 
         let app_enc_key2 = run_now(&app, move |_, context| {
@@ -941,9 +1022,12 @@ mod tests {
         assert_eq!(app_enc_key1, app_enc_key2);
 
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| enc_pub_key_free(&app, app_enc_key2_h, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| enc_pub_key_free(
+                &app,
+                app_enc_key2_h,
+                ud,
+                cb
+            ),))
         }
     }
 
@@ -955,14 +1039,20 @@ mod tests {
             unsafe { unwrap!(call_2(|ud, cb| enc_generate_key_pair(&app, ud, cb))) };
 
         let app_public_key1: AsymPublicKey = unsafe {
-            unwrap!(call_1(
-                |ud, cb| enc_pub_key_get(&app, app_public_key_h, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| enc_pub_key_get(
+                &app,
+                app_public_key_h,
+                ud,
+                cb
+            ),))
         };
         let app_secret_key1: AsymSecretKey = unsafe {
-            unwrap!(call_1(
-                |ud, cb| enc_secret_key_get(&app, app_secret_key1_h, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| enc_secret_key_get(
+                &app,
+                app_secret_key1_h,
+                ud,
+                cb
+            ),))
         };
 
         let app_secret_key1 = run_now(&app, move |_client, context| {
@@ -976,15 +1066,21 @@ mod tests {
         });
 
         let app_secret_key1_raw: AsymSecretKey = unsafe {
-            unwrap!(call_1(
-                |ud, cb| enc_secret_key_get(&app, app_secret_key1_h, ud, cb),
-            ))
+            unwrap!(call_1(|ud, cb| enc_secret_key_get(
+                &app,
+                app_secret_key1_h,
+                ud,
+                cb
+            ),))
         };
 
         let app_secret_key2_h = unsafe {
-            unwrap!(call_1(|ud, cb| {
-                enc_secret_key_new(&app, &app_secret_key1_raw, ud, cb)
-            }))
+            unwrap!(call_1(|ud, cb| enc_secret_key_new(
+                &app,
+                &app_secret_key1_raw,
+                ud,
+                cb
+            )))
         };
 
         run_now(&app, move |_, context| {
@@ -993,9 +1089,12 @@ mod tests {
         });
 
         unsafe {
-            unwrap!(call_0(|ud, cb| {
-                enc_secret_key_free(&app, app_secret_key2_h, ud, cb)
-            }))
+            unwrap!(call_0(|ud, cb| enc_secret_key_free(
+                &app,
+                app_secret_key2_h,
+                ud,
+                cb
+            )))
         }
     }
 
@@ -1011,18 +1110,24 @@ mod tests {
     fn sha3_smoke_test() {
         let data = b"test message";
         let sha3 = unsafe {
-            unwrap!(call_vec_u8(
-                |ud, cb| sha3_hash(data.as_ptr(), data.len(), ud, cb),
-            ))
+            unwrap!(call_vec_u8(|ud, cb| sha3_hash(
+                data.as_ptr(),
+                data.len(),
+                ud,
+                cb
+            ),))
         };
 
         assert_eq!(sha3.len(), 256 / 8);
 
         let data = b"";
         let sha3 = unsafe {
-            unwrap!(call_vec_u8(
-                |ud, cb| sha3_hash(data.as_ptr(), data.len(), ud, cb),
-            ))
+            unwrap!(call_vec_u8(|ud, cb| sha3_hash(
+                data.as_ptr(),
+                data.len(),
+                ud,
+                cb
+            ),))
         };
 
         assert_eq!(sha3.len(), 256 / 8);

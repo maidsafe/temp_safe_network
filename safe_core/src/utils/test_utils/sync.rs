@@ -115,7 +115,7 @@ struct State {
 impl State {
     fn new(rng: SeededRng) -> Self {
         State {
-            rng: rng,
+            rng,
             all: Vec::new(),
             next: 0,
             awake: 0,

@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use ffi::arrays::XorNameArray;
-use ffi_utils::ReprC;
 use ffi_utils::callback::CallbackArgs;
+use ffi_utils::ReprC;
 use ipc::req::permission_set_into_repr_c;
 use routing;
 use std::ffi::CString;

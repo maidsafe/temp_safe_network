@@ -9,14 +9,14 @@
 use super::{AuthError, AuthFuture};
 use access_container::{self, AUTHENTICATOR_ENTRY};
 use config::{self, AppInfo, RevocationQueue};
-use futures::Future;
 use futures::future::{self, Either, Loop};
+use futures::Future;
 use routing::{ClientError, EntryActions, User, Value};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo};
 use safe_core::recovery;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use safe_core::{Client, CoreError, FutureExt, MDataInfo};
 use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 type MDataEntries = BTreeMap<Vec<u8>, Value>;
 type Containers = HashMap<String, MDataInfo>;
@@ -36,9 +36,7 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
                 &app_id,
             )
         })
-        .and_then(move |(version, queue)| {
-            flush_app_revocation_queue_impl(&c2, queue, version + 1)
-        })
+        .and_then(move |(version, queue)| flush_app_revocation_queue_impl(&c2, queue, version + 1))
         .into_box()
 }
 
@@ -47,10 +45,12 @@ pub fn flush_app_revocation_queue(client: &Client<()>) -> Box<AuthFuture<()>> {
     let client = client.clone();
 
     config::get_app_revocation_queue(&client)
-        .and_then(move |(version, queue)| if let Some(version) = version {
-            flush_app_revocation_queue_impl(&client, queue, version + 1)
-        } else {
-            future::ok(()).into_box()
+        .and_then(move |(version, queue)| {
+            if let Some(version) = version {
+                flush_app_revocation_queue_impl(&client, queue, version + 1)
+            } else {
+                future::ok(()).into_box()
+            }
         })
         .into_box()
 }
@@ -70,51 +70,51 @@ fn flush_app_revocation_queue_impl(
     let client = client.clone();
     let moved_apps = Vec::new();
 
-    future::loop_fn((queue, version, moved_apps), move |(queue,
-           version,
-           mut moved_apps)| {
-        let c2 = client.clone();
-        let c3 = client.clone();
+    future::loop_fn(
+        (queue, version, moved_apps),
+        move |(queue, version, mut moved_apps)| {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-        if let Some(app_id) = queue.front().cloned() {
-            let f = revoke_single_app(&c2, &app_id)
-                .then(move |result| match result {
-                    Ok(_) => {
-                        config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
-                            .map(|(version, queue)| (version, queue, moved_apps))
-                            .into_box()
-                    }
-                    Err(AuthError::CoreError(CoreError::SymmetricDecipherFailure)) => {
-                        // The app entry can't be decrypted. No way to revoke app, so just remove
-                        // it from the queue and return an error.
-                        config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
-                            .and_then(|_| {
-                                err!(AuthError::CoreError(CoreError::SymmetricDecipherFailure))
-                            })
-                            .into_box()
-                    }
-                    Err(error) => {
-                        if moved_apps.contains(&app_id) {
-                            // If this app has already been moved to the back of the queue,
-                            // return the error.
-                            err!(error)
-                        } else {
-                            // Move the app to the end of the queue.
-                            moved_apps.push(app_id.clone());
-                            config::repush_to_app_revocation_queue(&c3, queue, version, &app_id)
-                                .map(|(version, queue)| (version, queue, moved_apps))
+            if let Some(app_id) = queue.front().cloned() {
+                let f = revoke_single_app(&c2, &app_id)
+                    .then(move |result| match result {
+                        Ok(_) => config::remove_from_app_revocation_queue(
+                            &c3, queue, version, &app_id,
+                        ).map(|(version, queue)| (version, queue, moved_apps))
+                            .into_box(),
+                        Err(AuthError::CoreError(CoreError::SymmetricDecipherFailure)) => {
+                            // The app entry can't be decrypted. No way to revoke app, so just remove
+                            // it from the queue and return an error.
+                            config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
+                                .and_then(|_| {
+                                    err!(AuthError::CoreError(CoreError::SymmetricDecipherFailure))
+                                })
                                 .into_box()
                         }
-                    }
-                })
-                .and_then(move |(version, queue, moved_apps)| {
-                    Ok(Loop::Continue((queue, version + 1, moved_apps)))
-                });
-            Either::A(f)
-        } else {
-            Either::B(future::ok(Loop::Break(())))
-        }
-    }).into_box()
+                        Err(error) => {
+                            if moved_apps.contains(&app_id) {
+                                // If this app has already been moved to the back of the queue,
+                                // return the error.
+                                err!(error)
+                            } else {
+                                // Move the app to the end of the queue.
+                                moved_apps.push(app_id.clone());
+                                config::repush_to_app_revocation_queue(&c3, queue, version, &app_id)
+                                    .map(|(version, queue)| (version, queue, moved_apps))
+                                    .into_box()
+                            }
+                        }
+                    })
+                    .and_then(move |(version, queue, moved_apps)| {
+                        Ok(Loop::Continue((queue, version + 1, moved_apps)))
+                    });
+                Either::A(f)
+            } else {
+                Either::B(future::ok(Loop::Break(())))
+            }
+        },
+    ).into_box()
 }
 
 // Revoke access for a single app
@@ -134,12 +134,10 @@ fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
     // 4. Re-encrypt private containers that the app had access to
     // 5. Remove the revoked app from the access container
     config::get_app(client, app_id)
+        .and_then(move |app| delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app))
         .and_then(move |app| {
-            delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app)
-        })
-        .and_then(move |app| {
-            access_container::fetch_entry(&c3, &app.info.id, app.keys.clone())
-                .and_then(move |(version, ac_entry)| {
+            access_container::fetch_entry(&c3, &app.info.id, app.keys.clone()).and_then(
+                move |(version, ac_entry)| {
                     match ac_entry {
                         Some(ac_entry) => {
                             let containers: Containers = ac_entry
@@ -154,7 +152,8 @@ fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
                         // revocation queue.
                         None => ok!(()),
                     }
-                })
+                },
+            )
         })
         .into_box()
 }
@@ -272,9 +271,8 @@ fn reencrypt_containers_and_update_access_container(
             })
         })
         .and_then(move |(ac_info, ac_entries, containers, container_names)| {
-            reencrypt_containers(&c3, containers).map(move |_| {
-                (ac_info, ac_entries, container_names)
-            })
+            reencrypt_containers(&c3, containers)
+                .map(move |_| (ac_info, ac_entries, container_names))
         })
         .and_then(move |(ac_info, ac_entries, container_names)| {
             update_access_container(

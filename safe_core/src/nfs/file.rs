@@ -8,7 +8,7 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use ffi::nfs::File as FfiFile;
-use ffi_utils::{ReprC, vec_into_raw_parts};
+use ffi_utils::{vec_into_raw_parts, ReprC};
 use nfs::errors::NfsError;
 use routing::XorName;
 use std::slice;
@@ -31,7 +31,7 @@ impl File {
             size: 0,
             created: Utc::now(),
             modified: Utc::now(),
-            user_metadata: user_metadata,
+            user_metadata,
             data_map_name: XorName::default(),
         }
     }
@@ -49,9 +49,9 @@ impl File {
             created_nsec: self.created_time().timestamp_subsec_nanos(),
             modified_sec: self.modified_time().timestamp(),
             modified_nsec: self.modified_time().timestamp_subsec_nanos(),
-            user_metadata_ptr: user_metadata_ptr,
-            user_metadata_len: user_metadata_len,
-            user_metadata_cap: user_metadata_cap,
+            user_metadata_ptr,
+            user_metadata_len,
+            user_metadata_cap,
             data_map_name: self.data_map_name().0,
         }
     }
@@ -133,11 +133,8 @@ impl ReprC for File {
 
 #[inline]
 fn convert_date_time(sec: i64, nsec: u32) -> Result<DateTime<Utc>, NfsError> {
-    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec).ok_or_else(
-        || {
-            NfsError::Unexpected("Invalid date format".to_string())
-        },
-    )?;
+    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec)
+        .ok_or_else(|| NfsError::Unexpected("Invalid date format".to_string()))?;
     Ok(DateTime::<Utc>::from_utc(naive, Utc))
 }
 

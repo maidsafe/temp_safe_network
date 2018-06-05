@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use CoreError;
 use config_file_handler;
 use std::ffi::OsString;
 #[cfg(test)]
 use std::path::PathBuf;
+use CoreError;
 
 /// Configuration for safe-core.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -50,8 +50,8 @@ fn read_config_file() -> Result<Config, CoreError> {
 /// with the appropriate file name.
 #[cfg(test)]
 pub fn write_config_file(config: &Config) -> Result<PathBuf, CoreError> {
-    use std::io::Write;
     use serde_json;
+    use std::io::Write;
 
     let mut config_path = config_file_handler::current_bin_dir()?;
     config_path.push(get_file_name()?);

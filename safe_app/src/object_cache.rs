@@ -11,17 +11,17 @@
 //! across FFI boundaries.
 
 use super::errors::AppError;
-use AppContext;
 use cipher_opt::CipherOpt;
 use ffi::nfs::FileContext;
 use ffi::object_cache::*;
 use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
-use safe_core::SelfEncryptionStorage;
 use safe_core::crypto::{shared_box, shared_sign};
+use safe_core::SelfEncryptionStorage;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, HashMap};
+use AppContext;
 
 /// Contains session object cache
 pub struct ObjectCache {
@@ -76,13 +76,7 @@ impl ObjectCache {
 }
 
 macro_rules! impl_cache {
-    ($name:ident,
-     $ty:ty,
-     $handle:ty,
-     $error:ident,
-     $get:ident,
-     $insert:ident,
-     $remove:ident) => {
+    ($name:ident, $ty:ty, $handle:ty, $error:ident, $get:ident, $insert:ident, $remove:ident) => {
         impl ObjectCache {
             /// Insert object into the object cache, returning a new handle to it.
             pub fn $insert(&self, value: $ty) -> $handle {
@@ -101,7 +95,7 @@ macro_rules! impl_cache {
                 self.$name.remove(handle).ok_or(AppError::$error)
             }
         }
-    }
+    };
 }
 
 impl_cache!(
@@ -131,20 +125,24 @@ impl_cache!(
     insert_secret_key,
     remove_secret_key
 );
-impl_cache!(mdata_entries,
-            BTreeMap<Vec<u8>, Value>,
-            MDataEntriesHandle,
-            InvalidMDataEntriesHandle,
-            get_mdata_entries,
-            insert_mdata_entries,
-            remove_mdata_entries);
-impl_cache!(mdata_entry_actions,
-            BTreeMap<Vec<u8>, EntryAction>,
-            MDataEntryActionsHandle,
-            InvalidMDataEntryActionsHandle,
-            get_mdata_entry_actions,
-            insert_mdata_entry_actions,
-            remove_mdata_entry_actions);
+impl_cache!(
+    mdata_entries,
+    BTreeMap<Vec<u8>, Value>,
+    MDataEntriesHandle,
+    InvalidMDataEntriesHandle,
+    get_mdata_entries,
+    insert_mdata_entries,
+    remove_mdata_entries
+);
+impl_cache!(
+    mdata_entry_actions,
+    BTreeMap<Vec<u8>, EntryAction>,
+    MDataEntryActionsHandle,
+    InvalidMDataEntryActionsHandle,
+    get_mdata_entry_actions,
+    insert_mdata_entry_actions,
+    remove_mdata_entry_actions
+);
 impl_cache!(mdata_permissions,
             BTreeMap<User, PermissionSet>,
             MDataPermissionsHandle,
@@ -152,41 +150,51 @@ impl_cache!(mdata_permissions,
             get_mdata_permissions,
             insert_mdata_permissions,
             remove_mdata_permissions);
-impl_cache!(se_reader,
-            SelfEncryptor<SelfEncryptionStorage<AppContext>>,
-            SelfEncryptorReaderHandle,
-            InvalidSelfEncryptorHandle,
-            get_se_reader,
-            insert_se_reader,
-            remove_se_reader);
-impl_cache!(se_writer,
-            SequentialEncryptor<SelfEncryptionStorage<AppContext>>,
-            SelfEncryptorWriterHandle,
-            InvalidSelfEncryptorHandle,
-            get_se_writer,
-            insert_se_writer,
-            remove_se_writer);
-impl_cache!(pub_sign_key,
-            sign::PublicKey,
-            SignPubKeyHandle,
-            InvalidSignPubKeyHandle,
-            get_pub_sign_key,
-            insert_pub_sign_key,
-            remove_pub_sign_key);
-impl_cache!(sec_sign_key,
-            shared_sign::SecretKey,
-            SignSecKeyHandle,
-            InvalidSignSecKeyHandle,
-            get_sec_sign_key,
-            insert_sec_sign_key,
-            remove_sec_sign_key);
-impl_cache!(file,
-            FileContext,
-            FileContextHandle,
-            InvalidFileContextHandle,
-            get_file,
-            insert_file,
-            remove_file);
+impl_cache!(
+    se_reader,
+    SelfEncryptor<SelfEncryptionStorage<AppContext>>,
+    SelfEncryptorReaderHandle,
+    InvalidSelfEncryptorHandle,
+    get_se_reader,
+    insert_se_reader,
+    remove_se_reader
+);
+impl_cache!(
+    se_writer,
+    SequentialEncryptor<SelfEncryptionStorage<AppContext>>,
+    SelfEncryptorWriterHandle,
+    InvalidSelfEncryptorHandle,
+    get_se_writer,
+    insert_se_writer,
+    remove_se_writer
+);
+impl_cache!(
+    pub_sign_key,
+    sign::PublicKey,
+    SignPubKeyHandle,
+    InvalidSignPubKeyHandle,
+    get_pub_sign_key,
+    insert_pub_sign_key,
+    remove_pub_sign_key
+);
+impl_cache!(
+    sec_sign_key,
+    shared_sign::SecretKey,
+    SignSecKeyHandle,
+    InvalidSignSecKeyHandle,
+    get_sec_sign_key,
+    insert_sec_sign_key,
+    remove_sec_sign_key
+);
+impl_cache!(
+    file,
+    FileContext,
+    FileContextHandle,
+    InvalidFileContextHandle,
+    get_file,
+    insert_file,
+    remove_file
+);
 
 impl Default for ObjectCache {
     fn default() -> Self {
@@ -219,7 +227,9 @@ struct Store<V> {
 
 impl<V> Store<V> {
     fn new() -> Self {
-        Store { inner: RefCell::new(HashMap::new()) }
+        Store {
+            inner: RefCell::new(HashMap::new()),
+        }
     }
 
     fn get(&self, handle: ObjectHandle) -> Option<RefMut<V>> {

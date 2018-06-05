@@ -7,18 +7,18 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use App;
 use cipher_opt::CipherOpt;
 use errors::AppError;
 use ffi::object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::XorName;
-use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use safe_core::ffi::arrays::XorNameArray;
+use safe_core::{immutable_data, FutureExt, SelfEncryptionStorage};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::os::raw::c_void;
+use App;
 
 /// Handle of a Self Encryptor Writer object
 pub type SEWriterHandle = SelfEncryptorWriterHandle;
@@ -32,9 +32,7 @@ pub type SEReaderHandle = SelfEncryptorReaderHandle;
 pub unsafe extern "C" fn idata_new_self_encryptor(
     app: *const App,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        se_h: SEWriterHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, se_h: SEWriterHandle),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -86,7 +84,8 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(
                     }
                 }
             };
-            let fut = fut.map_err(AppError::from)
+            let fut = fut
+                .map_err(AppError::from)
                 .then(move |res| {
                     call_result_cb!(res, user_data, o_cb);
                     Ok(())
@@ -106,9 +105,11 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
     se_h: SEWriterHandle,
     cipher_opt_h: CipherOptHandle,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        name: *const XorNameArray),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        name: *const XorNameArray,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -142,9 +143,10 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
                 .and_then(move |data| {
                     let name = *data.name();
 
-                    client3.put_idata(data).map_err(AppError::from).map(
-                        move |_| name,
-                    )
+                    client3
+                        .put_idata(data)
+                        .map_err(AppError::from)
+                        .map(move |_| name)
                 })
                 .then(move |result| {
                     match result {
@@ -169,9 +171,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(
     app: *const App,
     name: *const XorNameArray,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        se_h: SEReaderHandle),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, se_h: SEReaderHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -216,9 +216,7 @@ pub unsafe extern "C" fn idata_serialised_size(
     app: *const App,
     name: *const XorNameArray,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        serialised_size: u64),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, serialised_size: u64),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -228,9 +226,7 @@ pub unsafe extern "C" fn idata_serialised_size(
         (*app).send(move |client, _| {
             client
                 .get_idata(name)
-                .map(move |idata| {
-                    o_cb(user_data.0, FFI_RESULT_OK, idata.serialised_size())
-                })
+                .map(move |idata| o_cb(user_data.0, FFI_RESULT_OK, idata.serialised_size()))
                 .map_err(move |e| {
                     call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
                 })
@@ -277,10 +273,12 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
     from_pos: u64,
     len: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        data: *const u8,
-                        data_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        data: *const u8,
+        data_len: usize,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -303,7 +301,8 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
                 return None;
             }
 
-            let fut = se.read(from_pos, len)
+            let fut = se
+                .read(from_pos, len)
                 .map(move |data| {
                     o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
                 })
@@ -365,8 +364,8 @@ mod tests {
     use super::*;
     use errors::AppError;
     use ffi::cipher_opt::*;
-    use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_vec_u8};
+    use ffi_utils::ErrorCode;
     use safe_core::utils;
     use test_utils::create_app;
 
@@ -394,26 +393,26 @@ mod tests {
             });
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
-            unwrap!(call_0(|ud, cb| {
-                idata_write_to_self_encryptor(
-                    &app,
-                    se_writer_h,
-                    plain_text.as_ptr(),
-                    plain_text.len(),
-                    ud,
-                    cb,
-                )
-            }));
+            unwrap!(call_0(|ud, cb| idata_write_to_self_encryptor(
+                &app,
+                se_writer_h,
+                plain_text.as_ptr(),
+                plain_text.len(),
+                ud,
+                cb,
+            )));
 
             let name: XorNameArray;
-            name = unwrap!(call_1(|ud, cb| {
-                idata_close_self_encryptor(&app, se_writer_h, cipher_opt_h, ud, cb)
-            }));
+            name = unwrap!(call_1(|ud, cb| idata_close_self_encryptor(
+                &app,
+                se_writer_h,
+                cipher_opt_h,
+                ud,
+                cb
+            )));
 
             // It should've been closed by immut_data_close_self_encryptor
-            let res = call_0(|ud, cb| {
-                idata_self_encryptor_writer_free(&app, se_writer_h, ud, cb)
-            });
+            let res = call_0(|ud, cb| idata_self_encryptor_writer_free(&app, se_writer_h, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             // Invalid self encryptor reader.
@@ -429,9 +428,9 @@ mod tests {
             assert!(res > 0);
 
             let se_reader_h = {
-                unwrap!(call_1(
-                    |ud, cb| idata_fetch_self_encryptor(&app, &name, ud, cb),
-                ))
+                unwrap!(call_1(|ud, cb| idata_fetch_self_encryptor(
+                    &app, &name, ud, cb
+                ),))
             };
 
             let size = unwrap!(call_1(|ud, cb| idata_size(&app, se_reader_h, ud, cb)));
@@ -451,13 +450,14 @@ mod tests {
             });
             assert_eq!(plain_text, unwrap!(received_plain_text));
 
-            unwrap!(call_0(|ud, cb| {
-                idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb)
-            }));
+            unwrap!(call_0(|ud, cb| idata_self_encryptor_reader_free(
+                &app,
+                se_reader_h,
+                ud,
+                cb
+            )));
 
-            let res = call_0(|ud, cb| {
-                idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb)
-            });
+            let res = call_0(|ud, cb| idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             unwrap!(call_0(|ud, cb| cipher_opt_free(&app, cipher_opt_h, ud, cb)));

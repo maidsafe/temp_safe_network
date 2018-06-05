@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{AppExchangeInfo, permission_set_clone_from_repr_c, permission_set_into_repr_c};
+use super::{permission_set_clone_from_repr_c, permission_set_into_repr_c, AppExchangeInfo};
 use ffi::ipc::req as ffi;
-use ffi_utils::{ReprC, vec_into_raw_parts};
+use ffi_utils::{vec_into_raw_parts, ReprC};
 use ipc::errors::IpcError;
 use routing::{PermissionSet, XorName};
 use std::slice;
@@ -37,7 +37,8 @@ impl ShareMDataReq {
     /// Convert to it's C representation
     /// The returned `ffi::ShareMDataReq` contains pointers into the returned `Vec`. As such, the
     pub fn into_repr_c(self) -> Result<ffi::ShareMDataReq, IpcError> {
-        let mdata_repr_c: Vec<_> = self.mdata
+        let mdata_repr_c: Vec<_> = self
+            .mdata
             .into_iter()
             .map(|md| md.into_repr_c())
             .collect::<Result<_, _>>()?;

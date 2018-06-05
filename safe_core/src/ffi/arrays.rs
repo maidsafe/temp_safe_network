@@ -7,13 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::XOR_NAME_LEN;
-use rust_sodium::crypto::box_::{NONCEBYTES as ASYM_NONCE_LEN,
-                                PUBLICKEYBYTES as ASYM_PUBLIC_KEY_LEN,
-                                SECRETKEYBYTES as ASYM_SECRET_KEY_LEN};
+use rust_sodium::crypto::box_::{
+    NONCEBYTES as ASYM_NONCE_LEN, PUBLICKEYBYTES as ASYM_PUBLIC_KEY_LEN,
+    SECRETKEYBYTES as ASYM_SECRET_KEY_LEN,
+};
 use rust_sodium::crypto::secretbox::{KEYBYTES as SYM_KEY_LEN, NONCEBYTES as SYM_NONCE_LEN};
-use rust_sodium::crypto::sign::{PUBLICKEYBYTES as SIGN_PUBLIC_KEY_LEN,
-                                SECRETKEYBYTES as SIGN_SECRET_KEY_LEN};
-
+use rust_sodium::crypto::sign::{
+    PUBLICKEYBYTES as SIGN_PUBLIC_KEY_LEN, SECRETKEYBYTES as SIGN_SECRET_KEY_LEN,
+};
 
 /// Array containing public key bytes.
 pub type AsymPublicKey = [u8; ASYM_PUBLIC_KEY_LEN];

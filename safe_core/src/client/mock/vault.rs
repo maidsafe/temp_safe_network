@@ -40,12 +40,10 @@ pub struct Vault {
 fn init_vault_path(devconfig: Option<&DevConfig>) -> PathBuf {
     match env::var("SAFE_MOCK_VAULT_PATH") {
         Ok(path) => PathBuf::from(path),
-        Err(_) => {
-            match devconfig.and_then(|dev| dev.mock_vault_path.clone()) {
-                Some(path) => PathBuf::from(path),
-                None => env::temp_dir(),
-            }
-        }
+        Err(_) => match devconfig.and_then(|dev| dev.mock_vault_path.clone()) {
+            Some(path) => PathBuf::from(path),
+            None => env::temp_dir(),
+        },
     }
 }
 
@@ -60,22 +58,20 @@ fn init_vault_store(config: &Config) -> Box<Store> {
             trace!("Mock vault: using memory store");
             Box::new(MemoryStore)
         }
-        Err(_) => {
-            match config.dev {
-                Some(ref dev) if dev.mock_in_memory_storage => {
-                    trace!("Mock vault: using memory store");
-                    Box::new(MemoryStore)
-                }
-                Some(ref dev) => {
-                    trace!("Mock vault: using file store");
-                    Box::new(FileStore::new(&init_vault_path(Some(dev))))
-                }
-                None => {
-                    trace!("Mock vault: using file store");
-                    Box::new(FileStore::new(&init_vault_path(None)))
-                }
+        Err(_) => match config.dev {
+            Some(ref dev) if dev.mock_in_memory_storage => {
+                trace!("Mock vault: using memory store");
+                Box::new(MemoryStore)
             }
-        }
+            Some(ref dev) => {
+                trace!("Mock vault: using file store");
+                Box::new(FileStore::new(&init_vault_path(Some(dev))))
+            }
+            None => {
+                trace!("Mock vault: using file store");
+                Box::new(FileStore::new(&init_vault_path(None)))
+            }
+        },
     }
 }
 
@@ -110,10 +106,10 @@ impl Vault {
 
     // Create account for the given client manager name.
     pub fn insert_account(&mut self, name: XorName) {
-        let _ = self.cache.client_manager.insert(
-            name,
-            Account::new(self.config.clone()),
-        );
+        let _ = self
+            .cache
+            .client_manager
+            .insert(name, Account::new(self.config.clone()));
     }
 
     // Authorise read (non-mutation) operation.
@@ -289,9 +285,9 @@ impl Store for FileStore {
         let metadata = unwrap!(file.metadata());
         let mtime = unwrap!(metadata.modified());
         let mtime_duration = if let Some(sync_time) = self.sync_time {
-            mtime.duration_since(sync_time).unwrap_or_else(
-                |_| Duration::from_millis(0),
-            )
+            mtime
+                .duration_since(sync_time)
+                .unwrap_or_else(|_| Duration::from_millis(0))
         } else {
             Duration::from_millis(1)
         };
@@ -302,17 +298,15 @@ impl Store for FileStore {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
             match file.read_to_end(&mut raw_data) {
                 Ok(0) => (),
-                Ok(_) => {
-                    match deserialise::<Cache>(&raw_data) {
-                        Ok(cache) => {
-                            self.sync_time = Some(mtime);
-                            result = Some(cache);
-                        }
-                        Err(e) => {
-                            warn!("Can't read the mock vault: {:?}", e);
-                        }
+                Ok(_) => match deserialise::<Cache>(&raw_data) {
+                    Ok(cache) => {
+                        self.sync_time = Some(mtime);
+                        result = Some(cache);
                     }
-                }
+                    Err(e) => {
+                        warn!("Can't read the mock vault: {:?}", e);
+                    }
+                },
                 Err(e) => {
                     warn!("Can't read the mock vault: {:?}", e);
                     return None;
@@ -337,7 +331,6 @@ impl Store for FileStore {
 
                 let mtime = unwrap!(unwrap!(file.metadata()).modified());
                 self.sync_time = Some(mtime);
-
             }
 
             let _ = file.unlock();

@@ -18,10 +18,10 @@ macro_rules! fry {
             Ok(elt) => elt,
             Err(e) => {
                 use $crate::utils::FutureExt;
-                return ::futures::future::err(From::from(e)).into_box()
+                return ::futures::future::err(From::from(e)).into_box();
             }
         }
-    }
+    };
 }
 
 /// This is the equivalent of `Result::Ok()` adapted to deal with futures. This
@@ -32,7 +32,7 @@ macro_rules! ok {
     ($elt:expr) => {{
         use $crate::utils::FutureExt;
         ::futures::future::ok($elt).into_box()
-    }}
+    }};
 }
 
 /// This is the equivalent of `Result::Ok()` adapted to deal with futures. This
@@ -43,7 +43,7 @@ macro_rules! err {
     ($elt:expr) => {{
         use $crate::utils::FutureExt;
         ::futures::future::err(From::from($elt)).into_box()
-    }}
+    }};
 }
 
 /// Additional future combinators.

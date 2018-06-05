@@ -6,27 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use AuthError;
-use Authenticator;
-use app_auth::{AppState, app_state};
+use app_auth::{app_state, AppState};
 use app_container;
 use config;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str,
-                vec_into_raw_parts};
+use ffi_utils::{
+    catch_unwind_cb, from_c_str, vec_into_raw_parts, FfiResult, OpaqueCtx, SafePtr, FFI_RESULT_OK,
+};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
 use routing::User::Key;
 use routing::XorName;
-use safe_core::FutureExt;
 use safe_core::ffi::arrays::XorNameArray;
 use safe_core::ffi::ipc::req::{AppExchangeInfo, ContainerPermissions};
 use safe_core::ffi::ipc::resp::AppAccess;
-use safe_core::ipc::{IpcError, access_container_enc_key};
 use safe_core::ipc::req::containers_into_vec;
 use safe_core::ipc::resp::{AccessContainerEntry, AppAccess as NativeAppAccess};
+use safe_core::ipc::{access_container_enc_key, IpcError};
 use safe_core::utils::symmetric_decrypt;
+use safe_core::FutureExt;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_void};
+use AuthError;
+use Authenticator;
 
 /// Application registered in the authenticator
 #[repr(C)]
@@ -64,7 +65,6 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
-
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
@@ -79,9 +79,8 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
 
             config::list_apps(client)
                 .and_then(move |(apps_version, apps)| {
-                    app_state(&c2, &apps, &app_id).map(move |app_state| {
-                        (app_state, apps, apps_version)
-                    })
+                    app_state(&c2, &apps, &app_id)
+                        .map(move |app_state| (app_state, apps, apps_version))
                 })
                 .and_then(move |(app_state, apps, apps_version)| match app_state {
                     AppState::Revoked => Ok((apps, apps_version)),
@@ -109,10 +108,12 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
 pub unsafe extern "C" fn auth_revoked_apps(
     auth: *const Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        app_exchange_info: *const AppExchangeInfo,
-                        app_exchange_info_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        app_exchange_info: *const AppExchangeInfo,
+        app_exchange_info_len: usize,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -123,9 +124,9 @@ pub unsafe extern "C" fn auth_revoked_apps(
 
             config::list_apps(client)
                 .and_then(move |(_, auth_cfg)| {
-                    c2.access_container().map_err(AuthError::from).map(
-                        move |access_container| (access_container, auth_cfg),
-                    )
+                    c2.access_container()
+                        .map_err(AuthError::from)
+                        .map(move |access_container| (access_container, auth_cfg))
                 })
                 .and_then(move |(access_container, auth_cfg)| {
                     c3.list_mdata_entries(access_container.name, access_container.type_tag)
@@ -175,10 +176,12 @@ pub unsafe extern "C" fn auth_revoked_apps(
 pub unsafe extern "C" fn auth_registered_apps(
     auth: *const Authenticator,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        registered_app: *const RegisteredApp,
-                        registered_app_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        registered_app: *const RegisteredApp,
+        registered_app_len: usize,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
 
@@ -189,9 +192,9 @@ pub unsafe extern "C" fn auth_registered_apps(
 
             config::list_apps(client)
                 .and_then(move |(_, auth_cfg)| {
-                    c2.access_container().map_err(AuthError::from).map(
-                        move |access_container| (access_container, auth_cfg),
-                    )
+                    c2.access_container()
+                        .map_err(AuthError::from)
+                        .map(move |access_container| (access_container, auth_cfg))
                 })
                 .and_then(move |(access_container, auth_cfg)| {
                     c3.list_mdata_entries(access_container.name, access_container.type_tag)
@@ -218,10 +221,9 @@ pub unsafe extern "C" fn auth_registered_apps(
                             let plaintext = symmetric_decrypt(&entry.content, &app.keys.enc_key)?;
                             let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
 
-                            let containers =
-                                containers_into_vec(
-                                    app_access.into_iter().map(|(key, (_, perms))| (key, perms)),
-                                )?;
+                            let containers = containers_into_vec(
+                                app_access.into_iter().map(|(key, (_, perms))| (key, perms)),
+                            )?;
 
                             let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
                             let reg_app = RegisteredApp {
@@ -260,10 +262,12 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
     md_name: *const XorNameArray,
     md_type_tag: u64,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        app_access: *const AppAccess,
-                        app_access_len: usize),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        app_access: *const AppAccess,
+        app_access_len: usize,
+    ),
 ) {
     let user_data = OpaqueCtx(user_data);
     let name = XorName(*md_name);
@@ -292,14 +296,12 @@ pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
                     for (user, perm_set) in permissions {
                         if let Key(public_key) = user {
                             let app_access = match apps.get(&public_key) {
-                                Some(app_info) => {
-                                    NativeAppAccess {
-                                        sign_key: public_key,
-                                        permissions: perm_set,
-                                        name: Some(app_info.name.clone()),
-                                        app_id: Some(app_info.id.clone()),
-                                    }
-                                }
+                                Some(app_info) => NativeAppAccess {
+                                    sign_key: public_key,
+                                    permissions: perm_set,
+                                    name: Some(app_info.name.clone()),
+                                    app_id: Some(app_info.id.clone()),
+                                },
                                 None => {
                                     // If an app is listed in the MD permissions list, but is not
                                     // listed in the registered apps list in Authenticator, then set
@@ -346,8 +348,10 @@ mod tests {
     use ffi_utils::test_utils::call_0;
     use revocation::revoke_app;
     use safe_core::ipc::AuthReq;
-    use test_utils::{create_account_and_login, create_file, fetch_file, get_app_or_err, rand_app,
-                     register_app, run};
+    use test_utils::{
+        create_account_and_login, create_file, fetch_file, get_app_or_err, rand_app, register_app,
+        run,
+    };
 
     // Negative test - non-existing app:
     // 1. Try to call `auth_rm_revoked_app` with a random, non-existing app_id
@@ -448,9 +452,7 @@ mod tests {
         ));
 
         // Put a file with predefined content into app A's own container.
-        let mdata_info = unwrap!({
-            run(&auth, move |client| fetch(client, &app_id3))
-        });
+        let mdata_info = unwrap!({ run(&auth, move |client| fetch(client, &app_id3)) });
         unwrap!(create_file(&auth, mdata_info.clone(), "test", vec![1; 10]));
 
         // Revoke app A
@@ -474,9 +476,12 @@ mod tests {
         // Call `auth_rm_revoked_app` with an app id corresponding to app A.
         let app_info_ffi = unwrap!(app_info.clone().into_repr_c());
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| auth_rm_revoked_app(&auth, app_info_ffi.id, ud, cb),
-            ))
+            unwrap!(call_0(|ud, cb| auth_rm_revoked_app(
+                &auth,
+                app_info_ffi.id,
+                ud,
+                cb
+            ),))
         };
         // Verify that the app A is not listed anywhere in the authenticator config.
         let res = get_app_or_err(&auth, &app_id);
@@ -512,9 +517,7 @@ mod tests {
         assert_ne!(auth_granted1.app_keys, auth_granted2.app_keys);
 
         // Verify that the app A2 container does not contain the file created at step 2.
-        let mdata_info = unwrap!({
-            run(&auth, move |client| fetch(client, &app_id5))
-        });
+        let mdata_info = unwrap!({ run(&auth, move |client| fetch(client, &app_id5)) });
         let res = fetch_file(&auth, mdata_info, "test");
         match res {
             Err(_) => (),

@@ -8,29 +8,35 @@
 
 //! SAFE Authenticator
 
-#![doc(html_logo_url =
-           "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-       html_root_url = "http://maidsafe.github.io/safe_authenticator")]
-
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
+    html_favicon_url = "http://maidsafe.net/img/favicon.ico",
+    html_root_url = "http://maidsafe.github.io/safe_authenticator"
+)]
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
-          unknown_crate_types, warnings)]
-#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
-        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
-        private_no_mangle_fns, private_no_mangle_statics, stable_features,
-        unconditional_recursion, unknown_lints, unused,
-        unused_allocation, unused_attributes, unused_comparisons, unused_features,
-        unused_parens, while_true)]
-#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-        unused_qualifications, unused_results)]
-#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
-         variant_size_differences)]
-
-#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                   option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
+#![forbid(
+    exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types, warnings
+)]
+#![deny(
+    bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
+    overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
+    stable_features, unconditional_recursion, unknown_lints, unused, unused_allocation,
+    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+)]
+#![warn(
+    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+    unused_qualifications, unused_results
+)]
+#![allow(
+    box_pointers, missing_copy_implementations, missing_debug_implementations,
+    variant_size_differences
+)]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    deny(clippy, unicode_not_nfc, wrong_pub_self_convention, option_unwrap_used)
+)]
+#![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate config_file_handler;
 #[macro_use]
@@ -56,10 +62,10 @@ extern crate rand;
 /// FFI routines
 pub mod ffi;
 
-pub use ffi::*;
 pub use ffi::apps::*;
 pub use ffi::ipc::*;
 pub use ffi::logging::*;
+pub use ffi::*;
 
 mod access_container;
 mod app_auth;
@@ -78,16 +84,17 @@ pub mod test_utils;
 mod tests;
 
 pub use self::errors::AuthError;
-use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
+use futures::Future;
 use maidsafe_utilities::thread::{self, Joiner};
-use safe_core::{Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
-                event_loop};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use std::sync::Mutex;
+use safe_core::{
+    event_loop, Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
+};
 use std::sync::mpsc::sync_channel;
+use std::sync::Mutex;
 use tokio_core::reactor::{Core, Handle};
 
 /// Future type specialised with `AuthError` as an error type
@@ -97,9 +104,11 @@ macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
         match $result {
             Ok(res) => res,
-            Err(e) => { return unwrap!($tx.send(Err((None, AuthError::from(e))))); }
+            Err(e) => {
+                return unwrap!($tx.send(Err((None, AuthError::from(e)))));
+            }
         }
-    }
+    };
 }
 
 /// Authenticator instance
@@ -214,7 +223,6 @@ impl Authenticator {
         S: Into<String>,
         N: FnMut() + Send + 'static,
     {
-
         let locator = locator.into();
         let password = password.into();
 
@@ -311,7 +319,6 @@ impl Authenticator {
         F: Fn(MockRouting) -> MockRouting + Send + 'static,
         N: FnMut() + Send + 'static,
     {
-
         let locator = locator.into();
         let password = password.into();
 

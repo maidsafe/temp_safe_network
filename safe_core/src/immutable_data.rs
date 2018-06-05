@@ -47,9 +47,9 @@ pub fn create<T: 'static>(
                 let cipher_text = fry!(utils::symmetric_encrypt(&serialised_data_map, &key, None));
                 fry!(serialise(&DataTypeEncoding::Serialised(cipher_text)))
             } else {
-                fry!(serialise(
-                    &DataTypeEncoding::Serialised(serialised_data_map),
-                ))
+                fry!(serialise(&DataTypeEncoding::Serialised(
+                    serialised_data_map
+                ),))
             };
 
             pack(client, value)
@@ -279,7 +279,6 @@ mod tests {
                         assert!(res.is_err());
                         finish()
                     })
-
             })
         }
     }

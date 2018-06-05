@@ -7,15 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use App;
 use errors::AppError;
 use ffi::nfs::*;
 use ffi::object_cache::FileContextHandle;
-use ffi_utils::ErrorCode;
 use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
+use ffi_utils::ErrorCode;
 use futures::Future;
-use safe_core::ffi::MDataInfo;
 use safe_core::ffi::nfs::File;
+use safe_core::ffi::MDataInfo;
 use safe_core::ipc::Permission;
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::NfsError;
@@ -23,6 +22,7 @@ use std;
 use std::collections::HashMap;
 use std::ffi::CString;
 use test_utils::{create_app_by_req, create_auth_req_with_access, run};
+use App;
 
 fn setup() -> (App, MDataInfo) {
     let mut container_permissions = HashMap::new();
@@ -36,9 +36,9 @@ fn setup() -> (App, MDataInfo) {
         ],
     );
 
-    let app = unwrap!(create_app_by_req(
-        &create_auth_req_with_access(container_permissions),
-    ));
+    let app = unwrap!(create_app_by_req(&create_auth_req_with_access(
+        container_permissions
+    ),));
 
     let container_info = run(&app, move |client, context| {
         context.get_access_info(client).then(move |res| {
@@ -65,9 +65,7 @@ fn basics() {
 
     // fetching non-existing file fails.
     let res: Result<(NativeFile, u64), i32> = unsafe {
-        call_2(|ud, cb| {
-            dir_fetch_file(&app, &container_info, ffi_file_name0.as_ptr(), ud, cb)
-        })
+        call_2(|ud, cb| dir_fetch_file(&app, &container_info, ffi_file_name0.as_ptr(), ud, cb))
     };
 
     match res {
@@ -82,23 +80,25 @@ fn basics() {
     let ffi_file = file.into_repr_c();
 
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name0.as_ptr(),
-                &ffi_file,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name0.as_ptr(),
+            &ffi_file,
+            ud,
+            cb,
+        )))
     }
 
     // Fetch it back.
     let (retrieved_file, retrieved_version): (NativeFile, u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            dir_fetch_file(&app, &container_info, ffi_file_name0.as_ptr(), ud, cb)
-        }))
+        unwrap!(call_2(|ud, cb| dir_fetch_file(
+            &app,
+            &container_info,
+            ffi_file_name0.as_ptr(),
+            ud,
+            cb
+        )))
     };
     assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
     assert_eq!(retrieved_file.size(), 0);
@@ -106,9 +106,14 @@ fn basics() {
 
     // Delete file.
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_delete_file(&app, &container_info, ffi_file_name0.as_ptr(), 1, ud, cb)
-        }))
+        unwrap!(call_0(|ud, cb| dir_delete_file(
+            &app,
+            &container_info,
+            ffi_file_name0.as_ptr(),
+            1,
+            ud,
+            cb
+        )))
     }
 }
 
@@ -139,16 +144,14 @@ fn open_file() {
     let content = b"hello world";
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     let size: Result<u64, i32> = unsafe { call_1(|ud, cb| file_size(&app, write_h, ud, cb)) };
@@ -159,9 +162,14 @@ fn open_file() {
     }
 
     let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            write_h,
+            content.as_ptr(),
+            content.len(),
+            ud,
+            cb
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
     };
 
@@ -169,24 +177,26 @@ fn open_file() {
 
     // Insert file into container.
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name1.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name1.as_ptr(),
+            &written_file.into_repr_c(),
+            ud,
+            cb,
+        )))
     }
 
     // Fetch it back.
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name1.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 0);
@@ -195,34 +205,41 @@ fn open_file() {
 
     // Read the content
     let read_write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ | OPEN_MODE_APPEND,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ | OPEN_MODE_APPEND,
+            ud,
+            cb,
+        )))
     };
 
     let size1: u64 = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_write_h, ud, cb))) };
     assert_eq!(size0, size1);
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_write_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
     assert_eq!(retrieved_content, content);
 
     // Fetch the file back and compare timestamps
     let (file, _version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name1.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     let read_created_time = *file.created_time();
@@ -234,40 +251,40 @@ fn open_file() {
     let append_content = b" appended";
 
     let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(
-                &app,
-                read_write_h,
-                append_content.as_ptr(),
-                append_content.len(),
-                ud,
-                cb,
-            )
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            read_write_h,
+            append_content.as_ptr(),
+            append_content.len(),
+            ud,
+            cb,
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, read_write_h, ud, cb)))
     };
 
     // Update it in the dir
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_update_file(
-                &app,
-                &container_info,
-                ffi_file_name1.as_ptr(),
-                &written_file.into_repr_c(),
-                1,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_update_file(
+            &app,
+            &container_info,
+            ffi_file_name1.as_ptr(),
+            &written_file.into_repr_c(),
+            1,
+            ud,
+            cb,
+        )))
     }
 
     // Read the updated content
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name1.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 1);
@@ -279,25 +296,28 @@ fn open_file() {
     let orig_file = file.clone();
 
     let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ,
+            ud,
+            cb,
+        )))
     };
 
     let size: u64 = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_h, ud, cb))) };
     assert_eq!(size, orig_file.size());
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
     assert_eq!(retrieved_content, b"hello world appended");
 
@@ -326,45 +346,50 @@ fn fetch_file() {
     let content = b"hello world";
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            write_h,
+            content.as_ptr(),
+            content.len(),
+            ud,
+            cb
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
     };
 
     // Insert file into container.
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name1.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name1.as_ptr(),
+            &written_file.into_repr_c(),
+            ud,
+            cb,
+        )))
     }
 
     // Fetch it back.
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name1.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 0);
@@ -373,25 +398,28 @@ fn fetch_file() {
 
     // Read the content
     let read_write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ | OPEN_MODE_APPEND,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ | OPEN_MODE_APPEND,
+            ud,
+            cb,
+        )))
     };
 
     let size1: u64 = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_write_h, ud, cb))) };
     assert_eq!(size0, size1);
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_write_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
     assert_eq!(retrieved_content, content);
 
@@ -400,9 +428,13 @@ fn fetch_file() {
     // Fetch it back.
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name1.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name1.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 0);
@@ -411,25 +443,28 @@ fn fetch_file() {
 
     // Read the content
     let read_write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ | OPEN_MODE_APPEND,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ | OPEN_MODE_APPEND,
+            ud,
+            cb,
+        )))
     };
 
     let size1: u64 = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_write_h, ud, cb))) };
     assert_eq!(size0, size1);
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_write_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
     assert_eq!(retrieved_content, content);
 }
@@ -456,51 +491,50 @@ fn delete_then_open_file() {
     let content_original = b"hello world";
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(
-                &app,
-                write_h,
-                content_original.as_ptr(),
-                content_original.len(),
-                ud,
-                cb,
-            )
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            write_h,
+            content_original.as_ptr(),
+            content_original.len(),
+            ud,
+            cb,
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
     };
 
     // Insert file into container.
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name2.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name2.as_ptr(),
+            &written_file.into_repr_c(),
+            ud,
+            cb,
+        )))
     }
 
     // Delete file.
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_delete_file(&app, &container_info, ffi_file_name2.as_ptr(), 1, ud, cb)
-        }))
+        unwrap!(call_0(|ud, cb| dir_delete_file(
+            &app,
+            &container_info,
+            ffi_file_name2.as_ptr(),
+            1,
+            ud,
+            cb
+        )))
     }
 
     // Create new non-empty file.
@@ -510,79 +544,79 @@ fn delete_then_open_file() {
     let content_new = b"hello goodbye";
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     let new_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(
-                &app,
-                write_h,
-                content_new.as_ptr(),
-                content_new.len(),
-                ud,
-                cb,
-            )
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            write_h,
+            content_new.as_ptr(),
+            content_new.len(),
+            ud,
+            cb,
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
     };
 
     // Update file in container.
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_update_file(
-                &app,
-                &container_info,
-                ffi_file_name2.as_ptr(),
-                &new_file.into_repr_c(),
-                2,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_update_file(
+            &app,
+            &container_info,
+            ffi_file_name2.as_ptr(),
+            &new_file.into_repr_c(),
+            2,
+            ud,
+            cb,
+        )))
     }
 
     // Fetch the file.
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name2.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name2.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 2);
 
     // Read the content.
     let read_write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ | OPEN_MODE_APPEND,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ | OPEN_MODE_APPEND,
+            ud,
+            cb,
+        )))
     };
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_write_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
     assert_eq!(retrieved_content, content_new);
 }
-
 
 // Test closing files immediately after opening them in the different modes.
 // 1. Create a new file, close it, and insert it into a container.
@@ -604,60 +638,63 @@ fn open_close_file() {
     let content = b"hello world";
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     // Write to the file, close it and insert it.
     let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            write_h,
+            content.as_ptr(),
+            content.len(),
+            ud,
+            cb
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
     };
 
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name.as_ptr(),
+            &written_file.into_repr_c(),
+            ud,
+            cb,
+        )))
     }
 
     // Fetch the file
     let (file, _version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
 
     // Open in READ mode.
     let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ,
+            ud,
+            cb,
+        )))
     };
     // Close the file.
     let _: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
@@ -665,24 +702,26 @@ fn open_close_file() {
     // Fetch the file
     let (file, _version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
 
     // Open in OVERWRITE mode and close the file.
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     let _: NativeFile = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb))) };
@@ -690,24 +729,26 @@ fn open_close_file() {
     // Fetch the file
     let (file, _version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
 
     // Open in APPEND mode and close the file.
     let append_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_APPEND,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_APPEND,
+            ud,
+            cb,
+        )))
     };
 
     let _: NativeFile = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, append_h, ud, cb))) };
@@ -730,59 +771,62 @@ fn file_read_chunks() {
     let content = [0u8; ORIG_SIZE];
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     let written_file: NativeFile = unsafe {
-        unwrap!(call_0(|ud, cb| {
-            file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            &app,
+            write_h,
+            content.as_ptr(),
+            content.len(),
+            ud,
+            cb
+        )));
         unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
     };
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name.as_ptr(),
+            &written_file.into_repr_c(),
+            ud,
+            cb,
+        )))
     }
 
     // Fetch it back.
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 0);
 
     // Read the content in chunks
     let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ,
+            ud,
+            cb,
+        )))
     };
 
     let size = unsafe { unwrap!(call_1(|ud, cb| file_size(&app, read_h, ud, cb))) };
@@ -798,9 +842,9 @@ fn file_read_chunks() {
         };
 
         let mut retrieved_content = unsafe {
-            unwrap!(call_vec_u8(
-                |ud, cb| file_read(&app, read_h, size_read, to_read, ud, cb),
-            ))
+            unwrap!(call_vec_u8(|ud, cb| file_read(
+                &app, read_h, size_read, to_read, ud, cb
+            ),))
         };
 
         size_read += retrieved_content.len() as u64;
@@ -813,9 +857,9 @@ fn file_read_chunks() {
     // Read 0 bytes, should succeed
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(
-            |ud, cb| file_read(&app, read_h, size, 0, ud, cb),
-        ))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app, read_h, size, 0, ud, cb
+        ),))
     };
     assert_eq!(retrieved_content, Vec::<u8>::new());
 
@@ -849,62 +893,65 @@ fn file_write_chunks() {
     let ffi_file_name = unwrap!(CString::new(file_name));
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &ffi_file,
-                OPEN_MODE_OVERWRITE,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_OVERWRITE,
+            ud,
+            cb,
+        )))
     };
 
     // Write in chunks.
     let written_file = write_chunks(&app, write_h, &content, GOAL_SIZE, CHUNK_SIZE);
 
     unsafe {
-        unwrap!(call_0(|ud, cb| {
-            dir_insert_file(
-                &app,
-                &container_info,
-                ffi_file_name.as_ptr(),
-                &written_file.into_repr_c(),
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_0(|ud, cb| dir_insert_file(
+            &app,
+            &container_info,
+            ffi_file_name.as_ptr(),
+            &written_file.into_repr_c(),
+            ud,
+            cb,
+        )))
     }
 
     // Fetch it back.
     let (file, version): (NativeFile, u64) = {
         unsafe {
-            unwrap!(call_2(|ud, cb| {
-                dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-            }))
+            unwrap!(call_2(|ud, cb| dir_fetch_file(
+                &app,
+                &container_info,
+                ffi_file_name.as_ptr(),
+                ud,
+                cb
+            )))
         }
     };
     assert_eq!(version, 0);
 
     // Read the content
     let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &file.into_repr_c(),
+            OPEN_MODE_READ,
+            ud,
+            cb,
+        )))
     };
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
 
     assert_eq!(retrieved_content, vec![0u8; GOAL_SIZE]);
@@ -912,39 +959,51 @@ fn file_write_chunks() {
     // Test append mode
 
     let (file, version): (NativeFile, u64) = unsafe {
-        unwrap!(call_2(|ud, cb| {
-            dir_fetch_file(&app, &container_info, ffi_file_name.as_ptr(), ud, cb)
-        }))
+        unwrap!(call_2(|ud, cb| dir_fetch_file(
+            &app,
+            &container_info,
+            ffi_file_name.as_ptr(),
+            ud,
+            cb
+        )))
     };
     assert_eq!(version, 0);
     let ffi_file = file.into_repr_c();
 
     let write_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(&app, &container_info, &ffi_file, OPEN_MODE_APPEND, ud, cb)
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &ffi_file,
+            OPEN_MODE_APPEND,
+            ud,
+            cb
+        )))
     };
 
     let written_file = write_chunks(&app, write_h, &content, GOAL_SIZE, CHUNK_SIZE);
 
     // Read the content
     let read_h = unsafe {
-        unwrap!(call_1(|ud, cb| {
-            file_open(
-                &app,
-                &container_info,
-                &written_file.into_repr_c(),
-                OPEN_MODE_READ,
-                ud,
-                cb,
-            )
-        }))
+        unwrap!(call_1(|ud, cb| file_open(
+            &app,
+            &container_info,
+            &written_file.into_repr_c(),
+            OPEN_MODE_READ,
+            ud,
+            cb,
+        )))
     };
 
     let retrieved_content = unsafe {
-        unwrap!(call_vec_u8(|ud, cb| {
-            file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)
-        }))
+        unwrap!(call_vec_u8(|ud, cb| file_read(
+            &app,
+            read_h,
+            0,
+            FILE_READ_TO_END,
+            ud,
+            cb
+        )))
     };
 
     assert_eq!(retrieved_content, vec![0u8; 2 * GOAL_SIZE]);
@@ -969,16 +1028,14 @@ fn write_chunks(
 
         println!("Writing {} bytes to file", to_write);
         unsafe {
-            unwrap!(call_0(|ud, cb| {
-                file_write(
-                    app,
-                    write_h,
-                    content.get_unchecked(size_written),
-                    to_write,
-                    ud,
-                    cb,
-                )
-            }))
+            unwrap!(call_0(|ud, cb| file_write(
+                app,
+                write_h,
+                content.get_unchecked(size_written),
+                to_write,
+                ud,
+                cb,
+            )))
         }
 
         size_written += to_write;
@@ -987,9 +1044,14 @@ fn write_chunks(
     // Write 0 bytes, should succeed.
     unsafe {
         println!("Writing 0 bytes to file");
-        unwrap!(call_0(|ud, cb| {
-            file_write(app, write_h, content.get_unchecked(goal_size), 0, ud, cb)
-        }));
+        unwrap!(call_0(|ud, cb| file_write(
+            app,
+            write_h,
+            content.get_unchecked(goal_size),
+            0,
+            ud,
+            cb
+        )));
         unwrap!(call_1(|ud, cb| file_close(app, write_h, ud, cb)))
     }
 }

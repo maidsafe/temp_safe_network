@@ -8,27 +8,36 @@
 // Software.
 
 //! SAFE App
-#![doc(html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/
 maidsafe_logo.png",
-      html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-      html_root_url = "http://maidsafe.github.io/safe_app")]
+    html_favicon_url = "http://maidsafe.net/img/favicon.ico",
+    html_root_url = "http://maidsafe.github.io/safe_app"
+)]
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types,
-         warnings)]
-#![deny(bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
-       overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-       stable_features, unconditional_recursion, unknown_lints, unsafe_code, unused,
-       unused_allocation, unused_attributes, unused_comparisons, unused_features, unused_parens,
-       while_true)]
-#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-       unused_qualifications, unused_results)]
-#![allow(box_pointers, missing_copy_implementations, missing_debug_implementations,
-         variant_size_differences)]
-
-#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                           option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
+#![forbid(
+    exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types, warnings
+)]
+#![deny(
+    bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
+    overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
+    stable_features, unconditional_recursion, unknown_lints, unsafe_code, unused, unused_allocation,
+    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+)]
+#![warn(
+    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+    unused_qualifications, unused_results
+)]
+#![allow(
+    box_pointers, missing_copy_implementations, missing_debug_implementations,
+    variant_size_differences
+)]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    deny(clippy, unicode_not_nfc, wrong_pub_self_convention, option_unwrap_used)
+)]
+#![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate config_file_handler;
 #[macro_use]
@@ -55,8 +64,10 @@ extern crate unwrap;
 
 // Re-export functions used in FFI so that they are accessible through the Rust API.
 
-pub use routing::{Action, ClientError, EntryAction, ImmutableData, MutableData, PermissionSet,
-                  User, Value, XOR_NAME_LEN, XorName};
+pub use routing::{
+    Action, ClientError, EntryAction, ImmutableData, MutableData, PermissionSet, User, Value,
+    XorName, XOR_NAME_LEN,
+};
 pub use safe_core::*;
 
 // Export FFI interface.
@@ -65,7 +76,6 @@ pub mod ffi;
 
 // Required for moz_cheddar to work.
 
-pub use ffi::*;
 pub use ffi::access_container::*;
 pub use ffi::cipher_opt::*;
 pub use ffi::crypto::*;
@@ -73,18 +83,19 @@ pub use ffi::immutable_data::*;
 pub use ffi::ipc::*;
 pub use ffi::logging::*;
 pub use ffi::mdata_info::*;
-pub use ffi::mutable_data::*;
 pub use ffi::mutable_data::entries::*;
 pub use ffi::mutable_data::entry_actions::*;
 pub use ffi::mutable_data::metadata::*;
 pub use ffi::mutable_data::permissions::*;
+pub use ffi::mutable_data::*;
 pub use ffi::nfs::*;
 pub use ffi::object_cache::*;
 #[cfg(any(test, feature = "testing"))]
 pub use ffi::test_utils::*;
+pub use ffi::*;
 
-mod errors;
 pub mod cipher_opt;
+mod errors;
 pub mod object_cache;
 pub mod permissions;
 
@@ -100,23 +111,24 @@ pub use self::errors::*;
 use self::object_cache::ObjectCache;
 #[cfg(any(test, feature = "testing"))]
 pub use ffi::test_utils::{test_create_app, test_create_app_with_access};
-use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
+use futures::{future, Future};
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
-                event_loop, utils};
+use safe_core::crypto::shared_secretbox;
+use safe_core::ipc::resp::{access_container_enc_key, AccessContainerEntry};
+use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
-use safe_core::crypto::shared_secretbox;
-use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
-use safe_core::ipc::resp::{AccessContainerEntry, access_container_enc_key};
+use safe_core::{
+    event_loop, utils, Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
+use std::sync::Mutex;
 use tokio_core::reactor::{Core, Handle};
 
 macro_rules! try_tx {
@@ -125,7 +137,7 @@ macro_rules! try_tx {
             Ok(res) => res,
             Err(e) => return unwrap!($tx.send(Err(AppError::from(e)))),
         }
-    }
+    };
 }
 
 type AppFuture<T> = Future<Item = T, Error = AppError>;
@@ -173,14 +185,15 @@ impl App {
         N: FnMut() + Send + 'static,
     {
         let AuthGranted {
-            app_keys: AppKeys {
-                owner_key,
-                enc_key,
-                enc_pk,
-                enc_sk,
-                sign_pk,
-                sign_sk,
-            },
+            app_keys:
+                AppKeys {
+                    owner_key,
+                    enc_key,
+                    enc_pk,
+                    enc_sk,
+                    sign_pk,
+                    sign_sk,
+                },
             access_container_info,
             bootstrap_config,
             ..
@@ -208,7 +221,6 @@ impl App {
         })
     }
 
-
     /// Allows customising the mock Routing client before registering a new account
     #[cfg(feature = "use-mock-routing")]
     pub fn registered_with_hook<N, F>(
@@ -222,14 +234,15 @@ impl App {
         F: Fn(Routing) -> Routing + Send + 'static,
     {
         let AuthGranted {
-            app_keys: AppKeys {
-                owner_key,
-                enc_key,
-                enc_pk,
-                enc_sk,
-                sign_pk,
-                sign_sk,
-            },
+            app_keys:
+                AppKeys {
+                    owner_key,
+                    enc_key,
+                    enc_pk,
+                    enc_sk,
+                    sign_pk,
+                    sign_sk,
+                },
             access_container_info,
             bootstrap_config,
             ..
@@ -262,7 +275,7 @@ impl App {
     where
         N: FnMut() + Send + 'static,
         F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
-               -> Result<(Client<AppContext>, AppContext), AppError>
+                -> Result<(Client<AppContext>, AppContext), AppError>
             + Send
             + 'static,
     {
@@ -277,8 +290,10 @@ impl App {
 
             el_h.spawn(
                 net_rx
-                    .map(move |event| if let NetworkEvent::Disconnected = event {
-                        disconnect_notifier()
+                    .map(move |event| {
+                        if let NetworkEvent::Disconnected = event {
+                            disconnect_notifier()
+                        }
                     })
                     .for_each(|_| Ok(())),
             );
@@ -354,7 +369,9 @@ pub struct Registered {
 
 impl AppContext {
     fn unregistered() -> Self {
-        AppContext::Unregistered(Rc::new(Unregistered { object_cache: ObjectCache::new() }))
+        AppContext::Unregistered(Rc::new(Unregistered {
+            object_cache: ObjectCache::new(),
+        }))
     }
 
     fn registered(
@@ -364,9 +381,9 @@ impl AppContext {
     ) -> Self {
         AppContext::Registered(Rc::new(Registered {
             object_cache: ObjectCache::new(),
-            app_id: app_id,
-            sym_enc_key: sym_enc_key,
-            access_container_info: access_container_info,
+            app_id,
+            sym_enc_key,
+            access_container_info,
             access_info: RefCell::new(HashMap::new()),
         }))
     }

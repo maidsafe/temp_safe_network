@@ -10,12 +10,12 @@
 
 #![allow(unsafe_code)]
 
+/// Type definitions for arrays that are FFI input params.
+pub mod arrays;
 /// IPC utilities.
 pub mod ipc;
 /// NFS API.
 pub mod nfs;
-/// Type definitions for arrays that are FFI input params.
-pub mod arrays;
 
 use self::arrays::*;
 use errors::CoreError;

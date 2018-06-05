@@ -6,20 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::utils::{Payload, decode_ipc_msg};
+use super::utils::{decode_ipc_msg, Payload};
 use errors::{AuthError, ERR_INVALID_OWNER, ERR_SHARE_MDATA_DENIED};
 use ffi::apps::*;
 use ffi::ipc::encode_share_mdata_resp;
-use ffi_utils::FfiResult;
 use ffi_utils::test_utils::{call_vec, send_via_user_data, sender_as_user_data};
+use ffi_utils::FfiResult;
 use futures::Future;
 use maidsafe_utilities::serialisation::serialise;
 use rand;
 use routing::{Action, MutableData, PermissionSet, User, Value};
 use rust_sodium::crypto::sign;
-use safe_core::ipc::{self, AuthReq, IpcMsg, IpcReq, ShareMData, ShareMDataReq};
 use safe_core::ipc::req::AppExchangeInfo;
-use safe_core::ipc::resp::{AppAccess, METADATA_KEY, UserMetadata};
+use safe_core::ipc::resp::{AppAccess, UserMetadata, METADATA_KEY};
+use safe_core::ipc::{self, AuthReq, IpcMsg, IpcReq, ShareMData, ShareMDataReq};
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
@@ -43,8 +43,13 @@ fn share_zero_mdatas() {
 
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
-        (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(Payload::Metadata(metadatas))) => {
+        (
+            IpcMsg::Req {
+                req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }),
+                ..
+            },
+            Some(Payload::Metadata(metadatas)),
+        ) => {
             assert_eq!(mdata.len(), 0);
             assert_eq!(metadatas.len(), 0);
         }
@@ -86,7 +91,7 @@ fn share_some_mdatas() {
 
         mdatas.push(ShareMData {
             type_tag: tag,
-            name: name,
+            name,
             perms: PermissionSet::new().allow(Action::Insert),
         });
         metadatas.push((None, name, tag));
@@ -103,8 +108,13 @@ fn share_some_mdatas() {
 
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
-        (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(Payload::Metadata(received_metadatas))) => {
+        (
+            IpcMsg::Req {
+                req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }),
+                ..
+            },
+            Some(Payload::Metadata(received_metadatas)),
+        ) => {
             assert_eq!(mdata, mdatas);
             assert_eq!(received_metadatas, metadatas);
         }
@@ -166,8 +176,8 @@ fn share_some_mdatas_with_valid_metadata() {
 
         mdatas.push(ShareMData {
             type_tag: tag,
-            name: name,
-            perms: perms,
+            name,
+            perms,
         });
         metadatas.push((Some(metadata), name, tag));
     }
@@ -178,15 +188,20 @@ fn share_some_mdatas_with_valid_metadata() {
         mdata: mdatas.clone(),
     };
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::ShareMData(req.clone()),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
 
     let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
     match decoded {
-        (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-         Some(Payload::Metadata(received_metadatas))) => {
+        (
+            IpcMsg::Req {
+                req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }),
+                ..
+            },
+            Some(Payload::Metadata(received_metadatas)),
+        ) => {
             assert_eq!(mdata, mdatas);
             assert_eq!(received_metadatas, metadatas);
         }
@@ -214,9 +229,9 @@ fn share_some_mdatas_with_valid_metadata() {
         let name = share_mdata.name;
         let type_tag = share_mdata.type_tag;
         let mdata = run(&authenticator, move |client| {
-            client.get_mdata(name, type_tag).map_err(
-                AuthError::CoreError,
-            )
+            client
+                .get_mdata(name, type_tag)
+                .map_err(AuthError::CoreError)
         });
         let permissions = unwrap!(mdata.user_permissions(&User::Key(app_key)));
         assert_eq!(permissions, &perms);
@@ -260,7 +275,7 @@ fn share_some_mdatas_with_ownership_error() {
 
         mdatas.push(ShareMData {
             type_tag: 0,
-            name: name,
+            name,
             perms: PermissionSet::new().allow(Action::Insert),
         });
     }
@@ -271,7 +286,7 @@ fn share_some_mdatas_with_ownership_error() {
         mdata: mdatas.clone(),
     };
     let msg = IpcMsg::Req {
-        req_id: req_id,
+        req_id,
         req: IpcReq::ShareMData(req.clone()),
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -380,8 +395,8 @@ fn auth_apps_accessing_mdatas() {
 
         mdatas.push(ShareMData {
             type_tag: tag,
-            name: name,
-            perms: perms,
+            name,
+            perms,
         });
         metadatas.push((metadata, name, tag));
     }
@@ -408,7 +423,7 @@ fn auth_apps_accessing_mdatas() {
             mdata: mdatas.clone(),
         };
         let msg = IpcMsg::Req {
-            req_id: req_id,
+            req_id,
             req: IpcReq::ShareMData(req.clone()),
         };
         let encoded_msg = unwrap!(ipc::encode_msg(&msg));
@@ -416,8 +431,13 @@ fn auth_apps_accessing_mdatas() {
         let decoded = unwrap!(decode_ipc_msg(&authenticator, &encoded_msg));
 
         match decoded {
-            (IpcMsg::Req { req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }), .. },
-             Some(Payload::Metadata(received_metadatas))) => {
+            (
+                IpcMsg::Req {
+                    req: IpcReq::ShareMData(ShareMDataReq { mdata, .. }),
+                    ..
+                },
+                Some(Payload::Metadata(received_metadatas)),
+            ) => {
                 assert_eq!(mdata, mdatas);
                 // Ensure the received metadatas, xor names and type tags are equal.
                 // For mdata without metadata, received metadata should be `None`.
@@ -449,16 +469,21 @@ fn auth_apps_accessing_mdatas() {
     // Test the correctness of returned `AppAccess` objects
     for (_, name, tag) in metadatas {
         let app_access: Vec<AppAccess> = unsafe {
-            unwrap!(call_vec(|ud, cb| {
-                auth_apps_accessing_mutable_data(&authenticator, &name.0, tag, ud, cb)
-            }))
+            unwrap!(call_vec(|ud, cb| auth_apps_accessing_mutable_data(
+                &authenticator,
+                &name.0,
+                tag,
+                ud,
+                cb
+            )))
         };
 
         // Check each accessing app
         for &(ref app_key, ref app_id) in &apps {
-            let access = match app_access.iter().find(
-                |&access| access.sign_key == *app_key,
-            ) {
+            let access = match app_access
+                .iter()
+                .find(|&access| access.sign_key == *app_key)
+            {
                 Some(access) => access,
                 None => panic!("App not found in AppAccess list."),
             };
@@ -469,9 +494,10 @@ fn auth_apps_accessing_mdatas() {
         }
 
         // Check unregistered app
-        let access = match app_access.iter().find(
-            |&access| access.sign_key == unregistered,
-        ) {
+        let access = match app_access
+            .iter()
+            .find(|&access| access.sign_key == unregistered)
+        {
             Some(access) => access,
             None => panic!("Unregistered app not found in AppAccess list."),
         };
@@ -494,13 +520,11 @@ extern "C" fn encode_share_mdata_cb(
         let c_str = unsafe { CStr::from_ptr((*result).description) };
         let msg = match c_str.to_str() {
             Ok(s) => s.to_owned(),
-            Err(e) => {
-                format!(
-                    "utf8-error in error string: {} {:?}",
-                    e,
-                    c_str.to_string_lossy()
-                )
-            }
+            Err(e) => format!(
+                "utf8-error in error string: {} {:?}",
+                e,
+                c_str.to_string_lossy()
+            ),
         };
         Err((error_code, msg))
     };

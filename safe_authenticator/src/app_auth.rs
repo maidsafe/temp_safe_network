@@ -12,13 +12,13 @@ use super::{AuthError, AuthFuture};
 use access_container;
 use app_container;
 use config::{self, AppInfo, Apps};
-use futures::Future;
 use futures::future::{self, Either};
+use futures::Future;
 use ipc::update_container_perms;
 use routing::ClientError;
-use safe_core::{Client, CoreError, FutureExt, MDataInfo, app_container_name, recovery};
 use safe_core::ipc::req::{AuthReq, ContainerPermissions, Permission};
 use safe_core::ipc::resp::{AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted};
+use safe_core::{app_container_name, recovery, Client, CoreError, FutureExt, MDataInfo};
 use std::collections::HashMap;
 use tiny_keccak::sha3_256;
 
@@ -47,13 +47,13 @@ pub fn app_state(client: &Client<()>, apps: &Apps, app_id: &str) -> Box<AuthFutu
             .then(move |res| {
                 match res {
                     Ok((_version, Some(_))) => Ok(AppState::Authenticated),
-                    Ok((_, None)) |
-                        Err(AuthError::CoreError(
-                            CoreError::RoutingClientError(
-                                ClientError::NoSuchEntry))) => {
-                            // App is not in access container, so it is revoked
-                            Ok(AppState::Revoked)
-                        }
+                    Ok((_, None))
+                    | Err(AuthError::CoreError(CoreError::RoutingClientError(
+                        ClientError::NoSuchEntry,
+                    ))) => {
+                        // App is not in access container, so it is revoked
+                        Ok(AppState::Revoked)
+                    }
                     Err(e) => Err(e),
                 }
             })
@@ -68,8 +68,8 @@ pub fn app_state(client: &Client<()>, apps: &Apps, app_id: &str) -> Box<AuthFutu
 fn app_container_exists(permissions: &AccessContainerEntry, app_id: &str) -> bool {
     match permissions.get(&app_container_name(app_id)) {
         Some(&(_, ref access)) => {
-            *access ==
-                btree_set![
+            *access
+                == btree_set![
                     Permission::Read,
                     Permission::Insert,
                     Permission::Update,
@@ -87,14 +87,13 @@ fn insert_app_container(
     app_id: &str,
     app_container_info: MDataInfo,
 ) -> AccessContainerEntry {
-    let access =
-        btree_set![
-                    Permission::Read,
-                    Permission::Insert,
-                    Permission::Update,
-                    Permission::Delete,
-                    Permission::ManagePermissions,
-                ];
+    let access = btree_set![
+        Permission::Read,
+        Permission::Insert,
+        Permission::Update,
+        Permission::Delete,
+        Permission::ManagePermissions,
+    ];
     let _ = permissions.insert(app_container_name(app_id), (app_container_info, access));
     permissions
 }
@@ -116,9 +115,9 @@ fn update_access_container(
                 // Updating an existing entry
                 Ok((version, _)) => version + 1,
                 // Adding a new access container entry
-                Err(AuthError::CoreError(
-                CoreError::RoutingClientError(
-                    ClientError::NoSuchEntry))) => 0,
+                Err(AuthError::CoreError(CoreError::RoutingClientError(
+                    ClientError::NoSuchEntry,
+                ))) => 0,
                 // Error has occurred while trying to get an existing entry
                 Err(e) => return Err(e),
             };
@@ -148,9 +147,7 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
         .join(check_revocation(client, app_id.clone()))
         .and_then(move |((apps_version, apps), ())| {
             app_state(&c2, &apps, &app_id)
-                .map(move |app_state| {
-                    (apps_version, apps, app_state, app_id)
-                })
+                .map(move |app_state| (apps_version, apps, app_state, app_id))
         })
         .and_then(move |(apps_version, mut apps, app_state, app_id)| {
             // Determine an app state. If it's revoked we can reuse existing
@@ -162,14 +159,9 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
                     let keys = AppKeys::random(owner_key);
                     let app = AppInfo {
                         info: auth_req.app,
-                        keys: keys,
+                        keys,
                     };
-                    config::insert_app(
-                        &c3,
-                        apps,
-                        config::next_version(apps_version),
-                        app.clone()
-                    )
+                    config::insert_app(&c3, apps, config::next_version(apps_version), app.clone())
                         .map(move |_| (app, app_state, app_id))
                         .into_box()
                 }
@@ -191,8 +183,7 @@ pub fn authenticate(client: &Client<()>, auth_req: AuthReq) -> Box<AuthFuture<Au
                     // Return info of the already registered app
                     authenticated_app(&c4, app, app_id, app_container)
                 }
-                AppState::NotAuthenticated |
-                AppState::Revoked => {
+                AppState::NotAuthenticated | AppState::Revoked => {
                     // Register a new app or restore a previously registered app
                     authenticate_new_app(&c4, app, app_container, permissions)
                 }
@@ -216,18 +207,18 @@ fn authenticated_app(
     let sign_pk = app.keys.sign_pk;
     let bootstrap_config = fry!(Client::<()>::bootstrap_config());
 
-
     access_container::fetch_entry(client, &app_id, app_keys.clone())
         .and_then(move |(_version, perms)| {
             let perms = perms.unwrap_or_else(AccessContainerEntry::default);
 
             // Check whether we need to create/update dedicated container
             if app_container && !app_container_exists(&perms, &app_id) {
-                let future = app_container::fetch_or_create(&c2, &app_id, sign_pk)
-                    .and_then(move |mdata_info| {
+                let future = app_container::fetch_or_create(&c2, &app_id, sign_pk).and_then(
+                    move |mdata_info| {
                         let perms = insert_app_container(perms, &app_id, mdata_info);
                         update_access_container(&c2, &app, perms.clone()).map(move |_| perms)
-                    });
+                    },
+                );
                 Either::A(future)
             } else {
                 Either::B(future::ok(perms))
@@ -273,26 +264,28 @@ fn authenticate_new_app(
 
     client
         .list_auth_keys_and_version()
-        .and_then(move |(_, version)| {
-            recovery::ins_auth_key(&c2, app_keys.sign_pk, version + 1)
-        })
+        .and_then(move |(_, version)| recovery::ins_auth_key(&c2, app_keys.sign_pk, version + 1))
         .map_err(AuthError::from)
-        .and_then(move |_| if permissions.is_empty() {
-            ok!((Default::default(), sign_pk))
-        } else {
-            update_container_perms(&c3, permissions, sign_pk)
-                .map(move |perms| (perms, sign_pk))
-                .into_box()
+        .and_then(move |_| {
+            if permissions.is_empty() {
+                ok!((Default::default(), sign_pk))
+            } else {
+                update_container_perms(&c3, permissions, sign_pk)
+                    .map(move |perms| (perms, sign_pk))
+                    .into_box()
+            }
         })
-        .and_then(move |(perms, sign_pk)| if app_container {
-            app_container::fetch_or_create(&c4, &app_id, sign_pk)
-                .and_then(move |mdata_info| {
-                    ok!(insert_app_container(perms, &app_id, mdata_info))
-                })
-                .map(move |perms| (perms, app))
-                .into_box()
-        } else {
-            ok!((perms, app))
+        .and_then(move |(perms, sign_pk)| {
+            if app_container {
+                app_container::fetch_or_create(&c4, &app_id, sign_pk)
+                    .and_then(move |mdata_info| {
+                        ok!(insert_app_container(perms, &app_id, mdata_info))
+                    })
+                    .map(move |perms| (perms, app))
+                    .into_box()
+            } else {
+                ok!((perms, app))
+            }
         })
         .and_then(move |(perms, app)| {
             update_access_container(&c5, &app, perms.clone()).map(move |_| perms)
@@ -313,12 +306,14 @@ fn authenticate_new_app(
 
 fn check_revocation(client: &Client<()>, app_id: String) -> Box<AuthFuture<()>> {
     config::get_app_revocation_queue(client)
-        .and_then(move |(_, queue)| if queue.contains(&app_id) {
-            Err(AuthError::from(
-                "Couldn't authenticate app that is pending revocation",
-            ))
-        } else {
-            Ok(())
+        .and_then(move |(_, queue)| {
+            if queue.contains(&app_id) {
+                Err(AuthError::from(
+                    "Couldn't authenticate app that is pending revocation",
+                ))
+            } else {
+                Ok(())
+            }
         })
         .into_box()
 }

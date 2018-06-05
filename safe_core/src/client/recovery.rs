@@ -9,10 +9,11 @@
 use super::Client;
 use errors::CoreError;
 use event_loop::CoreFuture;
-use futures::Future;
 use futures::future::{self, Either, Loop};
-use routing::{Action, ClientError, EntryAction, EntryError, MutableData, PermissionSet, User,
-              Value, XorName};
+use futures::Future;
+use routing::{
+    Action, ClientError, EntryAction, EntryError, MutableData, PermissionSet, User, Value, XorName,
+};
 use rust_sodium::crypto::sign;
 use std::collections::BTreeMap;
 use utils::FutureExt;
@@ -188,16 +189,16 @@ fn update_mdata_entries<T: 'static>(
 ) -> Box<CoreFuture<()>> {
     let actions = desired_entries
         .into_iter()
-        .filter_map(|(key, value)| if let Some(current_value) =
-            current_entries.get(&key)
-        {
-            if current_value.entry_version <= value.entry_version {
-                Some((key, EntryAction::Update(value)))
+        .filter_map(|(key, value)| {
+            if let Some(current_value) = current_entries.get(&key) {
+                if current_value.entry_version <= value.entry_version {
+                    Some((key, EntryAction::Update(value)))
+                } else {
+                    None
+                }
             } else {
-                None
+                Some((key, EntryAction::Ins(value)))
             }
-        } else {
-            Some((key, EntryAction::Ins(value)))
         })
         .collect();
 
@@ -214,12 +215,12 @@ fn update_mdata_permissions<T: 'static>(
 ) -> Box<CoreFuture<()>> {
     let permissions: Vec<_> = desired_permissions
         .into_iter()
-        .map(|(user, desired_set)| if let Some(current_set) =
-            current_permissions.get(&user)
-        {
-            (user, union_permission_sets(current_set, &desired_set))
-        } else {
-            (user, desired_set)
+        .map(|(user, desired_set)| {
+            if let Some(current_set) = current_permissions.get(&user) {
+                (user, union_permission_sets(current_set, &desired_set))
+            } else {
+                (user, desired_set)
+            }
         })
         .collect();
 
@@ -242,22 +243,24 @@ fn fix_entry_actions(
 ) -> BTreeMap<Vec<u8>, EntryAction> {
     actions
         .into_iter()
-        .filter_map(|(key, action)| if let Some(error) = errors.get(&key) {
-            if let Some(action) = fix_entry_action(action, error) {
-                Some((key, action))
+        .filter_map(|(key, action)| {
+            if let Some(error) = errors.get(&key) {
+                if let Some(action) = fix_entry_action(action, error) {
+                    Some((key, action))
+                } else {
+                    None
+                }
             } else {
-                None
+                Some((key, action))
             }
-        } else {
-            Some((key, action))
         })
         .collect()
 }
 
 fn fix_entry_action(action: EntryAction, error: &EntryError) -> Option<EntryAction> {
     match (action, *error) {
-        (EntryAction::Ins(value), EntryError::EntryExists(current_version)) |
-        (EntryAction::Update(value), EntryError::InvalidSuccessor(current_version)) => {
+        (EntryAction::Ins(value), EntryError::EntryExists(current_version))
+        | (EntryAction::Update(value), EntryError::InvalidSuccessor(current_version)) => {
             Some(EntryAction::Update(Value {
                 content: value.content,
                 entry_version: current_version + 1,
@@ -280,22 +283,15 @@ fn union_permission_sets(a: &PermissionSet, b: &PermissionSet) -> PermissionSet 
         Action::Delete,
         Action::ManagePermissions,
     ];
-    actions.into_iter().fold(
-        PermissionSet::new(),
-        |set, &action| match (
-            a.is_allowed(
-                action,
-            ),
-            b.is_allowed(
-                action,
-            ),
-        ) {
-            (Some(true), _) | (_, Some(true)) => set.allow(action),
-            (Some(false), _) | (_, Some(false)) => set.deny(action),
-            _ => set,
-        },
-    )
-
+    actions
+        .into_iter()
+        .fold(PermissionSet::new(), |set, &action| {
+            match (a.is_allowed(action), b.is_allowed(action)) {
+                (Some(true), _) | (_, Some(true)) => set.allow(action),
+                (Some(false), _) | (_, Some(false)) => set.deny(action),
+                _ => set,
+            }
+        })
 }
 
 /// Insert key to maid managers.
@@ -450,9 +446,9 @@ mod tests {
             .allow(Action::Insert)
             .deny(Action::Update)
             .deny(Action::ManagePermissions);
-        let b = PermissionSet::new().allow(Action::Update).allow(
-            Action::Delete,
-        );
+        let b = PermissionSet::new()
+            .allow(Action::Update)
+            .allow(Action::Delete);
 
         let c = union_permission_sets(&a, &b);
         assert_eq!(c.is_allowed(Action::Insert), Some(true));
@@ -482,8 +478,7 @@ mod tests_with_mock_routing {
             let tag = 10_000;
             let owners = btree_set![unwrap!(client.public_signing_key())];
 
-            let entries =
-                btree_map![
+            let entries = btree_map![
                 vec![0] => Value {
                     content: vec![0, 0],
                     entry_version: 0,
@@ -497,8 +492,7 @@ mod tests_with_mock_routing {
                     entry_version: 0,
                 }
             ];
-            let permissions =
-                btree_map![
+            let permissions = btree_map![
                 User::Anyone => PermissionSet::new().allow(Action::Insert)
             ];
             let data0 = unwrap!(MutableData::new(
@@ -509,8 +503,7 @@ mod tests_with_mock_routing {
                 owners.clone(),
             ));
 
-            let entries =
-                btree_map![
+            let entries = btree_map![
                 vec![0] => Value {
                     content: vec![0, 1],
                     entry_version: 1,
@@ -526,8 +519,7 @@ mod tests_with_mock_routing {
             ];
 
             let user = User::Key(sign::gen_keypair().0);
-            let permissions =
-                btree_map![
+            let permissions = btree_map![
                 User::Anyone => PermissionSet::new().allow(Action::Insert).allow(Action::Update),
                 user => PermissionSet::new().allow(Action::Delete)
             ];
@@ -569,9 +561,9 @@ mod tests_with_mock_routing {
                     assert_eq!(permissions.len(), 2);
                     assert_eq!(
                         *unwrap!(permissions.get(&User::Anyone)),
-                        PermissionSet::new().allow(Action::Insert).allow(
-                            Action::Update,
-                        )
+                        PermissionSet::new()
+                            .allow(Action::Insert)
+                            .allow(Action::Update)
                     );
                     assert_eq!(
                         *unwrap!(permissions.get(&user)),
@@ -592,8 +584,7 @@ mod tests_with_mock_routing {
 
             let name = rand::random();
             let tag = 10_000;
-            let entries =
-                btree_map![
+            let entries = btree_map![
                 vec![1] => Value {
                     content: vec![1],
                     entry_version: 0,

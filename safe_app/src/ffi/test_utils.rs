@@ -9,24 +9,22 @@
 
 #![allow(unsafe_code)]
 
-use App;
 use errors::AppError;
 #[cfg(feature = "use-mock-routing")]
 use ffi::helper::send_sync;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb, from_c_str};
+use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, ReprC, FFI_RESULT_OK};
 use safe_core::ffi::ipc::req::AuthReq;
 use safe_core::ipc::req::AuthReq as NativeAuthReq;
 use std::os::raw::{c_char, c_void};
 use test_utils::{create_app_by_req, create_auth_req};
+use App;
 
 /// Creates a random app instance for testing.
 #[no_mangle]
 pub unsafe extern "C" fn test_create_app(
     app_id: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        app: *mut App),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let app_id = from_c_str(app_id)?;
@@ -48,9 +46,7 @@ pub unsafe extern "C" fn test_create_app(
 pub unsafe extern "C" fn test_create_app_with_access(
     auth_req: *const AuthReq,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void,
-                        result: *const FfiResult,
-                        o_app: *mut App),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, o_app: *mut App),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let auth_req = NativeAuthReq::clone_from_repr_c(auth_req)?;
@@ -85,13 +81,13 @@ pub unsafe extern "C" fn test_simulate_network_disconnect(
 #[cfg(test)]
 mod tests {
     use super::test_create_app_with_access;
-    use {App, AppError};
-    use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::call_1;
+    use ffi_utils::ErrorCode;
     use safe_authenticator::test_utils::rand_app;
-    use safe_core::ipc::Permission;
     use safe_core::ipc::req::AuthReq;
+    use safe_core::ipc::Permission;
     use std::collections::HashMap;
+    use {App, AppError};
 
     #[test]
     fn create_app_with_invalid_access() {
@@ -101,7 +97,7 @@ mod tests {
         let auth_req = AuthReq {
             app: rand_app(),
             app_container: false,
-            containers: containers,
+            containers,
         };
         let auth_req = unwrap!(auth_req.into_repr_c());
 
@@ -118,12 +114,12 @@ mod tests {
     #[test]
     fn simulate_network_disconnect() {
         use super::test_simulate_network_disconnect;
+        use ffi_utils::test_utils::call_0;
         use safe_authenticator::test_utils as authenticator;
+        use safe_core::utils;
         use std::sync::mpsc;
         use std::time::Duration;
         use test_utils::create_auth_req;
-        use safe_core::utils;
-        use ffi_utils::test_utils::call_0;
 
         let app_id = unwrap!(utils::generate_random_string(10));
         let auth_req = create_auth_req(Some(app_id), None);
@@ -142,9 +138,9 @@ mod tests {
         ));
 
         unsafe {
-            unwrap!(call_0(
-                |ud, cb| test_simulate_network_disconnect(&mut app, ud, cb),
-            ));
+            unwrap!(call_0(|ud, cb| test_simulate_network_disconnect(
+                &mut app, ud, cb
+            ),));
         }
 
         unwrap!(rx.recv_timeout(Duration::from_secs(10)));
