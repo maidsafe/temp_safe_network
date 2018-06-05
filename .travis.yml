@@ -85,7 +85,7 @@ jobs:
       if: type = pull_request
       os: osx
       rust: *stable
-    - script: set -x; scripts/check-debug-all; scripts/clippy-all
+    - script: set -x; scripts/clippy-all
       os: linux
       rust: *nightly
     # Nightly tests
