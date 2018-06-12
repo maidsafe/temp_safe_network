@@ -1,16 +1,16 @@
 vars:
-  - &stable "1.26.1"
-  - &stable-i686 "1.26.1-i686-unknown-linux-gnu"
-  - &nightly "nightly-2018-05-29"
+  - &stable "1.26.2"
+  - &stable-i686 "1.26.2-i686-unknown-linux-gnu"
+  - &nightly "nightly-2018-06-10"
 env:
   global:
     - RUST_BACKTRACE=1
-    - RUST_STABLE=1.26.1
-    - RUST_NIGHTLY=nightly-2018-05-29
-    - RUST_RUSTFMT=0.8.2
-    - RUST_CLIPPY=0.0.206
     - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
+    - RUST_STABLE=1.26.2
+    - RUST_NIGHTLY=nightly-2018-06-10
+    - RUST_RUSTFMT=0.8.2
+    - RUST_CLIPPY=0.0.207
 language: rust
 stages:
   - warmup-real
@@ -124,7 +124,7 @@ before_script:
     fi
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [ "$TRAVIS_RUST_VERSION" = $RUST_NIGHTLY ] && [ "$TRAVIS_OS_NAME" = linux ]; then
+  - if [ "$TRAVIS_RUST_VERSION" = "$RUST_NIGHTLY" ] && [ "$TRAVIS_OS_NAME" = linux ]; then
       bash cargo_install.sh rustfmt-nightly "$RUST_RUSTFMT";
       bash cargo_install.sh clippy "$RUST_CLIPPY";
     fi
