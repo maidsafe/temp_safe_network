@@ -18,6 +18,7 @@ stages:
   - tests-stable
   - tests-nightly
 jobs:
+  fast_finish: true
   allow_failures:
     - rust: *stable-i686
   include:
@@ -73,7 +74,7 @@ jobs:
       if: type = pull_request
       os: linux
       rust: *stable
-    - script: set -x; scripts/stable && scripts/test-binary
+    - script: set -x; scripts/stable
       if: type = pull_request
       os: linux
       rust: *stable-i686
