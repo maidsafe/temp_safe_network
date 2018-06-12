@@ -1,3 +1,0 @@
-#!/bin/bash
-
-cargo check --verbose --tests --manifest-path=ffi_utils/Cargo.toml

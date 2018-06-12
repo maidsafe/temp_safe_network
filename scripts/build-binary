@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -x;
+
+echo "--- Building the binary compatibility test ---" &&
+
+    cargo test --verbose --release --no-run --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml &&
+
+    # Find the file to run.
+    TEST_FILE=$(find target/release -maxdepth 1 -type f -perm -111 -name "safe_authenticator-*" | head -1) &&
+    COMPAT_TESTS="${HOME}/.cache/master/tests" &&
+    cp "$TEST_FILE" "$COMPAT_TESTS"

@@ -1,3 +1,5 @@
 #!/bin/bash
 
+set -x;
+
 scripts/check-ffi-utils && scripts/check-real && scripts/check-mock

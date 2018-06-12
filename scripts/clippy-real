@@ -1,6 +1,8 @@
 #!/bin/bash
 
-cd safe_core && cargo clippy --profile=test --features=testing && cd .. &&
-cd safe_authenticator && cargo clippy --profile=test --features=testing && cd .. &&
-cd safe_app && cargo clippy --profile=test --features=testing && cd .. &&
-cd tests && cargo clippy --profile=test && cd ..
+set -x;
+
+cd safe_core && cargo clippy --verbose --features=testing --release --profile=test && cd .. &&
+cd safe_authenticator && cargo clippy --verbose --features=testing --release --profile=test && cd .. &&
+cd safe_app && cargo clippy --verbose --features=testing --release --profile=test && cd .. &&
+cd tests && cargo clippy --verbose --release --profile=test && cd ..

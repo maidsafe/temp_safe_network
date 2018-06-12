@@ -1,3 +1,5 @@
 #!/bin/bash
 
+set -x;
+
 cargo build --verbose --release --tests --manifest-path=ffi_utils/Cargo.toml

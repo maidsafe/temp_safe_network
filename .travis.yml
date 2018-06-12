@@ -7,53 +7,100 @@ env:
     - RUST_BACKTRACE=1
     - RUST_STABLE=1.26.1
     - RUST_NIGHTLY=nightly-2018-05-29
+    - RUST_RUSTFMT=0.8.2
+    - RUST_CLIPPY=0.0.206
     - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
 language: rust
 stages:
-  - stable
-  - nightly-warmup
-  - nightly-tests
+  - warmup-real
+  - warmup-mock
+  - tests-stable
+  - tests-nightly
 jobs:
+  fast_finish: true
   allow_failures:
     - rust: *stable-i686
   include:
-    # Stable
-    - stage: stable
-      script: set -x; scripts/stable
+    # Warm up the cache for a real build
+    - stage: warmup-real
+      script: set -x; scripts/build-ffi-utils && scripts/build-real
+      if: type = pull_request
       os: linux
       rust: *stable
-    - os: linux
-      script: set -x; scripts/stable
+    - script: set -x; scripts/build-ffi-utils && scripts/build-real
+      if: type = pull_request
+      os: linux
       rust: *stable-i686
       addons:
         apt:
           packages:
             - gcc-multilib
-    - os: osx
-      script: set -x; scripts/stable
+    - script: set -x; scripts/rustfmt && scripts/build-ffi-utils && scripts/build-real
+      os: linux
+      rust: *nightly
+    # Warm up the cache for a mock build
+    - stage: warmup-mock
+      script: set -x; scripts/build-mock
+      if: type = pull_request
+      os: linux
       rust: *stable
-    # Nightly compiler warm-up + clippy
-    - stage: nightly-warmup
-      script: set -x; scripts/build-all
-      os: linux
-      rust: *nightly
-    - script: set -x; scripts/check-debug-ffi-utils && scripts/clippy-ffi-utils && scripts/check-debug-real && scripts/clippy-real
+    - script: set -x; scripts/build-mock && scripts/build-binary
       if: type = pull_request
       os: linux
+      rust: *stable-i686
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+    - script: set -x; scripts/build-mock
+      os: linux
       rust: *nightly
-    # Nightly tests + clippy
-    - stage: nightly-tests
+    - script: set -x; scripts/build-binary
+      if: type = push
+      os: linux
+      rust: *stable
+    - script: set -x; scripts/build-binary
+      if: type = push
+      os: linux
+      rust: *stable-i686
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+    # Stable + nightly clippy
+    - stage: tests-stable
+      script: set -x; scripts/stable && scripts/test-binary
+      if: type = pull_request
+      os: linux
+      rust: *stable
+    - script: set -x; scripts/stable
+      if: type = pull_request
+      os: linux
+      rust: *stable-i686
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+    - script: set -x; scripts/stable
+      if: type = pull_request
+      os: osx
+      rust: *stable
+    - script: set -x; scripts/clippy-all
+      os: linux
+      rust: *nightly
+    # Nightly tests
+    - stage: tests-nightly
       script: set -x; scripts/test-all
-      os: linux
-      rust: *nightly
-    - script: set -x; scripts/check-debug-mock && scripts/clippy-mock
-      if: type = pull_request
       os: linux
       rust: *nightly
 sudo: false
 cache:
+  # Double the default timeout.
+  timeout: 360
   cargo: true
+  directories:
+    - "${HOME}/.cache/master"
 before_script:
   # Expected version change PR title format:
   # Version change: safe_app to 0.2.2; safe_authenticator to 0.2.3; safe_core to 0.26.0;
@@ -78,8 +125,8 @@ before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
   - if [ "$TRAVIS_RUST_VERSION" = $RUST_NIGHTLY ] && [ "$TRAVIS_OS_NAME" = linux ]; then
-      bash cargo_install.sh rustfmt-nightly 0.8.2;
-      bash cargo_install.sh clippy 0.0.206;
+      bash cargo_install.sh rustfmt-nightly "$RUST_RUSTFMT";
+      bash cargo_install.sh clippy "$RUST_CLIPPY";
     fi
 after_script:
   - if [[ $TRAVIS_EVENT_TYPE = pull_request && -n $(git diff --shortstat 2> /dev/null | tail -n1) ]]; then

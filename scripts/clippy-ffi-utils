@@ -1,3 +1,5 @@
 #!/bin/bash
 
-cd ffi_utils && cargo clippy --profile=test && cd ..
+set -x;
+
+cd ffi_utils && cargo clippy --verbose --release --profile=test && cd ..
