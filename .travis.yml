@@ -36,7 +36,7 @@ jobs:
         apt:
           packages:
             - gcc-multilib
-    - script: set -x; scripts/rustfmt && scripts/build-ffi-utils && scripts/build-real
+    - script: set -x; scripts/build-ffi-utils && scripts/build-real
       os: linux
       rust: *nightly
     # Warm up the cache for a mock build
@@ -86,7 +86,7 @@ jobs:
       if: type = pull_request
       os: osx
       rust: *stable
-    - script: set -x; scripts/clippy-all
+    - script: set -x; scripts/rustfmt && scripts/clippy-all
       os: linux
       rust: *nightly
     # Nightly tests
