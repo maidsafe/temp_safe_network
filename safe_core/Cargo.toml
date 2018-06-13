@@ -7,13 +7,13 @@ license = "GPL-3.0"
 name = "safe_core"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_client_libs"
-version = "0.29.0"
+version = "0.30.0"
 
 [dependencies]
 base64 = "~0.9.0"
 chrono = { version = "~0.4.0", features = ["serde"] }
 config_file_handler = "~0.9.0"
-ffi_utils = { path = "../ffi_utils", version = "~0.5.0" }
+ffi_utils = { path = "../ffi_utils", version = "~0.6.0" }
 fs2 = "~0.4.3"
 futures = "~0.1.17"
 lazy_static = "~1.0.0"
