@@ -25,10 +25,10 @@ jobs:
     # Warm up the cache for a real build
     - stage: warmup-real
       script: set -x; scripts/build-ffi-utils && scripts/build-real
-      if: type = pull_request
       os: linux
       rust: *stable
-    - script: set -x; scripts/build-ffi-utils && scripts/build-real
+    - stage: warmup-real
+      script: set -x; scripts/build-ffi-utils && scripts/build-real
       if: type = pull_request
       os: linux
       rust: *stable-i686
@@ -36,45 +36,43 @@ jobs:
         apt:
           packages:
             - gcc-multilib
-    - script: set -x; scripts/build-ffi-utils && scripts/build-real
+    - stage: warmup-real
+      script: set -x; scripts/build-ffi-utils && scripts/build-real
+      if: type = pull_request
       os: linux
       rust: *nightly
+      
     # Warm up the cache for a mock build
+    - stage: warmup-mock
+      script: set -x; scripts/build-mock
+      os: linux
+      rust: *stable
     - stage: warmup-mock
       script: set -x; scripts/build-mock
       if: type = pull_request
       os: linux
-      rust: *stable
-    - script: set -x; scripts/build-mock && scripts/build-binary
+      rust: *stable-i686
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+    - stage: warmup-mock
+      script: set -x; scripts/build-mock
       if: type = pull_request
       os: linux
-      rust: *stable-i686
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
-    - script: set -x; scripts/build-mock
-      os: linux
       rust: *nightly
-    - script: set -x; scripts/build-binary
-      if: type = push
-      os: linux
-      rust: *stable
-    - script: set -x; scripts/build-binary
-      if: type = push
-      os: linux
-      rust: *stable-i686
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
+      
     # Stable + nightly clippy
     - stage: tests-stable
       script: set -x; scripts/stable && scripts/test-binary
-      if: type = pull_request
       os: linux
       rust: *stable
-    - script: set -x; scripts/stable
+    - stage: tests-stable
+      script: set -x; scripts/stable
+      os: osx
+      rust: *stable
+    - stage: tests-stable
+      script: set -x; scripts/stable
       if: type = pull_request
       os: linux
       rust: *stable-i686
@@ -82,18 +80,23 @@ jobs:
         apt:
           packages:
             - gcc-multilib
-    - script: set -x; scripts/stable
+    - stage: tests-stable
+      script: set -x; scripts/rustfmt && scripts/clippy-all
       if: type = pull_request
-      os: osx
-      rust: *stable
-    - script: set -x; scripts/rustfmt && scripts/clippy-all
       os: linux
       rust: *nightly
+      
     # Nightly tests
     - stage: tests-nightly
       script: set -x; scripts/test-all
+      if: type = pull_request
       os: linux
       rust: *nightly
+    - stage: tests-nightly
+      script: set -x; scripts/build-binary
+      if: type = push
+      os: linux
+      rust: *stable
 sudo: false
 cache:
   # Double the default timeout.
