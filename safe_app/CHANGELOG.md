@@ -1,5 +1,15 @@
 # SAFE App
 
+## [0.7.0]
+- Use rust 1.26.1 stable / 2018-02-29 nightly
+- rustfmt-nightly 0.8.2 and clippy-0.0.206
+- Updated license from dual Maidsafe/GPLv3 to dual license (MIT/BSD)
+- Implement bindings generation
+- Add Java/JNI, C, and C# bindings
+- Refactor `mdata_entries_for_each` to `mdata_list_entries`
+- Fix a panic in `test_create_app_with_access`
+- Add `test_simulate_network_disconnect`
+
 ## [0.6.0]
 - Use rust 1.22.1 stable / 2018-01-10 nightly
 - rustfmt 0.9.0 and clippy-0.0.179

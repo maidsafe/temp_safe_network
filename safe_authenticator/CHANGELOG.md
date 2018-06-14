@@ -1,5 +1,13 @@
 # SAFE Authenticator - Change Log
 
+## [0.7.0]
+- Use rust 1.26.1 stable / 2018-02-29 nightly
+- rustfmt-nightly 0.8.2 and clippy-0.0.206
+- Updated license from dual Maidsafe/GPLv3 to GPLv3
+- Implement bindings generation
+- Add Java/JNI, C, and C# bindings
+- Move apps to end of queue on revocation failure
+
 ## [0.6.0]
 - Use rust 1.22.1 stable / 2018-01-10 nightly
 - rustfmt 0.9.0 and clippy-0.0.179
