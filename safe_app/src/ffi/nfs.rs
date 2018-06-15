@@ -143,7 +143,7 @@ pub unsafe extern "C" fn dir_delete_file(
         let file_name = from_c_str(file_name)?;
 
         send(app, user_data, o_cb, move |client, _| {
-            file_helper::delete(client, &parent_info, file_name, version)
+            file_helper::delete(client.clone(), parent_info, file_name, version)
         })
     })
 }

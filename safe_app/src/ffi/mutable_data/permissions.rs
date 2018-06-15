@@ -15,7 +15,7 @@ use ffi::mutable_data::helper;
 use ffi::object_cache::{MDataPermissionsHandle, SignPubKeyHandle, NULL_OBJECT_HANDLE};
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, SafePtr, FFI_RESULT_OK};
 use permissions;
-use routing::{Action, User};
+use routing::User;
 use safe_core::ffi::ipc::req::PermissionSet;
 use safe_core::ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
 use std::os::raw::c_void;
@@ -24,30 +24,6 @@ use App;
 /// Special value that represents `User::Anyone` in permission sets.
 #[no_mangle]
 pub static USER_ANYONE: u64 = NULL_OBJECT_HANDLE;
-
-/// Permission actions.
-#[repr(C)]
-pub enum MDataAction {
-    /// Permission to insert new entries.
-    Insert,
-    /// Permission to update existing entries.
-    Update,
-    /// Permission to delete existing entries.
-    Delete,
-    /// Permission to manage permissions.
-    ManagePermissions,
-}
-
-impl Into<Action> for MDataAction {
-    fn into(self) -> Action {
-        match self {
-            MDataAction::Insert => Action::Insert,
-            MDataAction::Update => Action::Update,
-            MDataAction::Delete => Action::Delete,
-            MDataAction::ManagePermissions => Action::ManagePermissions,
-        }
-    }
-}
 
 /// FFI object representing a (User, Permission Set) pair.
 #[repr(C)]

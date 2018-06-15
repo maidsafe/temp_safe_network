@@ -86,8 +86,8 @@ pub fn read<C: Client>(
 #[allow(unknown_lints)]
 #[allow(needless_pass_by_value)]
 pub fn delete<S>(
-    client: &impl Client,
-    parent: &MDataInfo,
+    client: impl Client,
+    parent: MDataInfo,
     name: S,
     version: u64,
 ) -> Box<NfsFuture<()>>

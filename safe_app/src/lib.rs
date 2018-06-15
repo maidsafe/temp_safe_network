@@ -79,8 +79,6 @@ pub use safe_core::{
 
 pub mod ffi;
 
-// Required for moz_cheddar to work.
-
 pub use ffi::access_container::*;
 pub use ffi::cipher_opt::*;
 pub use ffi::crypto::*;
