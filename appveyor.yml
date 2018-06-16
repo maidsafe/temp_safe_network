@@ -5,7 +5,8 @@ environment:
     PROJECT_NAME: safe_vault
     RUST_BACKTRACE: 1
   matrix:
-    - RUST_TOOLCHAIN: 1.26.1
+    - RUST_STABLE: &stable "1.26.2"
+    - RUST_TOOLCHAIN: *stable
 
 clone_depth: 1
 
@@ -64,4 +65,4 @@ deploy:
   tag: $(PROJECT_VERSION)
   on:
     DEPLOY: true
-    RUST_VERSION: stable
+    RUST_VERSION: *stable
