@@ -18,9 +18,6 @@ stages:
   - tests-stable
   - tests-nightly
 jobs:
-  fast_finish: true
-  allow_failures:
-    - rust: *stable-i686
   include:
     # Warm up the cache for a real build
     - stage: warmup-real
@@ -29,7 +26,7 @@ jobs:
       rust: *stable
     - stage: warmup-real
       script: set -x; scripts/build-ffi-utils && scripts/build-real
-      if: type = pull_request
+      if: type = push
       os: linux
       rust: *stable-i686
       addons:
@@ -49,7 +46,7 @@ jobs:
       rust: *stable
     - stage: warmup-mock
       script: set -x; scripts/build-mock
-      if: type = pull_request
+      if: type = push
       os: linux
       rust: *stable-i686
       addons:
@@ -73,7 +70,7 @@ jobs:
       rust: *stable
     - stage: tests-stable
       script: set -x; scripts/stable
-      if: type = pull_request
+      if: type = push
       os: linux
       rust: *stable-i686
       addons:
