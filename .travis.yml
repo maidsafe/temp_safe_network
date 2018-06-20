@@ -82,6 +82,7 @@ jobs:
       if: type = pull_request
       os: linux
       rust: *nightly
+      env: RUN_RUSTFMT=1
       
     # Nightly tests
     - stage: tests-nightly
@@ -124,7 +125,7 @@ before_script:
     fi
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [ "$TRAVIS_RUST_VERSION" = "$RUST_NIGHTLY" ] && [ "$TRAVIS_OS_NAME" = linux ]; then
+  - if [ "$TRAVIS_RUST_VERSION" = "$RUST_NIGHTLY" ] && [ "$RUN_RUSTFMT" ]; then
       bash cargo_install.sh rustfmt-nightly "$RUST_RUSTFMT";
       bash cargo_install.sh clippy "$RUST_CLIPPY";
     fi
