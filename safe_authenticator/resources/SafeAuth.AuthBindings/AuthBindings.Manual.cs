@@ -18,7 +18,7 @@ namespace SafeAuth.AuthBindings {
       Action disconnnectedCb,
       Action<FfiResult, IntPtr, GCHandle> cb) {
       var userData = BindingUtils.ToHandlePtr((disconnnectedCb, cb));
-      CreateAccNative(locator, secret, invitation, userData, OnAuthenticatorDisconnectCb, OnAuthenticatorCreateCb);
+      CreateAccNative(locator, secret, invitation, userData, DelegateOnAuthenticatorDisconnectCb, DelegateOnAuthenticatorCreateCb);
     }
 
     public Task<IpcReq> DecodeIpcMessage(IntPtr authPtr, string msg) {
@@ -27,22 +27,22 @@ namespace SafeAuth.AuthBindings {
         authPtr,
         msg,
         userData,
-        OnDecodeIpcReqAuthCb,
-        OnDecodeIpcReqContainersCb,
-        OnDecodeIpcReqUnregisteredCb,
-        OnDecodeIpcReqShareMDataCb,
-        OnFfiResultIpcReqErrorCb);
+        DelegateOnDecodeIpcReqAuthCb,
+        DelegateOnDecodeIpcReqContainersCb,
+        DelegateOnDecodeIpcReqUnregisteredCb,
+        DelegateOnDecodeIpcReqShareMDataCb,
+        DelegateOnFfiResultIpcReqErrorCb);
       return task;
     }
 
     public void Login(string locator, string secret, Action disconnnectedCb, Action<FfiResult, IntPtr, GCHandle> cb) {
       var userData = BindingUtils.ToHandlePtr((disconnnectedCb, cb));
-      LoginNative(locator, secret, userData, OnAuthenticatorDisconnectCb, OnAuthenticatorCreateCb);
+      LoginNative(locator, secret, userData, DelegateOnAuthenticatorDisconnectCb, DelegateOnAuthenticatorCreateCb);
     }
 
     public Task<IpcReq> UnRegisteredDecodeIpcMsgAsync(string msg) {
       var (task, userData) = BindingUtils.PrepareTask<IpcReq>();
-      AuthUnregisteredDecodeIpcMsgNative(msg, userData, OnDecodeIpcReqUnregisteredCb, OnFfiResultIpcReqErrorCb);
+      AuthUnregisteredDecodeIpcMsgNative(msg, userData, DelegateOnDecodeIpcReqUnregisteredCb, DelegateOnFfiResultIpcReqErrorCb);
       return task;
     }
 
@@ -54,6 +54,8 @@ namespace SafeAuth.AuthBindings {
 
       action(Marshal.PtrToStructure<FfiResult>(result), app, GCHandle.FromIntPtr(userData));
     }
+    private static FfiResultAuthenticatorCb DelegateOnAuthenticatorCreateCb = OnAuthenticatorCreateCb;
+
 #if __IOS__
     [MonoPInvokeCallback(typeof(NoneCb))]
 #endif
@@ -62,6 +64,7 @@ namespace SafeAuth.AuthBindings {
 
       action();
     }
+    private static NoneCb DelegateOnAuthenticatorDisconnectCb = OnAuthenticatorDisconnectCb;
 
 #if __IOS__
     [MonoPInvokeCallback(typeof(UIntAuthReqCb))]
@@ -70,6 +73,7 @@ namespace SafeAuth.AuthBindings {
       var tcs = BindingUtils.FromHandlePtr<TaskCompletionSource<IpcReq>>(userData);
       tcs.SetResult(new AuthIpcReq(reqId, new AuthReq(Marshal.PtrToStructure<AuthReqNative>(authReq))));
     }
+    private static UIntAuthReqCb DelegateOnDecodeIpcReqAuthCb = OnDecodeIpcReqAuthCb;
 
 #if __IOS__
     [MonoPInvokeCallback(typeof(UIntContainersReqCb))]
@@ -78,6 +82,7 @@ namespace SafeAuth.AuthBindings {
       var tcs = BindingUtils.FromHandlePtr<TaskCompletionSource<IpcReq>>(userData);
       tcs.SetResult(new ContainersIpcReq(reqId, new ContainersReq(Marshal.PtrToStructure<ContainersReqNative>(authReq))));
     }
+    private static UIntContainersReqCb DelegateOnDecodeIpcReqContainersCb = OnDecodeIpcReqContainersCb;
 
 #if __IOS__
     [MonoPInvokeCallback(typeof(UIntShareMDataReqMetadataResponseCb))]
@@ -88,6 +93,7 @@ namespace SafeAuth.AuthBindings {
       var metadataResponse = Marshal.PtrToStructure<MetadataResponse>(metadata);
       tcs.SetResult(new ShareMDataIpcReq(reqId, shareMdReq, metadataResponse));
     }
+    private static UIntShareMDataReqMetadataResponseCb DelegateOnDecodeIpcReqShareMDataCb = OnDecodeIpcReqShareMDataCb;
 
 #if __IOS__
     [MonoPInvokeCallback(typeof(UIntByteListCb))]
@@ -96,6 +102,7 @@ namespace SafeAuth.AuthBindings {
       var tcs = BindingUtils.FromHandlePtr<TaskCompletionSource<IpcReq>>(userData);
       tcs.SetResult(new UnregisteredIpcReq(reqId, extraData, (ulong)size));
     }
+    private static UIntByteListCb DelegateOnDecodeIpcReqUnregisteredCb = OnDecodeIpcReqUnregisteredCb;
 
 #if __IOS__
     [MonoPInvokeCallback(typeof(FfiResultIpcReqErrorCb))]
@@ -105,6 +112,7 @@ namespace SafeAuth.AuthBindings {
       var ffiResult = Marshal.PtrToStructure<FfiResult>(result);
       tcs.SetResult(new IpcReqError(ffiResult.ErrorCode, ffiResult.Description, msg));
     }
+    private static FfiResultStringCb DelegateOnFfiResultIpcReqErrorCb = OnFfiResultIpcReqErrorCb;
 
     // ReSharper disable once UnusedMember.Local
     private delegate void FfiResultIpcReqErrorCb(IntPtr userData, IntPtr result, string msg);
