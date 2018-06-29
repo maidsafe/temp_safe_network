@@ -8,6 +8,7 @@
 
 use super::{AuthError, AuthFuture};
 use access_container::{self, AUTHENTICATOR_ENTRY};
+use client::AuthClient;
 use config::{self, AppInfo, RevocationQueue};
 use futures::future::{self, Either, Loop};
 use futures::Future;
@@ -22,7 +23,7 @@ type MDataEntries = BTreeMap<Vec<u8>, Value>;
 type Containers = HashMap<String, MDataInfo>;
 
 /// Revoke app access using a revocation queue.
-pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
+pub fn revoke_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<()>> {
     let app_id = app_id.to_string();
     let client = client.clone();
     let c2 = client.clone();
@@ -41,7 +42,7 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
 }
 
 /// Revoke all apps currently in the revocation queue.
-pub fn flush_app_revocation_queue(client: &Client<()>) -> Box<AuthFuture<()>> {
+pub fn flush_app_revocation_queue(client: &AuthClient) -> Box<AuthFuture<()>> {
     let client = client.clone();
 
     config::get_app_revocation_queue(&client)
@@ -63,7 +64,7 @@ pub fn flush_app_revocation_queue(client: &Client<()>) -> Box<AuthFuture<()>> {
 // The exception to this is if we encounter a `SymmetricDecipherFailure` error, which we know is
 // irrecoverable, so in this case we remove the app from the queue and return an error immediately.
 fn flush_app_revocation_queue_impl(
-    client: &Client<()>,
+    client: &AuthClient,
     queue: RevocationQueue,
     version: u64,
 ) -> Box<AuthFuture<()>> {
@@ -118,7 +119,7 @@ fn flush_app_revocation_queue_impl(
 }
 
 // Revoke access for a single app
-fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
+fn revoke_single_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<()>> {
     trace!("Revoking app with ID {}...", app_id);
 
     let c2 = client.clone();
@@ -160,7 +161,7 @@ fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
 
 // Delete the app auth key from the Maid Manager - this prevents the app from
 // performing any more mutations.
-fn delete_app_auth_key(client: &Client<()>, key: sign::PublicKey) -> Box<AuthFuture<()>> {
+fn delete_app_auth_key(client: &AuthClient, key: sign::PublicKey) -> Box<AuthFuture<()>> {
     let client = client.clone();
 
     client
@@ -181,7 +182,7 @@ fn delete_app_auth_key(client: &Client<()>, key: sign::PublicKey) -> Box<AuthFut
 }
 
 fn clear_from_access_container_entry(
-    client: &Client<()>,
+    client: &AuthClient,
     app: AppInfo,
     ac_entry_version: u64,
     containers: Containers,
@@ -204,7 +205,7 @@ fn clear_from_access_container_entry(
 
 // Revoke containers permissions
 fn revoke_container_perms(
-    client: &Client<()>,
+    client: &AuthClient,
     containers: &Containers,
     sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<()>> {
@@ -235,7 +236,7 @@ fn revoke_container_perms(
 
 // Re-encrypt private containers for a revoked app
 fn reencrypt_containers_and_update_access_container(
-    client: &Client<()>,
+    client: &AuthClient,
     container_names: HashSet<String>,
     revoked_app: &AppInfo,
 ) -> Box<AuthFuture<()>> {
@@ -251,7 +252,7 @@ fn reencrypt_containers_and_update_access_container(
     let c3 = client.clone();
     let c4 = client.clone();
 
-    let ac_info = fry!(client.access_container().map_err(AuthError::from));
+    let ac_info = client.access_container();
     let app_key = fry!(access_container::enc_key(
         &ac_info,
         &revoked_app.info.id,
@@ -290,7 +291,7 @@ fn reencrypt_containers_and_update_access_container(
 // Fetch all entries of the access container except the one for the app being revoked
 // (because it doesn't need to re-encrypted).
 fn fetch_access_container_entries(
-    client: &Client<()>,
+    client: &AuthClient,
     ac_info: &MDataInfo,
     revoked_app_key: Vec<u8>,
 ) -> Box<AuthFuture<BTreeMap<Vec<u8>, Value>>> {
@@ -307,7 +308,7 @@ fn fetch_access_container_entries(
 // Update `MDataInfo`s of the given containers in all the entries of the access
 // container.
 fn update_access_container(
-    client: &Client<()>,
+    client: &AuthClient,
     ac_info: MDataInfo,
     mut ac_entries: MDataEntries,
     container_names: HashSet<String>,
@@ -317,7 +318,11 @@ fn update_access_container(
     let c3 = client.clone();
 
     let auth_key = {
-        let sk = fry!(client.secret_symmetric_key());
+        let sk = fry!(
+            client
+                .secret_symmetric_key()
+                .ok_or_else(|| AuthError::Unexpected("Secret symmetric key not found".to_string()))
+        );
         fry!(access_container::enc_key(
             &ac_info,
             AUTHENTICATOR_ENTRY,
@@ -333,7 +338,9 @@ fn update_access_container(
 
             // Update the authenticator entry
             if let Some(raw) = ac_entries.get_mut(&auth_key) {
-                let sk = c2.secret_symmetric_key()?;
+                let sk = c2.secret_symmetric_key().ok_or_else(|| {
+                    AuthError::Unexpected("Secret symmetric key not found".to_string())
+                })?;
                 let mut decoded = access_container::decode_authenticator_entry(&raw.content, &sk)?;
 
                 for name in &container_names {
@@ -411,7 +418,7 @@ impl MDataInfoAction {
 // Re-encrypt the given `containers` using the `new_enc_info` in the corresponding
 // `MDataInfo`. Returns modified `containers` where the enc info regeneration is either
 // committed or aborted, depending on if the re-encryption succeeded or failed.
-fn reencrypt_containers(client: &Client<()>, containers: Containers) -> Box<AuthFuture<()>> {
+fn reencrypt_containers(client: &AuthClient, containers: Containers) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
 
     let fs = containers.into_iter().map(move |(_, mdata_info)| {

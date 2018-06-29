@@ -19,6 +19,7 @@ use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
 use safe_core::ffi::AccountInfo;
 use safe_core::ipc::req::{AuthReq, ContainerPermissions};
 use safe_core::ipc::{gen_req_id, AuthGranted, Permission};
+use safe_core::Client;
 use std::collections::HashMap;
 use test_utils::create_app;
 use test_utils::gen_app_exchange_info;

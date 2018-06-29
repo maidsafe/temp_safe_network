@@ -11,6 +11,7 @@
 //! Access container is stored in the user's session packet.
 
 use super::{AuthError, AuthFuture};
+use client::AuthClient;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
@@ -55,14 +56,18 @@ pub fn encode_authenticator_entry(
 }
 
 /// Gets an authenticator entry from the access container
-pub fn fetch_authenticator_entry<T: 'static>(
-    client: &Client<T>,
+pub fn fetch_authenticator_entry(
+    client: &AuthClient,
 ) -> Box<AuthFuture<(u64, HashMap<String, MDataInfo>)>> {
     let c2 = client.clone();
-    let access_container = fry!(client.access_container());
+    let access_container = client.access_container();
 
     let key = {
-        let sk = fry!(client.secret_symmetric_key());
+        let sk = fry!(
+            client
+                .secret_symmetric_key()
+                .ok_or_else(|| AuthError::Unexpected("Secret symmetric key not found".to_string()))
+        );
         fry!(enc_key(&access_container, AUTHENTICATOR_ENTRY, &sk))
     };
 
@@ -70,7 +75,9 @@ pub fn fetch_authenticator_entry<T: 'static>(
         .get_mdata_value(access_container.name, access_container.type_tag, key)
         .map_err(From::from)
         .and_then(move |value| {
-            let enc_key = c2.secret_symmetric_key()?;
+            let enc_key = c2.secret_symmetric_key().ok_or_else(|| {
+                AuthError::Unexpected("Secret symmetric key not found".to_string())
+            })?;
             decode_authenticator_entry(&value.content, &enc_key)
                 .map(|decoded| (value.entry_version, decoded))
         })
@@ -78,14 +85,18 @@ pub fn fetch_authenticator_entry<T: 'static>(
 }
 
 /// Updates the authenticator entry
-pub fn put_authenticator_entry<T: 'static>(
-    client: &Client<T>,
+pub fn put_authenticator_entry(
+    client: &AuthClient,
     new_value: &HashMap<String, MDataInfo>,
     version: u64,
 ) -> Box<AuthFuture<()>> {
-    let access_container = fry!(client.access_container());
+    let access_container = client.access_container();
     let (key, ciphertext) = {
-        let sk = fry!(client.secret_symmetric_key());
+        let sk = fry!(
+            client
+                .secret_symmetric_key()
+                .ok_or_else(|| AuthError::Unexpected("Secret symmetric key not found".to_string()))
+        );
         let key = fry!(enc_key(&access_container, AUTHENTICATOR_ENTRY, &sk));
         let ciphertext = fry!(encode_authenticator_entry(new_value, &sk));
 
@@ -126,19 +137,16 @@ pub fn encode_app_entry(
 }
 
 /// Gets an access container entry
-pub fn fetch_entry<T>(
-    client: &Client<T>,
+pub fn fetch_entry(
+    client: &AuthClient,
     app_id: &str,
     app_keys: AppKeys,
-) -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>>
-where
-    T: 'static,
-{
+) -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>> {
     trace!(
         "Fetching access container entry for app with ID {}...",
         app_id
     );
-    let access_container = fry!(client.access_container());
+    let access_container = client.access_container();
     let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
     trace!("Fetching entry using entry key {:?}", key);
 
@@ -158,19 +166,16 @@ where
 }
 
 /// Adds a new entry to the authenticator access container
-pub fn put_entry<T>(
-    client: &Client<T>,
+pub fn put_entry(
+    client: &AuthClient,
     app_id: &str,
     app_keys: &AppKeys,
     permissions: &AccessContainerEntry,
     version: u64,
-) -> Box<AuthFuture<()>>
-where
-    T: 'static,
-{
+) -> Box<AuthFuture<()>> {
     trace!("Putting access container entry for app {}...", app_id);
 
-    let access_container = fry!(client.access_container());
+    let access_container = client.access_container();
     let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
     let ciphertext = fry!(encode_app_entry(permissions, &app_keys.enc_key));
 
@@ -190,15 +195,15 @@ where
 }
 
 /// Deletes entry from the access container.
-pub fn delete_entry<T: 'static>(
-    client: &Client<T>,
+pub fn delete_entry(
+    client: &AuthClient,
     app_id: &str,
     app_keys: &AppKeys,
     version: u64,
 ) -> Box<AuthFuture<()>> {
     // TODO: make sure this can't be called for authenticator Entry-0
 
-    let access_container = fry!(client.access_container());
+    let access_container = client.access_container();
     let key = fry!(enc_key(&access_container, app_id, &app_keys.enc_key));
     let actions = EntryActions::new().del(key, version);
 

@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use client::AppClient;
 use errors::AppError;
 use ffi::helper::send;
 use ffi::object_cache::FileContextHandle;
@@ -22,12 +23,12 @@ use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::{file_helper, Mode, Reader, Writer};
 use safe_core::{FutureExt, MDataInfo as NativeMDataInfo};
 use std::os::raw::{c_char, c_void};
-use {App, AppContext};
+use App;
 
 /// Holds context for file operations, depending on the mode.
 pub struct FileContext {
-    reader: Option<Reader<AppContext>>,
-    writer: Option<Writer<AppContext>>,
+    reader: Option<Reader<AppClient>>,
+    writer: Option<Writer<AppClient>>,
     original_file: NativeFile,
 }
 

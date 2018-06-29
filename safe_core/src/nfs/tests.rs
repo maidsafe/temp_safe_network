@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use client::{Client, MDataInfo};
+use client::core_client::CoreClient;
+use client::MDataInfo;
 use crypto::shared_secretbox;
 use errors::CoreError;
 use futures::future::{self, Loop};
@@ -25,7 +26,7 @@ const APPEND_SIZE: usize = 10;
 const ORIG_SIZE: usize = 5555;
 const NEW_SIZE: usize = 50;
 
-fn create_test_file(client: &Client<()>) -> Box<NfsFuture<(MDataInfo, File)>> {
+fn create_test_file(client: &CoreClient) -> Box<NfsFuture<(MDataInfo, File)>> {
     let c2 = client.clone();
     let c3 = client.clone();
     let root = unwrap!(MDataInfo::random_private(DIR_TAG));
@@ -221,16 +222,18 @@ fn file_read_chunks() {
                             }
                         })
                     },
-                ).then(move |res: Result<(Reader<()>, u64, Vec<u8>), NfsError>| {
-                    let (reader, size_read, result) = unwrap!(res);
+                ).then(
+                    move |res: Result<(Reader<CoreClient>, u64, Vec<u8>), NfsError>| {
+                        let (reader, size_read, result) = unwrap!(res);
 
-                    assert_eq!(size, size_read);
-                    assert_eq!(result, vec![0u8; ORIG_SIZE]);
+                        assert_eq!(size, size_read);
+                        assert_eq!(result, vec![0u8; ORIG_SIZE]);
 
-                    // Read 0 bytes, should succeed
-                    println!("reading 0 bytes");
-                    reader.read(size, 0).map(move |data| (reader, size, data))
-                })
+                        // Read 0 bytes, should succeed
+                        println!("reading 0 bytes");
+                        reader.read(size, 0).map(move |data| (reader, size, data))
+                    },
+                )
                     .then(|res| {
                         let (reader, size, data) = unwrap!(res);
                         assert_eq!(data, Vec::<u8>::new());
@@ -297,13 +300,15 @@ fn file_write_chunks() {
                         })
                 }).map(move |writer| (writer, dir))
             })
-            .then(move |res: Result<(Writer<()>, MDataInfo), NfsError>| {
-                let (writer, dir) = unwrap!(res);
-                // Write 0 bytes, should succeed
-                writer
-                    .write(&content[GOAL_SIZE..GOAL_SIZE])
-                    .map(move |_| (writer, dir))
-            })
+            .then(
+                move |res: Result<(Writer<CoreClient>, MDataInfo), NfsError>| {
+                    let (writer, dir) = unwrap!(res);
+                    // Write 0 bytes, should succeed
+                    writer
+                        .write(&content[GOAL_SIZE..GOAL_SIZE])
+                        .map(move |_| (writer, dir))
+                },
+            )
             .then(move |res| {
                 let (writer, dir) = unwrap!(res);
                 writer.close().map(move |file| (file, dir))
@@ -341,13 +346,15 @@ fn file_write_chunks() {
                         })
                 }).map(move |writer| (writer, dir))
             })
-            .then(move |res: Result<(Writer<()>, MDataInfo), NfsError>| {
-                let (writer, dir) = unwrap!(res);
-                // Write 0 bytes, should succeed
-                writer
-                    .write(&content[GOAL_SIZE..GOAL_SIZE])
-                    .map(move |_| (writer, dir))
-            })
+            .then(
+                move |res: Result<(Writer<CoreClient>, MDataInfo), NfsError>| {
+                    let (writer, dir) = unwrap!(res);
+                    // Write 0 bytes, should succeed
+                    writer
+                        .write(&content[GOAL_SIZE..GOAL_SIZE])
+                        .map(move |_| (writer, dir))
+                },
+            )
             .then(move |res| {
                 let (writer, dir) = unwrap!(res);
                 writer.close().map(move |file| (file, dir))

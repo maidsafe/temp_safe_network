@@ -9,6 +9,7 @@
 //! Routines to handle an app's dedicated containers.
 
 use access_container;
+use client::AuthClient;
 use futures::Future;
 use routing::{Action, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::sign;
@@ -18,7 +19,7 @@ use {AuthError, AuthFuture};
 /// Returns an app's dedicated container if available and stored in the access container,
 /// `None` otherwise.
 #[cfg(test)]
-pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataInfo>>> {
+pub fn fetch(client: &AuthClient, app_id: &str) -> Box<AuthFuture<Option<MDataInfo>>> {
     let app_cont_name = app_container_name(app_id);
 
     access_container::fetch_authenticator_entry(client)
@@ -29,7 +30,7 @@ pub fn fetch(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<MDataIn
 /// Checks if an app's dedicated container is available and stored in the access container.
 /// If no previously created container has been found, then it will be created.
 pub fn fetch_or_create(
-    client: &Client<()>,
+    client: &AuthClient,
     app_id: &str,
     app_sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<MDataInfo>> {
@@ -83,7 +84,7 @@ pub fn fetch_or_create(
 
 /// Removes an app's dedicated container if it's available and stored in the user's root dir.
 /// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
-pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
+pub fn remove(client: AuthClient, app_id: &str) -> Box<AuthFuture<bool>> {
     let c2 = client.clone();
     let app_cont_name = app_container_name(app_id);
 
@@ -135,7 +136,7 @@ pub fn remove(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
 }
 
 // Creates a new app's dedicated container
-fn create(client: &Client<()>, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<MDataInfo>> {
+fn create(client: &AuthClient, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<MDataInfo>> {
     let dir = fry!(MDataInfo::random_private(DIR_TAG).map_err(AuthError::from));
     nfs::create_dir(
         client,

@@ -48,7 +48,7 @@ use maidsafe_utilities::serialisation::deserialise;
 use safe_core::ffi::ipc::resp::AuthGranted;
 use safe_core::ffi::AccountInfo;
 use safe_core::ipc::{AuthGranted as NativeAuthGranted, BootstrapConfig};
-use safe_core::{self, FutureExt};
+use safe_core::{self, Client, FutureExt};
 use std::ffi::{CStr, CString, OsStr};
 use std::os::raw::{c_char, c_void};
 use std::slice;

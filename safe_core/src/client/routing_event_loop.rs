@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use client::Client;
 use errors::CoreError;
 use event::{CoreEvent, NetworkEvent, NetworkTx};
 use event_loop::{CoreMsg, CoreMsgTx};
@@ -13,8 +14,11 @@ use routing::{Event, MessageId, Response};
 use std::sync::mpsc::Receiver;
 
 /// Run the routing event loop - this will receive messages from routing.
-pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &NetworkTx)
-where
+pub fn run<C: Client, T>(
+    routing_rx: &Receiver<Event>,
+    mut core_tx: CoreMsgTx<C, T>,
+    net_tx: &NetworkTx,
+) where
     T: 'static,
 {
     for it in routing_rx.iter() {
@@ -110,8 +114,12 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
 /// loop has hung up or sending fails for some other reason, treat it as an
 /// exit condition. The return value thus signifies if the firing was
 /// successful.
-fn fire<T: 'static>(core_tx: &mut CoreMsgTx<T>, msg_id: MessageId, event: CoreEvent) -> bool {
-    let msg = CoreMsg::new(move |client, _| {
+fn fire<C: Client, T: 'static>(
+    core_tx: &mut CoreMsgTx<C, T>,
+    msg_id: MessageId,
+    event: CoreEvent,
+) -> bool {
+    let msg = CoreMsg::new(move |client: &C, _| {
         client.fire_hook(&msg_id, event);
         None
     });

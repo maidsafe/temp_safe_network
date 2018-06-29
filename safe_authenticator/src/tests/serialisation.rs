@@ -12,6 +12,7 @@
 
 use access_container;
 use app_auth::{self, AppState};
+use client::AuthClient;
 use config;
 use futures::{future, Future};
 use rand::{Rng, SeedableRng, XorShiftRng};
@@ -134,7 +135,7 @@ fn read_data() {
 }
 
 fn verify_std_dirs(
-    client: &Client<()>,
+    client: &AuthClient,
     actual_containers: &HashMap<String, MDataInfo>,
 ) -> Box<AuthFuture<()>> {
     let futures: Vec<_> = DEFAULT_PUBLIC_DIRS

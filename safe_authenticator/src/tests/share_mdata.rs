@@ -20,6 +20,7 @@ use rust_sodium::crypto::sign;
 use safe_core::ipc::req::AppExchangeInfo;
 use safe_core::ipc::resp::{AppAccess, UserMetadata, METADATA_KEY};
 use safe_core::ipc::{self, AuthReq, IpcMsg, IpcReq, ShareMData, ShareMDataReq};
+use safe_core::Client;
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
@@ -63,7 +64,7 @@ fn share_some_mdatas() {
     let authenticator = create_account_and_login();
 
     let user = run(&authenticator, move |client| {
-        client.public_signing_key().map_err(AuthError::CoreError)
+        ok!(unwrap!(client.public_signing_key()))
     });
 
     const NUM_MDATAS: usize = 3;
@@ -138,7 +139,7 @@ fn share_some_mdatas_with_valid_metadata() {
     let app_key = app_auth.app_keys.sign_pk;
 
     let user = run(&authenticator, move |client| {
-        client.public_signing_key().map_err(AuthError::CoreError)
+        ok!(unwrap!(client.public_signing_key()))
     });
 
     const NUM_MDATAS: usize = 3;
@@ -244,7 +245,7 @@ fn share_some_mdatas_with_ownership_error() {
     let authenticator = create_account_and_login();
 
     let user = run(&authenticator, move |client| {
-        client.public_signing_key().map_err(AuthError::CoreError)
+        ok!(unwrap!(client.public_signing_key()))
     });
 
     let (someone_else, _) = sign::gen_keypair();
@@ -340,7 +341,7 @@ fn auth_apps_accessing_mdatas() {
     let authenticator = create_account_and_login();
 
     let user = run(&authenticator, move |client| {
-        client.public_signing_key().map_err(AuthError::CoreError)
+        ok!(unwrap!(client.public_signing_key()))
     });
 
     const NUM_MDATAS: usize = 3;

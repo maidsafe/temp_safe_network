@@ -17,15 +17,9 @@ use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
 
 /// Insert the file into the directory.
-pub fn insert<S, T>(
-    client: Client<T>,
-    parent: MDataInfo,
-    name: S,
-    file: &File,
-) -> Box<NfsFuture<()>>
+pub fn insert<S>(client: impl Client, parent: MDataInfo, name: S, file: &File) -> Box<NfsFuture<()>>
 where
     S: AsRef<str>,
-    T: 'static,
 {
     let name = name.as_ref();
     trace!("Inserting file with name '{}'", name);
@@ -51,10 +45,9 @@ where
 }
 
 /// Get a file from the directory.
-pub fn fetch<S, T>(client: Client<T>, parent: MDataInfo, name: S) -> Box<NfsFuture<(u64, File)>>
+pub fn fetch<S>(client: impl Client, parent: MDataInfo, name: S) -> Box<NfsFuture<(u64, File)>>
 where
     S: AsRef<str>,
-    T: 'static,
 {
     parent
         .enc_entry_key(name.as_ref().as_bytes())
@@ -74,11 +67,11 @@ where
 }
 
 /// Return a Reader for reading the file contents.
-pub fn read<T: 'static>(
-    client: Client<T>,
+pub fn read<C: Client>(
+    client: C,
     file: &File,
     encryption_key: Option<shared_secretbox::Key>,
-) -> Box<NfsFuture<Reader<T>>> {
+) -> Box<NfsFuture<Reader<C>>> {
     trace!("Reading file {:?}", file);
     Reader::new(
         client.clone(),
@@ -92,15 +85,14 @@ pub fn read<T: 'static>(
 // Allow pass by value for consistency with other functions.
 #[allow(unknown_lints)]
 #[allow(needless_pass_by_value)]
-pub fn delete<S, T>(
-    client: &Client<T>,
+pub fn delete<S>(
+    client: &impl Client,
     parent: &MDataInfo,
     name: S,
     version: u64,
 ) -> Box<NfsFuture<()>>
 where
     S: AsRef<str>,
-    T: 'static,
 {
     let name = name.as_ref();
     trace!("Deleting file with name {}.", name);
@@ -120,8 +112,8 @@ where
 /// Update the file.
 /// If `version` is 0, the current version is first retrieved from the network,
 /// and that version incremented by one is then used as the actual version.
-pub fn update<S, T>(
-    client: Client<T>,
+pub fn update<S>(
+    client: impl Client,
     parent: MDataInfo,
     name: S,
     file: &File,
@@ -129,7 +121,6 @@ pub fn update<S, T>(
 ) -> Box<NfsFuture<()>>
 where
     S: AsRef<str>,
-    T: 'static,
 {
     let name = name.as_ref();
     trace!("Updating file with name '{}'", name);
@@ -170,15 +161,12 @@ where
 /// object is returned, through which the data for the file can be written to
 /// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked.
-pub fn write<T>(
-    client: Client<T>,
+pub fn write<C: Client>(
+    client: C,
     file: File,
     mode: Mode,
     encryption_key: Option<shared_secretbox::Key>,
-) -> Box<NfsFuture<Writer<T>>>
-where
-    T: 'static,
-{
+) -> Box<NfsFuture<Writer<C>>> {
     trace!("Creating a writer for a file");
 
     Writer::new(

@@ -25,7 +25,7 @@ const MAX_ATTEMPTS: usize = 10;
 /// If the data already exists, it tries to mutate it so its entries and permissions
 /// are the same as those of the data being put, except it wont delete existing
 /// entries or remove existing permissions.
-pub fn put_mdata<T: 'static>(client: &Client<T>, data: MutableData) -> Box<CoreFuture<()>> {
+pub fn put_mdata(client: &impl Client, data: MutableData) -> Box<CoreFuture<()>> {
     let client2 = client.clone();
 
     client
@@ -40,8 +40,8 @@ pub fn put_mdata<T: 'static>(client: &Client<T>, data: MutableData) -> Box<CoreF
 }
 
 /// Mutates mutable data entries and tries to recover from errors.
-pub fn mutate_mdata_entries<T: 'static>(
-    client: &Client<T>,
+pub fn mutate_mdata_entries(
+    client: &impl Client,
     name: XorName,
     tag: u64,
     actions: BTreeMap<Vec<u8>, EntryAction>,
@@ -77,8 +77,8 @@ pub fn mutate_mdata_entries<T: 'static>(
 }
 
 /// Sets user permission on the mutable data and tries to recover from errors.
-pub fn set_mdata_user_permissions<T: 'static>(
-    client: &Client<T>,
+pub fn set_mdata_user_permissions(
+    client: &impl Client,
     name: XorName,
     tag: u64,
     user: User,
@@ -113,8 +113,8 @@ pub fn set_mdata_user_permissions<T: 'static>(
 }
 
 /// Deletes user permission on the mutable data and tries to recover from errors.
-pub fn del_mdata_user_permissions<T: 'static>(
-    client: &Client<T>,
+pub fn del_mdata_user_permissions(
+    client: &impl Client,
     name: XorName,
     tag: u64,
     user: User,
@@ -148,7 +148,7 @@ pub fn del_mdata_user_permissions<T: 'static>(
     }).into_box()
 }
 
-fn update_mdata<T: 'static>(client: &Client<T>, data: MutableData) -> Box<CoreFuture<()>> {
+fn update_mdata(client: &impl Client, data: MutableData) -> Box<CoreFuture<()>> {
     let client2 = client.clone();
     let client3 = client.clone();
 
@@ -180,8 +180,8 @@ fn update_mdata<T: 'static>(client: &Client<T>, data: MutableData) -> Box<CoreFu
 }
 
 // Update the mutable data on the network so it has all the `desired_entries`.
-fn update_mdata_entries<T: 'static>(
-    client: &Client<T>,
+fn update_mdata_entries(
+    client: &impl Client,
     name: XorName,
     tag: u64,
     current_entries: &BTreeMap<Vec<u8>, Value>,
@@ -205,8 +205,8 @@ fn update_mdata_entries<T: 'static>(
     mutate_mdata_entries(client, name, tag, actions)
 }
 
-fn update_mdata_permissions<T: 'static>(
-    client: &Client<T>,
+fn update_mdata_permissions(
+    client: &impl Client,
     name: XorName,
     tag: u64,
     current_permissions: &BTreeMap<User, PermissionSet>,
@@ -296,8 +296,8 @@ fn union_permission_sets(a: &PermissionSet, b: &PermissionSet) -> PermissionSet 
 
 /// Insert key to maid managers.
 /// Covers the `InvalidSuccessor` error case (it should not fail if the key already exists).
-pub fn ins_auth_key<T: 'static>(
-    client: &Client<T>,
+pub fn ins_auth_key(
+    client: &impl Client,
     key: sign::PublicKey,
     version: u64,
 ) -> Box<CoreFuture<()>> {

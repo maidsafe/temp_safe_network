@@ -16,14 +16,14 @@ use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
 use tiny_keccak::sha3_256;
 use DIR_TAG;
 
-/// Representing the User Account information on the network
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+/// Representing the User Account information on the network.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Account {
-    /// The User Account Keys
+    /// The User Account Keys.
     pub maid_keys: ClientKeys,
-    /// The user's access container
+    /// The user's access container.
     pub access_container: MDataInfo,
-    /// The user's configuration directory
+    /// The user's configuration directory.
     pub config_root: MDataInfo,
     /// Set to `true` when all root and standard containers
     /// have been created successfully. `false` signifies that
@@ -32,7 +32,7 @@ pub struct Account {
 }
 
 impl Account {
-    /// Create new Account with a provided set of keys
+    /// Create new Account with a provided set of keys.
     pub fn new(maid_keys: ClientKeys) -> Result<Self, CoreError> {
         Ok(Account {
             maid_keys,

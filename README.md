@@ -36,7 +36,7 @@ When in doubt, perform an integration test against the real network, in addition
 * Make sure you are able to login to your account via the SAFE Browser.
 * Navigate to the `tests` directory.
 * Open `tests.config` and set your account locator and password. **Do not commit this.** Alternatively, you can set the environment variables `TEST_ACC_LOCATOR` and `TEST_ACC_PASSWORD`.
-* Run `cargo test --release -- --nocapture` and make sure that no errors are reported.
+* Run `cargo test authorisation_and_revocation --release -- --ignored --nocapture` and make sure that no errors are reported.
 
 #### Binary compatibility of data
 

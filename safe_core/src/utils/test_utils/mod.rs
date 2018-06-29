@@ -11,7 +11,8 @@ mod sync;
 
 #[cfg(feature = "use-mock-routing")]
 pub use self::sync::Synchronizer;
-use errors::CoreError;
+use client::core_client::CoreClient;
+use client::Client;
 use event::{NetworkEvent, NetworkTx};
 use event_loop::{self, CoreMsg, CoreMsgTx};
 use futures::stream::Stream;
@@ -23,7 +24,6 @@ use std::sync::mpsc as std_mpsc;
 use std::{iter, u8};
 use tokio_core::reactor::{Core, Handle};
 use utils::{self, FutureExt};
-use Client;
 
 /// Generates random public keys
 pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
@@ -49,34 +49,26 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
         .collect()
 }
 
+/// Convenience for creating a blank runner.
+pub fn finish() -> Result<(), ()> {
+    Ok(())
+}
+
 /// Create random registered client and run it inside an event loop. Use this to
-/// create Client automatically and randomly,
+/// create a `CoreClient` automatically and randomly.
 pub fn random_client<Run, I, T, E>(r: Run) -> T
 where
-    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    Run: FnOnce(&CoreClient) -> I + Send + 'static,
     I: IntoFuture<Item = T, Error = E> + 'static,
     T: Send + 'static,
     E: Debug,
 {
     let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
-    random_client_with_net_obs(n, r)
-}
-
-/// Create random registered client and run it inside an event loop. Use this to
-/// create Client automatically and randomly,
-pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
-where
-    NetObs: FnMut(NetworkEvent) + 'static,
-    Run: FnOnce(&Client<()>) -> I + Send + 'static,
-    I: IntoFuture<Item = T, Error = E> + 'static,
-    T: Send + 'static,
-    E: Debug,
-{
     let c = |el_h, core_tx, net_tx| {
         let acc_locator = unwrap!(utils::generate_random_string(10));
         let acc_password = unwrap!(utils::generate_random_string(10));
         let invitation = unwrap!(utils::generate_random_string(10));
-        Client::registered(
+        CoreClient::new(
             &acc_locator,
             &acc_password,
             &invitation,
@@ -91,11 +83,13 @@ where
 /// Helper to create a client and run it in an event loop. Useful when we need
 /// to supply credentials explicitly or when Client is to be constructed as
 /// unregistered or as a result of successful login. Use this to create Client
-/// manually,
-pub fn setup_client<Create, Run, I, T, E>(c: Create, r: Run) -> T
+/// manually.
+pub fn setup_client<Create, Run, A, C, I, T, E>(c: Create, r: Run) -> T
 where
-    Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
-    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    Create: FnOnce(Handle, CoreMsgTx<C, ()>, NetworkTx) -> Result<C, A>,
+    Run: FnOnce(&C) -> I + Send + 'static,
+    A: Debug,
+    C: Client,
     I: IntoFuture<Item = T, Error = E> + 'static,
     T: Send + 'static,
     E: Debug,
@@ -107,16 +101,18 @@ where
 /// Helper to create a client and run it in an event loop. Useful when we need
 /// to supply credentials explicitly or when Client is to be constructed as
 /// unregistered or as a result of successful login. Use this to create Client
-/// manually,
-pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(
+/// manually.
+pub fn setup_client_with_net_obs<Create, NetObs, Run, A, C, I, T, E>(
     c: Create,
     mut n: NetObs,
     r: Run,
 ) -> T
 where
-    Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+    Create: FnOnce(Handle, CoreMsgTx<C, ()>, NetworkTx) -> Result<C, A>,
     NetObs: FnMut(NetworkEvent) + 'static,
-    Run: FnOnce(&Client<()>) -> I + Send + 'static,
+    Run: FnOnce(&C) -> I + Send + 'static,
+    A: Debug,
+    C: Client,
     I: IntoFuture<Item = T, Error = E> + 'static,
     T: Send + 'static,
     E: Debug,
@@ -155,9 +151,4 @@ where
     event_loop::run(el, &client, &(), core_rx);
 
     unwrap!(result_rx.recv())
-}
-
-/// Convenience for creating a blank runner.
-pub fn finish() -> Result<(), ()> {
-    Ok(())
 }

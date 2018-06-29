@@ -9,6 +9,7 @@
 use super::{AuthError, AuthFuture};
 use access_container;
 use app_auth::{app_state, AppState};
+use client::AuthClient;
 use config;
 use ffi_utils::StringError;
 use futures::future::{self, Either};
@@ -30,7 +31,7 @@ use std::ffi::CString;
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
 #[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
 pub fn decode_ipc_msg(
-    client: &Client<()>,
+    client: &AuthClient,
     msg: IpcMsg,
 ) -> Box<AuthFuture<Result<IpcMsg, (i32, CString, CString)>>> {
     match msg {
@@ -100,7 +101,7 @@ pub fn decode_ipc_msg(
 
 /// Updates containers permissions (adds a given key to the permissions set)
 pub fn update_container_perms(
-    client: &Client<()>,
+    client: &AuthClient,
     permissions: HashMap<String, ContainerPermissions>,
     sign_pk: sign::PublicKey,
 ) -> Box<AuthFuture<AccessContainerEntry>> {
@@ -160,10 +161,14 @@ enum ShareMDataError {
 }
 
 pub fn decode_share_mdata_req(
-    client: &Client<()>,
+    client: &AuthClient,
     req: &ShareMDataReq,
 ) -> Box<AuthFuture<Vec<Option<FfiUserMetadata>>>> {
-    let user = fry!(client.public_signing_key());
+    let user = fry!(
+        client
+            .public_signing_key()
+            .ok_or_else(|| AuthError::Unexpected("Public signing key not found".to_string()))
+    );
     let num_mdata = req.mdata.len();
     let mut futures = Vec::with_capacity(num_mdata);
 

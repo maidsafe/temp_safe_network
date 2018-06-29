@@ -15,26 +15,26 @@ use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
 
 /// Reader is used to read contents of a File. It can read in chunks if the
-/// file happens to be very large
+/// file happens to be very large.
 #[allow(dead_code)]
-pub struct Reader<T> {
-    client: Client<T>,
-    self_encryptor: SelfEncryptor<SelfEncryptionStorage<T>>,
+pub struct Reader<C: Client> {
+    client: C,
+    self_encryptor: SelfEncryptor<SelfEncryptionStorage<C>>,
 }
 
-impl<T: 'static> Reader<T> {
-    /// Create a new instance of Reader
+impl<C: Client> Reader<C> {
+    /// Create a new instance of Reader.
     pub fn new(
-        client: Client<T>,
-        storage: SelfEncryptionStorage<T>,
+        client: C,
+        storage: SelfEncryptionStorage<C>,
         file: &File,
         encryption_key: Option<shared_secretbox::Key>,
-    ) -> Box<NfsFuture<Reader<T>>> {
+    ) -> Box<NfsFuture<Self>> {
         data_map::get(&client, file.data_map_name(), encryption_key)
             .and_then(move |data_map| {
                 let self_encryptor = SelfEncryptor::new(storage, data_map)?;
 
-                Ok(Reader {
+                Ok(Self {
                     client,
                     self_encryptor,
                 })
@@ -42,12 +42,12 @@ impl<T: 'static> Reader<T> {
             .into_box()
     }
 
-    /// Returns the total size of the file/blob
+    /// Returns the total size of the file/blob.
     pub fn size(&self) -> u64 {
         self.self_encryptor.len()
     }
 
-    /// Read data from file/blob
+    /// Read data from file/blob.
     pub fn read(&self, position: u64, length: u64) -> Box<NfsFuture<Vec<u8>>> {
         trace!(
             "Reader reading from pos: {} and size: {}.",

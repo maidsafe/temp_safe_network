@@ -27,7 +27,7 @@ use safe_core::ffi::ipc::req::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::{
     self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp, Permission,
 };
-use safe_core::{app_container_name, mdata_info};
+use safe_core::{app_container_name, mdata_info, Client};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::mpsc;
@@ -49,7 +49,7 @@ mod mock_routing {
     use safe_core::ipc::AuthReq;
     use safe_core::nfs::NfsError;
     use safe_core::utils::generate_random_string;
-    use safe_core::{app_container_name, CoreError, MockRouting};
+    use safe_core::{app_container_name, Client, CoreError, MockRouting};
     use std_dirs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
     use test_utils::{
         access_container, create_account_and_login_with_hook, rand_app, register_app, run,
@@ -460,7 +460,7 @@ fn config_root_dir() {
 
     // Fetch the entries of the config root dir.
     let (dir, entries) = run(&authenticator, |client| {
-        let dir = unwrap!(client.config_root_dir());
+        let dir = client.config_root_dir();
         client
             .list_mdata_entries(dir.name, dir.type_tag)
             .map(move |entries| (dir, entries))

@@ -14,7 +14,7 @@ use revocation;
 use routing::{AccountInfo, EntryActions, User};
 use safe_core::ipc::{AuthReq, Permission};
 use safe_core::nfs::NfsError;
-use safe_core::{app_container_name, CoreError, MDataInfo};
+use safe_core::{app_container_name, Client, CoreError, MDataInfo};
 use std::collections::HashMap;
 use test_utils::{
     access_container, create_account_and_login, create_authenticator, create_file, fetch_file,
@@ -28,6 +28,7 @@ mod mock_routing {
     use super::*;
     use access_container;
     use app_auth::{app_state, AppState};
+    use client::AuthClient;
     use config;
     use ffi::ipc::auth_flush_app_revocation_queue;
     use ffi_utils::test_utils::call_0;
@@ -526,7 +527,7 @@ mod mock_routing {
     {
         // First, log in normally to obtain the access contained info.
         let auth = unwrap!(Authenticator::login(locator, password, || ()));
-        let ac_info = run(&auth, |client| Ok(unwrap!(client.access_container())));
+        let ac_info = run(&auth, |client| Ok(client.access_container()));
 
         // Then, log in with a request hook that makes mutation of the access container
         // fail.
@@ -567,7 +568,7 @@ mod mock_routing {
     }
 
     fn verify_app_is_revoked(
-        client: &Client<()>,
+        client: &AuthClient,
         app_id: String,
         prev_ac_entry: AccessContainerEntry,
     ) -> Box<AuthFuture<()>> {
@@ -642,7 +643,7 @@ mod mock_routing {
             .into_box()
     }
 
-    fn verify_app_is_authenticated(client: &Client<()>, app_id: String) -> Box<AuthFuture<()>> {
+    fn verify_app_is_authenticated(client: &AuthClient, app_id: String) -> Box<AuthFuture<()>> {
         let c0 = client.clone();
         let c1 = client.clone();
         let c2 = client.clone();

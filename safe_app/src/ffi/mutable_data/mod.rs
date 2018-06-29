@@ -32,6 +32,7 @@ use safe_core::ffi::ipc::resp::MDataValue;
 use safe_core::ffi::MDataInfo;
 use safe_core::ipc::req::{permission_set_clone_from_repr_c, permission_set_into_repr_c};
 use safe_core::ipc::resp::{MDataKey as NativeMDataKey, MDataValue as NativeMDataValue};
+use safe_core::Client;
 use safe_core::{CoreError, FutureExt, MDataInfo as NativeMDataInfo};
 use std::os::raw::c_void;
 use App;
@@ -67,7 +68,13 @@ pub unsafe extern "C" fn mdata_put(
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            let owner_key = try_cb!(client.owner_key().map_err(AppError::from), user_data, o_cb);
+            let owner_key = try_cb!(
+                client
+                    .owner_key()
+                    .ok_or_else(|| AppError::Unexpected("Owner key not found".to_string())),
+                user_data,
+                o_cb
+            );
 
             let permissions = if permissions_h != PERMISSIONS_EMPTY {
                 try_cb!(

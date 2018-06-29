@@ -8,6 +8,7 @@
 
 use access_container;
 use app_auth;
+use client::AuthClient;
 use config;
 use errors::AuthError;
 use futures::future;
@@ -22,10 +23,13 @@ use safe_core::ipc::req::{container_perms_into_permission_set, ContainerPermissi
 use safe_core::ipc::resp::AccessContainerEntry;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
 use safe_core::nfs::{file_helper, File, Mode};
+use safe_core::utils::test_utils::setup_client_with_net_obs;
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
+use safe_core::{utils, NetworkEvent};
 use safe_core::{Client, FutureExt, MDataInfo};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::mpsc;
 use Authenticator;
 
@@ -159,7 +163,7 @@ pub fn register_rand_app(
 /// returned.
 pub fn try_run<F, I, T>(authenticator: &Authenticator, f: F) -> Result<T, AuthError>
 where
-    F: FnOnce(&Client<()>) -> I + Send + 'static,
+    F: FnOnce(&AuthClient) -> I + Send + 'static,
     I: IntoFuture<Item = T, Error = AuthError> + 'static,
     T: Send + 'static,
 {
@@ -183,7 +187,7 @@ where
 /// Like `try_run`, but expects success.
 pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
 where
-    F: FnOnce(&Client<()>) -> I + Send + 'static,
+    F: FnOnce(&AuthClient) -> I + Send + 'static,
     I: IntoFuture<Item = T, Error = AuthError> + 'static,
     T: Send + 'static,
 {
@@ -367,4 +371,43 @@ pub fn compare_access_container_entries(
     for (perms, expected) in results {
         assert_eq!(perms, expected);
     }
+}
+
+/// Create random registered client and run it inside an event loop. Use this to
+/// create an `AuthClient` automatically and randomly.
+pub fn random_client<Run, I, T, E>(r: Run) -> T
+where
+    Run: FnOnce(&AuthClient) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = E> + 'static,
+    T: Send + 'static,
+    E: Debug,
+{
+    let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
+    random_client_with_net_obs(n, r)
+}
+
+/// Create random registered client and run it inside an event loop. Use this to
+/// create an `AuthClient` automatically and randomly.
+pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
+where
+    NetObs: FnMut(NetworkEvent) + 'static,
+    Run: FnOnce(&AuthClient) -> I + Send + 'static,
+    I: IntoFuture<Item = T, Error = E> + 'static,
+    T: Send + 'static,
+    E: Debug,
+{
+    let c = |el_h, core_tx, net_tx| {
+        let acc_locator = unwrap!(utils::generate_random_string(10));
+        let acc_password = unwrap!(utils::generate_random_string(10));
+        let invitation = unwrap!(utils::generate_random_string(10));
+        AuthClient::registered(
+            &acc_locator,
+            &acc_password,
+            &invitation,
+            el_h,
+            core_tx,
+            net_tx,
+        )
+    };
+    setup_client_with_net_obs(c, n, r)
 }

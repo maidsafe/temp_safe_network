@@ -110,6 +110,7 @@ pub unsafe extern "C" fn cipher_opt_free(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use client::AppClient;
     use errors::AppError;
     use ffi::object_cache::CipherOptHandle;
     use ffi_utils::test_utils::{call_0, call_1};
@@ -289,7 +290,7 @@ mod tests {
     }
 
     fn decrypt_and_check(
-        client: &Client<AppContext>,
+        client: &AppClient,
         context: &AppContext,
         cipher_text: &[u8],
         orig_plain_text: &[u8],

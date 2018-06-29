@@ -22,6 +22,7 @@ use safe_core::crypto::{shared_box, shared_sign};
 use safe_core::ffi::arrays::{
     AsymNonce, AsymPublicKey, AsymSecretKey, SignPublicKey, SignSecretKey,
 };
+use safe_core::Client;
 use std::os::raw::c_void;
 use std::slice;
 use tiny_keccak::sha3_256;
@@ -42,7 +43,9 @@ pub unsafe extern "C" fn app_pub_sign_key(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
-            let key = client.public_signing_key()?;
+            let key = client
+                .public_signing_key()
+                .ok_or_else(|| AppError::Unexpected("Public signing key not found".to_string()))?;
             Ok(context.object_cache().insert_pub_sign_key(key))
         })
     })
@@ -208,7 +211,9 @@ pub unsafe extern "C" fn app_pub_enc_key(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
-            let key = client.public_encryption_key()?;
+            let key = client.public_encryption_key().ok_or_else(|| {
+                AppError::Unexpected("Public encryption key not found".to_string())
+            })?;
             Ok(context.object_cache().insert_encrypt_key(key))
         })
     })
@@ -392,7 +397,11 @@ pub unsafe extern "C" fn sign(
         (*app).send(move |client, context| {
             let sign_sk = if sign_sk_h == SIGN_WITH_APP {
                 try_cb!(
-                    client.secret_signing_key().map_err(AppError::from),
+                    client
+                        .secret_signing_key()
+                        .ok_or_else(|| AppError::Unexpected(
+                            "Secret signing key not found".to_string()
+                        )),
                     user_data,
                     o_cb
                 )

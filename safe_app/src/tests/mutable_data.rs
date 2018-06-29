@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use client::AppClient;
 use ffi::test_utils::test_create_app;
 use ffi_utils::test_utils::call_1;
 use futures::Future;
@@ -15,7 +16,7 @@ use rand::{OsRng, Rng};
 use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use safe_core::utils::test_utils::random_client;
-use safe_core::{utils, CoreError, FutureExt, DIR_TAG};
+use safe_core::{utils, Client, CoreError, FutureExt, DIR_TAG};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::CString;
 use std::sync::mpsc;
@@ -34,7 +35,7 @@ fn md_created_by_app_1() {
     let app: *mut App =
         unsafe { unwrap!(call_1(|ud, cb| test_create_app(app_id.as_ptr(), ud, cb))) };
 
-    run(unsafe { &*app }, |client, _app_context| {
+    run(unsafe { &*app }, |client: &AppClient, _app_context| {
         let mut rng = unwrap!(OsRng::new());
 
         let owners = btree_set![unwrap!(client.public_signing_key())];
@@ -542,7 +543,7 @@ fn multiple_apps() {
 #[test]
 fn permissions_and_version() {
     let app = create_app();
-    run(&app, |client, _app_context| {
+    run(&app, |client: &AppClient, _app_context| {
         let mut rng = unwrap!(OsRng::new());
         let sign_pk = unwrap!(client.public_signing_key());
         let (random_key, _) = sign::gen_keypair();
@@ -669,7 +670,7 @@ fn permissions_and_version() {
 #[test]
 fn permissions_crud() {
     let app = create_app();
-    run(&app, |client, _app_context| {
+    run(&app, |client: &AppClient, _app_context| {
         let mut rng = unwrap!(OsRng::new());
         let sign_pk = unwrap!(client.public_signing_key());
         let (random_key_a, _) = sign::gen_keypair();
@@ -972,7 +973,7 @@ fn permissions_crud() {
 #[test]
 fn entries_crud() {
     let app = create_app();
-    run(&app, |client, _app_context| {
+    run(&app, |client: &AppClient, _app_context| {
         let mut rng = unwrap!(OsRng::new());
         let sign_pk = unwrap!(client.public_signing_key());
 

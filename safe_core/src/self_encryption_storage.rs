@@ -14,19 +14,19 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 /// Network storage is the concrete type which self-encryption crate will use
-/// to put or get data from the network
-pub struct SelfEncryptionStorage<T> {
-    client: Client<T>,
+/// to put or get data from the network.
+pub struct SelfEncryptionStorage<C: Client> {
+    client: C,
 }
 
-impl<T> SelfEncryptionStorage<T> {
-    /// Create a new SelfEncryptionStorage instance
-    pub fn new(client: Client<T>) -> Self {
+impl<C: Client> SelfEncryptionStorage<C> {
+    /// Create a new SelfEncryptionStorage instance.
+    pub fn new(client: C) -> Self {
         SelfEncryptionStorage { client }
     }
 }
 
-impl<T: 'static> Storage for SelfEncryptionStorage<T> {
+impl<C: Client> Storage for SelfEncryptionStorage<C> {
     type Error = SelfEncryptionStorageError;
 
     fn get(&self, name: &[u8]) -> Box<Future<Item = Vec<u8>, Error = Self::Error>> {

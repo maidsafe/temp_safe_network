@@ -7,15 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use client::AppClient;
 use errors::AppError;
 use ffi_utils::callback::Callback;
 use ffi_utils::{FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use futures::Future;
-use safe_core::{Client, FutureExt};
+use safe_core::FutureExt;
 use std::fmt::Debug;
 use std::os::raw::c_void;
-use App;
-use AppContext;
+use {App, AppContext};
 
 // Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.
@@ -28,7 +28,7 @@ pub unsafe fn send_sync<C, F>(
 ) -> Result<(), AppError>
 where
     C: Callback + Copy + Send + 'static,
-    F: FnOnce(&Client<AppContext>, &AppContext) -> Result<C::Args, AppError> + Send + 'static,
+    F: FnOnce(&AppClient, &AppContext) -> Result<C::Args, AppError> + Send + 'static,
 {
     let user_data = OpaqueCtx(user_data);
 
@@ -53,7 +53,7 @@ pub unsafe fn send<C, F, U, E>(
 ) -> Result<(), AppError>
 where
     C: Callback + Copy + Send + 'static,
-    F: FnOnce(&Client<AppContext>, &AppContext) -> U + Send + 'static,
+    F: FnOnce(&AppClient, &AppContext) -> U + Send + 'static,
     U: Future<Item = C::Args, Error = E> + 'static,
     E: Debug + 'static,
     AppError: From<E>,
