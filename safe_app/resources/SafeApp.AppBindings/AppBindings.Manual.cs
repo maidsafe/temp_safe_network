@@ -52,7 +52,7 @@ namespace SafeApp.AppBindings {
       action();
     }
 
-    private static NoneCb DelegateOnAppDisconnectCb = OnAppDisconnectCb;
+    private static readonly NoneCb DelegateOnAppDisconnectCb = OnAppDisconnectCb;
 
     #if __IOS__
     [MonoPInvokeCallback(typeof(FfiResultAppCb))]
@@ -66,7 +66,7 @@ namespace SafeApp.AppBindings {
       action(Marshal.PtrToStructure<FfiResult>(result), app, GCHandle.FromIntPtr(userData));
     }
 
-    private static FfiResultAppCb DelegateOnAppCreateCb = OnAppCreateCb;
+    private static readonly FfiResultAppCb DelegateOnAppCreateCb = OnAppCreateCb;
 
     public Task<IpcMsg> DecodeIpcMsgAsync(string msg) {
       var (task, userData) = BindingUtils.PrepareTask<IpcMsg>();
@@ -94,7 +94,7 @@ namespace SafeApp.AppBindings {
           new AuthGranted(Marshal.PtrToStructure<AuthGrantedNative>(authGranted))));
     }
 
-    private static UIntAuthGrantedCb DelegateOnDecodeIpcMsgAuthCb = OnDecodeIpcMsgAuthCb;
+    private static readonly UIntAuthGrantedCb DelegateOnDecodeIpcMsgAuthCb = OnDecodeIpcMsgAuthCb;
 
     #if __IOS__
     [MonoPInvokeCallback(typeof(UIntByteListCb))]
@@ -105,7 +105,7 @@ namespace SafeApp.AppBindings {
       tcs.SetResult(new UnregisteredIpcMsg(reqId, serialisedCfgPtr, serialisedCfgLen));
     }
 
-    private static UIntByteListCb DelegateOnDecodeIpcMsgUnregisteredCb = OnDecodeIpcMsgUnregisteredCb;
+    private static readonly UIntByteListCb DelegateOnDecodeIpcMsgUnregisteredCb = OnDecodeIpcMsgUnregisteredCb;
 
     #if __IOS__
     [MonoPInvokeCallback(typeof(UIntCb))]
@@ -116,7 +116,7 @@ namespace SafeApp.AppBindings {
       tcs.SetResult(new ContainersIpcMsg(reqId));
     }
 
-    private static UIntCb DelegateOnDecodeIpcMsgContainersCb = OnDecodeIpcMsgContainersCb;
+    private static readonly UIntCb DelegateOnDecodeIpcMsgContainersCb = OnDecodeIpcMsgContainersCb;
 
     #if __IOS__
     [MonoPInvokeCallback(typeof(UIntCb))]
@@ -127,7 +127,7 @@ namespace SafeApp.AppBindings {
       tcs.SetResult(new ShareMDataIpcMsg(reqId));
     }
 
-    private static UIntCb DelegateOnDecodeIpcMsgShareMdataCb = OnDecodeIpcMsgShareMdataCb;
+    private static readonly UIntCb DelegateOnDecodeIpcMsgShareMdataCb = OnDecodeIpcMsgShareMdataCb;
 
     #if __IOS__
     [MonoPInvokeCallback(typeof(NoneCb))]
@@ -138,7 +138,7 @@ namespace SafeApp.AppBindings {
       tcs.SetResult(new RevokedIpcMsg());
     }
 
-    private static NoneCb DelegateOnDecodeIpcMsgRevokedCb = OnDecodeIpcMsgRevokedCb;
+    private static readonly NoneCb DelegateOnDecodeIpcMsgRevokedCb = OnDecodeIpcMsgRevokedCb;
 
     #if __IOS__
     [MonoPInvokeCallback(typeof(FfiResultUIntCb))]
@@ -150,7 +150,7 @@ namespace SafeApp.AppBindings {
       tcs.SetException(new IpcMsgException(reqId, res.ErrorCode, res.Description));
     }
 
-    private static FfiResultUIntCb DelegateOnDecodeIpcMsgErrCb = OnDecodeIpcMsgErrCb;
+    private static readonly FfiResultUIntCb DelegateOnDecodeIpcMsgErrCb = OnDecodeIpcMsgErrCb;
   }
 }
 #endif
