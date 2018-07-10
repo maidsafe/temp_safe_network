@@ -21,6 +21,7 @@ use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions};
 use safe_core::ipc::{AuthGranted, Permission};
 use safe_core::nfs::{Mode, NfsError};
 use safe_core::{utils, CoreError};
+use serde_json;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::CString;

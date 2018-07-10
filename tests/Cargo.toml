@@ -9,11 +9,16 @@ version = "0.1.0"
 
 [dependencies]
 ffi_utils = { path = "../ffi_utils", version = "~0.6.0" }
-safe_app = { path = "../safe_app", version = "~0.7.0" }
+futures = "~0.1.17"
 serde = "~1.0.24"
 serde_json = "~1.0.2"
 serde_derive = "~1.0.24"
 unwrap = "~1.1.0"
+
+[dependencies.safe_app]
+path = "../safe_app"
+version = "~0.7.0"
+features = ["testing"]
 
 [dependencies.safe_authenticator]
 path = "../safe_authenticator"
@@ -24,3 +29,12 @@ features = ["testing"]
 path = "../safe_core"
 version = "~0.30.0"
 features = ["testing"]
+
+[features]
+use-mock-routing = [
+"testing",
+"safe_core/use-mock-routing",
+"safe_authenticator/use-mock-routing",
+"safe_app/use-mock-routing",
+]
+testing = ["safe_core/testing", "safe_authenticator/testing", "safe_app/testing"]

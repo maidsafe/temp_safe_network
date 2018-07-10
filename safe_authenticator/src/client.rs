@@ -644,6 +644,7 @@ mod tests {
         let inv = unwrap!(utils::generate_random_string(10));
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| {
                 match AuthClient::login(
                     &sec_0,
@@ -663,6 +664,7 @@ mod tests {
         );
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| AuthClient::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
             |_| finish(),
         );
@@ -696,6 +698,7 @@ mod tests {
         let seed = unwrap!(utils::generate_random_string(30));
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| {
                 match AuthClient::login_with_seed(
                     &seed,
@@ -714,6 +717,7 @@ mod tests {
         );
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| AuthClient::login_with_seed(&seed, el_h, core_tx, net_tx),
             |_| finish(),
         );
@@ -730,6 +734,7 @@ mod tests {
         let dir_clone = dir.clone();
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| {
                 AuthClient::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
             },
@@ -740,6 +745,7 @@ mod tests {
         );
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| AuthClient::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
             move |client| {
                 let got_dir = client.access_container();
@@ -760,6 +766,7 @@ mod tests {
         let dir_clone = dir.clone();
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| {
                 AuthClient::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
             },
@@ -770,6 +777,7 @@ mod tests {
         );
 
         setup_client(
+            &(),
             |el_h, core_tx, net_tx| AuthClient::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
             move |client| {
                 let got_dir = client.config_root_dir();

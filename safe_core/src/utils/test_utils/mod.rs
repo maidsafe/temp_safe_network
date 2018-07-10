@@ -77,45 +77,48 @@ where
             net_tx,
         )
     };
-    setup_client_with_net_obs(c, n, r)
+    setup_client_with_net_obs(&(), c, n, r)
 }
 
 /// Helper to create a client and run it in an event loop. Useful when we need
 /// to supply credentials explicitly or when Client is to be constructed as
 /// unregistered or as a result of successful login. Use this to create Client
 /// manually.
-pub fn setup_client<Create, Run, A, C, I, T, E>(c: Create, r: Run) -> T
+pub fn setup_client<Create, Run, A, C, I, T, E, F>(context: &A, c: Create, r: Run) -> T
 where
-    Create: FnOnce(Handle, CoreMsgTx<C, ()>, NetworkTx) -> Result<C, A>,
+    Create: FnOnce(Handle, CoreMsgTx<C, A>, NetworkTx) -> Result<C, F>,
     Run: FnOnce(&C) -> I + Send + 'static,
-    A: Debug,
+    A: 'static,
     C: Client,
     I: IntoFuture<Item = T, Error = E> + 'static,
     T: Send + 'static,
     E: Debug,
+    F: Debug,
 {
     let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
-    setup_client_with_net_obs(c, n, r)
+    setup_client_with_net_obs(context, c, n, r)
 }
 
 /// Helper to create a client and run it in an event loop. Useful when we need
 /// to supply credentials explicitly or when Client is to be constructed as
 /// unregistered or as a result of successful login. Use this to create Client
 /// manually.
-pub fn setup_client_with_net_obs<Create, NetObs, Run, A, C, I, T, E>(
+pub fn setup_client_with_net_obs<Create, NetObs, Run, A, C, I, T, E, F>(
+    context: &A,
     c: Create,
     mut n: NetObs,
     r: Run,
 ) -> T
 where
-    Create: FnOnce(Handle, CoreMsgTx<C, ()>, NetworkTx) -> Result<C, A>,
+    Create: FnOnce(Handle, CoreMsgTx<C, A>, NetworkTx) -> Result<C, F>,
     NetObs: FnMut(NetworkEvent) + 'static,
     Run: FnOnce(&C) -> I + Send + 'static,
-    A: Debug,
+    A: 'static,
     C: Client,
     I: IntoFuture<Item = T, Error = E> + 'static,
     T: Send + 'static,
     E: Debug,
+    F: Debug,
 {
     let el = unwrap!(Core::new());
     let el_h = el.handle();
@@ -135,20 +138,22 @@ where
     let core_tx_clone = core_tx.clone();
     let (result_tx, result_rx) = std_mpsc::channel();
 
-    unwrap!(core_tx.unbounded_send(CoreMsg::new(move |client, &()| {
-        let fut = r(client)
-            .into_future()
-            .map_err(|e| panic!("{:?}", e))
-            .map(move |value| {
-                unwrap!(result_tx.send(value));
-                unwrap!(core_tx_clone.unbounded_send(CoreMsg::build_terminator()));
-            })
-            .into_box();
+    unwrap!(
+        core_tx.unbounded_send(CoreMsg::new(move |client, _context| {
+            let fut = r(client)
+                .into_future()
+                .map_err(|e| panic!("{:?}", e))
+                .map(move |value| {
+                    unwrap!(result_tx.send(value));
+                    unwrap!(core_tx_clone.unbounded_send(CoreMsg::build_terminator()));
+                })
+                .into_box();
 
-        Some(fut)
-    })));
+            Some(fut)
+        }))
+    );
 
-    event_loop::run(el, &client, &(), core_rx);
+    event_loop::run(el, &client, context, core_rx);
 
     unwrap!(result_rx.recv())
 }

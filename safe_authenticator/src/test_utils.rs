@@ -409,5 +409,5 @@ where
             net_tx,
         )
     };
-    setup_client_with_net_obs(c, n, r)
+    setup_client_with_net_obs(&(), c, n, r)
 }

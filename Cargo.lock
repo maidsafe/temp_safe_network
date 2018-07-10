@@ -1485,6 +1485,7 @@ name = "tests"
 version = "0.1.0"
 dependencies = [
  "ffi_utils 0.6.0",
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_app 0.7.0",
  "safe_authenticator 0.7.0",
  "safe_core 0.30.0",

@@ -36,6 +36,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 extern crate ffi_utils;
+extern crate futures;
 extern crate safe_app;
 extern crate safe_authenticator;
 #[macro_use]
@@ -48,64 +49,30 @@ extern crate unwrap;
 
 mod real_network;
 
-// Tests for unregistered clients.
+use futures::future::Future;
+use safe_app::test_utils::run_now;
+use safe_app::{App, Client, ImmutableData};
+use safe_core::utils;
+use safe_core::utils::test_utils::random_client;
+
+// Test unregistered clients.
 // 1. Have a registered client PUT something on the network.
-// 2. Try to set the access container as unregistered - this should fail.
-// 3. Try to set the config root directory as unregistered - this should fail.
+// 2. Try to read it as unregistered.
 #[test]
 fn unregistered_client() {
     let orig_data = ImmutableData::new(unwrap!(utils::generate_random_vector(30)));
 
-    // Registered Client PUTs something onto the network
+    // Registered Client PUTs something onto the network.
     {
         let orig_data = orig_data.clone();
         random_client(|client| client.put_idata(orig_data));
     }
 
-    // Unregistered Client should be able to retrieve the data
-    setup_client(
-        |el_h, core_tx, net_tx| Client::unregistered(el_h, core_tx, net_tx, None),
-        move |client| {
-            let client2 = client.clone();
-            let client3 = client.clone();
-
-            client
-                .get_idata(*orig_data.name())
-                .then(move |res| {
-                    let data = unwrap!(res);
-                    assert_eq!(data, orig_data);
-                    let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
-                    client2.set_access_container(dir)
-                })
-                .then(move |res| {
-                    let e = match res {
-                        Ok(_) => {
-                            panic!("Unregistered client should not be allowed to set user root dir")
-                        }
-                        Err(e) => e,
-                    };
-                    match e {
-                        CoreError::OperationForbidden => (),
-                        _ => panic!("Unexpected {:?}", e),
-                    }
-
-                    let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
-                    client3.set_config_root_dir(dir)
-                })
-                .then(|res| {
-                    let e = match res {
-                        Ok(_) => panic!(
-                            "Unregistered client should not be allowed to set config root \
-                             dir"
-                        ),
-                        Err(e) => e,
-                    };
-                    match e {
-                        CoreError::OperationForbidden => (),
-                        _ => panic!("Unexpected {:?}", e),
-                    }
-                    finish()
-                })
-        },
-    );
+    // Unregistered Client should be able to retrieve the data.
+    let app = unwrap!(App::unregistered(|| (), None));
+    run_now(&app, move |client, _context| {
+        let _ = client.get_idata(*orig_data.name()).map(move |data| {
+            assert_eq!(data, orig_data);
+        });
+    });
 }
