@@ -2,4 +2,6 @@
 
 set -x;
 
-scripts/test-ffi-utils && scripts/test-mock
+scripts/test-ffi-utils &&
+  scripts/test-mock &&
+  scripts/test-integration

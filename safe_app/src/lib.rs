@@ -45,6 +45,7 @@ extern crate ffi_utils;
 extern crate futures;
 #[macro_use]
 extern crate log;
+extern crate lru_cache;
 extern crate maidsafe_utilities;
 #[cfg(test)]
 extern crate rand;
@@ -68,7 +69,10 @@ pub use routing::{
     Action, ClientError, EntryAction, ImmutableData, MutableData, PermissionSet, User, Value,
     XorName, XOR_NAME_LEN,
 };
-pub use safe_core::*;
+pub use safe_core::{
+    app_container_name, immutable_data, ipc, mdata_info, nfs, Client, ClientKeys, MDataInfo,
+    DIR_TAG, MAIDSAFE_TAG,
+};
 
 // Export FFI interface.
 
@@ -95,6 +99,7 @@ pub use ffi::test_utils::*;
 pub use ffi::*;
 
 pub mod cipher_opt;
+mod client;
 mod errors;
 pub mod object_cache;
 pub mod permissions;
@@ -107,10 +112,11 @@ mod tests;
 pub mod test_utils;
 
 pub use self::errors::*;
-
-use self::object_cache::ObjectCache;
+pub use client::AppClient;
 #[cfg(any(test, feature = "testing"))]
 pub use ffi::test_utils::{test_create_app, test_create_app_with_access};
+
+use self::object_cache::ObjectCache;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use futures::{future, Future};
@@ -121,9 +127,7 @@ use safe_core::ipc::resp::{access_container_enc_key, AccessContainerEntry};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
-use safe_core::{
-    event_loop, utils, Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
-};
+use safe_core::{event_loop, utils, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -141,10 +145,11 @@ macro_rules! try_tx {
 }
 
 type AppFuture<T> = Future<Item = T, Error = AppError>;
+type AppMsgTx = CoreMsgTx<AppClient, AppContext>;
 
 /// Handle to an application instance.
 pub struct App {
-    core_tx: Mutex<CoreMsgTx<AppContext>>,
+    core_tx: Mutex<AppMsgTx>,
     _core_joiner: Joiner,
 }
 
@@ -158,7 +163,7 @@ impl App {
         N: FnMut() + Send + 'static,
     {
         Self::new(disconnect_notifier, |el_h, core_tx, net_tx| {
-            let client = Client::unregistered(el_h, core_tx, net_tx, config)?;
+            let client = AppClient::unregistered(el_h, core_tx, net_tx, config)?;
             let context = AppContext::unregistered();
             Ok((client, context))
         })
@@ -208,7 +213,7 @@ impl App {
         };
 
         Self::new(disconnect_notifier, move |el_h, core_tx, net_tx| {
-            let client = Client::from_keys(
+            let client = AppClient::from_keys(
                 client_keys,
                 owner_key,
                 el_h,
@@ -257,7 +262,7 @@ impl App {
         };
 
         Self::new(disconnect_notifier, move |el_h, core_tx, net_tx| {
-            let client = Client::from_keys_with_hook(
+            let client = AppClient::from_keys_with_hook(
                 client_keys,
                 owner_key,
                 el_h,
@@ -274,8 +279,7 @@ impl App {
     fn new<N, F>(mut disconnect_notifier: N, setup: F) -> Result<Self, AppError>
     where
         N: FnMut() + Send + 'static,
-        F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
-                -> Result<(Client<AppContext>, AppContext), AppError>
+        F: FnOnce(Handle, AppMsgTx, NetworkTx) -> Result<(AppClient, AppContext), AppError>
             + Send
             + 'static,
     {
@@ -317,7 +321,7 @@ impl App {
     /// Send a message to app's event loop
     pub fn send<F>(&self, f: F) -> Result<(), AppError>
     where
-        F: FnOnce(&Client<AppContext>, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
+        F: FnOnce(&AppClient, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
             + Send
             + 'static,
     {
@@ -402,16 +406,13 @@ impl AppContext {
     }
 
     /// Refresh access info by fetching it from the network.
-    pub fn refresh_access_info(&self, client: &Client<AppContext>) -> Box<AppFuture<()>> {
+    pub fn refresh_access_info(&self, client: &AppClient) -> Box<AppFuture<()>> {
         let reg = Rc::clone(fry!(self.as_registered()));
         refresh_access_info(reg, client)
     }
 
     /// Fetch a list of containers that this app has access to
-    pub fn get_access_info(
-        &self,
-        client: &Client<AppContext>,
-    ) -> Box<AppFuture<AccessContainerEntry>> {
+    pub fn get_access_info(&self, client: &AppClient) -> Box<AppFuture<AccessContainerEntry>> {
         let reg = Rc::clone(fry!(self.as_registered()));
 
         fetch_access_info(Rc::clone(&reg), client)
@@ -430,7 +431,7 @@ impl AppContext {
     }
 }
 
-fn refresh_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Box<AppFuture<()>> {
+fn refresh_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFuture<()>> {
     let entry_key = fry!(access_container_enc_key(
         &context.app_id,
         &context.sym_enc_key,
@@ -455,7 +456,7 @@ fn refresh_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> 
         .into_box()
 }
 
-fn fetch_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Box<AppFuture<()>> {
+fn fetch_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFuture<()>> {
     if context.access_info.borrow().is_empty() {
         refresh_access_info(context, client)
     } else {

@@ -2,4 +2,6 @@
 
 set -x;
 
-scripts/build-ffi-utils && scripts/build-real && scripts/build-mock
+scripts/build-ffi-utils &&
+  scripts/build-real &&
+  scripts/build-mock

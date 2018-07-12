@@ -10,8 +10,6 @@
 #![allow(unsafe_code)]
 
 use errors::AppError;
-#[cfg(feature = "use-mock-routing")]
-use ffi::helper::send_sync;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, ReprC, FFI_RESULT_OK};
 use safe_core::ffi::ipc::req::AuthReq;
 use safe_core::ipc::req::AuthReq as NativeAuthReq;
@@ -70,6 +68,9 @@ pub unsafe extern "C" fn test_simulate_network_disconnect(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
+    use ffi::helper::send_sync;
+    use safe_core::Client;
+
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |client, _| {
             client.simulate_network_disconnect();

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use access_container::{self, AUTHENTICATOR_ENTRY};
+use client::AuthClient;
 use config::KEY_APPS;
 use futures::{future, Future};
 use maidsafe_utilities::serialisation::serialise;
@@ -32,14 +33,14 @@ pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
 pub static DEFAULT_PUBLIC_DIRS: [&'static str; 1] = ["_public"];
 
 /// Create the root directories and the standard directories for the access container
-pub fn create(client: &Client<()>) -> Box<AuthFuture<()>> {
+pub fn create(client: &AuthClient) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
     let c3 = client.clone();
     let c4 = client.clone();
 
     // Initialise standard directories
-    let access_container = fry!(client.access_container());
-    let config_dir = fry!(client.config_root_dir());
+    let access_container = client.access_container();
+    let config_dir = client.config_root_dir();
 
     // Try to get default dirs from the access container
     let access_cont_fut = access_container::fetch_authenticator_entry(&c2)
@@ -75,13 +76,13 @@ pub fn create(client: &Client<()>) -> Box<AuthFuture<()>> {
         .and_then(move |_| {
             // Update account packet - root directories have been created successfully
             // (so we don't have to recover them after login).
-            fry!(c4.set_std_dirs_created(true).map_err(AuthError::from));
+            c4.set_std_dirs_created(true);
             c4.update_account_packet().map_err(From::from).into_box()
         })
         .into_box()
 }
 
-fn create_config_dir(client: &Client<()>, config_dir: &MDataInfo) -> Box<AuthFuture<()>> {
+fn create_config_dir(client: &AuthClient, config_dir: &MDataInfo) -> Box<AuthFuture<()>> {
     let config_dir_entries =
         btree_map![KEY_APPS.to_vec() => Value { content: Vec::new(), entry_version: 0 }];
 
@@ -93,11 +94,15 @@ fn create_config_dir(client: &Client<()>, config_dir: &MDataInfo) -> Box<AuthFut
 }
 
 fn create_access_container(
-    client: &Client<()>,
+    client: &AuthClient,
     access_container: &MDataInfo,
     default_entries: &HashMap<String, MDataInfo>,
 ) -> Box<AuthFuture<()>> {
-    let enc_key = fry!(client.secret_symmetric_key());
+    let enc_key = fry!(
+        client
+            .secret_symmetric_key()
+            .ok_or_else(|| AuthError::Unexpected("Secret symmetric key not found".to_string()))
+    );
 
     // Create access container
     let authenticator_key = fry!(
@@ -141,8 +146,8 @@ pub fn random_std_dirs() -> Result<Vec<(&'static str, MDataInfo)>, CoreError> {
 
 /// A registration helper function to create the set of default dirs
 /// in the users root directory.
-pub fn create_std_dirs<T: 'static>(
-    client: &Client<T>,
+pub fn create_std_dirs(
+    client: &AuthClient,
     md_infos: &HashMap<String, MDataInfo>,
 ) -> Box<AuthFuture<()>> {
     let client = client.clone();

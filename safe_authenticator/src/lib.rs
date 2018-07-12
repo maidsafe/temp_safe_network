@@ -44,6 +44,7 @@ extern crate ffi_utils;
 extern crate futures;
 #[macro_use]
 extern crate log;
+extern crate lru_cache;
 extern crate maidsafe_utilities;
 extern crate routing;
 extern crate serde;
@@ -70,6 +71,7 @@ pub use ffi::*;
 mod access_container;
 mod app_auth;
 mod app_container;
+mod client;
 mod config;
 mod errors;
 mod ipc;
@@ -84,21 +86,23 @@ pub mod test_utils;
 mod tests;
 
 pub use self::errors::AuthError;
+pub use client::AuthClient;
+
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use futures::Future;
 use maidsafe_utilities::thread::{self, Joiner};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
-use safe_core::{
-    event_loop, Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
-};
+use safe_core::{event_loop, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx};
 use std::sync::mpsc::sync_channel;
 use std::sync::Mutex;
 use tokio_core::reactor::{Core, Handle};
 
-/// Future type specialised with `AuthError` as an error type
+/// Future type specialised with `AuthError` as an error type.
 pub type AuthFuture<T> = Future<Item = T, Error = AuthError>;
+/// Transmitter of AuthClient messages.
+pub type AuthMsgTx = CoreMsgTx<AuthClient, ()>;
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
@@ -114,7 +118,7 @@ macro_rules! try_tx {
 /// Authenticator instance
 pub struct Authenticator {
     /// Channel to communicate with the core event loop
-    pub core_tx: Mutex<CoreMsgTx<()>>,
+    pub core_tx: Mutex<AuthMsgTx>,
     _core_joiner: Joiner,
 }
 
@@ -122,7 +126,7 @@ impl Authenticator {
     /// Send a message to the authenticator event loop
     pub fn send<F>(&self, f: F) -> Result<(), AuthError>
     where
-        F: FnOnce(&Client<()>) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static,
+        F: FnOnce(&AuthClient) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static,
     {
         let msg = CoreMsg::new(|client, _| f(client));
         let core_tx = unwrap!(self.core_tx.lock());
@@ -146,7 +150,7 @@ impl Authenticator {
 
         Self::create_acc_impl(
             move |el_h, core_tx, net_tx| {
-                Client::registered(&locator, &password, &invitation, el_h, core_tx, net_tx)
+                AuthClient::registered(&locator, &password, &invitation, el_h, core_tx, net_tx)
             },
             disconnect_notifier,
         )
@@ -159,7 +163,7 @@ impl Authenticator {
     ) -> Result<Self, AuthError>
     where
         N: FnMut() + Send + 'static,
-        F: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+        F: FnOnce(Handle, AuthMsgTx, NetworkTx) -> Result<AuthClient, AuthError>,
     {
         let (tx, rx) = sync_channel(0);
 
@@ -227,7 +231,9 @@ impl Authenticator {
         let password = password.into();
 
         Self::login_impl(
-            move |el_h, core_tx, net_tx| Client::login(&locator, &password, el_h, core_tx, net_tx),
+            move |el_h, core_tx, net_tx| {
+                AuthClient::login(&locator, &password, el_h, core_tx, net_tx)
+            },
             disconnect_notifier,
         )
     }
@@ -238,7 +244,7 @@ impl Authenticator {
         mut disconnect_notifier: N,
     ) -> Result<Self, AuthError>
     where
-        F: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+        F: FnOnce(Handle, AuthMsgTx, NetworkTx) -> Result<AuthClient, AuthError>,
         N: FnMut() + Send + 'static,
     {
         let (tx, rx) = sync_channel(0);
@@ -263,7 +269,7 @@ impl Authenticator {
 
             let client = try_tx!(create_client_fn(el_h, core_tx_clone, net_tx), tx);
 
-            if !try_tx!(client.std_dirs_created(), tx) {
+            if !client.std_dirs_created() {
                 // Standard directories haven't been created during
                 // the user account registration - retry it again.
                 let tx2 = tx.clone();
@@ -324,7 +330,7 @@ impl Authenticator {
 
         Self::login_impl(
             move |el_h, core_tx, net_tx| {
-                Client::login_with_hook(
+                AuthClient::login_with_hook(
                     &locator,
                     &password,
                     el_h,
@@ -356,7 +362,7 @@ impl Authenticator {
 
         Self::create_acc_impl(
             move |el_h, core_tx_clone, net_tx| {
-                Client::registered_with_hook(
+                AuthClient::registered_with_hook(
                     &locator,
                     &password,
                     &invitation,

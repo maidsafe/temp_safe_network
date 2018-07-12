@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{AuthError, AuthFuture};
+use client::AuthClient;
 use futures::future::{self, Either, Loop};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -53,12 +54,12 @@ pub fn next_version(version: Option<u64>) -> u64 {
 }
 
 /// Retrieves apps registered with the authenticator.
-pub fn list_apps(client: &Client<()>) -> Box<AuthFuture<(Option<u64>, Apps)>> {
+pub fn list_apps(client: &AuthClient) -> Box<AuthFuture<(Option<u64>, Apps)>> {
     get_entry(client, KEY_APPS)
 }
 
 /// Retrieves an app info by the given app ID.
-pub fn get_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<AppInfo>> {
+pub fn get_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<AppInfo>> {
     let app_id_hash = sha3_256(app_id.as_bytes());
     list_apps(client)
         .and_then(move |(_, config)| {
@@ -72,7 +73,7 @@ pub fn get_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<AppInfo>> {
 
 /// Register the given app with authenticator.
 pub fn insert_app(
-    client: &Client<()>,
+    client: &AuthClient,
     apps: Apps,
     new_version: u64,
     app: AppInfo,
@@ -87,7 +88,7 @@ pub fn insert_app(
 
 /// Remove the given app from the list of registered apps.
 pub fn remove_app(
-    client: &Client<()>,
+    client: &AuthClient,
     apps: Apps,
     new_version: u64,
     app_id: &str,
@@ -102,7 +103,7 @@ pub fn remove_app(
 /// Returns version and the revocation queue in a tuple.
 /// If the queue is not found on the config file, returns `None`.
 pub fn get_app_revocation_queue(
-    client: &Client<()>,
+    client: &AuthClient,
 ) -> Box<AuthFuture<(Option<u64>, RevocationQueue)>> {
     get_entry(client, KEY_APP_REVOCATION_QUEUE)
 }
@@ -110,7 +111,7 @@ pub fn get_app_revocation_queue(
 /// Push new `app_id` into the revocation queue and put it onto the network.
 /// Does nothing if the queue already contains `app_id`.
 pub fn push_to_app_revocation_queue(
-    client: &Client<()>,
+    client: &AuthClient,
     queue: RevocationQueue,
     new_version: u64,
     app_id: &str,
@@ -137,7 +138,7 @@ pub fn push_to_app_revocation_queue(
 /// Remove `app_id` from the revocation queue.
 /// Does nothing if the queue doesn't contain `app_id`.
 pub fn remove_from_app_revocation_queue(
-    client: &Client<()>,
+    client: &AuthClient,
     queue: RevocationQueue,
     new_version: u64,
     app_id: &str,
@@ -164,7 +165,7 @@ pub fn remove_from_app_revocation_queue(
 /// Moves `app_id` to the back of the revocation queue.
 /// Does nothing if the queue doesn't contain `app_id`.
 pub fn repush_to_app_revocation_queue(
-    client: &Client<()>,
+    client: &AuthClient,
     queue: RevocationQueue,
     new_version: u64,
     app_id: &str,
@@ -191,11 +192,11 @@ pub fn repush_to_app_revocation_queue(
     )
 }
 
-fn get_entry<T>(client: &Client<()>, key: &[u8]) -> Box<AuthFuture<(Option<u64>, T)>>
+fn get_entry<T>(client: &AuthClient, key: &[u8]) -> Box<AuthFuture<(Option<u64>, T)>>
 where
     T: Default + DeserializeOwned + Serialize + 'static,
 {
-    let parent = fry!(client.config_root_dir());
+    let parent = client.config_root_dir();
     let key = fry!(parent.enc_entry_key(key));
 
     client
@@ -220,7 +221,7 @@ where
 }
 
 fn update_entry<T>(
-    client: &Client<()>,
+    client: &AuthClient,
     key: &[u8],
     content: &T,
     new_version: u64,
@@ -228,7 +229,7 @@ fn update_entry<T>(
 where
     T: Serialize,
 {
-    let parent = fry!(client.config_root_dir());
+    let parent = client.config_root_dir();
 
     let key = fry!(parent.enc_entry_key(key));
     let encoded = fry!(serialise(content));
@@ -269,7 +270,7 @@ where
 
 /// Atomically mutate the given value and store it in the network.
 fn mutate_entry<T, F>(
-    client: &Client<()>,
+    client: &AuthClient,
     key: &[u8],
     item: T,
     new_version: u64,

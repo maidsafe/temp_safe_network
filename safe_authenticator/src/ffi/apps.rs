@@ -23,7 +23,7 @@ use safe_core::ipc::req::containers_into_vec;
 use safe_core::ipc::resp::{AccessContainerEntry, AppAccess as NativeAppAccess};
 use safe_core::ipc::{access_container_enc_key, IpcError};
 use safe_core::utils::symmetric_decrypt;
-use safe_core::FutureExt;
+use safe_core::{Client, FutureExt};
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_void};
 use AuthError;
@@ -123,11 +123,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
             let c3 = client.clone();
 
             config::list_apps(client)
-                .and_then(move |(_, auth_cfg)| {
-                    c2.access_container()
-                        .map_err(AuthError::from)
-                        .map(move |access_container| (access_container, auth_cfg))
-                })
+                .map(move |(_, auth_cfg)| (c2.access_container(), auth_cfg))
                 .and_then(move |(access_container, auth_cfg)| {
                     c3.list_mdata_entries(access_container.name, access_container.type_tag)
                         .map_err(From::from)
@@ -191,11 +187,7 @@ pub unsafe extern "C" fn auth_registered_apps(
             let c3 = client.clone();
 
             config::list_apps(client)
-                .and_then(move |(_, auth_cfg)| {
-                    c2.access_container()
-                        .map_err(AuthError::from)
-                        .map(move |access_container| (access_container, auth_cfg))
-                })
+                .map(move |(_, auth_cfg)| (c2.access_container(), auth_cfg))
                 .and_then(move |(access_container, auth_cfg)| {
                     c3.list_mdata_entries(access_container.name, access_container.type_tag)
                         .map_err(From::from)

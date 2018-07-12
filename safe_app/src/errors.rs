@@ -99,6 +99,7 @@ mod codes {
     pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
     pub const ERR_INVALID_FILE_MODE: i32 = -1016;
     pub const ERR_INVALID_SIGN_SEC_KEY_HANDLE: i32 = -1017;
+    pub const ERR_UNREGISTERED_CLIENT_ACCESS: i32 = -1018;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -115,42 +116,44 @@ pub enum AppError {
     NfsError(NfsError),
     /// Generic encoding / decoding failure.
     EncodeDecodeError,
-    /// Forbidden operation
+    /// Forbidden operation.
     OperationForbidden,
-    /// Container not found
+    /// Container not found.
     NoSuchContainer(String),
-    /// Invalid file mode (e.g. trying to write when file is opened for reading only)
+    /// Invalid file mode (e.g. trying to write when file is opened for reading only).
     InvalidFileMode,
+    /// Tried to access a client key from an unregistered client.
+    UnregisteredClientAccess,
 
-    /// Invalid CipherOpt handle
+    /// Invalid CipherOpt handle.
     InvalidCipherOptHandle,
-    /// Invalid encrypt (box_) key handle
+    /// Invalid encrypt (box_) key handle.
     InvalidEncryptPubKeyHandle,
-    /// Invalid secret key handle
+    /// Invalid secret key handle.
     InvalidEncryptSecKeyHandle,
-    /// Invalid MutableData entries handle
+    /// Invalid MutableData entries handle.
     InvalidMDataEntriesHandle,
-    /// Invalid MutableData entry actions handle
+    /// Invalid MutableData entry actions handle.
     InvalidMDataEntryActionsHandle,
-    /// Invalid MutableData permissions handle
+    /// Invalid MutableData permissions handle.
     InvalidMDataPermissionsHandle,
-    /// Invalid Self Encryptor handle
+    /// Invalid Self Encryptor handle.
     InvalidSelfEncryptorHandle,
-    /// Invalid public sign key handle
+    /// Invalid public sign key handle.
     InvalidSignPubKeyHandle,
-    /// Invalid secret sign key handle
+    /// Invalid secret sign key handle.
     InvalidSignSecKeyHandle,
-    /// Invalid file writer handle
+    /// Invalid file writer handle.
     InvalidFileContextHandle,
 
-    /// Error while self-encrypting data
+    /// Error while self-encrypting data.
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
     /// Invalid offsets (from-position and length combination) provided for
     /// reading form SelfEncryptor. Would have probably caused an overflow.
     InvalidSelfEncryptorReadOffsets,
-    /// Input/output error
+    /// Input/output error.
     IoError(IoError),
-    /// Unexpected error
+    /// Unexpected error.
     Unexpected(String),
 }
 
@@ -168,8 +171,11 @@ impl Display for AppError {
             AppError::InvalidCipherOptHandle => write!(formatter, "Invalid CipherOpt handle"),
             AppError::InvalidFileMode => write!(
                 formatter,
-                "Invalid file mode (e.g. trying to write when \
-                 file is opened for reading only)"
+                "Invalid file mode (e.g. trying to write when file is opened for reading only)"
+            ),
+            AppError::UnregisteredClientAccess => write!(
+                formatter,
+                "Tried to access a client key from an unregistered client",
             ),
             AppError::InvalidEncryptPubKeyHandle => {
                 write!(formatter, "Invalid encrypt (box_) key handle")
@@ -355,6 +361,7 @@ impl ErrorCode for AppError {
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
             AppError::InvalidFileContextHandle => ERR_INVALID_FILE_CONTEXT_HANDLE,
             AppError::InvalidFileMode => ERR_INVALID_FILE_MODE,
+            AppError::UnregisteredClientAccess => ERR_UNREGISTERED_CLIENT_ACCESS,
             AppError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
             AppError::InvalidSelfEncryptorReadOffsets => ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS,
             AppError::IoError(_) => ERR_IO_ERROR,

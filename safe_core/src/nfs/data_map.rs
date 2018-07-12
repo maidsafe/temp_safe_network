@@ -20,8 +20,8 @@ use utils::FutureExt;
 
 // Get `DataMap` from the network.
 // If the `DataMap` is encrypted, an `encryption_key` must be passed in to decrypt it.
-pub fn get<T: 'static>(
-    client: &Client<T>,
+pub fn get(
+    client: &impl Client,
     name: &XorName,
     encryption_key: Option<shared_secretbox::Key>,
 ) -> Box<NfsFuture<DataMap>> {
@@ -33,8 +33,8 @@ pub fn get<T: 'static>(
 
 // Put `DataMap` on the network.
 // If `encryption_key` is passed in, the `DataMap` will be encrypted.
-pub fn put<T: 'static>(
-    client: &Client<T>,
+pub fn put(
+    client: &impl Client,
     data_map: &DataMap,
     encryption_key: Option<shared_secretbox::Key>,
 ) -> Box<NfsFuture<XorName>> {

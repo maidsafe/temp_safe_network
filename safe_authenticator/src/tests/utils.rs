@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use access_container::{fetch_authenticator_entry, put_authenticator_entry};
+use client::AuthClient;
 use ffi_utils::test_utils::{send_via_user_data, sender_as_user_data};
 use ffi_utils::{vec_clone_from_raw_parts, FfiResult, ReprC};
 use futures::Future;
@@ -20,7 +21,7 @@ use safe_core::ffi::ipc::resp::MetadataResponse as FfiUserMetadata;
 use safe_core::ipc::req::ContainerPermissions;
 use safe_core::ipc::resp::UserMetadata;
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcMsg, IpcReq, Permission, ShareMDataReq};
-use safe_core::{Client, FutureExt};
+use safe_core::FutureExt;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
@@ -55,7 +56,7 @@ pub fn create_containers_req() -> HashMap<String, ContainerPermissions> {
 }
 
 /// Corrupt an access container entry by overriding its secret key.
-pub fn corrupt_container(client: &Client<()>, container_id: &str) -> Box<AuthFuture<()>> {
+pub fn corrupt_container(client: &AuthClient, container_id: &str) -> Box<AuthFuture<()>> {
     trace!("Corrupting access container entry {}...", container_id);
 
     let c2 = client.clone();

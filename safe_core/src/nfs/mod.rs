@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-/// `FileHelper` provides functions for CRUD on file
+/// `FileHelper` provides functions for CRUD on file.
 pub mod file_helper;
 
 mod data_map;
@@ -25,5 +25,5 @@ pub use self::reader::Reader;
 pub use self::writer::{Mode, Writer};
 use futures::Future;
 
-/// Helper type for futures that can result in `NfsError`
+/// Helper type for futures that can result in `NfsError`.
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;

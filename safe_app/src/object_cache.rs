@@ -12,6 +12,7 @@
 
 use super::errors::AppError;
 use cipher_opt::CipherOpt;
+use client::AppClient;
 use ffi::nfs::FileContext;
 use ffi::object_cache::*;
 use routing::{EntryAction, PermissionSet, User, Value};
@@ -21,7 +22,6 @@ use safe_core::SelfEncryptionStorage;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, HashMap};
-use AppContext;
 
 /// Contains session object cache
 pub struct ObjectCache {
@@ -32,8 +32,8 @@ pub struct ObjectCache {
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
     mdata_permissions: Store<BTreeMap<User, PermissionSet>>,
-    se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppContext>>>,
-    se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppContext>>>,
+    se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppClient>>>,
+    se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppClient>>>,
     pub_sign_key: Store<sign::PublicKey>,
     sec_sign_key: Store<shared_sign::SecretKey>,
     file: Store<FileContext>,
@@ -152,7 +152,7 @@ impl_cache!(mdata_permissions,
             remove_mdata_permissions);
 impl_cache!(
     se_reader,
-    SelfEncryptor<SelfEncryptionStorage<AppContext>>,
+    SelfEncryptor<SelfEncryptionStorage<AppClient>>,
     SelfEncryptorReaderHandle,
     InvalidSelfEncryptorHandle,
     get_se_reader,
@@ -161,7 +161,7 @@ impl_cache!(
 );
 impl_cache!(
     se_writer,
-    SequentialEncryptor<SelfEncryptionStorage<AppContext>>,
+    SequentialEncryptor<SelfEncryptionStorage<AppClient>>,
     SelfEncryptorWriterHandle,
     InvalidSelfEncryptorHandle,
     get_se_writer,

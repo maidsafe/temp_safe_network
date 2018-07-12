@@ -8,12 +8,13 @@
 // Software.
 
 use super::{App, AppContext, AppError};
+use client::AppClient;
 use futures::{Future, IntoFuture};
 use safe_authenticator::test_utils as authenticator;
 use safe_authenticator::AuthError;
 use safe_core::ipc::req::{AuthReq as NativeAuthReq, ContainerPermissions};
 use safe_core::ipc::AppExchangeInfo;
-use safe_core::{utils, Client, FutureExt};
+use safe_core::{utils, FutureExt};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
@@ -31,7 +32,7 @@ pub fn gen_app_exchange_info() -> AppExchangeInfo {
 /// the closure is returned immediately.
 pub fn run_now<F, R>(app: &App, f: F) -> R
 where
-    F: FnOnce(&Client<AppContext>, &AppContext) -> R + Send + 'static,
+    F: FnOnce(&AppClient, &AppContext) -> R + Send + 'static,
     R: Send + 'static,
 {
     let (tx, rx) = mpsc::channel();
@@ -49,7 +50,7 @@ where
 /// returned.
 pub fn run<F, I, T>(app: &App, f: F) -> T
 where
-    F: FnOnce(&Client<AppContext>, &AppContext) -> I + Send + 'static,
+    F: FnOnce(&AppClient, &AppContext) -> I + Send + 'static,
     I: IntoFuture<Item = T, Error = AppError> + 'static,
     T: Send + 'static,
 {

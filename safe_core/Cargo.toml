@@ -39,10 +39,10 @@ serde_json = "~1.0.9"
 use-mock-routing = []
 testing = []
 
-[[example]]
-bench = false
-name = "gen_invites"
+# [[example]]
+# bench = false
+# name = "gen_invites"
 
-[[example]]
-bench = false
-name = "client_stress_test"
+# [[example]]
+# bench = false
+# name = "client_stress_test"

@@ -22,7 +22,7 @@ use safe_core::ipc::req::{
 };
 use safe_core::ipc::resp::IpcResp;
 use safe_core::ipc::{decode_msg, IpcError, IpcMsg};
-use safe_core::{Client, CoreError, FutureExt};
+use safe_core::{client, Client, CoreError, FutureExt};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
 use {AuthError, Authenticator};
@@ -339,7 +339,7 @@ pub unsafe extern "C" fn encode_unregistered_resp(
 
             o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
         } else {
-            let bootstrap_cfg = Client::<()>::bootstrap_config()?;
+            let bootstrap_cfg = client::bootstrap_config()?;
 
             let resp = encode_response(&IpcMsg::Resp {
                 req_id,

@@ -14,14 +14,18 @@ use routing::{ClientError, MutableData, PermissionSet, User, Value};
 use std::collections::BTreeMap;
 use utils::FutureExt;
 
-/// Create a new directory based on the provided `MDataInfo`
-pub fn create_dir<T: 'static>(
-    client: &Client<T>,
+/// Create a new directory based on the provided `MDataInfo`.
+pub fn create_dir(
+    client: &impl Client,
     dir: &MDataInfo,
     contents: BTreeMap<Vec<u8>, Value>,
     perms: BTreeMap<User, PermissionSet>,
 ) -> Box<NfsFuture<()>> {
-    let pub_key = fry!(client.owner_key().map_err(NfsError::from));
+    let pub_key = fry!(
+        client
+            .owner_key()
+            .ok_or_else(|| NfsError::Unexpected("Owner key not found".to_string()))
+    );
     let owners = btree_set![pub_key];
     let dir_md = fry!(
         MutableData::new(dir.name, dir.type_tag, perms, contents, owners).map_err(CoreError::from)

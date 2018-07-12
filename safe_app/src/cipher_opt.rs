@@ -9,6 +9,7 @@
 
 //! Cipher options.
 
+use client::AppClient;
 use errors::AppError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
@@ -64,7 +65,7 @@ impl CipherOpt {
     pub fn decrypt(
         cipher_text: &[u8],
         app_ctx: &AppContext,
-        client: &Client<AppContext>,
+        client: &AppClient,
     ) -> Result<Vec<u8>, AppError> {
         if cipher_text.is_empty() {
             return Ok(Vec::new());
@@ -79,7 +80,9 @@ impl CipherOpt {
                 )
             }
             WireFormat::Asymmetric(cipher_text) => {
-                let (asym_pk, asym_sk) = client.encryption_keypair()?;
+                let (asym_pk, asym_sk) = client
+                    .encryption_keypair()
+                    .ok_or(AppError::UnregisteredClientAccess)?;
                 Ok(sealedbox::open(&cipher_text, &asym_pk, &asym_sk)
                     .map_err(|()| CoreError::AsymmetricDecipherFailure)?)
             }

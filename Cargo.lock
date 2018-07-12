@@ -1110,6 +1110,7 @@ dependencies = [
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lru-cache 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "maidsafe_utilities 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "routing 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1145,6 +1146,7 @@ dependencies = [
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lru-cache 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "maidsafe_utilities 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "routing 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1483,6 +1485,7 @@ name = "tests"
 version = "0.1.0"
 dependencies = [
  "ffi_utils 0.6.0",
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_app 0.7.0",
  "safe_authenticator 0.7.0",
  "safe_core 0.30.0",

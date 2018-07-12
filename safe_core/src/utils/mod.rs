@@ -9,7 +9,9 @@
 #[macro_use]
 mod futures;
 
-/// Common utility functions for writing test cases
+/// Seed utilities.
+pub mod seed;
+/// Common utility functions for writing test cases.
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
@@ -115,7 +117,7 @@ pub fn generate_readable_string(length: usize) -> Result<String, CoreError> {
     Ok(os_rng.gen_ascii_chars().take(length).collect())
 }
 
-/// Generate a random vector of given length
+/// Generate a random vector of given length.
 pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
 where
     T: ::rand::Rand,
@@ -127,7 +129,7 @@ where
     Ok(os_rng.gen_iter().take(length).collect())
 }
 
-/// Derive Password, Keyword and PIN (in order)
+/// Derive Password, Keyword and PIN (in order).
 pub fn derive_secrets(acc_locator: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let Digest(locator_hash) = sha512::hash(acc_locator);
 
