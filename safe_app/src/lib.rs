@@ -7,7 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-//! SAFE App
+//! SAFE App.
+
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/
 maidsafe_logo.png",
@@ -154,6 +155,18 @@ pub struct App {
 }
 
 impl App {
+    /// Send a message to app's event loop.
+    pub fn send<F>(&self, f: F) -> Result<(), AppError>
+    where
+        F: FnOnce(&AppClient, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
+            + Send
+            + 'static,
+    {
+        let msg = CoreMsg::new(f);
+        let core_tx = unwrap!(self.core_tx.lock());
+        core_tx.unbounded_send(msg).map_err(AppError::from)
+    }
+
     /// Create unregistered app.
     pub fn unregistered<N>(
         disconnect_notifier: N,
@@ -316,18 +329,6 @@ impl App {
             core_tx: Mutex::new(core_tx),
             _core_joiner: joiner,
         })
-    }
-
-    /// Send a message to app's event loop
-    pub fn send<F>(&self, f: F) -> Result<(), AppError>
-    where
-        F: FnOnce(&AppClient, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
-            + Send
-            + 'static,
-    {
-        let msg = CoreMsg::new(f);
-        let core_tx = unwrap!(self.core_tx.lock());
-        core_tx.unbounded_send(msg).map_err(AppError::from)
     }
 }
 

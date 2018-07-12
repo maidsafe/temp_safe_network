@@ -30,6 +30,10 @@ tokio-core = "~0.1.12"
 unwrap = "~1.1.0"
 jni = { version = "~0.10.1", optional = true }
 
+[dev-dependencies]
+docopt = "~0.7.0"
+rustc-serialize = "~0.3.24"
+
 [dev-dependencies.safe_authenticator]
 path = "../safe_authenticator"
 version = "~0.7.0"
@@ -55,3 +59,11 @@ bindings = []
 
 [lib]
 crate_type = ["staticlib", "rlib", "cdylib"]
+
+[[example]]
+bench = false
+name = "gen_invites"
+
+[[example]]
+bench = false
+name = "client_stress_test"

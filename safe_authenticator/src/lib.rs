@@ -115,15 +115,15 @@ macro_rules! try_tx {
     };
 }
 
-/// Authenticator instance
+/// Authenticator instance.
 pub struct Authenticator {
-    /// Channel to communicate with the core event loop
+    /// Channel to communicate with the core event loop.
     pub core_tx: Mutex<AuthMsgTx>,
     _core_joiner: Joiner,
 }
 
 impl Authenticator {
-    /// Send a message to the authenticator event loop
+    /// Send a message to the authenticator event loop.
     pub fn send<F>(&self, f: F) -> Result<(), AuthError>
     where
         F: FnOnce(&AuthClient) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static,
@@ -133,7 +133,7 @@ impl Authenticator {
         core_tx.unbounded_send(msg).map_err(AuthError::from)
     }
 
-    /// Create a new account
+    /// Create a new account.
     pub fn create_acc<S, N>(
         locator: S,
         password: S,
@@ -156,7 +156,7 @@ impl Authenticator {
         )
     }
 
-    /// Create a new account
+    /// Create a new account.
     fn create_acc_impl<F: 'static + Send, N>(
         create_client_fn: F,
         mut disconnect_notifier: N,
@@ -238,7 +238,7 @@ impl Authenticator {
         )
     }
 
-    /// Log in to an existing account
+    /// Log in to an existing account.
     pub fn login_impl<F: Send + 'static, N>(
         create_client_fn: F,
         mut disconnect_notifier: N,
@@ -311,38 +311,39 @@ impl Authenticator {
     }
 }
 
-#[cfg(feature = "use-mock-routing")]
+#[cfg(any(test, feature = "testing"))]
 impl Authenticator {
-    #[allow(unused)]
-    fn login_with_hook<F, S, N>(
-        locator: S,
-        password: S,
-        disconnect_notifier: N,
-        routing_wrapper_fn: F,
-    ) -> Result<Self, AuthError>
+    /// Create a new account with given seed.
+    pub fn create_acc_with_seed<S, N>(seed: S, disconnect_notifier: N) -> Result<Self, AuthError>
     where
         S: Into<String>,
-        F: Fn(MockRouting) -> MockRouting + Send + 'static,
         N: FnMut() + Send + 'static,
     {
-        let locator = locator.into();
-        let password = password.into();
-
+        let seed = seed.into();
         Self::login_impl(
             move |el_h, core_tx, net_tx| {
-                AuthClient::login_with_hook(
-                    &locator,
-                    &password,
-                    el_h,
-                    core_tx,
-                    net_tx,
-                    routing_wrapper_fn,
-                )
+                AuthClient::registered_with_seed(&seed, el_h, core_tx, net_tx)
             },
             disconnect_notifier,
         )
     }
 
+    /// Login to an existing account using the same seed that was used during account creation.
+    pub fn login_with_seed<S, N>(seed: S, disconnect_notifier: N) -> Result<Self, AuthError>
+    where
+        S: Into<String>,
+        N: FnMut() + Send + 'static,
+    {
+        let seed = seed.into();
+        Self::login_impl(
+            move |el_h, core_tx, net_tx| AuthClient::login_with_seed(&seed, el_h, core_tx, net_tx),
+            disconnect_notifier,
+        )
+    }
+}
+
+#[cfg(feature = "use-mock-routing")]
+impl Authenticator {
     #[allow(unused)]
     fn create_acc_with_hook<F, S, N>(
         locator: S,
@@ -368,6 +369,36 @@ impl Authenticator {
                     &invitation,
                     el_h,
                     core_tx_clone,
+                    net_tx,
+                    routing_wrapper_fn,
+                )
+            },
+            disconnect_notifier,
+        )
+    }
+
+    #[allow(unused)]
+    fn login_with_hook<F, S, N>(
+        locator: S,
+        password: S,
+        disconnect_notifier: N,
+        routing_wrapper_fn: F,
+    ) -> Result<Self, AuthError>
+    where
+        S: Into<String>,
+        F: Fn(MockRouting) -> MockRouting + Send + 'static,
+        N: FnMut() + Send + 'static,
+    {
+        let locator = locator.into();
+        let password = password.into();
+
+        Self::login_impl(
+            move |el_h, core_tx, net_tx| {
+                AuthClient::login_with_hook(
+                    &locator,
+                    &password,
+                    el_h,
+                    core_tx,
                     net_tx,
                     routing_wrapper_fn,
                 )
