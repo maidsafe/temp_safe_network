@@ -37,6 +37,7 @@ use tiny_keccak::sha3_256;
 use tokio_core::reactor::Handle;
 use utils;
 
+#[macro_export]
 macro_rules! wait_for_response {
     ($rx:expr, $res:path, $msg_id:expr) => {
         match $rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {

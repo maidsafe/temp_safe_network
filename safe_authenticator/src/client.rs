@@ -39,36 +39,6 @@ use tokio_core::reactor::Handle;
 use AuthFuture;
 use AuthMsgTx;
 
-macro_rules! wait_for_response {
-    ($rx:expr, $res:path, $msg_id:expr) => {
-        match $rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
-            Ok(Event::Response {
-                response:
-                    $res {
-                        res,
-                        msg_id: res_msg_id,
-                    },
-                ..
-            }) => {
-                if res_msg_id == $msg_id {
-                    res.map_err(CoreError::RoutingClientError)
-                } else {
-                    warn!("Received response with unexpected message id");
-                    Err(CoreError::OperationAborted)
-                }
-            }
-            Ok(x) => {
-                warn!("Received unexpected response: {:?}", x);
-                Err(CoreError::OperationAborted)
-            }
-            Err(err) => {
-                warn!("Failed to receive response: {:?}", err);
-                Err(CoreError::OperationAborted)
-            }
-        }.map_err(AuthError::from)
-    };
-}
-
 /// Client object used by safe_authenticator.
 pub struct AuthClient {
     inner: Rc<RefCell<ClientInner<AuthClient, ()>>>,
@@ -189,8 +159,8 @@ where {
         routing
             .put_mdata(cm_addr, acc_md.clone(), msg_id, pub_key)
             .map_err(CoreError::from)
-            .map_err(AuthError::from)
             .and_then(|_| wait_for_response!(routing_rx, Response::PutMData, msg_id))
+            .map_err(AuthError::from)
             .map_err(|e| {
                 warn!("Could not put account to the Network: {:?}", e);
                 e
@@ -288,8 +258,8 @@ where {
                     msg_id,
                 )
                 .map_err(CoreError::from)
-                .map_err(AuthError::from)
                 .and_then(|_| wait_for_response!(routing_rx, Response::GetMDataValue, msg_id))
+                .map_err(AuthError::from)
                 .map_err(|e| {
                     warn!("Could not fetch account from the Network: {:?}", e);
                     e
@@ -354,10 +324,10 @@ where {
         trace!("Setting configuration root Dir ID.");
 
         let mut auth_inner = self.auth_inner.borrow_mut();
-        let account = &mut auth_inner.acc;
+        let acc = &mut auth_inner.acc;
 
-        if account.config_root != dir {
-            account.config_root = dir;
+        if acc.config_root != dir {
+            acc.config_root = dir;
             true
         } else {
             false

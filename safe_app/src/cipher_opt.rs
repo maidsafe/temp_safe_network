@@ -80,9 +80,9 @@ impl CipherOpt {
                 )
             }
             WireFormat::Asymmetric(cipher_text) => {
-                let (asym_pk, asym_sk) = client.encryption_keypair().ok_or_else(|| {
-                    AppError::Unexpected("Encryption keypair not found".to_string())
-                })?;
+                let (asym_pk, asym_sk) = client
+                    .encryption_keypair()
+                    .ok_or(AppError::UnregisteredClientAccess)?;
                 Ok(sealedbox::open(&cipher_text, &asym_pk, &asym_sk)
                     .map_err(|()| CoreError::AsymmetricDecipherFailure)?)
             }

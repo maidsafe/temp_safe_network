@@ -45,7 +45,7 @@ pub unsafe extern "C" fn app_pub_sign_key(
         send_sync(app, user_data, o_cb, move |client, context| {
             let key = client
                 .public_signing_key()
-                .ok_or_else(|| AppError::Unexpected("Public signing key not found".to_string()))?;
+                .ok_or(AppError::UnregisteredClientAccess)?;
             Ok(context.object_cache().insert_pub_sign_key(key))
         })
     })
@@ -211,9 +211,9 @@ pub unsafe extern "C" fn app_pub_enc_key(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
-            let key = client.public_encryption_key().ok_or_else(|| {
-                AppError::Unexpected("Public encryption key not found".to_string())
-            })?;
+            let key = client
+                .public_encryption_key()
+                .ok_or(AppError::UnregisteredClientAccess)?;
             Ok(context.object_cache().insert_encrypt_key(key))
         })
     })

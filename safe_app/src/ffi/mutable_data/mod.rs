@@ -69,9 +69,7 @@ pub unsafe extern "C" fn mdata_put(
 
         (*app).send(move |client, context| {
             let owner_key = try_cb!(
-                client
-                    .owner_key()
-                    .ok_or_else(|| AppError::Unexpected("Owner key not found".to_string())),
+                client.owner_key().ok_or(AppError::UnregisteredClientAccess),
                 user_data,
                 o_cb
             );
