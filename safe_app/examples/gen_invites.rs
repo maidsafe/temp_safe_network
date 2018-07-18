@@ -37,12 +37,11 @@
 extern crate clap;
 extern crate futures;
 extern crate maidsafe_utilities;
-#[macro_use]
-extern crate safe_core;
 extern crate rand;
-extern crate routing;
 extern crate safe_app;
 extern crate safe_authenticator;
+#[macro_use]
+extern crate safe_core;
 extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
@@ -50,11 +49,9 @@ extern crate unwrap;
 use clap::{App as ClapApp, Arg};
 use futures::Future;
 use rand::{thread_rng, Rng};
-use routing::{Action, MutableData, PermissionSet, User, XorName};
-use safe_app::App;
+use safe_app::utils::seed;
+use safe_app::{Action, App, Client, FutureExt, MutableData, PermissionSet, User, XorName};
 use safe_authenticator::Authenticator;
-use safe_core::utils::seed;
-use safe_core::{Client, FutureExt};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::mpsc;

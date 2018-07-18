@@ -71,8 +71,8 @@ pub use routing::{
     XorName, XOR_NAME_LEN,
 };
 pub use safe_core::{
-    app_container_name, immutable_data, ipc, mdata_info, nfs, Client, ClientKeys, MDataInfo,
-    DIR_TAG, MAIDSAFE_TAG,
+    app_container_name, immutable_data, ipc, mdata_info, nfs, utils, Client, ClientKeys, CoreError,
+    CoreFuture, FutureExt, MDataInfo, DIR_TAG, MAIDSAFE_TAG,
 };
 
 // Export FFI interface.
@@ -128,7 +128,7 @@ use safe_core::ipc::resp::{access_container_enc_key, AccessContainerEntry};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
-use safe_core::{event_loop, utils, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx};
+use safe_core::{event_loop, CoreMsg, CoreMsgTx, NetworkEvent, NetworkTx};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
