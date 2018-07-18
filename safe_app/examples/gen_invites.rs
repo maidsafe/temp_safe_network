@@ -34,21 +34,20 @@
 #![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
 #[macro_use]
-extern crate unwrap;
-
-extern crate docopt;
+extern crate clap;
 extern crate futures;
 extern crate maidsafe_utilities;
 #[macro_use]
 extern crate safe_core;
 extern crate rand;
 extern crate routing;
-extern crate rustc_serialize;
 extern crate safe_app;
 extern crate safe_authenticator;
 extern crate tiny_keccak;
+#[macro_use]
+extern crate unwrap;
 
-use docopt::Docopt;
+use clap::{App as ClapApp, Arg};
 use futures::Future;
 use rand::{thread_rng, Rng};
 use routing::{Action, MutableData, PermissionSet, User, XorName};
@@ -65,39 +64,44 @@ use tiny_keccak::sha3_256;
 const INVITE_TOKEN_SIZE: usize = 90;
 const INVITE_TOKEN_TYPE_TAG: u64 = 8;
 
-static USAGE: &'static str = "
-Usage:
-  gen_invites [--gen-seed SIZE | --get-pk | --check-invite INVITE | -c [-n INVITES] | \
-               -n INVITES | -h]
-
-Options:
-  --gen-seed SIZE            Only generate a random seed of given size, writing into input file.
-  --get-pk                   Only get the public sign key given the seed, don't do anything
-                             extra.
-  --check-invite INVITE      Only check the status of the given invite (exists, consumed etc.).
-  -c, --create               Create account using seed from input file. By default it will login.
-  -n, --num-invites INVITES  Number of invites to generate (will populate the Network too).
-  -h, --help                 Display this help message and exit.
-";
-
-#[derive(Debug, RustcDecodable)]
-struct Args {
-    flag_gen_seed: Option<usize>,
-    flag_get_pk: bool,
-    flag_check_invite: Option<String>,
-    flag_create: bool,
-    flag_num_invites: Option<usize>,
-    flag_help: bool,
-}
-
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|docopt| docopt.decode())
-        .unwrap_or_else(|error| error.exit());
+    let matches = ClapApp::new("gen_invites")
+        .about("Generate invites to the network")
+        .arg(
+            Arg::with_name("gen-seed")
+                .long("gen-seed")
+                .takes_value(true)
+                .help("Only generate a random seed of given size, writing into input file."),
+        )
+        .arg(
+            Arg::with_name("get-pk")
+                .long("get-pk")
+                .help("Only get the public sign key given the seed, don't do anything extra."),
+        )
+        .arg(
+            Arg::with_name("check-invite")
+                .long("check-invite")
+                .takes_value(true)
+                .help("Only check the status of the given invite (exists, consumed etc.)."),
+        )
+        .arg(
+            Arg::with_name("create")
+                .short("c")
+                .long("create")
+                .help("Create account using seed from input file. By default it will login."),
+        )
+        .arg(
+            Arg::with_name("num-invites")
+                .short("n")
+                .long("num-invites")
+                .takes_value(true)
+                .help("Number of invites to generate (will populate the Network too)."),
+        )
+        .get_matches();
 
-    if let Some(size) = args.flag_gen_seed {
+    if let Ok(size) = value_t!(matches, "gen-seed", usize) {
         let mut input = unwrap!(File::create("./input"), "Unable to create input file");
         let seed = generate_random_printable(size);
         unwrap!(write!(input, "{}", seed));
@@ -110,19 +114,20 @@ fn main() {
         let _ = unwrap!(input.read_to_string(&mut seed));
     }
 
-    if args.flag_get_pk {
+    if matches.is_present("get-pk") {
         let sign_pk = unwrap!(seed::sign_pk_from_seed(&seed));
         return println!("Public Signing Key: {:?}", sign_pk.0);
     }
 
     // Check a single invite.
 
-    if let Some(invite) = args.flag_check_invite {
+    if let Some(invite) = matches.value_of("check-invite") {
+        let invite = invite.to_string();
         let app = unwrap!(App::unregistered(|| (), None,));
         let (tx, rx) = mpsc::channel();
 
         unwrap!(app.send(move |client, _| {
-            let id = XorName(sha3_256(invite.as_bytes()));
+            let id = XorName(sha3_256(invite.as_str().as_bytes()));
 
             client
                 .get_mdata_version(id, INVITE_TOKEN_TYPE_TAG)
@@ -151,9 +156,9 @@ fn main() {
         unwrap!(File::create(&name))
     };
 
-    let flag_create = args.flag_create;
+    let create = matches.is_present("create");
 
-    let auth = unwrap!(if flag_create {
+    let auth = unwrap!(if create {
         println!("\nTrying to create an account using given seed from file...");
         Authenticator::create_acc_with_seed(seed.as_str(), || ())
     } else {
@@ -163,7 +168,7 @@ fn main() {
 
     println!("Success !");
 
-    let num_invites = args.flag_num_invites.unwrap_or_else(|| {
+    let num_invites = value_t!(matches, "num-invites", usize).unwrap_or_else(|_| {
         // Get number of invites to generate, if not passed in.
 
         println!("\n----------- Enter number of invitations to generate ---------------");

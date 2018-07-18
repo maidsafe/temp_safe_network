@@ -31,8 +31,7 @@ unwrap = "~1.1.0"
 jni = { version = "~0.10.1", optional = true }
 
 [dev-dependencies]
-docopt = "~0.7.0"
-rustc-serialize = "~0.3.24"
+clap = "=2.25.1"
 
 [dev-dependencies.safe_authenticator]
 path = "../safe_authenticator"

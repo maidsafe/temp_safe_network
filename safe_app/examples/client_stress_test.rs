@@ -33,12 +33,12 @@
 )]
 #![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
 
-extern crate docopt;
+#[macro_use]
+extern crate clap;
 extern crate futures;
 extern crate rand;
 extern crate routing;
 extern crate rust_sodium;
-extern crate rustc_serialize;
 #[macro_use]
 extern crate safe_core;
 extern crate maidsafe_utilities;
@@ -46,7 +46,7 @@ extern crate safe_authenticator;
 #[macro_use]
 extern crate unwrap;
 
-use docopt::Docopt;
+use clap::{App, Arg};
 use futures::Future;
 use rand::{Rng, SeedableRng};
 use routing::{ImmutableData, MutableData};
@@ -54,32 +54,6 @@ use rust_sodium::crypto::sign::PublicKey;
 use safe_authenticator::{AuthClient, Authenticator};
 use safe_core::{Client, CoreError, CoreFuture, FutureExt};
 use std::sync::mpsc;
-
-#[cfg_attr(rustfmt, rustfmt_skip)]
-static USAGE: &'static str = "
-Usage:
-  client_stress_test [options]
-
-Options:
-  -i <count>, --immutable=<count>   Number of ImmutableData chunks to Put and
-                                    Get [default: 100].
-  -m <count>, --mutable=<count>     Number of MutableData chunks to Put and
-                                    Get [default: 100].
-  --seed <seed>                     Seed for a pseudo-random number generator.
-  --get-only                        Only Get the data, don't Put it.
-  --invite INVITATION               Use the given invite.
-  -h, --help                        Display this help message and exit.
-";
-
-#[derive(Debug, RustcDecodable)]
-struct Args {
-    flag_immutable: Option<usize>,
-    flag_mutable: Option<usize>,
-    flag_seed: Option<u32>,
-    flag_get_only: bool,
-    flag_invite: Option<String>,
-    flag_help: bool,
-}
 
 fn random_mutable_data<R: Rng>(type_tag: u64, public_key: &PublicKey, rng: &mut R) -> MutableData {
     let permissions = btree_map![];
@@ -102,32 +76,76 @@ enum Data {
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|docopt| docopt.decode())
-        .unwrap_or_else(|error| error.exit());
+    let matches = App::new("client_stress_test")
+        .about(
+            "A stress test involving putting and getting immutable and mutable data chunks to the \
+             network",
+        )
+        .arg(
+            Arg::with_name("immutable")
+                .short("i")
+                .long("immutable")
+                .takes_value(true)
+                .default_value("100")
+                .help("Number of ImmutableData chunks to Put and Get."),
+        )
+        .arg(
+            Arg::with_name("mutable")
+                .short("m")
+                .long("mutable")
+                .takes_value(true)
+                .default_value("100")
+                .help("Number of MutableData chunks to Put and Get."),
+        )
+        .arg(
+            Arg::with_name("seed")
+                .long("seed")
+                .takes_value(true)
+                .help("Seed for a pseudo-random number generator."),
+        )
+        .arg(
+            Arg::with_name("get-only")
+                .long("get-only")
+                .help("Only Get the data, don't Put it."),
+        )
+        .arg(
+            Arg::with_name("invite")
+                .long("invite")
+                .takes_value(true)
+                .help("Use the given invite."),
+        )
+        .get_matches();
 
-    let immutable_data_count = unwrap!(args.flag_immutable);
-    let mutable_data_count = unwrap!(args.flag_mutable);
-    let mut rng = rand::XorShiftRng::from_seed(match args.flag_seed {
-        Some(seed) => [0, 0, 0, seed],
-        None => [
+    let immutable_data_count = unwrap!(value_t!(matches, "immutable", usize));
+    let mutable_data_count = unwrap!(value_t!(matches, "mutable", usize));
+
+    let mut rng = rand::XorShiftRng::from_seed(if matches.is_present("seed") {
+        let seed = unwrap!(value_t!(matches, "seed", u32));
+        [0, 0, 0, seed]
+    } else {
+        [
             rand::random(),
             rand::random(),
             rand::random(),
             rand::random(),
-        ],
+        ]
     });
+    let invitation: String = if let Some(i) = matches.value_of("invite") {
+        i.to_string()
+    } else {
+        rng.gen_ascii_chars().take(20).collect()
+    };
+
+    let get_only = matches.is_present("get-only");
 
     // Create account
     let secret_0: String = rng.gen_ascii_chars().take(20).collect();
     let secret_1: String = rng.gen_ascii_chars().take(20).collect();
-    let mut invitation = rng.gen_ascii_chars().take(20).collect();
-    if let Some(i) = args.flag_invite.clone() {
-        invitation = i;
-    }
 
-    let flag_get_only = args.flag_get_only;
-    let auth = if flag_get_only {
+    let auth = if get_only {
+        println!("\n\tAccount Login");
+        println!("\t================");
+        println!("\nTrying to login to an account ...");
         unwrap!(Authenticator::login(
             secret_0.as_str(),
             secret_1.as_str(),
@@ -191,7 +209,7 @@ fn main() {
 
             match data {
                 Data::Immutable(data) => {
-                    let fut = if flag_get_only {
+                    let fut = if get_only {
                         futures::finished(data).into_box()
                     } else {
                         // Put the data to the network.
@@ -203,13 +221,12 @@ fn main() {
                         c3.get_idata(*data.name()).map(move |retrieved_data| {
                             assert_eq!(data, retrieved_data);
                             println!("Retrieved chunk #{}: {:?}", i, data.name());
-
                             Ok(())
                         })
                     }).into_box()
                 }
                 Data::Mutable(data) => {
-                    let fut = if flag_get_only {
+                    let fut = if get_only {
                         futures::finished(data).into_box()
                     } else {
                         // Put the data to the network.
