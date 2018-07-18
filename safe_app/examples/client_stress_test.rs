@@ -106,7 +106,8 @@ fn main() {
         .arg(
             Arg::with_name("get-only")
                 .long("get-only")
-                .help("Only Get the data, don't Put it."),
+                .requires("seed")
+                .help("Only Get the data, don't Put it. Logs in to an existing account."),
         )
         .arg(
             Arg::with_name("invite")
@@ -119,17 +120,13 @@ fn main() {
     let immutable_data_count = unwrap!(value_t!(matches, "immutable", usize));
     let mutable_data_count = unwrap!(value_t!(matches, "mutable", usize));
 
-    let mut rng = rand::XorShiftRng::from_seed(if matches.is_present("seed") {
-        let seed = unwrap!(value_t!(matches, "seed", u32));
-        [0, 0, 0, seed]
+    let seed = if matches.is_present("seed") {
+        unwrap!(value_t!(matches, "seed", u32))
     } else {
-        [
-            rand::random(),
-            rand::random(),
-            rand::random(),
-            rand::random(),
-        ]
-    });
+        rand::random()
+    };
+    let mut rng = rand::XorShiftRng::from_seed([0, 0, 0, seed]);
+
     let invitation: String = if let Some(i) = matches.value_of("invite") {
         i.to_string()
     } else {
@@ -146,30 +143,37 @@ fn main() {
         println!("\n\tAccount Login");
         println!("\t================");
         println!("\nTrying to login to an account ...");
-        unwrap!(Authenticator::login(
-            secret_0.as_str(),
-            secret_1.as_str(),
-            || ()
-        ))
+
+        unwrap!(Authenticator::login(secret_0, secret_1, || ()))
     } else {
         println!("\n\tAccount Creation");
         println!("\t================");
         println!("\nTrying to create an account ...");
-        unwrap!(Authenticator::create_acc(
+
+        let auth = unwrap!(Authenticator::create_acc(
             secret_0.as_str(),
             secret_1.as_str(),
             invitation.as_str(),
             || ()
-        ))
+        ));
+
+        println!(
+            "Created an account!\nLocator: {}\nPassword: {}",
+            secret_0, secret_1
+        );
+
+        auth
     };
 
-    println!("Logged in successfully!");
+    println!("\nLogged in successfully!");
+    println!("Seed: {}", seed);
 
     let mut stored_data = Vec::with_capacity(mutable_data_count + immutable_data_count);
 
     for _ in 0..immutable_data_count {
         // Construct data
         let data = ImmutableData::new(rng.gen_iter().take(1024).collect());
+        println!("{:?}", data.name());
         stored_data.push(Data::Immutable(data));
     }
 
@@ -182,6 +186,7 @@ fn main() {
 
         ok!(()).into()
     }));
+
     let public_key = unwrap!(rx.recv());
 
     for _ in immutable_data_count..(immutable_data_count + mutable_data_count) {
@@ -249,6 +254,7 @@ fn main() {
                 .into_box()
                 .into()
         }));
+
         unwrap!(rx.recv());
     }
 
