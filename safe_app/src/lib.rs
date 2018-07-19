@@ -7,7 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-//! SAFE App
+//! SAFE App.
+
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/
 maidsafe_logo.png",
@@ -70,8 +71,8 @@ pub use routing::{
     XorName, XOR_NAME_LEN,
 };
 pub use safe_core::{
-    app_container_name, immutable_data, ipc, mdata_info, nfs, Client, ClientKeys, MDataInfo,
-    DIR_TAG, MAIDSAFE_TAG,
+    app_container_name, immutable_data, ipc, mdata_info, nfs, utils, Client, ClientKeys, CoreError,
+    CoreFuture, FutureExt, MDataInfo, DIR_TAG, MAIDSAFE_TAG,
 };
 
 // Export FFI interface.
@@ -127,7 +128,7 @@ use safe_core::ipc::resp::{access_container_enc_key, AccessContainerEntry};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig};
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting as Routing;
-use safe_core::{event_loop, utils, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx};
+use safe_core::{event_loop, CoreMsg, CoreMsgTx, NetworkEvent, NetworkTx};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -154,6 +155,18 @@ pub struct App {
 }
 
 impl App {
+    /// Send a message to app's event loop.
+    pub fn send<F>(&self, f: F) -> Result<(), AppError>
+    where
+        F: FnOnce(&AppClient, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
+            + Send
+            + 'static,
+    {
+        let msg = CoreMsg::new(f);
+        let core_tx = unwrap!(self.core_tx.lock());
+        core_tx.unbounded_send(msg).map_err(AppError::from)
+    }
+
     /// Create unregistered app.
     pub fn unregistered<N>(
         disconnect_notifier: N,
@@ -316,18 +329,6 @@ impl App {
             core_tx: Mutex::new(core_tx),
             _core_joiner: joiner,
         })
-    }
-
-    /// Send a message to app's event loop
-    pub fn send<F>(&self, f: F) -> Result<(), AppError>
-    where
-        F: FnOnce(&AppClient, &AppContext) -> Option<Box<Future<Item = (), Error = ()>>>
-            + Send
-            + 'static,
-    {
-        let msg = CoreMsg::new(f);
-        let core_tx = unwrap!(self.core_tx.lock());
-        core_tx.unbounded_send(msg).map_err(AppError::from)
     }
 }
 

@@ -26,7 +26,7 @@ use safe_core::client::{
     setup_routing, spawn_routing_thread, ClientInner, IMMUT_DATA_CACHE_SIZE, REQUEST_TIMEOUT_SECS,
 };
 use safe_core::crypto::{shared_box, shared_secretbox, shared_sign};
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 use safe_core::utils::seed::{divide_seed, SEED_SUBPARTS};
 use safe_core::{utils, Client, ClientKeys, CoreError, FutureExt, MDataInfo, NetworkTx};
 use std::cell::RefCell;
@@ -74,7 +74,7 @@ impl AuthClient {
     /// so this seed needs to be strong. For ordinary users, it's recommended to use the normal
     /// `registered` function where the secrets can be what's easy to remember for the user while
     /// also being strong.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     pub(crate) fn registered_with_seed(
         seed: &str,
         el_handle: Handle,
@@ -95,6 +95,32 @@ where {
             net_tx,
             Some(&id_seed),
             |routing| routing,
+        )
+    }
+
+    #[cfg(all(feature = "use-mock-routing", any(test, feature = "testing")))]
+    /// Allows customising the mock Routing client before registering a new account
+    pub fn registered_with_hook<F>(
+        acc_locator: &str,
+        acc_password: &str,
+        invitation: &str,
+        el_handle: Handle,
+        core_tx: AuthMsgTx,
+        net_tx: NetworkTx,
+        routing_wrapper_fn: F,
+    ) -> Result<Self, AuthError>
+    where
+        F: Fn(Routing) -> Routing,
+    {
+        Self::registered_impl(
+            acc_locator.as_bytes(),
+            acc_password.as_bytes(),
+            invitation,
+            el_handle,
+            core_tx,
+            net_tx,
+            None,
+            routing_wrapper_fn,
         )
     }
 
@@ -210,7 +236,7 @@ where {
     }
 
     /// Login using seeded account.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     pub(crate) fn login_with_seed(
         seed: &str,
         el_handle: Handle,
@@ -221,6 +247,29 @@ where {
         Self::login_impl(arr[0], arr[1], el_handle, core_tx, net_tx, |routing| {
             routing
         })
+    }
+
+    #[cfg(all(feature = "use-mock-routing", any(test, feature = "testing")))]
+    /// Allows customising the mock Routing client before logging into the network.
+    pub fn login_with_hook<F>(
+        acc_locator: &str,
+        acc_password: &str,
+        el_handle: Handle,
+        core_tx: AuthMsgTx,
+        net_tx: NetworkTx,
+        routing_wrapper_fn: F,
+    ) -> Result<Self, AuthError>
+    where
+        F: Fn(Routing) -> Routing,
+    {
+        Self::login_impl(
+            acc_locator.as_bytes(),
+            acc_password.as_bytes(),
+            el_handle,
+            core_tx,
+            net_tx,
+            routing_wrapper_fn,
+        )
     }
 
     fn login_impl<F>(
@@ -415,61 +464,6 @@ where {
         let mut auth_inner = self.auth_inner.borrow_mut();
         let account = &mut auth_inner.acc;
         account.root_dirs_created = val;
-    }
-}
-
-#[cfg(
-    any(
-        all(test, feature = "use-mock-routing"),
-        all(feature = "testing", feature = "use-mock-routing")
-    )
-)]
-impl AuthClient {
-    /// Allows customising the mock Routing client before registering a new account
-    pub fn registered_with_hook<F>(
-        acc_locator: &str,
-        acc_password: &str,
-        invitation: &str,
-        el_handle: Handle,
-        core_tx: AuthMsgTx,
-        net_tx: NetworkTx,
-        routing_wrapper_fn: F,
-    ) -> Result<Self, AuthError>
-    where
-        F: Fn(Routing) -> Routing,
-    {
-        Self::registered_impl(
-            acc_locator.as_bytes(),
-            acc_password.as_bytes(),
-            invitation,
-            el_handle,
-            core_tx,
-            net_tx,
-            None,
-            routing_wrapper_fn,
-        )
-    }
-
-    /// Allows customising the mock Routing client before logging into the network.
-    pub fn login_with_hook<F>(
-        acc_locator: &str,
-        acc_password: &str,
-        el_handle: Handle,
-        core_tx: AuthMsgTx,
-        net_tx: NetworkTx,
-        routing_wrapper_fn: F,
-    ) -> Result<Self, AuthError>
-    where
-        F: Fn(Routing) -> Routing,
-    {
-        Self::login_impl(
-            acc_locator.as_bytes(),
-            acc_password.as_bytes(),
-            el_handle,
-            core_tx,
-            net_tx,
-            routing_wrapper_fn,
-        )
     }
 }
 
