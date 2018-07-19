@@ -61,8 +61,12 @@ crate_type = ["staticlib", "rlib", "cdylib"]
 
 [[example]]
 bench = false
+name = "client_stress_test"
+
+[[example]]
+bench = false
 name = "gen_invites"
 
 [[example]]
 bench = false
-name = "client_stress_test"
+name = "self_authentication"
