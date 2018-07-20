@@ -270,7 +270,7 @@ pub fn delete_file<S: Into<String>>(
 ) -> Result<(), AuthError> {
     let name = name.into();
     try_run(authenticator, move |client| {
-        file_helper::delete(client, &container_info, name, version).map_err(From::from)
+        file_helper::delete(client.clone(), container_info, name, version).map_err(From::from)
     })
 }
 

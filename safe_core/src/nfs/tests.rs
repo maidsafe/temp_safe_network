@@ -505,7 +505,7 @@ fn file_delete() {
         create_test_file(client)
             .then(move |res| {
                 let (dir, _file) = unwrap!(res);
-                file_helper::delete(&c2, &dir, "hello.txt", 1).map(move |()| dir)
+                file_helper::delete(c2, dir.clone(), "hello.txt", 1).map(move |()| dir)
             })
             .then(move |res| {
                 let dir = unwrap!(res);
@@ -537,7 +537,7 @@ fn file_delete_then_add() {
         create_test_file(client)
             .then(move |res| {
                 let (dir, file) = unwrap!(res);
-                file_helper::delete(&c2, &dir, "hello.txt", 1).map(move |_| (dir, file))
+                file_helper::delete(c2, dir.clone(), "hello.txt", 1).map(move |_| (dir, file))
             })
             .then(move |res| {
                 let (dir, file) = unwrap!(res);
