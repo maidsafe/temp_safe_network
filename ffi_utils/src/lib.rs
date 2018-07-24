@@ -68,7 +68,7 @@ pub use self::string::{from_c_str, StringError};
 pub use self::vec::{vec_clone_from_raw_parts, vec_into_raw_parts, SafePtr};
 use std::os::raw::{c_char, c_void};
 
-/// Type that holds opaque user data handed into FFI functions
+/// Type that holds opaque user data handed into FFI functions.
 #[derive(Clone, Copy)]
 pub struct OpaqueCtx(pub *mut c_void);
 unsafe impl Send for OpaqueCtx {}
@@ -85,17 +85,17 @@ pub trait ErrorCode {
     fn error_code(&self) -> i32;
 }
 
-/// FFI result wrapper
+/// FFI result wrapper.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct FfiResult {
-    /// Unique error code
+    /// Unique error code.
     pub error_code: i32,
-    /// Error description
+    /// Error description.
     pub description: *const c_char,
 }
 
-/// Constant value to be used for OK result
+/// Constant value to be used for OK result.
 pub const FFI_RESULT_OK: &FfiResult = &FfiResult {
     error_code: 0,
     description: 0 as *const c_char,

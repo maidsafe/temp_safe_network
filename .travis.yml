@@ -18,6 +18,7 @@ stages:
   - warmup-mock
   - tests-stable
   - tests-nightly
+  - deploy
 jobs:
   include:
     # Warm up the cache dependencies
@@ -116,6 +117,18 @@ jobs:
       if: type = push
       os: linux
       rust: *stable
+
+      # Deploy
+    - stage: deploy
+      if: type = push
+      os: linux
+      rust: *stable
+      env: RUN_DEPLOY=1
+    - stage: deploy
+      if: type = push
+      os: osx
+      rust: *stable
+      env: RUN_DEPLOY=1
 sudo: false
 cache:
   # Double the default timeout.
@@ -180,5 +193,5 @@ deploy:
   on:
     branch: master
     tags: false
-    condition: $TRAVIS_RUST_VERSION =~ $RUST_STABLE && $TRAVIS_EVENT_TYPE = push
+    condition: $RUN_DEPLOY = 1
 after_deploy: rm -rf target/deploy

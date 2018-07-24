@@ -63,7 +63,7 @@ fn basics() {
     let file_name0 = "file0.txt";
     let ffi_file_name0 = unwrap!(CString::new(file_name0));
 
-    // fetching non-existing file fails.
+    // Fetching non-existing file fails.
     let res: Result<(NativeFile, u64), i32> = unsafe {
         call_2(|ud, cb| dir_fetch_file(&app, &container_info, ffi_file_name0.as_ptr(), ud, cb))
     };
