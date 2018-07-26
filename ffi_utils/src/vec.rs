@@ -35,7 +35,7 @@ impl<T> SafePtr for Vec<T> {
     }
 }
 
-/// Converts a pointer and lengts to Vec<T> by cloning the contents.
+/// Converts a pointer and lengths to Vec<T> by cloning the contents.
 pub unsafe fn vec_clone_from_raw_parts<T: Clone>(ptr: *const T, len: usize) -> Vec<T> {
     slice::from_raw_parts(ptr, len).to_vec()
 }
