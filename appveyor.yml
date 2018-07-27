@@ -74,13 +74,13 @@ test_script:
 
 before_deploy:
   - ps: |
-        $url2 = "https://s3.eu-west-2.amazonaws.com/download-native-libs/cargo-script.exe"
-        Invoke-WebRequest $url2 -OutFile "cargo-script.exe"
+        $url = "https://s3.eu-west-2.amazonaws.com/download-native-libs/cargo-script.exe"
+        Invoke-WebRequest $url -OutFile "cargo-script.exe"
         New-Item -Path ".\target\deploy" -ItemType directory
-  - cargo-script.exe -- ./scripts/package.rs --lib --name safe_app -d target/deploy --mock
-  - cargo-script.exe -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy --mock
-  - cargo-script.exe -- ./scripts/package.rs --lib --name safe_app -d target/deploy
-  - cargo-script.exe -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy
+  - cargo-script.exe script -- ./scripts/package.rs --lib --name safe_app -d target/deploy --mock
+  - cargo-script.exe script -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy --mock
+  - cargo-script.exe script -- ./scripts/package.rs --lib --name safe_app -d target/deploy
+  - cargo-script.exe script -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy
   - ps: $root = Resolve-Path .\target\deploy; [IO.Directory]::GetFiles($root.Path, '*.zip') | % { Push-AppveyorArtifact $_ -FileName $_.Substring($root.Path.Length + 1) }
 
 deploy:
