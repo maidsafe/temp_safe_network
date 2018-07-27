@@ -120,11 +120,13 @@ jobs:
 
       # Deploy
     - stage: deploy
+      script: set -x; true
       if: type = push
       os: linux
       rust: *stable
       env: RUN_DEPLOY=1
     - stage: deploy
+      script: set -x; true
       if: type = push
       os: osx
       rust: *stable
