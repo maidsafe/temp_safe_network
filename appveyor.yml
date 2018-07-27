@@ -73,9 +73,10 @@ test_script:
     cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
 
 before_deploy:
-  - $url2 = "https://s3.eu-west-2.amazonaws.com/download-native-libs/cargo-script.exe"
-  - Invoke-WebRequest $url2 -OutFile "cargo-script.exe"
-  - ps: New-Item -Path ".\target\deploy" -ItemType directory
+  - ps: |
+        $url2 = "https://s3.eu-west-2.amazonaws.com/download-native-libs/cargo-script.exe"
+        Invoke-WebRequest $url2 -OutFile "cargo-script.exe"
+        New-Item -Path ".\target\deploy" -ItemType directory
   - cargo-script.exe -- ./scripts/package.rs --lib --name safe_app -d target/deploy --mock
   - cargo-script.exe -- ./scripts/package.rs --lib --name safe_authenticator -d target/deploy --mock
   - cargo-script.exe -- ./scripts/package.rs --lib --name safe_app -d target/deploy
