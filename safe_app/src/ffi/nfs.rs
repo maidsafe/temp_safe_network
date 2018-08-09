@@ -148,7 +148,7 @@ pub unsafe extern "C" fn dir_delete_file(
     })
 }
 
-/// Open the file to read of write its contents.
+/// Open the file to read or write its contents.
 ///
 /// Callback parameters: user data, error code, file context handle
 #[no_mangle]

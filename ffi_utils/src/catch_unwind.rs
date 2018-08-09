@@ -12,7 +12,8 @@ use std::fmt::{Debug, Display};
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
 
-fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
+/// Catches panics and returns the result.
+pub fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
 where
     F: FnOnce() -> Result<T, E>,
     E: Debug + From<&'a str>,

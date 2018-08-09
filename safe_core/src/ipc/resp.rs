@@ -108,6 +108,7 @@ impl ReprC for AuthGranted {
         } = *repr_c;
         let bootstrap_config = slice::from_raw_parts(bootstrap_config, bootstrap_config_len);
         let bootstrap_config = deserialise(bootstrap_config)?;
+
         Ok(AuthGranted {
             app_keys: AppKeys::clone_from_repr_c(app_keys)?,
             bootstrap_config,
@@ -119,7 +120,7 @@ impl ReprC for AuthGranted {
     }
 }
 
-/// Represents the needed keys to work with the data
+/// Represents the needed keys to work with the data.
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct AppKeys {
     /// Owner signing public key.
