@@ -82,7 +82,7 @@ pub fn symmetric_encrypt(
     })?)
 }
 
-/// Symmetric decryption
+/// Symmetric decryption.
 pub fn symmetric_decrypt(
     cipher_text: &[u8],
     secret_key: &secretbox::Key,

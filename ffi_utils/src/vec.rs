@@ -15,7 +15,7 @@ use std::slice;
 /// can cause segmentation faults with the automatic pointer
 /// dereferencing on the front-end side (e.g. in Node.js).
 pub trait SafePtr {
-    /// Resulting pointer type
+    /// Resulting pointer type.
     type Ptr;
 
     /// Returns a pointer that guarantees safe dereferencing
@@ -40,7 +40,7 @@ pub unsafe fn vec_clone_from_raw_parts<T: Clone>(ptr: *const T, len: usize) -> V
     slice::from_raw_parts(ptr, len).to_vec()
 }
 
-/// Converts a Vec<T> to (pointer, size, capacity)
+/// Converts a Vec<T> to (pointer, size, capacity).
 pub fn vec_into_raw_parts<T>(mut v: Vec<T>) -> (*mut T, usize, usize) {
     v.shrink_to_fit();
     let ptr = v.as_mut_ptr();
