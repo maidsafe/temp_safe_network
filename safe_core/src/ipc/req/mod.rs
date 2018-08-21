@@ -192,7 +192,7 @@ pub fn permission_set_into_repr_c(perms: PermissionSet) -> FfiPermissionSet {
 
 /// Create a `PermissionSet` from its C representation.
 pub fn permission_set_clone_from_repr_c(
-    perms: &FfiPermissionSet,
+    perms: FfiPermissionSet,
 ) -> Result<PermissionSet, IpcError> {
     let mut pm = PermissionSet::new();
 
@@ -332,7 +332,7 @@ mod tests {
             manage_permissions: false,
         };
 
-        let res = permission_set_clone_from_repr_c(&ps);
+        let res = permission_set_clone_from_repr_c(ps);
         assert!(res.is_err());
 
         // It should ignore `read` perms in all other cases
@@ -344,7 +344,7 @@ mod tests {
             manage_permissions: false,
         };
 
-        let res = unwrap!(permission_set_clone_from_repr_c(&ps));
+        let res = unwrap!(permission_set_clone_from_repr_c(ps));
         assert!(unwrap!(res.is_allowed(Action::Update)));
         assert!(unwrap!(res.is_allowed(Action::Delete)));
         assert!(res.is_allowed(Action::Insert).is_none());

@@ -471,7 +471,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
                 user_data,
                 o_cb
             );
-            let permission_set = unwrap!(permission_set_clone_from_repr_c(&permission_set));
+            let permission_set = unwrap!(permission_set_clone_from_repr_c(permission_set));
 
             client
                 .set_mdata_user_permissions(info.name, info.type_tag, user, permission_set, version)

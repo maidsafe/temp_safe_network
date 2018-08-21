@@ -213,7 +213,7 @@ fn update_mdata_permissions(
         .into_iter()
         .map(|(user, desired_set)| {
             if let Some(current_set) = current_permissions.get(&user) {
-                (user, union_permission_sets(current_set, &desired_set))
+                (user, union_permission_sets(*current_set, desired_set))
             } else {
                 (user, desired_set)
             }
@@ -270,7 +270,7 @@ fn fix_entry_action(action: EntryAction, error: &EntryError) -> Option<EntryActi
 }
 
 // Create union of the two permission sets, preferring allows to deny's.
-fn union_permission_sets(a: &PermissionSet, b: &PermissionSet) -> PermissionSet {
+fn union_permission_sets(a: PermissionSet, b: PermissionSet) -> PermissionSet {
     let actions = [
         Action::Insert,
         Action::Update,
@@ -444,7 +444,7 @@ mod tests {
             .allow(Action::Update)
             .allow(Action::Delete);
 
-        let c = union_permission_sets(&a, &b);
+        let c = union_permission_sets(a, b);
         assert_eq!(c.is_allowed(Action::Insert), Some(true));
         assert_eq!(c.is_allowed(Action::Update), Some(true));
         assert_eq!(c.is_allowed(Action::Delete), Some(true));

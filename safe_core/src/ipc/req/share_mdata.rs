@@ -93,7 +93,7 @@ impl ReprC for ShareMData {
         Ok(ShareMData {
             type_tag: (*raw).type_tag,
             name: XorName((*raw).name),
-            perms: permission_set_clone_from_repr_c(&(*raw).perms)?,
+            perms: permission_set_clone_from_repr_c((*raw).perms)?,
         })
     }
 }

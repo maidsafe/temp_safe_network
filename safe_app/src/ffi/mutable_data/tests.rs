@@ -71,7 +71,7 @@ fn permissions_crud_ffi() {
             )))
         };
         assert!(perm_set2.insert);
-        let perm_set2 = unwrap!(permission_set_clone_from_repr_c(&perm_set2));
+        let perm_set2 = unwrap!(permission_set_clone_from_repr_c(perm_set2));
 
         assert_eq!(Some(true), perm_set2.is_allowed(Action::Insert));
         assert_eq!(None, perm_set2.is_allowed(Action::Update));
@@ -113,7 +113,7 @@ fn permissions_crud_ffi() {
                 cb
             )))
         };
-        let read_perm_set = unwrap!(permission_set_clone_from_repr_c(&read_perm_set));
+        let read_perm_set = unwrap!(permission_set_clone_from_repr_c(read_perm_set));
         assert_eq!(Some(true), read_perm_set.is_allowed(Action::Insert));
         assert_eq!(
             Some(true),
@@ -336,7 +336,7 @@ fn entries_crud_ffi() {
             cb
         )))
     };
-    let read_perm_set = unwrap!(permission_set_clone_from_repr_c(&read_perm_set));
+    let read_perm_set = unwrap!(permission_set_clone_from_repr_c(read_perm_set));
 
     assert_eq!(Some(true), read_perm_set.is_allowed(Action::Insert));
     assert_eq!(None, read_perm_set.is_allowed(Action::Update));

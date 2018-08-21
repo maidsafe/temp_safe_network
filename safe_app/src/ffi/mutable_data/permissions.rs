@@ -194,7 +194,7 @@ pub unsafe extern "C" fn mdata_permissions_insert(
                 .get_mdata_permissions(permissions_h)?;
             let _ = permissions.insert(
                 helper::get_user(context.object_cache(), user_h)?,
-                permission_set_clone_from_repr_c(&permission_set)?,
+                permission_set_clone_from_repr_c(permission_set)?,
             );
 
             Ok(())
