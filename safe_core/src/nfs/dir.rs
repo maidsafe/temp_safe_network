@@ -38,7 +38,6 @@ pub fn create_dir(
                 CoreError::RoutingClientError(ClientError::DataExists) => Ok(()),
                 e => Err(e),
             }
-        })
-        .map_err(NfsError::from)
+        }).map_err(NfsError::from)
         .into_box()
 }

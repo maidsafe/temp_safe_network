@@ -42,20 +42,17 @@ fn create_test_file(client: &CoreClient) -> Box<NfsFuture<(MDataInfo, File)>> {
                 Mode::Overwrite,
                 root.enc_key().cloned(),
             )
-        })
-        .then(move |res| {
+        }).then(move |res| {
             let writer = unwrap!(res);
 
             writer
                 .write(&[0u8; ORIG_SIZE])
                 .and_then(move |_| writer.close())
-        })
-        .then(move |res| {
+        }).then(move |res| {
             let file = unwrap!(res);
 
             file_helper::insert(c3, root2.clone(), "hello.txt", &file).map(move |_| (root2, file))
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Test inserting files to, and fetching from, a public mdata.
@@ -88,31 +85,26 @@ fn file_fetch_public_md() {
                     Mode::Overwrite,
                     root.enc_key().cloned(),
                 )
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let writer = unwrap!(res);
 
                 writer
                     .write(&[0u8; ORIG_SIZE])
                     .and_then(move |_| writer.close())
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let file = unwrap!(res);
 
                 file_helper::insert(c3, root2.clone(), "", &file).map(move |_| root2)
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let dir = unwrap!(res);
 
                 file_helper::fetch(c4, dir.clone(), "").map(move |(_version, file)| (dir, file))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, file) = unwrap!(res);
 
                 file_helper::read(c5, &file, dir.enc_key().cloned())
                     .map(move |reader| (reader, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (reader, dir) = unwrap!(res);
                 let size = reader.size();
                 println!("reading {} bytes", size);
@@ -120,21 +112,18 @@ fn file_fetch_public_md() {
                     assert_eq!(data, vec![0u8; ORIG_SIZE]);
                     dir
                 })
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let dir = unwrap!(res);
 
                 std::thread::sleep(std::time::Duration::new(3, 0));
 
                 file_helper::fetch(c6, dir.clone(), "").map(move |(_version, file)| (dir, file))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, file) = unwrap!(res);
 
                 file_helper::read(c7, &file, dir.enc_key().cloned())
                     .map(move |reader| (reader, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (reader, _dir) = unwrap!(res);
                 let size = reader.size();
                 println!("reading {} bytes", size);
@@ -159,8 +148,7 @@ fn file_read() {
 
                 file_helper::read(c2, &file, dir.enc_key().cloned())
                     .map(move |reader| (reader, file, creation_time))
-            })
-            .then(|res| {
+            }).then(|res| {
                 let (reader, file, creation_time) = unwrap!(res);
                 let size = reader.size();
                 println!("reading {} bytes", size);
@@ -170,8 +158,7 @@ fn file_read() {
                 assert!(creation_time <= *file.modified_time());
 
                 result
-            })
-            .map(move |data| {
+            }).map(move |data| {
                 assert_eq!(data, vec![0u8; ORIG_SIZE]);
             })
     });
@@ -190,8 +177,7 @@ fn file_read_chunks() {
                 let (dir, file) = unwrap!(res);
 
                 file_helper::read(c2, &file, dir.enc_key().cloned())
-            })
-            .then(|res| {
+            }).then(|res| {
                 let reader = unwrap!(res);
                 let size = reader.size();
                 assert_eq!(size, ORIG_SIZE as u64);
@@ -233,23 +219,21 @@ fn file_read_chunks() {
                         println!("reading 0 bytes");
                         reader.read(size, 0).map(move |data| (reader, size, data))
                     },
-                )
-                    .then(|res| {
-                        let (reader, size, data) = unwrap!(res);
-                        assert_eq!(data, Vec::<u8>::new());
+                ).then(|res| {
+                    let (reader, size, data) = unwrap!(res);
+                    assert_eq!(data, Vec::<u8>::new());
 
-                        // Read past the end of the file, expect an error
-                        reader.read(size, 1)
-                    })
-                    .then(|res| -> Result<_, CoreError> {
-                        match res {
-                            Ok(_) => {
-                                // We expect an error in this case
-                                panic!("Read past end of file successfully")
-                            }
-                            Err(_) => Ok(()),
+                    // Read past the end of the file, expect an error
+                    reader.read(size, 1)
+                }).then(|res| -> Result<_, CoreError> {
+                    match res {
+                        Ok(_) => {
+                            // We expect an error in this case
+                            panic!("Read past end of file successfully")
                         }
-                    })
+                        Err(_) => Ok(()),
+                    }
+                })
             })
     });
 }
@@ -273,8 +257,7 @@ fn file_write_chunks() {
 
                 file_helper::write(c2, file, Mode::Overwrite, dir.enc_key().cloned())
                     .map(move |writer| (writer, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (writer, dir) = unwrap!(res);
 
                 let size_written = 0;
@@ -299,8 +282,7 @@ fn file_write_chunks() {
                             }
                         })
                 }).map(move |writer| (writer, dir))
-            })
-            .then(
+            }).then(
                 move |res: Result<(Writer<CoreClient>, MDataInfo), NfsError>| {
                     let (writer, dir) = unwrap!(res);
                     // Write 0 bytes, should succeed
@@ -308,19 +290,16 @@ fn file_write_chunks() {
                         .write(&content[GOAL_SIZE..GOAL_SIZE])
                         .map(move |_| (writer, dir))
                 },
-            )
-            .then(move |res| {
+            ).then(move |res| {
                 let (writer, dir) = unwrap!(res);
                 writer.close().map(move |file| (file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 // Updating file - append
                 let (file, dir) = unwrap!(res);
 
                 file_helper::write(c3, file, Mode::Append, dir.enc_key().cloned())
                     .map(move |writer| (writer, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (writer, dir) = unwrap!(res);
 
                 let size_written = 0;
@@ -345,8 +324,7 @@ fn file_write_chunks() {
                             }
                         })
                 }).map(move |writer| (writer, dir))
-            })
-            .then(
+            }).then(
                 move |res: Result<(Writer<CoreClient>, MDataInfo), NfsError>| {
                     let (writer, dir) = unwrap!(res);
                     // Write 0 bytes, should succeed
@@ -354,24 +332,20 @@ fn file_write_chunks() {
                         .write(&content[GOAL_SIZE..GOAL_SIZE])
                         .map(move |_| (writer, dir))
                 },
-            )
-            .then(move |res| {
+            ).then(move |res| {
                 let (writer, dir) = unwrap!(res);
                 writer.close().map(move |file| (file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (file, dir) = unwrap!(res);
 
                 file_helper::read(c4, &file, dir.enc_key().cloned())
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let reader = unwrap!(res);
                 let size = reader.size();
 
                 assert_eq!(size, 2 * GOAL_SIZE as u64);
                 reader.read(0, size)
-            })
-            .map(move |data| {
+            }).map(move |data| {
                 assert_eq!(data, vec![0u8; 2 * GOAL_SIZE]);
             })
     })
@@ -395,25 +369,21 @@ fn file_update_overwrite() {
 
                 file_helper::write(c2, file, Mode::Overwrite, dir.enc_key().cloned())
                     .map(move |writer| (writer, dir, creation_time))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (writer, dir, creation_time) = unwrap!(res);
                 writer
                     .write(&[1u8; NEW_SIZE])
                     .and_then(move |_| writer.close())
                     .map(move |file| (file, dir, creation_time))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (file, dir, creation_time) = unwrap!(res);
                 file_helper::update(c3, dir.clone(), "hello.txt", &file, 1)
                     .map(move |_| (dir, creation_time))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, creation_time) = unwrap!(res);
                 file_helper::fetch(c4, dir.clone(), "hello.txt")
                     .map(move |(_version, file)| (dir, file, creation_time))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, file, creation_time) = unwrap!(res);
 
                 // Check file timestamps
@@ -421,14 +391,12 @@ fn file_update_overwrite() {
                 assert!(creation_time <= *file.modified_time());
 
                 file_helper::read(c5, &file, dir.enc_key().cloned())
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let reader = unwrap!(res);
                 let size = reader.size();
                 println!("reading {} bytes", size);
                 reader.read(0, size)
-            })
-            .map(move |data| {
+            }).map(move |data| {
                 assert_eq!(data, vec![1u8; NEW_SIZE]);
             })
     });
@@ -447,25 +415,21 @@ fn file_update_append() {
                 // Updating file - append
                 file_helper::write(c2, file, Mode::Append, dir.enc_key().cloned())
                     .map(move |writer| (dir, writer))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, writer) = unwrap!(res);
                 writer
                     .write(&[2u8; APPEND_SIZE])
                     .and_then(move |_| writer.close())
                     .map(move |file| (dir, file))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, file) = unwrap!(res);
                 file_helper::read(c3, &file, dir.enc_key().cloned())
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let reader = unwrap!(res);
                 let size = reader.size();
                 println!("reading {} bytes", size);
                 reader.read(0, size)
-            })
-            .map(move |data| {
+            }).map(move |data| {
                 assert_eq!(data.len(), ORIG_SIZE + APPEND_SIZE);
                 assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
                 assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
@@ -485,13 +449,11 @@ fn file_update_metadata() {
 
                 file.set_user_metadata(vec![12u8; 10]);
                 file_helper::update(c2, dir.clone(), "hello.txt", &file, 1).map(move |()| dir)
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let dir = unwrap!(res);
 
                 file_helper::fetch(c3.clone(), dir, "hello.txt")
-            })
-            .map(move |(_version, file)| {
+            }).map(move |(_version, file)| {
                 assert_eq!(*file.user_metadata(), [12u8; 10][..]);
             })
     });
@@ -506,12 +468,10 @@ fn file_delete() {
             .then(move |res| {
                 let (dir, _file) = unwrap!(res);
                 file_helper::delete(c2, dir.clone(), "hello.txt", 1).map(move |()| dir)
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let dir = unwrap!(res);
                 file_helper::fetch(c3.clone(), dir, "hello.txt")
-            })
-            .then(move |res| -> Result<_, CoreError> {
+            }).then(move |res| -> Result<_, CoreError> {
                 match res {
                     Ok(_) => {
                         // We expect an error in this case
@@ -538,42 +498,35 @@ fn file_delete_then_add() {
             .then(move |res| {
                 let (dir, file) = unwrap!(res);
                 file_helper::delete(c2, dir.clone(), "hello.txt", 1).map(move |_| (dir, file))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (dir, file) = unwrap!(res);
 
                 file_helper::write(c3, file, Mode::Overwrite, dir.enc_key().cloned())
                     .map(move |writer| (writer, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (writer, dir) = unwrap!(res);
 
                 writer
                     .write(&[1u8; NEW_SIZE])
                     .and_then(move |_| writer.close())
                     .map(move |file| (file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (file, dir) = unwrap!(res);
                 file_helper::update(c4, dir.clone(), "hello.txt", &file, 2).map(move |_| dir)
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let dir = unwrap!(res);
                 file_helper::fetch(c5, dir.clone(), "hello.txt")
                     .map(move |(version, file)| (version, file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (version, file, dir) = unwrap!(res);
                 assert_eq!(version, 2);
                 file_helper::read(c6, &file, dir.enc_key().cloned())
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let reader = unwrap!(res);
                 let size = reader.size();
                 println!("reading {} bytes", size);
                 reader.read(0, size)
-            })
-            .map(move |data| {
+            }).map(move |data| {
                 assert_eq!(data, vec![1u8; NEW_SIZE]);
             })
     });
@@ -594,35 +547,30 @@ fn file_open_close() {
                 // Open the file for reading
                 file_helper::read(c2, &file, dir.enc_key().cloned())
                     .map(move |reader| (reader, file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 // The reader should get dropped implicitly
                 let (_reader, file, dir) = unwrap!(res);
                 // Open the file for writing
                 file_helper::write(c3, file.clone(), Mode::Overwrite, dir.enc_key().cloned())
                     .map(move |writer| (writer, file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (writer, file, dir) = unwrap!(res);
                 // Close the file
                 let _ = writer.close();
                 // Open the file for appending
                 file_helper::write(c4, file.clone(), Mode::Append, dir.enc_key().cloned())
                     .map(move |writer| (writer, file, dir))
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let (writer, file, dir) = unwrap!(res);
                 // Close the file
                 let _ = writer.close();
                 // Open the file for reading, ensure it has original contents
                 file_helper::read(c5, &file, dir.enc_key().cloned())
-            })
-            .then(move |res| {
+            }).then(move |res| {
                 let reader = unwrap!(res);
                 let size = reader.size();
                 reader.read(0, size)
-            })
-            .map(move |data| {
+            }).map(move |data| {
                 assert_eq!(data, vec![0u8; ORIG_SIZE]);
             })
     });
@@ -653,41 +601,36 @@ fn encryption() {
         ).then(move |res| {
             let writer = unwrap!(res);
             writer.write(&content).and_then(move |_| writer.close())
+        }).then(move |res| {
+            // Attempt to read without an encryption key fails.
+            let file = unwrap!(res);
+            file_helper::read(c2, &file, None)
+                .and_then(|_| Err(NfsError::from("Unexpected success")))
+                .or_else(move |_error| -> Result<_, NfsError> {
+                    // TODO: assert the error is of the expected variant.
+                    Ok(file)
+                })
+        }).then(move |res| {
+            // Attempt to read using incorrect encryption key fails.
+            let file = unwrap!(res);
+            file_helper::read(c3, &file, Some(wrong_key))
+                .and_then(|_| Err(NfsError::from("Unexpected success")))
+                .or_else(move |error| match error {
+                    NfsError::CoreError(CoreError::SymmetricDecipherFailure) => Ok(file),
+                    error => Err(error),
+                })
+        }).then(move |res| {
+            // Attempt to read using original encryption key succeeds.
+            let file = unwrap!(res);
+            file_helper::read(c4, &file, Some(key))
+        }).then(move |res| {
+            let reader = unwrap!(res);
+            let size = reader.size();
+            reader.read(0, size)
+        }).then(move |res| -> Result<_, NfsError> {
+            let retrieved_content = unwrap!(res);
+            assert_eq!(retrieved_content, content2);
+            Ok(())
         })
-            .then(move |res| {
-                // Attempt to read without an encryption key fails.
-                let file = unwrap!(res);
-                file_helper::read(c2, &file, None)
-                    .and_then(|_| Err(NfsError::from("Unexpected success")))
-                    .or_else(move |_error| -> Result<_, NfsError> {
-                        // TODO: assert the error is of the expected variant.
-                        Ok(file)
-                    })
-            })
-            .then(move |res| {
-                // Attempt to read using incorrect encryption key fails.
-                let file = unwrap!(res);
-                file_helper::read(c3, &file, Some(wrong_key))
-                    .and_then(|_| Err(NfsError::from("Unexpected success")))
-                    .or_else(move |error| match error {
-                        NfsError::CoreError(CoreError::SymmetricDecipherFailure) => Ok(file),
-                        error => Err(error),
-                    })
-            })
-            .then(move |res| {
-                // Attempt to read using original encryption key succeeds.
-                let file = unwrap!(res);
-                file_helper::read(c4, &file, Some(key))
-            })
-            .then(move |res| {
-                let reader = unwrap!(res);
-                let size = reader.size();
-                reader.read(0, size)
-            })
-            .then(move |res| -> Result<_, NfsError> {
-                let retrieved_content = unwrap!(res);
-                assert_eq!(retrieved_content, content2);
-                Ok(())
-            })
     })
 }

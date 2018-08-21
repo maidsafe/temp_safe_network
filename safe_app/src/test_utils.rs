@@ -62,8 +62,7 @@ where
             .then(move |result| {
                 unwrap!(tx.send(result));
                 Ok(())
-            })
-            .into_box();
+            }).into_box();
 
         Some(future)
     }));
@@ -79,10 +78,11 @@ pub fn create_app() -> App {
 /// Create a random app given an app authorisation request
 pub fn create_app_by_req(auth_req: &NativeAuthReq) -> Result<App, AppError> {
     let auth = authenticator::create_account_and_login();
-    let auth_granted = authenticator::register_app(&auth, auth_req).map_err(|error| match error {
-        AuthError::NoSuchContainer(name) => AppError::NoSuchContainer(name),
-        _ => AppError::Unexpected(format!("{}", error)),
-    })?;
+    let auth_granted =
+        authenticator::register_app(&auth, auth_req).map_err(|error| match error {
+            AuthError::NoSuchContainer(name) => AppError::NoSuchContainer(name),
+            _ => AppError::Unexpected(format!("{}", error)),
+        })?;
     App::registered(auth_req.app.id.clone(), auth_granted, || ())
 }
 

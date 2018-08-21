@@ -175,8 +175,7 @@ where
             .then(move |result| {
                 unwrap!(tx.send(result));
                 Ok(())
-            })
-            .into_box();
+            }).into_box();
 
         Some(future)
     }));
@@ -225,9 +224,8 @@ pub fn create_file<S: Into<String>>(
         ).then(move |res| {
             let writer = unwrap!(res);
             writer.write(&content).and_then(move |_| writer.close())
-        })
-            .then(move |file| file_helper::insert(c2, container_info, name, &unwrap!(file)))
-            .map_err(From::from)
+        }).then(move |file| file_helper::insert(c2, container_info, name, &unwrap!(file)))
+        .map_err(From::from)
     })
 }
 
@@ -256,8 +254,7 @@ pub fn read_file(
             .then(|res| {
                 let reader = unwrap!(res);
                 reader.read(0, reader.size())
-            })
-            .map_err(From::from)
+            }).map_err(From::from)
     })
 }
 
@@ -289,8 +286,7 @@ pub fn write_file(
                 writer
                     .write(&content)
                     .and_then(move |_| writer.close().map(|_| ()))
-            })
-            .map_err(From::from)
+            }).map_err(From::from)
     })
 }
 

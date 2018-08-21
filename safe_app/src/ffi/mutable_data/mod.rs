@@ -102,7 +102,7 @@ pub unsafe extern "C" fn mdata_put(
                     entries,
                     btree_set![owner_key],
                 ).map_err(CoreError::from)
-                    .map_err(AppError::from),
+                .map_err(AppError::from),
                 user_data,
                 o_cb
             );
@@ -113,8 +113,7 @@ pub unsafe extern "C" fn mdata_put(
                 .then(move |result| {
                     call_result_cb!(result, user_data, o_cb);
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -203,12 +202,10 @@ pub unsafe extern "C" fn mdata_get_value(
                         content.len(),
                         version,
                     );
-                })
-                .map_err(AppError::from)
+                }).map_err(AppError::from)
                 .map_err(move |err| {
                     call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -287,8 +284,7 @@ pub unsafe extern "C" fn mdata_list_keys(
                         }
                     }
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -340,8 +336,7 @@ pub unsafe extern "C" fn mdata_list_values(
                         }
                     }
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -375,8 +370,7 @@ pub unsafe extern "C" fn mdata_mutate_entries(
                 .then(move |result| {
                     call_result_cb!(result, user_data, o_cb);
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -442,12 +436,10 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
                 .map(move |set| {
                     let perm_set = permission_set_into_repr_c(set);
                     o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
-                })
-                .map_err(AppError::from)
+                }).map_err(AppError::from)
                 .map_err(move |err| {
                     call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -487,8 +479,7 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
                 .then(move |result| {
                     call_result_cb!(result, user_data, o_cb);
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -525,8 +516,7 @@ pub unsafe extern "C" fn mdata_del_user_permissions(
                 .then(move |result| {
                     call_result_cb!(result, user_data, o_cb);
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })

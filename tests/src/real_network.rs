@@ -396,12 +396,8 @@ fn ffi_authorise_app(auth_h: *mut Authenticator, app_info: &AppExchangeInfo) -> 
         unwrap!(call_1(|ud, cb| {
             let auth_req = unwrap!(auth_req.into_repr_c());
             encode_auth_resp(
-                auth_h,
-                &auth_req,
-                req_id,
-                true, // is_granted
-                ud,
-                cb,
+                auth_h, &auth_req, req_id, true, // is_granted
+                ud, cb,
             )
         }))
     };

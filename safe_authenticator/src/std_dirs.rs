@@ -68,8 +68,7 @@ pub fn create(client: &AuthClient) -> Box<AuthFuture<()>> {
                 }
                 Err(e) => err!(e),
             }
-        })
-        .into_box();
+        }).into_box();
 
     future::join_all(vec![access_cont_fut, create_config_dir(&c2, &config_dir)])
         .map_err(From::from)
@@ -78,8 +77,7 @@ pub fn create(client: &AuthClient) -> Box<AuthFuture<()>> {
             // (so we don't have to recover them after login).
             c4.set_std_dirs_created(true);
             c4.update_account_packet().map_err(From::from).into_box()
-        })
-        .into_box()
+        }).into_box()
 }
 
 fn create_config_dir(client: &AuthClient, config_dir: &MDataInfo) -> Box<AuthFuture<()>> {
@@ -128,7 +126,7 @@ fn create_access_container(
         ],
         btree_map![],
     ).map_err(From::from)
-        .into_box()
+    .into_box()
 }
 
 /// Generates a list of `MDataInfo` for standard dirs.
@@ -155,8 +153,7 @@ pub fn create_std_dirs(
         .iter()
         .map(|(_, md_info)| {
             create_dir(&client, md_info, btree_map![], btree_map![]).map_err(AuthError::from)
-        })
-        .collect();
+        }).collect();
     future::join_all(creations).map(|_| ()).into_box()
 }
 
@@ -184,24 +181,23 @@ mod tests {
                 assert!(res.is_ok());
 
                 access_container::fetch_authenticator_entry(&client)
+            }).then(move |res| {
+                let (_, mdata_entries) = unwrap!(res);
+                assert_eq!(
+                    mdata_entries.len(),
+                    DEFAULT_PUBLIC_DIRS.len() + DEFAULT_PRIVATE_DIRS.len()
+                );
+
+                for key in DEFAULT_PUBLIC_DIRS
+                    .iter()
+                    .chain(DEFAULT_PRIVATE_DIRS.iter())
+                {
+                    // let's check whether all our entries have been created properly
+                    assert!(mdata_entries.contains_key(*key));
+                }
+
+                Ok(())
             })
-                .then(move |res| {
-                    let (_, mdata_entries) = unwrap!(res);
-                    assert_eq!(
-                        mdata_entries.len(),
-                        DEFAULT_PUBLIC_DIRS.len() + DEFAULT_PRIVATE_DIRS.len()
-                    );
-
-                    for key in DEFAULT_PUBLIC_DIRS
-                        .iter()
-                        .chain(DEFAULT_PRIVATE_DIRS.iter())
-                    {
-                        // let's check whether all our entries have been created properly
-                        assert!(mdata_entries.contains_key(*key));
-                    }
-
-                    Ok(())
-                })
         });
     }
 }

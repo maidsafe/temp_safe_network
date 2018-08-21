@@ -18,27 +18,61 @@ maidsafe_logo.png",
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 #![forbid(
-    exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types, warnings
+    exceeding_bitshifts,
+    mutable_transmutes,
+    no_mangle_const_items,
+    unknown_crate_types,
+    warnings
 )]
 #![deny(
-    bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
-    overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-    stable_features, unconditional_recursion, unknown_lints, unsafe_code, unused, unused_allocation,
-    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+    bad_style,
+    deprecated,
+    improper_ctypes,
+    missing_docs,
+    non_shorthand_field_patterns,
+    overflowing_literals,
+    plugin_as_library,
+    private_no_mangle_fns,
+    private_no_mangle_statics,
+    stable_features,
+    unconditional_recursion,
+    unknown_lints,
+    unsafe_code,
+    unused,
+    unused_allocation,
+    unused_attributes,
+    unused_comparisons,
+    unused_features,
+    unused_parens,
+    while_true
 )]
 #![warn(
-    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-    unused_qualifications, unused_results
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_results
 )]
 #![allow(
-    box_pointers, missing_copy_implementations, missing_debug_implementations,
+    box_pointers,
+    missing_copy_implementations,
+    missing_debug_implementations,
     variant_size_differences
 )]
 #![cfg_attr(
     feature = "cargo-clippy",
-    deny(clippy, unicode_not_nfc, wrong_pub_self_convention, option_unwrap_used)
+    deny(
+        clippy,
+        unicode_not_nfc,
+        wrong_pub_self_convention,
+        option_unwrap_used
+    )
 )]
-#![cfg_attr(feature = "cargo-clippy", allow(implicit_hasher, too_many_arguments, use_debug))]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(implicit_hasher, too_many_arguments, use_debug)
+)]
 
 extern crate config_file_handler;
 #[macro_use]
@@ -309,8 +343,7 @@ impl App {
                         if let NetworkEvent::Disconnected = event {
                             disconnect_notifier()
                         }
-                    })
-                    .for_each(|_| Ok(())),
+                    }).for_each(|_| Ok(())),
             );
 
             let core_tx_clone = core_tx.clone();
@@ -418,8 +451,7 @@ impl AppContext {
             .map(move |_| {
                 let access_info = reg.access_info.borrow();
                 access_info.clone()
-            })
-            .into_box()
+            }).into_box()
     }
 
     fn as_registered(&self) -> Result<&Rc<Registered>, AppError> {
@@ -442,8 +474,7 @@ fn refresh_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFu
             context.access_container_info.id,
             context.access_container_info.tag,
             entry_key,
-        )
-        .map_err(AppError::from)
+        ).map_err(AppError::from)
         .and_then(move |value| {
             let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
             let decoded = deserialise(&encoded)?;
@@ -451,8 +482,7 @@ fn refresh_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFu
             *context.access_info.borrow_mut() = decoded;
 
             Ok(())
-        })
-        .into_box()
+        }).into_box()
 }
 
 fn fetch_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFuture<()>> {

@@ -67,8 +67,7 @@ pub fn get_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<AppInfo>> {
                 .get(&app_id_hash)
                 .cloned()
                 .ok_or_else(|| AuthError::IpcError(IpcError::UnknownApp))
-        })
-        .into_box()
+        }).into_box()
 }
 
 /// Register the given app with authenticator.
@@ -210,14 +209,12 @@ where
             };
 
             Ok((Some(value.entry_version), decoded))
-        })
-        .or_else(|error| match error {
+        }).or_else(|error| match error {
             CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
                 Ok((None, Default::default()))
             }
             _ => Err(AuthError::from(error)),
-        })
-        .into_box()
+        }).into_box()
 }
 
 fn update_entry<T>(
@@ -263,8 +260,7 @@ where
             }
 
             Err(error)
-        })
-        .map_err(From::from)
+        }).map_err(From::from)
         .into_box()
 }
 

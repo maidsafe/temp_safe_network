@@ -38,8 +38,7 @@ impl<C: Client> Reader<C> {
                     client,
                     self_encryptor,
                 })
-            })
-            .into_box()
+            }).into_box()
     }
 
     /// Returns the total size of the file/blob.

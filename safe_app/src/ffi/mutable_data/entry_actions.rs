@@ -218,7 +218,8 @@ mod tests {
                 EntryAction::Ins(Value {
                     ref content,
                     entry_version: 0,
-                }) if *content == value0 =>
+                })
+                    if *content == value0 =>
                 {
                     ()
                 }
@@ -229,7 +230,8 @@ mod tests {
                 EntryAction::Update(Value {
                     ref content,
                     entry_version,
-                }) if *content == value1 && entry_version == version1 =>
+                })
+                    if *content == value1 && entry_version == version1 =>
                 {
                     ()
                 }

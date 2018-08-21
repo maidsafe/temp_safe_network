@@ -68,7 +68,9 @@ pub unsafe extern "C" fn mdata_permissions_len(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+            let permissions = context
+                .object_cache()
+                .get_mdata_permissions(permissions_h)?;
             Ok(permissions.len())
         })
     })
@@ -155,8 +157,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                         user_h,
                         perm_set: *permission_set,
                     }.into_repr_c()
-                })
-                .collect();
+                }).collect();
 
             o_cb(
                 user_data.0,
@@ -188,7 +189,9 @@ pub unsafe extern "C" fn mdata_permissions_insert(
         let permission_set = *permission_set;
 
         send_sync(app, user_data, o_cb, move |_, context| {
-            let mut permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+            let mut permissions = context
+                .object_cache()
+                .get_mdata_permissions(permissions_h)?;
             let _ = permissions.insert(
                 helper::get_user(context.object_cache(), user_h)?,
                 permission_set_clone_from_repr_c(&permission_set)?,

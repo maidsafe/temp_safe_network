@@ -305,8 +305,7 @@ where {
                     TYPE_TAG_SESSION_PACKET,
                     ACC_LOGIN_ENTRY_KEY.to_owned(),
                     msg_id,
-                )
-                .map_err(CoreError::from)
+                ).map_err(CoreError::from)
                 .and_then(|_| wait_for_response!(routing_rx, Response::GetMDataValue, msg_id))
                 .map_err(AuthError::from)
                 .map_err(|e| {
@@ -808,16 +807,14 @@ mod tests {
                     Ok(_) => panic!("Unexpected success"),
                     Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
                     Err(err) => panic!("Unexpected {:?}", err),
-                })
-                .then(move |result| {
+                }).then(move |result| {
                     unwrap!(result);
 
                     let data = unwrap!(utils::generate_random_vector(4));
                     let data = ImmutableData::new(data);
 
                     client2.put_idata(data)
-                })
-                .then(|result| match result {
+                }).then(|result| match result {
                     Ok(_) => panic!("Unexpected success"),
                     Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
                     Err(err) => panic!("Unexpected {:?}", err),

@@ -105,7 +105,7 @@ impl Account {
             pwhash::OPSLIMIT_INTERACTIVE,
             pwhash::MEMLIMIT_INTERACTIVE,
         ).map(|_| ())
-            .map_err(|_| CoreError::UnsuccessfulPwHash)
+        .map_err(|_| CoreError::UnsuccessfulPwHash)
     }
 }
 

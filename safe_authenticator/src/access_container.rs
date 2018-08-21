@@ -80,8 +80,7 @@ pub fn fetch_authenticator_entry(
             })?;
             decode_authenticator_entry(&value.content, &enc_key)
                 .map(|decoded| (value.entry_version, decoded))
-        })
-        .into_box()
+        }).into_box()
 }
 
 /// Updates the authenticator entry
@@ -115,7 +114,7 @@ pub fn put_authenticator_entry(
         access_container.type_tag,
         actions.into(),
     ).map_err(From::from)
-        .into_box()
+    .into_box()
 }
 
 /// Decodes raw app entry.
@@ -161,8 +160,7 @@ pub fn fetch_entry(
             };
 
             Ok((value.entry_version, decoded))
-        })
-        .into_box()
+        }).into_box()
 }
 
 /// Adds a new entry to the authenticator access container
@@ -191,7 +189,7 @@ pub fn put_entry(
         access_container.type_tag,
         actions.into(),
     ).map_err(From::from)
-        .into_box()
+    .into_box()
 }
 
 /// Deletes entry from the access container.
@@ -213,5 +211,5 @@ pub fn delete_entry(
         access_container.type_tag,
         actions.into(),
     ).map_err(From::from)
-        .into_box()
+    .into_box()
 }
