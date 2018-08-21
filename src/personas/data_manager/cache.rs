@@ -85,19 +85,16 @@ impl Cache {
                 } else {
                     true
                 }
-            })
-            .map(FragmentInfo::data_id)
+            }).map(FragmentInfo::data_id)
             .chain(
                 self.needed_mutable_chunks
                     .iter()
                     .map(|id| DataId::Mutable(*id)),
-            )
-            .chain(
+            ).chain(
                 self.needed_mutable_chunk_request
                     .iter()
                     .map(|request| DataId::Mutable(request.data_id)),
-            )
-            .collect()
+            ).collect()
     }
 
     /// Returns the next mutable data chunk we need (if any)
@@ -261,8 +258,7 @@ impl Cache {
                 } else {
                     None
                 }
-            })
-            .collect();
+            }).collect();
 
         if fragments.is_empty() {
             return;
@@ -478,8 +474,7 @@ impl Cache {
                     .position(|write| write.timestamp.elapsed() > timeout)
                     .map_or_else(Vec::new, |index| writes.split_off(index))
                     .into_iter()
-            })
-            .collect();
+            }).collect();
 
         let expired_keys: Vec<_> = self
             .pending_writes

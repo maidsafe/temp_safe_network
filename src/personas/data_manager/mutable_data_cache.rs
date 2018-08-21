@@ -125,8 +125,7 @@ impl MutableDataCache {
                     } else {
                         None
                     }
-                })
-                .collect();
+                }).collect();
 
             for key in expired_keys {
                 let _ = entries.remove(&key);

@@ -181,7 +181,8 @@ impl DataManager {
         } = write;
 
         let mutation_type = mutation.mutation_type();
-        let fragments = self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)?;
+        let fragments =
+            self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)?;
 
         if fragments.is_empty() {
             // The commit wasn't successful.
@@ -653,7 +654,8 @@ impl DataManager {
                     ref key,
                     hash,
                     ..
-                } if hash == actual_hash =>
+                }
+                    if hash == actual_hash =>
                 {
                     self.cache.remove_needed_fragment(&fragment);
                     Some((name, tag, key.clone()))
@@ -1088,8 +1090,7 @@ impl DataManager {
                         .filter_map(|key| {
                             data.get(&key)
                                 .map(|value| FragmentInfo::mutable_data_entry(data, key, value))
-                        })
-                        .collect()
+                        }).collect()
                 })
             }
             Mutation::SetMDataUserPermissions {
@@ -1496,8 +1497,7 @@ impl DataManager {
                 } else {
                     None
                 }
-            })
-            .map(|delayed_refresh| self.handle_group_refresh(routing_node, delayed_refresh));
+            }).map(|delayed_refresh| self.handle_group_refresh(routing_node, delayed_refresh));
     }
 
     fn get_version(&self, data_id: &DataId) -> Result<u64, ChunkStoreError> {

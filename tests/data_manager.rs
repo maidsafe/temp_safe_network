@@ -632,8 +632,7 @@ fn mutable_data_parallel_mutations() {
             let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = BootstrapConfig::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
-        })
-        .collect();
+        }).collect();
 
     for client in &mut clients {
         client.ensure_connected(&mut nodes);
@@ -716,8 +715,7 @@ fn mutable_data_parallel_mutations() {
                 );
                 let _ = client.mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
                 actions
-            })
-            .collect();
+            }).collect();
 
         event_count += poll::nodes_and_clients(&mut nodes, &mut clients, true);
         trace!("Processed {} events.", event_count);
@@ -912,8 +910,7 @@ fn mutable_data_concurrent_mutations() {
                     node.name(),
                     unwrap!(node.get_maid_manager_mutation_count(client.name())),
                 )
-            })
-            .collect();
+            }).collect();
         expected_mutation_count += successes;
         for &(_, count) in &node_count_stats {
             assert_eq!(
@@ -950,8 +947,7 @@ fn mutable_data_put_and_mutate() {
             client.ensure_connected(&mut nodes);
             client.create_account(&mut nodes);
             client
-        })
-        .collect();
+        }).collect();
 
     let permissions = PermissionSet::new()
         .allow(Action::Insert)
@@ -1061,8 +1057,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
             let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = BootstrapConfig::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
-        })
-        .collect();
+        }).collect();
 
     for client in &mut clients {
         client.ensure_connected(&mut nodes);

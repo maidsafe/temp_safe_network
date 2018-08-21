@@ -189,30 +189,61 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 #![forbid(
-    exceeding_bitshifts, mutable_transmutes, no_mangle_const_items, unknown_crate_types, warnings
+    exceeding_bitshifts,
+    mutable_transmutes,
+    no_mangle_const_items,
+    unknown_crate_types,
+    warnings
 )]
 #![deny(
-    bad_style, deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
-    overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-    stable_features, unconditional_recursion, unknown_lints, unsafe_code, unused, unused_allocation,
-    unused_attributes, unused_comparisons, unused_features, unused_parens, while_true
+    bad_style,
+    deprecated,
+    improper_ctypes,
+    missing_docs,
+    non_shorthand_field_patterns,
+    overflowing_literals,
+    plugin_as_library,
+    private_no_mangle_fns,
+    private_no_mangle_statics,
+    stable_features,
+    unconditional_recursion,
+    unknown_lints,
+    unsafe_code,
+    unused,
+    unused_allocation,
+    unused_attributes,
+    unused_comparisons,
+    unused_features,
+    unused_parens,
+    while_true
 )]
 #![warn(
-    trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-    unused_qualifications, unused_results
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_results
 )]
 // TODO: Remove `renamed_and_removed_lints` once
 // https://github.com/rust-lang-nursery/error-chain/pull/246 has been fixed.
 #![allow(
-    box_pointers, missing_copy_implementations, missing_debug_implementations,
-    renamed_and_removed_lints, variant_size_differences
+    box_pointers,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    renamed_and_removed_lints,
+    variant_size_differences
 )]
 // FIXME: remove this when it'll be OK to change the public API, as `needless_pass_by_value`
 // requires to make changes to public functions.
 #![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 
 extern crate accumulator;
-#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[cfg(any(
+    test,
+    feature = "use-mock-crust",
+    feature = "use-mock-routing"
+))]
 extern crate fake_clock;
 extern crate hex;
 #[cfg(feature = "use-mock-crust")]
@@ -224,7 +255,11 @@ extern crate lru_time_cache;
 extern crate maidsafe_utilities;
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[cfg(any(
+    test,
+    feature = "use-mock-crust",
+    feature = "use-mock-routing"
+))]
 extern crate rand;
 #[macro_use]
 extern crate routing;
@@ -245,7 +280,10 @@ extern crate unwrap;
 pub mod test_utils;
 
 /// For integration tests only
-#[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
+#[cfg(all(
+    feature = "use-mock-crust",
+    not(feature = "use-mock-routing")
+))]
 pub mod mock_crust_detail;
 
 mod authority;

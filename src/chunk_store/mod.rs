@@ -149,8 +149,7 @@ impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
                     .map(|metadata| {
                         self.used_space += metadata.len();
                     })
-            })
-            .map_err(From::from)
+            }).map_err(From::from)
     }
 
     /// Deletes the data chunk stored under `id`.
@@ -202,8 +201,7 @@ impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
                         .and_then(|bytes| serialisation::deserialise(&*bytes).ok())
                 };
                 Ok(dir_entries.filter_map(dir_entry_to_routing_name).collect())
-            })
-            .unwrap_or_else(|_| Vec::new())
+            }).unwrap_or_else(|_| Vec::new())
     }
 
     /// Returns the maximum amount of storage space available for this `ChunkStore`.
