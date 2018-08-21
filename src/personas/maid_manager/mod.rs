@@ -205,8 +205,7 @@ impl MaidManager {
                         INVITE_CLAIMED_KEY.to_vec(),
                         INVITE_CLAIMED_VALUE.to_vec(),
                         0,
-                    )
-                    .into();
+                    ).into();
 
                 routing_node.send_mutate_mdata_entries_request(
                     invite_src,
@@ -433,7 +432,12 @@ impl MaidManager {
     ) -> Result<(), InternalError> {
         let CachedRequest { src, dst, .. } =
             self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
-        routing_node.send_set_mdata_user_permissions_response(dst.into(), src.into(), res, msg_id)?;
+        routing_node.send_set_mdata_user_permissions_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
@@ -494,7 +498,12 @@ impl MaidManager {
     ) -> Result<(), InternalError> {
         let CachedRequest { src, dst, .. } =
             self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
-        routing_node.send_del_mdata_user_permissions_response(dst.into(), src.into(), res, msg_id)?;
+        routing_node.send_del_mdata_user_permissions_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
@@ -565,7 +574,12 @@ impl MaidManager {
         let res = self
             .get_account(&src, &dst)
             .map(|account| (account.keys.clone(), account.keys_ops_count));
-        routing_node.send_list_auth_keys_and_version_response(dst.into(), src.into(), res, msg_id)?;
+        routing_node.send_list_auth_keys_and_version_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
@@ -617,8 +631,7 @@ impl MaidManager {
                 } else {
                     None
                 }
-            })
-            .collect();
+            }).collect();
         for msg_id in msg_ids_to_delete {
             let _ = self.request_cache.remove(&msg_id);
         }

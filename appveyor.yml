@@ -5,7 +5,7 @@ environment:
     PROJECT_NAME: safe_vault
     RUST_BACKTRACE: 1
   matrix:
-    - RUST_STABLE: &stable "1.26.2"
+    - RUST_STABLE: &stable "1.28.0"
     - RUST_TOOLCHAIN: *stable
 
 clone_depth: 1
