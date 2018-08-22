@@ -8,5 +8,7 @@ echo "--- Building the binary compatibility test ---" &&
 
     # Find the file to run.
     TEST_FILE=$(find target/release -maxdepth 1 -type f -perm -111 -name "safe_authenticator-*" | head -1) &&
-    COMPAT_TESTS="${HOME}/.cache/master/tests" &&
+    COMPAT_DIR="${HOME}/.cache/master"
+    COMPAT_TESTS="$COMPAT_DIR"/tests &&
+    mkdir -p "$COMPAT_DIR" &&
     cp "$TEST_FILE" "$COMPAT_TESTS"

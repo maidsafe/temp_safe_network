@@ -32,7 +32,7 @@ use Authenticator;
 
 #[test]
 #[ignore]
-fn write_data() {
+fn serialisation_write_data() {
     let (stash, vault_path) = setup();
 
     // Clear the vault store.
@@ -75,7 +75,7 @@ fn write_data() {
 
 #[test]
 #[ignore]
-fn read_data() {
+fn serialisation_read_data() {
     let (stash, _) = setup();
 
     let auth = unwrap!(Authenticator::login(
