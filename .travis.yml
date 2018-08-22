@@ -23,11 +23,11 @@ jobs:
   include:
     # Warm up the cache dependencies
     - stage: warmup-ffi
-      script: set -x; scripts/build-ffi-utils && scripts/build-real-core
+      script: set -x; scripts/build-real-core
       os: linux
       rust: *stable
     - stage: warmup-ffi
-      script: set -x; scripts/build-ffi-utils && scripts/build-real-core
+      script: set -x; scripts/build-real-core
       if: type = push
       os: linux
       rust: *stable-i686
@@ -36,7 +36,7 @@ jobs:
           packages:
             - gcc-multilib
     - stage: warmup-ffi
-      script: set -x; scripts/build-ffi-utils && scripts/build-real-core
+      script: set -x; scripts/build-real-core
       if: type = pull_request
       os: linux
       rust: *nightly

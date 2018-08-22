@@ -2,10 +2,7 @@
 
 set -x;
 
-echo "--- Test ffi_utils ---" &&
-  scripts/test-ffi-utils &&
-
-  echo "--- Check compilation against actual routing ---" &&
+echo "--- Check compilation against actual routing ---" &&
   scripts/check-real &&
 
   echo "--- Test against mock ---" &&

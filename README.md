@@ -12,7 +12,6 @@
 This is the project workspace. Please refer to individual members for details:
 
 - [safe_core](safe_core/README.md)
-- [ffi_utils](ffi_utils/README.md)
 - [safe_authenticator](safe_authenticator/README.md)
 - [safe_app](safe_app/README.md)
 

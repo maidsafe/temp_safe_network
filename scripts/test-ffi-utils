@@ -1,5 +1,0 @@
-#!/bin/bash
-
-set -x;
-
-cargo test --verbose --release --manifest-path=ffi_utils/Cargo.toml

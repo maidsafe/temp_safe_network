@@ -52,10 +52,6 @@ fn gen_bindings_c() {
     let mut bindgen = unwrap!(Bindgen::new());
     let mut lang = LangC::new();
 
-    lang.set_lib_name("ffi_utils");
-    bindgen.source_file("../ffi_utils/src/lib.rs");
-    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
-
     lang.set_lib_name("safe_core");
     bindgen.source_file("../safe_core/src/lib.rs");
     unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
@@ -143,10 +139,6 @@ fn gen_bindings_java() {
 
     bindgen.source_file("../safe_core/src/lib.rs");
     lang.set_lib_name("safe_core");
-    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
-
-    bindgen.source_file("../ffi_utils/src/lib.rs");
-    lang.set_lib_name("ffi_utils");
     unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
 
     bindgen.source_file("src/lib.rs");

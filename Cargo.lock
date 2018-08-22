@@ -367,11 +367,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "ffi_utils"
 version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1090,7 +1090,7 @@ version = "0.8.0"
 dependencies = [
  "clap 2.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "config_file_handler 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ffi_utils 0.7.0",
+ "ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1114,7 +1114,7 @@ dependencies = [
 name = "safe_app_jni"
 version = "0.1.0"
 dependencies = [
- "ffi_utils 0.7.0",
+ "ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_app 0.8.0",
  "safe_core 0.31.0",
@@ -1126,7 +1126,7 @@ name = "safe_authenticator"
 version = "0.8.0"
 dependencies = [
  "config_file_handler 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ffi_utils 0.7.0",
+ "ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1148,7 +1148,7 @@ dependencies = [
 name = "safe_authenticator_jni"
 version = "0.1.0"
 dependencies = [
- "ffi_utils 0.7.0",
+ "ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jni 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_authenticator 0.8.0",
  "safe_core 0.31.0",
@@ -1179,7 +1179,7 @@ dependencies = [
  "base64 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "config_file_handler 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ffi_utils 0.7.0",
+ "ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs2 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1433,7 +1433,7 @@ dependencies = [
 name = "tests"
 version = "0.1.0"
 dependencies = [
- "ffi_utils 0.7.0",
+ "ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_app 0.8.0",
  "safe_authenticator 0.8.0",
@@ -1842,6 +1842,7 @@ dependencies = [
 "checksum error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff511d5dc435d703f4971bc399647c9bc38e20cb41452e3b9feb4765419ed3f3"
 "checksum extprim 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "eb09b6eb24a48a5c57729e4a60980bf538b3662c3bcec04b6c7908d7a0f3d9b9"
 "checksum fake_clock 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2d8098c37c3aa33404700f9097733de3bf28b0393aab28af03b5b179a230b81c"
+"checksum ffi_utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6e0126b10d09d65e8adee103fe44760ea2d7598821703fc7738caee54f202b84"
 "checksum filetime 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)" = "714653f3e34871534de23771ac7b26e999651a0a228f47beb324dfdf1dd4b10f"
 "checksum fixedbitset 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "86d4de0081402f5e88cdac65c8dcdcc73118c1a7a465e2a05f0da05843a8ea33"
 "checksum flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "e6234dd4468ae5d1e2dbb06fe2b058696fdc50a339c68a393aefbf00bc81e423"
