@@ -47,7 +47,7 @@ impl ReprC for UserPermissionSet {
 
         Ok(UserPermissionSet {
             user_h,
-            perm_set: permission_set_clone_from_repr_c(&perm_set)?,
+            perm_set: permission_set_clone_from_repr_c(perm_set)?,
         })
     }
 }

@@ -8,8 +8,14 @@
 // Software.
 
 #![allow(
-    non_snake_case, missing_docs, unsafe_code, unused_results, trivial_casts, trivial_numeric_casts,
-    unused, unused_qualifications
+    non_snake_case,
+    missing_docs,
+    unsafe_code,
+    unused_results,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused,
+    unused_qualifications
 )]
 
 #[macro_use]

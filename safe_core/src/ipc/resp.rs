@@ -362,7 +362,7 @@ impl ReprC for AppAccess {
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         Ok(AppAccess {
             sign_key: PublicKey((*repr_c).sign_key),
-            permissions: permission_set_clone_from_repr_c(&(*repr_c).permissions)?,
+            permissions: permission_set_clone_from_repr_c((*repr_c).permissions)?,
             name: Some(String::clone_from_repr_c((*repr_c).name)?),
             app_id: Some(String::clone_from_repr_c((*repr_c).app_id)?),
         })

@@ -52,8 +52,7 @@ pub fn flush_app_revocation_queue(client: &AuthClient) -> Box<AuthFuture<()>> {
             } else {
                 future::ok(()).into_box()
             }
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Try to revoke all apps in the revocation queue. If app revocation results in an error, move the
@@ -80,18 +79,18 @@ fn flush_app_revocation_queue_impl(
             if let Some(app_id) = queue.front().cloned() {
                 let f = revoke_single_app(&c2, &app_id)
                     .then(move |result| match result {
-                        Ok(_) => config::remove_from_app_revocation_queue(
-                            &c3, queue, version, &app_id,
-                        ).map(|(version, queue)| (version, queue, moved_apps))
-                            .into_box(),
+                        Ok(_) => {
+                            config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
+                                .map(|(version, queue)| (version, queue, moved_apps))
+                                .into_box()
+                        }
                         Err(AuthError::CoreError(CoreError::SymmetricDecipherFailure)) => {
                             // The app entry can't be decrypted. No way to revoke app, so just remove
                             // it from the queue and return an error.
                             config::remove_from_app_revocation_queue(&c3, queue, version, &app_id)
                                 .and_then(|_| {
                                     err!(AuthError::CoreError(CoreError::SymmetricDecipherFailure))
-                                })
-                                .into_box()
+                                }).into_box()
                         }
                         Err(error) => {
                             if moved_apps.contains(&app_id) {
@@ -106,8 +105,7 @@ fn flush_app_revocation_queue_impl(
                                     .into_box()
                             }
                         }
-                    })
-                    .and_then(move |(version, queue, moved_apps)| {
+                    }).and_then(move |(version, queue, moved_apps)| {
                         Ok(Loop::Continue((queue, version + 1, moved_apps)))
                     });
                 Either::A(f)
@@ -155,8 +153,7 @@ fn revoke_single_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<()>> {
                     }
                 },
             )
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Delete the app auth key from the Maid Manager - this prevents the app from
@@ -173,12 +170,10 @@ fn delete_app_auth_key(client: &AuthClient, key: sign::PublicKey) -> Box<AuthFut
                 // The key has been removed already
                 ok!(())
             }
-        })
-        .or_else(|error| match error {
+        }).or_else(|error| match error {
             CoreError::RoutingClientError(ClientError::NoSuchKey) => Ok(()),
             error => Err(AuthError::from(error)),
-        })
-        .into_box()
+        }).into_box()
 }
 
 fn clear_from_access_container_entry(
@@ -196,11 +191,9 @@ fn clear_from_access_container_entry(
             let container_names = containers.into_iter().map(|(name, _)| name).collect();
             reencrypt_containers_and_update_access_container(&c2, container_names, &app)
                 .map(move |_| (app, ac_entry_version))
-        })
-        .and_then(move |(app, version)| {
+        }).and_then(move |(app, version)| {
             access_container::delete_entry(&c3, &app.info.id, &app.keys, version + 1)
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Revoke containers permissions
@@ -226,10 +219,8 @@ fn revoke_container_perms(
                         User::Key(sign_pk),
                         version + 1,
                     )
-                })
-                .map_err(From::from)
-        })
-        .collect();
+                }).map_err(From::from)
+        }).collect();
 
     future::join_all(reqs).map(move |_| ()).into_box()
 }
@@ -270,12 +261,10 @@ fn reencrypt_containers_and_update_access_container(
             ).map(move |(ac_entries, containers)| {
                 (ac_info, ac_entries, containers, container_names)
             })
-        })
-        .and_then(move |(ac_info, ac_entries, containers, container_names)| {
+        }).and_then(move |(ac_info, ac_entries, containers, container_names)| {
             reencrypt_containers(&c3, containers)
                 .map(move |_| (ac_info, ac_entries, container_names))
-        })
-        .and_then(move |(ac_info, ac_entries, container_names)| {
+        }).and_then(move |(ac_info, ac_entries, container_names)| {
             update_access_container(
                 &c4,
                 ac_info,
@@ -283,8 +272,7 @@ fn reencrypt_containers_and_update_access_container(
                 container_names,
                 MDataInfoAction::Commit,
             )
-        })
-        .map(|_| ())
+        }).map(|_| ())
         .into_box()
 }
 
@@ -301,8 +289,7 @@ fn fetch_access_container_entries(
         .map(move |mut entries| {
             let _ = entries.remove(&revoked_app_key);
             entries
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Update `MDataInfo`s of the given containers in all the entries of the access
@@ -380,13 +367,11 @@ fn update_access_container(
             }
 
             Ok((ac_info, ac_entries, actions, cache))
-        })
-        .and_then(move |(ac_info, ac_entries, actions, containers)| {
+        }).and_then(move |(ac_info, ac_entries, actions, containers)| {
             c3.mutate_mdata_entries(ac_info.name, ac_info.type_tag, actions.into())
                 .map(move |_| (ac_entries, containers))
                 .map_err(From::from)
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Action to be performed on `MDataInfo` during access container update.
@@ -455,11 +440,9 @@ fn reencrypt_containers(client: &AuthClient, containers: Containers) -> Box<Auth
                 }
 
                 Ok((mdata_info, actions))
-            })
-            .and_then(move |(mdata_info, actions)| {
+            }).and_then(move |(mdata_info, actions)| {
                 c3.mutate_mdata_entries(mdata_info.name, mdata_info.type_tag, actions.into())
-            })
-            .map_err(From::from)
+            }).map_err(From::from)
     });
 
     future::join_all(fs).map(|_| ()).into_box()

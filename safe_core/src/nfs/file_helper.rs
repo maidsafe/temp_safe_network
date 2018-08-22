@@ -31,16 +31,14 @@ where
             let value = parent.enc_entry_value(&encoded)?;
 
             Ok((key, value))
-        })
-        .into_future()
+        }).into_future()
         .and_then(move |(key, value)| {
             client.mutate_mdata_entries(
                 parent.name,
                 parent.type_tag,
                 EntryActions::new().ins(key, value, 0).into(),
             )
-        })
-        .map_err(From::from)
+        }).map_err(From::from)
         .into_box()
 }
 
@@ -56,13 +54,11 @@ where
             client
                 .get_mdata_value(parent.name, parent.type_tag, key)
                 .map(move |value| (value, parent))
-        })
-        .and_then(move |(value, parent)| {
+        }).and_then(move |(value, parent)| {
             let plaintext = parent.decrypt(&value.content)?;
             let file = deserialise(&plaintext)?;
             Ok((value.entry_version, file))
-        })
-        .map_err(convert_error)
+        }).map_err(convert_error)
         .into_box()
 }
 
@@ -104,8 +100,7 @@ where
             parent.name,
             parent.type_tag,
             EntryActions::new().del(key, version).into(),
-        )
-        .map_err(convert_error)
+        ).map_err(convert_error)
         .into_box()
 }
 
@@ -134,8 +129,7 @@ where
             let content = parent.enc_entry_value(&encoded)?;
 
             Ok((key, content))
-        })
-        .into_future()
+        }).into_future()
         .and_then(move |(key, content)| {
             if version != 0 {
                 ok!((key, content, version, parent))
@@ -145,15 +139,13 @@ where
                     .map(move |value| (key, content, value.entry_version + 1, parent))
                     .into_box()
             }
-        })
-        .and_then(move |(key, content, version, parent)| {
+        }).and_then(move |(key, content, version, parent)| {
             client2.mutate_mdata_entries(
                 parent.name,
                 parent.type_tag,
                 EntryActions::new().update(key, content, version).into(),
             )
-        })
-        .map_err(convert_error)
+        }).map_err(convert_error)
         .into_box()
 }
 

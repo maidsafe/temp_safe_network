@@ -189,14 +189,13 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.get_idata(Authority::NaeManager(name), name, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::GetIData))
-            .map(move |data| {
-                if let Some(inner) = inner.upgrade() {
-                    // Put to cache
-                    let _ = inner.borrow_mut().cache.insert(*data.name(), data.clone());
-                }
-                data
-            })
-            .into_box()
+        .map(move |data| {
+            if let Some(inner) = inner.upgrade() {
+                // Put to cache
+                let _ = inner.borrow_mut().cache.insert(*data.name(), data.clone());
+            }
+            data
+        }).into_box()
     }
 
     // TODO All these return the same future from all branches. So convert to impl
@@ -243,7 +242,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.get_mdata(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::GetMData))
-            .into_box()
+        .into_box()
     }
 
     /// Get a shell (bare bones) version of `MutableData` from the network.
@@ -253,7 +252,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.get_mdata_shell(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::GetMDataShell))
-            .into_box()
+        .into_box()
     }
 
     /// Get a current version of `MutableData` from the network.
@@ -263,7 +262,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::GetMDataVersion))
-            .into_box()
+        .into_box()
     }
 
     /// Return a complete list of entries in `MutableData`.
@@ -277,7 +276,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.list_mdata_entries(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::ListMDataEntries))
-            .into_box()
+        .into_box()
     }
 
     /// Return a list of keys in `MutableData` stored on the network.
@@ -287,7 +286,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.list_mdata_keys(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::ListMDataKeys))
-            .into_box()
+        .into_box()
     }
 
     /// Return a list of keys in `MutableData` stored on the network.
@@ -297,7 +296,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.list_mdata_values(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::ListMDataValues))
-            .into_box()
+        .into_box()
     }
 
     /// Get a single entry from `MutableData`.
@@ -307,7 +306,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.get_mdata_value(Authority::NaeManager(name), name, tag, key.clone(), msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::GetMDataValue))
-            .into_box()
+        .into_box()
     }
 
     /// Get data from the network.
@@ -318,7 +317,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.get_account_info(dst, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::GetAccountInfo))
-            .into_box()
+        .into_box()
     }
 
     /// Return a list of permissions in `MutableData` stored on the network.
@@ -332,7 +331,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.list_mdata_permissions(Authority::NaeManager(name), name, tag, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::ListMDataPermissions))
-            .into_box()
+        .into_box()
     }
 
     /// Return a list of permissions for a particular User in MutableData.
@@ -348,7 +347,7 @@ pub trait Client: Clone + 'static {
             let dst = Authority::NaeManager(name);
             routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::ListMDataUserPermissions))
-            .into_box()
+        .into_box()
     }
 
     /// Updates or inserts a permission set for a given user
@@ -416,7 +415,7 @@ pub trait Client: Clone + 'static {
         send(self, move |routing, msg_id| {
             routing.list_auth_keys_and_version(dst, msg_id)
         }).and_then(|event| match_event!(event, CoreEvent::ListAuthKeysAndVersion))
-            .into_box()
+        .into_box()
     }
 
     /// Adds a new authorised key to MaidManager.
@@ -437,36 +436,30 @@ pub trait Client: Clone + 'static {
         })
     }
 
-    #[cfg(
-        any(
-            all(test, feature = "use-mock-routing"),
-            all(feature = "testing", feature = "use-mock-routing")
-        )
-    )]
+    #[cfg(any(
+        all(test, feature = "use-mock-routing"),
+        all(feature = "testing", feature = "use-mock-routing")
+    ))]
     #[doc(hidden)]
     fn set_network_limits(&self, max_ops_count: Option<u64>) {
         let inner = self.inner();
         inner.borrow_mut().routing.set_network_limits(max_ops_count);
     }
 
-    #[cfg(
-        any(
-            all(test, feature = "use-mock-routing"),
-            all(feature = "testing", feature = "use-mock-routing")
-        )
-    )]
+    #[cfg(any(
+        all(test, feature = "use-mock-routing"),
+        all(feature = "testing", feature = "use-mock-routing")
+    ))]
     #[doc(hidden)]
     fn simulate_network_disconnect(&self) {
         let inner = self.inner();
         inner.borrow_mut().routing.simulate_disconnect();
     }
 
-    #[cfg(
-        any(
-            all(test, feature = "use-mock-routing"),
-            all(feature = "testing", feature = "use-mock-routing")
-        )
-    )]
+    #[cfg(any(
+        all(test, feature = "use-mock-routing"),
+        all(feature = "testing", feature = "use-mock-routing")
+    ))]
     #[doc(hidden)]
     fn set_simulate_timeout(&self, enabled: bool) {
         let inner = self.inner();
@@ -650,8 +643,7 @@ where
         .then(|result| match result {
             Ok((a, _)) => Ok(a),
             Err((a, _)) => Err(a),
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Create a future that resolves into `CoreError::RequestTimeout` after the given time interval.

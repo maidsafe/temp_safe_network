@@ -70,8 +70,7 @@ pub fn corrupt_container(client: &AuthClient, container_id: &str) -> Box<AuthFut
             }
             // Update the old entry.
             put_authenticator_entry(&c2, &ac_entry, version + 1)
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Helper to decode IpcMsg.
@@ -136,8 +135,7 @@ pub fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> ChannelType {
                         XorName(ffi_metadata.xor_name),
                         ffi_metadata.type_tag,
                     )
-                })
-                .collect();
+                }).collect();
 
             let msg = IpcMsg::Req {
                 req_id,

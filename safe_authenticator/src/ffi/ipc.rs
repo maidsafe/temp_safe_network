@@ -155,8 +155,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                             );
 
                             Ok(())
-                        })
-                        .into_box(),
+                        }).into_box(),
                     Err((error_code, description, err)) => {
                         let res = FfiResult {
                             error_code,
@@ -174,11 +173,9 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
                         call_result_cb!(Err::<(), _>(err), user_data, o_err);
                         ok!(())
                     }
-                })
-                .map_err(move |err| {
+                }).map_err(move |err| {
                     call_result_cb!(Err::<(), _>(err), user_data, o_err);
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })?;
         Ok(())
@@ -215,8 +212,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                                 client_cloned0
                                     .get_mdata_shell(mdata.name, mdata.type_tag)
                                     .map(|md| (md.version(), mdata))
-                            })
-                            .buffer_unordered(num_mdata)
+                            }).buffer_unordered(num_mdata)
                             .map(move |(version, mdata)| {
                                 client_cloned1.set_mdata_user_permissions(
                                     mdata.name,
@@ -225,8 +221,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                                     mdata.perms,
                                     version + 1,
                                 )
-                            })
-                            .buffer_unordered(num_mdata)
+                            }).buffer_unordered(num_mdata)
                             .map_err(AuthError::CoreError)
                             .for_each(|()| Ok(()))
                             .and_then(move |()| {
@@ -236,13 +231,10 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
                                 }).map_err(AuthError::IpcError)?;
                                 o_cb(user_data, FFI_RESULT_OK, resp.as_ptr());
                                 Ok(())
-                            })
-                            .into_box()
-                    })
-                    .map_err(move |e| {
+                            }).into_box()
+                    }).map_err(move |e| {
                         call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                    })
-                    .into_box()
+                    }).into_box()
                     .into()
             })?;
         } else {
@@ -282,11 +274,9 @@ pub unsafe extern "C" fn auth_revoke_app(
                     let resp = encode_response(&IpcMsg::Revoked { app_id })?;
                     o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
                     Ok(())
-                })
-                .map_err(move |e| {
+                }).map_err(move |e| {
                     call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })?;
 
@@ -311,8 +301,7 @@ pub unsafe extern "C" fn auth_flush_app_revocation_queue(
                 .then(move |res| {
                     call_result_cb!(res, user_data, o_cb);
                     Ok(())
-                })
-                .into_box()
+                }).into_box()
                 .into()
         })
     })
@@ -387,8 +376,7 @@ pub unsafe extern "C" fn encode_auth_resp(
 
                         o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
                         Ok(())
-                    })
-                    .or_else(move |e| -> Result<(), AuthError> {
+                    }).or_else(move |e| -> Result<(), AuthError> {
                         let (error_code, description) = ffi_error!(e);
                         let resp = encode_response(&IpcMsg::Resp {
                             req_id,
@@ -400,11 +388,9 @@ pub unsafe extern "C" fn encode_auth_resp(
                         };
                         o_cb(user_data.0, &res, resp.as_ptr());
                         Ok(())
-                    })
-                    .map_err(move |e| {
+                    }).map_err(move |e| {
                         call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                    })
-                    .into_box()
+                    }).into_box()
                     .into()
             })?;
         }
@@ -451,8 +437,7 @@ pub unsafe extern "C" fn encode_containers_resp(
                         let sign_pk = app.keys.sign_pk;
                         update_container_perms(&c2, permissions, sign_pk)
                             .map(move |perms| (app, perms))
-                    })
-                    .and_then(move |(app, mut perms)| {
+                    }).and_then(move |(app, mut perms)| {
                         let app_keys = app.keys;
 
                         access_container::fetch_entry(&c3, &app_id, app_keys.clone()).then(
@@ -481,19 +466,16 @@ pub unsafe extern "C" fn encode_containers_resp(
                                 Ok((version, app_id, app_keys, perms))
                             },
                         )
-                    })
-                    .and_then(move |(version, app_id, app_keys, perms)| {
+                    }).and_then(move |(version, app_id, app_keys, perms)| {
                         access_container::put_entry(&c4, &app_id, &app_keys, &perms, version)
-                    })
-                    .and_then(move |_| {
+                    }).and_then(move |_| {
                         let resp = encode_response(&IpcMsg::Resp {
                             req_id,
                             resp: IpcResp::Containers(Ok(())),
                         })?;
                         o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
                         Ok(())
-                    })
-                    .or_else(move |e| -> Result<(), AuthError> {
+                    }).or_else(move |e| -> Result<(), AuthError> {
                         let (error_code, description) = ffi_error!(e);
                         let resp = encode_response(&IpcMsg::Resp {
                             req_id,
@@ -505,8 +487,7 @@ pub unsafe extern "C" fn encode_containers_resp(
                         };
                         o_cb(user_data.0, &res, resp.as_ptr());
                         Ok(())
-                    })
-                    .map_err(move |e| debug!("Unexpected error: {:?}", e))
+                    }).map_err(move |e| debug!("Unexpected error: {:?}", e))
                     .into_box()
                     .into()
             })?;

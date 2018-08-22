@@ -59,8 +59,7 @@ pub fn fetch_or_create(
                                 ps,
                                 version + 1,
                             ).map(move |_| mdata_info)
-                        })
-                        .map_err(From::from)
+                        }).map_err(From::from)
                         .into_box()
                 }
                 None => {
@@ -74,12 +73,10 @@ pub fn fetch_or_create(
                                 &ac_entries,
                                 ac_entry_version + 1,
                             ).map(move |()| md_info)
-                        })
-                        .into_box()
+                        }).into_box()
                 }
             }
-        })
-        .into_box()
+        }).into_box()
 }
 
 /// Removes an app's dedicated container if it's available and stored in the user's root dir.
@@ -113,8 +110,7 @@ pub fn remove(client: AuthClient, app_id: &str) -> Box<AuthFuture<bool>> {
                                 mdata_info.type_tag,
                                 actions.into(),
                             )
-                        })
-                        .map_err(From::from)
+                        }).map_err(From::from)
                         .and_then(move |_| {
                             // Remove MDataInfo from the access container
                             access_container::put_authenticator_entry(
@@ -125,14 +121,12 @@ pub fn remove(client: AuthClient, app_id: &str) -> Box<AuthFuture<bool>> {
 
                             // TODO(nbaksalyar): when MData deletion is implemented properly,
                             // also delete the actual MutableData related to app
-                        })
-                        .map_err(From::from)
+                        }).map_err(From::from)
                         .map(move |_| true)
                         .into_box()
                 }
             }
-        })
-        .into_box()
+        }).into_box()
 }
 
 // Creates a new app's dedicated container
@@ -148,6 +142,6 @@ fn create(client: &AuthClient, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<M
                 .allow(Action::Delete)
                 .allow(Action::ManagePermissions)],
     ).map(move |()| dir)
-        .map_err(From::from)
-        .into_box()
+    .map_err(From::from)
+    .into_box()
 }

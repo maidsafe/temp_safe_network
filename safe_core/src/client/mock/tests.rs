@@ -1256,7 +1256,8 @@ fn request_hooks() {
         match *req {
             Request::PutMData {
                 ref data, msg_id, ..
-            } if data.tag() == 10_000u64 =>
+            }
+                if data.tag() == 10_000u64 =>
             {
                 // Send an OK response but don't put data on the mock vault
                 Some(Response::PutMData {

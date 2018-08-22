@@ -206,8 +206,7 @@ impl Routing {
                             Ok(())
                         }
                     }
-                })
-                .map(|_| vault.commit_mutation(&dst))
+                }).map(|_| vault.commit_mutation(&dst))
         };
 
         self.send_response(
@@ -314,8 +313,7 @@ impl Routing {
                             vault.insert_data(data_name, Data::Mutable(data));
                             Ok(())
                         }
-                    })
-                    .map(|_| vault.commit_mutation(&dst))
+                    }).map(|_| vault.commit_mutation(&dst))
             }
         };
 

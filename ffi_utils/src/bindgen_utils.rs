@@ -26,12 +26,11 @@ pub fn copy_files<S: AsRef<Path>, T: AsRef<Path>>(
     for entry in WalkDir::new(source) {
         let entry = entry?;
 
-        if entry.path().is_file()
-            && entry
-                .path()
-                .to_str()
-                .map(|s| s.ends_with(extension))
-                .unwrap_or(false)
+        if entry.path().is_file() && entry
+            .path()
+            .to_str()
+            .map(|s| s.ends_with(extension))
+            .unwrap_or(false)
         {
             let source_path = entry.path();
             let target_path = target.join(source_path.strip_prefix(source).unwrap_or(source_path));

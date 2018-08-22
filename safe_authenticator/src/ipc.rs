@@ -90,8 +90,7 @@ pub fn decode_ipc_msg(
                             Ok(Err((error_code, description, resp)))
                         }
                     }
-                })
-                .into_box()
+                }).into_box()
         }
         IpcMsg::Resp { .. } | IpcMsg::Revoked { .. } | IpcMsg::Err(..) => {
             return err!(AuthError::IpcError(IpcError::InvalidMsg));
@@ -132,21 +131,18 @@ pub fn update_container_perms(
                             perm_set,
                             version + 1,
                         ).map(move |_| (container_key, mdata_info, access))
-                    })
-                    .map_err(AuthError::from);
+                    }).map_err(AuthError::from);
 
                 reqs.push(fut);
             }
 
             future::join_all(reqs).into_box()
-        })
-        .map(|perms| {
+        }).map(|perms| {
             perms
                 .into_iter()
                 .map(|(container_key, dir, access)| (container_key, (dir, access)))
                 .collect()
-        })
-        .map_err(AuthError::from)
+        }).map_err(AuthError::from)
         .into_box()
 }
 
@@ -212,8 +208,7 @@ pub fn decode_share_mdata_req(
                         name, type_tag,
                     ))))
                 }
-            })
-            .map_err(AuthError::from);
+            }).map_err(AuthError::from);
 
         futures.push(future);
     }
@@ -238,6 +233,5 @@ pub fn decode_share_mdata_req(
             } else {
                 Err(AuthError::IpcError(IpcError::InvalidOwner(invalids)))
             }
-        })
-        .into_box()
+        }).into_box()
 }

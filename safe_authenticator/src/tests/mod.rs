@@ -86,7 +86,8 @@ mod mock_routing {
                     match *req {
                         Request::PutMData {
                             ref data, msg_id, ..
-                        } if data.tag() == DIR_TAG =>
+                        }
+                            if data.tag() == DIR_TAG =>
                         {
                             put_mdata_counter += 1;
 
@@ -399,8 +400,7 @@ mod mock_routing {
 
                     // Check that the app's container has required permissions.
                     c2.list_mdata_permissions(app_container_md.name, app_container_md.type_tag)
-                })
-                .then(move |res| {
+                }).then(move |res| {
                     let perms = unwrap!(res);
                     assert!(perms.contains_key(&User::Key(app_pk)));
                     assert_eq!(perms.len(), 1);
@@ -439,8 +439,7 @@ fn test_access_container() {
                 let f2 = client.list_mdata_permissions(dir.name, dir.type_tag);
 
                 f1.join(f2).map_err(AuthError::from)
-            })
-            .collect();
+            }).collect();
 
         future::join_all(fs)
     });
@@ -709,10 +708,8 @@ fn unregistered_authentication() {
     let encoded_resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
             encode_unregistered_resp(
-                req_id,
-                true, // is_granted
-                ud,
-                cb,
+                req_id, true, // is_granted
+                ud, cb,
             )
         }))
     };
@@ -843,7 +840,8 @@ fn containers_unknown_app() {
                 resp: IpcResp::Auth(Err(IpcError::UnknownApp)),
                 ..
             }),
-        )) if code == ERR_UNKNOWN_APP =>
+        ))
+            if code == ERR_UNKNOWN_APP =>
         {
             ()
         }
