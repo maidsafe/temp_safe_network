@@ -51,7 +51,6 @@ before_build:
 
 build_script:
   - |-
-    cargo check --verbose --release --lib --tests --manifest-path=ffi_utils/Cargo.toml
     cargo check --verbose --release --features testing --lib --tests --manifest-path=safe_core/Cargo.toml
     cargo check --verbose --release --features testing --lib --tests --manifest-path=safe_authenticator/Cargo.toml
     cargo check --verbose --release --features testing --lib --tests --manifest-path=safe_app/Cargo.toml
@@ -67,7 +66,6 @@ after_build:
 
 test_script:
   - |-
-    cargo test --verbose --release --manifest-path=ffi_utils/Cargo.toml
     cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_core/Cargo.toml
     cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_authenticator/Cargo.toml
     cargo test --verbose --release --features=use-mock-routing --manifest-path=safe_app/Cargo.toml
