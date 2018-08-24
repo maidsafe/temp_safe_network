@@ -236,7 +236,7 @@ impl<V> Store<V> {
         // TODO: find a way to avoid double lookup here.
         let mut inner = self.inner.borrow_mut();
         if inner.get_mut(&handle).is_some() {
-            Some(RefMut::map(inner, |i| i.get_mut(&handle).unwrap()))
+            Some(RefMut::map(inner, |i| unwrap!(i.get_mut(&handle))))
         } else {
             None
         }
