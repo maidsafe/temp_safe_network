@@ -1,7 +1,5 @@
 # SAFE App
 
-**Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
-
 | [![](http://meritbadge.herokuapp.com/safe_app)](https://crates.io/crates/safe_app) | [![Documentation](https://docs.rs/safe_app/badge.svg)](https://docs.rs/safe_app) |
 |:----------:|:----------:|
 

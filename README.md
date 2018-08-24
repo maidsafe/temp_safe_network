@@ -1,7 +1,5 @@
 # safe_client_libs
 
-**Maintainer:** Nikita Baksalyar (nikita.baksalyar@maidsafe.net)
-
 |Linux/OS X|Windows|Issues|
 |:--------:|:-----:|:----:|
 |[![Build Status](https://travis-ci.org/maidsafe/safe_client_libs.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client_libs)|[![Build status](https://ci.appveyor.com/api/projects/status/qyvxnojplcwcey4l/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client-libs/branch/master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client_libs.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client_libs)|

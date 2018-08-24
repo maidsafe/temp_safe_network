@@ -1,7 +1,5 @@
 # SAFE Authenticator
 
-**Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
-
 | [![](http://meritbadge.herokuapp.com/safe_authenticator)](https://crates.io/crates/safe_authenticator) | [![Documentation](https://docs.rs/safe_authenticator/badge.svg)](https://docs.rs/safe_authenticator) |
 |:----------:|:----------:|
 
