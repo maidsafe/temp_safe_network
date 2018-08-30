@@ -1,6 +1,4 @@
-# SAFE core
-
-**Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
+# SAFE Core
 
 | [![](http://meritbadge.herokuapp.com/safe_core)](https://crates.io/crates/safe_core) | [![Documentation](https://docs.rs/safe_core/badge.svg)](https://docs.rs/safe_core) |
 |:----------:|:----------:|
