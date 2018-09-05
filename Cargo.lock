@@ -1478,7 +1478,7 @@ dependencies = [
  "routing 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_authenticator 0.8.0",
- "safe_bindgen 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe_bindgen 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_core 0.31.0",
  "self_encryption 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1513,7 +1513,7 @@ dependencies = [
  "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "routing 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "safe_bindgen 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe_bindgen 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_core 0.31.0",
  "serde 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1535,7 +1535,7 @@ dependencies = [
 
 [[package]]
 name = "safe_bindgen"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "Inflector 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1546,7 +1546,7 @@ dependencies = [
  "rustfmt 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "syntex_errors 0.59.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "syntex_syntax 0.59.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "unwrap 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1655,11 +1655,6 @@ dependencies = [
 [[package]]
 name = "semver-parser"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "serde"
-version = "0.9.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -2107,14 +2102,6 @@ dependencies = [
  "mio-uds 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-reactor 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "toml"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2567,7 +2554,7 @@ dependencies = [
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 "checksum rustfmt 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ec940eed814db0fb7ab928c5f5025f97dc55d1c0e345e39dda2ce9f945557500"
 "checksum ryu 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "7153dd96dade874ab973e098cb62fcdbb89a03682e46b144fd09550998d4a4a7"
-"checksum safe_bindgen 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e25cc3f11cd57fb659ced6bae0e4300e4b169b98990b14817c41f224a095791e"
+"checksum safe_bindgen 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "94ee92d3894cf4693f60d518dbbc8781702936604428a2cfb544e7d58279d318"
 "checksum safemem 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e27a8b19b835f7aea908818e871f5cc3a5a186550c30773be987e155e8163d8f"
 "checksum same-file 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "10f7794e2fda7f594866840e95f5c5962e886e228e68b6505885811a94dd728c"
 "checksum schannel 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "dc1fabf2a7b6483a141426e1afd09ad543520a77ac49bd03c286e7696ccfd77f"
@@ -2578,7 +2565,6 @@ dependencies = [
 "checksum self_encryption 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "73c3684493313f42f0567c66b22a66b2b3a31b2d2de437780cce3a0065528134"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
-"checksum serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)" = "34b623917345a631dc9608d5194cc206b3fe6c3554cd1c75b937e55e285254af"
 "checksum serde 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)" = "22d340507cea0b7e6632900a176101fea959c7065d93ba555072da90aaaafc87"
 "checksum serde-value 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "52903ade2290cbd61a0937a66a268f26cebf246e3ddd7964a8babb297111fb0d"
 "checksum serde_derive 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)" = "234fc8b737737b148ccd625175fc6390f5e4dacfdaa543cb93a3430d984a9119"
@@ -2622,7 +2608,6 @@ dependencies = [
 "checksum tokio-tls 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "772f4b04e560117fe3b0a53e490c16ddc8ba6ec437015d91fa385564996ed913"
 "checksum tokio-udp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "da941144b816d0dcda4db3a1ba87596e4df5e860a72b70783fe435891f80601c"
 "checksum tokio-uds 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "424c1ed15a0132251813ccea50640b224c809d6ceafb88154c1a8775873a0e89"
-"checksum toml 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "bd86ad9ebee246fdedd610e0f6d0587b754a3d81438db930a244d0480ed7878f"
 "checksum toml 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "a0263c6c02c4db6c8f7681f9fd35e90de799ebd4cfdeab77a38f4ff6b3d8c0d9"
 "checksum traitobject 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
 "checksum try-lock 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ee2aa4715743892880f70885373966c83d73ef1b0838a664ef0c76fffd35e7c2"

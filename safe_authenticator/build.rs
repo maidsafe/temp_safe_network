@@ -35,6 +35,12 @@ const BSD_MIT_LICENSE: &str =
      // specific language governing permissions and limitations relating to use\n\
      // of the SAFE Network Software.";
 
+// As currently we have no easy way to pull code for external dependencies for bindgen parsing,
+// we use this workaround to cater for structures defined in the `ffi_utils` package. At present,
+// it's only `FfiResult`.
+const FFI_UTILS_CODE: &str =
+    "#[repr(C)] pub struct FfiResult { error_code: i32, description: *const c_char }";
+
 fn main() {
     if env::var("CARGO_FEATURE_BINDINGS").is_err() {
         return;
@@ -51,6 +57,10 @@ fn gen_bindings_c() {
 
     let mut bindgen = unwrap!(Bindgen::new());
     let mut lang = LangC::new();
+
+    lang.set_lib_name("ffi_utils");
+    bindgen.source_code("ffi_utils/src/lib.rs", FFI_UTILS_CODE);
+    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
 
     lang.set_lib_name("safe_core");
     bindgen.source_file("../safe_core/src/lib.rs");
@@ -139,6 +149,10 @@ fn gen_bindings_java() {
 
     bindgen.source_file("../safe_core/src/lib.rs");
     lang.set_lib_name("safe_core");
+    unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
+
+    bindgen.source_code("ffi_utils/src/lib.rs", FFI_UTILS_CODE);
+    lang.set_lib_name("ffi_utils");
     unwrap!(bindgen.compile(&mut lang, &mut outputs, false));
 
     bindgen.source_file("src/lib.rs");
