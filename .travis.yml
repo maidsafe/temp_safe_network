@@ -1,6 +1,5 @@
 vars:
   - &stable "1.28.0"
-  - &stable-i686 "1.28.0-i686-unknown-linux-gnu"
   - &nightly "nightly-2018-07-07"
 env:
   global:
@@ -28,15 +27,6 @@ jobs:
       rust: *stable
     - stage: warmup-ffi
       script: set -x; scripts/build-real-core
-      if: type = push
-      os: linux
-      rust: *stable-i686
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
-    - stage: warmup-ffi
-      script: set -x; scripts/build-real-core
       if: type = pull_request
       os: linux
       rust: *nightly
@@ -48,15 +38,6 @@ jobs:
       rust: *stable
     - stage: warmup-real
       script: set -x; scripts/build-real
-      if: type = push
-      os: linux
-      rust: *stable-i686
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
-    - stage: warmup-real
-      script: set -x; scripts/build-real
       if: type = pull_request
       os: linux
       rust: *nightly
@@ -66,15 +47,6 @@ jobs:
       script: set -x; scripts/build-mock
       os: linux
       rust: *stable
-    - stage: warmup-mock
-      script: set -x; scripts/build-mock
-      if: type = push
-      os: linux
-      rust: *stable-i686
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
     - stage: warmup-mock
       script: set -x; scripts/build-mock
       if: type = pull_request
@@ -90,15 +62,6 @@ jobs:
       script: set -x; scripts/stable
       os: osx
       rust: *stable
-    - stage: tests-stable
-      script: set -x; scripts/stable
-      if: type = push
-      os: linux
-      rust: *stable-i686
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
     - stage: tests-stable
       script: set -x; scripts/rustfmt && scripts/clippy-all
       if: type = pull_request
