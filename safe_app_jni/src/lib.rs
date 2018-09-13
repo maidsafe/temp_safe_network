@@ -29,10 +29,10 @@ extern crate unwrap;
 use ffi_utils::java::{convert_cb_from_java, object_array_to_java, JniResult};
 use ffi_utils::*;
 use jni::errors::{Error as JniError, ErrorKind};
-use jni::objects::{GlobalRef, JClass, JObject, JString};
+use jni::objects::{AutoLocal, GlobalRef, JClass, JMethodID, JObject, JString, JValue};
 use jni::strings::JNIStr;
-use jni::sys::{jbyte, jbyteArray, jint, jlong, jobject, jsize};
-use jni::{JNIEnv, JavaVM};
+use jni::sys::{jbyte, jbyteArray, jclass, jint, jlong, jobject, jsize};
+use jni::{signature::JavaType, JNIEnv, JavaVM};
 use safe_app::ffi::object_cache::*;
 use safe_app::UserPermissionSet;
 use safe_core::arrays::*;
@@ -57,6 +57,8 @@ pub type SEWriterHandle = SelfEncryptorWriterHandle;
 pub type SEReaderHandle = SelfEncryptorReaderHandle;
 
 static mut JVM: Option<JavaVM> = None;
+static mut CLASS_LOADER: Option<GlobalRef> = None;
+static mut FIND_CLASS_METHOD: Option<JMethodID> = None;
 
 /// Trait for conversion of Rust value to Java value.
 pub trait ToJava<'a, T: Sized + 'a> {
@@ -76,7 +78,46 @@ pub trait FromJava<T> {
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut jni::sys::JavaVM, _reserved: *mut c_void) -> jint {
     JVM = Some(unwrap!(JavaVM::from_raw(vm)));
+
+    let env = JVM
+        .as_ref()
+        .map(|vm| unwrap!(vm.attach_current_thread_as_daemon()))
+        .expect("no JVM reference found");
+
+    let res_class = unwrap!(env.find_class("net/maidsafe/safe_app/FfiResult"));
+
+    CLASS_LOADER = Some(unwrap!(env.new_global_ref(
+        unwrap!(unwrap!(env.call_method(  From::from(res_class),
+                "getClassLoader",
+                "()Ljava/lang/ClassLoader;",
+                &[]
+            )).l())
+    )));
+
+    FIND_CLASS_METHOD = Some(unwrap!(env.get_method_id(
+        "java/lang/ClassLoader",
+        "findClass",
+        "(Ljava/lang/String;)Ljava/lang/Class;",
+    )));
+
     jni::sys::JNI_VERSION_1_4
+}
+
+pub(crate) fn find_class<'a>(env: &'a JNIEnv, class_name: &str) -> AutoLocal<'a> {
+    unsafe {
+        let cls = env.new_string(class_name).unwrap();
+
+        env.auto_local(From::from(
+            env.call_method_unsafe(
+                CLASS_LOADER.as_ref().unwrap().as_obj(),
+                FIND_CLASS_METHOD.unwrap(),
+                JavaType::from_str("Ljava/lang/Object;").unwrap(),
+                &[JValue::from(*cls)],
+            ).unwrap()
+            .l()
+            .unwrap(),
+        ))
+    }
 }
 
 gen_primitive_type_converter!(u8, jbyte);
@@ -160,11 +201,11 @@ impl<'a> FromJava<JObject<'a>> for Vec<u8> {
     }
 }
 
-gen_object_array_converter!(MDataKey, "net/maidsafe/safe_app/MDataKey");
-gen_object_array_converter!(MDataValue, "net/maidsafe/safe_app/MDataValue");
-gen_object_array_converter!(UserPermissionSet, "net/maidsafe/safe_app/UserPermissionSet");
-gen_object_array_converter!(MDataEntry, "net/maidsafe/safe_app/MDataEntry");
-gen_object_array_converter!(
+gen_object_array_converter!(find_class, MDataKey, "net/maidsafe/safe_app/MDataKey");
+gen_object_array_converter!(find_class, MDataValue, "net/maidsafe/safe_app/MDataValue");
+gen_object_array_converter!(find_class, UserPermissionSet, "net/maidsafe/safe_app/UserPermissionSet");
+gen_object_array_converter!(find_class, MDataEntry, "net/maidsafe/safe_app/MDataEntry");
+gen_object_array_converter!(find_class,
     ContainerPermissions,
     "net/maidsafe/safe_app/ContainerPermissions"
 );
