@@ -42,8 +42,6 @@ pub static OPEN_MODE_READ: u64 = 4;
 pub static FILE_READ_TO_END: u64 = 0;
 
 /// Retrieve file with the given name, and its version, from the directory.
-///
-/// Callback parameters: user data, error code, file, version
 #[no_mangle]
 pub unsafe extern "C" fn dir_fetch_file(
     app: *const App,
@@ -77,8 +75,6 @@ pub unsafe extern "C" fn dir_fetch_file(
 }
 
 /// Insert the file into the parent directory.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_insert_file(
     app: *const App,
@@ -101,8 +97,6 @@ pub unsafe extern "C" fn dir_insert_file(
 
 /// Replace the file in the parent directory.
 /// If `version` is 0, the correct version is obtained automatically.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
     app: *const App,
@@ -125,8 +119,6 @@ pub unsafe extern "C" fn dir_update_file(
 }
 
 /// Delete the file in the parent directory.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
@@ -147,8 +139,6 @@ pub unsafe extern "C" fn dir_delete_file(
 }
 
 /// Open the file to read or write its contents.
-///
-/// Callback parameters: user data, error code, file context handle
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
@@ -210,8 +200,6 @@ pub unsafe extern "C" fn file_open(
 }
 
 /// Get a size of file opened for read.
-///
-/// Callback parameters: user data, error code, file size
 #[no_mangle]
 pub unsafe extern "C" fn file_size(
     app: *const App,
@@ -236,8 +224,6 @@ pub unsafe extern "C" fn file_size(
 }
 
 /// Read data from file.
-///
-/// Callback parameters: user data, error code, file data vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn file_read(
     app: *const App,
@@ -282,8 +268,6 @@ pub unsafe extern "C" fn file_read(
 }
 
 /// Write data to file in smaller chunks.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn file_write(
     app: *const App,
@@ -325,8 +309,6 @@ pub unsafe extern "C" fn file_write(
 /// `file_open`.
 ///
 /// Frees the file context handle.
-///
-/// Callback parameters: user data, error code, file
 #[no_mangle]
 pub unsafe extern "C" fn file_close(
     app: *const App,

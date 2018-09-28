@@ -24,8 +24,6 @@ use std::os::raw::c_void;
 use App;
 
 /// Create new empty entries.
-///
-/// Callback parameters: user data, error code, entries handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_new(
     app: *const App,
@@ -46,8 +44,6 @@ pub unsafe extern "C" fn mdata_entries_new(
 }
 
 /// Insert an entry to the entries.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_insert(
     app: *const App,
@@ -78,8 +74,6 @@ pub unsafe extern "C" fn mdata_entries_insert(
 }
 
 /// Returns the number of entries.
-///
-/// Callback parameters: user data, error code, length
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_len(
     app: *const App,
@@ -198,8 +192,6 @@ pub unsafe extern "C" fn mdata_list_entries(
 }
 
 /// Free the entries from memory.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_free(
     app: *const App,

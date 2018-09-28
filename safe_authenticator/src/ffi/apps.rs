@@ -56,8 +56,6 @@ impl Drop for RegisteredApp {
 }
 
 /// Removes a revoked app from the authenticator config.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn auth_rm_revoked_app(
     auth: *const Authenticator,
@@ -98,8 +96,6 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
 }
 
 /// Get a list of apps revoked from authenticator.
-///
-/// Callback parameters: user data, error code, app exchange info vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn auth_revoked_apps(
     auth: *const Authenticator,
@@ -159,8 +155,6 @@ pub unsafe extern "C" fn auth_revoked_apps(
 }
 
 /// Get a list of apps registered in authenticator.
-///
-/// Callback parameters: user data, error code, registered app vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn auth_registered_apps(
     auth: *const Authenticator,
@@ -236,8 +230,6 @@ pub unsafe extern "C" fn auth_registered_apps(
 
 /// Return a list of apps having access to an arbitrary MD object.
 /// `md_name` and `md_type_tag` together correspond to a single MD.
-///
-/// Callback parameters: user data, error code, app access vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn auth_apps_accessing_mutable_data(
     auth: *const Authenticator,

@@ -17,8 +17,6 @@ use std::os::raw::c_void;
 use AppError;
 
 /// Serialize metadata.
-///
-/// Callback parameters: user data, error code, encoded metadata vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_encode_metadata(
     metadata: *const MetadataResponse,

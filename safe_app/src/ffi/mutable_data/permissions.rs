@@ -35,8 +35,6 @@ pub struct UserPermissionSet {
 }
 
 /// Create new permissions.
-///
-/// Callback parameters: user data, error code, permissions handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_new(
     app: *const App,
@@ -57,8 +55,6 @@ pub unsafe extern "C" fn mdata_permissions_new(
 }
 
 /// Get the number of entries in the permissions.
-///
-/// Callback parameters: user data, error code, size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_len(
     app: *const App,
@@ -78,8 +74,6 @@ pub unsafe extern "C" fn mdata_permissions_len(
 
 /// Get the permission set corresponding to the given user.
 /// Use a constant `USER_ANYONE` for anyone.
-///
-/// Callback parameters: user data, error code, permission set handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_get(
     app: *const App,
@@ -123,8 +117,6 @@ pub unsafe extern "C" fn mdata_permissions_get(
 }
 
 /// Return each (user, permission set) pair in the permissions.
-///
-/// Callback parameters: user data, error code, vector of user/permission set objects, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_permission_sets(
     app: *const App,
@@ -174,8 +166,6 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
 /// Insert permission set for the given user to the permissions.
 ///
 /// To insert permissions for "Anyone", pass `USER_ANYONE` as the user handle.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_insert(
     app: *const App,
@@ -203,8 +193,6 @@ pub unsafe extern "C" fn mdata_permissions_insert(
 }
 
 /// Free the permissions from memory.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_free(
     app: *const App,

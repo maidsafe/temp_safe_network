@@ -52,8 +52,6 @@ pub static ENTRIES_EMPTY: u64 = NULL_OBJECT_HANDLE;
 ///
 /// `entries_h` is a handle to entries for the mutable data.
 /// If `ENTRIES_EMPTY`, the entries will be empty.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_put(
     app: *const App,
@@ -120,8 +118,6 @@ pub unsafe extern "C" fn mdata_put(
 }
 
 /// Get version of the mutable data.
-///
-/// Callback parameters: user data, error code, version
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_version(
     app: *const App,
@@ -139,8 +135,6 @@ pub unsafe extern "C" fn mdata_get_version(
 }
 
 /// Get size of serialised mutable data.
-///
-/// Callback parameters: user data, error code, serialised size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_serialised_size(
     app: *const App,
@@ -212,8 +206,6 @@ pub unsafe extern "C" fn mdata_get_value(
 }
 
 /// Get a handle to the complete list of entries in the mutable data.
-///
-/// Callback parameters: user data, error code, entries handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries(
     app: *const App,
@@ -241,8 +233,6 @@ pub unsafe extern "C" fn mdata_entries(
 }
 
 /// Get list of all keys in the mutable data.
-///
-/// Callback parameters: user data, error code, vector of keys, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_keys(
     app: *const App,
@@ -291,8 +281,6 @@ pub unsafe extern "C" fn mdata_list_keys(
 }
 
 /// Get list of all values in the mutable data.
-///
-/// Callback parameters: user data, error code, vector of values, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_values(
     app: *const App,
@@ -343,8 +331,6 @@ pub unsafe extern "C" fn mdata_list_values(
 }
 
 /// Mutate entries of the mutable data.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_mutate_entries(
     app: *const App,
@@ -377,8 +363,6 @@ pub unsafe extern "C" fn mdata_mutate_entries(
 }
 
 /// Get list of all permissions set on the mutable data
-///
-/// Callback parameters: user data, error code, permission handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_permissions(
     app: *const App,
@@ -406,8 +390,6 @@ pub unsafe extern "C" fn mdata_list_permissions(
 /// Get list of permissions set on the mutable data for the given user.
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
-///
-/// Callback parameters: user data, error code, permission set handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_user_permissions(
     app: *const App,
@@ -448,8 +430,6 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
 /// Set permissions set on the mutable data for the given user.
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_set_user_permissions(
     app: *const App,
@@ -488,8 +468,6 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
 /// Delete permissions set on the mutable data for the given user.
 ///
 /// User is either handle to a signing key or `USER_ANYONE`.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_del_user_permissions(
     app: *const App,

@@ -17,8 +17,6 @@ use std::os::raw::c_void;
 use App;
 
 /// Create new entry actions.
-///
-/// Callback parameters: user data, error code, entry actions handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_new(
     app: *const App,
@@ -38,8 +36,6 @@ pub unsafe extern "C" fn mdata_entry_actions_new(
 }
 
 /// Add action to insert new entry.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_insert(
     app: *const App,
@@ -60,8 +56,6 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(
 }
 
 /// Add action to update existing entry.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_update(
     app: *const App,
@@ -83,8 +77,6 @@ pub unsafe extern "C" fn mdata_entry_actions_update(
 }
 
 /// Add action to delete existing entry.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_delete(
     app: *const App,
@@ -101,8 +93,6 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(
 }
 
 /// Free the entry actions from memory
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entry_actions_free(
     app: *const App,
