@@ -21,8 +21,6 @@ use std::slice;
 
 /// Create encrypted mdata info with explicit data name and a
 /// provided private key.
-///
-/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_private(
     name: *const XorNameArray,
@@ -50,8 +48,6 @@ pub unsafe extern "C" fn mdata_info_new_private(
 }
 
 /// Create random, non-encrypted mdata info.
-///
-/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_random_public(
     type_tag: u64,
@@ -72,8 +68,6 @@ pub unsafe extern "C" fn mdata_info_random_public(
 }
 
 /// Create random, encrypted mdata info.
-///
-/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_random_private(
     type_tag: u64,
@@ -94,8 +88,6 @@ pub unsafe extern "C" fn mdata_info_random_private(
 }
 
 /// Encrypt mdata entry key using the corresponding mdata info.
-///
-/// Callback parameters: user data, error code, encrypted entry key vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
     info: *const MDataInfo,
@@ -125,8 +117,6 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(
 }
 
 /// Encrypt mdata entry value using the corresponding mdata info.
-///
-/// Callback parameters: user data, error code, encrypted entry value vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
     info: *const MDataInfo,
@@ -156,8 +146,6 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(
 }
 
 /// Decrypt mdata entry value or a key using the corresponding mdata info.
-///
-/// Callback parameters: user data, error code, decrypted mdata info vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_decrypt(
     info: *const MDataInfo,
@@ -187,8 +175,6 @@ pub unsafe extern "C" fn mdata_info_decrypt(
 }
 
 /// Serialise `MDataInfo`.
-///
-/// Callback parameters: user data, error code, serialised mdata info
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_serialise(
     info: *const MDataInfo,
@@ -215,8 +201,6 @@ pub unsafe extern "C" fn mdata_info_serialise(
 }
 
 /// Deserialise `MDataInfo`.
-///
-/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_deserialise(
     encoded_ptr: *const u8,

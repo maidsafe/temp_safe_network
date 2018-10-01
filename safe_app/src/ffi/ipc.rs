@@ -24,8 +24,6 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 /// Encode `AuthReq`.
-///
-/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_auth_req(
     req: *const AuthReq,
@@ -48,8 +46,6 @@ pub unsafe extern "C" fn encode_auth_req(
 }
 
 /// Encode `ContainersReq`.
-///
-/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_containers_req(
     req: *const ContainersReq,
@@ -72,8 +68,6 @@ pub unsafe extern "C" fn encode_containers_req(
 }
 
 /// Encode `AuthReq` for an unregistered client.
-///
-/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_unregistered_req(
     extra_data: *const u8,
@@ -97,8 +91,6 @@ pub unsafe extern "C" fn encode_unregistered_req(
 }
 
 /// Encode `ShareMDataReq`.
-///
-/// Callback parameters: user data, error code, request id, encoded request
 #[no_mangle]
 pub unsafe extern "C" fn encode_share_mdata_req(
     req: *const ShareMDataReq,

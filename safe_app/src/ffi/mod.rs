@@ -56,8 +56,6 @@ use std::slice;
 /// Create unregistered app.
 /// The `user_data` parameter corresponds to the first parameter of the
 /// `o_cb` and `o_disconnect_notifier_cb` callbacks.
-///
-/// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_unregistered(
     bootstrap_config: *const u8,
@@ -87,8 +85,6 @@ pub unsafe extern "C" fn app_unregistered(
 /// Create a registered app.
 /// The `user_data` parameter corresponds to the first parameter of the
 /// `o_cb` and `o_disconnect_notifier_cb` callbacks.
-///
-/// Callback parameters: user data, error code, app
 #[no_mangle]
 pub unsafe extern "C" fn app_registered(
     app_id: *const c_char,
@@ -113,8 +109,6 @@ pub unsafe extern "C" fn app_registered(
 }
 
 /// Try to restore a failed connection with the network.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn app_reconnect(
     app: *mut App,
@@ -136,8 +130,6 @@ pub unsafe extern "C" fn app_reconnect(
 }
 
 /// Get the account usage statistics (mutations done and mutations available).
-///
-/// Callback parameters: user data, error code, account info
 #[no_mangle]
 pub unsafe extern "C" fn app_account_info(
     app: *mut App,

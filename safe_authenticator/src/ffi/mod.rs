@@ -27,8 +27,6 @@ use Authenticator;
 /// functions to get an authenticator instance must be called before initiating any
 /// operation allowed by this module. The `user_data` parameter corresponds to the
 /// first parameter of the `o_cb` and `o_disconnect_notifier_cb` callbacks.
-///
-/// Callback parameters: user data, error code, authenticator
 #[no_mangle]
 pub unsafe extern "C" fn create_acc(
     account_locator: *const c_char,
@@ -70,8 +68,6 @@ pub unsafe extern "C" fn create_acc(
 /// functions to get an authenticator instance must be called before initiating
 /// any operation allowed for authenticator. The `user_data` parameter corresponds to the
 /// first parameter of the `o_cb` and `o_disconnect_notifier_cb` callbacks.
-///
-/// Callback parameters: user data, error code, authenticator
 #[no_mangle]
 pub unsafe extern "C" fn login(
     account_locator: *const c_char,
@@ -107,8 +103,6 @@ pub unsafe extern "C" fn login(
 }
 
 /// Try to restore a failed connection with the network.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn auth_reconnect(
     auth: *mut Authenticator,
@@ -130,8 +124,6 @@ pub unsafe extern "C" fn auth_reconnect(
 }
 
 /// Get the account usage statistics.
-///
-/// Callback parameters: user data, error code, account info
 #[no_mangle]
 pub unsafe extern "C" fn auth_account_info(
     auth: *mut Authenticator,
@@ -161,7 +153,7 @@ pub unsafe extern "C" fn auth_account_info(
     })
 }
 
-/// Returns the expected name for the application executable without an extension
+/// Returns the expected name for the application executable without an extension.
 #[no_mangle]
 pub unsafe extern "C" fn auth_exe_file_stem(
     user_data: *mut c_void,

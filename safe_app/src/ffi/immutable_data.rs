@@ -26,8 +26,6 @@ pub type SEWriterHandle = SelfEncryptorWriterHandle;
 pub type SEReaderHandle = SelfEncryptorReaderHandle;
 
 /// Get a Self Encryptor.
-///
-/// Callback parameters: user data, error code, SE handle
 #[no_mangle]
 pub unsafe extern "C" fn idata_new_self_encryptor(
     app: *const App,
@@ -56,8 +54,6 @@ pub unsafe extern "C" fn idata_new_self_encryptor(
 }
 
 /// Write to Self Encryptor.
-///
-/// Callback parameters: user data, error code, data, size
 #[no_mangle]
 pub unsafe extern "C" fn idata_write_to_self_encryptor(
     app: *const App,
@@ -94,8 +90,6 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(
 }
 
 /// Close Self Encryptor and free the Self Encryptor Writer handle.
-///
-/// Callback parameters: user data, error code, xor name
 #[no_mangle]
 pub unsafe extern "C" fn idata_close_self_encryptor(
     app: *const App,
@@ -157,8 +151,6 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
 }
 
 /// Fetch Self Encryptor.
-///
-/// Callback parameters: user data, error code, SE handle
 #[no_mangle]
 pub unsafe extern "C" fn idata_fetch_self_encryptor(
     app: *const App,
@@ -198,8 +190,6 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(
 }
 
 /// Get serialised size of `ImmutableData`.
-///
-/// Callback parameters: user data, error code, serialised size
 #[no_mangle]
 pub unsafe extern "C" fn idata_serialised_size(
     app: *const App,
@@ -225,8 +215,6 @@ pub unsafe extern "C" fn idata_serialised_size(
 }
 
 /// Get data size from Self Encryptor.
-///
-/// Callback parameters: user data, error code, size
 #[no_mangle]
 pub unsafe extern "C" fn idata_size(
     app: *const App,
@@ -252,8 +240,6 @@ pub unsafe extern "C" fn idata_size(
 }
 
 /// Read from Self Encryptor.
-///
-/// Callback parameters: user data, error code, data, size
 #[no_mangle]
 pub unsafe extern "C" fn idata_read_from_self_encryptor(
     app: *const App,
@@ -304,8 +290,6 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
 }
 
 /// Free Self Encryptor Writer handle.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn idata_self_encryptor_writer_free(
     app: *const App,
@@ -325,8 +309,6 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(
 }
 
 /// Free Self Encryptor Reader handle.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn idata_self_encryptor_reader_free(
     app: *const App,

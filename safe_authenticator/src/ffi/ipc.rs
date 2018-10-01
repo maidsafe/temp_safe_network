@@ -183,8 +183,6 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(
 }
 
 /// Encode share mutable data response.
-///
-/// Callback parameters: user data, error code, response ptr
 #[no_mangle]
 pub unsafe extern "C" fn encode_share_mdata_resp(
     auth: *const Authenticator,
@@ -254,8 +252,6 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
 }
 
 /// Revoke app access.
-///
-/// Callback parameters: user data, error code, response ptr
 #[no_mangle]
 pub unsafe extern "C" fn auth_revoke_app(
     auth: *const Authenticator,
@@ -285,8 +281,6 @@ pub unsafe extern "C" fn auth_revoke_app(
 }
 
 /// Flush the revocation queue.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn auth_flush_app_revocation_queue(
     auth: *const Authenticator,
@@ -308,8 +302,6 @@ pub unsafe extern "C" fn auth_flush_app_revocation_queue(
 }
 
 /// Encodes a response to unregistered client authentication request.
-///
-/// Callback parameters: user data, error code, response ptr
 #[no_mangle]
 pub unsafe extern "C" fn encode_unregistered_resp(
     req_id: u32,
@@ -342,8 +334,6 @@ pub unsafe extern "C" fn encode_unregistered_resp(
 }
 
 /// Provides and encodes an Authenticator response.
-///
-/// Callback parameters: user data, error code, response ptr
 #[no_mangle]
 pub unsafe extern "C" fn encode_auth_resp(
     auth: *const Authenticator,
@@ -400,8 +390,6 @@ pub unsafe extern "C" fn encode_auth_resp(
 }
 
 /// Update containers permissions for an App.
-///
-/// Callback parameters: user data, error code, response ptr
 #[no_mangle]
 pub unsafe extern "C" fn encode_containers_resp(
     auth: *const Authenticator,

@@ -17,8 +17,6 @@ use std::os::raw::{c_char, c_void};
 use {App, AppError};
 
 /// Fetch access info from the network.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn access_container_refresh_access_info(
     app: *const App,
@@ -41,8 +39,6 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
 }
 
 /// Retrieve a list of container names that an app has access to.
-///
-/// Callback parameters: user data, error code, container permissions vector, vector size
 #[no_mangle]
 pub unsafe extern "C" fn access_container_fetch(
     app: *const App,
@@ -80,8 +76,6 @@ pub unsafe extern "C" fn access_container_fetch(
 }
 
 /// Retrieve `MDataInfo` for the given container name from the access container.
-///
-/// Callback parameters: user data, error code, mdata info handle
 #[no_mangle]
 pub unsafe extern "C" fn access_container_get_container_mdata_info(
     app: *const App,

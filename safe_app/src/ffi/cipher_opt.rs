@@ -14,8 +14,6 @@ use std::os::raw::c_void;
 use App;
 
 /// Construct `CipherOpt::PlainText` handle.
-///
-/// Callback parameters: user data, error code, cipher opt handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_plaintext(
     app: *const App,
@@ -36,8 +34,6 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
 }
 
 /// Construct `CipherOpt::Symmetric` handle.
-///
-/// Callback parameters: user data, error code, cipher opt handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_symmetric(
     app: *const App,
@@ -57,8 +53,6 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(
 }
 
 /// Construct `CipherOpt::Asymmetric` handle.
-///
-/// Callback parameters: user data, error code, cipher opt handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(
     app: *const App,
@@ -87,8 +81,6 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
 }
 
 /// Free `CipherOpt` handle.
-///
-/// Callback parameters: user data, error code
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_free(
     app: *const App,
