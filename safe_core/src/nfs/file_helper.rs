@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::GET_NEXT_VERSION;
 use client::{Client, MDataInfo};
 use crypto::shared_secretbox;
 use errors::CoreError;
@@ -105,8 +106,9 @@ where
 }
 
 /// Update the file.
-/// If `version` is 0, the current version is first retrieved from the network,
-/// and that version incremented by one is then used as the actual version.
+///
+/// If `version` is `GET_NEXT_VERSION`, the current version is first retrieved from the network, and
+/// that version incremented by one is then used as the actual version.
 pub fn update<S>(
     client: impl Client,
     parent: MDataInfo,
@@ -131,13 +133,13 @@ where
             Ok((key, content))
         }).into_future()
         .and_then(move |(key, content)| {
-            if version != 0 {
-                ok!((key, content, version, parent))
-            } else {
+            if version == GET_NEXT_VERSION {
                 client
                     .get_mdata_value(parent.name, parent.type_tag, key.clone())
                     .map(move |value| (key, content, value.entry_version + 1, parent))
                     .into_box()
+            } else {
+                ok!((key, content, version, parent))
             }
         }).and_then(move |(key, content, version, parent)| {
             client2.mutate_mdata_entries(

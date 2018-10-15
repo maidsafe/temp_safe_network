@@ -16,8 +16,7 @@ use futures::Future;
 use safe_core::ffi::nfs::File;
 use safe_core::ffi::MDataInfo;
 use safe_core::ipc::Permission;
-use safe_core::nfs::File as NativeFile;
-use safe_core::nfs::NfsError;
+use safe_core::nfs::{File as NativeFile, NfsError, GET_NEXT_VERSION};
 use std;
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -269,7 +268,7 @@ fn open_file() {
             &container_info,
             ffi_file_name1.as_ptr(),
             &written_file.into_repr_c(),
-            1,
+            GET_NEXT_VERSION,
             ud,
             cb,
         )))
