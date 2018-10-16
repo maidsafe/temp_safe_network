@@ -27,7 +27,3 @@ use futures::Future;
 
 /// Helper type for futures that can result in `NfsError`.
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
-
-/// Constant to pass to `update()` when the correct version should be retrieved and used
-/// automatically.
-pub const GET_NEXT_VERSION: u64 = 0;

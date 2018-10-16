@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::GET_NEXT_VERSION;
 use client::{Client, MDataInfo};
 use crypto::shared_secretbox;
 use errors::CoreError;
@@ -16,6 +15,15 @@ use nfs::{File, Mode, NfsError, NfsFuture, Reader, Writer};
 use routing::{ClientError, EntryActions};
 use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
+
+/// Enum specifying which version should be used in places where a version is required.
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub enum Version {
+    /// Query the network for the next version.
+    GetNext,
+    /// Use the specified version.
+    Custom(u64),
+}
 
 /// Insert the file into the directory.
 pub fn insert<S>(client: impl Client, parent: MDataInfo, name: S, file: &File) -> Box<NfsFuture<()>>
@@ -78,7 +86,10 @@ pub fn read<C: Client>(
     )
 }
 
-/// Delete a file from the Directory.
+/// Delete a file from the directory.
+///
+/// If `version` is `GET_NEXT_VERSION`, the current version is first retrieved from the network, and
+/// that version incremented by one is then used as the actual version.
 // Allow pass by value for consistency with other functions.
 #[allow(unknown_lints)]
 #[allow(needless_pass_by_value)]
@@ -86,8 +97,8 @@ pub fn delete<S>(
     client: impl Client,
     parent: MDataInfo,
     name: S,
-    version: u64,
-) -> Box<NfsFuture<()>>
+    version: Version,
+) -> Box<NfsFuture<u64>>
 where
     S: AsRef<str>,
 {
@@ -96,13 +107,22 @@ where
 
     let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
-    client
-        .mutate_mdata_entries(
-            parent.name,
-            parent.type_tag,
-            EntryActions::new().del(key, version).into(),
-        ).map_err(convert_error)
-        .into_box()
+    match version {
+        Version::GetNext => client
+            .get_mdata_value(parent.name, parent.type_tag, key.clone())
+            .map(move |value| (value.entry_version + 1))
+            .into_box(),
+        Version::Custom(version) => ok!(version),
+    }.map_err(NfsError::from)
+    .and_then(move |version| {
+        client
+            .mutate_mdata_entries(
+                parent.name,
+                parent.type_tag,
+                EntryActions::new().del(key, version).into(),
+            ).map(move |()| version)
+            .map_err(convert_error)
+    }).into_box()
 }
 
 /// Update the file.
@@ -114,8 +134,8 @@ pub fn update<S>(
     parent: MDataInfo,
     name: S,
     file: &File,
-    version: u64,
-) -> Box<NfsFuture<()>>
+    version: Version,
+) -> Box<NfsFuture<u64>>
 where
     S: AsRef<str>,
 {
@@ -132,21 +152,19 @@ where
 
             Ok((key, content))
         }).into_future()
-        .and_then(move |(key, content)| {
-            if version == GET_NEXT_VERSION {
-                client
-                    .get_mdata_value(parent.name, parent.type_tag, key.clone())
-                    .map(move |value| (key, content, value.entry_version + 1, parent))
-                    .into_box()
-            } else {
-                ok!((key, content, version, parent))
-            }
+        .and_then(move |(key, content)| match version {
+            Version::GetNext => client
+                .get_mdata_value(parent.name, parent.type_tag, key.clone())
+                .map(move |value| (key, content, value.entry_version + 1, parent))
+                .into_box(),
+            Version::Custom(version) => ok!((key, content, version, parent)),
         }).and_then(move |(key, content, version, parent)| {
-            client2.mutate_mdata_entries(
-                parent.name,
-                parent.type_tag,
-                EntryActions::new().update(key, content, version).into(),
-            )
+            client2
+                .mutate_mdata_entries(
+                    parent.name,
+                    parent.type_tag,
+                    EntryActions::new().update(key, content, version).into(),
+                ).map(move |()| version)
         }).map_err(convert_error)
         .into_box()
 }
