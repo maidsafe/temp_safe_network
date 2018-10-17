@@ -29,6 +29,9 @@ jobs:
     - stage: warmup-mock
       script: set -x; scripts/build-mock
       os: linux
+    - stage: warmup-mock
+      script: set -x; scripts/build-mock
+      os: osx
 
     # Tests + clippy
     - stage: tests
