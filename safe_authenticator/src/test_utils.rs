@@ -516,8 +516,7 @@ pub fn auth_decode_ipc_msg_helper(authenticator: &Authenticator, msg: &str) -> C
     let mut ud = Default::default();
 
     unsafe {
-        use ffi::ipc::auth_decode_ipc_msg;
-        auth_decode_ipc_msg(
+        ::ffi::ipc::auth_decode_ipc_msg(
             authenticator,
             ffi_msg.as_ptr(),
             sender_as_user_data(&tx, &mut ud),

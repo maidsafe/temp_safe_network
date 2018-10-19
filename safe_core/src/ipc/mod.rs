@@ -22,6 +22,7 @@ pub use self::resp::{
 };
 
 use data_encoding::BASE32_NOPAD;
+#[cfg(any(test, feature = "testing"))]
 use ffi_utils;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::{self, Rng};
@@ -74,8 +75,8 @@ pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
     let decoded = match chars.next().ok_or(IpcError::InvalidMsg)? {
         // Encoded as base32
         'b' | 'B' => BASE32_NOPAD.decode(chars.as_str().as_bytes())?,
-        // Default fallback is URL-safe base64 nopad
-        _ => ffi_utils::base64_decode(encoded).map_err(|_| IpcError::EncodeDecodeError)?,
+        // Fail if not encoded as base32
+        _ => return Err(IpcError::EncodeDecodeError),
     };
     Ok(deserialise(&decoded)?)
 }

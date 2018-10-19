@@ -357,9 +357,19 @@ mod tests {
         let auth_req = test_utils::create_random_auth_req();
         let ffi_auth_req = unwrap!(auth_req.clone().into_repr_c());
 
-        // Encode auth req.
-        let (req_id, encoded): (u32, String) =
+        // Encode auth req using base64.
+        let (_req_id, encoded): (u32, String) =
             unsafe { unwrap!(call_2(|ud, cb| encode_auth_req_64(&ffi_auth_req, ud, cb))) };
+
+        // Try to decode ipc message, should fail.
+        match auth_utils::auth_decode_ipc_msg_helper(&auth, &encoded) {
+            Err((-1, None)) => (),
+            _ => panic!("Unexpected result"),
+        }
+
+        // Encode auth req using base32.
+        let (req_id, encoded): (u32, String) =
+            unsafe { unwrap!(call_2(|ud, cb| encode_auth_req(&ffi_auth_req, ud, cb))) };
 
         // Decode ipc message in the authenticator.
         let decoded = unwrap!(auth_utils::auth_decode_ipc_msg_helper(&auth, &encoded));
