@@ -468,22 +468,22 @@ impl ReprC for MDataValue {
 
 /// Mutable data key.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub struct MDataKey {
+pub struct MDataKey(
     /// Key value.
-    pub val: Vec<u8>,
-}
+    pub Vec<u8>,
+);
 
 impl MDataKey {
     /// Convert routing representation to `MDataKey`.
     pub fn from_routing(key: Vec<u8>) -> Self {
-        MDataKey { val: key }
+        MDataKey(key)
     }
 
     /// Returns FFI counterpart without consuming the object.
     pub fn as_repr_c(&self) -> ffi::MDataKey {
         ffi::MDataKey {
-            val: self.val.as_ptr(),
-            val_len: self.val.len(),
+            key: self.0.as_ptr(),
+            key_len: self.0.len(),
         }
     }
 }
@@ -493,11 +493,9 @@ impl ReprC for MDataKey {
     type Error = ();
 
     unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
-        let ffi::MDataKey { val, val_len } = *c_repr;
+        let ffi::MDataKey { key, key_len } = *c_repr;
 
-        Ok(MDataKey {
-            val: slice::from_raw_parts(val, val_len).to_vec(),
-        })
+        Ok(MDataKey(slice::from_raw_parts(key, key_len).to_vec()))
     }
 }
 

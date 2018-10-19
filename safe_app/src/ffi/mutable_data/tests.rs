@@ -544,8 +544,8 @@ fn entries_crud_ffi() {
         let decrypted = unsafe {
             unwrap!(call_vec_u8(|ud, cb| mdata_info_decrypt(
                 &md_info_priv,
-                keys_list[0].val.as_ptr(),
-                keys_list[0].val.len(),
+                keys_list[0].0.as_ptr(),
+                keys_list[0].0.len(),
                 ud,
                 cb,
             )))
