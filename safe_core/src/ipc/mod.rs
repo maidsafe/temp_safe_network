@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-/// Request module
+/// Request module.
 pub mod req;
-/// Response module
+/// Response module.
 pub mod resp;
 
 mod errors;
@@ -29,27 +29,27 @@ use rand::{self, Rng};
 pub use routing::BootstrapConfig;
 use std::u32;
 
-/// IPC message
+/// IPC message.
 #[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum IpcMsg {
-    /// Request
+    /// Request.
     Req {
-        /// Request ID
+        /// Request ID.
         req_id: u32,
-        /// Request
+        /// Request.
         req: IpcReq,
     },
-    /// Response
+    /// Response.
     Resp {
-        /// Request ID
+        /// Request ID.
         req_id: u32,
-        /// Response
+        /// Response.
         resp: IpcResp,
     },
-    /// Revoked
+    /// Revoked.
     Revoked {
-        /// Application ID
+        /// Application ID.
         app_id: String,
     },
     /// Generic error like couldn't parse IpcMsg etc.
@@ -60,10 +60,13 @@ pub enum IpcMsg {
 pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
     // We also add a multicodec compatible prefix. For more details please follow
     // https://github.com/multiformats/multicodec/blob/master/table.csv
-    Ok(format!("b{}", BASE32_NOPAD.encode(&serialise(msg)?)))
+    let msg = (msg, cfg!(feature = "use-mock-routing"));
+    Ok(format!("b{}", BASE32_NOPAD.encode(&serialise(&msg)?)))
 }
 
 /// Encode `IpcMsg` into string, using base64 encoding.
+///
+/// For testing purposes only.
 #[cfg(any(test, feature = "testing"))]
 pub fn encode_msg_64(msg: &IpcMsg) -> Result<String, IpcError> {
     Ok(ffi_utils::base64_encode(&serialise(msg)?))
@@ -78,10 +81,18 @@ pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
         // Fail if not encoded as base32
         _ => return Err(IpcError::EncodeDecodeError),
     };
-    Ok(deserialise(&decoded)?)
+
+    let (msg, mock): (IpcMsg, bool) = deserialise(&decoded)?;
+    if mock != cfg!(feature = "use-mock-routing") {
+        return Err(IpcError::IncompatibleMockStatus);
+    }
+
+    Ok(msg)
 }
 
 /// Decode `IpcMsg` encoded with base64 encoding.
+///
+/// For testing purposes only.
 #[cfg(any(test, feature = "testing"))]
 pub fn decode_msg_64(encoded: &str) -> Result<IpcMsg, IpcError> {
     Ok(deserialise(
