@@ -20,7 +20,7 @@ use safe_core::{Client, CoreError, FutureExt, MDataInfo, DIR_TAG};
 use std::collections::HashMap;
 use {AuthError, AuthFuture};
 
-/// Default Directories to be created at registration
+/// Default directories to be created at registration.
 pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
     "_documents",
     "_downloads",
@@ -29,10 +29,10 @@ pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
     "_publicNames",
 ];
 
-/// Publicly accessible default directories to be created upon registration
+/// Publicly accessible default directories to be created upon registration.
 pub static DEFAULT_PUBLIC_DIRS: [&'static str; 1] = ["_public"];
 
-/// Create the root directories and the standard directories for the access container
+/// Create the root directories and the standard directories for the access container.
 pub fn create(client: &AuthClient) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
     let c3 = client.clone();
@@ -142,8 +142,7 @@ pub fn random_std_dirs() -> Result<Vec<(&'static str, MDataInfo)>, CoreError> {
     priv_dirs.chain(pub_dirs).collect()
 }
 
-/// A registration helper function to create the set of default dirs
-/// in the users root directory.
+/// A registration helper function to create the set of default dirs in the users root directory.
 pub fn create_std_dirs(
     client: &AuthClient,
     md_infos: &HashMap<String, MDataInfo>,

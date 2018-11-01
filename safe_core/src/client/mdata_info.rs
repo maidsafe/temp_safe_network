@@ -26,8 +26,7 @@ pub struct MDataInfo {
     pub name: XorName,
     /// Type tag of the data where the directory is stored.
     pub type_tag: u64,
-    /// Key to encrypt/decrypt the directory content.
-    /// and the nonce to be used for keys
+    /// Key to encrypt/decrypt the directory content and the nonce to be used for keys
     pub enc_info: Option<(shared_secretbox::Key, secretbox::Nonce)>,
 
     /// Future encryption info, used for two-phase data reencryption.
@@ -35,8 +34,7 @@ pub struct MDataInfo {
 }
 
 impl MDataInfo {
-    /// Construct `MDataInfo` for private (encrypted) data with a
-    /// provided private key.
+    /// Construct `MDataInfo` for private (encrypted) data with a provided private key.
     pub fn new_private(
         name: XorName,
         type_tag: u64,
@@ -78,12 +76,12 @@ impl MDataInfo {
         self.enc_info.as_ref().map(|&(ref key, _)| key)
     }
 
-    /// Returns the nonce, inf any.
+    /// Returns the nonce, if any.
     pub fn nonce(&self) -> Option<&secretbox::Nonce> {
         self.enc_info.as_ref().map(|&(_, ref nonce)| nonce)
     }
 
-    /// encrypt the key for the mdata entry accordingly
+    /// Encrypt the key for the mdata entry accordingly.
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.new_enc_info {
             enc_entry_key(plain_text, key, seed)
@@ -94,7 +92,7 @@ impl MDataInfo {
         }
     }
 
-    /// encrypt the value for this mdata entry accordingly
+    /// Encrypt the value for this mdata entry accordingly.
     pub fn enc_entry_value(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.new_enc_info {
             symmetric_encrypt(plain_text, key, None)
@@ -105,7 +103,7 @@ impl MDataInfo {
         }
     }
 
-    /// decrypt key or value of this mdata entry
+    /// Decrypt key or value of this mdata entry.
     pub fn decrypt(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.new_enc_info {
             if let Ok(plain) = symmetric_decrypt(cipher, key) {
