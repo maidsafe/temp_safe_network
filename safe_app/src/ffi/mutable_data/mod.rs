@@ -155,12 +155,6 @@ pub unsafe extern "C" fn mdata_serialised_size(
 }
 
 /// Get value at the given key from the mutable data.
-/// The arguments to the callback are:
-///     1. user data
-///     2. error code
-///     3. pointer to content
-///     4. content length
-///     5. entry version
 ///
 /// Please notice that if a value is fetched from a private `MutableData`,
 /// it's not automatically decrypted.

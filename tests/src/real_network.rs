@@ -10,16 +10,32 @@ use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec};
 use ffi_utils::{from_c_str, FfiResult, ReprC, StringError};
 use safe_app::ffi::app_registered;
 use safe_app::ffi::ipc::*;
-use safe_app::App;
+use safe_app::ffi::mdata_info::mdata_info_random_public;
+use safe_app::ffi::mutable_data::entries::{
+    mdata_entries_insert, mdata_entries_new, mdata_list_entries,
+};
+use safe_app::ffi::mutable_data::entry_actions::{
+    mdata_entry_actions_delete, mdata_entry_actions_insert, mdata_entry_actions_new,
+    mdata_entry_actions_update,
+};
+use safe_app::ffi::mutable_data::permissions::{
+    mdata_permissions_insert, mdata_permissions_new, USER_ANYONE,
+};
+use safe_app::ffi::mutable_data::{mdata_entries, mdata_mutate_entries, mdata_put};
+use safe_app::{Action, App, PermissionSet};
 use safe_authenticator::ffi::apps::*;
 use safe_authenticator::ffi::ipc::*;
 use safe_authenticator::ffi::*;
 use safe_authenticator::test_utils::*;
 use safe_authenticator::{AuthError, Authenticator};
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
-use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions};
+use safe_core::ipc::req::{
+    permission_set_into_repr_c, AppExchangeInfo, AuthReq, ContainerPermissions,
+};
+use safe_core::ipc::resp::{MDataEntry, MDataKey, MDataValue};
 use safe_core::ipc::{AuthGranted, Permission};
 use safe_core::nfs::{Mode, NfsError};
+use safe_core::MDataInfo;
 use safe_core::{utils, CoreError};
 use serde_json;
 use std::collections::HashMap;
@@ -236,6 +252,223 @@ fn read_data() {
 
 #[ignore]
 #[test]
+fn mdata_operations() {
+    let auth_h = setup_test();
+
+    // Create and authorise an app.
+    let app_id = unwrap!(utils::generate_readable_string(10));
+    let ffi_app_id = unwrap!(CString::new(app_id.clone()));
+    println!("App ID: {}", app_id);
+
+    let app_info = AppExchangeInfo {
+        id: app_id.clone(),
+        scope: None,
+        name: app_id.clone(), // Use ID for name so the app is easier to find in Browser.
+        vendor: app_id.clone(),
+    };
+
+    println!("Authorising app...");
+
+    let auth_granted = ffi_authorise_app(auth_h, &app_info);
+
+    println!("Registering app...");
+
+    let app: *mut App = unsafe {
+        unwrap!(call_1(|ud, cb| app_registered(
+            ffi_app_id.as_ptr(),
+            &unwrap!(auth_granted.clone().into_repr_c()),
+            ud,
+            disconnect_cb,
+            cb,
+        )))
+    };
+
+    println!("Creating random mdata...");
+
+    let type_tag = 15_000;
+    let mdata_info: MDataInfo =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(type_tag, ud, cb))) };
+    let mdata_info = mdata_info.into_repr_c();
+
+    // Create permissions for anyone
+    let perms_h = unsafe { unwrap!(call_1(|ud, cb| mdata_permissions_new(app, ud, cb))) };
+    {
+        // Create a permissions set
+        let perms_set = PermissionSet::new()
+            .allow(Action::Insert)
+            .allow(Action::Update)
+            .allow(Action::Delete);
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| mdata_permissions_insert(
+                app,
+                perms_h,
+                USER_ANYONE,
+                &permission_set_into_repr_c(perms_set),
+                ud,
+                cb,
+            )))
+        };
+    }
+
+    let entries_h = unsafe { unwrap!(call_1(|ud, cb| mdata_entries_new(app, ud, cb))) };
+
+    let key0 = b"random_key_1".to_vec();
+    let value0 = b"Scotland to try Scotch whisky".to_vec();
+    let key1 = b"random_key_2".to_vec();
+    let value1 = b"Patagonia before I'm too old".to_vec();
+    let value1_2 = b"Bogota before I'm too old".to_vec();
+    let key2 = b"random_key_3".to_vec();
+    let value2 = b"Cyprus for falafels and kebab".to_vec();
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_entries_insert(
+            app,
+            entries_h,
+            key0.as_ptr(),
+            key0.len(),
+            value0.as_ptr(),
+            value0.len(),
+            ud,
+            cb
+        )));
+        unwrap!(call_0(|ud, cb| mdata_entries_insert(
+            app,
+            entries_h,
+            key1.as_ptr(),
+            key1.len(),
+            value1.as_ptr(),
+            value1.len(),
+            ud,
+            cb
+        )));
+    }
+
+    // Put the entries to the mdata.
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_put(
+            app,
+            &mdata_info,
+            perms_h,
+            entries_h,
+            ud,
+            cb
+        )))
+    };
+
+    println!("Getting the list of mdata entries...");
+
+    let entries: Vec<MDataEntry> = unsafe {
+        unwrap!(call_vec(|ud, cb| mdata_list_entries(
+            app, entries_h, ud, cb
+        )))
+    };
+
+    assert_eq!(entries[0].key, MDataKey(key0.clone()));
+    assert_eq!(
+        entries[0].value,
+        MDataValue {
+            content: value0,
+            entry_version: 0
+        }
+    );
+    assert_eq!(entries[1].key, MDataKey(key1.clone()));
+    assert_eq!(
+        entries[1].value,
+        MDataValue {
+            content: value1,
+            entry_version: 0
+        }
+    );
+
+    println!("Inserting, mutating, and deleting the entries...");
+
+    let actions_h = unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(app, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_entry_actions_insert(
+            app,
+            actions_h,
+            key2.as_ptr(),
+            key2.len(),
+            value2.as_ptr(),
+            value2.len(),
+            ud,
+            cb
+        )));
+
+        unwrap!(call_0(|ud, cb| mdata_entry_actions_update(
+            app,
+            actions_h,
+            key1.as_ptr(),
+            key1.len(),
+            value1_2.as_ptr(),
+            value1_2.len(),
+            1,
+            ud,
+            cb
+        )));
+
+        unwrap!(call_0(|ud, cb| mdata_entry_actions_delete(
+            app,
+            actions_h,
+            key0.as_ptr(),
+            key0.len(),
+            1,
+            ud,
+            cb
+        )))
+    }
+
+    // Apply the mutation.
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_mutate_entries(
+            app,
+            &mdata_info,
+            actions_h,
+            ud,
+            cb
+        )))
+    }
+
+    println!("Getting the list of mdata entries...");
+
+    let entries_h = unsafe { unwrap!(call_1(|ud, cb| mdata_entries(app, &mdata_info, ud, cb))) };
+
+    let entries: Vec<MDataEntry> = unsafe {
+        unwrap!(call_vec(|ud, cb| mdata_list_entries(
+            app, entries_h, ud, cb
+        )))
+    };
+
+    assert_eq!(entries[0].key, MDataKey(key0));
+    assert_eq!(
+        entries[0].value,
+        MDataValue {
+            content: b"".to_vec(),
+            entry_version: 1
+        }
+    );
+    assert_eq!(entries[1].key, MDataKey(key1));
+    assert_eq!(
+        entries[1].value,
+        MDataValue {
+            content: value1_2,
+            entry_version: 1
+        }
+    );
+    assert_eq!(entries[2].key, MDataKey(key2));
+    assert_eq!(
+        entries[2].value,
+        MDataValue {
+            content: value2,
+            entry_version: 0
+        }
+    );
+}
+
+#[ignore]
+#[test]
 fn authorisation_and_revocation() {
     let auth_h = setup_test();
 
@@ -252,10 +485,11 @@ fn authorisation_and_revocation() {
     };
 
     println!("Authorising app...");
+
     let auth_granted = ffi_authorise_app(auth_h, &app_info);
 
-    // Register the app.
     println!("Registering app...");
+
     let _app: *mut App = unsafe {
         unwrap!(call_1(|ud, cb| app_registered(
             ffi_app_id.as_ptr(),
@@ -276,6 +510,7 @@ fn authorisation_and_revocation() {
 
     // Put file into container.
     println!("Creating file...");
+
     let file_name = format!("{}.mp4", unwrap!(utils::generate_readable_string(10)));
     println!("File name: {}", file_name.clone());
 
@@ -296,8 +531,8 @@ fn authorisation_and_revocation() {
         let _ = unwrap!(fetch_file(&*auth_h, videos_md.clone(), file_name.as_str()));
     }
 
-    // Revoke our app.
     println!("Revoking app...");
+
     let _: String = unsafe {
         unwrap!(call_1(|ud, cb| auth_revoke_app(
             auth_h,
@@ -328,11 +563,12 @@ fn authorisation_and_revocation() {
         }
     }
 
-    // Re-authorise the app.
     println!("Re-authorising app...");
+
     let auth_granted = ffi_authorise_app(auth_h, &app_info);
 
     println!("Re-registering app...");
+
     let _app: *mut App = unsafe {
         unwrap!(call_1(|ud, cb| app_registered(
             ffi_app_id.as_ptr(),
@@ -358,8 +594,8 @@ fn authorisation_and_revocation() {
         let _ = unwrap!(fetch_file(&*auth_h, videos_md.clone(), file_name));
     };
 
-    // Revoke our app.
     println!("Revoking app...");
+
     let _: String = unsafe {
         unwrap!(call_1(|ud, cb| auth_revoke_app(
             auth_h,

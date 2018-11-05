@@ -201,9 +201,9 @@ impl Drop for MetadataResponse {
 #[derive(Clone, Copy, Debug)]
 pub struct MDataKey {
     /// Key value pointer.
-    pub val: *const u8,
+    pub key: *const u8,
     /// Key length.
-    pub val_len: usize,
+    pub key_len: usize,
 }
 
 /// Represents the FFI-safe mutable data value.

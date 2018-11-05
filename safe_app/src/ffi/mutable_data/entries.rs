@@ -88,8 +88,7 @@ pub unsafe extern "C" fn mdata_entries_len(
 
 /// Get the entry value at the given key.
 ///
-/// The callbacks arguments are: user data, error code, pointer to value,
-/// value length, entry version. The caller must NOT free the pointer.
+/// The caller must NOT free the content pointer.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_get(
     app: *const App,
@@ -136,13 +135,7 @@ pub unsafe extern "C" fn mdata_entries_get(
     })
 }
 
-/// Iterate over the entries.
-///
-/// The `o_each_cb` callback is invoked once for each entry,
-/// passing user data, pointer to key, key length, pointer to value, value length
-/// and entry version in that order.
-///
-/// The `o_done_cb` callback is invoked after the iteration is done, or in case of error.
+/// Return a list of the entries.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_entries(
     app: *const App,
@@ -169,8 +162,8 @@ pub unsafe extern "C" fn mdata_list_entries(
                 .iter()
                 .map(|(key, value)| MDataEntry {
                     key: MDataKey {
-                        val: key.as_safe_ptr(),
-                        val_len: key.len(),
+                        key: key.as_safe_ptr(),
+                        key_len: key.len(),
                     },
                     value: MDataValue {
                         content: value.content.as_safe_ptr(),
@@ -363,11 +356,11 @@ mod tests {
         assert_eq!(entries.len(), 2);
 
         assert!(entries.contains(&MDataEntry {
-            key: MDataKey { val: key0 },
+            key: MDataKey(key0),
             value: MDataValue::from_routing(value0),
         }));
         assert!(entries.contains(&MDataEntry {
-            key: MDataKey { val: key1 },
+            key: MDataKey(key1),
             value: MDataValue::from_routing(value1),
         }));
 
@@ -486,8 +479,8 @@ mod tests {
             unsafe { unwrap!(call_vec(|ud, cb| mdata_list_keys(&app, &md_info, ud, cb))) };
         assert_eq!(keys.len(), 2);
 
-        assert!(keys.contains(&MDataKey { val: key0 }));
-        assert!(keys.contains(&MDataKey { val: key1 }));
+        assert!(keys.contains(&MDataKey(key0)));
+        assert!(keys.contains(&MDataKey(key1)));
 
         let values: Vec<MDataValue> =
             unsafe { unwrap!(call_vec(|ud, cb| mdata_list_values(&app, &md_info, ud, cb))) };
