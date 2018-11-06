@@ -17,6 +17,7 @@ use nfs::writer::Writer;
 use nfs::{create_dir, file_helper, File, Mode, NfsError, NfsFuture};
 use rand::{self, Rng};
 use rust_sodium::crypto::secretbox;
+use self_encryption::MIN_CHUNK_SIZE;
 use std;
 use utils::test_utils::random_client;
 use utils::FutureExt;
@@ -26,7 +27,10 @@ const APPEND_SIZE: usize = 10;
 const ORIG_SIZE: usize = 5555;
 const NEW_SIZE: usize = 50;
 
-fn create_test_file(client: &CoreClient) -> Box<NfsFuture<(MDataInfo, File)>> {
+fn create_test_file_with_size(
+    client: &CoreClient,
+    size: usize,
+) -> Box<NfsFuture<(MDataInfo, File)>> {
     let c2 = client.clone();
     let c3 = client.clone();
     let root = unwrap!(MDataInfo::random_private(DIR_TAG));
@@ -45,14 +49,17 @@ fn create_test_file(client: &CoreClient) -> Box<NfsFuture<(MDataInfo, File)>> {
         }).then(move |res| {
             let writer = unwrap!(res);
 
-            writer
-                .write(&[0u8; ORIG_SIZE])
-                .and_then(move |_| writer.close())
+            let bytes = vec![0u8; size];
+            writer.write(&bytes).and_then(move |_| writer.close())
         }).then(move |res| {
             let file = unwrap!(res);
 
             file_helper::insert(c3, root2.clone(), "hello.txt", &file).map(move |_| (root2, file))
         }).into_box()
+}
+
+fn create_test_file(client: &CoreClient) -> Box<NfsFuture<(MDataInfo, File)>> {
+    create_test_file_with_size(client, ORIG_SIZE)
 }
 
 // Test inserting files to, and fetching from, a public mdata.
@@ -404,37 +411,48 @@ fn file_update_overwrite() {
 
 #[test]
 fn file_update_append() {
-    random_client(|client| {
-        let c2 = client.clone();
-        let c3 = client.clone();
+    random_client(move |client| {
+        let mut futures = vec![];
 
-        create_test_file(client)
-            .then(move |res| {
-                let (dir, file) = unwrap!(res);
+        for i in 0..3 {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-                // Updating file - append
-                file_helper::write(c2, file, Mode::Append, dir.enc_key().cloned())
-                    .map(move |writer| (dir, writer))
-            }).then(move |res| {
-                let (dir, writer) = unwrap!(res);
-                writer
-                    .write(&[2u8; APPEND_SIZE])
-                    .and_then(move |_| writer.close())
-                    .map(move |file| (dir, file))
-            }).then(move |res| {
-                let (dir, file) = unwrap!(res);
-                file_helper::read(c3, &file, dir.enc_key().cloned())
-            }).then(move |res| {
-                let reader = unwrap!(res);
-                let size = reader.size();
-                println!("reading {} bytes", size);
-                reader.read(0, size)
-            }).map(move |data| {
-                assert_eq!(data.len(), ORIG_SIZE + APPEND_SIZE);
-                assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
-                assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
-            })
-    });
+            let size = i * MIN_CHUNK_SIZE as usize;
+            println!("Testing with size {}", size);
+
+            futures.push(
+                create_test_file_with_size(client, size)
+                    .then(move |res| {
+                        let (dir, file) = unwrap!(res);
+
+                        // Updating file - append
+                        file_helper::write(c2, file, Mode::Append, dir.enc_key().cloned())
+                            .map(move |writer| (dir, writer))
+                    }).then(move |res| {
+                        let (dir, writer) = unwrap!(res);
+                        writer
+                            .write(&[2u8; APPEND_SIZE])
+                            .and_then(move |_| writer.close())
+                            .map(move |file| (dir, file))
+                    }).then(move |res| {
+                        let (dir, file) = unwrap!(res);
+                        file_helper::read(c3, &file, dir.enc_key().cloned())
+                    }).then(move |res| {
+                        let reader = unwrap!(res);
+                        let size = reader.size();
+                        println!("reading {} bytes", size);
+                        reader.read(0, size)
+                    }).map(move |data| {
+                        assert_eq!(data.len(), size + APPEND_SIZE);
+                        assert_eq!(data[0..size].to_owned(), vec![0u8; size]);
+                        assert_eq!(&data[size..], [2u8; APPEND_SIZE]);
+                    }),
+            );
+        }
+
+        future::join_all(futures).map(|_| ())
+    })
 }
 
 #[test]

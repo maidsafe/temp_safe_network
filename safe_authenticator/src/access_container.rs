@@ -22,7 +22,7 @@ use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use safe_core::{recovery, Client, FutureExt, MDataInfo};
 use std::collections::HashMap;
 
-/// Key of the authenticator entry in the access container
+/// Key of the authenticator entry in the access container.
 pub const AUTHENTICATOR_ENTRY: &str = "authenticator";
 
 /// Gets access container entry key corresponding to the given app.
