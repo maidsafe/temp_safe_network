@@ -88,7 +88,7 @@ pub fn read<C: Client>(
 
 /// Delete a file from the directory.
 ///
-/// If `version` is `GET_NEXT_VERSION`, the current version is first retrieved from the network, and
+/// If `version` is `Version::GetNext`, the current version is first retrieved from the network, and
 /// that version incremented by one is then used as the actual version.
 // Allow pass by value for consistency with other functions.
 #[allow(unknown_lints)]
@@ -107,14 +107,15 @@ where
 
     let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
-    match version {
+    let version_fut = match version {
         Version::GetNext => client
             .get_mdata_value(parent.name, parent.type_tag, key.clone())
             .map(move |value| (value.entry_version + 1))
             .into_box(),
         Version::Custom(version) => ok!(version),
-    }.map_err(NfsError::from)
-    .and_then(move |version| {
+    }.map_err(NfsError::from);
+
+    version_fut.and_then(move |version| {
         client
             .mutate_mdata_entries(
                 parent.name,
@@ -127,7 +128,7 @@ where
 
 /// Update the file.
 ///
-/// If `version` is `GET_NEXT_VERSION`, the current version is first retrieved from the network, and
+/// If `version` is `Version::GetNext`, the current version is first retrieved from the network, and
 /// that version incremented by one is then used as the actual version.
 pub fn update<S>(
     client: impl Client,

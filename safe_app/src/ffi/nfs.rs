@@ -101,6 +101,7 @@ pub unsafe extern "C" fn dir_insert_file(
 }
 
 /// Replace the file in the parent directory.
+///
 /// If `version` is `GET_NEXT_VERSION`, the correct version is obtained automatically.
 #[no_mangle]
 pub unsafe extern "C" fn dir_update_file(
@@ -129,6 +130,8 @@ pub unsafe extern "C" fn dir_update_file(
 }
 
 /// Delete the file in the parent directory.
+///
+/// If `version` is `GET_NEXT_VERSION`, the correct version is obtained automatically.
 #[no_mangle]
 pub unsafe extern "C" fn dir_delete_file(
     app: *const App,
