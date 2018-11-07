@@ -22,7 +22,8 @@ use safe_core::crypto::shared_secretbox;
 use safe_core::ipc::req::{container_perms_into_permission_set, ContainerPermissions};
 use safe_core::ipc::resp::AccessContainerEntry;
 use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq};
-use safe_core::nfs::{file_helper, File, Mode};
+use safe_core::nfs::file_helper::{self, Version};
+use safe_core::nfs::{File, Mode};
 use safe_core::utils::test_utils::setup_client_with_net_obs;
 #[cfg(feature = "use-mock-routing")]
 use safe_core::MockRouting;
@@ -264,10 +265,15 @@ pub fn delete_file<S: Into<String>>(
     container_info: MDataInfo,
     name: S,
     version: u64,
-) -> Result<(), AuthError> {
+) -> Result<u64, AuthError> {
     let name = name.into();
     try_run(authenticator, move |client| {
-        file_helper::delete(client.clone(), container_info, name, version).map_err(From::from)
+        file_helper::delete(
+            client.clone(),
+            container_info,
+            name,
+            Version::Custom(version),
+        ).map_err(From::from)
     })
 }
 
