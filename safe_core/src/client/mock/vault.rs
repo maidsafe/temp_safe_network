@@ -17,7 +17,7 @@ use rust_sodium::crypto::sign;
 use std::collections::HashMap;
 use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
@@ -326,6 +326,7 @@ impl Store for FileStore {
             if writing {
                 let raw_data = unwrap!(serialise(&cache));
                 unwrap!(file.set_len(0));
+                let _ = unwrap!(file.seek(SeekFrom::Start(0)));
                 unwrap!(file.write_all(&raw_data));
                 unwrap!(file.sync_all());
 
