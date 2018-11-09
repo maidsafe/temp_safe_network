@@ -18,21 +18,25 @@
     unused_qualifications
 )]
 
+#[cfg(target_os = "android")]
+extern crate android_logger;
+#[macro_use]
+extern crate ffi_utils;
 extern crate jni;
+#[macro_use]
+extern crate log;
 extern crate safe_app;
 extern crate safe_core;
 #[macro_use]
-extern crate ffi_utils;
-#[macro_use]
 extern crate unwrap;
 
-use ffi_utils::java::{convert_cb_from_java, object_array_to_java, JniResult};
+use ffi_utils::java::{convert_cb_from_java, object_array_to_java, EnvGuard, JniResult};
 use ffi_utils::*;
 use jni::errors::{Error as JniError, ErrorKind};
-use jni::objects::{GlobalRef, JClass, JObject, JString};
+use jni::objects::{AutoLocal, GlobalRef, JClass, JMethodID, JObject, JString, JValue};
 use jni::strings::JNIStr;
-use jni::sys::{jbyte, jbyteArray, jint, jlong, jobject, jsize};
-use jni::{JNIEnv, JavaVM};
+use jni::sys::{jbyte, jbyteArray, jclass, jint, jlong, jobject, jsize};
+use jni::{signature::JavaType, AttachGuard, JNIEnv, JavaVM};
 use safe_app::ffi::object_cache::*;
 use safe_app::UserPermissionSet;
 use safe_core::arrays::*;
@@ -57,6 +61,8 @@ pub type SEWriterHandle = SelfEncryptorWriterHandle;
 pub type SEReaderHandle = SelfEncryptorReaderHandle;
 
 static mut JVM: Option<JavaVM> = None;
+static mut CLASS_LOADER: Option<GlobalRef> = None;
+static mut FIND_CLASS_METHOD: Option<JMethodID> = None;
 
 /// Trait for conversion of Rust value to Java value.
 pub trait ToJava<'a, T: Sized + 'a> {
@@ -75,8 +81,80 @@ pub trait FromJava<T> {
 // This is called when `loadLibrary` is called on the Java side.
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut jni::sys::JavaVM, _reserved: *mut c_void) -> jint {
-    JVM = Some(unwrap!(JavaVM::from_raw(vm)));
+    if let Err(e) = cache_class_loader(vm) {
+        error!("{}", e);
+        return -1;
+    }
     jni::sys::JNI_VERSION_1_4
+}
+
+unsafe fn cache_class_loader(vm: *mut jni::sys::JavaVM) -> Result<(), JniError> {
+    JVM = Some(JavaVM::from_raw(vm)?);
+
+    let env = JVM
+        .as_ref()
+        .ok_or_else(|| From::from("no JVM reference found"))
+        .and_then(|vm| vm.get_env())?;
+
+    let res_class = env.find_class("net/maidsafe/safe_app/FfiResult")?;
+
+    CLASS_LOADER = Some(
+        env.new_global_ref(
+            env.call_method(
+                From::from(res_class),
+                "getClassLoader",
+                "()Ljava/lang/ClassLoader;",
+                &[],
+            )?.l()?,
+        )?,
+    );
+
+    FIND_CLASS_METHOD = Some(env.get_method_id(
+        "java/lang/ClassLoader",
+        "findClass",
+        "(Ljava/lang/String;)Ljava/lang/Class;",
+    )?);
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+pub(crate) fn init_jni_logging() -> Result<(), JniError> {
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+pub(crate) fn init_jni_logging() -> Result<(), JniError> {
+    use android_logger::Filter;
+    use log::Level;
+
+    android_logger::init_once(
+        Filter::default().with_min_level(Level::Info),
+        Some("safe_app_jni"),
+    );
+
+    Ok(())
+}
+
+/// Uses the cached class loader to find a Java class.
+pub(crate) unsafe fn find_class<'a>(
+    env: &'a JNIEnv,
+    class_name: &str,
+) -> Result<AutoLocal<'a>, JniError> {
+    let cls = env.new_string(class_name)?;
+
+    Ok(env.auto_local(From::from(
+        env.call_method_unsafe(
+            CLASS_LOADER
+                .as_ref()
+                .ok_or_else(|| JniError::from("Unexpected - no cached class loader"))?
+                .as_obj(),
+            FIND_CLASS_METHOD
+                .ok_or_else(|| JniError::from("Unexpected - no cached findClass method ID"))?,
+            JavaType::from_str("Ljava/lang/Object;")?,
+            &[JValue::from(*cls)],
+        )?.l()?,
+    )))
 }
 
 gen_primitive_type_converter!(u8, jbyte);
@@ -160,11 +238,16 @@ impl<'a> FromJava<JObject<'a>> for Vec<u8> {
     }
 }
 
-gen_object_array_converter!(MDataKey, "net/maidsafe/safe_app/MDataKey");
-gen_object_array_converter!(MDataValue, "net/maidsafe/safe_app/MDataValue");
-gen_object_array_converter!(UserPermissionSet, "net/maidsafe/safe_app/UserPermissionSet");
-gen_object_array_converter!(MDataEntry, "net/maidsafe/safe_app/MDataEntry");
+gen_object_array_converter!(find_class, MDataKey, "net/maidsafe/safe_app/MDataKey");
+gen_object_array_converter!(find_class, MDataValue, "net/maidsafe/safe_app/MDataValue");
 gen_object_array_converter!(
+    find_class,
+    UserPermissionSet,
+    "net/maidsafe/safe_app/UserPermissionSet"
+);
+gen_object_array_converter!(find_class, MDataEntry, "net/maidsafe/safe_app/MDataEntry");
+gen_object_array_converter!(
+    find_class,
     ContainerPermissions,
     "net/maidsafe/safe_app/ContainerPermissions"
 );
