@@ -21,10 +21,11 @@ use std::collections::HashMap;
 use {AuthError, AuthFuture};
 
 /// Default directories to be created at registration.
-pub static DEFAULT_PRIVATE_DIRS: [&'static str; 5] = [
+pub static DEFAULT_PRIVATE_DIRS: [&'static str; 6] = [
     "_documents",
     "_downloads",
     "_music",
+    "_pictures",
     "_videos",
     "_publicNames",
 ];
