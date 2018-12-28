@@ -9,6 +9,7 @@
 use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::{self, Mutation};
 use super::STATUS_LOG_INTERVAL;
+use crate::utils::{self, HashMap, HashSet, Instant, SecureHash};
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{
     Authority, MessageId, MutableData, RoutingTable, Value, XorName, MAX_MUTABLE_DATA_ENTRIES,
@@ -18,7 +19,6 @@ use std::collections::hash_map::Entry;
 use std::collections::VecDeque;
 use std::iter;
 use std::time::Duration;
-use utils::{self, HashMap, HashSet, Instant, SecureHash};
 
 #[cfg(not(feature = "use-mock-crust"))]
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.

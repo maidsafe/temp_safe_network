@@ -18,7 +18,7 @@ macro_rules! assert_err {
     };
 }
 
-use chunk_store::{Chunk, ChunkId, ChunkStore, Error};
+use crate::chunk_store::{Chunk, ChunkId, ChunkStore, Error};
 use maidsafe_utilities::{serialisation, SeededRng};
 use rand::Rng;
 use tempdir::TempDir;

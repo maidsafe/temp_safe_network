@@ -9,6 +9,9 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
+#![cfg(feature = "use-mock-crust")]
+#![cfg(not(feature = "use-mock-routing"))]
+use log::{log, trace};
 use rand::distributions::{IndependentSample, Range};
 use rand::Rng;
 use routing::mock_crust::Network;

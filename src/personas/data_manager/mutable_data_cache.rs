@@ -8,10 +8,10 @@
 
 use super::data::{Data, MutableDataId};
 use super::ACCUMULATOR_TIMEOUT_SECS;
+use crate::utils::{self, HashMap, Instant, SecureHash};
 use accumulator::Accumulator;
 use routing::{MutableData, Value, XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR};
 use std::time::Duration;
-use utils::{self, HashMap, Instant, SecureHash};
 
 /// The timeout after which cached mutable data entries expire.
 const ENTRY_CACHE_TIMEOUT_SECS: u64 = 60;

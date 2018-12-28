@@ -9,7 +9,10 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
+#![cfg(feature = "use-mock-crust")]
+#![cfg(not(feature = "use-mock-routing"))]
 use fake_clock::FakeClock;
+use log::{log, trace};
 use rand::Rng;
 use routing::mock_crust::Network;
 use routing::rate_limiter_consts::{MIN_CLIENT_CAPACITY, RATE};
@@ -24,6 +27,7 @@ use safe_vault::mock_crust_detail::{self, poll, test_node, Data};
 use safe_vault::{test_utils, Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tiny_keccak;
+use unwrap::unwrap;
 
 const TEST_NET_SIZE: usize = 20;
 const TEST_TAG: u64 = 123_456;

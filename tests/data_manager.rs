@@ -9,7 +9,10 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
+#![cfg(feature = "use-mock-crust")]
+#![cfg(not(feature = "use-mock-routing"))]
 use fake_clock::FakeClock;
+use log::{log, trace};
 use rand::Rng;
 use routing::mock_crust::Network;
 use routing::{
@@ -20,9 +23,10 @@ use rust_sodium::crypto::sign;
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
 use safe_vault::mock_crust_detail::{self, poll, Data};
-use safe_vault::{test_utils, PENDING_WRITE_TIMEOUT_SECS};
+use safe_vault::{assert_match, test_utils, PENDING_WRITE_TIMEOUT_SECS};
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use unwrap::unwrap;
 
 const TEST_NET_SIZE: usize = 20;
 

@@ -8,14 +8,14 @@
 
 use super::account::DEFAULT_MAX_OPS_COUNT;
 use super::*;
+use crate::test_utils;
+use crate::vault::Refresh as VaultRefresh;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand;
 use routing::{
     AccountInfo, Request, Response, Value, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
     MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES,
 };
-use test_utils;
-use vault::Refresh as VaultRefresh;
 
 const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;

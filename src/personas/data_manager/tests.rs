@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::*;
+use crate::mock_routing::RequestWrapper;
+use crate::test_utils;
+use crate::vault::Refresh as VaultRefresh;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::SeededRng;
-use mock_routing::RequestWrapper;
 use rand::{self, Rng};
 use routing::{Action, EntryActions, Request, Response, User, MAX_MUTABLE_DATA_ENTRIES};
-use test_utils;
-use vault::Refresh as VaultRefresh;
 
 const CHUNK_STORE_CAPACITY: Option<u64> = Some(1024 * 1024);
 const GROUP_SIZE: usize = 8;

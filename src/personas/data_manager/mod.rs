@@ -11,12 +11,15 @@ use self::cache::{Cache, FragmentInfo, MutationVote, PendingWrite};
 pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
 use self::mutable_data_cache::MutableDataCache;
 use self::mutation::{Mutation, MutationType};
-use accumulator::Accumulator;
-use authority::ClientManagerAuthority;
+use crate::authority::ClientManagerAuthority;
 #[cfg(feature = "use-mock-crust")]
-use chunk_store::Error as ChunkStoreError;
-use chunk_store::{Chunk, ChunkId, ChunkStore};
-use error::InternalError;
+use crate::chunk_store::Error as ChunkStoreError;
+use crate::chunk_store::{Chunk, ChunkId, ChunkStore};
+use crate::error::InternalError;
+use crate::utils::{self, HashMap, HashSet, Instant};
+use crate::vault::Refresh as VaultRefresh;
+use crate::vault::RoutingNode;
+use accumulator::Accumulator;
 use maidsafe_utilities::serialisation;
 use routing::{
     Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
@@ -29,9 +32,6 @@ use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::time::Duration;
 use tiny_keccak;
-use utils::{self, HashMap, HashSet, Instant};
-use vault::Refresh as VaultRefresh;
-use vault::RoutingNode;
 
 const MAX_FULL_PERCENT: u64 = 50;
 /// The timeout for accumulating refresh messages.

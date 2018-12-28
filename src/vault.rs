@@ -6,21 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use authority::{ClientAuthority, ClientManagerAuthority};
-use cache::Cache;
+use crate::authority::{ClientAuthority, ClientManagerAuthority};
+use crate::cache::Cache;
 #[cfg(feature = "use-mock-crust")]
-use chunk_store::Error as ChunkStoreError;
-use config_handler::{self, Config};
-use error::InternalError;
+use crate::chunk_store::Error as ChunkStoreError;
+use crate::config_handler::{self, Config};
+use crate::error::InternalError;
+#[cfg(all(test, feature = "use-mock-routing"))]
+pub use crate::mock_routing::Node as RoutingNode;
+#[cfg(all(test, feature = "use-mock-routing"))]
+use crate::mock_routing::NodeBuilder;
+#[cfg(feature = "use-mock-crust")]
+use crate::personas::data_manager::DataId;
+use crate::personas::data_manager::{self, DataManager};
+use crate::personas::maid_manager::{self, MaidManager};
 use maidsafe_utilities::serialisation;
-#[cfg(all(test, feature = "use-mock-routing"))]
-pub use mock_routing::Node as RoutingNode;
-#[cfg(all(test, feature = "use-mock-routing"))]
-use mock_routing::NodeBuilder;
-#[cfg(feature = "use-mock-crust")]
-use personas::data_manager::DataId;
-use personas::data_manager::{self, DataManager};
-use personas::maid_manager::{self, MaidManager};
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
 #[cfg(feature = "use-mock-crust")]

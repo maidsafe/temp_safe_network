@@ -60,10 +60,8 @@
 
 #[macro_use]
 extern crate log;
-extern crate clap;
-extern crate config_file_handler;
-extern crate maidsafe_utilities;
-extern crate safe_vault;
+use config_file_handler;
+use maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 

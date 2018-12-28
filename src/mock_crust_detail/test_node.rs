@@ -7,11 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::poll;
-use chunk_store::Error as ChunkStoreError;
-use config_handler::Config;
+use crate::chunk_store::Error as ChunkStoreError;
+use crate::config_handler::Config;
+use crate::personas::data_manager::DataId;
+use crate::vault::Vault;
 use hex;
 use itertools::Itertools;
-use personas::data_manager::DataId;
 use rand::{self, Rng};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use routing::Config as RoutingConfig;
@@ -20,7 +21,6 @@ use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use vault::Vault;
 
 /// Test node for mock network
 pub struct TestNode {
