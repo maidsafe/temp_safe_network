@@ -1,7 +1,3 @@
-vars:
-  - &stable "1.28.0"
-  - &nightly "nightly-2018-07-07"
-
 # Env variables:
 #
 #   TARGET:      target triplet
@@ -15,10 +11,6 @@ env:
     - PROJECT_NAME=safe_vault
     - PATH=$PATH:$HOME/.cargo/bin:$HOME/musl/bin
     - RUST_BACKTRACE=1
-    - RUST_STABLE=1.28.0
-    - RUST_NIGHTLY=nightly-2018-07-07
-    - RUST_RUSTFMT=0.99.2
-    - RUST_CLIPPY=0.0.212
 
 sudo: false
 
@@ -46,7 +38,7 @@ matrix:
 
     - os: linux
     # TODO: Remove this once the musl build works again.
-      rust: *stable
+      rust: stable
       env: >
         PLATFORM=linux-x64
       sudo: required
@@ -57,7 +49,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: *stable
+      rust: stable
       env: >
         PLATFORM=linux-x86
         TARGET=i686-unknown-linux-gnu
@@ -70,7 +62,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: *stable
+      rust: stable
       env: >
         PLATFORM=armv7
         TARGET=armv7-unknown-linux-gnueabihf
@@ -85,14 +77,10 @@ matrix:
             - libc6-dev-armhf-cross
 
     - os: osx
-      rust: *stable
+      rust: stable
       env: >
         PLATFORM=osx-x64
         SKIP_SIGN_PACKAGE=1
-
-    # For running `cargo clippy`
-    - os: linux
-      rust: *nightly
 
 cache:
   cargo: true
@@ -109,10 +97,7 @@ install:
 before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [ "$TRAVIS_RUST_VERSION" = "$RUST_NIGHTLY" ] && [ "$TRAVIS_OS_NAME" = linux ]; then
-      bash cargo_install.sh rustfmt-nightly "$RUST_RUSTFMT";
-      bash cargo_install.sh clippy "$RUST_CLIPPY";
-    fi
+  - rustup component add rustfmt clippy;
 
 script:
   - export -f travis_wait &&
@@ -141,7 +126,7 @@ deploy:
     draft: true
     tag_name: ${PROJECT_VERSION}
     on:
-      rust: *stable
+      rust: stable
       condition: -n "$PROJECT_VERSION"
 
 # TODO - verify and renable following block

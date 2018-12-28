@@ -341,6 +341,7 @@ fn mutable_data_normal_flow() {
 }
 
 #[test]
+#[allow(clippy::cyclomatic_complexity)]
 fn mutable_data_error_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
@@ -501,11 +502,9 @@ fn mutable_data_error_flow() {
         .ins(b"key".to_vec(), b"value".to_vec(), 0)
         .update(non_existing_key.clone(), b"value".to_vec(), 1)
         .into();
-    assert!(
-        client
-            .mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes)
-            .is_err()
-    );
+    assert!(client
+        .mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes)
+        .is_err());
     let entries =
         unwrap!(client.list_mdata_entries_response(*data.name(), data.tag(), &mut nodes,));
     assert!(entries.is_empty());
@@ -632,7 +631,8 @@ fn mutable_data_parallel_mutations() {
             let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = BootstrapConfig::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
-        }).collect();
+        })
+        .collect();
 
     for client in &mut clients {
         client.ensure_connected(&mut nodes);
@@ -715,7 +715,8 @@ fn mutable_data_parallel_mutations() {
                 );
                 let _ = client.mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
                 actions
-            }).collect();
+            })
+            .collect();
 
         event_count += poll::nodes_and_clients(&mut nodes, &mut clients, true);
         trace!("Processed {} events.", event_count);
@@ -910,7 +911,8 @@ fn mutable_data_concurrent_mutations() {
                     node.name(),
                     unwrap!(node.get_maid_manager_mutation_count(client.name())),
                 )
-            }).collect();
+            })
+            .collect();
         expected_mutation_count += successes;
         for &(_, count) in &node_count_stats {
             assert_eq!(
@@ -947,7 +949,8 @@ fn mutable_data_put_and_mutate() {
             client.ensure_connected(&mut nodes);
             client.create_account(&mut nodes);
             client
-        }).collect();
+        })
+        .collect();
 
     let permissions = PermissionSet::new()
         .allow(Action::Insert)
@@ -1057,7 +1060,8 @@ fn no_permission_mutable_data_concurrent_mutations() {
             let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = BootstrapConfig::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
-        }).collect();
+        })
+        .collect();
 
     for client in &mut clients {
         client.ensure_connected(&mut nodes);
@@ -1133,10 +1137,8 @@ fn no_permission_mutable_data_concurrent_mutations() {
                 match res {
                     Ok(()) => {
                         trace!("Client {:?} received success response.", clients[0].name());
-                        unwrap!(
-                            all_data[index]
-                                .mutate_entries(actions.clone(), *clients[0].signing_public_key())
-                        );
+                        unwrap!(all_data[index]
+                            .mutate_entries(actions.clone(), *clients[0].signing_public_key()));
                     }
                     Err(error) => {
                         panic!(

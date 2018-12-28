@@ -203,8 +203,6 @@
     non_shorthand_field_patterns,
     overflowing_literals,
     plugin_as_library,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
     stable_features,
     unconditional_recursion,
     unknown_lints,
@@ -239,11 +237,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 
 extern crate accumulator;
-#[cfg(any(
-    test,
-    feature = "use-mock-crust",
-    feature = "use-mock-routing"
-))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate fake_clock;
 extern crate hex;
 #[cfg(feature = "use-mock-crust")]
@@ -255,11 +249,7 @@ extern crate lru_time_cache;
 extern crate maidsafe_utilities;
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(
-    test,
-    feature = "use-mock-crust",
-    feature = "use-mock-routing"
-))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
 #[macro_use]
 extern crate routing;
@@ -280,10 +270,7 @@ extern crate unwrap;
 pub mod test_utils;
 
 /// For integration tests only
-#[cfg(all(
-    feature = "use-mock-crust",
-    not(feature = "use-mock-routing")
-))]
+#[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
 pub mod mock_crust_detail;
 
 mod authority;

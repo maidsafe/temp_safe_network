@@ -51,7 +51,8 @@ fn handle_put_without_account() {
         .filter(|node| {
             node.get_maid_manager_mutation_count(client.name())
                 .is_some()
-        }).count();
+        })
+        .count();
     assert_eq!(
         count, 0,
         "mutations count {} found with {} nodes",
@@ -95,7 +96,8 @@ fn handle_put_with_account() {
         .filter(|node| {
             node.get_maid_manager_mutation_count(client.name())
                 .is_some()
-        }).count();
+        })
+        .count();
     assert_eq!(
         count, group_size,
         "client account count {} found on {} nodes",
@@ -169,7 +171,7 @@ fn put_oversized_data() {
         *client.full_id().public_id().signing_public_key(),
         &mut rng,
     );
-    for i in 0..MAX_MUTABLE_DATA_ENTRIES + 1 {
+    for i in 0..=MAX_MUTABLE_DATA_ENTRIES {
         let key = format!("key{}", i).into_bytes();
         let value = Value {
             content: test_utils::gen_vec(10, &mut rng),
@@ -466,7 +468,8 @@ fn account_balance_with_successful_mutations_with_churn() {
                     node.name(),
                     unwrap!(node.get_maid_manager_mutation_count(client.name())),
                 )
-            }).collect();
+            })
+            .collect();
 
         for &(_, count) in &node_count_stats {
             assert_eq!(
@@ -544,7 +547,8 @@ fn account_balance_with_failed_mutations_with_churn() {
                     node.name(),
                     unwrap!(node.get_maid_manager_mutation_count(client.name())),
                 )
-            }).collect();
+            })
+            .collect();
 
         let expected_mutation_count = chunks_per_iter * (i / 2 + 1) + 1;
         for &(_, count) in &node_count_stats {
@@ -748,7 +752,8 @@ fn account_concurrent_insert_key_put_data() {
                 node.name(),
                 node.get_maid_manager_mutation_count(client.name()),
             )
-        }).collect();
+        })
+        .collect();
 
     for &(_, count) in &node_count_stats {
         assert_eq!(count, Some(mutate_count));
@@ -883,7 +888,8 @@ fn claiming_invitation_concurrently() {
             let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = BootstrapConfig::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
-        }).collect();
+        })
+        .collect();
 
     for client in &mut clients {
         client.ensure_connected(&mut nodes);

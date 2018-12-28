@@ -65,9 +65,9 @@ fn idata_basics() {
     assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request,
-                  Request::PutIData { data: request_data, .. } => {
-                      assert_eq!(request_data, data);
-                  });
+    Request::PutIData { data: request_data, .. } => {
+        assert_eq!(request_data, data);
+    });
 
     // Simulate receiving the response from the NAE manager and verify it gets
     // forwarded to the client.
@@ -123,9 +123,9 @@ fn mdata_basics() {
     assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request,
-                  Request::PutMData { data: request_data, .. } => {
-                      assert_eq!(request_data, data);
-                  });
+    Request::PutMData { data: request_data, .. } => {
+        assert_eq!(request_data, data);
+    });
 
     // Simulate receiving the response from the NAE manager and verify it gets
     // forwarded to the client.
@@ -444,6 +444,7 @@ fn auth_keys() {
 }
 
 #[test]
+#[allow(clippy::cyclomatic_complexity)]
 fn mutation_authorisation() {
     let mut rng = rand::thread_rng();
 

@@ -31,8 +31,6 @@
     non_shorthand_field_patterns,
     overflowing_literals,
     plugin_as_library,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
     stable_features,
     unconditional_recursion,
     unknown_lints,
@@ -88,7 +86,8 @@ pub fn main() {
                 .short("f")
                 .long("first")
                 .help("Run as the first Vault of a new network."),
-        ).version(env!("CARGO_PKG_VERSION"))
+        )
+        .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
 
     let _ = maidsafe_utilities::log::init(false);

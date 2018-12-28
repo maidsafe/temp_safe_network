@@ -205,7 +205,8 @@ impl MaidManager {
                         INVITE_CLAIMED_KEY.to_vec(),
                         INVITE_CLAIMED_VALUE.to_vec(),
                         0,
-                    ).into();
+                    )
+                    .into();
 
                 routing_node.send_mutate_mdata_entries_request(
                     invite_src,
@@ -631,7 +632,8 @@ impl MaidManager {
                 } else {
                     None
                 }
-            }).collect();
+            })
+            .collect();
         for msg_id in msg_ids_to_delete {
             let _ = self.request_cache.remove(&msg_id);
         }
@@ -955,11 +957,12 @@ impl MaidManager {
             .accounts
             .get(dst.name())
             .ok_or(ClientError::NoSuchAccount)?;
-        let allowed = src.name() == dst.name() || if AuthPolicy::Key == policy {
-            account.keys.contains(src.client_key())
-        } else {
-            false
-        };
+        let allowed = src.name() == dst.name()
+            || if AuthPolicy::Key == policy {
+                account.keys.contains(src.client_key())
+            } else {
+                false
+            };
 
         if !allowed {
             return Err(ClientError::AccessDenied);

@@ -44,6 +44,7 @@ pub struct Vault {
 
 impl Vault {
     /// Creates a network Vault instance.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(first_vault: bool, use_cache: bool) -> Result<Self, InternalError> {
         let config = config_handler::read_config_file().map_err(|error| {
             warn!("Failed to parse vault config file: {:?}", error);

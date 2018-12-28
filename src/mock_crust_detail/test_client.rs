@@ -195,7 +195,8 @@ impl TestClient {
                 content,
                 entry_version: 0,
             },
-        )).collect();
+        ))
+        .collect();
 
         MutableData::new(
             self.rng.gen(),
@@ -215,10 +216,9 @@ impl TestClient {
 
     /// Puts immutable data using the given message id.
     pub fn put_idata_with_msg_id(&mut self, data: ImmutableData, msg_id: MessageId) {
-        unwrap!(
-            self.routing_client
-                .put_idata(self.client_manager, data, msg_id,)
-        )
+        unwrap!(self
+            .routing_client
+            .put_idata(self.client_manager, data, msg_id,))
     }
 
     /// Puts immutable data and reads from the mock network
@@ -326,10 +326,9 @@ impl TestClient {
     pub fn put_mdata(&mut self, data: MutableData) -> MessageId {
         let msg_id = MessageId::new();
         let requester = *self.signing_public_key();
-        unwrap!(
-            self.routing_client
-                .put_mdata(self.client_manager, data, msg_id, requester,)
-        );
+        unwrap!(self
+            .routing_client
+            .put_mdata(self.client_manager, data, msg_id, requester,));
         msg_id
     }
 
@@ -356,10 +355,9 @@ impl TestClient {
         let dst = Authority::NaeManager(name);
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .get_mdata_version(dst, name, tag, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .get_mdata_version(dst, name, tag, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, GetMDataVersion, msg_id)
     }
@@ -391,10 +389,9 @@ impl TestClient {
         let dst = Authority::NaeManager(name);
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .list_mdata_entries(dst, name, tag, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .list_mdata_entries(dst, name, tag, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, ListMDataEntries, msg_id)
     }
@@ -411,10 +408,9 @@ impl TestClient {
         let dst = Authority::NaeManager(name);
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .get_mdata_value(dst, name, tag, key.clone(), msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .get_mdata_value(dst, name, tag, key.clone(), msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, GetMDataValue, msg_id)
     }
@@ -464,10 +460,9 @@ impl TestClient {
         let dst = Authority::NaeManager(name);
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .list_mdata_permissions(dst, name, tag, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .list_mdata_permissions(dst, name, tag, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, ListMDataPermissions, msg_id)
     }
@@ -484,10 +479,9 @@ impl TestClient {
         let dst = Authority::NaeManager(name);
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .list_mdata_user_permissions(dst, name, tag, user, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .list_mdata_user_permissions(dst, name, tag, user, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, ListMDataUserPermissions, msg_id)
     }
@@ -579,10 +573,9 @@ impl TestClient {
         self.flush();
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .get_account_info(self.client_manager, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .get_account_info(self.client_manager, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, GetAccountInfo, msg_id)
     }
@@ -595,10 +588,9 @@ impl TestClient {
         self.flush();
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .list_auth_keys_and_version(self.client_manager, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .list_auth_keys_and_version(self.client_manager, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, ListAuthKeysAndVersion, msg_id)
     }
@@ -631,10 +623,9 @@ impl TestClient {
         self.flush();
 
         let msg_id = MessageId::new();
-        unwrap!(
-            self.routing_client
-                .ins_auth_key(self.client_manager, key, version, msg_id,)
-        );
+        unwrap!(self
+            .routing_client
+            .ins_auth_key(self.client_manager, key, version, msg_id,));
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, InsAuthKey, msg_id)
     }
