@@ -1,122 +1,49 @@
-# Env variables:
-#
-#   TARGET:      target triplet
-#   PLATFORM:    platform suffix for the release file name (e.g. linux-x64)
-#   ONLY_DEPLOY: build this configuration only if we are deploying a release
-#                (on version bump).
-
 env:
   global:
     - secure: GXW0WyMkipF5lh29QHMxSKl6Dpvd4Qqggu5SBGymS5KQ7VPuqgEE2A8YwQDIGf4IEZUoAcAb1W7oPwQ0/kv7omlF2S8gmals1BeGKStU1np6lIIH64B87w4RIDhD+limVAfKgWb3Oldj6PDAm8gjbWjPiZF/6oxH4hd/+d9r2GY=
     - PROJECT_NAME=safe_vault
-    - PATH=$PATH:$HOME/.cargo/bin:$HOME/musl/bin
     - RUST_BACKTRACE=1
-
-sudo: false
-
+    - PATH=$PATH:$HOME/.cargo/bin
+    - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
 language: rust
-
 matrix:
   include:
-# TODO: Re-enable this once the musl build works again.
-#    - os: linux
-#      env: >
-#        TARGET=x86_64-unknown-linux-musl
-#        PLATFORM=linux-x64
-#        FEATURES=use-mock-crust
-#        DOCKER_IMAGE=msafe/vault
-#      sudo: required
-#      services:
-#        - docker
-#      addons:
-#        apt:
-#          packages:
-#            - rpm
-#            - sshpass
-#            # TODO: uncomment once https://github.com/travis-ci/apt-package-whitelist/issues/369 is resolved
-#            # - musl-tools
-
     - os: linux
-    # TODO: Remove this once the musl build works again.
-      rust: stable
       env: >
         PLATFORM=linux-x64
-      sudo: required
       addons:
         apt:
           packages:
             - rpm
             - sshpass
-
-    - os: linux
-      rust: stable
-      env: >
-        PLATFORM=linux-x86
-        TARGET=i686-unknown-linux-gnu
-        ONLY_DEPLOY=1
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - rpm
-            - sshpass
-
-    - os: linux
-      rust: stable
-      env: >
-        PLATFORM=armv7
-        TARGET=armv7-unknown-linux-gnueabihf
-        ONLY_DEPLOY=1
-      sudo: required
-      addons:
-        apt:
-          packages:
-            # Cross compiler and cross compiled C libraries
-            - gcc-arm-linux-gnueabihf
-            - libc6-armhf-cross
-            - libc6-dev-armhf-cross
-
     - os: osx
-      rust: stable
       env: >
         PLATFORM=osx-x64
         SKIP_SIGN_PACKAGE=1
-
+rust: stable
+branches:
+  only:
+    - master
 cache:
   cargo: true
-  directories:
-    - $HOME/musl
-    - $HOME/.gem
-
-before_install:
-  - export PROJECT_VERSION=$(git log -1 | grep -i "version change to" | sed "s/.*[vV]ersion change to v\{0,1\}//")
-
-install:
-  - ./ci/travis/install.sh
-
 before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - rustup component add rustfmt clippy;
-
+  - rustup component add rustfmt clippy
 script:
-  - export -f travis_wait &&
-    export -f travis_jigger &&
-    ./ci/travis/script.sh
-
-after_script:
-  - if [[ $TRAVIS_EVENT_TYPE = pull_request && -n $(git diff --shortstat 2> /dev/null | tail -n1) ]]; then
-      echo "Working tree is dirty after building.  Probably Cargo.lock should be updated.";
-      git status;
-      travis_terminate 1;
-    fi
-
+  - set -x;
+    cargo fmt -- --check &&
+    cargo check --verbose --lib --tests &&
+    cargo check --verbose --bin safe_vault --tests &&
+    cargo clippy --all-targets &&
+    cargo clippy --all-targets --features use-mock-crust &&
+    cargo clippy --all-targets --features use-mock-routing &&
+    cargo test --verbose --release --features use-mock-routing &&
+    cargo test --verbose --release --features use-mock-crust;
 before_cache:
- - cargo prune
-
+  - cargo prune
 before_deploy:
   - ./ci/travis/before_deploy.sh
-
 deploy:
   # Deploy tarballs to GitHub releases
   - provider: releases
@@ -129,39 +56,3 @@ deploy:
       rust: stable
       condition: -n "$PROJECT_VERSION"
 
-# TODO - verify and renable following block
-#   # Deploy osx pkg to Github releases
-#   - provider: releases
-#     api_key: ${GH_TOKEN}
-#     file: ./packages/osx/${PROJECT_NAME}-${PROJECT_VERSION}.pkg
-#     skip_cleanup: true
-#     draft: true
-#     tag_name: ${PROJECT_VERSION}
-#     on:
-#       condition: >
-#         ("$PLATFORM" = "osx-x64") &&
-#         (-n "$PROJECT_VERSION") &&
-#         ("${CHANNEL:-stable}"=stable)
-
-#   # Deploy linux deb and rpm packages to MaidSafe repositories
-#   - provider: script
-#     script: ./ci/travis/deploy_linux_packages.sh
-#     skip_cleanup: true
-#     on:
-#       condition: >
-#         (("$PLATFORM" = "linux-x64") || ("$PLATFORM" = "linux-x86")) &&
-#         (-n "$PROJECT_VERSION") &&
-#         ("${CHANNEL:-stable}"=stable)
-
-#   # Deploy docker image to Docker Hub.
-#   - provider: script
-#     script: ./ci/travis/deploy_docker_image.sh
-#     skip_cleanup: true
-#     on:
-#       condition: >
-#         (-n "$DOCKER_IMAGE") &&
-#         (-n "$DOCKER_EMAIL") &&
-#         (-n "$DOCKER_USERNAME") &&
-#         (-n "$DOCKER_PASSWORD") &&
-#         (-n "$PROJECT_VERSION") &&
-#         ("${CHANNEL:-stable}"=stable)
