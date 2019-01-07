@@ -11,6 +11,7 @@ use config_file_handler::{self, FileHandler};
 use routing::XorName;
 use rust_sodium::crypto::sign;
 use std::ffi::OsString;
+use serde_derive::{Deserialize, Serialize};
 
 /// Lets a vault configure a wallet address and storage limit.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -77,6 +78,7 @@ mod test {
     use std::fs::File;
     use std::io::Read;
     use std::path::Path;
+    use unwrap::unwrap;
 
     #[test]
     fn parse_sample_config_file() {

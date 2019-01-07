@@ -18,6 +18,7 @@ use crate::personas::data_manager::DataId;
 use itertools::Itertools;
 use routing::{self, ImmutableData, MutableData, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
+use unwrap::unwrap;
 
 /// Type that can hold both immutable and mutable data.
 #[derive(Clone)]

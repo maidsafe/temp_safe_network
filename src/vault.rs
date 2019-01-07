@@ -33,7 +33,11 @@ use routing::NodeBuilder;
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use rust_sodium::crypto::sign;
+use self::rust_sodium::crypto::sign;
+use serde_derive::{Deserialize, Serialize};
+use log::{log, warn, debug};
+#[cfg(feature = "use-mock-crust")]
+use unwrap::unwrap;
 
 /// Main struct to hold all personas and Routing instance
 pub struct Vault {

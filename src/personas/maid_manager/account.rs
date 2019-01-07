@@ -7,8 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::{AccountInfo, MessageId};
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use std::collections::BTreeSet;
+use serde_derive::{Deserialize, Serialize};
 
 /// Default available number of operations per account.
 #[cfg(not(feature = "use-mock-crust"))]

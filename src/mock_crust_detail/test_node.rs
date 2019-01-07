@@ -21,6 +21,8 @@ use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use unwrap::unwrap;
+use log::{log, trace};
 
 /// Test node for mock network
 pub struct TestNode {

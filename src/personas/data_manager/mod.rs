@@ -26,12 +26,20 @@ use routing::{
     RoutingTable, User, Value, XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR,
     TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::time::Duration;
 use tiny_keccak;
+use serde_derive::{Deserialize, Serialize};
+use log::{log, info, trace, error, warn};
+#[cfg(all(test, feature = "use-mock-routing"))]
+use unwrap::unwrap;
 
 const MAX_FULL_PERCENT: u64 = 50;
 /// The timeout for accumulating refresh messages.

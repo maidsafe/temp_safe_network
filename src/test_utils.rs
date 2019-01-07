@@ -18,9 +18,14 @@ use routing::Config as RoutingConfig;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::DevConfig as RoutingDevConfig;
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
+use unwrap::unwrap;
 
 #[macro_export]
 macro_rules! assert_match {

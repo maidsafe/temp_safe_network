@@ -22,6 +22,8 @@ use std::io::{self, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use tempdir::TempDir;
+use quick_error::quick_error;
+use log::{log, info};
 
 const CHUNK_STORE_DIR: &str = "safe_vault_chunk_store";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;

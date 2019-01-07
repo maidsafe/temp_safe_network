@@ -10,7 +10,11 @@
 pub use fake_clock::FakeClock as Instant;
 use maidsafe_utilities::serialisation;
 use routing::{sha3, MutableData, Value, XorName};
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use serde::Serialize;
 use std::collections;
 #[cfg(feature = "use-mock-crust")]
@@ -20,6 +24,8 @@ use std::hash::BuildHasherDefault;
 #[cfg(not(any(test, feature = "use-mock-crust", feature = "use-mock-routing")))]
 pub use std::time::Instant;
 use tiny_keccak;
+use serde_derive::{Deserialize, Serialize};
+use log::{log, error};
 
 #[derive(
     Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize,

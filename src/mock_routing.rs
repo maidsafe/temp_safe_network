@@ -12,9 +12,14 @@ use routing::{
     ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId, Request,
     Response, RoutingError, RoutingTable, User, Value, XorName,
 };
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
+use unwrap::unwrap;
 
 const DEFAULT_GROUP_SIZE: usize = 8;
 

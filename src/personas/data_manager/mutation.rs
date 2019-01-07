@@ -7,11 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
-use log::Level;
+use log::{log, Level};
 use maidsafe_utilities::serialisation::serialised_size;
-use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
-use rust_sodium::crypto::sign;
+use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName, log_or_panic};
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
+use serde_derive::Serialize;
 
 #[derive(Serialize)]
 pub enum Mutation {

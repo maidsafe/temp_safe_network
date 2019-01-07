@@ -57,6 +57,3 @@ use tiny_keccak;
 mod data_manager;
 mod maid_manager;
 mod network;
-
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;

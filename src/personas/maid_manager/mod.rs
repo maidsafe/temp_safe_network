@@ -27,11 +27,18 @@ use routing::{
     MessageId, MutableData, PermissionSet, RoutingTable, User, XorName, ACC_LOGIN_ENTRY_KEY,
     TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use self::rust_sodium::crypto::sign;
 use std::collections::hash_map::{Entry, VacantEntry};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 use tiny_keccak;
+use serde_derive::{Deserialize, Serialize};
+use log::{log, info, trace, error, debug};
+use unwrap::unwrap;
 
 /// The timeout for accumulating refresh messages.
 const ACCUMULATOR_TIMEOUT_SECS: u64 = 180;

@@ -23,6 +23,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::sync::mpsc::TryRecvError;
 use std::time::Duration;
+use unwrap::unwrap;
+use log::{log, trace};
 
 // Duration clients expect a response by.
 const CLIENT_MSG_EXPIRY_DUR_SECS: u64 = 90;
