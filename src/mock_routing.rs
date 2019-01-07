@@ -6,17 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use self::rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 use routing::Config as RoutingConfig;
 use routing::{
     AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream, FullId,
     ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId, Request,
     Response, RoutingError, RoutingTable, User, Value, XorName,
 };
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use self::rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
 use unwrap::unwrap;

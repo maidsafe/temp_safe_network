@@ -13,6 +13,7 @@ use crate::personas::data_manager::DataId;
 use crate::vault::Vault;
 use hex;
 use itertools::Itertools;
+use log::{log, trace};
 use rand::{self, Rng};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use routing::Config as RoutingConfig;
@@ -22,7 +23,6 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use unwrap::unwrap;
-use log::{log, trace};
 
 /// Test node for mock network
 pub struct TestNode {

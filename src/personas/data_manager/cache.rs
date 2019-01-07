@@ -10,17 +10,17 @@ use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::{self, Mutation};
 use super::STATUS_LOG_INTERVAL;
 use crate::utils::{self, HashMap, HashSet, Instant, SecureHash};
+use log::{info, log};
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{
     Authority, MessageId, MutableData, RoutingTable, Value, XorName, MAX_MUTABLE_DATA_ENTRIES,
     MAX_MUTABLE_DATA_SIZE_IN_BYTES, QUORUM_DENOMINATOR, QUORUM_NUMERATOR,
 };
+use serde_derive::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::VecDeque;
 use std::iter;
 use std::time::Duration;
-use serde_derive::{Deserialize, Serialize};
-use log::{log, info};
 
 #[cfg(not(feature = "use-mock-crust"))]
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.

@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use self::rust_sodium::crypto::sign;
 use crate::authority::{ClientAuthority, ClientManagerAuthority};
 use crate::cache::Cache;
 #[cfg(feature = "use-mock-crust")]
@@ -20,6 +21,7 @@ use crate::mock_routing::NodeBuilder;
 use crate::personas::data_manager::DataId;
 use crate::personas::data_manager::{self, DataManager};
 use crate::personas::maid_manager::{self, MaidManager};
+use log::{debug, log, warn};
 use maidsafe_utilities::serialisation;
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
@@ -33,9 +35,7 @@ use routing::NodeBuilder;
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use self::rust_sodium::crypto::sign;
 use serde_derive::{Deserialize, Serialize};
-use log::{log, warn, debug};
 #[cfg(feature = "use-mock-crust")]
 use unwrap::unwrap;
 

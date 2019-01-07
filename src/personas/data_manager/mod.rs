@@ -11,6 +11,7 @@ use self::cache::{Cache, FragmentInfo, MutationVote, PendingWrite};
 pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
 use self::mutable_data_cache::MutableDataCache;
 use self::mutation::{Mutation, MutationType};
+use self::rust_sodium::crypto::sign;
 use crate::authority::ClientManagerAuthority;
 #[cfg(feature = "use-mock-crust")]
 use crate::chunk_store::Error as ChunkStoreError;
@@ -20,24 +21,23 @@ use crate::utils::{self, HashMap, HashSet, Instant};
 use crate::vault::Refresh as VaultRefresh;
 use crate::vault::RoutingNode;
 use accumulator::Accumulator;
+use log::{error, info, log, trace, warn};
 use maidsafe_utilities::serialisation;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 use routing::{
     Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
     RoutingTable, User, Value, XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR,
     TYPE_TAG_SESSION_PACKET,
 };
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use self::rust_sodium::crypto::sign;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::time::Duration;
 use tiny_keccak;
-use serde_derive::{Deserialize, Serialize};
-use log::{log, info, trace, error, warn};
 #[cfg(all(test, feature = "use-mock-routing"))]
 use unwrap::unwrap;
 

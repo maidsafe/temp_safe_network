@@ -9,12 +9,12 @@
 use crate::chunk_store;
 use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
+use quick_error::quick_error;
 use routing::messaging;
 use routing::ClientError;
 use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
 use serde_json;
 use std::io;
-use quick_error::quick_error;
 
 quick_error! {
     #[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]

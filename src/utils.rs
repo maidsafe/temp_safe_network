@@ -6,16 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use self::rust_sodium::crypto::sign;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 pub use fake_clock::FakeClock as Instant;
+use log::{error, log};
 use maidsafe_utilities::serialisation;
-use routing::{sha3, MutableData, Value, XorName};
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
+use routing::{sha3, MutableData, Value, XorName};
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use self::rust_sodium::crypto::sign;
 use serde::Serialize;
+use serde_derive::{Deserialize, Serialize};
 use std::collections;
 #[cfg(feature = "use-mock-crust")]
 use std::collections::hash_map::DefaultHasher;
@@ -24,8 +26,6 @@ use std::hash::BuildHasherDefault;
 #[cfg(not(any(test, feature = "use-mock-crust", feature = "use-mock-routing")))]
 pub use std::time::Instant;
 use tiny_keccak;
-use serde_derive::{Deserialize, Serialize};
-use log::{log, error};
 
 #[derive(
     Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize,

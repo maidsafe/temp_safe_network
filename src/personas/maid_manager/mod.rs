@@ -14,30 +14,30 @@ mod tests;
 use self::account::Account;
 pub use self::account::DEFAULT_MAX_OPS_COUNT;
 use self::message_id_accumulator::MessageIdAccumulator;
+use self::rust_sodium::crypto::sign;
 use crate::authority::{ClientAuthority, ClientManagerAuthority};
 use crate::error::InternalError;
 use crate::utils::{self, HashMap};
 use crate::vault::Refresh as VaultRefresh;
 use crate::vault::RoutingNode;
 use crate::TYPE_TAG_INVITE;
+use log::{debug, error, info, log, trace};
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 use routing::{
     AccountPacket, Authority, ClientError, EntryAction, EntryActions, EntryError, ImmutableData,
     MessageId, MutableData, PermissionSet, RoutingTable, User, XorName, ACC_LOGIN_ENTRY_KEY,
     TYPE_TAG_SESSION_PACKET,
 };
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use self::rust_sodium::crypto::sign;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::hash_map::{Entry, VacantEntry};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 use tiny_keccak;
-use serde_derive::{Deserialize, Serialize};
-use log::{log, info, trace, error, debug};
 use unwrap::unwrap;
 
 /// The timeout for accumulating refresh messages.
