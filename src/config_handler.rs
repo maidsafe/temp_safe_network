@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::error::InternalError;
 use config_file_handler::{self, FileHandler};
-use error::InternalError;
 use routing::XorName;
 use rust_sodium::crypto::sign;
 use std::ffi::OsString;

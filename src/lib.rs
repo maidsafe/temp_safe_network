@@ -203,8 +203,6 @@
     non_shorthand_field_patterns,
     overflowing_literals,
     plugin_as_library,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
     stable_features,
     unconditional_recursion,
     unknown_lints,
@@ -238,39 +236,22 @@
 // requires to make changes to public functions.
 #![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 
-extern crate accumulator;
-#[cfg(any(
-    test,
-    feature = "use-mock-crust",
-    feature = "use-mock-routing"
-))]
-extern crate fake_clock;
-extern crate hex;
-#[cfg(feature = "use-mock-crust")]
-extern crate itertools;
+use hex;
 #[macro_use]
 extern crate log;
-extern crate config_file_handler;
-extern crate lru_time_cache;
-extern crate maidsafe_utilities;
+use config_file_handler;
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(
-    test,
-    feature = "use-mock-crust",
-    feature = "use-mock-routing"
-))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
 #[macro_use]
 extern crate routing;
 #[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate tempdir;
-extern crate tiny_keccak;
+use serde_json;
+use tiny_keccak;
 #[macro_use]
 extern crate unwrap;
 
@@ -280,10 +261,7 @@ extern crate unwrap;
 pub mod test_utils;
 
 /// For integration tests only
-#[cfg(all(
-    feature = "use-mock-crust",
-    not(feature = "use-mock-routing")
-))]
+#[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
 pub mod mock_crust_detail;
 
 mod authority;
@@ -297,14 +275,14 @@ mod personas;
 mod utils;
 mod vault;
 
-pub use config_handler::Config;
-pub use personas::data_manager::DataId;
+pub use crate::config_handler::Config;
+pub use crate::personas::data_manager::DataId;
 #[cfg(feature = "use-mock-crust")]
-pub use personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
-pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
+pub use crate::personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
+pub use crate::personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
+pub use crate::vault::Vault;
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
-pub use vault::Vault;
 
 /// The type tag of invitations to create an account.
 pub const TYPE_TAG_INVITE: u64 = 8;

@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::*;
+use crate::mock_routing::RequestWrapper;
+use crate::test_utils;
+use crate::vault::Refresh as VaultRefresh;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::SeededRng;
-use mock_routing::RequestWrapper;
 use rand::{self, Rng};
 use routing::{Action, EntryActions, Request, Response, User, MAX_MUTABLE_DATA_ENTRIES};
-use test_utils;
-use vault::Refresh as VaultRefresh;
 
 const CHUNK_STORE_CAPACITY: Option<u64> = Some(1024 * 1024);
 const GROUP_SIZE: usize = 8;
@@ -419,11 +419,9 @@ fn idata_with_churn() {
     let bad_data = test_utils::gen_immutable_data(10, &mut rng);
     let bad_data_name = *bad_data.name();
     unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, bad_data));
-    assert!(
-        new_dm
-            .get_from_chunk_store(&ImmutableDataId(bad_data_name))
-            .is_none()
-    );
+    assert!(new_dm
+        .get_from_chunk_store(&ImmutableDataId(bad_data_name))
+        .is_none());
     let dst = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // ...
@@ -587,17 +585,15 @@ fn mdata_non_conflicting_parallel_mutations() {
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
     let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
-    unwrap!(
-        data.set_user_permissions(
-            User::Anyone,
-            PermissionSet::new()
-                .allow(Action::Insert)
-                .allow(Action::Update)
-                .allow(Action::Delete),
-            1,
-            client_key_0
-        )
-    );
+    unwrap!(data.set_user_permissions(
+        User::Anyone,
+        PermissionSet::new()
+            .allow(Action::Insert)
+            .allow(Action::Update)
+            .allow(Action::Delete),
+        1,
+        client_key_0
+    ));
 
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
@@ -672,17 +668,15 @@ fn mdata_conflicting_parallel_mutations() {
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
     let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
-    unwrap!(
-        data.set_user_permissions(
-            User::Anyone,
-            PermissionSet::new()
-                .allow(Action::Insert)
-                .allow(Action::Update)
-                .allow(Action::Delete),
-            1,
-            client_key_0
-        )
-    );
+    unwrap!(data.set_user_permissions(
+        User::Anyone,
+        PermissionSet::new()
+            .allow(Action::Insert)
+            .allow(Action::Update)
+            .allow(Action::Delete),
+        1,
+        client_key_0
+    ));
 
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
@@ -750,17 +744,15 @@ fn mdata_parallel_mutations_limits() {
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
     let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
-    unwrap!(
-        data.set_user_permissions(
-            User::Anyone,
-            PermissionSet::new()
-                .allow(Action::Insert)
-                .allow(Action::Update)
-                .allow(Action::Delete),
-            1,
-            client_key_0
-        )
-    );
+    unwrap!(data.set_user_permissions(
+        User::Anyone,
+        PermissionSet::new()
+            .allow(Action::Insert)
+            .allow(Action::Update)
+            .allow(Action::Delete),
+        1,
+        client_key_0
+    ));
 
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
@@ -824,7 +816,7 @@ fn mdata_parallel_mutations_limits() {
     // is more than half the allowed remaining entries (i.e. `MAX_MUTABLE_DATA_ENTRIES / 2`), the
     // second request should be rejected.
     let mut actions = EntryActions::new();
-    for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 8 + 1) {
+    for _ in 0..=MAX_MUTABLE_DATA_ENTRIES / 8 {
         actions = actions.ins(to_vec_of_u8(index), vec![], 0);
         index += 1;
     }
@@ -841,7 +833,7 @@ fn mdata_parallel_mutations_limits() {
     ));
 
     let mut actions = EntryActions::new();
-    for _ in 0..(MAX_MUTABLE_DATA_ENTRIES / 8 + 1) {
+    for _ in 0..=MAX_MUTABLE_DATA_ENTRIES / 8 {
         actions = actions.ins(to_vec_of_u8(index), vec![], 0);
         index += 1;
     }

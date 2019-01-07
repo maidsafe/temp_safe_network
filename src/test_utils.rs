@@ -7,8 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 #[cfg(not(feature = "use-mock-crust"))]
-use authority::ClientAuthority;
-use authority::ClientManagerAuthority;
+use crate::authority::ClientAuthority;
+use crate::authority::ClientManagerAuthority;
+use crate::utils;
+#[cfg(all(test, feature = "use-mock-routing"))]
+use crate::vault::RoutingNode;
 use rand::{seq, Rand, Rng};
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::Config as RoutingConfig;
@@ -18,9 +21,6 @@ use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
 use rust_sodium::crypto::sign;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
-use utils;
-#[cfg(all(test, feature = "use-mock-routing"))]
-use vault::RoutingNode;
 
 #[macro_export]
 macro_rules! assert_match {

@@ -8,14 +8,14 @@
 
 use super::account::DEFAULT_MAX_OPS_COUNT;
 use super::*;
+use crate::test_utils;
+use crate::vault::Refresh as VaultRefresh;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand;
 use routing::{
     AccountInfo, Request, Response, Value, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
     MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES,
 };
-use test_utils;
-use vault::Refresh as VaultRefresh;
 
 const GROUP_SIZE: usize = 8;
 const QUORUM: usize = 5;
@@ -65,9 +65,9 @@ fn idata_basics() {
     assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request,
-                  Request::PutIData { data: request_data, .. } => {
-                      assert_eq!(request_data, data);
-                  });
+    Request::PutIData { data: request_data, .. } => {
+        assert_eq!(request_data, data);
+    });
 
     // Simulate receiving the response from the NAE manager and verify it gets
     // forwarded to the client.
@@ -123,9 +123,9 @@ fn mdata_basics() {
     assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request,
-                  Request::PutMData { data: request_data, .. } => {
-                      assert_eq!(request_data, data);
-                  });
+    Request::PutMData { data: request_data, .. } => {
+        assert_eq!(request_data, data);
+    });
 
     // Simulate receiving the response from the NAE manager and verify it gets
     // forwarded to the client.
@@ -444,6 +444,7 @@ fn auth_keys() {
 }
 
 #[test]
+#[allow(clippy::cyclomatic_complexity)]
 fn mutation_authorisation() {
     let mut rng = rand::thread_rng();
 

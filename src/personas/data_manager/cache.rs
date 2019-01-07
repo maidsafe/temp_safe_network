@@ -9,6 +9,7 @@
 use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::{self, Mutation};
 use super::STATUS_LOG_INTERVAL;
+use crate::utils::{self, HashMap, HashSet, Instant, SecureHash};
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{
     Authority, MessageId, MutableData, RoutingTable, Value, XorName, MAX_MUTABLE_DATA_ENTRIES,
@@ -18,7 +19,6 @@ use std::collections::hash_map::Entry;
 use std::collections::VecDeque;
 use std::iter;
 use std::time::Duration;
-use utils::{self, HashMap, HashSet, Instant, SecureHash};
 
 #[cfg(not(feature = "use-mock-crust"))]
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
@@ -85,16 +85,19 @@ impl Cache {
                 } else {
                     true
                 }
-            }).map(FragmentInfo::data_id)
+            })
+            .map(FragmentInfo::data_id)
             .chain(
                 self.needed_mutable_chunks
                     .iter()
                     .map(|id| DataId::Mutable(*id)),
-            ).chain(
+            )
+            .chain(
                 self.needed_mutable_chunk_request
                     .iter()
                     .map(|request| DataId::Mutable(request.data_id)),
-            ).collect()
+            )
+            .collect()
     }
 
     /// Returns the next mutable data chunk we need (if any)
@@ -258,7 +261,8 @@ impl Cache {
                 } else {
                     None
                 }
-            }).collect();
+            })
+            .collect();
 
         if fragments.is_empty() {
             return;
@@ -474,7 +478,8 @@ impl Cache {
                     .position(|write| write.timestamp.elapsed() > timeout)
                     .map_or_else(Vec::new, |index| writes.split_off(index))
                     .into_iter()
-            }).collect();
+            })
+            .collect();
 
         let expired_keys: Vec<_> = self
             .pending_writes

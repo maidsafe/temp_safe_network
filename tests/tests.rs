@@ -24,8 +24,6 @@
     non_shorthand_field_patterns,
     overflowing_literals,
     plugin_as_library,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
     stable_features,
     unconditional_recursion,
     unknown_lints,
@@ -52,21 +50,9 @@
     missing_debug_implementations,
     variant_size_differences
 )]
-#![cfg(feature = "use-mock-crust")]
-#![cfg(not(feature = "use-mock-routing"))]
 
-extern crate fake_clock;
-#[macro_use]
-extern crate log;
-extern crate rand;
-extern crate routing;
-#[cfg(not(feature = "use-mock-crypto"))]
-extern crate rust_sodium;
-#[macro_use(assert_match)]
-extern crate safe_vault;
-#[macro_use]
-extern crate unwrap;
-extern crate tiny_keccak;
+use routing;
+use tiny_keccak;
 
 mod data_manager;
 mod maid_manager;
