@@ -6,11 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use self::rust_sodium::crypto::sign;
 use super::data::{Data, DataId};
-use log::Level;
+use log::{log, Level};
 use maidsafe_utilities::serialisation::serialised_size;
-use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
-use rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+use routing::{
+    log_or_panic, EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName,
+};
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use serde_derive::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Serialize)]

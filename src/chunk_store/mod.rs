@@ -13,7 +13,9 @@
 mod tests;
 
 use hex::{self, FromHex};
+use log::{info, log};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
+use quick_error::quick_error;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cmp;

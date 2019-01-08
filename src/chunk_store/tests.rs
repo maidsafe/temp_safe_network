@@ -6,6 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use serde_derive::{Deserialize, Serialize};
+use unwrap::unwrap;
+
 macro_rules! assert_err {
     ($cond:expr, $error:pat) => {
         match $cond {

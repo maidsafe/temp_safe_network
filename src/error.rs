@@ -9,6 +9,7 @@
 use crate::chunk_store;
 use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
+use quick_error::quick_error;
 use routing::messaging;
 use routing::ClientError;
 use routing::{InterfaceError, MessageId, Request, Response, RoutingError};

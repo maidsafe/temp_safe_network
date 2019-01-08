@@ -14,6 +14,7 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::SeededRng;
 use rand::{self, Rng};
 use routing::{Action, EntryActions, Request, Response, User, MAX_MUTABLE_DATA_ENTRIES};
+use unwrap::unwrap;
 
 const CHUNK_STORE_CAPACITY: Option<u64> = Some(1024 * 1024);
 const GROUP_SIZE: usize = 8;

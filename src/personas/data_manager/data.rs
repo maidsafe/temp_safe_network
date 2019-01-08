@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::{ImmutableData, MutableData, XorName};
+use serde_derive::{Deserialize, Serialize};
 
 /// Identifier of immutable data
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]

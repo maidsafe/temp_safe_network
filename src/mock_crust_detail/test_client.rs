@@ -8,6 +8,7 @@
 
 use super::poll;
 use super::test_node::TestNode;
+use log::{log, trace};
 use maidsafe_utilities::{serialisation, SeededRng};
 use rand::Rng;
 use routing::mock_crust::{self, Network, ServiceHandle};
@@ -23,6 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::sync::mpsc::TryRecvError;
 use std::time::Duration;
+use unwrap::unwrap;
 
 // Duration clients expect a response by.
 const CLIENT_MSG_EXPIRY_DUR_SECS: u64 = 90;

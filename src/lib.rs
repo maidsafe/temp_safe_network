@@ -236,25 +236,6 @@
 // requires to make changes to public functions.
 #![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 
-use hex;
-#[macro_use]
-extern crate log;
-use config_file_handler;
-#[macro_use]
-extern crate quick_error;
-#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
-extern crate rand;
-#[macro_use]
-extern crate routing;
-#[cfg(not(feature = "use-mock-crypto"))]
-extern crate rust_sodium;
-#[macro_use]
-extern crate serde_derive;
-use serde_json;
-use tiny_keccak;
-#[macro_use]
-extern crate unwrap;
-
 /// For unit and integration tests only
 #[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
 #[macro_use]
@@ -281,8 +262,6 @@ pub use crate::personas::data_manager::DataId;
 pub use crate::personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
 pub use crate::personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
 pub use crate::vault::Vault;
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
 
 /// The type tag of invitations to create an account.
 pub const TYPE_TAG_INVITE: u64 = 8;

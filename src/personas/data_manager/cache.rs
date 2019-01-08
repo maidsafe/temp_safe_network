@@ -10,11 +10,13 @@ use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::{self, Mutation};
 use super::STATUS_LOG_INTERVAL;
 use crate::utils::{self, HashMap, HashSet, Instant, SecureHash};
+use log::{info, log};
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{
     Authority, MessageId, MutableData, RoutingTable, Value, XorName, MAX_MUTABLE_DATA_ENTRIES,
     MAX_MUTABLE_DATA_SIZE_IN_BYTES, QUORUM_DENOMINATOR, QUORUM_NUMERATOR,
 };
+use serde_derive::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::VecDeque;
 use std::iter;
@@ -954,6 +956,7 @@ mod tests {
     use super::*;
     use fake_clock::FakeClock;
     use rand::{self, Rng};
+    use unwrap::unwrap;
 
     #[test]
     fn needed_fragments() {
