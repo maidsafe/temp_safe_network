@@ -8,7 +8,7 @@
 
 use super::poll;
 use super::test_node::TestNode;
-use log::{log, trace};
+use log::trace;
 use maidsafe_utilities::{serialisation, SeededRng};
 use rand::Rng;
 use routing::mock_crust::{self, Network, ServiceHandle};

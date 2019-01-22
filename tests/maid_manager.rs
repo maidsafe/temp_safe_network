@@ -12,7 +12,7 @@
 #![cfg(feature = "use-mock-crust")]
 #![cfg(not(feature = "use-mock-routing"))]
 use fake_clock::FakeClock;
-use log::{log, trace};
+use log::trace;
 use rand::Rng;
 use routing::mock_crust::Network;
 use routing::rate_limiter_consts::{MIN_CLIENT_CAPACITY, RATE};
