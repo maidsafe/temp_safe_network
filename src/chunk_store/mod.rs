@@ -13,7 +13,9 @@
 mod tests;
 
 use hex::{self, FromHex};
+use log::{info, log};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
+use quick_error::quick_error;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cmp;
@@ -95,6 +97,7 @@ impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
     /// function returns an error.
     ///
     /// [1]: https://doc.rust-lang.org/std/env/fn.temp_dir.html
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(root: Option<String>, capacity: Option<u64>) -> Result<Self, Error> {
         let root_dir = match root {
             Some(path) => {
@@ -149,7 +152,8 @@ impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
                     .map(|metadata| {
                         self.used_space += metadata.len();
                     })
-            }).map_err(From::from)
+            })
+            .map_err(From::from)
     }
 
     /// Deletes the data chunk stored under `id`.
@@ -201,7 +205,8 @@ impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
                         .and_then(|bytes| serialisation::deserialise(&*bytes).ok())
                 };
                 Ok(dir_entries.filter_map(dir_entry_to_routing_name).collect())
-            }).unwrap_or_else(|_| Vec::new())
+            })
+            .unwrap_or_else(|_| Vec::new())
     }
 
     /// Returns the maximum amount of storage space available for this `ChunkStore`.

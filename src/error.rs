@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use chunk_store;
+use crate::chunk_store;
 use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
+use quick_error::quick_error;
 use routing::messaging;
 use routing::ClientError;
 use routing::{InterfaceError, MessageId, Request, Response, RoutingError};

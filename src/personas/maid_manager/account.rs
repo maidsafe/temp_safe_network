@@ -6,8 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use self::rust_sodium::crypto::sign;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 use routing::{AccountInfo, MessageId};
-use rust_sodium::crypto::sign;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// Default available number of operations per account.

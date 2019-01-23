@@ -6,21 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use authority::{ClientAuthority, ClientManagerAuthority};
-use cache::Cache;
+use self::rust_sodium::crypto::sign;
+use crate::authority::{ClientAuthority, ClientManagerAuthority};
+use crate::cache::Cache;
 #[cfg(feature = "use-mock-crust")]
-use chunk_store::Error as ChunkStoreError;
-use config_handler::{self, Config};
-use error::InternalError;
+use crate::chunk_store::Error as ChunkStoreError;
+use crate::config_handler::{self, Config};
+use crate::error::InternalError;
+#[cfg(all(test, feature = "use-mock-routing"))]
+pub use crate::mock_routing::Node as RoutingNode;
+#[cfg(all(test, feature = "use-mock-routing"))]
+use crate::mock_routing::NodeBuilder;
+#[cfg(feature = "use-mock-crust")]
+use crate::personas::data_manager::DataId;
+use crate::personas::data_manager::{self, DataManager};
+use crate::personas::maid_manager::{self, MaidManager};
+use log::{debug, log, warn};
 use maidsafe_utilities::serialisation;
-#[cfg(all(test, feature = "use-mock-routing"))]
-pub use mock_routing::Node as RoutingNode;
-#[cfg(all(test, feature = "use-mock-routing"))]
-use mock_routing::NodeBuilder;
-#[cfg(feature = "use-mock-crust")]
-use personas::data_manager::DataId;
-use personas::data_manager::{self, DataManager};
-use personas::maid_manager::{self, MaidManager};
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
 #[cfg(feature = "use-mock-crust")]
@@ -33,7 +35,9 @@ use routing::NodeBuilder;
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
-use rust_sodium::crypto::sign;
+use serde_derive::{Deserialize, Serialize};
+#[cfg(feature = "use-mock-crust")]
+use unwrap::unwrap;
 
 /// Main struct to hold all personas and Routing instance
 pub struct Vault {
@@ -44,6 +48,7 @@ pub struct Vault {
 
 impl Vault {
     /// Creates a network Vault instance.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(first_vault: bool, use_cache: bool) -> Result<Self, InternalError> {
         let config = config_handler::read_config_file().map_err(|error| {
             warn!("Failed to parse vault config file: {:?}", error);

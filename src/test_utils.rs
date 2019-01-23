@@ -6,21 +6,26 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use self::rust_sodium::crypto::sign;
 #[cfg(not(feature = "use-mock-crust"))]
-use authority::ClientAuthority;
-use authority::ClientManagerAuthority;
+use crate::authority::ClientAuthority;
+use crate::authority::ClientManagerAuthority;
+use crate::utils;
+#[cfg(all(test, feature = "use-mock-routing"))]
+use crate::vault::RoutingNode;
 use rand::{seq, Rand, Rng};
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::Config as RoutingConfig;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::DevConfig as RoutingDevConfig;
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
-use rust_sodium::crypto::sign;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
-use utils;
-#[cfg(all(test, feature = "use-mock-routing"))]
-use vault::RoutingNode;
+use unwrap::unwrap;
 
 #[macro_export]
 macro_rules! assert_match {

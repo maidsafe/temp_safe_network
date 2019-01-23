@@ -1,6 +1,4 @@
-# safe_vault
-
-**Maintainer:** Andreas Fackler (andreas.fackler@maidsafe.net)
+# SAFE Vault
 
 |Crate|Documentation|Linux/OS X|Windows|Issues|
 |:---:|:-----------:|:--------:|:-----:|:----:|
