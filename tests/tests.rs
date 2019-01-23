@@ -51,9 +51,6 @@
     variant_size_differences
 )]
 
-use routing;
-use tiny_keccak;
-
 mod data_manager;
 mod maid_manager;
 mod network;
