@@ -11,15 +11,19 @@
 
 #![cfg(feature = "use-mock-crust")]
 #![cfg(not(feature = "use-mock-routing"))]
+use self::rust_sodium::crypto::sign;
 use fake_clock::FakeClock;
-use log::{log, trace};
+use log::trace;
 use rand::Rng;
 use routing::mock_crust::Network;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 use routing::{
     Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions, EntryError, Event,
     ImmutableData, MessageId, MutableData, PermissionSet, Response, User, MAX_MUTABLE_DATA_ENTRIES,
 };
-use rust_sodium::crypto::sign;
+#[cfg(not(feature = "use-mock-crypto"))]
+use rust_sodium;
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
 use safe_vault::mock_crust_detail::{self, poll, Data};

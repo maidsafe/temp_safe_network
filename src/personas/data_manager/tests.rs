@@ -492,7 +492,7 @@ fn mdata_with_churn_with_partial_accumulation() {
     // quorum are written to the chunk store.
     let mut entries = data
         .entries()
-        .into_iter()
+        .iter()
         .map(|(key, value)| (key.clone(), value.clone()));
     let (key0, value0) = unwrap!(entries.next());
     let (key1, value1) = unwrap!(entries.next());

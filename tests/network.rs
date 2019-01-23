@@ -11,7 +11,7 @@
 
 #![cfg(feature = "use-mock-crust")]
 #![cfg(not(feature = "use-mock-routing"))]
-use log::{log, trace};
+use log::trace;
 use rand::distributions::{IndependentSample, Range};
 use rand::Rng;
 use routing::mock_crust::Network;

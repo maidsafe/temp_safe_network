@@ -13,7 +13,7 @@ use crate::personas::data_manager::DataId;
 use crate::vault::Vault;
 use hex;
 use itertools::Itertools;
-use log::{log, trace};
+use log::trace;
 use rand::{self, Rng};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use routing::Config as RoutingConfig;
