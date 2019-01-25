@@ -111,3 +111,11 @@ Run `sudo uninstall_safe_vault.sh`
 - it should remove `/var/cache/safe_vault/safe_vault.vault.config`
 - it should leave `/var/cache/safe_vault/safe_vault.bootstrap.cache` untouched
 - it should remove the `safe` user and `safe` group
+
+## License
+
+This SAFE Network library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
+
+## Contribution
+
+Copyrights in the SAFE Network are retained by their contributors. No copyright assignment is required to contribute to this project.
