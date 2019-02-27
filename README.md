@@ -1,8 +1,8 @@
 # SAFE Vault
 
-|Crate|Documentation|Linux/OS X|Windows|Issues|
+|Crate|Documentation|Linux/macOS|Windows|Issues|
 |:---:|:-----------:|:--------:|:-----:|:----:|
-|[![](http://meritbadge.herokuapp.com/safe_vault)](https://crates.io/crates/safe_vault)|[![Documentation](https://docs.rs/safe_vault/badge.svg)](https://docs.rs/safe_vault)|[![Build Status](https://travis-ci.org/maidsafe/safe_vault.svg?branch=master)](https://travis-ci.org/maidsafe/safe_vault)|[![Build status](https://ci.appveyor.com/api/projects/status/ohu678c6ufw8b2bn/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-vault/branch/master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_vault.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_vault)|
+|[![](http://meritbadge.herokuapp.com/safe_vault)](https://crates.io/crates/safe_vault)|[![Documentation](https://docs.rs/safe_vault/badge.svg)](https://docs.rs/safe_vault)|[![Build Status](https://travis-ci.com/maidsafe/safe_vault.svg?branch=master)](https://travis-ci.com/maidsafe/safe_vault)|[![Build status](https://ci.appveyor.com/api/projects/status/ohu678c6ufw8b2bn/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-vault/branch/master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_vault.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_vault)|
 
 | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
