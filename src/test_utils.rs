@@ -27,6 +27,7 @@ use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use unwrap::unwrap;
 
+/// Asserts that $e matches to $p, and if it does then returns $r or ().
 #[macro_export]
 macro_rules! assert_match {
     ($e:expr, $p:pat => $r:expr) => {
