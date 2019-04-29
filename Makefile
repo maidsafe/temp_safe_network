@@ -52,6 +52,11 @@ else
 endif
 
 package-build-artifacts:
+ifndef SCL_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
 ifndef SCL_BUILD_NUMBER
 	@echo "A build number must be supplied for build artifact packaging."
 	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
@@ -68,9 +73,9 @@ ifndef SCL_BUILD_OS
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
 endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
@@ -84,6 +89,11 @@ package-deploy-artifacts:
 		scripts/package-runner-container
 
 retrieve-build-artifacts:
+ifndef SCL_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
 ifndef SCL_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
 	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
@@ -100,9 +110,9 @@ ifndef SCL_BUILD_OS
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
 endif
 	aws s3 cp \
 		--no-sign-request \
@@ -125,6 +135,11 @@ endif
 	rm ${ARCHIVE_NAME}
 
 retrieve-all-build-artifacts:
+ifndef SCL_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
 ifndef SCL_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
 	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
