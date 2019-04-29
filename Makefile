@@ -7,24 +7,25 @@ PWD := $(shell echo $$PWD)
 USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
-S3_BUCKET := safe-jenkins-build-artifacts
-UUID := $(shell uuidgen | sed 's/-//g')
+S3_BUCKET := safe-client-libs-jenkins
 
 build-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:build
-	docker build -f scripts/Dockerfile.build -t maidsafe/safe-client-libs-build:build .
+	docker rmi -f maidsafe/safe-client-libs-build:${SAFE_APP_VERSION}
+	docker build -f scripts/Dockerfile.build -t maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} .
 
 push-container:
-	docker push maidsafe/safe-client-libs-build:build
+	docker push maidsafe/safe-client-libs-build:${SAFE_APP_VERSION}
 
 clean:
-	@echo "This is deprecated."
+	@if docker ps -a | grep safe_app_build &> /dev/null; then \
+		docker rm -f safe_app_build; \
+	fi
 
 build:
 	rm -rf artifacts
 ifeq ($(UNAME_S),Linux)
-	./scripts/build-with-container "real"
+	./scripts/build-with-container "real" "${SAFE_APP_VERSION}"
 else
 	./scripts/build-real
 endif
@@ -34,7 +35,7 @@ endif
 build-mock:
 	rm -rf artifacts
 ifeq ($(UNAME_S),Linux)
-	./scripts/build-with-container "mock"
+	./scripts/build-with-container "mock" "${SAFE_APP_VERSION}"
 else
 	./scripts/build-mock
 endif
@@ -51,11 +52,6 @@ else
 endif
 
 package-build-artifacts:
-ifndef SCL_BRANCH
-	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
-	@exit 1
-endif
 ifndef SCL_BUILD_NUMBER
 	@echo "A build number must be supplied for build artifact packaging."
 	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
@@ -72,9 +68,9 @@ ifndef SCL_BUILD_OS
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
 endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
@@ -84,31 +80,10 @@ package-deploy-artifacts:
 	@rm -rf deploy
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} \
 		scripts/package-runner-container
 
-retrieve-cache:
-ifndef SCL_BRANCH
-	@echo "A branch reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch reference."
-	@exit 1
-endif
-ifeq ($(OS),Windows_NT)
-	aws s3 cp \
-		--no-sign-request \
-		--region eu-west-2 \
-		s3://${S3_BUCKET}/scl-${SCL_BRANCH}-windows-cache.tar.gz .
-endif
-	mkdir target
-	tar -C target -xvf scl-${SCL_BRANCH}-windows-cache.tar.gz
-	rm scl-${SCL_BRANCH}-windows-cache.tar.gz
-
 retrieve-build-artifacts:
-ifndef SCL_BRANCH
-	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
-	@exit 1
-endif
 ifndef SCL_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
 	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
@@ -125,9 +100,9 @@ ifndef SCL_BUILD_OS
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
 endif
 	aws s3 cp \
 		--no-sign-request \
@@ -150,11 +125,6 @@ endif
 	rm ${ARCHIVE_NAME}
 
 retrieve-all-build-artifacts:
-ifndef SCL_BRANCH
-	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
-	@exit 1
-endif
 ifndef SCL_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
 	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
@@ -186,6 +156,26 @@ endif
 	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
 	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
 
+test-artifacts-mock:
+ifeq ($(UNAME_S),Linux)
+	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		-e CARGO_TARGET_DIR=/target \
+		-e SCL_TEST_SUITE=mock \
+		maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} \
+		scripts/test-runner-container
+else
+	./scripts/test-mock
+endif
+
+test-artifacts-integration:
+	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		-e CARGO_TARGET_DIR=/target \
+		-e SCL_TEST_SUITE=integration \
+		maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} \
+		scripts/test-runner-container
+
 test-artifacts-binary:
 ifndef SCL_BCT_PATH
 	@echo "A value must be supplied for the previous binary compatibility test suite."
@@ -200,47 +190,19 @@ endif
 		-e CARGO_TARGET_DIR=/target \
 		-e COMPAT_TESTS=/bct/tests \
 		-e SCL_TEST_SUITE=binary \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} \
 		scripts/test-runner-container
 
 tests: clean
-	rm -rf artifacts
-ifeq ($(UNAME_S),Linux)
 	rm -rf target/
-	docker run --name "safe_app_tests-${UUID}" \
+	docker run --name safe_app_build \
 		-v "${PWD}":/usr/src/safe_client_libs \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} \
 		scripts/test-mock
-	docker cp "safe_app_tests-${UUID}":/target .
-	docker rm -f "safe_app_tests-${UUID}"
-else
-	./scripts/test-mock
-endif
-	make copy-artifacts
-
-test-with-mock-vault-file: clean
-ifeq ($(UNAME_S),Darwin)
-	rm -rf artifacts
-	./scripts/test-with-mock-vault-file
-	make copy-artifacts
-else
-	@echo "Tests against the mock vault file are run only on OS X."
-	@exit 1
-endif
-
-tests-integration: clean
-	rm -rf target/
-	docker run --rm -v "${PWD}":/usr/src/safe_client_libs \
-		-u ${USER_ID}:${GROUP_ID} \
-		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build \
-		scripts/test-integration
+	docker cp safe_app_build:/target .
+	docker rm -f safe_app_build
 
 debug:
-	docker run --rm -v "${PWD}":/usr/src/crust maidsafe/safe-client-libs-build:build /bin/bash
-
-copy-artifacts:
-	mkdir artifacts
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+	docker run --rm -v "${PWD}":/usr/src/crust maidsafe/safe-client-libs-build:${SAFE_APP_VERSION} /bin/bash
