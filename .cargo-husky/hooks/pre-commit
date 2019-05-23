@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Any update to this file will require erasing the githook locally on your machine
+# and running cargo test to install it again
+set -e
+
+# Stash unstaged changes
+git stash -q --keep-index
+
+echo 'Precommit: cargo test'
+cargo test
+echo 'Precommit: cargo clippy -- -D warnings'
+cargo clippy -- -D warnings
+echo 'Precommit: cargo fmt'
+cargo fmt
+
+echo 'Precommit: updating formatted files'
+# Stage updated files
+git add -u
+
+# Re-apply original unstaged changes
+git stash pop -q

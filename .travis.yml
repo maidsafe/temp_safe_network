@@ -1,0 +1,37 @@
+env:
+  global:
+    - RUST_BACKTRACE=1
+    # - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
+    - PATH=$PATH:$HOME/.cargo/bin
+language: rust
+rust:
+  - 1.32.0
+
+matrix:
+  include:
+    - os: linux
+    - os: osx
+    - os: windows
+      env:
+        - YARN_GPG=no # otherwise this starts gpg-agent that never exits
+
+sudo: false
+cache:
+  # Double the default timeout.
+  timeout: 360
+  cargo: true
+  directories:
+    - "${HOME}/.cache/master"
+
+before_script:
+  - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
+  - bash cargo_install.sh cargo-prune;
+
+before_cache:
+  - cargo prune
+
+install :
+  - cargo check --release --features mock-network
+
+script :
+  - cargo test --release --features mock-network
