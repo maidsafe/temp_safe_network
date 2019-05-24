@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// use crate::cli_helpers::*;
-
 // use log::{debug, warn};
 // use std::env;
 use structopt::StructOpt;
@@ -21,7 +19,7 @@ pub struct CmdArgs {
     #[structopt(short = "t", long = "target")]
     target: String,
     /// The account's Root Container address
-    #[structopt(short = "r", long = "root")]
+    #[structopt(long = "root")]
     root: bool,
     /// subcommands
     #[structopt(subcommand)]
