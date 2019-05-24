@@ -18,16 +18,14 @@ pub fn create_key() -> XorName {
     let pk_to = sk_to.public_key();
     //let sig = sk_from.sign();
 
-    let key_xor_name = mock.create_balance(
+    mock.create_balance(
         pk_from,
         pk_to,
         Coin {
             units: 1,
             parts: 30,
         },
-    );
-
-    key_xor_name
+    )
 }
 
 #[test]

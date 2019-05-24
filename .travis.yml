@@ -31,7 +31,7 @@ before_cache:
   - cargo prune
 
 install :
-  - cargo check --release --features mock-network
+  - cargo check --release #--features mock-network
 
 script :
-  - cargo test --release --features mock-network
+  - cargo test --release #--features mock-network
