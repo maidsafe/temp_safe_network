@@ -37,5 +37,8 @@ pub enum KeysSubCommands {
         /// Preload the key with a coinbalance
         #[structopt(long = "preload")]
         preload: Option<String>,
+        /// Don't generate a key pair and just use the provided public key
+        #[structopt(long = "pk")]
+        pk: Option<String>,
     },
 }

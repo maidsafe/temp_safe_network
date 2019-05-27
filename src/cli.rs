@@ -55,18 +55,24 @@ pub fn run() -> Result<(), String> {
     // Is it a keys command?
     if let SubCommands::Keys { cmd } = args.cmd {
         // Is it a create subcommand?
-        if let Some(KeysSubCommands::Create { anon, .. }) = cmd {
+        if let Some(KeysSubCommands::Create {
+            anon, preload, pk, ..
+        }) = cmd
+        {
             // Want an anonymous Key?
             if anon {
-                let (xorname, key_pair) = keys_create(&mut safe_app);
+                let (xorname, key_pair) = keys_create(&mut safe_app, preload, pk);
                 println!(
                     "New Key created at: {:?}. This was not linked from any container.",
                     xorname
                 );
-                println!(
-                    "Key pair generated is: pk: {:?}, sk: {:?}",
-                    key_pair.pk, key_pair.sk
-                );
+
+                if let Some(pair) = key_pair {
+                    println!(
+                        "Key pair generated is: pk: {:?}, sk: {:?}",
+                        pair.pk, pair.sk
+                    );
+                }
             }
         }
     }
