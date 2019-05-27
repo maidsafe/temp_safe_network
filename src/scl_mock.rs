@@ -13,11 +13,14 @@ struct CoinBalance {
 }
 
 pub type XorName = [u8; 32];
+type AppendOnlyDataMock = HashMap<usize, Vec<u8>>;
+type TxStatusList = HashMap<Uuid, String>;
 
 #[derive(Default)]
 pub struct MockSCL {
     coin_balances: HashMap<XorName, CoinBalance>,
-    txs: HashMap<XorName, HashMap<Uuid, String>>, // keep track of TX status per tx ID, per xorname
+    txs: HashMap<XorName, TxStatusList>, // keep track of TX status per tx ID, per xorname
+    unpublished_append_only: HashMap<XorName, AppendOnlyDataMock>, // keep a versioned map of data per xorname
 }
 
 fn xorname_from_pk(pk: &PublicKey) -> XorName {
@@ -33,6 +36,7 @@ impl MockSCL {
         MockSCL {
             coin_balances: HashMap::new(),
             txs: HashMap::new(),
+            unpublished_append_only: HashMap::new(),
         }
     }
 
@@ -141,9 +145,82 @@ impl MockSCL {
     }
 
     #[allow(dead_code)]
-    pub fn unpublished_append_only_put(&self) {
-        // TODO
+    pub fn unpublished_append_only_put(
+        &mut self,
+        pk: &PublicKey,
+        _sk: &SecretKey,
+        data: &[u8],
+    ) -> XorName {
+        let xorname = xorname_from_pk(pk);
+        let mut uao_for_xorname = match self.unpublished_append_only.get(&xorname) {
+            Some(uao) => uao.clone(),
+            None => HashMap::new(),
+        };
+        uao_for_xorname.insert(uao_for_xorname.len(), data.to_vec());
+        self.unpublished_append_only
+            .insert(xorname, uao_for_xorname);
+
+        xorname
     }
+
+    #[allow(dead_code)]
+    pub fn unpublished_append_only_get(
+        &self,
+        pk: &PublicKey,
+        _sk: &SecretKey,
+        version: Option<usize>,
+    ) -> Vec<u8> {
+        let xorname = xorname_from_pk(pk);
+        let uao_for_xorname = &self.unpublished_append_only[&xorname];
+        let data = match version {
+            Some(version) => uao_for_xorname.get(&version).unwrap(),
+            None => uao_for_xorname
+                .get(&self.unpublished_append_only.len())
+                .unwrap(),
+        };
+
+        data.to_vec()
+    }
+}
+
+#[test]
+fn test_unpublished_append_only_put() {
+    use self::MockSCL;
+    use threshold_crypto::SecretKey;
+
+    let mut mock = MockSCL::new();
+
+    let sk = SecretKey::random();
+    let pk = sk.public_key();
+    println!(
+        "New Unpublished AppendOnlyData at: {:?}",
+        mock.unpublished_append_only_put(&pk, &sk, &vec![])
+    );
+}
+
+#[test]
+fn test_unpublished_append_only_get() {
+    use self::MockSCL;
+    use threshold_crypto::SecretKey;
+
+    let mut mock = MockSCL::new();
+
+    let sk = SecretKey::random();
+    let pk = sk.public_key();
+    let data = vec![1, 2, 3];
+    println!(
+        "New Unpublished AppendOnlyData at: {:?}",
+        mock.unpublished_append_only_put(&pk, &sk, &data)
+    );
+
+    let curr_data = mock.unpublished_append_only_get(&pk, &sk, Some(0));
+
+    println!(
+        "Current data at Unpublished AppendOnlyData at: {:?}",
+        curr_data
+    );
+
+    assert_eq!(data, curr_data);
 }
 
 #[test]
