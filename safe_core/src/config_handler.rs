@@ -7,64 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::CoreError;
-use directories::ProjectDirs;
-use quic_p2p::Config as QuicP2pConfig;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use config_file_handler;
+use std::ffi::OsString;
 #[cfg(test)]
-use std::{fs, path::PathBuf};
-use std::{
-    fs::File,
-    io::{self, BufReader},
-};
-
-const CONFIG_DIR_QUALIFIER: &str = "net";
-const CONFIG_DIR_ORGANISATION: &str = "MaidSafe";
-const CONFIG_DIR_APPLICATION: &str = "safe_core";
-const CONFIG_FILE: &str = "safe_core.config";
-
-const VAULT_CONFIG_DIR_APPLICATION: &str = "safe_vault";
-const VAULT_CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
+use std::path::PathBuf;
 
 /// Configuration for safe-core.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
-    /// QuicP2p options.
-    pub quic_p2p: QuicP2pConfig,
     /// Developer options.
     pub dev: Option<DevConfig>,
-}
-
-impl Config {
-    /// Returns a new `Config` instance. Tries to read quic-p2p config from file.
-    pub fn new() -> Self {
-        let quic_p2p = Self::read_qp2p_from_file().unwrap_or_default();
-        Self {
-            quic_p2p,
-            dev: None,
-        }
-    }
-
-    fn read_qp2p_from_file() -> Result<QuicP2pConfig, CoreError> {
-        // Firs we read the default configuration file, and use a slightly modified default config
-        // if there is none.
-        let mut config: QuicP2pConfig = {
-            match read_config_file(dirs()?, CONFIG_FILE) {
-                Err(CoreError::IoError(ref err)) if err.kind() == io::ErrorKind::NotFound => {
-                    // If there is no config file, assume we are a client
-                    QuicP2pConfig {
-                        our_type: quic_p2p::OurType::Client,
-                        ..Default::default()
-                    }
-                }
-                result => result?,
-            }
-        };
-        // Then if there is a locally running Vault we add it to the list of know contacts.
-        if let Ok(node_info) = read_config_file(vault_dirs()?, VAULT_CONNECTION_INFO_FILE) {
-            let _ = config.hard_coded_contacts.insert(node_info);
-        }
-        Ok(config)
-    }
 }
 
 /// Extra configuration options intended for developers.
@@ -80,81 +32,92 @@ pub struct DevConfig {
 
 /// Reads the `safe_core` config file and returns it or a default if this fails.
 pub fn get_config() -> Config {
-    Config::new()
-}
-
-fn dirs() -> Result<ProjectDirs, CoreError> {
-    ProjectDirs::from(
-        CONFIG_DIR_QUALIFIER,
-        CONFIG_DIR_ORGANISATION,
-        CONFIG_DIR_APPLICATION,
-    )
-    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
-}
-
-fn vault_dirs() -> Result<ProjectDirs, CoreError> {
-    ProjectDirs::from(
-        CONFIG_DIR_QUALIFIER,
-        CONFIG_DIR_ORGANISATION,
-        VAULT_CONFIG_DIR_APPLICATION,
-    )
-    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
-}
-
-fn read_config_file<T>(dirs: ProjectDirs, file: &str) -> Result<T, CoreError>
-where
-    T: DeserializeOwned,
-{
-    let path = dirs.config_dir().join(file);
-    let file = match File::open(&path) {
-        Ok(file) => {
-            trace!("Reading: {}", path.display());
-            file
-        }
-        Err(error) => {
-            trace!("Not available: {}", path.display());
-            return Err(error.into());
-        }
-    };
-    let reader = BufReader::new(file);
-    serde_json::from_reader(reader).map_err(|err| {
-        info!("Could not parse: {} ({:?})", err, err);
-        err.into()
+    read_config_file().unwrap_or_else(|error| {
+        warn!("Failed to parse safe_core config file: {:?}", error);
+        Config::default()
     })
+}
+
+fn read_config_file() -> Result<Config, CoreError> {
+    // If the config file is not present, a default one will be generated.
+    let file_handler = config_file_handler::FileHandler::new(&get_file_name()?, false)?;
+    Ok(file_handler.read_file()?)
 }
 
 /// Writes a `safe_core` config file **for use by tests and examples**.
 ///
-/// The file is written to the `current_bin_dir()` with the appropriate file name.
-///
-/// N.B. This method should only be used as a utility for test and examples.  In normal use cases,
-/// the config file should be created by the Vault's installer.
+/// The file is written to the [`current_bin_dir()`](file_handler/fn.current_bin_dir.html)
+/// with the appropriate file name.
 #[cfg(test)]
-#[allow(unused)]
 pub fn write_config_file(config: &Config) -> Result<PathBuf, CoreError> {
-    let dirs = dirs()?;
-    let dir = dirs.config_dir();
-    fs::create_dir_all(dir)?;
+    use std::io::Write;
 
-    let path = dir.join(CONFIG_FILE);
-    dbg!(&path);
-    let mut file = File::create(&path)?;
-    serde_json::to_writer_pretty(&mut file, config)?;
+    let mut config_path = config_file_handler::current_bin_dir()?;
+    config_path.push(get_file_name()?);
+    let mut file = ::std::fs::File::create(&config_path)?;
+    write!(
+        &mut file,
+        "{}",
+        unwrap!(serde_json::to_string_pretty(config))
+    )?;
     file.sync_all()?;
+    Ok(config_path)
+}
 
-    Ok(path)
+fn get_file_name() -> Result<OsString, CoreError> {
+    let mut name = config_file_handler::exe_file_stem()?;
+    name.push(".safe_core.config");
+    Ok(name)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde_json;
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::Path;
 
-    // Write a default config file for use as reference. This will overwrite any existing
-    // configurations so use with care.
     #[test]
-    #[ignore]
-    fn write_default_config_file() {
-        let config = Config::default();
-        unwrap!(write_config_file(&config));
+    fn parse_sample_config_file_memory() {
+        let path = Path::new("sample_config/sample_memory.safe_core.config").to_path_buf();
+        let mut file = unwrap!(File::open(&path), "Error opening {}:", path.display());
+        let mut encoded_contents = String::new();
+        let _ = unwrap!(
+            file.read_to_string(&mut encoded_contents),
+            "Error reading {}:",
+            path.display()
+        );
+        let config: Config = unwrap!(
+            serde_json::from_str(&encoded_contents),
+            "Error parsing {} as JSON:",
+            path.display()
+        );
+
+        let dev_config = unwrap!(config.dev, "{} is missing `dev` field.", path.display());
+        assert_eq!(dev_config.mock_unlimited_mutations, true);
+        assert_eq!(dev_config.mock_in_memory_storage, true);
+    }
+
+    #[test]
+    fn parse_sample_config_file_disk() {
+        let path = Path::new("sample_config/sample_disk.safe_core.config").to_path_buf();
+        let mut file = unwrap!(File::open(&path), "Error opening {}:", path.display());
+        let mut encoded_contents = String::new();
+        let _ = unwrap!(
+            file.read_to_string(&mut encoded_contents),
+            "Error reading {}:",
+            path.display()
+        );
+        let config: Config = unwrap!(
+            serde_json::from_str(&encoded_contents),
+            "Error parsing {} as JSON:",
+            path.display()
+        );
+
+        let dev_config = unwrap!(config.dev, "{} is missing `dev` field.", path.display());
+        assert_eq!(dev_config.mock_unlimited_mutations, false);
+        assert_eq!(dev_config.mock_in_memory_storage, false);
+        assert_eq!(dev_config.mock_vault_path, Some(String::from("./tmp")));
     }
 }
