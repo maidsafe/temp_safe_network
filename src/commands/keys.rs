@@ -28,14 +28,14 @@ pub enum KeysSubCommands {
     #[structopt(name = "create")]
     /// Create a new KeyPair
     Create {
-        /// Do not save the keypair to the network
+        /// Do not save the secret key to the network
         #[structopt(long = "anon")]
-        anon: String,
+        anon: bool,
         /// The name to give this key
         #[structopt(long = "name")]
-        name: String,
+        name: Option<String>,
         /// Preload the key with a coinbalance
         #[structopt(long = "preload")]
-        preload: String,
+        preload: Option<String>,
     },
 }

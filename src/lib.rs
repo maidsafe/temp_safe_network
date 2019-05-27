@@ -1,34 +1,35 @@
-use threshold_crypto::SecretKey;
-use uuid::Uuid;
+use threshold_crypto::{PublicKey, SecretKey};
 
-mod scl_mock;
+pub mod scl_mock;
+use scl_mock::{MockSCL, XorName};
 
-use self::scl_mock::{Coin, MockSCL, XorName};
+pub struct BlsKeyPair {
+    pub pk: PublicKey,
+    pub sk: SecretKey,
+}
 
-// Create a Ket on the network and return its XOR name
-pub fn create_key() -> XorName {
-    let mut mock = MockSCL::new();
-    let my_uuid = Uuid::new_v4();
-    println!("UUID {}", my_uuid);
-
+// Create a KeY on the network and return its XOR name
+pub fn keys_create(safe_app: &mut MockSCL) -> (XorName, BlsKeyPair) {
     let sk_from = SecretKey::random();
     let pk_from = sk_from.public_key();
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
-    //let sig = sk_from.sign();
 
-    mock.create_balance(
-        pk_from,
-        pk_to,
-        Coin {
-            units: 1,
-            parts: 30,
+    let xorname = safe_app.create_balance(&pk_from, &sk_from, &pk_to, "0");
+
+    (
+        xorname,
+        BlsKeyPair {
+            pk: pk_to,
+            sk: sk_to,
         },
     )
 }
 
 #[test]
-fn test_create_key() {
-    println!("New Key at: {:?}", create_key());
+fn test_keys_create() {
+    let mut safe_app = MockSCL::new();
+    let (xorname, _) = keys_create(&mut safe_app);
+    println!("New Key at: {:?}", xorname);
 }

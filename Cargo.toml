@@ -18,13 +18,15 @@ prettytable-rs = "^0.8"
 unwrap = "~1.2.0"
 threshold_crypto = "0.3.1"
 uuid = "0.7"
+safecoin = "0.5.0"
 
 [features]
 default = ["uuid/v4"]
 #mock-network = ["safe_app/mock-network"]
 
 [patch.crates-io]
-#safe_app = { git = "https://github.com/bochaco/safe_client_libs", branch = "safe_authenticator-master-upgrades" }
+safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }
+#safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
