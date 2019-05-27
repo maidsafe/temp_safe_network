@@ -5,6 +5,7 @@ description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 publish = false
 edition = "2018"
+license = "GPL-3.0"
 
 [dependencies]
 actix = "0.7.9"
