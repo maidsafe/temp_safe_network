@@ -13,7 +13,6 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum SafeIdSubCommands {
     #[structopt(name = "create")]
     /// Create a new Wallet/CoinBalance

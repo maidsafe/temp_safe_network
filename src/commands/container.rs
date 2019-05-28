@@ -13,14 +13,10 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum ContainerSubCommands {
     #[structopt(name = "create")]
     /// Create a network container
     Create {
-        /// Create the root contianer
-        #[structopt(short = "r", long = "root")]
-        root: bool,
         /// Desired container name
         #[structopt(long = "name")]
         name: String,
@@ -31,15 +27,12 @@ pub enum ContainerSubCommands {
         #[structopt(short = "p", long = "publish")]
         publish: bool,
         /// Do not require new versions for container edits
-        #[structopt(short = "nv", long = "non_versioned")]
+        #[structopt(short = "n", long = "non_versioned")]
         non_versioned: bool,
     },
     #[structopt(name = "add")]
     /// Add a container to another container on the network
     Add {
-        /// Create the root contianer
-        #[structopt(short = "r", long = "root")]
-        root: bool,
         /// Desired container name
         #[structopt(long = "name")]
         name: String,
@@ -54,7 +47,7 @@ pub enum ContainerSubCommands {
         #[structopt(short = "k", long = "key")]
         key: String,
         /// The value to edit
-        #[structopt(short = "val", long = "value")]
+        #[structopt(short = "d", long = "value")]
         value: bool,
     },
 }

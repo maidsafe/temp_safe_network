@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use threshold_crypto::{PublicKey, SecretKey};
+use unwrap::unwrap;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -48,7 +49,7 @@ impl MockSCL {
         amount: &str,
     ) -> XorName {
         let xorname = xorname_from_pk(new_balance_owner);
-        let coin = Coins::from_str(amount).unwrap();
+        let coin = unwrap!(Coins::from_str(amount));
         self.coin_balances.insert(
             xorname,
             CoinBalance {
@@ -60,9 +61,18 @@ impl MockSCL {
         xorname
     }
 
-    pub fn get_balance(&self, pk: &PublicKey, _sk: &SecretKey) -> String {
+    pub fn get_balance_from_pk(&self, pk: &PublicKey, _sk: &SecretKey) -> String {
         let xorname = xorname_from_pk(pk);
         let coin_balance = &self.coin_balances[&xorname];
+        coin_balance
+            .value
+            .to_string()
+            .replace("Coins(", "")
+            .replace(")", "")
+    }
+
+    pub fn get_balance_from_xorname(&self, xorname: &XorName, _sk: &SecretKey) -> String {
+        let coin_balance = &self.coin_balances[xorname];
         coin_balance
             .value
             .to_string()
@@ -73,7 +83,7 @@ impl MockSCL {
     #[allow(dead_code)]
     pub fn allocate_test_coins(&mut self, to_pk: &PublicKey, amount: &str) -> XorName {
         let xorname = xorname_from_pk(to_pk);
-        let coin = Coins::from_str(&amount).unwrap();
+        let coin = unwrap!(Coins::from_str(&amount));
         self.coin_balances.insert(
             xorname,
             CoinBalance {
@@ -105,13 +115,13 @@ impl MockSCL {
         txs_for_xorname.insert(tx_id.clone(), format!("Success({})", amount).to_string());
         self.txs.insert(to_xorname, txs_for_xorname);
 
-        let amount_coin = Coins::from_str(amount).unwrap();
+        let amount_coin = unwrap!(Coins::from_str(amount));
 
         // reduce balance from sender
-        let from_balance = Coins::from_str(&self.get_balance(from_pk, from_sk)).unwrap();
-        let from_nano_balance = NanoCoins::try_from(from_balance).unwrap();
-        let amount_nano = NanoCoins::try_from(amount_coin).unwrap();
-        let from_new_amount = NanoCoins::new(from_nano_balance.num() - amount_nano.num()).unwrap(); // TODO: check it has enough balance
+        let from_balance = unwrap!(Coins::from_str(&self.get_balance_from_pk(from_pk, from_sk)));
+        let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
+        let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
+        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num())); // TODO: check it has enough balance
         self.coin_balances.insert(
             from_xorname,
             CoinBalance {
@@ -121,12 +131,11 @@ impl MockSCL {
         );
 
         // credit destination
-        let to_balance = Coins::from_str(
-            &self.get_balance(to_pk, from_sk /*incorrect but doesn't matter for now*/),
-        )
-        .unwrap();
-        let to_nano_balance = NanoCoins::try_from(to_balance).unwrap();
-        let to_new_amount = NanoCoins::new(to_nano_balance.num() + amount_nano.num()).unwrap();
+        let to_balance = unwrap!(Coins::from_str(
+            &self.get_balance_from_pk(to_pk, from_sk /*incorrect but doesn't matter for now*/),
+        ));
+        let to_nano_balance = unwrap!(NanoCoins::try_from(to_balance));
+        let to_new_amount = unwrap!(NanoCoins::new(to_nano_balance.num() + amount_nano.num()));
         self.coin_balances.insert(
             to_xorname,
             CoinBalance {
@@ -140,7 +149,7 @@ impl MockSCL {
     pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKey, _sk: &SecretKey) -> String {
         let xorname = xorname_from_pk(pk);
         let txs_for_xorname = &self.txs[&xorname];
-        let tx_state = txs_for_xorname.get(tx_id).unwrap();
+        let tx_state = unwrap!(txs_for_xorname.get(tx_id));
         tx_state.to_string()
     }
 
@@ -173,10 +182,8 @@ impl MockSCL {
         let xorname = xorname_from_pk(pk);
         let uao_for_xorname = &self.unpublished_append_only[&xorname];
         let data = match version {
-            Some(version) => uao_for_xorname.get(&version).unwrap(),
-            None => uao_for_xorname
-                .get(&self.unpublished_append_only.len())
-                .unwrap(),
+            Some(version) => unwrap!(uao_for_xorname.get(&version)),
+            None => unwrap!(uao_for_xorname.get(&self.unpublished_append_only.len())),
         };
 
         data.to_vec()
@@ -258,7 +265,7 @@ fn test_check_balance() {
         "New CoinBalance at: {:?}",
         mock.create_balance(&pk_from, &sk_from, &pk_to, balance)
     );
-    let current_balance = mock.get_balance(&pk_to, &sk_to);
+    let current_balance = mock.get_balance_from_pk(&pk_to, &sk_to);
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
 }
@@ -276,7 +283,7 @@ fn test_allocate_test_coins() {
     let balance = "2.345678912";
     mock.allocate_test_coins(&pk_to, balance);
 
-    let current_balance = mock.get_balance(&pk_to, &sk_to);
+    let current_balance = mock.get_balance_from_pk(&pk_to, &sk_to);
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
 }
@@ -306,8 +313,8 @@ fn test_send() {
         mock.allocate_test_coins(&pk2, balance2)
     );
 
-    let curr_balance1 = mock.get_balance(&pk1, &sk1);
-    let curr_balance2 = mock.get_balance(&pk2, &sk2);
+    let curr_balance1 = mock.get_balance_from_pk(&pk1, &sk1);
+    let curr_balance2 = mock.get_balance_from_pk(&pk2, &sk2);
     println!(
         "Current balances before TX: {} and {}",
         curr_balance1, curr_balance2
@@ -325,8 +332,8 @@ fn test_send() {
         mock.get_transaction(&tx_id, &pk2, &sk2)
     );
 
-    let curr_balance1 = mock.get_balance(&pk1, &sk1);
-    let curr_balance2 = mock.get_balance(&pk2, &sk2);
+    let curr_balance1 = mock.get_balance_from_pk(&pk1, &sk1);
+    let curr_balance2 = mock.get_balance_from_pk(&pk2, &sk2);
     println!(
         "Current balances after TX: {} and {}",
         curr_balance1, curr_balance2

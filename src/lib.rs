@@ -2,6 +2,7 @@ use threshold_crypto::{PublicKey, SecretKey};
 
 pub mod scl_mock;
 use scl_mock::{MockSCL, XorName};
+use unwrap::unwrap;
 
 pub struct BlsKeyPair {
     pub pk: PublicKey,
@@ -47,7 +48,7 @@ pub fn keys_create(
         let pk_bytes = parse_hex(&pk_str);
         let mut pk_bytes_array: [u8; 48] = [0; 48];
         pk_bytes_array.copy_from_slice(&pk_bytes[..48]);
-        let pk = PublicKey::from_bytes(pk_bytes_array).unwrap();
+        let pk = unwrap!(PublicKey::from_bytes(pk_bytes_array));
         (create_key(pk), None)
     } else {
         let sk = SecretKey::random();
@@ -56,9 +57,14 @@ pub fn keys_create(
     }
 }
 
-// Create a Key on the network and return its XOR name
-pub fn keys_balance(safe_app: &MockSCL, pk: &PublicKey, sk: &SecretKey) -> String {
-    safe_app.get_balance(pk, sk)
+// Check Key's from the network from a given PublicKey
+pub fn keys_balance_from_pk(safe_app: &MockSCL, pk: &PublicKey, sk: &SecretKey) -> String {
+    safe_app.get_balance_from_pk(pk, sk)
+}
+
+// Check Key's from the network from a given XOR name
+pub fn keys_balance_from_xorname(safe_app: &MockSCL, xorname: &XorName, sk: &SecretKey) -> String {
+    safe_app.get_balance_from_xorname(xorname, sk)
 }
 
 #[test]
@@ -81,7 +87,7 @@ fn test_keys_create_preload() {
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
         Some(kp) => {
-            let balance = keys_balance(&safe_app, &kp.pk, &kp.sk);
+            let balance = keys_balance_from_pk(&safe_app, &kp.pk, &kp.sk);
             assert_eq!(balance, preload_amount);
         }
     };
@@ -98,3 +104,5 @@ fn test_keys_create_pk() {
         Some(kp) => panic!("Unexpected key pair generated: {:?} {:?}", kp.pk, kp.sk),
     };
 }
+
+// TODO: test_keys_create_pk --pk <invalid pk>

@@ -15,7 +15,6 @@ use structopt::StructOpt;
 use crate::commands::{container, files, keys, pns, safe_id, wallet};
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum SubCommands {
     #[structopt(name = "container")]
     /// Create a new SAFE Network account with the credentials provided

@@ -13,7 +13,6 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum KeysSubCommands {
     #[structopt(name = "add")]
     /// Add a key to another document
@@ -41,4 +40,7 @@ pub enum KeysSubCommands {
         #[structopt(long = "pk")]
         pk: Option<String>,
     },
+    #[structopt(name = "balance")]
+    /// Query a Key's current balance
+    Balance {},
 }

@@ -13,7 +13,6 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum PnsSubCommands {
     #[structopt(name = "add")]
     /// Add a subname to a public name

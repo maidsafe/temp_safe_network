@@ -13,7 +13,6 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum FilesSubCommands {
     #[structopt(name = "add")]
     /// Add a file to a network document / container

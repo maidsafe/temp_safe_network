@@ -13,7 +13,6 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 pub enum WalletSubCommands {
     #[structopt(name = "add")]
     /// Add a wallet to another document
