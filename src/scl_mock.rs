@@ -1,14 +1,14 @@
+use log::debug;
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
 use std::fs;
 use std::io::Write;
+use std::str::FromStr;
 use threshold_crypto::{PublicKey, SecretKey};
 use unwrap::unwrap;
 use uuid::Uuid;
-use log::debug;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -34,9 +34,7 @@ struct MockData {
 
 fn xorname_from_pk(pk: &PublicKey) -> XorName {
     let pk_as_bytes: [u8; 48] = pk.to_bytes();
-    let pk_str: String = pk_as_bytes.iter()
-                                  .map(|b| format!("{:02x}", b))
-                                  .collect();
+    let pk_str: String = pk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect();
     let xorname = &pk_str[..64];
     xorname.to_string()
 }
@@ -55,7 +53,7 @@ fn populate_from_mock_file() -> MockData {
             let deserialized: MockData = unwrap!(serde_json::from_reader(&file));
             debug!("deserialized = {:?}", deserialized.coin_balances);
             deserialized
-        },
+        }
         Err(error) => {
             debug!("Error reading mock file. {}", error.to_string());
             MockData::default()
@@ -64,6 +62,13 @@ fn populate_from_mock_file() -> MockData {
 }
 
 pub struct MockSCL {}
+
+/// Writes the mock data onto the mock file
+/*impl Drop for MockSCL {
+    fn drop(&mut self) {
+        //
+    }
+}*/
 
 impl MockSCL {
     pub fn new() -> MockSCL {
@@ -93,6 +98,21 @@ impl MockSCL {
         xorname
     }
 
+    pub fn allocate_test_coins(&mut self, to_pk: &PublicKey, amount: &str) -> XorName {
+        let mut mock_data: MockData = populate_from_mock_file();
+        let xorname = xorname_from_pk(to_pk);
+        mock_data.coin_balances.insert(
+            xorname.clone(),
+            CoinBalance {
+                owner: (*to_pk),
+                value: amount.to_string(),
+            },
+        );
+
+        write_to_mock_file(&mock_data);
+        xorname
+    }
+
     pub fn get_balance_from_pk(&self, pk: &PublicKey, _sk: &SecretKey) -> String {
         let mock_data: MockData = populate_from_mock_file();
         let xorname = xorname_from_pk(pk);
@@ -114,20 +134,10 @@ impl MockSCL {
             .replace(")", "")
     }
 
-    #[allow(dead_code)]
-    pub fn allocate_test_coins(&mut self, to_pk: &PublicKey, amount: &str) -> XorName {
-        let mut mock_data: MockData = populate_from_mock_file();
-        let xorname = xorname_from_pk(to_pk);
-        mock_data.coin_balances.insert(
-            xorname.clone(),
-            CoinBalance {
-                owner: (*to_pk),
-                value: amount.to_string(),
-            },
-        );
-
-        write_to_mock_file(&mock_data);
-        xorname
+    pub fn fetch_key_pk(&self, xorname: &XorName, _sk: &SecretKey) -> PublicKey {
+        let mock_data: MockData = populate_from_mock_file();
+        let coin_balance = &mock_data.coin_balances[xorname];
+        coin_balance.owner
     }
 
     #[allow(dead_code)]
@@ -208,7 +218,8 @@ impl MockSCL {
             None => BTreeMap::new(),
         };
         uao_for_xorname.insert(uao_for_xorname.len(), data.to_vec());
-        mock_data.unpublished_append_only
+        mock_data
+            .unpublished_append_only
             .insert(xorname.clone(), uao_for_xorname);
 
         write_to_mock_file(&mock_data);

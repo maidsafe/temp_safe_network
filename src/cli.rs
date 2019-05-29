@@ -6,14 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use log::debug;
-use std::io;
+use log::{debug, warn};
+use std::io::{self, stdin, stdout, Write};
 use structopt::StructOpt;
 
 use crate::commands::keys::KeysSubCommands;
 use crate::commands::subcommands::SubCommands;
-use safe_cli::scl_mock::{MockSCL};
-use safe_cli::{keys_balance_from_xorname, keys_create};
+use safe_cli::scl_mock::MockSCL;
+// #[cfg(feature = "mock-network")]
+use safe_cli::keys_create_test_coins;
+use safe_cli::{fetch_key_pk, keys_balance_from_xorname, keys_create, BlsKeyPair};
 use threshold_crypto::SecretKey;
 
 #[derive(StructOpt, Debug)]
@@ -59,29 +61,67 @@ pub fn run() -> Result<(), String> {
         // Is it a create subcommand?
         match cmd {
             Some(KeysSubCommands::Create {
-                anon, preload, pk, ..
+                anon,
+                preload,
+                pk,
+                from,
+                test_coins,
+                ..
             }) => {
+                let create_new_key = |safe_app, from, preload: Option<String>, pk| {
+                    if test_coins {
+                        /*if cfg!(not(feature = "mock-network")) {
+                            warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+                            println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+                            keys_create(safe_app, from, preload, pk)
+                        } else {*/
+                        warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+                        println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+                        let amount = preload.unwrap_or("0".to_string());
+                        keys_create_test_coins(safe_app, amount, pk)
+                    // }
+                    } else {
+                        keys_create(safe_app, from, preload, pk)
+                    }
+                };
+
+                // 'from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
+                let from_key_pair = match from {
+                    Some(from_xorname) => {
+                        // TODO: support Key XOR-URL and pk, we now support only Key XOR name
+                        // Prompt the user for the secret key since 'from' is a Key and not a Wallet
+                        let _user_input = prompt_user(
+                            &format!(
+                                "Enter secret key corresponding to public key at XOR name: {}",
+                                from_xorname
+                            ),
+                            "Invalid input",
+                        );
+                        let sk = SecretKey::random(); //FIXME: from(user_input);
+                        let pk = fetch_key_pk(&safe_app, &from_xorname, &sk);
+                        Some(BlsKeyPair { pk, sk })
+                    }
+                    None => None,
+                };
+
                 // Want an anonymous Key?
                 if anon {
-                    let (xorname, key_pair) = keys_create(&mut safe_app, preload, pk);
+                    let (xorname, key_pair) =
+                        create_new_key(&mut safe_app, from_key_pair, preload, pk);
                     println!(
                         "New Key created at: {:?}. This was not linked from any container.",
                         xorname
                     );
 
                     if let Some(pair) = key_pair {
-                        println!(
-                            "Key pair generated is: pk: {:?}, sk: {:?}",
-                            pair.pk, pair.sk
-                        );
+                        reveal_key_pair(pair);
                     }
                 }
             }
             Some(KeysSubCommands::Balance {}) => {
                 let sk = SecretKey::random(); // FIXME: get sk from args or account
                 let target = get_target_location(args.target)?;
-                let current_balance =
-                    keys_balance_from_xorname(&mut safe_app, &target, &sk);
+                let current_balance = keys_balance_from_xorname(&mut safe_app, &target, &sk);
                 println!("Key's current balance: {:?}", current_balance);
             }
             Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),
@@ -112,4 +152,30 @@ fn get_target_location(target_arg: Option<String>) -> Result<String, String> {
             }
         }
     }
+}
+
+fn prompt_user(prompt_msg: &str, error_msg: &str) -> String {
+    let mut user_input = String::new();
+    print!("{}", prompt_msg);
+    let _ = stdout().flush();
+    stdin().read_line(&mut user_input).expect(error_msg);
+    if let Some('\n') = user_input.chars().next_back() {
+        user_input.pop();
+    }
+    if let Some('\r') = user_input.chars().next_back() {
+        user_input.pop();
+    }
+
+    user_input
+}
+
+fn reveal_key_pair(key_pair: BlsKeyPair) {
+    let pk_as_bytes: [u8; 48] = key_pair.pk.to_bytes();
+    let sk_as_bytes = key_pair.sk.reveal();
+    let pk_str: String = pk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+    //let sk_str: String = sk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+    println!(
+        "Key pair generated is: pk: {:?}, sk: {:?}",
+        pk_str, sk_as_bytes
+    );
 }

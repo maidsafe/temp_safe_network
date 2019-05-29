@@ -25,6 +25,7 @@ serde_json = "1.0.39"
 [features]
 default = ["uuid/v4"]
 #mock-network = ["safe_app/mock-network"]
+mock-network = []
 
 [patch.crates-io]
 safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }

@@ -27,6 +27,12 @@ pub enum KeysSubCommands {
     #[structopt(name = "create")]
     /// Create a new KeyPair
     Create {
+        /// Create a Key and allocate test-coins onto it
+        #[structopt(long = "test-coins")]
+        test_coins: bool,
+        /// The source wallet for funds
+        #[structopt(long = "from")]
+        from: Option<String>,
         /// Do not save the secret key to the network
         #[structopt(long = "anon")]
         anon: bool,
