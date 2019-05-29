@@ -12,8 +12,9 @@ use structopt::StructOpt;
 
 use crate::commands::keys::KeysSubCommands;
 use crate::commands::subcommands::SubCommands;
-use safe_cli::keys_create;
-use safe_cli::scl_mock::{MockSCL, XorName};
+use safe_cli::scl_mock::{MockSCL};
+use safe_cli::{keys_balance_from_xorname, keys_create};
+use threshold_crypto::SecretKey;
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -77,12 +78,11 @@ pub fn run() -> Result<(), String> {
                 }
             }
             Some(KeysSubCommands::Balance {}) => {
-                let mut xorname = XorName::default();
-                // Target location for the command
+                let sk = SecretKey::random(); // FIXME: get sk from args or account
                 let target = get_target_location(args.target)?;
-                xorname.copy_from_slice(target.as_bytes());
-                // let current_balance = keys_balance_from_xorname(&safe_app, &xorname, &sk);
-                // println!("Key's current balance: {:?}", current_balance);
+                let current_balance =
+                    keys_balance_from_xorname(&mut safe_app, &target, &sk);
+                println!("Key's current balance: {:?}", current_balance);
             }
             Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),
             None => return Err("Missing keys subcommand".to_string()),
@@ -105,6 +105,7 @@ fn get_target_location(target_arg: Option<String>) -> Result<String, String> {
                         "Read ({} bytes) from STDIN for target location: {}",
                         n, input
                     );
+                    input.truncate(input.len() - 1);
                     Ok(input)
                 }
                 Err(_) => Err("There is no `--target` specified and no STDIN stream".to_string()),

@@ -1,44 +1,73 @@
 use safecoin::{Coins, NanoCoins};
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
+use std::fs;
+use std::io::Write;
 use threshold_crypto::{PublicKey, SecretKey};
 use unwrap::unwrap;
 use uuid::Uuid;
+use log::debug;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct CoinBalance {
     owner: PublicKey,
-    value: Coins,
+    value: String,
 }
 
-pub type XorName = [u8; 32];
-type AppendOnlyDataMock = HashMap<usize, Vec<u8>>;
-type TxStatusList = HashMap<Uuid, String>;
+//pub type XorName = [u8; 32];
+type AppendOnlyDataMock = BTreeMap<usize, Vec<u8>>;
+type TxStatusList = BTreeMap<String, String>;
 
-#[derive(Default)]
-pub struct MockSCL {
-    coin_balances: HashMap<XorName, CoinBalance>,
-    txs: HashMap<XorName, TxStatusList>, // keep track of TX status per tx ID, per xorname
-    unpublished_append_only: HashMap<XorName, AppendOnlyDataMock>, // keep a versioned map of data per xorname
+pub type XorName = String;
+
+static MOCK_FILE: &str = "./mock_data.txt";
+
+#[derive(Default, Serialize, Deserialize)]
+struct MockData {
+    coin_balances: BTreeMap<XorName, CoinBalance>,
+    txs: BTreeMap<XorName, TxStatusList>, // keep track of TX status per tx ID, per xorname
+    unpublished_append_only: BTreeMap<XorName, AppendOnlyDataMock>, // keep a versioned map of data per xorname
 }
 
 fn xorname_from_pk(pk: &PublicKey) -> XorName {
     let pk_as_bytes: [u8; 48] = pk.to_bytes();
-    let mut xorname: XorName = [0; 32];
-    xorname.copy_from_slice(&pk_as_bytes[..32]);
-
-    xorname
+    let pk_str: String = pk_as_bytes.iter()
+                                  .map(|b| format!("{:02x}", b))
+                                  .collect();
+    let xorname = &pk_str[..64];
+    xorname.to_string()
 }
+
+fn write_to_mock_file(mock_data: &MockData) {
+    let serialized = unwrap!(serde_json::to_string(mock_data));
+    debug!("serialized = {}", serialized);
+
+    let mut file = unwrap!(fs::File::create(&MOCK_FILE));
+    unwrap!(file.write(serialized.as_bytes()));
+}
+
+fn populate_from_mock_file() -> MockData {
+    match fs::File::open(&MOCK_FILE) {
+        Ok(file) => {
+            let deserialized: MockData = unwrap!(serde_json::from_reader(&file));
+            debug!("deserialized = {:?}", deserialized.coin_balances);
+            deserialized
+        },
+        Err(error) => {
+            debug!("Error reading mock file. {}", error.to_string());
+            MockData::default()
+        }
+    }
+}
+
+pub struct MockSCL {}
 
 impl MockSCL {
     pub fn new() -> MockSCL {
-        MockSCL {
-            coin_balances: HashMap::new(),
-            txs: HashMap::new(),
-            unpublished_append_only: HashMap::new(),
-        }
+        MockSCL {}
     }
 
     pub fn create_balance(
@@ -48,22 +77,26 @@ impl MockSCL {
         new_balance_owner: &PublicKey,
         amount: &str,
     ) -> XorName {
+        let mut mock_data: MockData = populate_from_mock_file();
+
         let xorname = xorname_from_pk(new_balance_owner);
-        let coin = unwrap!(Coins::from_str(amount));
-        self.coin_balances.insert(
-            xorname,
+        mock_data.coin_balances.insert(
+            xorname.clone(),
             CoinBalance {
                 owner: (*new_balance_owner),
-                value: coin,
+                value: amount.to_string(),
             },
         );
+
+        write_to_mock_file(&mock_data);
 
         xorname
     }
 
     pub fn get_balance_from_pk(&self, pk: &PublicKey, _sk: &SecretKey) -> String {
+        let mock_data: MockData = populate_from_mock_file();
         let xorname = xorname_from_pk(pk);
-        let coin_balance = &self.coin_balances[&xorname];
+        let coin_balance = &mock_data.coin_balances[&xorname];
         coin_balance
             .value
             .to_string()
@@ -72,7 +105,8 @@ impl MockSCL {
     }
 
     pub fn get_balance_from_xorname(&self, xorname: &XorName, _sk: &SecretKey) -> String {
-        let coin_balance = &self.coin_balances[xorname];
+        let mock_data: MockData = populate_from_mock_file();
+        let coin_balance = &mock_data.coin_balances[xorname];
         coin_balance
             .value
             .to_string()
@@ -82,16 +116,17 @@ impl MockSCL {
 
     #[allow(dead_code)]
     pub fn allocate_test_coins(&mut self, to_pk: &PublicKey, amount: &str) -> XorName {
+        let mut mock_data: MockData = populate_from_mock_file();
         let xorname = xorname_from_pk(to_pk);
-        let coin = unwrap!(Coins::from_str(&amount));
-        self.coin_balances.insert(
-            xorname,
+        mock_data.coin_balances.insert(
+            xorname.clone(),
             CoinBalance {
                 owner: (*to_pk),
-                value: coin,
+                value: amount.to_string(),
             },
         );
 
+        write_to_mock_file(&mock_data);
         xorname
     }
 
@@ -104,16 +139,20 @@ impl MockSCL {
         tx_id: &Uuid,
         amount: &str,
     ) {
+        let mut mock_data: MockData = populate_from_mock_file();
         let to_xorname = xorname_from_pk(to_pk);
         let from_xorname = xorname_from_pk(from_pk);
 
         // generate TX in destination section (to_pk)
-        let mut txs_for_xorname = match self.txs.get(&to_xorname) {
+        let mut txs_for_xorname = match mock_data.txs.get(&to_xorname) {
             Some(txs) => txs.clone(),
-            None => HashMap::new(),
+            None => BTreeMap::new(),
         };
-        txs_for_xorname.insert(tx_id.clone(), format!("Success({})", amount).to_string());
-        self.txs.insert(to_xorname, txs_for_xorname);
+        txs_for_xorname.insert(
+            tx_id.to_string(),
+            format!("Success({})", amount).to_string(),
+        );
+        mock_data.txs.insert(to_xorname.clone(), txs_for_xorname);
 
         let amount_coin = unwrap!(Coins::from_str(amount));
 
@@ -122,11 +161,11 @@ impl MockSCL {
         let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
         let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
         let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num())); // TODO: check it has enough balance
-        self.coin_balances.insert(
+        mock_data.coin_balances.insert(
             from_xorname,
             CoinBalance {
                 owner: (*from_pk),
-                value: Coins::from(from_new_amount),
+                value: Coins::from(from_new_amount).to_string(),
             },
         );
 
@@ -136,20 +175,22 @@ impl MockSCL {
         ));
         let to_nano_balance = unwrap!(NanoCoins::try_from(to_balance));
         let to_new_amount = unwrap!(NanoCoins::new(to_nano_balance.num() + amount_nano.num()));
-        self.coin_balances.insert(
+        mock_data.coin_balances.insert(
             to_xorname,
             CoinBalance {
                 owner: (*to_pk),
-                value: Coins::from(to_new_amount),
+                value: Coins::from(to_new_amount).to_string(),
             },
         );
+        write_to_mock_file(&mock_data);
     }
 
     #[allow(dead_code)]
     pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKey, _sk: &SecretKey) -> String {
+        let mock_data: MockData = populate_from_mock_file();
         let xorname = xorname_from_pk(pk);
-        let txs_for_xorname = &self.txs[&xorname];
-        let tx_state = unwrap!(txs_for_xorname.get(tx_id));
+        let txs_for_xorname = &mock_data.txs[&xorname];
+        let tx_state = unwrap!(txs_for_xorname.get(&tx_id.to_string()));
         tx_state.to_string()
     }
 
@@ -160,15 +201,17 @@ impl MockSCL {
         _sk: &SecretKey,
         data: &[u8],
     ) -> XorName {
+        let mut mock_data: MockData = populate_from_mock_file();
         let xorname = xorname_from_pk(pk);
-        let mut uao_for_xorname = match self.unpublished_append_only.get(&xorname) {
+        let mut uao_for_xorname = match mock_data.unpublished_append_only.get(&xorname) {
             Some(uao) => uao.clone(),
-            None => HashMap::new(),
+            None => BTreeMap::new(),
         };
         uao_for_xorname.insert(uao_for_xorname.len(), data.to_vec());
-        self.unpublished_append_only
-            .insert(xorname, uao_for_xorname);
+        mock_data.unpublished_append_only
+            .insert(xorname.clone(), uao_for_xorname);
 
+        write_to_mock_file(&mock_data);
         xorname
     }
 
@@ -179,11 +222,12 @@ impl MockSCL {
         _sk: &SecretKey,
         version: Option<usize>,
     ) -> Vec<u8> {
+        let mock_data: MockData = populate_from_mock_file();
         let xorname = xorname_from_pk(pk);
-        let uao_for_xorname = &self.unpublished_append_only[&xorname];
+        let uao_for_xorname = &mock_data.unpublished_append_only[&xorname];
         let data = match version {
             Some(version) => unwrap!(uao_for_xorname.get(&version)),
-            None => unwrap!(uao_for_xorname.get(&self.unpublished_append_only.len())),
+            None => unwrap!(uao_for_xorname.get(&mock_data.unpublished_append_only.len())),
         };
 
         data.to_vec()

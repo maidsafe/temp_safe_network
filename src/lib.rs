@@ -71,7 +71,7 @@ pub fn keys_balance_from_xorname(safe_app: &MockSCL, xorname: &XorName, sk: &Sec
 fn test_keys_create() {
     let mut safe_app = MockSCL::new();
     let (xorname, key_pair) = keys_create(&mut safe_app, None, None);
-    assert_eq!(xorname.len(), 32);
+    assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
         Some(_) => assert!(true),
@@ -83,7 +83,7 @@ fn test_keys_create_preload() {
     let mut safe_app = MockSCL::new();
     let preload_amount = "1.8";
     let (xorname, key_pair) = keys_create(&mut safe_app, Some(preload_amount.to_string()), None);
-    assert_eq!(xorname.len(), 32);
+    assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
         Some(kp) => {
@@ -98,7 +98,7 @@ fn test_keys_create_pk() {
     let mut safe_app = MockSCL::new();
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
     let (xorname, key_pair) = keys_create(&mut safe_app, None, Some(pk));
-    assert_eq!(xorname.len(), 32);
+    assert_eq!(xorname.len(), 64);
     match key_pair {
         None => assert!(true),
         Some(kp) => panic!("Unexpected key pair generated: {:?} {:?}", kp.pk, kp.sk),
