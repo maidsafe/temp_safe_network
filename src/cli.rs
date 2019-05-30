@@ -10,12 +10,9 @@ use log::{debug, warn};
 use std::io::{self, stdin, stdout, Write};
 use structopt::StructOpt;
 
-use crate::commands::keys::KeysSubCommands;
-use crate::commands::subcommands::SubCommands;
-use safe_cli::scl_mock::MockSCL; // TODO: to be removed as a CLI API instance can be retrieved with an `auth` function
-use safe_cli::{fetch_key_pk, keys_balance_from_xorname, keys_create, BlsKeyPair};
-// #[cfg(feature = "mock-network")]
-use safe_cli::keys_create_test_coins;
+use crate::subcommands::keys::KeysSubCommands;
+use crate::subcommands::SubCommands;
+use safe_cli::{BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -51,7 +48,7 @@ pub fn run() -> Result<(), String> {
     // Let's first get all the arguments passed in
     let args = CmdArgs::from_args();
 
-    let mut safe_app = MockSCL::new();
+    let mut safe = Safe::new();
 
     debug!("Processing command: {:?}", args);
 
@@ -67,20 +64,20 @@ pub fn run() -> Result<(), String> {
                 test_coins,
                 ..
             }) => {
-                let create_new_key = |safe_app, from, preload: Option<String>, pk| {
+                let create_new_key = |safe: &mut Safe, from, preload: Option<String>, pk| {
                     if test_coins {
                         /*if cfg!(not(feature = "mock-network")) {
                             warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
                             println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-                            keys_create(safe_app, from, preload, pk)
+                            safe.keys_create(from, preload, pk)
                         } else {*/
                         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
                         println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
                         let amount = preload.unwrap_or("0".to_string());
-                        keys_create_test_coins(safe_app, amount, pk)
+                        safe.keys_create_test_coins(amount, pk)
                     // }
                     } else {
-                        keys_create(safe_app, from, preload, pk)
+                        safe.keys_create(from, preload, pk)
                     }
                 };
 
@@ -97,7 +94,7 @@ pub fn run() -> Result<(), String> {
                             "Invalid input",
                         );
 
-                        let pk = fetch_key_pk(&safe_app, &from_xorname, &sk);
+                        let pk = safe.fetch_key_pk(&from_xorname, &sk);
                         Some(BlsKeyPair { pk, sk })
                     }
                     None => None,
@@ -105,8 +102,7 @@ pub fn run() -> Result<(), String> {
 
                 // Want an anonymous Key?
                 if anon {
-                    let (xorname, key_pair) =
-                        create_new_key(&mut safe_app, from_key_pair, preload, pk);
+                    let (xorname, key_pair) = create_new_key(&mut safe, from_key_pair, preload, pk);
                     println!("New Key created at XOR name: \"{}\"", xorname);
                     println!("This was not linked from any container.");
                     if let Some(pair) = key_pair {
@@ -121,7 +117,7 @@ pub fn run() -> Result<(), String> {
                     "391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058",
                 ); // FIXME: get sk from args or account
                 let target = get_target_location(args.target)?;
-                let current_balance = keys_balance_from_xorname(&mut safe_app, &target, &sk);
+                let current_balance = safe.keys_balance_from_xorname(&target, &sk);
                 println!("Key's current balance: {}", current_balance);
             }
             Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),

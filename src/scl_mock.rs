@@ -1,3 +1,11 @@
+// Copyright 2019 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use log::debug;
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
@@ -18,10 +26,10 @@ struct CoinBalance {
 }
 
 //pub type XorName = [u8; 32];
+pub type XorName = String;
+
 type AppendOnlyDataMock = BTreeMap<usize, Vec<u8>>;
 type TxStatusList = BTreeMap<String, String>;
-
-pub type XorName = String;
 
 static MOCK_FILE: &str = "./mock_data.txt";
 
@@ -55,7 +63,7 @@ impl Drop for MockSCL {
 }
 
 impl MockSCL {
-    pub fn new() -> MockSCL {
+    pub fn new() -> Self {
         let mock_data = match fs::File::open(&MOCK_FILE) {
             Ok(file) => {
                 let deserialized: MockData = unwrap!(serde_json::from_reader(&file));
@@ -67,7 +75,7 @@ impl MockSCL {
             }
         };
 
-        MockSCL { mock_data }
+        Self { mock_data }
     }
 
     pub fn create_balance(

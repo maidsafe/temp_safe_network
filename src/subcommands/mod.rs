@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// use crate::cli_helpers::*;
+pub mod container;
+pub mod files;
+pub mod keys;
+pub mod pns;
+pub mod safe_id;
+pub mod wallet;
 
-// use log::{debug, warn};
-// use std::env;
 use structopt::StructOpt;
-
-use crate::commands::{container, files, keys, pns, safe_id, wallet};
 
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {

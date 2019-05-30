@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod cli;
-mod commands;
+mod subcommands;
 
 use cli::run;
 use env_logger;
