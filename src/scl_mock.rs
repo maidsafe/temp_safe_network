@@ -349,7 +349,10 @@ fn test_check_balance() {
 
     let current_balance = mock.get_balance_from_pk(&pk, &sk);
     println!("Current balance: {}", current_balance);
-    assert_eq!("1.065432109"/* == 2.3 - 1.234567891*/, &current_balance);
+    assert_eq!(
+        "1.065432109", /* == 2.3 - 1.234567891*/
+        &current_balance
+    );
 }
 
 #[test]
