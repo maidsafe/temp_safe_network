@@ -12,11 +12,10 @@ use structopt::StructOpt;
 
 use crate::commands::keys::KeysSubCommands;
 use crate::commands::subcommands::SubCommands;
-use safe_cli::scl_mock::MockSCL;
+use safe_cli::scl_mock::MockSCL; // TODO: to be removed as a CLI API instance can be retrieved with an `auth` function
+use safe_cli::{fetch_key_pk, keys_balance_from_xorname, keys_create, BlsKeyPair};
 // #[cfg(feature = "mock-network")]
 use safe_cli::keys_create_test_coins;
-use safe_cli::{fetch_key_pk, keys_balance_from_xorname, keys_create, BlsKeyPair};
-use threshold_crypto::SecretKey;
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -85,19 +84,19 @@ pub fn run() -> Result<(), String> {
                     }
                 };
 
-                // 'from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
+                // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
                 let from_key_pair = match from {
                     Some(from_xorname) => {
                         // TODO: support Key XOR-URL and pk, we now support only Key XOR name
                         // Prompt the user for the secret key since 'from' is a Key and not a Wallet
-                        let _user_input = prompt_user(
+                        let sk = prompt_user(
                             &format!(
-                                "Enter secret key corresponding to public key at XOR name: {}",
+                                "Enter secret key corresponding to public key at XOR name [{}]: ",
                                 from_xorname
                             ),
                             "Invalid input",
                         );
-                        let sk = SecretKey::random(); //FIXME: from(user_input);
+
                         let pk = fetch_key_pk(&safe_app, &from_xorname, &sk);
                         Some(BlsKeyPair { pk, sk })
                     }
@@ -109,23 +108,30 @@ pub fn run() -> Result<(), String> {
                     let (xorname, key_pair) =
                         create_new_key(&mut safe_app, from_key_pair, preload, pk);
                     println!(
-                        "New Key created at: {:?}. This was not linked from any container.",
+                        "New Key created at: \"{}\". This was not linked from any container.",
                         xorname
                     );
 
                     if let Some(pair) = key_pair {
-                        reveal_key_pair(pair);
+                        println!(
+                            "Key pair generated is: pk=\"{}\", sk=\"{}\"",
+                            pair.pk, pair.sk
+                        );
                     }
+                } else {
+                    // TODO: create Key and add it to the provided --target Wallet
                 }
             }
             Some(KeysSubCommands::Balance {}) => {
-                let sk = SecretKey::random(); // FIXME: get sk from args or account
+                let sk = String::from(
+                    "391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058",
+                ); // FIXME: get sk from args or account
                 let target = get_target_location(args.target)?;
                 let current_balance = keys_balance_from_xorname(&mut safe_app, &target, &sk);
-                println!("Key's current balance: {:?}", current_balance);
+                println!("Key's current balance: {}", current_balance);
             }
             Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),
-            None => return Err("Missing keys subcommand".to_string()),
+            None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
         };
     }
 
@@ -167,15 +173,4 @@ fn prompt_user(prompt_msg: &str, error_msg: &str) -> String {
     }
 
     user_input
-}
-
-fn reveal_key_pair(key_pair: BlsKeyPair) {
-    let pk_as_bytes: [u8; 48] = key_pair.pk.to_bytes();
-    let sk_as_bytes = key_pair.sk.reveal();
-    let pk_str: String = pk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect();
-    //let sk_str: String = sk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect();
-    println!(
-        "Key pair generated is: pk: {:?}, sk: {:?}",
-        pk_str, sk_as_bytes
-    );
 }

@@ -1,24 +1,49 @@
-use threshold_crypto::{PublicKey, SecretKey};
-
 pub mod scl_mock;
 use scl_mock::{MockSCL, XorName};
+
+use threshold_crypto::serde_impl::SerdeSecret;
+use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
 use unwrap::unwrap;
 
+// We expose a BLS key pair as two hex encoded strings
+// TODO: consider supporting others like base32 or just expose Vec<u8>
 pub struct BlsKeyPair {
+    pub pk: String,
+    pub sk: String,
+}
+
+// Out internal key pair structure to manage BLS keys
+struct KeyPair {
     pub pk: PublicKey,
     pub sk: SecretKey,
 }
 
-impl BlsKeyPair {
+impl KeyPair {
     fn random() -> Self {
         let sk = SecretKey::random();
         let pk = sk.public_key();
-        BlsKeyPair { sk, pk }
+        KeyPair { pk, sk }
+    }
+
+    fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> Self {
+        let pk = pk_from_hex(pk_hex_str);
+        let sk = sk_from_hex(sk_hex_str);
+        KeyPair { pk, sk }
+    }
+
+    fn to_hex_key_pair(&self) -> BlsKeyPair {
+        let pk: String = pk_to_hex(&self.pk);
+
+        let sk_serialised = bincode::serialize(&SerdeSecret(&self.sk))
+            .expect("Failed to serialise the generated secret key");
+        let sk: String = sk_serialised.iter().map(|b| format!("{:02x}", b)).collect();
+
+        BlsKeyPair { pk, sk }
     }
 }
 
-fn parse_hex(hex_asm: &str) -> Vec<u8> {
-    let mut hex_bytes = hex_asm
+fn parse_hex(hex_str: &str) -> Vec<u8> {
+    let mut hex_bytes = hex_str
         .as_bytes()
         .iter()
         .filter_map(|b| match b {
@@ -36,6 +61,23 @@ fn parse_hex(hex_asm: &str) -> Vec<u8> {
     bytes
 }
 
+fn pk_to_hex(pk: &PublicKey) -> String {
+    let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
+    pk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+fn pk_from_hex(hex_str: &str) -> PublicKey {
+    let pk_bytes = parse_hex(&hex_str);
+    let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
+    pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
+    unwrap!(PublicKey::from_bytes(pk_bytes_array))
+}
+
+fn sk_from_hex(hex_str: &str) -> SecretKey {
+    let sk_bytes = parse_hex(&hex_str);
+    bincode::deserialize(&sk_bytes).expect("Failed to deserialize provided secret key")
+}
+
 // Create a Key on the network and return its XOR name
 pub fn keys_create(
     safe_app: &mut MockSCL,
@@ -43,7 +85,10 @@ pub fn keys_create(
     preload_amount: Option<String>,
     pk: Option<String>,
 ) -> (XorName, Option<BlsKeyPair>) {
-    let from_key_pair = from.unwrap_or(BlsKeyPair::random()); // TODO: fetch default wallet from account
+    let from_key_pair: KeyPair = match from {
+        Some(key_pair) => KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk),
+        None => panic!("Missing coins' key pair to cover the costs of the operation"), // TODO: fetch default wallet from account if not provided
+    };
 
     let create_key = |pk| match preload_amount {
         Some(amount) => safe_app.create_balance(&from_key_pair.pk, &from_key_pair.sk, &pk, &amount),
@@ -51,14 +96,12 @@ pub fn keys_create(
     };
 
     if let Some(pk_str) = pk {
-        let pk_bytes = parse_hex(&pk_str);
-        let mut pk_bytes_array: [u8; 48] = [0; 48];
-        pk_bytes_array.copy_from_slice(&pk_bytes[..48]);
-        let pk = unwrap!(PublicKey::from_bytes(pk_bytes_array));
+        let pk = pk_from_hex(&pk_str);
         (create_key(pk), None)
     } else {
-        let key_pair = BlsKeyPair::random();
-        (create_key(key_pair.pk), Some(key_pair))
+        let key_pair = KeyPair::random();
+        let bls_key_pair = key_pair.to_hex_key_pair();
+        (create_key(key_pair.pk), Some(bls_key_pair))
     }
 }
 
@@ -71,32 +114,33 @@ pub fn keys_create_test_coins(
     pk: Option<String>,
 ) -> (XorName, Option<BlsKeyPair>) {
     if let Some(pk_str) = pk {
-        let pk_bytes = parse_hex(&pk_str);
-        let mut pk_bytes_array: [u8; 48] = [0; 48];
-        pk_bytes_array.copy_from_slice(&pk_bytes[..48]);
-        let pk = unwrap!(PublicKey::from_bytes(pk_bytes_array));
+        let pk = pk_from_hex(&pk_str);
         let xorname = safe_app.allocate_test_coins(&pk, &preload_amount);
         (xorname, None)
     } else {
-        let key_pair = BlsKeyPair::random();
+        let key_pair = KeyPair::random();
         let xorname = safe_app.allocate_test_coins(&key_pair.pk, &preload_amount);
-        (xorname, Some(key_pair))
+        (xorname, Some(key_pair.to_hex_key_pair()))
     }
 }
 
-// Check Key's from the network from a given PublicKey
-pub fn keys_balance_from_pk(safe_app: &MockSCL, pk: &PublicKey, sk: &SecretKey) -> String {
-    safe_app.get_balance_from_pk(pk, sk)
+// Check Key's balance from the network from a given PublicKey
+pub fn keys_balance_from_pk(safe_app: &MockSCL, key_pair: &BlsKeyPair) -> String {
+    let pair = KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk);
+    safe_app.get_balance_from_pk(&pair.pk, &pair.sk)
 }
 
-// Check Key's from the network from a given XOR name
-pub fn keys_balance_from_xorname(safe_app: &MockSCL, xorname: &XorName, sk: &SecretKey) -> String {
-    safe_app.get_balance_from_xorname(xorname, sk)
+// Check Key's balance from the network from a given XOR name
+pub fn keys_balance_from_xorname(safe_app: &MockSCL, xorname: &XorName, sk: &str) -> String {
+    let secret_key: SecretKey = sk_from_hex(sk);
+    safe_app.get_balance_from_xorname(xorname, &secret_key)
 }
 
 // Fetch Key's pk from the network from a given XOR name
-pub fn fetch_key_pk(safe_app: &MockSCL, xorname: &XorName, sk: &SecretKey) -> PublicKey {
-    safe_app.fetch_key_pk(xorname, sk)
+pub fn fetch_key_pk(safe_app: &MockSCL, xorname: &XorName, sk: &str) -> String {
+    let secret_key: SecretKey = sk_from_hex(sk);
+    let public_key = safe_app.fetch_key_pk(xorname, &secret_key);
+    pk_to_hex(&public_key)
 }
 
 #[test]
@@ -120,7 +164,13 @@ fn test_keys_create_preload() {
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
         Some(kp) => {
-            let balance = keys_balance_from_pk(&safe_app, &kp.pk, &kp.sk);
+            let balance = keys_balance_from_pk(
+                &safe_app,
+                &BlsKeyPair {
+                    pk: kp.pk,
+                    sk: kp.sk,
+                },
+            );
             assert_eq!(balance, preload_amount);
         }
     };

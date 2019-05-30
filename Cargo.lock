@@ -57,7 +57,7 @@ dependencies = [
  "backtrace-sys 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.55 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-demangle 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-demangle 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -67,6 +67,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.55 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "bincode"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "autocfg 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -593,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "rustc-demangle"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -605,6 +615,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "safe_cli"
 version = "0.0.1"
 dependencies = [
+ "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cargo-husky 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -879,6 +890,7 @@ dependencies = [
 "checksum autocfg 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0e49efa51329a5fd37e7c79db4621af617cd4e3e5bc224939808d076077077bf"
 "checksum backtrace 0.3.26 (registry+https://github.com/rust-lang/crates.io-index)" = "1a13fc43f04daf08ab4f71e3d27e1fc27fc437d3e95ac0063a796d92fb40f39b"
 "checksum backtrace-sys 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)" = "797c830ac25ccc92a7f8a7b9862bde440715531514594a6154e3d4a54dd769b6"
+"checksum bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "9f04a5e50dc80b3d5d35320889053637d15011aed5e66b66b37ae798c65da6f7"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum blake2-rfc 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "5d6d530bdd2d52966a6d03b7a964add7ae1a288d25214066fd4b600f0f796400"
 "checksum byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a019b10a2a7cdeb292db131fc8113e57ea2a908f6e7894b0c3c671893b65dbeb"
@@ -943,7 +955,7 @@ dependencies = [
 "checksum regex 1.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "8f0a0bcab2fd7d1d7c54fa9eae6f43eddeb9ce2e7352f8518a814a4f65d60c58"
 "checksum regex-syntax 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)" = "dcfd8681eebe297b81d98498869d4aae052137651ad7b96822f09ceb690d0a96"
 "checksum rpassword 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c34fa7bcae7fca3c8471e8417088bbc3ad9af8066b0ecf4f3c0d98a0d772716e"
-"checksum rustc-demangle 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "ccc78bfd5acd7bf3e89cffcf899e5cb1a52d6fafa8dec2739ad70c9577a57288"
+"checksum rustc-demangle 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)" = "a7f4dccf6f4891ebcc0c39f9b6eb1a83b9bf5d747cb439ec6fba4f3b977038af"
 "checksum ryu 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "b96a9549dc8d48f2c283938303c4b5a77aa29bfbc5b54b084fb1630408899a8f"
 "checksum safecoin 0.5.0 (git+https://gitlab.com/Fraser999/SafeCoin)" = "<none>"
 "checksum scoped_threadpool 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "1d51f5df5af43ab3f1360b429fa5e0152ac5ce8c0bd6485cae490332e96846a8"
