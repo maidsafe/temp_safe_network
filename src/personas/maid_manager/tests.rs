@@ -444,7 +444,7 @@ fn auth_keys() {
 }
 
 #[test]
-#[allow(clippy::cyclomatic_complexity)]
+#[allow(clippy::cognitive_complexity)]
 fn mutation_authorisation() {
     let mut rng = rand::thread_rng();
 
