@@ -107,16 +107,10 @@ pub fn run() -> Result<(), String> {
                 if anon {
                     let (xorname, key_pair) =
                         create_new_key(&mut safe_app, from_key_pair, preload, pk);
-                    println!(
-                        "New Key created at: \"{}\". This was not linked from any container.",
-                        xorname
-                    );
-
+                    println!("New Key created at XOR name: \"{}\"", xorname);
+                    println!("This was not linked from any container.");
                     if let Some(pair) = key_pair {
-                        println!(
-                            "Key pair generated is: pk=\"{}\", sk=\"{}\"",
-                            pair.pk, pair.sk
-                        );
+                        println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
                     }
                 } else {
                     // TODO: create Key and add it to the provided --target Wallet
