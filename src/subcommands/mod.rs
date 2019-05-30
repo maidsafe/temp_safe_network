@@ -9,6 +9,7 @@
 pub mod container;
 pub mod files;
 pub mod keys;
+pub mod mutable_data;
 pub mod pns;
 pub mod safe_id;
 pub mod wallet;
@@ -71,5 +72,12 @@ pub enum SubCommands {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<safe_id::SafeIdSubCommands>,
+    },
+    #[structopt(name = "mutable-data")]
+    /// Manage mutable data on the network
+    MutableData {
+        /// subcommands
+        #[structopt(subcommand)]
+        cmd: Option<mutable_data::MutableDataSubCommands>,
     },
 }

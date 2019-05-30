@@ -10,7 +10,13 @@ mod lib_helpers;
 mod scl_mock;
 
 use lib_helpers::{pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
-use scl_mock::{MockSCL, XorName};
+use rand::rngs::OsRng;
+use rand::Rng;
+use rand_core::RngCore;
+use safe_nd::mutable_data::{MutableData, MutableDataKind, Permission, User, Value};
+use scl_mock::{MockSCL, XorHash, XorName};
+use std::collections::{BTreeMap, BTreeSet};
+use tiny_keccak::sha3_256;
 
 use threshold_crypto::SecretKey;
 
@@ -104,6 +110,82 @@ impl Safe {
         let secret_key: SecretKey = sk_from_hex(sk);
         let public_key = self.safe_app.fetch_key_pk(xorname, &secret_key);
         pk_to_hex(&public_key)
+    }
+
+    pub fn md_create(
+        &mut self,
+        name: Option<String>,
+        tag: Option<u64>,
+        // _data: Option<String>,
+        permissions: Option<String>,
+        sequenced: bool,
+    ) -> XorHash {
+        let mut xorname: XorHash;
+        if let Some(n) = name {
+            xorname = sha3_256(n.as_bytes());
+        } else {
+            let mut os_rng = OsRng::new().unwrap();
+            xorname = [0u8; 32];
+            os_rng.fill_bytes(&mut xorname);
+        }
+
+        let mut permission_map: BTreeMap<User, BTreeSet<Permission>> = BTreeMap::new();
+        let perms_string: String;
+        if let Some(perms) = permissions {
+            perms_string = perms;
+        } else {
+            perms_string = String::from("read insert update delete permissions");
+        }
+        let permission_set: BTreeSet<Permission> = perms_string
+            .split_whitespace()
+            .map(|permission| match permission.to_lowercase().as_str() {
+                "read" => Ok(Permission::Read),
+                "insert" => Ok(Permission::Insert),
+                "update" => Ok(Permission::Update),
+                "delete" => Ok(Permission::Delete),
+                "permissions" => Ok(Permission::ManagePermissions),
+                _ => Err("Invalid permission"),
+            })
+            .filter_map(Result::ok)
+            .collect();
+        permission_map.insert(User::Anyone, permission_set);
+
+        let md_kind = match sequenced {
+            true => {
+                // if let Some(data_string) = data {
+                // }
+                let mut inner: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+                inner.insert(String::from("test"), String::from("test").into_bytes());
+                MutableDataKind::Sequenced { data: inner }
+            }
+            false => {
+                // An unsequenced MD doesn't need data versioning. Noted here: https://github.com/maidsafe/safe-nd/issues/7
+
+                // if let Some(data_string) = data {
+                // }
+                let mut inner: BTreeMap<String, Value> = BTreeMap::new();
+                inner.insert(
+                    String::from("test"),
+                    Value {
+                        data: String::from("test").into_bytes(),
+                        version: 0,
+                    },
+                );
+                MutableDataKind::Unsequenced { data: inner }
+            }
+        };
+        let md_tag: u64;
+        if let Some(t) = tag {
+            md_tag = t;
+        } else {
+            let mut rng = rand::thread_rng();
+            md_tag = rng.gen();
+        }
+        let sk = SecretKey::random();
+        let pk = sk.public_key();
+        let md = MutableData::new(xorname, md_tag, md_kind, permission_map, pk);
+        self.safe_app.mutable_data_put(md);
+        xorname
     }
 }
 

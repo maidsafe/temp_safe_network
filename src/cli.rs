@@ -11,6 +11,7 @@ use std::io::{self, stdin, stdout, Write};
 use structopt::StructOpt;
 
 use crate::subcommands::keys::KeysSubCommands;
+use crate::subcommands::mutable_data::MutableDataSubCommands;
 use crate::subcommands::SubCommands;
 use safe_cli::{BlsKeyPair, Safe};
 
@@ -123,6 +124,19 @@ pub fn run() -> Result<(), String> {
             Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),
             None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
         };
+    } else if let SubCommands::MutableData { cmd } = args.cmd {
+        match cmd {
+            Some(MutableDataSubCommands::Create {
+                name,
+                permissions,
+                tag,
+                sequenced,
+            }) => {
+                let xor = safe.md_create(name, tag, permissions, sequenced);
+                println!("{:?}", xor);
+            }
+            None => return Err("Missing mutable-data subcommand".to_string()),
+        }
     }
 
     Ok(())

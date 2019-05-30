@@ -7,13 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use log::debug;
+use safe_nd::mutable_data::MutableData;
+pub use safe_nd::XorName as XorHash;
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
-use std::fs;
 use std::io::Write;
 use std::str::FromStr;
+use std::{fs, str};
 use threshold_crypto::{PublicKey, SecretKey};
 use unwrap::unwrap;
 use uuid::Uuid;
@@ -38,6 +40,7 @@ struct MockData {
     coin_balances: BTreeMap<XorName, CoinBalance>,
     txs: BTreeMap<XorName, TxStatusList>, // keep track of TX status per tx ID, per xorname
     unpublished_append_only: BTreeMap<XorName, AppendOnlyDataMock>, // keep a versioned map of data per xorname
+    mutable_data: BTreeMap<String, MutableData>,
 }
 
 fn xorname_from_pk(pk: &PublicKey) -> XorName {
@@ -246,6 +249,16 @@ impl MockSCL {
         };
 
         data.to_vec()
+    }
+
+    #[allow(dead_code)]
+    pub fn mutable_data_put(&mut self, md: MutableData) -> XorHash {
+        let xorname_as_string: String = md.name().iter().map(|b| format!("{:02x}", b)).collect();
+        &self
+            .mock_data
+            .mutable_data
+            .insert(xorname_as_string, md.clone());
+        md.name()
     }
 }
 
