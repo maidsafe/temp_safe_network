@@ -282,46 +282,6 @@ fn test_unpublished_append_only_get() {
 }
 
 #[test]
-fn test_create_balance() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
-
-    let mut mock = MockSCL::new();
-
-    let sk_from = SecretKey::random();
-    let pk_from = sk_from.public_key();
-
-    let sk_to = SecretKey::random();
-    let pk_to = sk_to.public_key();
-    println!(
-        "New CoinBalance at: {:?}",
-        mock.create_balance(&pk_from, &sk_from, &pk_to, "1.234567891")
-    );
-}
-
-#[test]
-fn test_check_balance() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
-
-    let mut mock = MockSCL::new();
-
-    let sk_from = SecretKey::random();
-    let pk_from = sk_from.public_key();
-
-    let sk_to = SecretKey::random();
-    let pk_to = sk_to.public_key();
-    let balance = "1.234567891";
-    println!(
-        "New CoinBalance at: {:?}",
-        mock.create_balance(&pk_from, &sk_from, &pk_to, balance)
-    );
-    let current_balance = mock.get_balance_from_pk(&pk_to, &sk_to);
-    println!("Current balance: {}", current_balance);
-    assert_eq!(balance, &current_balance);
-}
-
-#[test]
 fn test_allocate_test_coins() {
     use self::MockSCL;
     use threshold_crypto::SecretKey;
@@ -337,6 +297,59 @@ fn test_allocate_test_coins() {
     let current_balance = mock.get_balance_from_pk(&pk_to, &sk_to);
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
+}
+
+#[test]
+fn test_create_balance() {
+    use self::MockSCL;
+    use threshold_crypto::SecretKey;
+
+    let mut mock = MockSCL::new();
+
+    let sk = SecretKey::random();
+    let pk = sk.public_key();
+
+    let balance = "2.345678912";
+    mock.allocate_test_coins(&pk, balance);
+
+    let sk_to = SecretKey::random();
+    let pk_to = sk_to.public_key();
+    println!(
+        "New CoinBalance at: {:?}",
+        mock.create_balance(&pk, &sk, &pk_to, "1.234567891")
+    );
+}
+
+#[test]
+fn test_check_balance() {
+    use self::MockSCL;
+    use threshold_crypto::SecretKey;
+
+    let mut mock = MockSCL::new();
+
+    let sk = SecretKey::random();
+    let pk = sk.public_key();
+
+    let balance = "2.3";
+    mock.allocate_test_coins(&pk, balance);
+    let current_balance = mock.get_balance_from_pk(&pk, &sk);
+    println!("Current balance: {}", current_balance);
+    assert_eq!(balance, &current_balance);
+
+    let sk_to = SecretKey::random();
+    let pk_to = sk_to.public_key();
+    let preload = "1.234567891";
+    println!(
+        "New CoinBalance at: {:?}",
+        mock.create_balance(&pk, &sk, &pk_to, preload)
+    );
+    let current_balance = mock.get_balance_from_pk(&pk_to, &sk_to);
+    println!("Current balance: {}", current_balance);
+    assert_eq!(preload, &current_balance);
+
+    let current_balance = mock.get_balance_from_pk(&pk, &sk);
+    println!("Current balance: {}", current_balance);
+    assert_eq!("1.065432109"/* == 2.3 - 1.234567891*/, &current_balance);
 }
 
 #[test]

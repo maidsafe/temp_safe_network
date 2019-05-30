@@ -144,9 +144,22 @@ pub fn fetch_key_pk(safe_app: &MockSCL, xorname: &XorName, sk: &str) -> String {
 }
 
 #[test]
+fn test_keys_create_test_coins() {
+    let mut safe_app = MockSCL::new();
+    let (xorname, key_pair) = keys_create_test_coins(&mut safe_app, "12.23".to_string(), None);
+    assert_eq!(xorname.len(), 64);
+    match key_pair {
+        None => panic!("Key pair was not generated as it was expected"),
+        Some(_) => assert!(true),
+    };
+}
+
+#[test]
 fn test_keys_create() {
     let mut safe_app = MockSCL::new();
-    let (xorname, key_pair) = keys_create(&mut safe_app, None, None, None);
+    let (_, from_key_pair) = keys_create_test_coins(&mut safe_app, "23.23".to_string(), None);
+
+    let (xorname, key_pair) = keys_create(&mut safe_app, from_key_pair, None, None);
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
@@ -157,9 +170,11 @@ fn test_keys_create() {
 #[test]
 fn test_keys_create_preload() {
     let mut safe_app = MockSCL::new();
+    let (_, from_key_pair) = keys_create_test_coins(&mut safe_app, "543.2312".to_string(), None);
+
     let preload_amount = "1.8";
     let (xorname, key_pair) =
-        keys_create(&mut safe_app, None, Some(preload_amount.to_string()), None);
+        keys_create(&mut safe_app, from_key_pair, Some(preload_amount.to_string()), None);
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
@@ -179,8 +194,9 @@ fn test_keys_create_preload() {
 #[test]
 fn test_keys_create_pk() {
     let mut safe_app = MockSCL::new();
+    let (_, from_key_pair) = keys_create_test_coins(&mut safe_app, "1.1".to_string(), None);
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
-    let (xorname, key_pair) = keys_create(&mut safe_app, None, None, Some(pk));
+    let (xorname, key_pair) = keys_create(&mut safe_app, from_key_pair, None, Some(pk));
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => assert!(true),
