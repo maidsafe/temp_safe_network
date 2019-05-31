@@ -9,6 +9,7 @@
 mod lib_helpers;
 mod scl_mock;
 
+pub use lib_helpers::hash_to_hex;
 use lib_helpers::{pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
 use rand::rngs::OsRng;
 use rand::Rng;
@@ -119,7 +120,7 @@ impl Safe {
         // _data: Option<String>,
         permissions: Option<String>,
         sequenced: bool,
-    ) -> XorHash {
+    ) -> MutableData {
         let mut xorname: XorHash;
         if let Some(n) = name {
             xorname = sha3_256(n.as_bytes());
@@ -184,8 +185,8 @@ impl Safe {
         let sk = SecretKey::random();
         let pk = sk.public_key();
         let md = MutableData::new(xorname, md_tag, md_kind, permission_map, pk);
-        self.safe_app.mutable_data_put(md);
-        xorname
+        self.safe_app.mutable_data_put(md.clone());
+        md
     }
 }
 
@@ -347,4 +348,16 @@ fn test_fetch_key_pk() {
     let key_pair_unwrapped = unwrap!(key_pair);
     let pk = safe.fetch_key_pk(&xorname, &key_pair_unwrapped.sk);
     assert_eq!(pk, key_pair_unwrapped.pk);
+}
+
+#[test]
+fn test_md_create() {
+    use lib_helpers::hash_to_hex;
+    let mut safe = Safe::new();
+    let name = String::from("test");
+    let md = safe.md_create(Some(name.clone()), None, None, false);
+    let hash = sha3_256(name.as_bytes());
+    let hash_as_string: String = hash_to_hex(hash.to_vec());
+    let xorname = hash_to_hex(md.name().to_vec());
+    assert_eq!(xorname, hash_as_string);
 }

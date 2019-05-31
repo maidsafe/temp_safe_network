@@ -34,10 +34,14 @@ impl KeyPair {
 
         let sk_serialised = bincode::serialize(&SerdeSecret(&self.sk))
             .expect("Failed to serialise the generated secret key");
-        let sk: String = sk_serialised.iter().map(|b| format!("{:02x}", b)).collect();
+        let sk: String = hash_to_hex(sk_serialised);
 
         (pk, sk)
     }
+}
+
+pub fn hash_to_hex(hash: Vec<u8>) -> String {
+    hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 fn parse_hex(hex_str: &str) -> Vec<u8> {
@@ -61,7 +65,7 @@ fn parse_hex(hex_str: &str) -> Vec<u8> {
 
 pub fn pk_to_hex(pk: &PublicKey) -> String {
     let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
-    pk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    hash_to_hex(pk_as_bytes.to_vec())
 }
 
 pub fn pk_from_hex(hex_str: &str) -> PublicKey {

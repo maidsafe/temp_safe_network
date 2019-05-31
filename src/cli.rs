@@ -13,7 +13,7 @@ use structopt::StructOpt;
 use crate::subcommands::keys::KeysSubCommands;
 use crate::subcommands::mutable_data::MutableDataSubCommands;
 use crate::subcommands::SubCommands;
-use safe_cli::{BlsKeyPair, Safe};
+use safe_cli::{hash_to_hex, BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -132,8 +132,9 @@ pub fn run() -> Result<(), String> {
                 tag,
                 sequenced,
             }) => {
-                let xor = safe.md_create(name, tag, permissions, sequenced);
-                println!("{:?}", xor);
+                let md = safe.md_create(name, tag, permissions, sequenced);
+                let xorname: String = hash_to_hex(md.name().to_vec());
+                println!("XorName: {:?}, Tag: {:?}", xorname, md.tag());
             }
             None => return Err("Missing mutable-data subcommand".to_string()),
         }

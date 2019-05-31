@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::lib_helpers::hash_to_hex;
 use log::debug;
 use safe_nd::mutable_data::MutableData;
 pub use safe_nd::XorName as XorHash;
@@ -45,7 +46,7 @@ struct MockData {
 
 fn xorname_from_pk(pk: &PublicKey) -> XorName {
     let pk_as_bytes: [u8; 48] = pk.to_bytes();
-    let pk_str: String = pk_as_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+    let pk_str: String = hash_to_hex(pk_as_bytes.to_vec());
     let xorname = &pk_str[..64];
     xorname.to_string()
 }
@@ -252,13 +253,9 @@ impl MockSCL {
     }
 
     #[allow(dead_code)]
-    pub fn mutable_data_put(&mut self, md: MutableData) -> XorHash {
-        let xorname_as_string: String = md.name().iter().map(|b| format!("{:02x}", b)).collect();
-        &self
-            .mock_data
-            .mutable_data
-            .insert(xorname_as_string, md.clone());
-        md.name()
+    pub fn mutable_data_put(&mut self, md: MutableData) {
+        let xorname_as_string: String = hash_to_hex(md.name().to_vec());
+        &self.mock_data.mutable_data.insert(xorname_as_string, md);
     }
 }
 
