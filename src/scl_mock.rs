@@ -252,10 +252,15 @@ impl MockSCL {
         data.to_vec()
     }
 
-    #[allow(dead_code)]
-    pub fn mutable_data_put(&mut self, md: MutableData) {
+    pub fn mutable_data_put(&mut self, md: &MutableData) -> XorHash {
         let xorname_as_string: String = hash_to_hex(md.name().to_vec());
-        &self.mock_data.mutable_data.insert(xorname_as_string, md);
+        &self
+            .mock_data
+            .mutable_data
+            .insert(xorname_as_string, md.clone());
+        let mut xorhash = XorHash::default();
+        xorhash.copy_from_slice(&md.name());
+        xorhash
     }
 }
 
@@ -311,7 +316,6 @@ fn test_allocate_test_coins() {
 
     let balance = "2.345678912";
     mock.allocate_test_coins(&pk_to, balance);
-
     let current_balance = mock.get_balance_from_pk(&pk_to, &sk_to);
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);

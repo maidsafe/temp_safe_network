@@ -6,6 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::scl_mock::XorHash;
+use cid::{Cid, Codec, Version};
+use multibase::{encode, Base};
+use multihash;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
 use unwrap::unwrap;
@@ -61,6 +65,14 @@ fn parse_hex(hex_str: &str) -> Vec<u8> {
         bytes.push(h << 4 | l)
     }
     bytes
+}
+
+#[allow(dead_code)]
+pub fn name_and_tag_xorurl(xorhash: &XorHash, type_tag: u64) -> String {
+    let h = multihash::encode(multihash::Hash::SHA3256, xorhash).unwrap();
+    let cid = Cid::new(Codec::Raw, Version::V1, &h);
+    let cid_str = encode(Base::Base32z, cid.to_bytes().as_slice());
+    format!("safe://{}:{}", cid_str, type_tag)
 }
 
 pub fn pk_to_hex(pk: &PublicKey) -> String {

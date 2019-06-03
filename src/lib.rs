@@ -10,16 +10,15 @@ mod lib_helpers;
 mod scl_mock;
 
 pub use lib_helpers::hash_to_hex;
-use lib_helpers::{pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
+use lib_helpers::{/*name_and_tag_xorurl, */ pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
 use rand::rngs::OsRng;
 use rand::Rng;
 use rand_core::RngCore;
 use safe_nd::mutable_data::{MutableData, MutableDataKind, Permission, User, Value};
 use scl_mock::{MockSCL, XorHash, XorName};
 use std::collections::{BTreeMap, BTreeSet};
-use tiny_keccak::sha3_256;
-
 use threshold_crypto::SecretKey;
+use tiny_keccak::sha3_256;
 
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>
@@ -28,6 +27,8 @@ pub struct BlsKeyPair {
     pub pk: String,
     pub sk: String,
 }
+
+// pub type XorUrl = String;
 
 pub struct Safe {
     safe_app: MockSCL,
@@ -62,14 +63,19 @@ impl Safe {
                 .create_balance(&from_key_pair.pk, &from_key_pair.sk, &pk, "0"),
         };
 
-        if let Some(pk_str) = pk {
-            let pk = pk_from_hex(&pk_str);
-            (create_key(pk), None)
-        } else {
-            let key_pair = KeyPair::random();
-            let (pk, sk) = key_pair.to_hex_key_pair();
-            (create_key(key_pair.pk), Some(BlsKeyPair { pk, sk }))
-        }
+        let (xorname, key_pair) = match pk {
+            Some(pk_str) => {
+                let pk = pk_from_hex(&pk_str);
+                (create_key(pk), None)
+            }
+            None => {
+                let key_pair = KeyPair::random();
+                let (pk, sk) = key_pair.to_hex_key_pair();
+                (create_key(key_pair.pk), Some(BlsKeyPair { pk, sk }))
+            }
+        };
+
+        (xorname, key_pair)
     }
 
     // Create a Key on the network, allocates testcoins onto it, and return the Key's XOR name
@@ -80,18 +86,23 @@ impl Safe {
         preload_amount: String,
         pk: Option<String>,
     ) -> (XorName, Option<BlsKeyPair>) {
-        if let Some(pk_str) = pk {
-            let pk = pk_from_hex(&pk_str);
-            let xorname = self.safe_app.allocate_test_coins(&pk, &preload_amount);
-            (xorname, None)
-        } else {
-            let key_pair = KeyPair::random();
-            let xorname = self
-                .safe_app
-                .allocate_test_coins(&key_pair.pk, &preload_amount);
-            let (pk, sk) = key_pair.to_hex_key_pair();
-            (xorname, Some(BlsKeyPair { pk, sk }))
-        }
+        let (xorname, key_pair) = match pk {
+            Some(pk_str) => {
+                let pk = pk_from_hex(&pk_str);
+                let xorhash = self.safe_app.allocate_test_coins(&pk, &preload_amount);
+                (xorhash, None)
+            }
+            None => {
+                let key_pair = KeyPair::random();
+                let xorhash = self
+                    .safe_app
+                    .allocate_test_coins(&key_pair.pk, &preload_amount);
+                let (pk, sk) = key_pair.to_hex_key_pair();
+                (xorhash, Some(BlsKeyPair { pk, sk }))
+            }
+        };
+
+        (xorname, key_pair)
     }
 
     // Check Key's balance from the network from a given PublicKey
@@ -113,6 +124,23 @@ impl Safe {
         pk_to_hex(&public_key)
     }
 
+    // Create an empty Wallet and return its XOR name
+    pub fn wallet_create(&mut self) -> String {
+        self.md_create(None, None, None, true)
+    }
+
+    // Check the total balance of a Wallet found at a given XOR name
+    pub fn wallet_balance(&mut self, _xorname: &str, _sk: &str) -> String {
+        let total_balance = "0";
+        // let wallet_md = self.md_fetch(&target, &sk);
+        // Iterate through the Keys and query the balance for each
+        // foreach current_key in wallet_md {
+        //      let current_key_balance = self.keys_balance_from_xorname(&current_key, &current_sk);
+        //      total_balance += current_key_balance;
+        // }
+        total_balance.to_string()
+    }
+
     pub fn md_create(
         &mut self,
         name: Option<String>,
@@ -120,7 +148,7 @@ impl Safe {
         // _data: Option<String>,
         permissions: Option<String>,
         sequenced: bool,
-    ) -> MutableData {
+    ) -> XorName {
         let mut xorname: XorHash;
         if let Some(n) = name {
             xorname = sha3_256(n.as_bytes());
@@ -185,8 +213,9 @@ impl Safe {
         let sk = SecretKey::random();
         let pk = sk.public_key();
         let md = MutableData::new(xorname, md_tag, md_kind, permission_map, pk);
-        self.safe_app.mutable_data_put(md.clone());
-        md
+        self.safe_app.mutable_data_put(&md);
+
+        hash_to_hex(xorname.to_vec())
     }
 }
 
@@ -355,9 +384,8 @@ fn test_md_create() {
     use lib_helpers::hash_to_hex;
     let mut safe = Safe::new();
     let name = String::from("test");
-    let md = safe.md_create(Some(name.clone()), None, None, false);
+    let xorname = safe.md_create(Some(name.clone()), None, None, false);
     let hash = sha3_256(name.as_bytes());
     let hash_as_string: String = hash_to_hex(hash.to_vec());
-    let xorname = hash_to_hex(md.name().to_vec());
     assert_eq!(xorname, hash_as_string);
 }

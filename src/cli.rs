@@ -12,8 +12,9 @@ use structopt::StructOpt;
 
 use crate::subcommands::keys::KeysSubCommands;
 use crate::subcommands::mutable_data::MutableDataSubCommands;
+use crate::subcommands::wallet::WalletSubCommands;
 use crate::subcommands::SubCommands;
-use safe_cli::{hash_to_hex, BlsKeyPair, Safe};
+use safe_cli::{BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -53,92 +54,115 @@ pub fn run() -> Result<(), String> {
 
     debug!("Processing command: {:?}", args);
 
-    // Is it a keys command?
-    if let SubCommands::Keys { cmd } = args.cmd {
-        // Is it a create subcommand?
-        match cmd {
-            Some(KeysSubCommands::Create {
-                anon,
-                preload,
-                pk,
-                from,
-                test_coins,
-                ..
-            }) => {
-                let create_new_key = |safe: &mut Safe, from, preload: Option<String>, pk| {
-                    if test_coins {
-                        /*if cfg!(not(feature = "mock-network")) {
-                            warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-                            println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+    match args.cmd {
+        SubCommands::Keys { cmd } => {
+            // Is it a create subcommand?
+            match cmd {
+                Some(KeysSubCommands::Create {
+                    anon,
+                    preload,
+                    pk,
+                    from,
+                    test_coins,
+                    ..
+                }) => {
+                    let create_new_key = |safe: &mut Safe, from, preload: Option<String>, pk| {
+                        if test_coins {
+                            /*if cfg!(not(feature = "mock-network")) {
+                                warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+                                println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+                                safe.keys_create(from, preload, pk)
+                            } else {*/
+                            warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+                            println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+                            let amount = preload.unwrap_or("0".to_string());
+                            safe.keys_create_test_coins(amount, pk)
+                        // }
+                        } else {
                             safe.keys_create(from, preload, pk)
-                        } else {*/
-                        warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-                        println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-                        let amount = preload.unwrap_or("0".to_string());
-                        safe.keys_create_test_coins(amount, pk)
-                    // }
+                        }
+                    };
+
+                    // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
+                    let from_key_pair = match from {
+                        Some(from_xorname) => {
+                            // TODO: support Key XOR-URL and pk, we now support only Key XOR name
+                            // Prompt the user for the secret key since 'from' is a Key and not a Wallet
+                            let sk = prompt_user(
+                                &format!(
+                                    "Enter secret key corresponding to public key at XOR name [{}]: ",
+                                    from_xorname
+                                ),
+                                "Invalid input",
+                            );
+
+                            let pk = safe.fetch_key_pk(&from_xorname, &sk);
+                            Some(BlsKeyPair { pk, sk })
+                        }
+                        None => None,
+                    };
+
+                    // Want an anonymous Key?
+                    if anon {
+                        let (xorname, key_pair) =
+                            create_new_key(&mut safe, from_key_pair, preload, pk);
+                        println!("New Key created at XOR name: \"{}\"", xorname);
+                        println!("This was not linked from any container.");
+                        if let Some(pair) = key_pair {
+                            println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
+                        }
                     } else {
-                        safe.keys_create(from, preload, pk)
+                        // TODO: create Key and add it to the provided --target Wallet
                     }
-                };
-
-                // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
-                let from_key_pair = match from {
-                    Some(from_xorname) => {
-                        // TODO: support Key XOR-URL and pk, we now support only Key XOR name
-                        // Prompt the user for the secret key since 'from' is a Key and not a Wallet
-                        let sk = prompt_user(
-                            &format!(
-                                "Enter secret key corresponding to public key at XOR name [{}]: ",
-                                from_xorname
-                            ),
-                            "Invalid input",
-                        );
-
-                        let pk = safe.fetch_key_pk(&from_xorname, &sk);
-                        Some(BlsKeyPair { pk, sk })
-                    }
-                    None => None,
-                };
-
-                // Want an anonymous Key?
-                if anon {
-                    let (xorname, key_pair) = create_new_key(&mut safe, from_key_pair, preload, pk);
-                    println!("New Key created at XOR name: \"{}\"", xorname);
-                    println!("This was not linked from any container.");
-                    if let Some(pair) = key_pair {
-                        println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
-                    }
-                } else {
-                    // TODO: create Key and add it to the provided --target Wallet
                 }
-            }
-            Some(KeysSubCommands::Balance {}) => {
-                let sk = String::from(
-                    "391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058",
-                ); // FIXME: get sk from args or account
-                let target = get_target_location(args.target)?;
-                let current_balance = safe.keys_balance_from_xorname(&target, &sk);
-                println!("Key's current balance: {}", current_balance);
-            }
-            Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),
-            None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
-        };
-    } else if let SubCommands::MutableData { cmd } = args.cmd {
-        match cmd {
-            Some(MutableDataSubCommands::Create {
-                name,
-                permissions,
-                tag,
-                sequenced,
-            }) => {
-                let md = safe.md_create(name, tag, permissions, sequenced);
-                let xorname: String = hash_to_hex(md.name().to_vec());
-                println!("XorName: {:?}, Tag: {:?}", xorname, md.tag());
-            }
-            None => return Err("Missing mutable-data subcommand".to_string()),
+                Some(KeysSubCommands::Balance {}) => {
+                    let sk = String::from(
+                        "391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058",
+                    ); // FIXME: get sk from args or from the account
+                    let target = get_target_location(args.target)?;
+                    let current_balance = safe.keys_balance_from_xorname(&target, &sk);
+                    println!("Key's current balance: {}", current_balance);
+                }
+                Some(KeysSubCommands::Add { .. }) => println!("keys add ...coming soon!"),
+                None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
+            };
         }
-    }
+        SubCommands::MutableData { cmd } => {
+            match cmd {
+                Some(MutableDataSubCommands::Create {
+                    name,
+                    permissions,
+                    tag,
+                    sequenced,
+                }) => {
+                    let xorurl = safe.md_create(name, tag, permissions, sequenced);
+                    println!("MutableData created at: {}", xorurl);
+                }
+                _ => return Err("Missing mutable-data subcommand".to_string()),
+            };
+        }
+        SubCommands::Wallet { cmd } => {
+            match cmd {
+                Some(WalletSubCommands::Create {}) => {
+                    let xorname = safe.wallet_create();
+                    println!("Wallet created at XOR name: \"{}\"", xorname);
+                }
+                Some(WalletSubCommands::Balance {}) => {
+                    let sk = String::from(
+                        "391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058",
+                    ); // FIXME: get sk from args or from the account
+                    let target = get_target_location(args.target)?;
+                    let balance = safe.wallet_balance(&target, &sk);
+                    println!(
+                        "Wallet at XOR name \"{}\" has a total balance of {} safecoins",
+                        target, balance
+                    );
+                }
+                _ => return Err("Sub-command not supported yet".to_string()),
+            };
+        }
+        _ => return Err("Command not supported yet".to_string()),
+    };
 
     Ok(())
 }
