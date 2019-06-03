@@ -16,9 +16,11 @@ use rand::Rng;
 use rand_core::RngCore;
 use safe_nd::mutable_data::{MutableData, MutableDataKind, Permission, User, Value};
 use scl_mock::{MockSCL, XorHash, XorName};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use threshold_crypto::SecretKey;
 use tiny_keccak::sha3_256;
+use unwrap::unwrap;
 
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>
@@ -29,6 +31,14 @@ pub struct BlsKeyPair {
 }
 
 // pub type XorUrl = String;
+
+// Struct which is serialised and stored in Wallet MD for linking to a spendable balance (Key)
+#[derive(Serialize, Deserialize)]
+struct WalletSpendableBalance {
+    xorname: String,
+    sk: String,
+    default: bool,
+}
 
 pub struct Safe {
     safe_app: MockSCL,
@@ -50,7 +60,7 @@ impl Safe {
     ) -> (XorName, Option<BlsKeyPair>) {
         let from_key_pair: KeyPair = match from {
             Some(key_pair) => KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk),
-            None => panic!("Missing coins' key pair to cover the costs of the operation"), // TODO: fetch default wallet from account if not provided
+            None => panic!("Missing coins' key pair to cover the costs of the operation. You can specify it with --from"), // TODO: fetch default wallet from account if not provided
         };
 
         let create_key = |pk| match preload_amount {
@@ -118,26 +128,50 @@ impl Safe {
     }
 
     // Fetch Key's pk from the network from a given XOR name
-    pub fn fetch_key_pk(&self, xorname: &XorName, sk: &str) -> String {
+    pub fn keys_fetch_pk(&self, xorname: &XorName, sk: &str) -> String {
         let secret_key: SecretKey = sk_from_hex(sk);
-        let public_key = self.safe_app.fetch_key_pk(xorname, &secret_key);
+        let public_key = self.safe_app.keys_fetch_pk(xorname, &secret_key);
         pk_to_hex(&public_key)
     }
 
     // Create an empty Wallet and return its XOR name
     pub fn wallet_create(&mut self) -> String {
-        self.md_create(None, None, None, true)
+        self.md_create(None, None, None, false)
+    }
+
+    // Add a Key to a Wallet to make it spendable
+    pub fn wallet_add(
+        &mut self,
+        wallet_xorname: &XorName,
+        name: &str,
+        default: bool,
+        key_pair: &BlsKeyPair,
+        key_xorname: &XorName,
+    ) {
+        let value = WalletSpendableBalance {
+            xorname: key_xorname.clone(),
+            sk: key_pair.sk.clone(),
+            default,
+        };
+        let serialised_value = unwrap!(serde_json::to_string(&value));
+        let k = name.to_string().into_bytes();
+        self.md_insert(wallet_xorname, 10000, &k, &serialised_value.into_bytes());
     }
 
     // Check the total balance of a Wallet found at a given XOR name
-    pub fn wallet_balance(&mut self, _xorname: &str, _sk: &str) -> String {
-        let total_balance = "0";
-        // let wallet_md = self.md_fetch(&target, &sk);
+    pub fn wallet_balance(&mut self, xorname: &XorName, _sk: &str) -> String {
+        let mut total_balance: f64 = 0.0;
+        let spendable_balances = self.md_get_entries(xorname, 10000);
         // Iterate through the Keys and query the balance for each
-        // foreach current_key in wallet_md {
-        //      let current_key_balance = self.keys_balance_from_xorname(&current_key, &current_sk);
-        //      total_balance += current_key_balance;
-        // }
+        spendable_balances.iter().for_each(|(_name, balance)| {
+            let current_balance = String::from_utf8_lossy(balance).to_string();
+            let spendable_balance: WalletSpendableBalance =
+                unwrap!(serde_json::from_str(&current_balance));
+
+            let current_balance =
+                self.keys_balance_from_xorname(&spendable_balance.xorname, &spendable_balance.sk);
+            total_balance += unwrap!(current_balance.parse::<f64>());
+        });
         total_balance.to_string()
     }
 
@@ -183,8 +217,8 @@ impl Safe {
             true => {
                 // if let Some(data_string) = data {
                 // }
-                let mut inner: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-                inner.insert(String::from("test"), String::from("test").into_bytes());
+                let inner: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+                //inner.insert(String::from("testkeyseq"), b"testvalueseq".to_vec());
                 MutableDataKind::Sequenced { data: inner }
             }
             false => {
@@ -192,14 +226,14 @@ impl Safe {
 
                 // if let Some(data_string) = data {
                 // }
-                let mut inner: BTreeMap<String, Value> = BTreeMap::new();
-                inner.insert(
-                    String::from("test"),
+                let inner: BTreeMap<String, Value> = BTreeMap::new();
+                /*inner.insert(
+                    String::from("testkeyunseq"),
                     Value {
-                        data: String::from("test").into_bytes(),
+                        data: b"testvalueunseq".to_vec(),
                         version: 0,
                     },
-                );
+                );*/
                 MutableDataKind::Unsequenced { data: inner }
             }
         };
@@ -216,6 +250,14 @@ impl Safe {
         self.safe_app.mutable_data_put(&md);
 
         hash_to_hex(xorname.to_vec())
+    }
+
+    pub fn md_insert(&mut self, xorname: &XorName, tag: u64, key: &Vec<u8>, value: &Vec<u8>) {
+        self.safe_app.mutable_data_insert(xorname, tag, key, value);
+    }
+
+    pub fn md_get_entries(&mut self, xorname: &XorName, tag: u64) -> BTreeMap<Vec<u8>, Vec<u8>> {
+        self.safe_app.mutable_data_get_entries(xorname, tag)
     }
 }
 
@@ -358,24 +400,24 @@ fn test_keys_balance_xorname() {
 }
 
 #[test]
-fn test_fetch_key_pk_test_coins() {
+fn test_keys_fetch_pk_test_coins() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
     let (xorname, key_pair) = safe.keys_create_test_coins("23.22".to_string(), None);
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = safe.fetch_key_pk(&xorname, &key_pair_unwrapped.sk);
+    let pk = safe.keys_fetch_pk(&xorname, &key_pair_unwrapped.sk);
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
 
 #[test]
-fn test_fetch_key_pk() {
+fn test_keys_fetch_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
     let (_, from_key_pair) = safe.keys_create_test_coins("0.56".to_string(), None);
 
     let (xorname, key_pair) = safe.keys_create(from_key_pair, None, None);
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = safe.fetch_key_pk(&xorname, &key_pair_unwrapped.sk);
+    let pk = safe.keys_fetch_pk(&xorname, &key_pair_unwrapped.sk);
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
 

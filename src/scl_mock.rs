@@ -8,7 +8,7 @@
 
 use crate::lib_helpers::hash_to_hex;
 use log::debug;
-use safe_nd::mutable_data::MutableData;
+use safe_nd::mutable_data::{MutableData, MutableDataKind, Value};
 pub use safe_nd::XorName as XorHash;
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
@@ -58,11 +58,11 @@ pub struct MockSCL {
 /// Writes the mock data onto the mock file
 impl Drop for MockSCL {
     fn drop(&mut self) {
-        let serialized = unwrap!(serde_json::to_string(&self.mock_data));
-        debug!("serialized = {}", serialized);
+        let serialised = unwrap!(serde_json::to_string(&self.mock_data));
+        debug!("serialised = {}", serialised);
 
         let mut file = unwrap!(fs::File::create(&MOCK_FILE));
-        unwrap!(file.write(serialized.as_bytes()));
+        unwrap!(file.write(serialised.as_bytes()));
     }
 }
 
@@ -70,8 +70,8 @@ impl MockSCL {
     pub fn new() -> Self {
         let mock_data = match fs::File::open(&MOCK_FILE) {
             Ok(file) => {
-                let deserialized: MockData = unwrap!(serde_json::from_reader(&file));
-                deserialized
+                let deserialised: MockData = unwrap!(serde_json::from_reader(&file));
+                deserialised
             }
             Err(error) => {
                 debug!("Error reading mock file. {}", error.to_string());
@@ -147,7 +147,7 @@ impl MockSCL {
             .replace(")", "")
     }
 
-    pub fn fetch_key_pk(&self, xorname: &XorName, _sk: &SecretKey) -> PublicKey {
+    pub fn keys_fetch_pk(&self, xorname: &XorName, _sk: &SecretKey) -> PublicKey {
         let coin_balance = &self.mock_data.coin_balances[xorname];
         coin_balance.owner
     }
@@ -254,13 +254,52 @@ impl MockSCL {
 
     pub fn mutable_data_put(&mut self, md: &MutableData) -> XorHash {
         let xorname_as_string: String = hash_to_hex(md.name().to_vec());
-        &self
-            .mock_data
+        self.mock_data
             .mutable_data
             .insert(xorname_as_string, md.clone());
         let mut xorhash = XorHash::default();
         xorhash.copy_from_slice(&md.name());
         xorhash
+    }
+
+    pub fn mutable_data_insert(
+        &mut self,
+        xorname: &str,
+        _tag: u64,
+        key: &Vec<u8>,
+        value: &Vec<u8>,
+    ) {
+        let md = &self.mock_data.mutable_data[&xorname.to_string()];
+        if let MutableDataKind::Unsequenced { data } = &md.data {
+            let mut inner: BTreeMap<String, Value> = data.clone();
+            inner.insert(
+                String::from_utf8_lossy(key).to_string(),
+                Value {
+                    data: value.clone(),
+                    version: 0,
+                },
+            );
+            let mut updated_md = md.clone();
+            updated_md.data = MutableDataKind::Unsequenced { data: inner };
+            self.mock_data
+                .mutable_data
+                .insert(xorname.to_string(), updated_md);
+        }
+    }
+
+    pub fn mutable_data_get_entries(
+        &mut self,
+        xorname: &str,
+        _tag: u64,
+    ) -> BTreeMap<Vec<u8>, Vec<u8>> {
+        let md = &self.mock_data.mutable_data[&xorname.to_string()];
+        let mut res = BTreeMap::new();
+        if let MutableDataKind::Unsequenced { data } = &md.data {
+            data.iter().for_each(|elem| {
+                res.insert(elem.0.clone().into_bytes(), elem.1.data.clone());
+            });
+        }
+        res.clone()
     }
 }
 

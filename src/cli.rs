@@ -15,6 +15,7 @@ use crate::subcommands::mutable_data::MutableDataSubCommands;
 use crate::subcommands::wallet::WalletSubCommands;
 use crate::subcommands::SubCommands;
 use safe_cli::{BlsKeyPair, Safe};
+use unwrap::unwrap;
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -66,53 +67,13 @@ pub fn run() -> Result<(), String> {
                     test_coins,
                     ..
                 }) => {
-                    let create_new_key = |safe: &mut Safe, from, preload: Option<String>, pk| {
-                        if test_coins {
-                            /*if cfg!(not(feature = "mock-network")) {
-                                warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-                                println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-                                safe.keys_create(from, preload, pk)
-                            } else {*/
-                            warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-                            println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-                            let amount = preload.unwrap_or("0".to_string());
-                            safe.keys_create_test_coins(amount, pk)
-                        // }
-                        } else {
-                            safe.keys_create(from, preload, pk)
-                        }
-                    };
-
-                    // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
-                    let from_key_pair = match from {
-                        Some(from_xorname) => {
-                            // TODO: support Key XOR-URL and pk, we now support only Key XOR name
-                            // Prompt the user for the secret key since 'from' is a Key and not a Wallet
-                            let sk = prompt_user(
-                                &format!(
-                                    "Enter secret key corresponding to public key at XOR name [{}]: ",
-                                    from_xorname
-                                ),
-                                "Invalid input",
-                            );
-
-                            let pk = safe.fetch_key_pk(&from_xorname, &sk);
-                            Some(BlsKeyPair { pk, sk })
-                        }
-                        None => None,
-                    };
-
                     // Want an anonymous Key?
                     if anon {
-                        let (xorname, key_pair) =
-                            create_new_key(&mut safe, from_key_pair, preload, pk);
-                        println!("New Key created at XOR name: \"{}\"", xorname);
+                        create_new_key(&mut safe, test_coins, from, preload, pk);
                         println!("This was not linked from any container.");
-                        if let Some(pair) = key_pair {
-                            println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
-                        }
                     } else {
                         // TODO: create Key and add it to the provided --target Wallet
+                        println!("Missing --target or --anon");
                     }
                 }
                 Some(KeysSubCommands::Balance {}) => {
@@ -158,6 +119,41 @@ pub fn run() -> Result<(), String> {
                         target, balance
                     );
                 }
+                Some(WalletSubCommands::Add {
+                    preload,
+                    from,
+                    test_coins,
+                    link,
+                    name,
+                    default,
+                }) => {
+                    let target = get_target_location(args.target)?;
+                    let (xorname, key_pair) = match link {
+                        Some(linked_key) => {
+                            // Get pk from Key, and prompt user for the corresponding sk
+                            let sk = prompt_user(
+                                &format!(
+                                    "Enter secret key corresponding to public key at XOR name \"{}\": ",
+                                    linked_key
+                                ),
+                                "Invalid input",
+                            );
+                            let pk = safe.keys_fetch_pk(&linked_key, &sk);
+                            println!(
+                                "Spendable balance added with name '{}' in wallet located at XOR name \"{}\"",
+                                name, target
+                            );
+                            (linked_key, Some(BlsKeyPair { pk, sk }))
+                        }
+                        None => {
+                            let new_key =
+                                create_new_key(&mut safe, test_coins, from, preload, None);
+                            println!("New spendable balance generated with name '{}' in wallet located at XOR name \"{}\"", name, target);
+                            new_key
+                        }
+                    };
+                    safe.wallet_add(&target, &name, default, &unwrap!(key_pair), &xorname);
+                }
                 _ => return Err("Sub-command not supported yet".to_string()),
             };
         }
@@ -202,4 +198,53 @@ fn prompt_user(prompt_msg: &str, error_msg: &str) -> String {
     }
 
     user_input
+}
+
+fn create_new_key(
+    safe: &mut Safe,
+    test_coins: bool,
+    from: Option<String>,
+    preload: Option<String>,
+    pk: Option<String>,
+) -> (String, Option<BlsKeyPair>) {
+    // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
+    let from_key_pair = match from {
+        Some(from_xorname) => {
+            // TODO: support Key XOR-URL and pk, we now support only Key XOR name
+            // Prompt the user for the secret key since 'from' is a Key and not a Wallet
+            let sk = prompt_user(
+                &format!(
+                    "Enter secret key corresponding to public key at XOR name \"{}\": ",
+                    from_xorname
+                ),
+                "Invalid input",
+            );
+
+            let pk = safe.keys_fetch_pk(&from_xorname, &sk);
+            Some(BlsKeyPair { pk, sk })
+        }
+        None => None,
+    };
+
+    let (xorname, key_pair) = if test_coins {
+        /*if cfg!(not(feature = "mock-network")) {
+            warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+            println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
+            safe.keys_create(from, preload, pk)
+        } else {*/
+        warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+        println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+        let amount = preload.unwrap_or("0".to_string());
+        safe.keys_create_test_coins(amount, pk)
+    // }
+    } else {
+        safe.keys_create(from_key_pair, preload, pk)
+    };
+
+    println!("New Key created at XOR name: \"{}\"", xorname);
+    if let Some(pair) = &key_pair {
+        println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
+    }
+
+    (xorname, key_pair)
 }

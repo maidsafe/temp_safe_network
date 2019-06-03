@@ -13,12 +13,24 @@ pub enum WalletSubCommands {
     #[structopt(name = "add")]
     /// Add a wallet to another document
     Add {
+        /// Create a Key, allocate test-coins onto it, and add it to the wallet
+        #[structopt(long = "test-coins")]
+        test_coins: bool,
+        /// The source wallet for funds
+        #[structopt(long = "from")]
+        from: Option<String>,
         /// The safe:// url to add
         #[structopt(long = "link")]
-        link: String,
+        link: Option<String>,
         /// The name to give this wallet
         #[structopt(long = "name")]
         name: String,
+        /// Preload the key with a coinbalance
+        #[structopt(long = "preload")]
+        preload: Option<String>,
+        /// Set the sub name as default for this public name
+        #[structopt(long = "default")]
+        default: bool,
     },
     #[structopt(name = "balance")]
     /// Query a new Wallet or PublicKeys CoinBalance
