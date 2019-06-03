@@ -1,4 +1,4 @@
-// Copyright 2018 MaidSafe.net limited.
+// Copyright 2019 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,20 +8,7 @@
 
 use serde_derive::{Deserialize, Serialize};
 use unwrap::unwrap;
-
-macro_rules! assert_err {
-    ($cond:expr, $error:pat) => {
-        match $cond {
-            Err($error) => (),
-            result => panic!(
-                concat!("Expecting ", stringify!($error), " got {:?}"),
-                result
-            ),
-        }
-    };
-}
-
-use crate::chunk_store::{Chunk, ChunkId, ChunkStore, Error};
+use super::chunk_store::{Chunk, ChunkId, ChunkStore, Error};
 use maidsafe_utilities::{serialisation, SeededRng};
 use rand::Rng;
 use tempdir::TempDir;

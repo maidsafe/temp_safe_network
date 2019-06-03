@@ -1,4 +1,4 @@
-// Copyright 2018 MaidSafe.net limited.
+// Copyright 2019 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -58,51 +58,41 @@
     variant_size_differences
 )]
 
-#[macro_use]
-extern crate log;
-use maidsafe_utilities;
-#[macro_use]
-extern crate unwrap;
-
-use clap::{App, Arg};
-use safe_vault::Vault;
-use std::{env, fs};
+// use clap::{App, Arg};
+use env_logger;
+use log::info;
+use log4rs;
+use safe_vault::{self, Vault};
+use std::env;
 
 /// Runs a SAFE Network vault.
 pub fn main() {
-    // TODO - remove the following line once maidsafe_utilities is updated to use log4rs v4.
-    let _ = fs::remove_file("Node.log");
+    if safe_vault::log_config_file_path()
+        .and_then(|path| log4rs::init_file(path, Default::default()).ok())
+        .is_none()
+    {
+        env_logger::init();
+    }
 
     let name = exe_name().unwrap_or_else(|| "vault".to_string());
-    let name_and_version = format!("{} v{}", name, env!("CARGO_PKG_VERSION"));
 
-    let matches = App::new(name)
-        .arg(
-            Arg::with_name("first")
-                .short("f")
-                .long("first")
-                .help("Run as the first Vault of a new network."),
-        )
-        .version(env!("CARGO_PKG_VERSION"))
-        .get_matches();
+    // let matches = App::new(name)
+    //     .arg(
+    //         Arg::with_name("first")
+    //             .short("f")
+    //             .long("first")
+    //             .help("Run as the first Vault of a new network."),
+    //     )
+    //     .version(env!("CARGO_PKG_VERSION"))
+    //     .get_matches();
 
-    let _ = maidsafe_utilities::log::init(false);
+    let message = format!("Running {} v{}", name, env!("CARGO_PKG_VERSION"));
+    info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let mut message = String::from("Running ");
-    message.push_str(&name_and_version);
-    let underline = unwrap!(String::from_utf8(vec![b'='; message.len()]));
-    info!("\n\n{}\n{}", message, underline);
-
-    loop {
-        let mut vault = match Vault::new(matches.is_present("first"), true) {
-            Ok(vault) => vault,
-            Err(e) => {
-                println!("Cannot start vault due to error: {:?}", e);
-                return;
-            }
-        };
-        if let Ok(true) = vault.run() {
-            break;
+    match Vault::new() {
+        Ok(mut vault) => vault.run(),
+        Err(e) => {
+            println!("Cannot start vault due to error: {:?}", e);
         }
     }
 }

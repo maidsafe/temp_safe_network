@@ -5,3 +5,16 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
+
+use crate::{
+    chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
+    error::Result,
+};
+
+pub(crate) struct Adult {
+    immutable_chunks: ImmutableChunkStore,
+    mutable_chunks: MutableChunkStore,
+    appendable_chunks: AppendOnlyChunkStore,
+}
+
+impl Adult {}
