@@ -287,6 +287,20 @@ impl MockSCL {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn mutable_data_delete(&mut self, xorname: &str, _tag: u64, key: &Vec<u8>) {
+        let md = &self.mock_data.mutable_data[&xorname.to_string()];
+        if let MutableDataKind::Unsequenced { data } = &md.data {
+            let mut inner: BTreeMap<String, Value> = data.clone();
+            inner.remove(&String::from_utf8_lossy(key).to_string());
+            let mut updated_md = md.clone();
+            updated_md.data = MutableDataKind::Unsequenced { data: inner };
+            self.mock_data
+                .mutable_data
+                .insert(xorname.to_string(), updated_md);
+        }
+    }
+
     pub fn mutable_data_get_entries(
         &mut self,
         xorname: &str,
