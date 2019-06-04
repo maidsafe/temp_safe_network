@@ -20,8 +20,11 @@ use safe_cli::Safe;
 /// Interact with the SAFE Network
 #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
 struct CmdArgs {
+    /// subcommands
+    #[structopt(subcommand)]
+    cmd: SubCommands,
     /// The safe:// address of target data
-    #[structopt(short = "t", long = "target", raw(global = "true"))]
+    #[structopt(short = "t", long = "target")]
     target: Option<String>,
     /// The account's Root Container address
     #[structopt(long = "root", raw(global = "true"))]
@@ -41,9 +44,6 @@ struct CmdArgs {
     /// Dry run of command. No data will be written. No coins spent.
     #[structopt(long = "dry-run", raw(global = "true"))]
     dry: bool,
-    /// subcommands
-    #[structopt(subcommand)]
-    cmd: SubCommands,
 }
 
 pub fn run() -> Result<(), String> {

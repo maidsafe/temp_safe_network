@@ -54,14 +54,11 @@ impl Safe {
     // Create a Key on the network and return its XOR name
     pub fn keys_create(
         &mut self,
-        from: Option<BlsKeyPair>,
+        from: BlsKeyPair,
         preload_amount: Option<String>,
         pk: Option<String>,
     ) -> (XorName, Option<BlsKeyPair>) {
-        let from_key_pair: KeyPair = match from {
-            Some(key_pair) => KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk),
-            None => panic!("Missing coins' key pair to cover the costs of the operation. You can specify it with --from"), // TODO: fetch default wallet from account if not provided
-        };
+        let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk);
 
         let create_key = |pk| match preload_amount {
             Some(amount) => {
@@ -91,7 +88,7 @@ impl Safe {
     // Create a Key on the network, allocates testcoins onto it, and return the Key's XOR name
     // This is avilable only when testing with mock-network
     // #[cfg(feature = "mock-network")]
-    pub fn keys_create_test_coins(
+    pub fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: String,
         pk: Option<String>,
@@ -264,9 +261,9 @@ impl Safe {
 // Unit Tests
 
 #[test]
-fn test_keys_create_test_coins() {
+fn test_keys_create_preload_test_coins() {
     let mut safe = Safe::new();
-    let (xorname, key_pair) = safe.keys_create_test_coins("12.23".to_string(), None);
+    let (xorname, key_pair) = safe.keys_create_preload_test_coins("12.23".to_string(), None);
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
@@ -275,10 +272,10 @@ fn test_keys_create_test_coins() {
 }
 
 #[test]
-fn test_keys_create_test_coins_pk() {
+fn test_keys_create_preload_test_coins_pk() {
     let mut safe = Safe::new();
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
-    let (xorname, key_pair) = safe.keys_create_test_coins("1.1".to_string(), Some(pk));
+    let (xorname, key_pair) = safe.keys_create_preload_test_coins("1.1".to_string(), Some(pk));
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => assert!(true),
@@ -289,9 +286,9 @@ fn test_keys_create_test_coins_pk() {
 #[test]
 fn test_keys_create() {
     let mut safe = Safe::new();
-    let (_, from_key_pair) = safe.keys_create_test_coins("23.23".to_string(), None);
+    let (_, from_key_pair) = safe.keys_create_preload_test_coins("23.23".to_string(), None);
 
-    let (xorname, key_pair) = safe.keys_create(from_key_pair, None, None);
+    let (xorname, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, None);
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
@@ -302,11 +299,14 @@ fn test_keys_create() {
 #[test]
 fn test_keys_create_preload() {
     let mut safe = Safe::new();
-    let (_, from_key_pair) = safe.keys_create_test_coins("543.2312".to_string(), None);
+    let (_, from_key_pair) = safe.keys_create_preload_test_coins("543.2312".to_string(), None);
 
     let preload_amount = "1.8";
-    let (xorname, key_pair) =
-        safe.keys_create(from_key_pair, Some(preload_amount.to_string()), None);
+    let (xorname, key_pair) = safe.keys_create(
+        unwrap!(from_key_pair),
+        Some(preload_amount.to_string()),
+        None,
+    );
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
@@ -323,9 +323,9 @@ fn test_keys_create_preload() {
 #[test]
 fn test_keys_create_pk() {
     let mut safe = Safe::new();
-    let (_, from_key_pair) = safe.keys_create_test_coins("1.1".to_string(), None);
+    let (_, from_key_pair) = safe.keys_create_preload_test_coins("1.1".to_string(), None);
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
-    let (xorname, key_pair) = safe.keys_create(from_key_pair, None, Some(pk));
+    let (xorname, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, Some(pk));
     assert_eq!(xorname.len(), 64);
     match key_pair {
         None => assert!(true),
@@ -338,7 +338,7 @@ fn test_keys_test_coins_balance_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
     let preload_amount = "1.1542";
-    let (_, key_pair) = safe.keys_create_test_coins(preload_amount.to_string(), None);
+    let (_, key_pair) = safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let current_balance = safe.keys_balance_from_pk(&unwrap!(key_pair));
     assert_eq!(preload_amount, current_balance);
 }
@@ -348,7 +348,7 @@ fn test_keys_test_coins_balance_xorname() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
     let preload_amount = "0.243";
-    let (xorname, key_pair) = safe.keys_create_test_coins(preload_amount.to_string(), None);
+    let (xorname, key_pair) = safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let current_balance = safe.keys_balance_from_xorname(&xorname, &unwrap!(key_pair).sk);
     assert_eq!(preload_amount, current_balance);
 }
@@ -358,12 +358,12 @@ fn test_keys_balance_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
     let preload_amount = "1743.234";
-    let (_, from_key_pair) = safe.keys_create_test_coins(preload_amount.to_string(), None);
+    let (_, from_key_pair) = safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let from_key_pair_unwrapped = unwrap!(from_key_pair);
 
     let amount = "1740";
     let (_, to_key_pair) = safe.keys_create(
-        Some(from_key_pair_unwrapped.clone()),
+        from_key_pair_unwrapped.clone(),
         Some(amount.to_string()),
         None,
     );
@@ -381,12 +381,12 @@ fn test_keys_balance_xorname() {
     let mut safe = Safe::new();
     let preload_amount = "435.34";
     let (from_xorname, from_key_pair) =
-        safe.keys_create_test_coins(preload_amount.to_string(), None);
+        safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let from_key_pair_unwrapped = unwrap!(from_key_pair);
 
     let amount = "35.3";
     let (to_xorname, to_key_pair) = safe.keys_create(
-        Some(from_key_pair_unwrapped.clone()),
+        from_key_pair_unwrapped.clone(),
         Some(amount.to_string()),
         None,
     );
@@ -403,7 +403,7 @@ fn test_keys_balance_xorname() {
 fn test_keys_fetch_pk_test_coins() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
-    let (xorname, key_pair) = safe.keys_create_test_coins("23.22".to_string(), None);
+    let (xorname, key_pair) = safe.keys_create_preload_test_coins("23.22".to_string(), None);
     let key_pair_unwrapped = unwrap!(key_pair);
     let pk = safe.keys_fetch_pk(&xorname, &key_pair_unwrapped.sk);
     assert_eq!(pk, key_pair_unwrapped.pk);
@@ -413,9 +413,9 @@ fn test_keys_fetch_pk_test_coins() {
 fn test_keys_fetch_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new();
-    let (_, from_key_pair) = safe.keys_create_test_coins("0.56".to_string(), None);
+    let (_, from_key_pair) = safe.keys_create_preload_test_coins("0.56".to_string(), None);
 
-    let (xorname, key_pair) = safe.keys_create(from_key_pair, None, None);
+    let (xorname, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, None);
     let key_pair_unwrapped = unwrap!(key_pair);
     let pk = safe.keys_fetch_pk(&xorname, &key_pair_unwrapped.sk);
     assert_eq!(pk, key_pair_unwrapped.pk);

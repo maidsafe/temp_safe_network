@@ -16,31 +16,14 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
-    #[structopt(name = "add")]
-    /// Add a key to another document
-    Add {
-        /// The safe:// url to add
-        #[structopt(long = "link")]
-        link: String,
-        /// The name to give this key
-        #[structopt(long = "name")]
-        name: String,
-    },
     #[structopt(name = "create")]
     /// Create a new KeyPair
     Create {
+        /// The source wallet for funds
+        from: String,
         /// Create a Key and allocate test-coins onto it
         #[structopt(long = "test-coins")]
-        test_coins: bool,
-        /// The source wallet for funds
-        #[structopt(long = "from")]
-        from: Option<String>,
-        /// Do not save the secret key to the network
-        #[structopt(long = "anon")]
-        anon: bool,
-        /// The name to give this key
-        #[structopt(long = "name")]
-        name: Option<String>,
+        preload_test_coins: bool,
         /// Preload the key with a coinbalance
         #[structopt(long = "preload")]
         preload: Option<String>,
@@ -61,22 +44,13 @@ pub fn key_commander(
     // Is it a create subcommand?
     match cmd {
         Some(KeysSubCommands::Create {
-            anon,
             preload,
             pk,
             from,
-            test_coins,
+            preload_test_coins,
             ..
         }) => {
-            // Want an anonymous Key?
-            if anon {
-                create_new_key(safe, test_coins, from, preload, pk);
-                println!("This was not linked from any container.");
-            } else {
-                // TODO: create Key and add it to the provided --target Wallet
-                eprintln!("Missing --target or --anon");
-            }
-
+            create_new_key(safe, preload_test_coins, from, preload, pk);
             Ok(())
         }
         Some(KeysSubCommands::Balance {}) => {
@@ -87,41 +61,35 @@ pub fn key_commander(
             println!("Key's current balance: {}", current_balance);
             Ok(())
         }
-        Some(KeysSubCommands::Add { .. }) => {
-            println!("keys add ...coming soon!");
-            Ok(())
-        }
         None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
     }
 }
 
 pub fn create_new_key(
     safe: &mut Safe,
-    test_coins: bool,
-    from: Option<String>,
+    preload_test_coins: bool,
+    from: String,
     preload: Option<String>,
     pk: Option<String>,
 ) -> (String, Option<BlsKeyPair>) {
     // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
-    let from_key_pair = match from {
-        Some(from_xorname) => {
-            // TODO: support Key XOR-URL and pk, we now support only Key XOR name
-            // Prompt the user for the secret key since 'from' is a Key and not a Wallet
-            let sk = prompt_user(
-                &format!(
-                    "Enter secret key corresponding to public key at XOR name \"{}\": ",
-                    from_xorname
-                ),
-                "Invalid input",
-            );
+    // TODO: support Key XOR-URL and pk, we now support only Key XOR name
+    // Prompt the user for the secret key since 'from' is a Key and not a Wallet
+    let sk = prompt_user(
+        &format!(
+            "Enter secret key corresponding to public key at XOR name \"{}\": ",
+            from
+        ),
+        "Invalid input",
+    );
 
-            let pk = safe.keys_fetch_pk(&from_xorname, &sk);
-            Some(BlsKeyPair { pk, sk })
-        }
-        None => None,
+    let pk_from_xor = safe.keys_fetch_pk(&from, &sk);
+    let from_key_pair = BlsKeyPair {
+        pk: pk_from_xor,
+        sk,
     };
 
-    let (xorname, key_pair) = if test_coins {
+    let (xorname, key_pair) = if preload_test_coins {
         /*if cfg!(not(feature = "mock-network")) {
             warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
             println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
@@ -129,8 +97,13 @@ pub fn create_new_key(
         } else {*/
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
         println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-        let amount = preload.unwrap_or("0".to_string());
-        safe.keys_create_test_coins(amount, pk)
+        let amount = preload.unwrap_or("1000.111".to_string());
+
+        if amount == "1000.111" {
+            eprintln!("You must pass a preload amount with test-coins, 1000.111 will be added");
+        }
+
+        safe.keys_create_preload_test_coins(amount, pk)
     // }
     } else {
         safe.keys_create(from_key_pair, preload, pk)
