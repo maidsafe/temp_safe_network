@@ -6,16 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use log::{debug, warn};
+use log::debug;
 use std::io::{self, stdin, stdout, Write};
 use structopt::StructOpt;
 
-use crate::subcommands::keys::{create_new_key, KeyCommander, KeysSubCommands};
-use crate::subcommands::mutable_data::MutableDataSubCommands;
-use crate::subcommands::wallet::WalletSubCommands;
+use crate::subcommands::keys::key_commander;
+// use crate::subcommands::mutable_data::MutableDataSubCommands;
+use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::SubCommands;
-use safe_cli::{BlsKeyPair, Safe};
-use unwrap::unwrap;
+use safe_cli::Safe;
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -56,86 +55,26 @@ pub fn run() -> Result<(), String> {
     debug!("Processing command: {:?}", args);
 
     match args.cmd {
-        SubCommands::Keys { cmd } => KeyCommander(cmd, args.target, &mut safe),
-        SubCommands::MutableData { cmd } => {
-            match cmd {
-                Some(MutableDataSubCommands::Create {
-                    name,
-                    permissions,
-                    tag,
-                    sequenced,
-                }) => {
-                    let xorurl = safe.md_create(name, tag, permissions, sequenced);
-                    println!("MutableData created at: {}", xorurl);
-                    // Ok(())
-                }
-                _ => return Err("Missing mutable-data subcommand".to_string()),
-            };
-            Ok(())
-        }
-        SubCommands::Wallet { cmd } => {
-            match cmd {
-                Some(WalletSubCommands::Create {}) => {
-                    let xorname = safe.wallet_create();
-                    println!("Wallet created at XOR name: \"{}\"", xorname);
-                    // Ok(())
-                }
-                Some(WalletSubCommands::Balance {}) => {
-                    let sk = String::from(
-                        "391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058",
-                    ); // FIXME: get sk from args or from the account
-                    let target = get_target_location(args.target)?;
-                    let balance = safe.wallet_balance(&target, &sk);
-                    println!(
-                        "Wallet at XOR name \"{}\" has a total balance of {} safecoins",
-                        target, balance
-                    );
-                    // Ok(())
-                }
-                Some(WalletSubCommands::Add {
-                    preload,
-                    from,
-                    test_coins,
-                    link,
-                    name,
-                    default,
-                }) => {
-                    let target = get_target_location(args.target)?;
-                    let (xorname, key_pair) = match link {
-                        Some(linked_key) => {
-                            // Get pk from Key, and prompt user for the corresponding sk
-                            let sk = prompt_user(
-                                &format!(
-                                    "Enter secret key corresponding to public key at XOR name \"{}\": ",
-                                    linked_key
-                                ),
-                                "Invalid input",
-                            );
-                            let pk = safe.keys_fetch_pk(&linked_key, &sk);
-                            println!(
-                                "Spendable balance added with name '{}' in wallet located at XOR name \"{}\"",
-                                name, target
-                            );
-                            (linked_key, Some(BlsKeyPair { pk, sk }))
-                        }
-                        None => {
-                            let new_key =
-                                create_new_key(&mut safe, test_coins, from, preload, None);
-                            println!("New spendable balance generated with name '{}' in wallet located at XOR name \"{}\"", name, target);
-                            new_key
-                        }
-                    };
-                    safe.wallet_add(&target, &name, default, &unwrap!(key_pair), &xorname);
-                    // Ok(())
-                }
-                _ => return Err("Sub-command not supported yet".to_string()),
-            };
-            Ok(())
-        }
+        SubCommands::Keys { cmd } => key_commander(cmd, args.target, &mut safe),
+        SubCommands::Wallet { cmd } => wallet_commander(cmd, args.target, &mut safe),
+        // SubCommands::MutableData { cmd } => {
+        //     match cmd {
+        //         Some(MutableDataSubCommands::Create {
+        //             name,
+        //             permissions,
+        //             tag,
+        //             sequenced,
+        //         }) => {
+        //             let xorurl = safe.md_create(name, tag, permissions, sequenced);
+        //             println!("MutableData created at: {}", xorurl);
+        //             // Ok(())
+        //         }
+        //         _ => return Err("Missing mutable-data subcommand".to_string()),
+        //     };
+        //     Ok(())
+        // }
         _ => return Err("Command not supported yet".to_string()),
-    };
-
-    Ok(())
+    }
 }
 
 pub fn get_target_location(target_arg: Option<String>) -> Result<String, String> {

@@ -8,6 +8,13 @@
 
 use structopt::StructOpt;
 
+use safe_cli::{BlsKeyPair, Safe};
+use unwrap::unwrap;
+
+// TODO: move these to helper file
+use crate::cli::{get_target_location, prompt_user};
+use crate::subcommands::keys::create_new_key;
+
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
     #[structopt(name = "add")]
@@ -64,4 +71,66 @@ pub enum WalletSubCommands {
         #[structopt(long = "to")]
         to: String,
     },
+}
+
+pub fn wallet_commander(
+    cmd: Option<WalletSubCommands>,
+    target: Option<String>,
+    safe: &mut Safe,
+) -> Result<(), String> {
+    match cmd {
+        Some(WalletSubCommands::Create {}) => {
+            let xorname = safe.wallet_create();
+            println!("Wallet created at XOR name: \"{}\"", xorname);
+            // Ok(())
+        }
+        Some(WalletSubCommands::Balance {}) => {
+            let sk =
+                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058"); // FIXME: get sk from args or from the account
+            let target = get_target_location(target)?;
+            let balance = safe.wallet_balance(&target, &sk);
+            println!(
+                "Wallet at XOR name \"{}\" has a total balance of {} safecoins",
+                target, balance
+            );
+            // Ok(())
+        }
+        Some(WalletSubCommands::Add {
+            preload,
+            from,
+            test_coins,
+            link,
+            name,
+            default,
+        }) => {
+            let target = get_target_location(target)?;
+            let (xorname, key_pair) = match link {
+                Some(linked_key) => {
+                    // Get pk from Key, and prompt user for the corresponding sk
+                    let sk = prompt_user(
+                        &format!(
+                            "Enter secret key corresponding to public key at XOR name \"{}\": ",
+                            linked_key
+                        ),
+                        "Invalid input",
+                    );
+                    let pk = safe.keys_fetch_pk(&linked_key, &sk);
+                    println!(
+						"Spendable balance added with name '{}' in wallet located at XOR name \"{}\"",
+						name, target
+					);
+                    (linked_key, Some(BlsKeyPair { pk, sk }))
+                }
+                None => {
+                    let new_key = create_new_key(safe, test_coins, from, preload, None);
+                    println!("New spendable balance generated with name '{}' in wallet located at XOR name \"{}\"", name, target);
+                    new_key
+                }
+            };
+            safe.wallet_add(&target, &name, default, &unwrap!(key_pair), &xorname);
+            // Ok(())
+        }
+        _ => return Err("Sub-command not supported yet".to_string()),
+    };
+    Ok(())
 }

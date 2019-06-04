@@ -5,16 +5,13 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-use log::{debug, warn};
-use std::io::{self, stdin, stdout, Write};
+use log::warn;
 
 use safe_cli::{BlsKeyPair, Safe};
-use unwrap::unwrap;
 
 // TODO: move these to helper file
 use crate::cli::{get_target_location, prompt_user};
 
-use structopt::clap::Arg;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -56,7 +53,7 @@ pub enum KeysSubCommands {
     Balance {},
 }
 
-pub fn KeyCommander(
+pub fn key_commander(
     cmd: Option<KeysSubCommands>,
     target: Option<String>,
     safe: &mut Safe,
