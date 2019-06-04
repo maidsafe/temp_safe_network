@@ -6,10 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::scl_mock::XorHash;
-use cid::{Cid, Codec, Version};
-use multibase::{encode, Base};
-use multihash;
+use crate::scl_mock::XorName;
+// use cid::{Cid, Codec, Version};
+// use multibase::{encode, decode, Base};
+// use multihash;
+use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
 use unwrap::unwrap;
@@ -38,13 +39,13 @@ impl KeyPair {
 
         let sk_serialised = bincode::serialize(&SerdeSecret(&self.sk))
             .expect("Failed to serialise the generated secret key");
-        let sk: String = hash_to_hex(sk_serialised);
+        let sk: String = vec_to_hex(sk_serialised);
 
         (pk, sk)
     }
 }
 
-pub fn hash_to_hex(hash: Vec<u8>) -> String {
+pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
@@ -67,17 +68,32 @@ fn parse_hex(hex_str: &str) -> Vec<u8> {
     bytes
 }
 
-#[allow(dead_code)]
-pub fn name_and_tag_xorurl(xorhash: &XorHash, type_tag: u64) -> String {
-    let h = multihash::encode(multihash::Hash::SHA3256, xorhash).unwrap();
+pub fn name_xorurl(xorname: &XorName) -> String {
+    /*    let h = multihash::encode(multihash::Hash::SHA3256, xorname).unwrap();
     let cid = Cid::new(Codec::Raw, Version::V1, &h);
-    let cid_str = encode(Base::Base32z, cid.to_bytes().as_slice());
-    format!("safe://{}:{}", cid_str, type_tag)
+    let cid_str = encode(Base::Base32, cid.to_bytes().as_slice());*/
+    let cid_str = vec_to_hex(xorname.to_vec());
+    format!("safe://{}", cid_str)
+}
+
+pub fn xorurl_to_xorname(xorurl: &String) -> XorName {
+    let cid_str = &xorurl[("safe://".len())..];
+    /*let cid = unwrap!(Cid::from(cid_str));
+    let h = multihash::decode(&cid.hash).unwrap();
+    let mut digest_str;
+    unsafe {
+        digest_str = str::from_utf8_unchecked(&h.digest);
+    }
+    let (_base, data) = unwrap!(decode(&digest_str));*/
+    let xorurl_bytes = parse_hex(&cid_str);
+    let mut xorname = XorName::default();
+    xorname.copy_from_slice(&xorurl_bytes);
+    xorname
 }
 
 pub fn pk_to_hex(pk: &PublicKey) -> String {
     let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
-    hash_to_hex(pk_as_bytes.to_vec())
+    vec_to_hex(pk_as_bytes.to_vec())
 }
 
 pub fn pk_from_hex(hex_str: &str) -> PublicKey {

@@ -11,8 +11,7 @@ use structopt::StructOpt;
 use safe_cli::{BlsKeyPair, Safe};
 use unwrap::unwrap;
 
-// TODO: move these to helper file
-use crate::cli::{get_target_location, prompt_user};
+use crate::subcommands::helpers::{get_target_location, prompt_user};
 use crate::subcommands::keys::create_new_key;
 
 #[derive(StructOpt, Debug)]
@@ -41,7 +40,10 @@ pub enum WalletSubCommands {
     },
     #[structopt(name = "balance")]
     /// Query a new Wallet or PublicKeys CoinBalance
-    Balance {},
+    Balance {
+        /// The target wallet to check the total balance.
+        target: Option<String>,
+    },
     #[structopt(name = "check-tx")]
     /// Check the status of a given transaction
     CheckTx {},
@@ -68,27 +70,24 @@ pub enum WalletSubCommands {
     },
 }
 
-pub fn wallet_commander(
-    cmd: Option<WalletSubCommands>,
-    target: Option<String>,
-    safe: &mut Safe,
-) -> Result<(), String> {
+pub fn wallet_commander(cmd: Option<WalletSubCommands>, safe: &mut Safe) -> Result<(), String> {
     match cmd {
         Some(WalletSubCommands::Create {}) => {
             let xorname = safe.wallet_create();
-            println!("Wallet created at XOR name: \"{}\"", xorname);
-            // Ok(())
+            println!("Wallet created at XOR-URL: \"{}\"", xorname);
+            Ok(())
         }
-        Some(WalletSubCommands::Balance {}) => {
+        Some(WalletSubCommands::Balance { target }) => {
+            // FIXME: get sk from args or from the account
             let sk =
-                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058"); // FIXME: get sk from args or from the account
+                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
             let balance = safe.wallet_balance(&target, &sk);
             println!(
-                "Wallet at XOR name \"{}\" has a total balance of {} safecoins",
+                "Wallet at XOR-URL \"{}\" has a total balance of {} safecoins",
                 target, balance
             );
-            // Ok(())
+            Ok(())
         }
         Some(WalletSubCommands::Insert {
             preload,
@@ -105,33 +104,32 @@ pub fn wallet_commander(
                     // Get pk payee Key, and prompt user for the corresponding sk
                     let sk = prompt_user(
                         &format!(
-                            "Enter secret key corresponding to public key at XOR name \"{}\": ",
+                            "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
                             linked_key
                         ),
                         "Invalid input",
                     );
                     let pk = safe.keys_fetch_pk(&linked_key, &sk);
                     println!(
-						"Spendable balance added with name '{}' in wallet located at XOR name \"{}\"",
+						"Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",
 						name, target
 					);
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }
                 None => {
-                    let new_key = create_new_key(safe, test_coins, payee, preload, None);
-                    println!("New spendable balance generated with name '{}' in wallet located at XOR name \"{}\"", name, target);
+                    let new_key = create_new_key(safe, test_coins, Some(payee), preload, None);
+                    println!("New spendable balance generated with name '{}' in wallet located at XOR-URL \"{}\"", name, target);
                     new_key
                 }
             };
-            safe.wallet_add(&target, &name, default, &unwrap!(key_pair), &xorname);
-            // Ok(())
+            safe.wallet_insert(&target, &name, default, &unwrap!(key_pair), &xorname);
+            Ok(())
         }
-        Some(WalletSubCommands::Transfer { from, to }) => {
+        Some(WalletSubCommands::Transfer { from: _, to: _ }) => {
             let xorname = safe.wallet_create();
-            println!("Wallet created at XOR name: \"{}\"", xorname);
-            // Ok(())
+            println!("Wallet created at XOR-URL: \"{}\"", xorname);
+            Ok(())
         }
         _ => return Err("Sub-command not supported yet".to_string()),
-    };
-    Ok(())
+    }
 }

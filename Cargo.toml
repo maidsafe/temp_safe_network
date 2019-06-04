@@ -24,7 +24,6 @@ serde = "1.0.91"
 serde_json = "1.0.39"
 bincode = "1.1.4"
 safe-nd = { git = "https://github.com/bochaco/safe-nd", branch = "make-fields-public" }
-tiny-keccak = "~1.4.2"
 cid = "0.3.0"
 multihash = "0.8.0"
 multibase = "0.6.0"
