@@ -10,7 +10,9 @@ mod lib_helpers;
 mod scl_mock;
 
 pub use lib_helpers::vec_to_hex;
-use lib_helpers::{name_xorurl, pk_from_hex, pk_to_hex, sk_from_hex, xorurl_to_xorname, KeyPair};
+use lib_helpers::{
+    pk_from_hex, pk_to_hex, sk_from_hex, xorname_to_xorurl, xorurl_to_xorname, KeyPair,
+};
 use scl_mock::MockSCL;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;
@@ -39,12 +41,14 @@ struct WalletSpendableBalance {
 
 pub struct Safe {
     safe_app: MockSCL,
+    xor_url_base: String,
 }
 
 impl Safe {
-    pub fn new() -> Self {
+    pub fn new(xor_url_base: String) -> Self {
         Self {
             safe_app: MockSCL::new(), // TODO: this will need to be replaced by auth process
+            xor_url_base,
         }
     }
 
@@ -79,7 +83,7 @@ impl Safe {
             }
         };
 
-        let xor_url = name_xorurl(&xorname);
+        let xor_url = xorname_to_xorurl(&xorname, &self.xor_url_base);
         (xor_url, key_pair)
     }
 
@@ -107,7 +111,7 @@ impl Safe {
             }
         };
 
-        let xor_url = name_xorurl(&xorname);
+        let xor_url = xorname_to_xorurl(&xorname, &self.xor_url_base);
         (xor_url, key_pair)
     }
 
@@ -136,7 +140,7 @@ impl Safe {
     // Create an empty Wallet and return its XOR-URL
     pub fn wallet_create(&mut self) -> XorUrl {
         let xorname = self.safe_app.mutable_data_put(None, None, None, false);
-        name_xorurl(&xorname)
+        xorname_to_xorurl(&xorname, &self.xor_url_base)
     }
 
     // Add a Key to a Wallet to make it spendable
@@ -191,7 +195,7 @@ impl Safe {
 
 #[test]
 fn test_keys_create_preload_test_coins() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let (xor_url, key_pair) = safe.keys_create_preload_test_coins("12.23".to_string(), None);
     assert!(xor_url.starts_with("safe://"));
     match key_pair {
@@ -202,7 +206,7 @@ fn test_keys_create_preload_test_coins() {
 
 #[test]
 fn test_keys_create_preload_test_coins_pk() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
     let (xor_url, key_pair) = safe.keys_create_preload_test_coins("1.1".to_string(), Some(pk));
     assert!(xor_url.starts_with("safe://"));
@@ -214,7 +218,7 @@ fn test_keys_create_preload_test_coins_pk() {
 
 #[test]
 fn test_keys_create() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let (_, from_key_pair) = safe.keys_create_preload_test_coins("23.23".to_string(), None);
 
     let (xor_url, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, None);
@@ -227,7 +231,7 @@ fn test_keys_create() {
 
 #[test]
 fn test_keys_create_preload() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let (_, from_key_pair) = safe.keys_create_preload_test_coins("543.2312".to_string(), None);
 
     let preload_amount = "1.8";
@@ -251,7 +255,7 @@ fn test_keys_create_preload() {
 
 #[test]
 fn test_keys_create_pk() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let (_, from_key_pair) = safe.keys_create_preload_test_coins("1.1".to_string(), None);
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
     let (xor_url, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, Some(pk));
@@ -265,7 +269,7 @@ fn test_keys_create_pk() {
 #[test]
 fn test_keys_test_coins_balance_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let preload_amount = "1.1542";
     let (_, key_pair) = safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let current_balance = safe.keys_balance_from_pk(&unwrap!(key_pair));
@@ -275,7 +279,7 @@ fn test_keys_test_coins_balance_pk() {
 #[test]
 fn test_keys_test_coins_balance_xorurl() {
     use unwrap::unwrap;
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let preload_amount = "0.243";
     let (xor_url, key_pair) = safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let current_balance = safe.keys_balance_from_xorurl(&xor_url, &unwrap!(key_pair).sk);
@@ -285,7 +289,7 @@ fn test_keys_test_coins_balance_xorurl() {
 #[test]
 fn test_keys_balance_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let preload_amount = "1743.234";
     let (_, from_key_pair) = safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
     let from_key_pair_unwrapped = unwrap!(from_key_pair);
@@ -307,7 +311,7 @@ fn test_keys_balance_pk() {
 #[test]
 fn test_keys_balance_xorname() {
     use unwrap::unwrap;
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let preload_amount = "435.34";
     let (from_xorname, from_key_pair) =
         safe.keys_create_preload_test_coins(preload_amount.to_string(), None);
@@ -331,7 +335,7 @@ fn test_keys_balance_xorname() {
 #[test]
 fn test_keys_fetch_pk_test_coins() {
     use unwrap::unwrap;
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let (xor_url, key_pair) = safe.keys_create_preload_test_coins("23.22".to_string(), None);
     let key_pair_unwrapped = unwrap!(key_pair);
     let pk = safe.keys_fetch_pk(&xor_url, &key_pair_unwrapped.sk);
@@ -341,7 +345,7 @@ fn test_keys_fetch_pk_test_coins() {
 #[test]
 fn test_keys_fetch_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let (_, from_key_pair) = safe.keys_create_preload_test_coins("0.56".to_string(), None);
 
     let (xor_url, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, None);
@@ -352,14 +356,14 @@ fn test_keys_fetch_pk() {
 
 #[test]
 fn test_wallet_create() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let xor_url = safe.wallet_create();
     assert!(xor_url.starts_with("safe://"));
 }
 
 #[test]
 fn test_wallet_insert_and_balance() {
-    let mut safe = Safe::new();
+    let mut safe = Safe::new("base32".to_string());
     let sk = String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
     let wallet_xorurl = safe.wallet_create();
     println!("AA: {}", wallet_xorurl);

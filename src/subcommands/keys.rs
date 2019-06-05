@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::subcommands::helpers::{get_target_location, prompt_user};
 use log::warn;
 use safe_cli::{BlsKeyPair, Safe};
-use crate::subcommands::helpers::{get_target_location, prompt_user};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
