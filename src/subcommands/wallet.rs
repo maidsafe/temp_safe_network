@@ -52,9 +52,10 @@ pub enum WalletSubCommands {
     Create {},
     #[structopt(name = "transfer")]
     Transfer {
+        /// Number of safecoins to transfer
+        amount: String,
         /// target wallet
         to: String,
-
         /// source wallet, or pulled from stdin if not present
         from: Option<String>,
     },
@@ -125,10 +126,9 @@ pub fn wallet_commander(cmd: Option<WalletSubCommands>, safe: &mut Safe) -> Resu
             safe.wallet_insert(&target, &name, default, &unwrap!(key_pair), &xorname);
             Ok(())
         }
-        Some(WalletSubCommands::Transfer { from: _, to: _ }) => {
-            let xorname = safe.wallet_create();
-            println!("Wallet created at XOR-URL: \"{}\"", xorname);
-            Ok(())
+        Some(WalletSubCommands::Transfer { amount, from, to }) => {
+            //TODO: if from/to start withOUT safe:// PKs.
+            safe.wallet_transfer(&amount, &to, from)
         }
         _ => return Err("Sub-command not supported yet".to_string()),
     }

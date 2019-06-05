@@ -17,6 +17,7 @@ use scl_mock::MockSCL;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
+use uuid::Uuid;
 
 static WALLET_TYPE_TAG: u64 = 10000;
 
@@ -32,11 +33,10 @@ pub struct BlsKeyPair {
 }
 
 // Struct which is serialised and stored in Wallet MD for linking to a spendable balance (Key)
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct WalletSpendableBalance {
     xorurl: XorUrl,
     sk: String,
-    default: bool,
 }
 
 pub struct Safe {
@@ -133,7 +133,7 @@ impl Safe {
     pub fn keys_fetch_pk(&self, xorurl: &XorUrl, sk: &str) -> String {
         let secret_key: SecretKey = sk_from_hex(sk);
         let xorname = xorurl_to_xorname(xorurl);
-        let public_key = self.safe_app.keys_fetch_pk(&xorname, &secret_key);
+		let public_key = self.safe_app.keys_fetch_pk(&xorname, &secret_key);
         pk_to_hex(&public_key)
     }
 
@@ -155,7 +155,6 @@ impl Safe {
         let value = WalletSpendableBalance {
             xorurl: key_xorurl.clone(),
             sk: key_pair.sk.clone(),
-            default,
         };
         let serialised_value = unwrap!(serde_json::to_string(&value));
         // FIXME: it should return error if the name already exists
@@ -167,6 +166,16 @@ impl Safe {
             &k,
             &serialised_value.into_bytes(),
         );
+
+        if default {
+            // add the _default key
+            self.safe_app.mutable_data_insert(
+                &wallet_xorname,
+                WALLET_TYPE_TAG,
+                &"_default".to_string().into_bytes(),
+                &k,
+            );
+        }
     }
 
     // Check the total balance of a Wallet found at a given XOR-URL
@@ -178,16 +187,143 @@ impl Safe {
             .mutable_data_get_entries(&wallet_xorname, WALLET_TYPE_TAG);
 
         // Iterate through the Keys and query the balance for each
-        spendable_balances.iter().for_each(|(_name, balance)| {
-            let current_balance = String::from_utf8_lossy(balance).to_string();
-            let spendable_balance: WalletSpendableBalance =
-                unwrap!(serde_json::from_str(&current_balance));
+        spendable_balances.iter().for_each(|(name, balance)| {
+            let thename = String::from_utf8_lossy(name).to_string();
+            // ignore the _default Wallet MDkey
+            if thename != "_default" {
+                let current_balance = String::from_utf8_lossy(balance).to_string();
+                let spendable_balance: WalletSpendableBalance =
+                    unwrap!(serde_json::from_str(&current_balance));
 
-            let current_balance =
-                self.keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk);
-            total_balance += unwrap!(current_balance.parse::<f64>());
+                let current_balance = self
+                    .keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk);
+                total_balance += unwrap!(current_balance.parse::<f64>());
+            }
         });
         total_balance.to_string()
+    }
+
+    fn wallet_get_default_balance(
+        &mut self,
+        wallet_xorurl: &XorUrl,
+    ) -> Result<WalletSpendableBalance, String> {
+        let xorname = xorurl_to_xorname(&wallet_xorurl);
+        let mut default_key: String = "".to_string();
+
+        if let Some(default) =
+            unwrap!(self
+                .safe_app
+                .mutable_data_get_key("_default", &xorname, WALLET_TYPE_TAG))
+        {
+            default_key = String::from_utf8_lossy(&default).to_string();
+            println!(
+                "The default WalletBalance {:?} is named \"{:?}\"",
+                &wallet_xorurl, &default_key
+            );
+        } else {
+            return Err(format!(
+                "No default balance found at Wallet {:?}",
+                &wallet_xorurl
+            ));
+        }
+
+        let the_balance: WalletSpendableBalance = {
+            let default_balance_vec = unwrap!(unwrap!(self.safe_app.mutable_data_get_key(
+                &default_key,
+                &xorname,
+                WALLET_TYPE_TAG
+            )));
+
+            let default_balance = String::from_utf8_lossy(&default_balance_vec).to_string();
+            let spendable_balance: WalletSpendableBalance =
+                unwrap!(serde_json::from_str(&default_balance));
+            spendable_balance
+        };
+
+        Ok(the_balance)
+    }
+
+    /// # Transfer safecoins from one Wallet to another
+    ///
+    /// Using established Wallet and SpendableBalances you can send safecoins between Wallets.
+    ///
+    /// ## Example
+    /// ```
+    /// # use safe_cli::Safe;
+    /// # use unwrap::unwrap;
+    /// let mut safe = Safe::new();
+    /// let sk = String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
+    /// let wallet_xorurl = safe.wallet_create();
+    /// let wallet_xorurl2 = safe.wallet_create();
+    /// let (key1_xor_url, key_pair1) = safe.keys_create_preload_test_coins("14".to_string(), None);
+    /// let (key2_xor_url, key_pair2) = safe.keys_create_preload_test_coins("1".to_string(), None);
+    /// safe.wallet_insert(
+    ///     &wallet_xorurl,
+    ///     "frombalance",
+    ///     true,
+    ///     &key_pair1.unwrap(),
+    ///     &key1_xor_url,
+    /// );
+    /// let current_balance = safe.wallet_balance(&wallet_xorurl, &sk);
+    /// assert_eq!("14", current_balance);
+    ///
+    /// safe.wallet_insert(
+    ///     &wallet_xorurl2,
+    ///     "tobalance",
+    ///     true,
+    ///     &key_pair2.unwrap(),
+    ///     &key2_xor_url,
+    /// );
+    ///
+    ///
+    /// safe.wallet_transfer( "10", &wallet_xorurl2, Some(wallet_xorurl) );
+    /// let from_balance = safe.keys_balance_from_xorurl(&key1_xor_url, &sk );
+    /// assert_eq!("4.", from_balance);
+    /// let to_balance = safe.keys_balance_from_xorurl(&key2_xor_url, &sk );
+    /// assert_eq!("11.", to_balance);
+    /// ```
+    pub fn wallet_transfer(
+        &mut self,
+        amount: &str,
+        to: &XorUrl,
+        from: Option<XorUrl>,
+    ) -> Result<(), String> {
+        // from is not optional until we know default account container / Wallet location ("root")
+        // if no FROM for now, ERR
+        // FROM needs to be from default
+
+        // TODO: Grab "from" stdin
+
+        // TODO, check if to/from are WalletContainers or PKs (via safe:)
+        let from_wallet_xorurl =
+            match from {
+                Some(wallet_xorurl) => wallet_xorurl,
+                _ => return Err(
+                    "A \"<from>\" wallet is required until default wallets have been configured."
+                        .to_string(),
+                ),
+            };
+
+        let from_wallet_balance = unwrap!(self.wallet_get_default_balance(&from_wallet_xorurl));
+        let to_wallet_balance = unwrap!(self.wallet_get_default_balance(&to));
+
+        let from_pk = self
+            .safe_app
+            .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xor_url));
+
+        let to_pk = self
+            .safe_app
+            .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xor_url));
+
+        let from_sk = sk_from_hex(&from_wallet_balance.sk);
+        let tx_id = Uuid::new_v4();
+
+        // TODO: what doe this return? tx_id?
+        self.safe_app
+            .safecoin_transfer(&from_pk, &from_sk, &to_pk, &tx_id, amount);
+
+        println!("Success. TX_ID: {:?}", &tx_id);
+        Ok(())
     }
 }
 

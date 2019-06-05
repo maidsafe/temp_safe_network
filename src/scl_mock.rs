@@ -148,23 +148,24 @@ impl MockSCL {
             .replace(")", "")
     }
 
-    pub fn keys_fetch_pk(&self, xorname: &XorName, _sk: &SecretKey) -> PublicKey {
+    pub fn keys_fetch_pk(&self, xorname: &XorName) -> PublicKey {
         let coin_balance = &self.mock_data.coin_balances[&vec_to_hex(xorname.to_vec())];
         coin_balance.owner
     }
 
     #[allow(dead_code)]
-    pub fn send(
+    pub fn safecoin_transfer(
         &mut self,
         from_pk: &PublicKey,
         from_sk: &SecretKey,
         to_pk: &PublicKey,
         tx_id: &Uuid,
         amount: &str,
-    ) {
+    ) -> Result<Uuid, String> {
         let to_xorname = xorname_from_pk(to_pk);
         let from_xorname = xorname_from_pk(from_pk);
 
+        let the_tx_id = tx_id.clone();
         // generate TX in destination section (to_pk)
         let mut txs_for_xorname = match self.mock_data.txs.get(&vec_to_hex(to_xorname.to_vec())) {
             Some(txs) => txs.clone(),
@@ -180,7 +181,7 @@ impl MockSCL {
 
         let amount_coin = unwrap!(Coins::from_str(amount));
 
-        // reduce balance from sender
+        // reduce balance from safecoin_transferer
         let from_balance = unwrap!(Coins::from_str(&self.get_balance_from_pk(from_pk, from_sk)));
         let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
         let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
@@ -206,6 +207,8 @@ impl MockSCL {
                 value: Coins::from(to_new_amount).to_string(),
             },
         );
+
+        Ok(the_tx_id)
     }
 
     #[allow(dead_code)]
@@ -378,6 +381,30 @@ impl MockSCL {
         }
     }
 
+    pub fn mutable_data_get_key(
+        &mut self,
+        key: &str,
+        xorname: &XorName,
+        _tag: u64,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let xorname_as_string: String = vec_to_hex(xorname.to_vec());
+        let md = &self.mock_data.mutable_data[&xorname_as_string];
+        let mut res = None;
+        if let MutableDataKind::Unsequenced { data } = &md.data {
+            data.iter().for_each(|elem| {
+                let this_key = elem.0.clone();
+
+                if this_key == key {
+                    res = Some(elem.1.data.clone())
+                }
+                // res.insert(elem.0.clone().into_bytes(), elem.1.data.clone());
+            });
+        }
+        // let the_key = unwrap!(res[$key]);
+
+        Ok(res)
+    }
+
     pub fn mutable_data_get_entries(
         &mut self,
         xorname: &XorName,
@@ -509,7 +536,7 @@ fn test_check_balance() {
 }
 
 #[test]
-fn test_send() {
+fn test_safecoin_transfer() {
     use self::MockSCL;
     use threshold_crypto::SecretKey;
 
@@ -546,7 +573,7 @@ fn test_send() {
     let tx_id = Uuid::new_v4();
     println!("UUID {}", tx_id);
 
-    mock.send(&pk1, &sk1, &pk2, &tx_id, "1.4");
+    mock.safecoin_transfer(&pk1, &sk1, &pk2, &tx_id, "1.4");
     println!(
         "Current TX state: {}",
         mock.get_transaction(&tx_id, &pk2, &sk2)
