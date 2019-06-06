@@ -15,6 +15,8 @@ use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
 use unwrap::unwrap;
 
+static SAFE_URL_PROTOCOL: &str = "safe://";
+
 // Out internal key pair structure to manage BLS keys
 pub struct KeyPair {
     pub pk: PublicKey,
@@ -86,31 +88,27 @@ pub fn sk_from_hex(hex_str: &str) -> SecretKey {
 }
 
 pub fn xorname_to_xorurl(xorname: &XorName, base: &String) -> String {
-    // FIXME: temp_multihash_encode is a temporary solution until a PR in multihash project is
-    // merged and solves the problem of the encode to not only encoding but also hashing the string.
-    // Issue: https://github.com/multiformats/rust-multihash/issues/32
-    // PR: https://github.com/multiformats/rust-multihash/pull/26
     let h = temp_multihash_encode(multihash::Hash::SHA3256, xorname).unwrap();
     let cid = Cid::new(Codec::Raw, Version::V1, &h);
     let base_encoding = match base.as_str() {
         "base32z" => Base::Base32z,
         "base32" => Base::Base32,
-        a => {
-            if a.len() > 0 {
+        base => {
+            if base.len() > 0 {
                 println!(
                     "Base encoding '{}' not supported for XOR-URL. Using default 'base32'.",
-                    a
+                    base
                 );
             }
             Base::Base32
         }
     };
     let cid_str = encode(base_encoding, cid.to_bytes().as_slice());
-    format!("safe://{}", cid_str)
+    format!("{}{}", SAFE_URL_PROTOCOL, cid_str)
 }
 
 pub fn xorurl_to_xorname(xorurl: &String) -> XorName {
-    let cid_str = &xorurl[("safe://".len())..];
+    let cid_str = &xorurl[(SAFE_URL_PROTOCOL.len())..];
     let cid = unwrap!(Cid::from(cid_str));
     let hash = multihash::decode(&cid.hash).unwrap();
     let mut xorname = XorName::default();
@@ -118,6 +116,10 @@ pub fn xorurl_to_xorname(xorurl: &String) -> XorName {
     xorname
 }
 
+// FIXME: temp_multihash_encode is a temporary solution until a PR in multihash project is
+// merged and solves the problem of the 'encode' which not only encodes but also hashes the string.
+// Issue: https://github.com/multiformats/rust-multihash/issues/32
+// PR: https://github.com/multiformats/rust-multihash/pull/26
 fn temp_multihash_encode(hash: multihash::Hash, digest: &[u8]) -> Result<Vec<u8>, String> {
     let size = hash.size();
     if digest.len() != size as usize {
