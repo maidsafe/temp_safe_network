@@ -7,11 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::error::InternalError;
-use config_file_handler::{self, FileHandler};
+use directories::ProjectDirs;
 use routing::XorName;
 use rust_sodium::crypto::sign;
 use serde_derive::{Deserialize, Serialize};
-use std::ffi::OsString;
+#[cfg(test)]
+use std::{fs, path::PathBuf};
+use std::{
+    fs::File,
+    io::{self, BufReader},
+};
+
+const CONFIG_DIR_QUALIFIER: &str = "net";
+const CONFIG_DIR_ORGANIZATION: &str = "MaidSafe";
+const CONFIG_DIR_APPLICATION: &str = "vault";
+const CONFIG_FILE: &str = "vault.config";
 
 /// Lets a vault configure a wallet address and storage limit.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -37,10 +47,11 @@ pub struct DevConfig {
 
 /// Reads the default vault config file.
 pub fn read_config_file() -> Result<Config, InternalError> {
-    // if the config file is not present, a default one will be generated
-    let file_handler = FileHandler::new(&get_file_name()?, false)?;
-    let cfg = file_handler.read_file()?;
-    Ok(cfg)
+    let path = dirs()?.config_dir().join(CONFIG_FILE);
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let config = serde_json::from_reader(reader)?;
+    Ok(config)
 }
 
 /// Writes a Vault config file **for use by tests and examples**.
@@ -52,23 +63,26 @@ pub fn read_config_file() -> Result<Config, InternalError> {
 /// the config file should be created by the Vault's installer.
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn write_config_file(config: &Config) -> Result<::std::path::PathBuf, InternalError> {
-    use serde_json;
-    use std::fs::File;
-    use std::io::Write;
+pub fn write_config_file(config: &Config) -> Result<PathBuf, InternalError> {
+    let dirs = dirs()?;
+    let dir = dirs.config_dir();
+    fs::create_dir_all(dir)?;
 
-    let mut config_path = config_file_handler::current_bin_dir()?;
-    config_path.push(get_file_name()?);
-    let mut file = File::create(&config_path)?;
-    write!(&mut file, "{}", serde_json::to_string_pretty(&config)?)?;
+    let path = dir.join(CONFIG_FILE);
+    let mut file = File::create(&path)?;
+    serde_json::to_writer_pretty(&mut file, config)?;
     file.sync_all()?;
-    Ok(config_path)
+
+    Ok(path)
 }
 
-fn get_file_name() -> Result<OsString, InternalError> {
-    let mut name = config_file_handler::exe_file_stem()?;
-    name.push(".vault.config");
-    Ok(name)
+fn dirs() -> Result<ProjectDirs, InternalError> {
+    ProjectDirs::from(
+        CONFIG_DIR_QUALIFIER,
+        CONFIG_DIR_ORGANIZATION,
+        CONFIG_DIR_APPLICATION,
+    )
+    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
 }
 
 #[cfg(test)]

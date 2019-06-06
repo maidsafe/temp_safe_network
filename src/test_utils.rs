@@ -7,19 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use self::rust_sodium::crypto::sign;
+
 #[cfg(not(feature = "use-mock-crust"))]
 use crate::authority::ClientAuthority;
-use crate::authority::ClientManagerAuthority;
-use crate::utils;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use crate::vault::RoutingNode;
+use crate::{authority::ClientManagerAuthority, utils};
 use rand::{seq, Rand, Rng};
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;
 #[cfg(all(test, feature = "use-mock-routing"))]
-use routing::Config as RoutingConfig;
-#[cfg(all(test, feature = "use-mock-routing"))]
-use routing::DevConfig as RoutingDevConfig;
+use routing::{Config as RoutingConfig, DevConfig as RoutingDevConfig};
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
 #[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
@@ -148,11 +146,9 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
 /// Generate random `Client` authority and return it together with its client key.
 #[cfg(not(feature = "use-mock-crust"))]
 pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
-    use rand;
     use routing::FullId;
 
     let full_id = FullId::new();
-
     let client = ClientAuthority {
         client_id: *full_id.public_id(),
         proxy_node_name: rand::random(),

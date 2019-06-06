@@ -60,25 +60,23 @@
 
 #[macro_use]
 extern crate log;
-use config_file_handler;
 use maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 
 use clap::{App, Arg};
 use safe_vault::Vault;
-use std::ffi::OsString;
-use std::fs;
+use std::{env, fs};
 
 /// Runs a SAFE Network vault.
 pub fn main() {
     // TODO - remove the following line once maidsafe_utilities is updated to use log4rs v4.
     let _ = fs::remove_file("Node.log");
 
-    let name = config_file_handler::exe_file_stem().unwrap_or_else(|_| OsString::new());
-    let name_and_version = format!("{} v{}", name.to_string_lossy(), env!("CARGO_PKG_VERSION"));
+    let name = exe_name().unwrap_or_else(|| "vault".to_string());
+    let name_and_version = format!("{} v{}", name, env!("CARGO_PKG_VERSION"));
 
-    let matches = App::new(name.to_string_lossy())
+    let matches = App::new(name)
         .arg(
             Arg::with_name("first")
                 .short("f")
@@ -107,4 +105,12 @@ pub fn main() {
             break;
         }
     }
+}
+
+fn exe_name() -> Option<String> {
+    env::current_exe()
+        .ok()?
+        .file_stem()?
+        .to_str()
+        .map(|name| name.to_string())
 }

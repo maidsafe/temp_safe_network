@@ -349,7 +349,7 @@ fn mutable_data_normal_flow() {
 }
 
 #[test]
-#[allow(clippy::cyclomatic_complexity)]
+#[allow(clippy::cognitive_complexity)]
 fn mutable_data_error_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;

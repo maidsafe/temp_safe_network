@@ -7,12 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::chunk_store;
-use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
 use quick_error::quick_error;
-use routing::messaging;
-use routing::ClientError;
-use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
+use routing::{messaging, ClientError, InterfaceError, MessageId, Request, Response, RoutingError};
 use serde_json;
 use std::io;
 
@@ -24,9 +21,6 @@ quick_error! {
             from()
         }
         FailedToFindCachedRequest(message_id: MessageId)
-        FileHandler(error: config_file_handler::Error) {
-            from()
-        }
         Io(error: io::Error) {
             from()
         }
