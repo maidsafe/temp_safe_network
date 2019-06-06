@@ -88,16 +88,16 @@ pub fn create_new_key(
         // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
         // TODO: support Key XOR-URL and pk, we now support only Key XOR-URL
         // Prompt the user for the secret key since 'from' is a Key and not a Wallet
-        let from_xor_url = from.expect("Missing the 'from' argument");
+        let from_xorurl = from.expect("Missing the 'from' argument");
         let sk = prompt_user(
             &format!(
                 "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
-                from_xor_url
+                from_xorurl
             ),
             "Invalid input",
         );
 
-        let pk_from_xor = safe.keys_fetch_pk(&from_xor_url, &sk);
+        let pk_from_xor = safe.keys_fetch_pk(&from_xorurl, &sk);
         let from_key_pair = BlsKeyPair {
             pk: pk_from_xor,
             sk,

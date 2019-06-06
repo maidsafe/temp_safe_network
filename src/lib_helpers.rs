@@ -133,28 +133,28 @@ fn temp_multihash_encode(hash: multihash::Hash, digest: &[u8]) -> Result<Vec<u8>
 }
 
 #[test]
-fn test_xor_url_base32_encoding() {
+fn test_xorurl_base32_encoding() {
     let xorname: XorName = *b"12345678901234567890123456789012";
-    let xor_url = xorname_to_xorurl(&xorname, &"base32".to_string());
+    let xorurl = xorname_to_xorurl(&xorname, &"base32".to_string());
     let base32_xorurl = "safe://bbkulcamjsgm2dknrxha4tamjsgm2dknrxha4tamjsgm2dknrxha4tamjs";
-    assert_eq!(xor_url, base32_xorurl);
+    assert_eq!(xorurl, base32_xorurl);
 
-    let xor_url = xorname_to_xorurl(&xorname, &"".to_string());
-    assert_eq!(xor_url, base32_xorurl);
+    let xorurl = xorname_to_xorurl(&xorname, &"".to_string());
+    assert_eq!(xorurl, base32_xorurl);
 }
 
 #[test]
-fn test_xor_url_base32z_encoding() {
+fn test_xorurl_base32z_encoding() {
     let xorname: XorName = *b"12345678901234567890123456789012";
-    let xor_url = xorname_to_xorurl(&xorname, &"base32z".to_string());
+    let xorurl = xorname_to_xorurl(&xorname, &"base32z".to_string());
     let base32_xorurl = "safe://hbkwmnycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
-    assert_eq!(xor_url, base32_xorurl);
+    assert_eq!(xorurl, base32_xorurl);
 }
 
 #[test]
-fn test_xor_url_decoding() {
+fn test_xorurl_decoding() {
     let xorname: XorName = *b"12345678901234567890123456789012";
-    let xor_url = xorname_to_xorurl(&xorname, &"base32".to_string());
-    let decoded_xorname = xorurl_to_xorname(&xor_url);
+    let xorurl = xorname_to_xorurl(&xorname, &"base32".to_string());
+    let decoded_xorname = xorurl_to_xorname(&xorurl);
     assert_eq!(xorname, decoded_xorname);
 }

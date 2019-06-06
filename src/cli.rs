@@ -42,14 +42,14 @@ struct CmdArgs {
     dry: bool,
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32 (default) and base32z
     #[structopt(long = "xorurl", raw(global = "true"))]
-    xor_url_base: Option<String>,
+    xorurl_base: Option<String>,
 }
 
 pub fn run() -> Result<(), String> {
     // Let's first get all the arguments passed in
     let args = CmdArgs::from_args();
 
-    let mut safe = Safe::new(args.xor_url_base.clone().unwrap_or("".to_string()));
+    let mut safe = Safe::new(args.xorurl_base.clone().unwrap_or("".to_string()));
 
     debug!("Processing command: {:?}", args);
 
