@@ -37,6 +37,9 @@ pub enum WalletSubCommands {
         /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
+        /// Optionally pass the secret key for the balance being inserted.
+        #[structopt(short = "sk", long = "secret-key")]
+        secret: Option<String>,
     },
     #[structopt(name = "balance")]
     /// Query a new Wallet or PublicKeys CoinBalance
@@ -71,11 +74,20 @@ pub enum WalletSubCommands {
     },
 }
 
-pub fn wallet_commander(cmd: Option<WalletSubCommands>, safe: &mut Safe) -> Result<(), String> {
+pub fn wallet_commander(
+    cmd: Option<WalletSubCommands>,
+    pretty: bool,
+    safe: &mut Safe,
+) -> Result<(), String> {
     match cmd {
         Some(WalletSubCommands::Create {}) => {
             let xorname = safe.wallet_create();
-            println!("Wallet created at XOR-URL: \"{}\"", xorname);
+
+            if pretty {
+                println!("Wallet created at XOR-URL: \"{}\"", xorname);
+            } else {
+                println!("{}", xorname);
+            }
             Ok(())
         }
         Some(WalletSubCommands::Balance { target }) => {
@@ -84,10 +96,16 @@ pub fn wallet_commander(cmd: Option<WalletSubCommands>, safe: &mut Safe) -> Resu
                 String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
             let balance = safe.wallet_balance(&target, &sk);
-            println!(
-                "Wallet at XOR-URL \"{}\" has a total balance of {} safecoins",
-                target, balance
-            );
+
+            if pretty {
+                println!(
+                    "Wallet at XOR-URL \"{}\" has a total balance of {} safecoins",
+                    target, balance
+                );
+            } else {
+                println!("{}", balance);
+            }
+
             Ok(())
         }
         Some(WalletSubCommands::Insert {
@@ -98,28 +116,43 @@ pub fn wallet_commander(cmd: Option<WalletSubCommands>, safe: &mut Safe) -> Resu
             key,
             name,
             default,
+            secret,
         }) => {
             let target = get_target_location(target)?;
             let (xorname, key_pair) = match key {
                 Some(linked_key) => {
-                    // Get pk payee Key, and prompt user for the corresponding sk
-                    let sk = prompt_user(
-                        &format!(
-                            "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
-                            linked_key
-                        ),
-                        "Invalid input",
-                    );
-                    let pk = safe.keys_fetch_pk(&linked_key, &sk);
-                    println!(
-						"Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",
-						name, target
-					);
+                    let mut sk = secret.unwrap_or(String::from(""));
+
+                    if sk.is_empty() {
+                        // Get pk payee Key, and prompt user for the corresponding sk
+                        sk = prompt_user(
+                            &format!(
+                                "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
+                                linked_key
+                            ),
+                            "Invalid input",
+                        );
+                    }
+
+                    let pk = safe.keys_fetch_pk(&linked_key);
+                    if pretty {
+                        println!(
+							"Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",
+							name, target
+						);
+                    } else {
+                        println!("{}", target);
+                    }
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }
                 None => {
-                    let new_key = create_new_key(safe, test_coins, Some(payee), preload, None);
-                    println!("New spendable balance generated with name '{}' in wallet located at XOR-URL \"{}\"", name, target);
+                    let new_key =
+                        create_new_key(safe, test_coins, Some(payee), preload, None, pretty);
+                    if pretty {
+                        println!("New spendable balance generated with name '{}' in wallet located at XOR-URL \"{}\"", name, target);
+                    } else {
+                        println!("{}", target);
+                    }
                     new_key
                 }
             };
@@ -128,7 +161,15 @@ pub fn wallet_commander(cmd: Option<WalletSubCommands>, safe: &mut Safe) -> Resu
         }
         Some(WalletSubCommands::Transfer { amount, from, to }) => {
             //TODO: if from/to start withOUT safe:// PKs.
-            safe.wallet_transfer(&amount, &to, from)
+            let tx_id = safe.wallet_transfer(&amount, &to, from).unwrap();
+
+			if pretty {
+				println!("Success. TX_ID: {:?}", &tx_id);
+			} else {
+				println!("{}", &tx_id)
+			}
+
+			Ok(())
         }
         _ => return Err("Sub-command not supported yet".to_string()),
     }

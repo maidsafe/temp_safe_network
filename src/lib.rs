@@ -8,6 +8,7 @@
 
 mod lib_helpers;
 mod scl_mock;
+use log::{info, debug};
 
 pub use lib_helpers::vec_to_hex;
 use lib_helpers::{
@@ -20,6 +21,7 @@ use unwrap::unwrap;
 use uuid::Uuid;
 
 static WALLET_TYPE_TAG: u64 = 10000;
+static WALLET_DEFAULT: &str = "_default";
 
 // The XOR-URL type (in the future in can be a struct with different functions)
 pub type XorUrl = String;
@@ -130,10 +132,9 @@ impl Safe {
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
-    pub fn keys_fetch_pk(&self, xorurl: &XorUrl, sk: &str) -> String {
-        let secret_key: SecretKey = sk_from_hex(sk);
+    pub fn keys_fetch_pk(&self, xorurl: &XorUrl) -> String {
         let xorname = xorurl_to_xorname(xorurl);
-		let public_key = self.safe_app.keys_fetch_pk(&xorname, &secret_key);
+        let public_key = self.safe_app.keys_fetch_pk(&xorname);
         pk_to_hex(&public_key)
     }
 
@@ -172,7 +173,7 @@ impl Safe {
             self.safe_app.mutable_data_insert(
                 &wallet_xorname,
                 WALLET_TYPE_TAG,
-                &"_default".to_string().into_bytes(),
+                &WALLET_DEFAULT.to_string().into_bytes(),
                 &k,
             );
         }
@@ -190,13 +191,13 @@ impl Safe {
         spendable_balances.iter().for_each(|(name, balance)| {
             let thename = String::from_utf8_lossy(name).to_string();
             // ignore the _default Wallet MDkey
-            if thename != "_default" {
+            if thename != WALLET_DEFAULT {
                 let current_balance = String::from_utf8_lossy(balance).to_string();
                 let spendable_balance: WalletSpendableBalance =
                     unwrap!(serde_json::from_str(&current_balance));
 
-                let current_balance = self
-                    .keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk);
+                let current_balance =
+                    self.keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk);
                 total_balance += unwrap!(current_balance.parse::<f64>());
             }
         });
@@ -205,7 +206,7 @@ impl Safe {
 
     fn wallet_get_default_balance(
         &mut self,
-        wallet_xorurl: &XorUrl,
+        wallet_xorurl: &XorUrl
     ) -> Result<WalletSpendableBalance, String> {
         let xorname = xorurl_to_xorname(&wallet_xorurl);
         let mut default_key: String = "".to_string();
@@ -213,13 +214,15 @@ impl Safe {
         if let Some(default) =
             unwrap!(self
                 .safe_app
-                .mutable_data_get_key("_default", &xorname, WALLET_TYPE_TAG))
+                .mutable_data_get_key(WALLET_DEFAULT, &xorname, WALLET_TYPE_TAG))
         {
             default_key = String::from_utf8_lossy(&default).to_string();
-            println!(
+
+            info!(
                 "The default WalletBalance {:?} is named \"{:?}\"",
                 &wallet_xorurl, &default_key
             );
+
         } else {
             return Err(format!(
                 "No default balance found at Wallet {:?}",
@@ -251,18 +254,18 @@ impl Safe {
     /// ```
     /// # use safe_cli::Safe;
     /// # use unwrap::unwrap;
-    /// let mut safe = Safe::new();
+    /// let mut safe = Safe::new("base32".to_string());
     /// let sk = String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
     /// let wallet_xorurl = safe.wallet_create();
     /// let wallet_xorurl2 = safe.wallet_create();
-    /// let (key1_xor_url, key_pair1) = safe.keys_create_preload_test_coins("14".to_string(), None);
-    /// let (key2_xor_url, key_pair2) = safe.keys_create_preload_test_coins("1".to_string(), None);
+    /// let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("14".to_string(), None);
+    /// let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1".to_string(), None);
     /// safe.wallet_insert(
     ///     &wallet_xorurl,
     ///     "frombalance",
     ///     true,
     ///     &key_pair1.unwrap(),
-    ///     &key1_xor_url,
+    ///     &key1_xorurl,
     /// );
     /// let current_balance = safe.wallet_balance(&wallet_xorurl, &sk);
     /// assert_eq!("14", current_balance);
@@ -272,22 +275,22 @@ impl Safe {
     ///     "tobalance",
     ///     true,
     ///     &key_pair2.unwrap(),
-    ///     &key2_xor_url,
+    ///     &key2_xorurl,
     /// );
     ///
     ///
     /// safe.wallet_transfer( "10", &wallet_xorurl2, Some(wallet_xorurl) );
-    /// let from_balance = safe.keys_balance_from_xorurl(&key1_xor_url, &sk );
+    /// let from_balance = safe.keys_balance_from_xorurl(&key1_xorurl, &sk );
     /// assert_eq!("4.", from_balance);
-    /// let to_balance = safe.keys_balance_from_xorurl(&key2_xor_url, &sk );
+    /// let to_balance = safe.keys_balance_from_xorurl(&key2_xorurl, &sk );
     /// assert_eq!("11.", to_balance);
     /// ```
     pub fn wallet_transfer(
         &mut self,
         amount: &str,
         to: &XorUrl,
-        from: Option<XorUrl>,
-    ) -> Result<(), String> {
+        from: Option<XorUrl>
+    ) -> Result<Uuid, String> {
         // from is not optional until we know default account container / Wallet location ("root")
         // if no FROM for now, ERR
         // FROM needs to be from default
@@ -304,26 +307,25 @@ impl Safe {
                 ),
             };
 
-        let from_wallet_balance = unwrap!(self.wallet_get_default_balance(&from_wallet_xorurl));
+        let from_wallet_balance =
+            unwrap!(self.wallet_get_default_balance(&from_wallet_xorurl));
         let to_wallet_balance = unwrap!(self.wallet_get_default_balance(&to));
 
         let from_pk = self
             .safe_app
-            .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xor_url));
+            .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xorurl));
 
         let to_pk = self
             .safe_app
-            .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xor_url));
+            .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xorurl));
 
         let from_sk = sk_from_hex(&from_wallet_balance.sk);
         let tx_id = Uuid::new_v4();
 
-        // TODO: what doe this return? tx_id?
         self.safe_app
             .safecoin_transfer(&from_pk, &from_sk, &to_pk, &tx_id, amount);
 
-        println!("Success. TX_ID: {:?}", &tx_id);
-        Ok(())
+        Ok(tx_id)
     }
 }
 
@@ -474,7 +476,7 @@ fn test_keys_fetch_pk_test_coins() {
     let mut safe = Safe::new("base32".to_string());
     let (xorurl, key_pair) = safe.keys_create_preload_test_coins("23.22".to_string(), None);
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = safe.keys_fetch_pk(&xorurl, &key_pair_unwrapped.sk);
+    let pk = safe.keys_fetch_pk(&xorurl);
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
 
@@ -486,7 +488,7 @@ fn test_keys_fetch_pk() {
 
     let (xorurl, key_pair) = safe.keys_create(unwrap!(from_key_pair), None, None);
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = safe.keys_fetch_pk(&xorurl, &key_pair_unwrapped.sk);
+    let pk = safe.keys_fetch_pk(&xorurl);
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
 

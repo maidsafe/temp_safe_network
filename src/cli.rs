@@ -29,8 +29,8 @@ struct CmdArgs {
     #[structopt(short = "o", long = "output", raw(global = "true"))]
     output: Option<String>,
     /// Print human readable responses. (Alias to --output human-readable.)
-    #[structopt(short = "hr", long = "human-readable", raw(global = "true"))]
-    human: bool,
+    #[structopt(long = "pretty", raw(global = "true"))]
+    pretty: bool,
     /// Increase output verbosity. (More logs!)
     #[structopt(short = "v", long = "verbose", raw(global = "true"))]
     verbose: bool,
@@ -50,12 +50,13 @@ pub fn run() -> Result<(), String> {
     let args = CmdArgs::from_args();
 
     let mut safe = Safe::new(args.xorurl_base.clone().unwrap_or("".to_string()));
+    let pretty = args.pretty;
 
     debug!("Processing command: {:?}", args);
 
     match args.cmd {
-        SubCommands::Keys { cmd } => key_commander(cmd, &mut safe),
-        SubCommands::Wallet { cmd } => wallet_commander(cmd, &mut safe),
+        SubCommands::Keys { cmd } => key_commander(cmd, pretty, &mut safe),
+        SubCommands::Wallet { cmd } => wallet_commander(cmd, pretty, &mut safe),
         _ => return Err("Command not supported yet".to_string()),
     }
 }

@@ -36,7 +36,11 @@ pub enum KeysSubCommands {
     },
 }
 
-pub fn key_commander(cmd: Option<KeysSubCommands>, safe: &mut Safe) -> Result<(), String> {
+pub fn key_commander(
+    cmd: Option<KeysSubCommands>,
+    pretty: bool,
+    safe: &mut Safe,
+) -> Result<(), String> {
     // Is it a create subcommand?
     match cmd {
         Some(KeysSubCommands::Create {
@@ -46,7 +50,7 @@ pub fn key_commander(cmd: Option<KeysSubCommands>, safe: &mut Safe) -> Result<()
             preload_test_coins,
             ..
         }) => {
-            create_new_key(safe, preload_test_coins, from, preload, pk);
+            create_new_key(safe, preload_test_coins, from, preload, pk, pretty);
             Ok(())
         }
         Some(KeysSubCommands::Balance { target }) => {
@@ -54,7 +58,12 @@ pub fn key_commander(cmd: Option<KeysSubCommands>, safe: &mut Safe) -> Result<()
                 String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058"); // FIXME: get sk from args or from the account
             let target = get_target_location(target)?;
             let current_balance = safe.keys_balance_from_xorurl(&target, &sk);
-            println!("Key's current balance: {}", current_balance);
+
+            if pretty {
+                println!("Key's current balance: {}", current_balance);
+            } else {
+                println!("{}", current_balance);
+            }
             Ok(())
         }
         None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
@@ -67,6 +76,7 @@ pub fn create_new_key(
     from: Option<String>,
     preload: Option<String>,
     pk: Option<String>,
+    pretty: bool,
 ) -> (String, Option<BlsKeyPair>) {
     let (xorname, key_pair) = if preload_test_coins {
         /*if cfg!(not(feature = "mock-network")) {
@@ -75,11 +85,11 @@ pub fn create_new_key(
             safe.keys_create(from, preload, pk)
         } else {*/
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-        println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+        // println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or("1000.111".to_string());
 
         if amount == "1000.111" {
-            eprintln!("You must pass a preload amount with test-coins, 1000.111 will be added");
+            warn!("You must pass a preload amount with test-coins, 1000.111 will be added by default.");
         }
 
         safe.keys_create_preload_test_coins(amount, pk)
@@ -97,7 +107,7 @@ pub fn create_new_key(
             "Invalid input",
         );
 
-        let pk_from_xor = safe.keys_fetch_pk(&from_xorurl, &sk);
+        let pk_from_xor = safe.keys_fetch_pk(&from_xorurl);
         let from_key_pair = BlsKeyPair {
             pk: pk_from_xor,
             sk,
@@ -106,9 +116,19 @@ pub fn create_new_key(
         safe.keys_create(from_key_pair, preload, pk)
     };
 
-    println!("New Key created at XOR-URL: \"{}\"", xorname);
+    if pretty {
+        println!("New Key created at XOR-URL: \"{}\"", xorname);
+    } else {
+        println!("{}", xorname);
+    }
+
     if let Some(pair) = &key_pair {
-        println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
+        if pretty {
+            println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
+        } else {
+            println!("pk={}", pair.pk);
+            println!("sk={}", pair.sk);
+        }
     }
 
     (xorname, key_pair)
