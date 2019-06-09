@@ -12,6 +12,7 @@ build = "build.rs"
 edition = "2018"
 
 [dependencies]
+bincode = "~1.1.4"
 config_file_handler = "~0.11.0"
 ffi_utils = "~0.12.0"
 futures = "~0.1.17"
@@ -23,8 +24,7 @@ rand = "~0.3.18"
 routing = { git = "https://github.com/lionel1704/routing", branch = "patch" }
 rust_sodium = "~0.10.2"
 safe_core = { path = "../safe_core", version = "~0.32.1" }
-# safe-nd = { git = "https://github.com/maidsafe/safe-nd", branch = "master" }
-safe-nd = { path = "../../safe-nd" }
+safe-nd = { git = "https://github.com/maidsafe/safe-nd", branch = "master" }
 serde = "~1.0.27"
 serde_derive = "~1.0.27"
 threshold_crypto = "0.3.1"

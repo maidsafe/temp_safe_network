@@ -222,14 +222,13 @@ impl App {
                     enc_sk,
                     sign_pk,
                     sign_sk,
+                    bls_sk,
+                    bls_pk,
                 },
             access_container_info,
             bootstrap_config,
             ..
         } = auth_granted;
-
-        // Create a random BLS key-pair for now
-        let bls_sk = threshold_crypto::SecretKey::random();
 
         let client_keys = ClientKeys {
             sign_pk,
@@ -237,7 +236,7 @@ impl App {
             enc_pk,
             enc_sk,
             enc_key: enc_key.clone(),
-            bls_pk: bls_sk.public_key(),
+            bls_pk,
             bls_sk,
         };
 
@@ -276,14 +275,13 @@ impl App {
                     enc_sk,
                     sign_pk,
                     sign_sk,
+                    bls_pk,
+                    bls_sk,
                 },
             access_container_info,
             bootstrap_config,
             ..
         } = auth_granted;
-
-        // Create a random BLS key-pair for now
-        let bls_sk = threshold_crypto::SecretKey::random();
 
         let client_keys = ClientKeys {
             sign_pk,
@@ -291,7 +289,7 @@ impl App {
             enc_pk,
             enc_sk,
             enc_key: enc_key.clone(),
-            bls_pk: bls_sk.public_key(),
+            bls_pk,
             bls_sk,
         };
 

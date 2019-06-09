@@ -223,7 +223,7 @@ impl Client for AppClient {
         Message::Request {
             request,
             message_id,
-            requester: Requester::Key(unwrap!(app_inner.keys.clone()).sign_pk),
+            requester: Requester::Key(PublicKey::Bls(unwrap!(self.public_bls_key()))),
         }
     }
 }

@@ -23,10 +23,14 @@ use routing::{
     TYPE_TAG_SESSION_PACKET,
 };
 use rust_sodium::crypto::sign;
-use safe_nd::mutable_data::{MutableData as NewMutableData, MutableDataRef, UnseqMutableData};
+use safe_nd::mutable_data::{
+    Action as NewAction, MutableData as NewMutableData, MutableDataRef,
+    PermissionSet as NewPermissionSet, UnseqMutableData,
+};
 use safe_nd::request::{Request as RpcRequest, Requester};
 use safe_nd::response::Response as RpcResponse;
 use safe_nd::{Message, PublicKey};
+use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -1045,11 +1049,16 @@ fn unpub_md() {
     let name = XorName(rand::random());
     let tag = 15001;
 
+    let mut permissions: BTreeMap<_, _> = Default::default();
+    let _ = permissions.insert(
+        PublicKey::Bls(bls_key),
+        NewPermissionSet::new().allow(NewAction::Read),
+    );
     let data = UnseqMutableData::new_with_data(
         name.to_new(),
         tag,
         Default::default(),
-        Default::default(),
+        permissions,
         bls_key,
     );
 

@@ -241,7 +241,7 @@ impl Client for CoreClient {
         let sig = self
             .keys
             .bls_sk
-            .sign(&unwrap!(serialise(&(&request, message_id))));
+            .sign(&unwrap!(bincode::serialize(&(&request, message_id))));
 
         Message::Request {
             request,
