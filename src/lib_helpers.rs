@@ -91,7 +91,14 @@ pub fn sk_from_hex(hex_str: &str) -> SecretKey {
     bincode::deserialize(&sk_bytes).expect("Failed to deserialize provided secret key")
 }
 
-pub fn xorname_to_xorurl(xorname: &XorName, base: &str) -> String {
+pub fn parse_coins_amount(amount_str: &str) -> Result<f64, String> {
+    let amount: f64 = amount_str
+        .parse::<f64>()
+        .map_err(|_| "Invalid safecoins amount, expected a numeric value".to_string())?;
+    Ok(amount)
+}
+
+pub fn xorname_to_xorurl(xorname: &XorName, base: &str) -> Result<String, String> {
     let h = temp_multihash_encode(multihash::Hash::SHA3256, xorname).unwrap();
     let cid = Cid::new(Codec::Raw, Version::V1, &h);
     let base_encoding = match base {
@@ -108,16 +115,22 @@ pub fn xorname_to_xorurl(xorname: &XorName, base: &str) -> String {
         }
     };
     let cid_str = encode(base_encoding, cid.to_bytes().as_slice());
-    format!("{}{}", SAFE_URL_PROTOCOL, cid_str)
+    Ok(format!("{}{}", SAFE_URL_PROTOCOL, cid_str))
 }
 
-pub fn xorurl_to_xorname(xorurl: &str) -> XorName {
-    let cid_str = &xorurl[(SAFE_URL_PROTOCOL.len())..];
-    let cid = unwrap!(Cid::from(cid_str));
-    let hash = multihash::decode(&cid.hash).unwrap();
+pub fn xorurl_to_xorname(xorurl: &str) -> Result<XorName, String> {
+    let min_len = SAFE_URL_PROTOCOL.len();
+    if xorurl.len() < min_len {
+        return Err("Invalid XOR-URL".to_string());
+    }
+
+    let cid_str = &xorurl[min_len..];
+    let cid = Cid::from(cid_str).map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
+    let hash = multihash::decode(&cid.hash)
+        .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
     let mut xorname = XorName::default();
     xorname.copy_from_slice(&hash.digest);
-    xorname
+    Ok(xorname)
 }
 
 // FIXME: temp_multihash_encode is a temporary solution until a PR in multihash project is
@@ -161,18 +174,18 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted, String> {
 #[test]
 fn test_xorurl_base32_encoding() {
     let xorname: XorName = *b"12345678901234567890123456789012";
-    let xorurl = xorname_to_xorurl(&xorname, &"base32".to_string());
+    let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"base32".to_string()));
     let base32_xorurl = "safe://bbkulcamjsgm2dknrxha4tamjsgm2dknrxha4tamjsgm2dknrxha4tamjs";
     assert_eq!(xorurl, base32_xorurl);
 
-    let xorurl = xorname_to_xorurl(&xorname, &"".to_string());
+    let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"".to_string()));
     assert_eq!(xorurl, base32_xorurl);
 }
 
 #[test]
 fn test_xorurl_base32z_encoding() {
     let xorname: XorName = *b"12345678901234567890123456789012";
-    let xorurl = xorname_to_xorurl(&xorname, &"base32z".to_string());
+    let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"base32z".to_string()));
     let base32_xorurl = "safe://hbkwmnycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
     assert_eq!(xorurl, base32_xorurl);
 }
@@ -180,7 +193,7 @@ fn test_xorurl_base32z_encoding() {
 #[test]
 fn test_xorurl_decoding() {
     let xorname: XorName = *b"12345678901234567890123456789012";
-    let xorurl = xorname_to_xorurl(&xorname, &"base32".to_string());
-    let decoded_xorname = xorurl_to_xorname(&xorurl);
+    let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"base32".to_string()));
+    let decoded_xorname = unwrap!(xorurl_to_xorname(&xorurl));
     assert_eq!(xorname, decoded_xorname);
 }

@@ -82,7 +82,7 @@ pub fn wallet_commander(
 ) -> Result<(), String> {
     match cmd {
         Some(WalletSubCommands::Create {}) => {
-            let xorname = safe.wallet_create();
+            let xorname = safe.wallet_create()?;
 
             if pretty {
                 println!("Wallet created at: \"{}\"", xorname);
@@ -96,7 +96,7 @@ pub fn wallet_commander(
             let sk =
                 String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
-            let balance = safe.wallet_balance(&target, &sk);
+            let balance = safe.wallet_balance(&target, &sk)?;
 
             if pretty {
                 println!(
@@ -136,7 +136,7 @@ pub fn wallet_commander(
                         )?;
                     }
 
-                    let pk = safe.keys_fetch_pk(&linked_key);
+                    let pk = safe.keys_fetch_pk(&linked_key)?;
 
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }
@@ -148,7 +148,7 @@ pub fn wallet_commander(
                 None => xorname.clone(),
             };
 
-            safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname);
+            safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname)?;
             if pretty {
                 println!(
                     "Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",

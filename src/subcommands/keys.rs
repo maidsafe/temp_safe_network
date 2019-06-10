@@ -58,7 +58,7 @@ pub fn key_commander(
             let sk =
                 String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
-            let current_balance = safe.keys_balance_from_xorurl(&target, &sk);
+            let current_balance = safe.keys_balance_from_xorurl(&target, &sk)?;
 
             if pretty {
                 println!("Key's current balance: {}", current_balance);
@@ -92,28 +92,28 @@ pub fn create_new_key(
             warn!("You must pass a preload amount with test-coins, 1000.111 will be added by default.");
         }
 
-        safe.keys_create_preload_test_coins(amount, pk)
+        safe.keys_create_preload_test_coins(amount, pk)?
     // }
     } else {
         // '--source' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
         // TODO: support Key XOR-URL and pk, we now support only Key XOR-URL
         // Prompt the user for the secret key since 'source' is a Key and not a Wallet
-        let payee_xorurl = source.unwrap_or_else(|| "Missing the 'source' argument".to_string());
+        let source_xorurl = source.unwrap_or_else(|| "Missing the 'source' argument".to_string());
         let sk = prompt_user(
             &format!(
                 "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
                 source_xorurl
             ),
-            "Invalid input",
+            "Invalid input, expected secret key string",
         )?;
 
-        let pk_source_xor = safe.keys_fetch_pk(&source_xorurl);
+        let pk_source_xor = safe.keys_fetch_pk(&source_xorurl)?;
         let source_key_pair = BlsKeyPair {
             pk: pk_source_xor,
             sk,
         };
 
-        safe.keys_create(source_key_pair, preload, pk)
+        safe.keys_create(source_key_pair, preload, pk)?
     };
 
     if pretty {

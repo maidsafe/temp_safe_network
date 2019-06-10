@@ -15,7 +15,7 @@ pub fn get_target_location(target_arg: Option<String>) -> Result<String, String>
         Some(t) => Ok(t),
         None => {
             // try reading target from stdin then
-            println!("Reading target XOR-URL from STDIN...");
+            println!("...awaiting target XOR-URL from STDIN stream...");
             let mut input = String::new();
             match io::stdin().read_line(&mut input) {
                 Ok(n) => {
@@ -45,5 +45,9 @@ pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String, String> 
         user_input.pop();
     }
 
-    Ok(user_input)
+    if user_input.is_empty() {
+        Err(error_msg.to_string())
+    } else {
+        Ok(user_input)
+    }
 }
