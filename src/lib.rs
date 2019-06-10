@@ -278,7 +278,7 @@ impl Safe {
     /// );
     ///
     ///
-    /// safe.wallet_transfer( "10", &wallet_xorurl2, Some(wallet_xorurl) );
+    /// safe.wallet_transfer( "10", Some(wallet_xorurl), &wallet_xorurl2, );
     /// let from_balance = safe.keys_balance_from_xorurl(&key1_xorurl, &sk );
     /// assert_eq!("4.", from_balance);
     /// let to_balance = safe.keys_balance_from_xorurl(&key2_xorurl, &sk );
@@ -287,8 +287,8 @@ impl Safe {
     pub fn wallet_transfer(
         &mut self,
         amount: &str,
-        to: &XorUrl,
         from: Option<XorUrl>,
+        to: &XorUrl,
     ) -> Result<Uuid, String> {
         // from is not optional until we know default account container / Wallet location ("root")
         // if no FROM for now, ERR

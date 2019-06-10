@@ -54,6 +54,7 @@ pub enum WalletSubCommands {
     /// Create a new Wallet/CoinBalance
     Create {},
     #[structopt(name = "transfer")]
+    /// Transfer safecoins from one wallet, spendable balance or pk to another.
     Transfer {
         /// Number of safecoins to transfer
         amount: String,
@@ -161,7 +162,7 @@ pub fn wallet_commander(
         }
         Some(WalletSubCommands::Transfer { amount, from, to }) => {
             //TODO: if from/to start withOUT safe:// PKs.
-            let tx_id = safe.wallet_transfer(&amount, &to, from).unwrap();
+            let tx_id = safe.wallet_transfer(&amount, from, &to).unwrap();
 
             if pretty {
                 println!("Success. TX_ID: {:?}", &tx_id);
