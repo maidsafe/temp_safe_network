@@ -8,20 +8,33 @@
 
 mod lib_helpers;
 mod scl_mock;
-use log::{debug, info};
 
 pub use lib_helpers::vec_to_hex;
 use lib_helpers::{
-    pk_from_hex, pk_to_hex, sk_from_hex, xorname_to_xorurl, xorurl_to_xorname, KeyPair,
+    decode_ipc_msg, encode_ipc_msg, pk_from_hex, pk_to_hex, sk_from_hex, xorname_to_xorurl,
+    xorurl_to_xorname, KeyPair,
 };
+use log::{debug, info, warn};
+use reqwest::get as httpget;
+#[cfg(feature = "fake-auth")]
+use safe_app::test_utils::create_app;
+use safe_app::App;
+use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
 use scl_mock::MockSCL;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::Read;
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 use uuid::Uuid;
 
-static WALLET_TYPE_TAG: u64 = 10000;
+// Type tag used for the Wallet container
+static WALLET_TYPE_TAG: u64 = 10_000;
+
 static WALLET_DEFAULT: &str = "_default";
+
+// Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
+const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
 
 // The XOR-URL type (in the future in can be a struct with different functions)
 pub type XorUrl = String;
@@ -42,15 +55,103 @@ struct WalletSpendableBalance {
 }
 
 pub struct Safe {
-    safe_app: MockSCL,
+    safe_app: Option<App>,
+    safe_app_mock: MockSCL,
     xorurl_base: String,
 }
 
 impl Safe {
     pub fn new(xorurl_base: String) -> Self {
         Self {
-            safe_app: MockSCL::new(), // TODO: this will need to be replaced by auth process
+            safe_app: None,
+            safe_app_mock: MockSCL::new(), // TODO: this will need to be replaced by auth process
             xorurl_base,
+        }
+    }
+
+    // Generate an authorisation request string and send it to a SAFE Authenticator.
+    // Ir returns the credentials necessary to connect to the network, encoded in a single string.
+    pub fn auth_app(
+        &mut self,
+        app_id: &str,
+        app_name: &str,
+        app_vendor: &str,
+    ) -> Result<String, String> {
+        info!("Sending authorisation request to SAFE Authenticator...");
+
+        let ipc_req = IpcReq::Auth(AuthReq {
+            app: AppExchangeInfo {
+                id: app_id.to_string(),
+                scope: None,
+                name: app_name.to_string(),
+                vendor: app_vendor.to_string(),
+            },
+            app_container: false,
+            // TODO: allow list of required containers permissions to be passed in as param
+            containers: HashMap::new(),
+        });
+
+        match encode_ipc_msg(ipc_req) {
+            Ok(auth_req_str) => {
+                debug!(
+                    "Authorisation request generated successfully: {}",
+                    auth_req_str
+                );
+
+                let authenticator_webservice_url =
+                    SAFE_AUTH_WEBSERVICE_BASE_URL.to_string() + &auth_req_str;
+                let mut res = httpget(&authenticator_webservice_url).unwrap();
+                let mut auth_res = String::new();
+                res.read_to_string(&mut auth_res).unwrap();
+                info!("SAFE authorisation response received!");
+
+                // Check if the app has been authorised
+                match decode_ipc_msg(&auth_res) {
+                    Ok(_) => {
+                        info!("Application was authorisaed");
+                        Ok(auth_res)
+                    }
+                    Err(e) => {
+                        info!("Application was not authorised");
+                        Err(e)
+                    }
+                }
+            }
+            Err(e) => Err(format!(
+                "Failed encoding the authorisation request: {:?}",
+                e
+            )),
+        }
+    }
+
+    #[cfg(feature = "fake-auth")]
+    pub fn connect(&mut self, _app_id: &str, _auth_credentials: &str) -> Result<(), String> {
+        warn!("Using fake authorisation for testing...");
+        self.safe_app = Some(create_app());
+        Ok(())
+    }
+
+    // Connect to the SAFE Network using the provided app id and auth credentials
+    #[cfg(not(feature = "fake-auth"))]
+    pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> Result<(), String> {
+        debug!("Connecting to SAFE Network...");
+
+        let disconnect_cb = || {
+            warn!("Connection with the SAFE Network was lost");
+        };
+
+        match decode_ipc_msg(auth_credentials) {
+            Ok(auth_granted) => {
+                match App::registered(app_id.to_string(), auth_granted, disconnect_cb) {
+                    Ok(app) => {
+                        self.safe_app = Some(app);
+                        debug!("Successfully connected to the Network!!!");
+                        Ok(())
+                    }
+                    Err(e) => Err(format!("Failed to connect to the SAFE Network: {:?}", e)),
+                }
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -64,13 +165,16 @@ impl Safe {
         let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk);
 
         let create_key = |pk| match preload_amount {
-            Some(amount) => {
-                self.safe_app
-                    .create_balance(&from_key_pair.pk, &from_key_pair.sk, &pk, &amount)
+            Some(amount) => self.safe_app_mock.create_balance(
+                &from_key_pair.pk,
+                &from_key_pair.sk,
+                &pk,
+                &amount,
+            ),
+            None => {
+                self.safe_app_mock
+                    .create_balance(&from_key_pair.pk, &from_key_pair.sk, &pk, "0")
             }
-            None => self
-                .safe_app
-                .create_balance(&from_key_pair.pk, &from_key_pair.sk, &pk, "0"),
         };
 
         let (xorname, key_pair) = match pk {
@@ -100,13 +204,13 @@ impl Safe {
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
                 let pk = pk_from_hex(&pk_str);
-                let xorhash = self.safe_app.allocate_test_coins(&pk, &preload_amount);
+                let xorhash = self.safe_app_mock.allocate_test_coins(&pk, &preload_amount);
                 (xorhash, None)
             }
             None => {
                 let key_pair = KeyPair::random();
                 let xorhash = self
-                    .safe_app
+                    .safe_app_mock
                     .allocate_test_coins(&key_pair.pk, &preload_amount);
                 let (pk, sk) = key_pair.to_hex_key_pair();
                 (xorhash, Some(BlsKeyPair { pk, sk }))
@@ -120,27 +224,27 @@ impl Safe {
     // Check Key's balance from the network from a given PublicKey
     pub fn keys_balance_from_pk(&self, key_pair: &BlsKeyPair) -> String {
         let pair = KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk);
-        self.safe_app.get_balance_from_pk(&pair.pk, &pair.sk)
+        self.safe_app_mock.get_balance_from_pk(&pair.pk, &pair.sk)
     }
 
     // Check Key's balance from the network from a given XOR-URL
     pub fn keys_balance_from_xorurl(&self, xorurl: &XorUrl, sk: &str) -> String {
         let secret_key: SecretKey = sk_from_hex(sk);
         let xorname = xorurl_to_xorname(xorurl);
-        self.safe_app
+        self.safe_app_mock
             .get_balance_from_xorname(&xorname, &secret_key)
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
     pub fn keys_fetch_pk(&self, xorurl: &XorUrl) -> String {
         let xorname = xorurl_to_xorname(xorurl);
-        let public_key = self.safe_app.keys_fetch_pk(&xorname);
+        let public_key = self.safe_app_mock.keys_fetch_pk(&xorname);
         pk_to_hex(&public_key)
     }
 
     // Create an empty Wallet and return its XOR-URL
     pub fn wallet_create(&mut self) -> XorUrl {
-        let xorname = self.safe_app.mutable_data_put(None, None, None, false);
+        let xorname = self.safe_app_mock.mutable_data_put(None, None, None, false);
         xorname_to_xorurl(&xorname, &self.xorurl_base)
     }
 
@@ -161,7 +265,7 @@ impl Safe {
         // FIXME: it should return error if the name already exists
         let k = name.to_string().into_bytes();
         let wallet_xorname = xorurl_to_xorname(&wallet_xorurl);
-        self.safe_app.mutable_data_insert(
+        self.safe_app_mock.mutable_data_insert(
             &wallet_xorname,
             WALLET_TYPE_TAG,
             &k,
@@ -170,7 +274,7 @@ impl Safe {
 
         if default {
             // add the _default key
-            self.safe_app.mutable_data_insert(
+            self.safe_app_mock.mutable_data_insert(
                 &wallet_xorname,
                 WALLET_TYPE_TAG,
                 &WALLET_DEFAULT.to_string().into_bytes(),
@@ -184,7 +288,7 @@ impl Safe {
         let mut total_balance: f64 = 0.0;
         let wallet_xorname = xorurl_to_xorname(&xorurl);
         let spendable_balances = self
-            .safe_app
+            .safe_app_mock
             .mutable_data_get_entries(&wallet_xorname, WALLET_TYPE_TAG);
 
         // Iterate through the Keys and query the balance for each
@@ -209,13 +313,13 @@ impl Safe {
         wallet_xorurl: &XorUrl,
     ) -> Result<WalletSpendableBalance, String> {
         let xorname = xorurl_to_xorname(&wallet_xorurl);
-        let mut default_key: String = "".to_string();
+        let mut default_key: String;
 
-        if let Some(default) =
-            unwrap!(self
-                .safe_app
-                .mutable_data_get_key(WALLET_DEFAULT, &xorname, WALLET_TYPE_TAG))
-        {
+        if let Some(default) = unwrap!(self.safe_app_mock.mutable_data_get_key(
+            WALLET_DEFAULT,
+            &xorname,
+            WALLET_TYPE_TAG
+        )) {
             default_key = String::from_utf8_lossy(&default).to_string();
 
             info!(
@@ -229,18 +333,17 @@ impl Safe {
             ));
         }
 
-        let the_balance: WalletSpendableBalance = {
-            let default_balance_vec = unwrap!(unwrap!(self.safe_app.mutable_data_get_key(
-                &default_key,
-                &xorname,
-                WALLET_TYPE_TAG
-            )));
+        let the_balance: WalletSpendableBalance =
+            {
+                let default_balance_vec = unwrap!(unwrap!(self
+                    .safe_app_mock
+                    .mutable_data_get_key(&default_key, &xorname, WALLET_TYPE_TAG)));
 
-            let default_balance = String::from_utf8_lossy(&default_balance_vec).to_string();
-            let spendable_balance: WalletSpendableBalance =
-                unwrap!(serde_json::from_str(&default_balance));
-            spendable_balance
-        };
+                let default_balance = String::from_utf8_lossy(&default_balance_vec).to_string();
+                let spendable_balance: WalletSpendableBalance =
+                    unwrap!(serde_json::from_str(&default_balance));
+                spendable_balance
+            };
 
         Ok(the_balance)
     }
@@ -310,20 +413,18 @@ impl Safe {
         let to_wallet_balance = unwrap!(self.wallet_get_default_balance(&to));
 
         let from_pk = self
-            .safe_app
+            .safe_app_mock
             .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xorurl));
 
         let to_pk = self
-            .safe_app
+            .safe_app_mock
             .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xorurl));
 
         let from_sk = sk_from_hex(&from_wallet_balance.sk);
         let tx_id = Uuid::new_v4();
 
-        self.safe_app
-            .safecoin_transfer(&from_pk, &from_sk, &to_pk, &tx_id, amount);
-
-        Ok(tx_id)
+        self.safe_app_mock
+            .safecoin_transfer(&from_pk, &from_sk, &to_pk, &tx_id, amount)
     }
 }
 
@@ -502,7 +603,6 @@ fn test_wallet_insert_and_balance() {
     let mut safe = Safe::new("base32".to_string());
     let sk = String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
     let wallet_xorurl = safe.wallet_create();
-    println!("AA: {}", wallet_xorurl);
     let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23".to_string(), None);
     let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53".to_string(), None);
     safe.wallet_insert(

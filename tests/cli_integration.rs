@@ -23,7 +23,7 @@ static SAFE_PROTOCOL: &str = "safe://";
 
 fn get_bin_location() -> &'static str {
     let mut location = "./target/release/safe_cli";
-    if (cfg!(debug_assertions)) {
+    if cfg!(debug_assertions) {
         location = "./target/debug/safe_cli";
     }
     location
@@ -263,7 +263,6 @@ fn calling_safe_keys_balance() {
 
     let mut lines = pk_command_result.lines();
     let pk_xorurl = lines.next().unwrap();
-    // let sk = lines.next().unwrap();
     assert!(pk_xorurl.contains("safe://"));
 
     let mut cmd = Command::cargo_bin("safe_cli").unwrap();

@@ -9,8 +9,8 @@
 use log::debug;
 use structopt::StructOpt;
 
+use crate::subcommands::auth::{auth_commander, auth_connect};
 use crate::subcommands::keys::key_commander;
-// use crate::subcommands::mutable_data::MutableDataSubCommands;
 use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::SubCommands;
 use safe_cli::Safe;
@@ -55,8 +55,16 @@ pub fn run() -> Result<(), String> {
     debug!("Processing command: {:?}", args);
 
     match args.cmd {
-        SubCommands::Keys { cmd } => key_commander(cmd, pretty, &mut safe),
-        SubCommands::Wallet { cmd } => wallet_commander(cmd, pretty, &mut safe),
-        _ => return Err("Command not supported yet".to_string()),
+        SubCommands::Auth { cmd } => auth_commander(cmd, &mut safe),
+        _ => {
+            // We treat SubCommands::Auth separatelly since we need to connect before
+            // handling any command but auth
+            auth_connect(&mut safe)?;
+            match args.cmd {
+                SubCommands::Keys { cmd } => key_commander(cmd, pretty, &mut safe),
+                SubCommands::Wallet { cmd } => wallet_commander(cmd, pretty, &mut safe),
+                _ => Err("Command not supported yet".to_string()),
+            }
+        }
     }
 }

@@ -54,8 +54,9 @@ pub fn key_commander(
             Ok(())
         }
         Some(KeysSubCommands::Balance { target }) => {
+            // FIXME: get sk from args or from the account
             let sk =
-                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058"); // FIXME: get sk from args or from the account
+                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
             let current_balance = safe.keys_balance_from_xorurl(&target, &sk);
 
@@ -85,7 +86,6 @@ pub fn create_new_key(
             safe.keys_create(source, preload, pk)
         } else {*/
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-        // println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or("1000.111".to_string());
 
         if amount == "1000.111" {
@@ -117,7 +117,7 @@ pub fn create_new_key(
     };
 
     if pretty {
-        println!("New Key created at XOR-URL: \"{}\"", xorname);
+        println!("New Key created at: \"{}\"", xorname);
     } else {
         println!("{}", xorname);
     }

@@ -10,6 +10,10 @@ use crate::scl_mock::XorName;
 use cid::{Cid, Codec, Version};
 use multibase::{encode, Base};
 use multihash;
+use safe_app::AppError;
+use safe_core::ipc::{
+    decode_msg, encode_msg, gen_req_id, resp::AuthGranted, IpcMsg, IpcReq, IpcResp,
+};
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
@@ -130,6 +134,30 @@ fn temp_multihash_encode(hash: multihash::Hash, digest: &[u8]) -> Result<Vec<u8>
     output.push(size);
     output.extend_from_slice(digest);
     Ok(output)
+}
+
+pub fn encode_ipc_msg(req: IpcReq) -> Result<String, AppError> {
+    let req_id: u32 = gen_req_id();
+    let encoded = encode_msg(&IpcMsg::Req { req_id, req })?;
+    Ok(encoded)
+}
+
+pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted, String> {
+    let msg =
+        decode_msg(&ipc_msg).map_err(|e| format!("Failed to decode the credentials: {:?}", e))?;
+    match msg {
+        IpcMsg::Resp {
+            resp: IpcResp::Auth(res),
+            req_id: _,
+        } => match res {
+            Ok(auth_granted) => Ok(auth_granted),
+            Err(err) => Err(format!("{:?}", err)),
+        },
+        IpcMsg::Revoked { .. } => {
+            return Err("Authorisation denied".to_string());
+        }
+        other => Err(format!("{:?}", other)),
+    }
 }
 
 #[test]

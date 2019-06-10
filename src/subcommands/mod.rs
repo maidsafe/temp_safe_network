@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod auth;
 pub mod container;
 pub mod files;
 mod helpers;
@@ -18,6 +19,13 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {
+    #[structopt(name = "auth")]
+    /// Authorise the CLI
+    Auth {
+        /// subcommands
+        #[structopt(subcommand)]
+        cmd: Option<auth::AuthSubCommands>,
+    },
     #[structopt(name = "container")]
     /// Create a new SAFE Network account with the credentials provided
     Container {
@@ -25,9 +33,6 @@ pub enum SubCommands {
         #[structopt(subcommand)]
         cmd: Option<container::ContainerSubCommands>,
     },
-    #[structopt(name = "auth")]
-    /// Authorise the CLI
-    Auth {},
     #[structopt(name = "cat")]
     /// Read data on the network.
     Cat {

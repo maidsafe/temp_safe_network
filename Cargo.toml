@@ -9,7 +9,9 @@ edition = "2018"
 
 [dependencies]
 log = "0.4.6"
-#safe_app = "0.9.1"
+safe_app = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
+safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
+safe-nd = { git = "https://github.com/bochaco/safe-nd", branch = "make-fields-public" }
 rpassword = "3.0.1"
 structopt = "0.2.15"
 env_logger = "0.6.0"
@@ -23,25 +25,24 @@ safecoin = "0.5.0"
 serde = "1.0.91"
 serde_json = "1.0.39"
 bincode = "1.1.4"
-safe-nd = { git = "https://github.com/bochaco/safe-nd", branch = "make-fields-public" }
 cid = "0.3.0"
 multihash = "0.8.0"
 multibase = "0.6.0"
-assert_cmd = "0.11.1"
-predicates = "1.0.1"
-duct = "0.12.0"
+reqwest = "0.9.5"
 
 [features]
 default = ["uuid/v4"]
-#mock-network = ["safe_app/mock-network"]
-mock-network = []
+mock-network = ["safe_app/mock-network"]
+fake-auth = ["safe_app/testing"]
 
 [patch.crates-io]
 safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }
-#safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
+predicates = "1.0.0"
+assert_cmd = "0.11.1"
+duct = "0.12.0"
 
 [dev-dependencies.cargo-husky]
 version = "1"

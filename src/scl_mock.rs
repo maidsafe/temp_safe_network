@@ -153,7 +153,6 @@ impl MockSCL {
         coin_balance.owner
     }
 
-    #[allow(dead_code)]
     pub fn safecoin_transfer(
         &mut self,
         from_pk: &PublicKey,
@@ -573,7 +572,7 @@ fn test_safecoin_transfer() {
     let tx_id = Uuid::new_v4();
     println!("UUID {}", tx_id);
 
-    mock.safecoin_transfer(&pk1, &sk1, &pk2, &tx_id, "1.4");
+    let _ = mock.safecoin_transfer(&pk1, &sk1, &pk2, &tx_id, "1.4");
     println!(
         "Current TX state: {}",
         mock.get_transaction(&tx_id, &pk2, &sk2)

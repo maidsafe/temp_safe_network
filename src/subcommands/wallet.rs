@@ -85,7 +85,7 @@ pub fn wallet_commander(
             let xorname = safe.wallet_create();
 
             if pretty {
-                println!("Wallet created at XOR-URL: \"{}\"", xorname);
+                println!("Wallet created at: \"{}\"", xorname);
             } else {
                 println!("{}", xorname);
             }
@@ -100,7 +100,7 @@ pub fn wallet_commander(
 
             if pretty {
                 println!(
-                    "Wallet at XOR-URL \"{}\" has a total balance of {} safecoins",
+                    "Wallet at \"{}\" has a total balance of {} safecoins",
                     target, balance
                 );
             } else {
@@ -129,7 +129,7 @@ pub fn wallet_commander(
                         // Get pk source Key, and prompt user for the corresponding sk
                         sk = prompt_user(
                             &format!(
-                                "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
+                                "Enter secret key corresponding to public key at \"{}\": ",
                                 linked_key
                             ),
                             "Invalid input",
