@@ -21,26 +21,29 @@ static PRETTY_WALLET_BALANCE_RESPONSE: &str = "has a total balance of 0 safecoin
 static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at XOR-URL:";
 static SAFE_PROTOCOL: &str = "safe://";
 
+fn get_bin_location() -> &'static str {
+    let mut location = "./target/release/safe_cli";
+    if (cfg!(debug_assertions)) {
+        location = "./target/debug/safe_cli";
+    }
+    location
+}
+
 #[test]
-#[ignore]
 fn calling_safe_wallet_transfer() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     // FROM
-    let wallet_from = cmd!("./target/debug/safe_cli", "wallet", "create")
-        .read()
-        .unwrap();
+    let wallet_from = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet_from.contains("safe://"));
 
     // TO
-    let wallet_to = cmd!("./target/debug/safe_cli", "wallet", "create")
-        .read()
-        .unwrap();
+    let wallet_to = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet_to.contains("safe://"));
 
     // KEY_FROM
     let pk_command_result = cmd!(
-        "./target/debug/safe_cli",
+        get_bin_location(),
         "keys",
         "create",
         "--test-coins",
@@ -58,7 +61,7 @@ fn calling_safe_wallet_transfer() {
     let from_sk = &sk_line[sk_eq.chars().count()..];
 
     let wallet_from_insert = cmd!(
-        "./target/debug/safe_cli",
+        get_bin_location(),
         "wallet",
         "insert",
         &pk_from_xorurl,
@@ -77,7 +80,7 @@ fn calling_safe_wallet_transfer() {
 
     // KEY_TO
     let pk_to_command_result = cmd!(
-        "./target/debug/safe_cli",
+        get_bin_location(),
         "keys",
         "create",
         "--test-coins",
@@ -95,7 +98,7 @@ fn calling_safe_wallet_transfer() {
     let to_sk = &sk_line_to[sk_eq_to.chars().count()..];
 
     let wallet_to_insert = cmd!(
-        "./target/debug/safe_cli",
+        get_bin_location(),
         "wallet",
         "insert",
         &pk_to_xorurl,
@@ -126,14 +129,14 @@ fn calling_safe_wallet_transfer() {
     .success();
 
     // To got coins?
-    let to_has = cmd!("./target/debug/safe_cli", "wallet", "balance", &wallet_to)
+    let to_has = cmd!(get_bin_location(), "wallet", "balance", &wallet_to)
         .read()
         .unwrap();
 
     assert_eq!(to_has, "103");
 
     // from lost coins?
-    let from_has = cmd!("./target/debug/safe_cli", "wallet", "balance", &wallet_from)
+    let from_has = cmd!(get_bin_location(), "wallet", "balance", &wallet_from)
         .read()
         .unwrap();
 
@@ -141,13 +144,10 @@ fn calling_safe_wallet_transfer() {
 }
 
 #[test]
-#[ignore]
 fn calling_safe_wallet_balance_pretty() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let wallet = cmd!("./target/debug/safe_cli", "wallet", "create")
-        .read()
-        .unwrap();
+    let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet.contains("safe://"));
 
     cmd.args(&vec!["wallet", "balance", &wallet, "--pretty"])
@@ -157,13 +157,10 @@ fn calling_safe_wallet_balance_pretty() {
 }
 
 #[test]
-#[ignore]
 fn calling_safe_wallet_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let wallet = cmd!("./target/debug/safe_cli", "wallet", "create")
-        .read()
-        .unwrap();
+    let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet.contains("safe://"));
 
     cmd.args(&vec![
@@ -215,10 +212,9 @@ fn calling_safe_keys_create() {
 }
 
 #[test]
-#[ignore]
 fn calling_safe_keys_balance() {
     let pk_command_result = cmd!(
-        "./target/debug/safe_cli",
+        get_bin_location(),
         "keys",
         "create",
         "--test-coins",
