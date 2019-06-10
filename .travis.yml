@@ -32,7 +32,7 @@ before_cache:
   - cargo prune
 
 install:
-  - cargo check --release --features "mock-network fake-auth"
+  - cargo check --features "mock-network fake-auth"
 
 script:
-  - cargo test --release --features "mock-network fake-auth"
+  - cargo test --features "mock-network fake-auth"

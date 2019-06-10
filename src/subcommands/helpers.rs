@@ -33,11 +33,11 @@ pub fn get_target_location(target_arg: Option<String>) -> Result<String, String>
 }
 
 // Prompt the user with the message provided
-pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> String {
+pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String, String> {
     let mut user_input = String::new();
     print!("{}", prompt_msg);
     let _ = stdout().flush();
-    stdin().read_line(&mut user_input).expect(error_msg);
+    stdin().read_line(&mut user_input).map_err(|_| error_msg)?;
     if let Some('\n') = user_input.chars().next_back() {
         user_input.pop();
     }
@@ -45,5 +45,5 @@ pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> String {
         user_input.pop();
     }
 
-    user_input
+    Ok(user_input)
 }

@@ -91,14 +91,14 @@ pub fn sk_from_hex(hex_str: &str) -> SecretKey {
     bincode::deserialize(&sk_bytes).expect("Failed to deserialize provided secret key")
 }
 
-pub fn xorname_to_xorurl(xorname: &XorName, base: &String) -> String {
+pub fn xorname_to_xorurl(xorname: &XorName, base: &str) -> String {
     let h = temp_multihash_encode(multihash::Hash::SHA3256, xorname).unwrap();
     let cid = Cid::new(Codec::Raw, Version::V1, &h);
-    let base_encoding = match base.as_str() {
+    let base_encoding = match base {
         "base32z" => Base::Base32z,
         "base32" => Base::Base32,
         base => {
-            if base.len() > 0 {
+            if !base.is_empty() {
                 println!(
                     "Base encoding '{}' not supported for XOR-URL. Using default 'base32'.",
                     base
@@ -111,7 +111,7 @@ pub fn xorname_to_xorurl(xorname: &XorName, base: &String) -> String {
     format!("{}{}", SAFE_URL_PROTOCOL, cid_str)
 }
 
-pub fn xorurl_to_xorname(xorurl: &String) -> XorName {
+pub fn xorurl_to_xorname(xorurl: &str) -> XorName {
     let cid_str = &xorurl[(SAFE_URL_PROTOCOL.len())..];
     let cid = unwrap!(Cid::from(cid_str));
     let hash = multihash::decode(&cid.hash).unwrap();

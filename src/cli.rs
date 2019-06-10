@@ -49,7 +49,7 @@ pub fn run() -> Result<(), String> {
     // Let's first get all the arguments passed in
     let args = CmdArgs::from_args();
 
-    let mut safe = Safe::new(args.xorurl_base.clone().unwrap_or("".to_string()));
+    let mut safe = Safe::new(args.xorurl_base.clone().unwrap_or_else(|| "".to_string()));
     let pretty = args.pretty;
 
     debug!("Processing command: {:?}", args);

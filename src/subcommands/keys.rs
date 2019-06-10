@@ -50,7 +50,7 @@ pub fn key_commander(
             preload_test_coins,
             ..
         }) => {
-            create_new_key(safe, preload_test_coins, source, preload, pk, pretty);
+            create_new_key(safe, preload_test_coins, source, preload, pk, pretty)?;
             Ok(())
         }
         Some(KeysSubCommands::Balance { target }) => {
@@ -67,7 +67,7 @@ pub fn key_commander(
             }
             Ok(())
         }
-        None => return Err("Missing keys sub-command. Use --help for details.".to_string()),
+        None => Err("Missing keys sub-command. Use --help for details.".to_string()),
     }
 }
 
@@ -78,7 +78,7 @@ pub fn create_new_key(
     preload: Option<String>,
     pk: Option<String>,
     pretty: bool,
-) -> (String, Option<BlsKeyPair>) {
+) -> Result<(String, Option<BlsKeyPair>), String> {
     let (xorname, key_pair) = if preload_test_coins {
         /*if cfg!(not(feature = "mock-network")) {
             warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
@@ -86,7 +86,7 @@ pub fn create_new_key(
             safe.keys_create(source, preload, pk)
         } else {*/
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-        let amount = preload.unwrap_or("1000.111".to_string());
+        let amount = preload.unwrap_or_else(|| "1000.111".to_string());
 
         if amount == "1000.111" {
             warn!("You must pass a preload amount with test-coins, 1000.111 will be added by default.");
@@ -98,14 +98,14 @@ pub fn create_new_key(
         // '--source' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
         // TODO: support Key XOR-URL and pk, we now support only Key XOR-URL
         // Prompt the user for the secret key since 'source' is a Key and not a Wallet
-        let source_xorurl = source.expect("Missing the 'source' argument");
+        let payee_xorurl = source.unwrap_or_else(|| "Missing the 'source' argument".to_string());
         let sk = prompt_user(
             &format!(
                 "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
                 source_xorurl
             ),
             "Invalid input",
-        );
+        )?;
 
         let pk_source_xor = safe.keys_fetch_pk(&source_xorurl);
         let source_key_pair = BlsKeyPair {
@@ -131,5 +131,5 @@ pub fn create_new_key(
         }
     }
 
-    (xorname, key_pair)
+    Ok((xorname, key_pair))
 }

@@ -228,7 +228,7 @@ impl Safe {
     }
 
     // Check Key's balance from the network from a given XOR-URL
-    pub fn keys_balance_from_xorurl(&self, xorurl: &XorUrl, sk: &str) -> String {
+    pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> String {
         let secret_key: SecretKey = sk_from_hex(sk);
         let xorname = xorurl_to_xorname(xorurl);
         self.safe_app_mock
@@ -236,7 +236,7 @@ impl Safe {
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
-    pub fn keys_fetch_pk(&self, xorurl: &XorUrl) -> String {
+    pub fn keys_fetch_pk(&self, xorurl: &str) -> String {
         let xorname = xorurl_to_xorname(xorurl);
         let public_key = self.safe_app_mock.keys_fetch_pk(&xorname);
         pk_to_hex(&public_key)
@@ -251,14 +251,14 @@ impl Safe {
     // Add a Key to a Wallet to make it spendable
     pub fn wallet_insert(
         &mut self,
-        wallet_xorurl: &XorUrl,
+        wallet_xorurl: &str,
         name: &str,
         default: bool,
         key_pair: &BlsKeyPair,
-        key_xorurl: &XorUrl,
+        key_xorurl: &str,
     ) {
         let value = WalletSpendableBalance {
-            xorurl: key_xorurl.clone(),
+            xorurl: key_xorurl.to_string(),
             sk: key_pair.sk.clone(),
         };
         let serialised_value = unwrap!(serde_json::to_string(&value));
@@ -284,7 +284,7 @@ impl Safe {
     }
 
     // Check the total balance of a Wallet found at a given XOR-URL
-    pub fn wallet_balance(&mut self, xorurl: &XorUrl, _sk: &str) -> String {
+    pub fn wallet_balance(&mut self, xorurl: &str, _sk: &str) -> String {
         let mut total_balance: f64 = 0.0;
         let wallet_xorname = xorurl_to_xorname(&xorurl);
         let spendable_balances = self
@@ -310,7 +310,7 @@ impl Safe {
 
     fn wallet_get_default_balance(
         &mut self,
-        wallet_xorurl: &XorUrl,
+        wallet_xorurl: &str,
     ) -> Result<WalletSpendableBalance, String> {
         let xorname = xorurl_to_xorname(&wallet_xorurl);
         let mut default_key: String;
@@ -391,7 +391,7 @@ impl Safe {
         &mut self,
         amount: &str,
         from: Option<XorUrl>,
-        to: &XorUrl,
+        to: &str,
     ) -> Result<Uuid, String> {
         // from is not optional until we know default account container / Wallet location ("root")
         // if no FROM for now, ERR

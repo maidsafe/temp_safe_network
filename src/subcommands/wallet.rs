@@ -123,7 +123,7 @@ pub fn wallet_commander(
 
             let (xorname, key_pair) = match key {
                 Some(linked_key) => {
-                    let mut sk = secret.unwrap_or(String::from(""));
+                    let mut sk = secret.unwrap_or_else(|| String::from(""));
 
                     if sk.is_empty() {
                         // Get pk source Key, and prompt user for the corresponding sk
@@ -133,14 +133,14 @@ pub fn wallet_commander(
                                 linked_key
                             ),
                             "Invalid input",
-                        );
+                        )?;
                     }
 
                     let pk = safe.keys_fetch_pk(&linked_key);
 
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }
-                None => create_new_key(safe, test_coins, Some(source), preload, None, pretty),
+                None => create_new_key(safe, test_coins, Some(source), preload, None, pretty)?,
             };
 
             let the_name = match name {
@@ -171,6 +171,6 @@ pub fn wallet_commander(
 
             Ok(())
         }
-        _ => return Err("Sub-command not supported yet".to_string()),
+        _ => Err("Sub-command not supported yet".to_string()),
     }
 }

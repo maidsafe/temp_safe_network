@@ -164,7 +164,7 @@ impl MockSCL {
         let to_xorname = xorname_from_pk(to_pk);
         let from_xorname = xorname_from_pk(from_pk);
 
-        let the_tx_id = tx_id.clone();
+        let the_tx_id = *tx_id;
         // generate TX in destination section (to_pk)
         let mut txs_for_xorname = match self.mock_data.txs.get(&vec_to_hex(to_xorname.to_vec())) {
             Some(txs) => txs.clone(),
@@ -296,30 +296,28 @@ impl MockSCL {
             .collect();
         permission_map.insert(User::Anyone, permission_set);
 
-        let md_kind = match sequenced {
-            true => {
-                // if let Some(data_string) = data {
-                // }
-                let inner: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-                //inner.insert(String::from("testkeyseq"), b"testvalueseq".to_vec());
-                MutableDataKind::Sequenced { data: inner }
-            }
-            false => {
-                // An unsequenced MD doesn't need data versioning. Noted here: https://github.com/maidsafe/safe-nd/issues/7
+        let md_kind = if sequenced {
+            // if let Some(data_string) = data {
+            // }
+            let inner: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+            //inner.insert(String::from("testkeyseq"), b"testvalueseq".to_vec());
+            MutableDataKind::Sequenced { data: inner }
+        } else {
+            // An unsequenced MD doesn't need data versioning. Noted here: https://github.com/maidsafe/safe-nd/issues/7
 
-                // if let Some(data_string) = data {
-                // }
-                let inner: BTreeMap<String, Value> = BTreeMap::new();
-                /*inner.insert(
-                    String::from("testkeyunseq"),
-                    Value {
-                        data: b"testvalueunseq".to_vec(),
-                        version: 0,
-                    },
-                );*/
-                MutableDataKind::Unsequenced { data: inner }
-            }
+            // if let Some(data_string) = data {
+            // }
+            let inner: BTreeMap<String, Value> = BTreeMap::new();
+            /*inner.insert(
+                String::from("testkeyunseq"),
+                Value {
+                    data: b"testvalueunseq".to_vec(),
+                    version: 0,
+                },
+            );*/
+            MutableDataKind::Unsequenced { data: inner }
         };
+
         let md_tag: u64;
         if let Some(t) = tag {
             md_tag = t;
@@ -339,13 +337,7 @@ impl MockSCL {
         md.name()
     }
 
-    pub fn mutable_data_insert(
-        &mut self,
-        xorname: &XorName,
-        _tag: u64,
-        key: &Vec<u8>,
-        value: &Vec<u8>,
-    ) {
+    pub fn mutable_data_insert(&mut self, xorname: &XorName, _tag: u64, key: &[u8], value: &[u8]) {
         let xorname_as_string: String = vec_to_hex(xorname.to_vec());
         let md = &self.mock_data.mutable_data[&xorname_as_string];
         if let MutableDataKind::Unsequenced { data } = &md.data {
@@ -353,7 +345,7 @@ impl MockSCL {
             inner.insert(
                 String::from_utf8_lossy(key).to_string(),
                 Value {
-                    data: value.clone(),
+                    data: value.to_vec(),
                     version: 0,
                 },
             );
@@ -366,7 +358,7 @@ impl MockSCL {
     }
 
     #[allow(dead_code)]
-    pub fn mutable_data_delete(&mut self, xorname: &XorName, _tag: u64, key: &Vec<u8>) {
+    pub fn mutable_data_delete(&mut self, xorname: &XorName, _tag: u64, key: &[u8]) {
         let xorname_as_string: String = vec_to_hex(xorname.to_vec());
         let md = &self.mock_data.mutable_data[&xorname_as_string];
         if let MutableDataKind::Unsequenced { data } = &md.data {
