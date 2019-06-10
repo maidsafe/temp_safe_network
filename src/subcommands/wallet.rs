@@ -25,9 +25,9 @@ pub enum WalletSubCommands {
         target: Option<String>,
         /// The existing keys safe://xor-url to add to the wallet
         key: Option<String>,
-        /// The name to give this wallet
+        /// The name to give this spendable balance
         #[structopt(long = "name")]
-        name: String,
+        name: Option<String>,
         /// Create a Key, allocate test-coins onto it, and add it to the wallet
         #[structopt(long = "test-coins")]
         test_coins: bool,
@@ -120,6 +120,7 @@ pub fn wallet_commander(
             secret,
         }) => {
             let target = get_target_location(target)?;
+
             let (xorname, key_pair) = match key {
                 Some(linked_key) => {
                     let mut sk = secret.unwrap_or(String::from(""));
@@ -136,28 +137,26 @@ pub fn wallet_commander(
                     }
 
                     let pk = safe.keys_fetch_pk(&linked_key);
-                    if pretty {
-                        println!(
-							"Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",
-							name, target
-						);
-                    } else {
-                        println!("{}", target);
-                    }
+
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }
-                None => {
-                    let new_key =
-                        create_new_key(safe, test_coins, Some(payee), preload, None, pretty);
-                    if pretty {
-                        println!("New spendable balance generated with name '{}' in wallet located at XOR-URL \"{}\"", name, target);
-                    } else {
-                        println!("{}", target);
-                    }
-                    new_key
-                }
+                None => create_new_key(safe, test_coins, Some(payee), preload, None, pretty),
             };
-            safe.wallet_insert(&target, &name, default, &unwrap!(key_pair), &xorname);
+
+            let the_name = match name {
+                Some(name_str) => name_str,
+                None => xorname.clone(),
+            };
+
+            safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname);
+            if pretty {
+                println!(
+                    "Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",
+                    the_name, target
+                );
+            } else {
+                println!("{}", target);
+            }
             Ok(())
         }
         Some(WalletSubCommands::Transfer { amount, from, to }) => {

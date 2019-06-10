@@ -77,7 +77,7 @@ $ safe_cli keys create <payee>
 ## or via cargo and with test-coins added
 $ cargo run -- keys create --test-coins --preload 15.342 --pretty
 
-New Key created at XOR-URL: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
+New Key created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
 Key pair generated: pk="b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61", sk="c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965"
 ```
 
@@ -111,7 +111,7 @@ Create a new wallet container.
 
 ```shell
 $ safe_cli wallet create --pretty
-> Wallet created at XOR-URL: "safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy"
+> Wallet created at: "safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy"
 ```
 #### Wallet Balance
 
@@ -142,20 +142,34 @@ Transaction Success. Tx_id: 44dcd919-0703-4f23-a9a2-6b6be8da0bcc
 
 Insert a public key into a wallet to make it a spendable balance.
 
+```shell
+USAGE:
+    safe_cli wallet insert [FLAGS] [OPTIONS] <payee> [ARGS]
+
+OPTIONS:
+    --name <name>             The name to give this spendable balance
+    -s, --secret-key <secret>     Optionally pass the secret key for the
+
+ARGS:
+    <payee>     The source wallet for funds
+    <target>    The target wallet to store the spendable balance.
+    <key>       The existing keys safe://xor-url to add to the wallet
+```
+
 - The `<payee>` is the wallet paying for data creation.
+- The `<target>` is the wallet to insert the spendable balance to.
+- The `<key>` allows passing an existing key XorUrl, which we'll be using to generate the spendable balance.
 - The `--name` is an optional nickname to give a wallet for easy reference,
 - The `--default` flag sets _this_ new spendable balance as the default for the containing wallet.
-- The `--target` is the wallet to insert the spendable balance too.
-- The `--key` is the existing key on the network we'll be using to generate the spendable balance.
 
 With the above options, the user will be prompted to input the secret key associated with the public key. This is stored in the wallet.
 
-Otherwise, there's also the `--secret-key` argument which can pass the key as part of the command line instruction itself.
+Otherwise, there's also the `--secret-key` argument which, when combined with `--key` can pass the key as part of the command line instruction itself.
 
 ```shell
-$ safe_cli wallet insert safe://pk-xor-url safe://wallet-xorurl safe://pk-xor-url --name my_wallet --default --pretty
-Enter secret key corresponding to public key at XOR-URL "safe://pk-xor-url": b493a84e3b35239cbffdf10b8ebfa49c0013a5d1b59e5ef3c000320e2d303311
-Spendable balance added with name 'my_wallet' in wallet located at XOR-URL "safe://wallet-xorurl"
+$ $ safe_cli wallet insert safe://pk-xor-url --target safe://wallet-xorurl --key safe://pk-xor-url --name my_wallet --default --pretty
+Enter secret key corresponding to public key at "safe://pk-xor-url": b493a84e3b35239cbffdf10b8ebfa49c0013a5d1b59e5ef3c000320e2d303311
+Spendable balance added with name 'my_wallet' in wallet located at "safe://wallet-xorurl"
 
 ```
 
