@@ -3,6 +3,7 @@ env:
     - RUST_BACKTRACE=1
     # - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
+    - RUST_TEST_THREADS=1
 language: rust
 rust:
   - stable
@@ -34,4 +35,4 @@ install:
   - cargo check --release --features "mock-network fake-auth"
 
 script:
-  - cargo test --release --features "mock-network fake-auth" -- --test-threads=1
+  - cargo test --release --features "mock-network fake-auth"

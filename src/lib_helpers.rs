@@ -148,14 +148,12 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted, String> {
     match msg {
         IpcMsg::Resp {
             resp: IpcResp::Auth(res),
-            req_id: _,
+            ..
         } => match res {
             Ok(auth_granted) => Ok(auth_granted),
             Err(err) => Err(format!("{:?}", err)),
         },
-        IpcMsg::Revoked { .. } => {
-            return Err("Authorisation denied".to_string());
-        }
+        IpcMsg::Revoked { .. } => Err("Authorisation denied".to_string()),
         other => Err(format!("{:?}", other)),
     }
 }

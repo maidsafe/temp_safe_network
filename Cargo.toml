@@ -9,8 +9,8 @@ edition = "2018"
 
 [dependencies]
 log = "0.4.6"
-safe_app = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
-safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
+safe_app = "0.9.1"
+safe_core = "0.32.1"
 safe-nd = { git = "https://github.com/bochaco/safe-nd", branch = "make-fields-public" }
 rpassword = "3.0.1"
 structopt = "0.2.15"
@@ -37,12 +37,22 @@ fake-auth = ["safe_app/testing"]
 
 [patch.crates-io]
 safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }
+safe_app = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
+safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
 predicates = "1.0.0"
 assert_cmd = "0.11.1"
 duct = "0.12.0"
+
+[dev-dependencies.safe_core]
+version = "0.32.1"
+features = ["mock-network", "testing"]
+
+[dev-dependencies.safe_app]
+version = "0.9.1"
+features = ["mock-network", "testing"]
 
 [dev-dependencies.cargo-husky]
 version = "1"
