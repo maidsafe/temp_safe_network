@@ -30,8 +30,8 @@ before_script:
 before_cache:
   - cargo prune
 
-install :
+install:
   - cargo check --release --features "mock-network fake-auth"
 
-script :
+script:
   - cargo test --release --features "mock-network fake-auth" -- --test-threads=1

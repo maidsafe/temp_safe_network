@@ -17,6 +17,9 @@ use structopt::StructOpt;
 static APP_ID: &str = "net.maidsafe.cli";
 static APP_NAME: &str = "SAFE CLI";
 static APP_VENDOR: &str = "MaidSafe.net Ltd";
+static ENV_VAR_HOME: &str = "HOME";
+static AUTH_CREDENTIALS_FOLDER: &str = ".safe";
+static AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
@@ -42,10 +45,9 @@ pub fn auth_commander(cmd: Option<AuthSubCommands>, safe: &mut Safe) -> Result<(
         None => {
             println!("Authorising CLI application...");
 
-            let auth_credentials = safe.auth_app(APP_ID, APP_NAME, APP_VENDOR).map_err(|err| {
-                println!("Application authorisation failed: {}", err);
-                err
-            })?;
+            let auth_credentials = safe
+                .auth_app(APP_ID, APP_NAME, APP_VENDOR)
+                .map_err(|err| format!("Application authorisation failed: {}", err))?;
 
             file.write_all(auth_credentials.as_bytes())
                 .map_err(|err| format!("Unable to write credentials in {}: {}", file_path, err))?;
@@ -77,18 +79,15 @@ pub fn auth_connect(safe: &mut Safe) -> Result<(), String> {
 }
 
 fn credentials_file_path() -> Result<String, String> {
-    let key = "HOME";
-    let home_path =
-        env::var(key).map_err(|err| format!("Couldn't find {} env var: {}", key, err))?;
+    let home_path = env::var(ENV_VAR_HOME)
+        .map_err(|err| format!("Couldn't find {} env var: {}", ENV_VAR_HOME, err))?;
 
-    let credentials_folder = ".safe";
-    let path = Path::new(&home_path).join(credentials_folder);
+    let path = Path::new(&home_path).join(AUTH_CREDENTIALS_FOLDER);
     if !Path::new(&path).exists() {
-        println!("Creating ~/{} folder", credentials_folder);
+        println!("Creating ~/{} folder", AUTH_CREDENTIALS_FOLDER);
         DirBuilder::new().recursive(false).create(&path).unwrap();
     }
 
-    let credentials_filename = "credentials";
-    let path = Path::new(&path).join(credentials_filename);
+    let path = Path::new(&path).join(AUTH_CREDENTIALS_FILENAME);
     Ok(path.display().to_string())
 }
