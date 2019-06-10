@@ -17,7 +17,7 @@ pub enum KeysSubCommands {
     /// Create a new KeyPair
     Create {
         /// The source wallet for funds
-        from: Option<String>,
+        payee: Option<String>,
         /// Create a Key and allocate test-coins onto it
         #[structopt(long = "test-coins")]
         preload_test_coins: bool,
@@ -46,11 +46,11 @@ pub fn key_commander(
         Some(KeysSubCommands::Create {
             preload,
             pk,
-            from,
+            payee,
             preload_test_coins,
             ..
         }) => {
-            create_new_key(safe, preload_test_coins, from, preload, pk, pretty);
+            create_new_key(safe, preload_test_coins, payee, preload, pk, pretty);
             Ok(())
         }
         Some(KeysSubCommands::Balance { target }) => {
@@ -73,7 +73,7 @@ pub fn key_commander(
 pub fn create_new_key(
     safe: &mut Safe,
     preload_test_coins: bool,
-    from: Option<String>,
+    payee: Option<String>,
     preload: Option<String>,
     pk: Option<String>,
     pretty: bool,
@@ -82,7 +82,7 @@ pub fn create_new_key(
         /*if cfg!(not(feature = "mock-network")) {
             warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
             println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-            safe.keys_create(from, preload, pk)
+            safe.keys_create(payee, preload, pk)
         } else {*/
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
         // println!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
@@ -95,25 +95,25 @@ pub fn create_new_key(
         safe.keys_create_preload_test_coins(amount, pk)
     // }
     } else {
-        // '--from' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
+        // '--payee' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
         // TODO: support Key XOR-URL and pk, we now support only Key XOR-URL
-        // Prompt the user for the secret key since 'from' is a Key and not a Wallet
-        let from_xorurl = from.expect("Missing the 'from' argument");
+        // Prompt the user for the secret key since 'payee' is a Key and not a Wallet
+        let payee_xorurl = payee.expect("Missing the 'payee' argument");
         let sk = prompt_user(
             &format!(
                 "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
-                from_xorurl
+                payee_xorurl
             ),
             "Invalid input",
         );
 
-        let pk_from_xor = safe.keys_fetch_pk(&from_xorurl);
-        let from_key_pair = BlsKeyPair {
-            pk: pk_from_xor,
+        let pk_payee_xor = safe.keys_fetch_pk(&payee_xorurl);
+        let payee_key_pair = BlsKeyPair {
+            pk: pk_payee_xor,
             sk,
         };
 
-        safe.keys_create(from_key_pair, preload, pk)
+        safe.keys_create(payee_key_pair, preload, pk)
     };
 
     if pretty {

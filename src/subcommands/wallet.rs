@@ -163,13 +163,13 @@ pub fn wallet_commander(
             //TODO: if from/to start withOUT safe:// PKs.
             let tx_id = safe.wallet_transfer(&amount, &to, from).unwrap();
 
-			if pretty {
-				println!("Success. TX_ID: {:?}", &tx_id);
-			} else {
-				println!("{}", &tx_id)
-			}
+            if pretty {
+                println!("Success. TX_ID: {:?}", &tx_id);
+            } else {
+                println!("{}", &tx_id)
+            }
 
-			Ok(())
+            Ok(())
         }
         _ => return Err("Sub-command not supported yet".to_string()),
     }

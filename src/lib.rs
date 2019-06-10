@@ -8,7 +8,7 @@
 
 mod lib_helpers;
 mod scl_mock;
-use log::{info, debug};
+use log::{debug, info};
 
 pub use lib_helpers::vec_to_hex;
 use lib_helpers::{
@@ -206,7 +206,7 @@ impl Safe {
 
     fn wallet_get_default_balance(
         &mut self,
-        wallet_xorurl: &XorUrl
+        wallet_xorurl: &XorUrl,
     ) -> Result<WalletSpendableBalance, String> {
         let xorname = xorurl_to_xorname(&wallet_xorurl);
         let mut default_key: String = "".to_string();
@@ -222,7 +222,6 @@ impl Safe {
                 "The default WalletBalance {:?} is named \"{:?}\"",
                 &wallet_xorurl, &default_key
             );
-
         } else {
             return Err(format!(
                 "No default balance found at Wallet {:?}",
@@ -289,7 +288,7 @@ impl Safe {
         &mut self,
         amount: &str,
         to: &XorUrl,
-        from: Option<XorUrl>
+        from: Option<XorUrl>,
     ) -> Result<Uuid, String> {
         // from is not optional until we know default account container / Wallet location ("root")
         // if no FROM for now, ERR
@@ -307,8 +306,7 @@ impl Safe {
                 ),
             };
 
-        let from_wallet_balance =
-            unwrap!(self.wallet_get_default_balance(&from_wallet_xorurl));
+        let from_wallet_balance = unwrap!(self.wallet_get_default_balance(&from_wallet_xorurl));
         let to_wallet_balance = unwrap!(self.wallet_get_default_balance(&to));
 
         let from_pk = self
