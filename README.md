@@ -16,12 +16,12 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 1. [Build](#build)
 1. [Using the CLI](#using-the-cli)
 	- [Keys](#keys)
-		- [Balance](#keys-balance)
 		- [Create](#keys-create)
+		- [Balance](#keys-balance)
 	- [Wallet](#wallet)
-		- [Balance](#wallet-balance)
 		- [Create](#wallet-create)
 		- [Transfer](#wallet-transfer)
+		- [Balance](#wallet-balance)
 1. [Further Help](#further-help)
 1. [License](#license)
 
@@ -45,28 +45,66 @@ The base command, if built is `$ safe_cli`, or all commands can be run via `$ ca
 
 Various global flags are available (those commented out are not yet implemented):
 
-```shell
-    # --dry-run    Dry run of command. No data will be written. No coins spent.
-    -h, --help       Prints help information
-    --pretty     Print human readable responses. (Alias to --output human-readable.)
-    #--root       The account's Root Container address
-    -V, --version    Prints version information
-    #-v, --verbose    Increase output verbosity. (More logs!)
+```bash
+# --dry-run              Dry run of command. No data will be written. No coins spent.
+-h, --help               Prints help information
+--pretty                 Print human readable responses. (Alias to --output human-readable.)
+# --root                 The account's Root Container address
+-V, --version            Prints version information
+# -v, --verbose          Increase output verbosity. (More logs!)
+# -o, --output <output>  Output data serlialisation
+# -q, --query <query>    Enable to query the output via SPARQL eg.
+--xorurl <xorurl_base>   Base encoding to be used for XOR-URLs generated. Currently supported: base32 (default) and base32z
 ```
+
 ### `--help`
 
 All commands have a `--help` function which will list args, options and subcommands.
 
+### Auth
+
+The CLI is just another client SAFE application, therefore it needs to be authorised by the user to gain access to the SAFE Network on behave of the user. The CLI `auth` command allows us to obtain such authorisation from the account owner (the user) via the SAFE Authenticator.
+
+This command simply sends an authorisation request to the Authenticator available, e.g. the safe_auth CLI daemon (see further bellow for explanation of how to run it), and it then stores the authorisation response (credentials) in `<user's home directory>/.safe/credentials` file. Any subsequent CLI command will read the `~/.safe/credentials` file, to obtain the credentials and connect to the network for the corresponding operation.
+
+##### Prerequisite: run the Authenticator
+
+You need the [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli) running locally and exposing its WebService interface for authorising applications, and also be logged in to a SAFE account created on the mock network (i.e. `MockVault` file), making sure the port number you set is `41805`, and enabling the `mock-network` feature.
+
+Please open a second/separate terminal console to execute the following commands (again, please make sure you have `rustc v1.35.0` or higher):
+```
+$ git clone https://github.com/maidsafe/safe-authenticator-cli.git
+$ cd safe-authenticator-cli
+$ cargo run --features mock-network -- --daemon 41805
+```
+
+### Authorise the safe_cli app
+
+Now that the Authenticator is running and ready to authorise applications, we can simply invoke the `auth` command:
+```bash
+$ safe_cli auth
+```
+
+At this point, you need to authorise the application on the Authenticator, you should see a prompt like the following:
+```bash
+The following application authorisation request was received:
++------------------+----------+------------------+------------------------+
+| Id               | Name     | Vendor           | Permissions requested  |
++------------------+----------+------------------+------------------------+
+| net.maidsafe.cli | SAFE CLI | MaidSafe.net Ltd | Own container: false   |
+|                  |          |                  | Default containers: {} |
++------------------+----------+------------------+------------------------+
+Allow authorisation? [y/N]:
+```
+
+
 ### Keys
-#### Keys Balance
 
-Retrieve a given key's balance from a target XorUrl.
+`Key` management allows users to generate sign/encryption key pairs that can be used for different type of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a Key is linked with a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
 
-Target can be passed as an arg, or retrieved from `stdin`
-```
-$ safe_cli keys balance <target>
-> 33
-```
+Users can record `Key`'s in a `Wallet` (see further below for more details about `Wallet`'s), having friendly names to refer to them, but they can also be created as throw away `Key`'s which are not linked from any `Wallet`, container, or any other type of data on the network.
+
+Note that even that the key pair is automatically generated by the CLI, `Key`s don’t hold the secret key on the network but just the public key, and `Key`s optionally can have a safecoin balance attached to it. Thus `Key`'s can also be used for safecoin transactions (again, see the wallet section below for more details).
 
 #### Keys Create
 
@@ -89,8 +127,19 @@ Other optional args includes:
 ```
 // TODO: Do we need to enable `--anon` functionality here?
 
+#### Key's Balance
+
+Retrieve a given `Key`'s balance using its XorUrl.
+
+Target can be passed as an arg, or retrieved from `stdin`
+```
+$ safe_cli keys balance <target>
+> 33
+```
 
 ### Wallet
+
+A `Wallet` is a specific type of Container on the network, holding a set of spendable safecoin balances. A `Wallet` effectively contains links to `Key`'s which have safecoin balances attached to them, but the `Wallet` can also store the secret keys needed to spend them. Wallets are stored encrypted and only accessible to the owner by default.
 
 Manage a wallet container and safecoin funds therein.
 
@@ -122,8 +171,6 @@ Target can be passed as an arg, or retrieved from `stdin`
 $ safe_cli wallet balance <target>
 > 33
 ```
-
-// TODO: stdin functionality not yet in place.
 
 #### Wallet Transfer
 
