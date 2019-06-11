@@ -175,6 +175,40 @@ fn calling_safe_wallet_balance() {
     .success();
 }
 
+
+#[test]
+fn calling_safe_wallet_insert_w_preload() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
+    assert!(wallet.contains("safe://"));
+
+
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+
+    let wallet_to_insert = cmd!(
+        get_bin_location(),
+        "wallet",
+        "insert",
+        &pk_pay_xor,
+        &wallet,
+		"--test-coins",
+		"--preload",
+		"150",
+    )
+    .read()
+    .unwrap();
+
+
+    cmd.args(&vec![
+        "wallet", "balance", &wallet,
+    ])
+    .assert()
+    .stdout("150\n")
+    .success();
+}
+
+
 #[test]
 fn calling_safe_wallet_create() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
