@@ -17,7 +17,7 @@ use crate::subcommands::keys::create_new_key;
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
     #[structopt(name = "insert")]
-    /// Insert a spendable balance into a wallet
+    /// Insert a spendable balance into a Wallet
     Insert {
         /// The source Wallet for funds
         source: String,

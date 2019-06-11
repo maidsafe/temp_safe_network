@@ -106,7 +106,7 @@ Allow authorisation? [y/N]:
 
 ### Keys
 
-`Key` management allows users to generate sign/encryption key pairs that can be used for different type of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a Key is linked with a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
+`Key` management allows users to generate sign/encryption key pairs that can be used for different type of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a `Key` is linked from a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
 
 Users can record `Key`'s in a `Wallet` (see further below for more details about `Wallet`'s), having friendly names to refer to them, but they can also be created as throw away `Key`'s which are not linked from any `Wallet`, container, or any other type of data on the network.
 
@@ -132,7 +132,7 @@ Once we have some `Key`'s with some test-coins we can use them as the `source` f
 
 Other optional args that can be used with `keys create` sub-command are:
 ```shell
---pk <pk>       Don't generate a key pair and just use the provided public key
+--pk <pk>            Don't generate a key pair and just use the provided public key
 --preload <preload>  Preload the Key with a coin balance
 ```
 
@@ -142,7 +142,7 @@ We can retrieve a given `Key`'s balance using its XorUrl.
 
 The target `Key` can be passed as an argument (or it will be retrieved from `stdin`)
 ```
-$ safe_cli keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks
+$ safe_cli keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks --pretty
 Key's current balance: 15.342
 ```
 
@@ -160,23 +160,22 @@ SUBCOMMANDS:
     # check-tx    Check the status of a given transaction
     create        Create a new Wallet
     help          Prints this message or the help of the given subcommand(s)
-    insert        Insert a spendable balance into a wallet
+    insert        Insert a spendable balance into a Wallet
     # sweep       Move all coins within a Wallet to a second given Wallet or Key
     transfer      Transfer safecoins from one Wallet, Key or pk, to another.
 ```
 
 #### Wallet Creation
 
-We can create a new `Wallet` container by simply running:
-
+We can create a new `Wallet` by simply running:
 ```shell
 $ safe_cli wallet create --pretty
-> Wallet created at: "safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy"
+Wallet created at: "safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy"
 ```
 
 #### Wallet Balance
 
-A given `Wallet`'s balance can be queried using its XorUrl. This returns the balance of the whole `Wallet`, including the contained spendable balances, or any child wallets (this is not implemented just yet).
+The balance of a given `Wallet` can be queried using its XorUrl. This returns the balance of the whole `Wallet`, including the contained spendable balances, or any child wallets (this is not implemented just yet).
 
 The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
 ```shell
@@ -186,9 +185,9 @@ Wallet at "safe://bbkulcakdcx2jxw2gfyvh7klkacht652c2pog3pohhpmiri73qjjpd2vks" ha
 
 #### Wallet Insert
 
-As mentioned before, a `Key` doesn't hold the secret key on the network, therefore even if it has some positive coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `Key`'s, and making their balances spendable by storing the correspondig secret keys.
+As mentioned before, a `Key` doesn't hold the secret key on the network, therefore even if it has some non-zero coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `Key`'s, and making their balances spendable by storing the correspondig secret keys.
 
-We achieve this by `insert`-ing a link to a `Key` into a `Wallet`, making it a spendable balance.
+We achieve this by `insert`-ing into a `Wallet` a link to a `Key`, making it a spendable balance.
 
 ```shell
 USAGE:
@@ -206,7 +205,7 @@ ARGS:
 
 - The `<source>` is the `Wallet` paying for data creation/mutation.
 - The `<target>` is the `Wallet` to insert the spendable balance to.
-- The `<key>` allows passing an existing `Key` XorUrl, which we'll be using to generate the spendable balance.
+- The `<key>` allows passing an existing `Key` XorUrl, which we'll be used to generate the spendable balance.
 - The `--name` is an optional nickname to give a spendable balance for easy reference,
 - The `--default` flag sets _this_ new spendable balance as the default for the containing `Wallet`. This can be used by wallet applications to apply some logic on how to spend and/or choose the balances for a transaction.
 
@@ -232,7 +231,7 @@ $ safe_cli wallet transfer <amount> <to> <from>
 ```
 E.g.:
 ```shell
-$ safe_cli wallet transfer --pretty safe://7e0ae5e6ed15a8065ea03218a0903b0be7c9d78384998817331b309e9d23566e safe://6221785c1a20163bbefaf523af15fa525d83b00be7502d28cae5b09ac54f4e75
+$ safe_cli wallet transfer 323.23 safe://7e0ae5e6ed15a8065ea03218a0903b0be7c9d78384998817331b309e9d23566e safe://6221785c1a20163bbefaf523af15fa525d83b00be7502d28cae5b09ac54f4e75 --pretty
 Transaction Success. Tx_id: 44dcd919-0703-4f23-a9a2-6b6be8da0bcc
 ```
 
