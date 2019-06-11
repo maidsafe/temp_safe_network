@@ -21,7 +21,7 @@ pub enum KeysSubCommands {
         /// Create a Key and allocate test-coins onto it
         #[structopt(long = "test-coins")]
         preload_test_coins: bool,
-        /// Preload the key with a coinbalance
+        /// Preload the Key with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
         /// Don't generate a key pair and just use the provided public key

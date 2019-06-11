@@ -11,7 +11,7 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum SafeIdSubCommands {
     #[structopt(name = "create")]
-    /// Create a new Wallet/CoinBalance
+    /// Create a new SafeId
     Create {
         /// The SafeId name
         #[structopt(long = "name")]

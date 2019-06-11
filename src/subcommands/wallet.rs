@@ -19,57 +19,57 @@ pub enum WalletSubCommands {
     #[structopt(name = "insert")]
     /// Insert a spendable balance into a wallet
     Insert {
-        /// The source wallet for funds
+        /// The source Wallet for funds
         source: String,
-        /// The target wallet to store the spendable balance.
+        /// The target Wallet to insert the spendable balance
         target: Option<String>,
-        /// An existing key safe://xor-url to add to the wallet. If this is not supplied a new key will be generated and inserted.
+        /// An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
         key: Option<String>,
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
-        /// Create a Key, allocate test-coins onto it, and add it to the wallet
+        /// Create a Key, allocate test-coins onto it, and add it to the Wallet
         #[structopt(long = "test-coins")]
         test_coins: bool,
-        /// Preload the key with a coinbalance
+        /// Preload the key with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
         /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
-        /// Optionally pass the secret key for the balance being inserted.
+        /// Optionally pass the secret key to make the balance spendable
         #[structopt(short = "sk", long = "secret-key")]
         secret: Option<String>,
     },
     #[structopt(name = "balance")]
-    /// Query a new Wallet or PublicKeys CoinBalance
+    /// Query a Wallet's total balance
     Balance {
-        /// The target wallet to check the total balance.
+        /// The target Wallet to check the total balance
         target: Option<String>,
     },
     #[structopt(name = "check-tx")]
     /// Check the status of a given transaction
     CheckTx {},
     #[structopt(name = "create")]
-    /// Create a new Wallet/CoinBalance
+    /// Create a new Wallet
     Create {},
     #[structopt(name = "transfer")]
-    /// Transfer safecoins from one wallet, spendable balance or pk to another.
+    /// Transfer safecoins from one Wallet, Key or pk, to another
     Transfer {
         /// Number of safecoins to transfer
         amount: String,
-        /// target wallet
+        /// target Wallet
         to: String,
-        /// source wallet, or pulled from stdin if not present
+        /// source Wallet, or pulled from stdin if not present
         from: Option<String>,
     },
     #[structopt(name = "sweep")]
-    /// Move all coins within a wallet to a given balance
+    /// Move all coins within a Wallet to a second given Wallet or Key
     Sweep {
-        /// The source wallet for funds
+        /// The source Wallet for funds
         #[structopt(long = "from")]
         from: String,
-        /// The receiving wallet/ballance
+        /// The receiving Wallet/Key
         #[structopt(long = "to")]
         to: String,
     },
@@ -151,7 +151,7 @@ pub fn wallet_commander(
             safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname)?;
             if pretty {
                 println!(
-                    "Spendable balance added with name '{}' in wallet located at XOR-URL \"{}\"",
+                    "Spendable balance inserted with name '{}' in Wallet located at XOR-URL \"{}\"",
                     the_name, target
                 );
             } else {
