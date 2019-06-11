@@ -29,6 +29,29 @@ fn get_bin_location() -> &'static str {
     location
 }
 
+fn create_preload_and_get_keys(preload: &str) -> (String, String) {
+    // KEY_FROM
+    let pk_command_result = cmd!(
+        get_bin_location(),
+        "keys",
+        "create",
+        "--test-coins",
+        "---preload",
+        preload
+    )
+    .read()
+    .unwrap();
+
+    let mut lines = pk_command_result.lines();
+    let pk_xor = lines.next().unwrap();
+    let pk = lines.next().unwrap();
+    let sk_line = lines.next().unwrap();
+    let sk_eq = String::from("sk=");
+    let sk = &sk_line[sk_eq.chars().count()..];
+
+    (pk_xor.to_string(), sk.to_string())
+}
+
 #[test]
 fn calling_safe_wallet_transfer() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -41,24 +64,7 @@ fn calling_safe_wallet_transfer() {
     let wallet_to = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet_to.contains("safe://"));
 
-    // KEY_FROM
-    let pk_command_result = cmd!(
-        get_bin_location(),
-        "keys",
-        "create",
-        "--test-coins",
-        "---preload",
-        "123"
-    )
-    .read()
-    .unwrap();
-
-    let mut lines = pk_command_result.lines();
-    let pk_from_xorurl = lines.next().unwrap();
-    let pk = lines.next().unwrap();
-    let sk_line = lines.next().unwrap();
-    let sk_eq = String::from("sk=");
-    let from_sk = &sk_line[sk_eq.chars().count()..];
+    let (pk_from_xorurl, from_sk) = create_preload_and_get_keys("123");
 
     let wallet_from_insert = cmd!(
         get_bin_location(),
@@ -78,24 +84,7 @@ fn calling_safe_wallet_transfer() {
 
     assert_eq!(&wallet_from, &wallet_from_insert);
 
-    // KEY_TO
-    let pk_to_command_result = cmd!(
-        get_bin_location(),
-        "keys",
-        "create",
-        "--test-coins",
-        "---preload",
-        "3"
-    )
-    .read()
-    .unwrap();
-
-    let mut to_lines = pk_to_command_result.lines();
-    let pk_to_xorurl = to_lines.next().unwrap();
-    let pk_to = to_lines.next().unwrap();
-    let sk_line_to = to_lines.next().unwrap();
-    let sk_eq_to = String::from("sk=");
-    let to_sk = &sk_line_to[sk_eq_to.chars().count()..];
+    let (pk_to_xorurl, to_sk) = create_preload_and_get_keys("3");
 
     let wallet_to_insert = cmd!(
         get_bin_location(),
@@ -150,24 +139,7 @@ fn calling_safe_wallet_balance_pretty_no_sk() {
     let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet.contains("safe://"));
 
-    // KEY_TO
-    let pk_to_command_result = cmd!(
-        get_bin_location(),
-        "keys",
-        "create",
-        "--test-coins",
-        "---preload",
-        "300"
-    )
-    .read()
-    .unwrap();
-
-    let mut to_lines = pk_to_command_result.lines();
-    let pk_to_xorurl = to_lines.next().unwrap();
-    let pk_to = to_lines.next().unwrap();
-    let sk_line_to = to_lines.next().unwrap();
-    let sk_eq_to = String::from("sk=");
-    let to_sk = &sk_line_to[sk_eq_to.chars().count()..];
+    let (pk_to_xorurl, to_sk) = create_preload_and_get_keys("300");
 
     let wallet_to_insert = cmd!(
         get_bin_location(),
