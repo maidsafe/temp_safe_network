@@ -20,7 +20,7 @@ pub enum WalletSubCommands {
     /// Insert a spendable balance into a wallet
     Insert {
         /// The source wallet for funds
-        payee: String,
+        source: String,
         /// The target wallet to store the spendable balance.
         target: Option<String>,
         /// The existing keys safe://xor-url to add to the wallet
@@ -111,7 +111,7 @@ pub fn wallet_commander(
         }
         Some(WalletSubCommands::Insert {
             preload,
-            payee,
+            source,
             test_coins,
             target,
             key,
@@ -126,7 +126,7 @@ pub fn wallet_commander(
                     let mut sk = secret.unwrap_or(String::from(""));
 
                     if sk.is_empty() {
-                        // Get pk payee Key, and prompt user for the corresponding sk
+                        // Get pk source Key, and prompt user for the corresponding sk
                         sk = prompt_user(
                             &format!(
                                 "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
@@ -140,7 +140,7 @@ pub fn wallet_commander(
 
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }
-                None => create_new_key(safe, test_coins, Some(payee), preload, None, pretty),
+                None => create_new_key(safe, test_coins, Some(source), preload, None, pretty),
             };
 
             let the_name = match name {

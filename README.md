@@ -70,9 +70,9 @@ $ safe_cli keys balance <target>
 
 #### Keys Create
 
-Creates a new `Key` on the network. A `payee` address is needed to pay for PUTs
+Creates a new `Key` on the network. A `source` address is needed to pay for PUTs
 ```shell
-$ safe_cli keys create <payee>
+$ safe_cli keys create <source>
 
 ## or via cargo and with test-coins added
 $ cargo run -- keys create --test-coins --preload 15.342 --pretty
@@ -144,19 +144,19 @@ Insert a public key into a wallet to make it a spendable balance.
 
 ```shell
 USAGE:
-    safe_cli wallet insert [FLAGS] [OPTIONS] <payee> [ARGS]
+    safe_cli wallet insert [FLAGS] [OPTIONS] <source> [ARGS]
 
 OPTIONS:
     --name <name>             The name to give this spendable balance
     -s, --secret-key <secret>     Optionally pass the secret key for the
 
 ARGS:
-    <payee>     The source wallet for funds
+    <source>     The source wallet for funds
     <target>    The target wallet to store the spendable balance.
     <key>       The existing keys safe://xor-url to add to the wallet
 ```
 
-- The `<payee>` is the wallet paying for data creation.
+- The `<source>` is the wallet paying for data creation.
 - The `<target>` is the wallet to insert the spendable balance to.
 - The `<key>` allows passing an existing key XorUrl, which we'll be using to generate the spendable balance.
 - The `--name` is an optional nickname to give a wallet for easy reference,
