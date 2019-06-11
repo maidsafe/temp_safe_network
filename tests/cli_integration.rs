@@ -17,7 +17,7 @@ use std::process::Command;
 
 static CLI: &str = "safe_cli";
 static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-static PRETTY_WALLET_BALANCE_RESPONSE: &str = "has a total balance of 0 safecoins";
+static PRETTY_WALLET_BALANCE_EMPTY_RESPONSE: &str = "has a total balance of 0 safecoins";
 static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at XOR-URL:";
 static SAFE_PROTOCOL: &str = "safe://";
 
@@ -144,15 +144,46 @@ fn calling_safe_wallet_transfer() {
 }
 
 #[test]
-fn calling_safe_wallet_balance_pretty() {
+fn calling_safe_wallet_balance_pretty_no_sk() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet.contains("safe://"));
 
-    cmd.args(&vec!["wallet", "balance", &wallet, "--pretty"])
+    // KEY_TO
+    let pk_to_command_result = cmd!(
+        get_bin_location(),
+        "keys",
+        "create",
+        "--test-coins",
+        "---preload",
+        "300"
+    )
+    .read()
+    .unwrap();
+
+    let mut to_lines = pk_to_command_result.lines();
+    let pk_to_xorurl = to_lines.next().unwrap();
+    let pk_to = to_lines.next().unwrap();
+    let sk_line_to = to_lines.next().unwrap();
+    let sk_eq_to = String::from("sk=");
+    let to_sk = &sk_line_to[sk_eq_to.chars().count()..];
+
+    let wallet_to_insert = cmd!(
+        get_bin_location(),
+        "wallet",
+        "insert",
+        &pk_to_xorurl,
+        &wallet,
+        &pk_to_xorurl
+    )
+    .input(to_sk)
+    .read()
+    .unwrap();
+
+    cmd.args(&vec!["wallet", "balance", &wallet])
         .assert()
-        .stdout(predicate::str::contains(PRETTY_WALLET_BALANCE_RESPONSE))
+        .stdout("300\n")
         .success();
 }
 
