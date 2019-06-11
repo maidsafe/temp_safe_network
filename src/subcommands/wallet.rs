@@ -23,7 +23,7 @@ pub enum WalletSubCommands {
         source: String,
         /// The target wallet to store the spendable balance.
         target: Option<String>,
-		/// An existing key safe://xor-url to add to the wallet. If this is not supplied a new key will be generated and inserted.
+        /// An existing key safe://xor-url to add to the wallet. If this is not supplied a new key will be generated and inserted.
         key: Option<String>,
         /// The name to give this spendable balance
         #[structopt(long = "name")]

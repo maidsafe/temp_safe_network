@@ -17,8 +17,9 @@ use std::process::Command;
 
 static CLI: &str = "safe_cli";
 static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
+#[allow(dead_code)]
 static PRETTY_WALLET_BALANCE_EMPTY_RESPONSE: &str = "has a total balance of 0 safecoins";
-static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at XOR-URL:";
+static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at:";
 static SAFE_PROTOCOL: &str = "safe://";
 
 fn get_bin_location() -> &'static str {
@@ -44,7 +45,7 @@ fn create_preload_and_get_keys(preload: &str) -> (String, String) {
 
     let mut lines = pk_command_result.lines();
     let pk_xor = lines.next().unwrap();
-    let pk = lines.next().unwrap();
+    let _pk = lines.next().unwrap();
     let sk_line = lines.next().unwrap();
     let sk_eq = String::from("sk=");
     let sk = &sk_line[sk_eq.chars().count()..];
@@ -141,7 +142,7 @@ fn calling_safe_wallet_balance_pretty_no_sk() {
 
     let (pk_to_xorurl, to_sk) = create_preload_and_get_keys("300");
 
-    let wallet_to_insert = cmd!(
+    let _wallet_to_insert = cmd!(
         get_bin_location(),
         "wallet",
         "insert",
@@ -175,7 +176,6 @@ fn calling_safe_wallet_balance() {
     .success();
 }
 
-
 #[test]
 fn calling_safe_wallet_insert_w_preload() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -183,36 +183,30 @@ fn calling_safe_wallet_insert_w_preload() {
     let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
     assert!(wallet.contains("safe://"));
 
+    let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
 
-    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
-
-    let wallet_to_insert = cmd!(
+    let _wallet_to_insert = cmd!(
         get_bin_location(),
         "wallet",
         "insert",
         &pk_pay_xor,
         &wallet,
-		"--test-coins",
-		"--preload",
-		"150",
+        "--test-coins",
+        "--preload",
+        "150",
     )
     .read()
     .unwrap();
 
-
-    cmd.args(&vec![
-        "wallet", "balance", &wallet,
-    ])
-    .assert()
-    .stdout("150\n")
-    .success();
+    cmd.args(&vec!["wallet", "balance", &wallet])
+        .assert()
+        .stdout("150\n")
+        .success();
 }
-
 
 #[test]
 fn calling_safe_wallet_create() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-
     cmd.args(&vec!["wallet", "create", "--pretty"])
         .assert()
         .stdout(predicate::str::starts_with(PRETTY_WALLET_CREATION_RESPONSE).from_utf8())
@@ -222,7 +216,6 @@ fn calling_safe_wallet_create() {
 #[test]
 fn calling_safe_keys_create_pretty() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-
     cmd.args(&vec![
         "keys",
         "create",
@@ -240,7 +233,6 @@ fn calling_safe_keys_create_pretty() {
 #[test]
 fn calling_safe_keys_create() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-
     cmd.args(&vec!["keys", "create", "--test-coins", "--preload", "123"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE).count(0))
@@ -266,7 +258,6 @@ fn calling_safe_keys_balance() {
     assert!(pk_xorurl.contains("safe://"));
 
     let mut cmd = Command::cargo_bin("safe_cli").unwrap();
-
     cmd.args(&vec!["keys", "balance", pk_xorurl])
         .assert()
         .stdout("123\n")
