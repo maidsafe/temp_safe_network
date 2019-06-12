@@ -957,6 +957,8 @@ mod tests {
         let enc_key = shared_secretbox::gen_key();
         let (sign_pk, sign_sk) = shared_sign::gen_keypair();
         let (enc_pk, enc_sk) = shared_box::gen_keypair();
+        let bls_sk = threshold_crypto::SecretKey::random();
+        let bls_pk = bls_sk.public_key();
 
         AppKeys {
             owner_key,
@@ -965,6 +967,8 @@ mod tests {
             sign_sk,
             enc_pk,
             enc_sk,
+            bls_pk,
+            bls_sk,
         }
     }
 

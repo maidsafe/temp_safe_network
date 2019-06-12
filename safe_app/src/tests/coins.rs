@@ -76,7 +76,7 @@ fn coin_app_allow_permissions() {
     let app = create_app();
 
     let wallet2 = unwrap!(run(&app, |client, _app_context| {
-        XorName(sha3_256(&unwrap!(client.owner_key()).0))
+        Ok(XorName(sha3_256(&unwrap!(client.owner_key()).0)))
     }));
 
     // Create an app that can access the owner's coin balance.
@@ -88,7 +88,7 @@ fn coin_app_allow_permissions() {
     let app = unwrap!(create_app_by_req(&app_auth_req));
 
     // Test the basic coin operations.
-    unwrap!(run(&app, |client, _app_context| {
+    unwrap!(run(&app, move |client, _app_context| {
         let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
         let c2 = client.clone();
         let c3 = client.clone();
@@ -97,7 +97,7 @@ fn coin_app_allow_permissions() {
             .get_balance(owner_wallet)
             .then(move |res| {
                 match res {
-                    Ok(balance) => dbg!(balance),
+                    Ok(balance) => println!("{:?}", balance),
                     res => panic!("Unexpected result: {:?}", res),
                 }
 
@@ -113,7 +113,7 @@ fn coin_app_allow_permissions() {
             })
             .then(move |res| {
                 match res {
-                    Ok(transaction) => dbg!(transaction),
+                    Ok(transaction) => println!("{:?}", transaction),
                     res => panic!("Unexpected result: {:?}", res),
                 }
                 Ok::<_, AppError>(())

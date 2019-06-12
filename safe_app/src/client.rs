@@ -24,7 +24,7 @@ use safe_core::ipc::BootstrapConfig;
 use safe_core::{Client, ClientKeys, NetworkTx};
 use safe_nd::{
     request::{Request, Requester},
-    Message, MessageId,
+    Message, MessageId, PublicKey,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -219,7 +219,6 @@ impl Client for AppClient {
 
     fn compose_message(&self, request: Request) -> Message {
         let message_id = MessageId::new();
-        let app_inner = self.app_inner.borrow();
         Message::Request {
             request,
             message_id,
