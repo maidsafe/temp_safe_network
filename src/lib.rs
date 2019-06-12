@@ -100,9 +100,15 @@ impl Safe {
 
                 let authenticator_webservice_url =
                     SAFE_AUTH_WEBSERVICE_BASE_URL.to_string() + &auth_req_str;
-                let mut res = httpget(&authenticator_webservice_url).unwrap();
+                let mut res = httpget(&authenticator_webservice_url)
+                    .map_err(|err| format!("Failed to send request to Authenticator: {}", err))?;
                 let mut auth_res = String::new();
-                res.read_to_string(&mut auth_res).unwrap();
+                res.read_to_string(&mut auth_res).map_err(|err| {
+                    format!(
+                        "Failed read authorisation response received from Authenticator: {}",
+                        err
+                    )
+                })?;
                 info!("SAFE authorisation response received!");
 
                 // Check if the app has been authorised
