@@ -162,7 +162,7 @@ impl Safe {
         preload_amount: Option<String>,
         pk: Option<String>,
     ) -> Result<(XorUrl, Option<BlsKeyPair>), String> {
-        let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk);
+        let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk)?;
         let _ = parse_coins_amount(&preload_amount.clone().unwrap_or_else(|| "0".to_string()))?;
         let create_key = |pk| match preload_amount {
             Some(amount) => self.safe_app_mock.create_balance(
@@ -179,7 +179,7 @@ impl Safe {
 
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
-                let pk = pk_from_hex(&pk_str);
+                let pk = unwrap!(pk_from_hex(&pk_str));
                 (create_key(pk), None)
             }
             None => {
@@ -204,7 +204,7 @@ impl Safe {
         let _ = parse_coins_amount(&preload_amount)?;
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
-                let pk = pk_from_hex(&pk_str);
+                let pk = unwrap!(pk_from_hex(&pk_str));
                 let xorhash = self.safe_app_mock.allocate_test_coins(&pk, &preload_amount);
                 (xorhash, None)
             }
@@ -223,18 +223,21 @@ impl Safe {
     }
 
     // Check Key's balance from the network from a given PublicKey
-    pub fn keys_balance_from_pk(&self, key_pair: &BlsKeyPair) -> String {
-        let pair = KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk);
-        self.safe_app_mock.get_balance_from_pk(&pair.pk, &pair.sk)
+    pub fn keys_balance_from_pk(&self, key_pair: &BlsKeyPair) -> Result<String, String> {
+        let pair = KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk)?;
+        self.safe_app_mock
+            .get_balance_from_pk(&pair.pk, &pair.sk)
+            .map_err(|_| "No Key found at specified location".to_string())
     }
 
     // Check Key's balance from the network from a given XOR-URL
     pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> Result<String, String> {
-        let secret_key: SecretKey = sk_from_hex(sk);
+        let secret_key: SecretKey =
+            sk_from_hex(sk).map_err(|_| "Invalid secret key provided".to_string())?;
         let xorname = xorurl_to_xorname(xorurl)?;
-        Ok(self
-            .safe_app_mock
-            .get_balance_from_xorname(&xorname, &secret_key))
+        self.safe_app_mock
+            .get_balance_from_xorname(&xorname, &secret_key)
+            .map_err(|_| "No Key found at specified location".to_string())
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
@@ -425,7 +428,7 @@ impl Safe {
             .safe_app_mock
             .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xorurl)?);
 
-        let from_sk = sk_from_hex(&from_wallet_balance.sk);
+        let from_sk = unwrap!(sk_from_hex(&from_wallet_balance.sk));
         let tx_id = Uuid::new_v4();
 
         self.safe_app_mock
@@ -490,10 +493,10 @@ fn test_keys_create_preload() {
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
         Some(kp) => {
-            let balance = safe.keys_balance_from_pk(&BlsKeyPair {
+            let balance = unwrap!(safe.keys_balance_from_pk(&BlsKeyPair {
                 pk: kp.pk,
                 sk: kp.sk,
-            });
+            }));
             assert_eq!(balance, preload_amount);
         }
     };
@@ -519,7 +522,7 @@ fn test_keys_test_coins_balance_pk() {
     let preload_amount = "1.1542";
     let (_, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
-    let current_balance = safe.keys_balance_from_pk(&unwrap!(key_pair));
+    let current_balance = unwrap!(safe.keys_balance_from_pk(&unwrap!(key_pair)));
     assert_eq!(preload_amount, current_balance);
 }
 
@@ -532,6 +535,49 @@ fn test_keys_test_coins_balance_xorurl() {
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
     let current_balance = unwrap!(safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk));
     assert_eq!(preload_amount, current_balance);
+}
+
+#[test]
+fn test_keys_test_coins_balance_wrong_xorurl() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32".to_string());
+    let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0".to_string(), None));
+
+    let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
+    let current_balance = safe.keys_balance_from_xorurl(&invalid_xorurl, &unwrap!(key_pair).sk);
+    match current_balance {
+        Err(msg) => assert!(msg.contains("Failed to decode XOR-URL")),
+        Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
+    };
+}
+
+#[test]
+fn test_keys_test_coins_balance_wrong_location() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32".to_string());
+    let (mut xorurl, key_pair) =
+        unwrap!(safe.keys_create_preload_test_coins("0".to_string(), None));
+    // let's corrupt the XOR-URL
+    xorurl.replace_range(xorurl.len() - 5.., "ccccc");
+    let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
+    match current_balance {
+        Err(msg) => assert!(msg.contains("No Key found at specified location")),
+        Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
+    };
+}
+
+#[test]
+fn test_keys_test_coins_balance_wrong_pk() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32".to_string());
+    let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0".to_string(), None));
+    let mut unwrapped_key_pair = unwrap!(key_pair);
+    unwrapped_key_pair.pk.replace_range(..6, "ababab");
+    let current_balance = safe.keys_balance_from_pk(&unwrapped_key_pair);
+    match current_balance {
+        Err(msg) => assert!(msg.contains("Invalid public key string")),
+        Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
+    };
 }
 
 #[test]
@@ -550,10 +596,10 @@ fn test_keys_balance_pk() {
         None,
     ));
 
-    let from_current_balance = safe.keys_balance_from_pk(&from_key_pair_unwrapped);
+    let from_current_balance = unwrap!(safe.keys_balance_from_pk(&from_key_pair_unwrapped));
     assert_eq!("3.234" /*== 1743.234 - 1740*/, from_current_balance);
 
-    let to_current_balance = safe.keys_balance_from_pk(&unwrap!(to_key_pair));
+    let to_current_balance = unwrap!(safe.keys_balance_from_pk(&unwrap!(to_key_pair)));
     assert_eq!(amount, to_current_balance);
 }
 

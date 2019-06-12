@@ -17,7 +17,6 @@ use safe_core::ipc::{
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
-use unwrap::unwrap;
 
 static SAFE_URL_PROTOCOL: &str = "safe://";
 
@@ -34,10 +33,10 @@ impl KeyPair {
         KeyPair { pk, sk }
     }
 
-    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> Self {
-        let pk = pk_from_hex(pk_hex_str);
-        let sk = sk_from_hex(sk_hex_str);
-        KeyPair { pk, sk }
+    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> Result<Self, String> {
+        let pk = pk_from_hex(pk_hex_str)?;
+        let sk = sk_from_hex(sk_hex_str)?;
+        Ok(KeyPair { pk, sk })
     }
 
     pub fn to_hex_key_pair(&self) -> (String, String) {
@@ -79,16 +78,17 @@ pub fn pk_to_hex(pk: &PublicKey) -> String {
     vec_to_hex(pk_as_bytes.to_vec())
 }
 
-pub fn pk_from_hex(hex_str: &str) -> PublicKey {
+pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey, String> {
     let pk_bytes = parse_hex(&hex_str);
     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
-    unwrap!(PublicKey::from_bytes(pk_bytes_array))
+    PublicKey::from_bytes(pk_bytes_array).map_err(|_| "Invalid public key string".to_string())
 }
 
-pub fn sk_from_hex(hex_str: &str) -> SecretKey {
+pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey, String> {
     let sk_bytes = parse_hex(&hex_str);
-    bincode::deserialize(&sk_bytes).expect("Failed to deserialize provided secret key")
+    bincode::deserialize(&sk_bytes)
+        .map_err(|_| "Failed to deserialize provided secret key".to_string())
 }
 
 pub fn parse_coins_amount(amount_str: &str) -> Result<f64, String> {
@@ -173,6 +173,7 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted, String> {
 
 #[test]
 fn test_xorurl_base32_encoding() {
+    use unwrap::unwrap;
     let xorname: XorName = *b"12345678901234567890123456789012";
     let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"base32".to_string()));
     let base32_xorurl = "safe://bbkulcamjsgm2dknrxha4tamjsgm2dknrxha4tamjsgm2dknrxha4tamjs";
@@ -184,6 +185,7 @@ fn test_xorurl_base32_encoding() {
 
 #[test]
 fn test_xorurl_base32z_encoding() {
+    use unwrap::unwrap;
     let xorname: XorName = *b"12345678901234567890123456789012";
     let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"base32z".to_string()));
     let base32_xorurl = "safe://hbkwmnycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
@@ -192,6 +194,7 @@ fn test_xorurl_base32z_encoding() {
 
 #[test]
 fn test_xorurl_decoding() {
+    use unwrap::unwrap;
     let xorname: XorName = *b"12345678901234567890123456789012";
     let xorurl = unwrap!(xorname_to_xorurl(&xorname, &"base32".to_string()));
     let decoded_xorname = unwrap!(xorurl_to_xorname(&xorurl));
