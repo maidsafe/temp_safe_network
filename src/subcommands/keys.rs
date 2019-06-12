@@ -49,14 +49,10 @@ pub fn key_commander(
         Some(KeysSubCommands::Keypair {}) => {
             let key_pair = safe.keys_keypair()?;
             if pretty {
-                println!(
-                    "Key pair generated: pk=\"{}\", sk=\"{}\"",
-                    key_pair.pk, key_pair.sk
-                );
-            } else {
-                println!("pk={}", key_pair.pk);
-                println!("sk={}", key_pair.sk);
+                println!("Key pair generated:");
             }
+            println!("pk={}", key_pair.pk);
+            println!("sk={}", key_pair.sk);
             Ok(())
         }
         Some(KeysSubCommands::Create {
@@ -139,11 +135,10 @@ pub fn create_new_key(
 
     if let Some(pair) = &key_pair {
         if pretty {
-            println!("Key pair generated: pk=\"{}\", sk=\"{}\"", pair.pk, pair.sk);
-        } else {
-            println!("pk={}", pair.pk);
-            println!("sk={}", pair.sk);
+            println!("Key pair generated:");
         }
+        println!("pk={}", pair.pk);
+        println!("sk={}", pair.sk);
     }
 
     Ok((xorname, key_pair))

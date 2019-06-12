@@ -20,11 +20,11 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
   - [Auth](#auth)
     - [Prerequisite: run the Authenticator](#prerequisite-run-the-authenticator)
     - [Authorise the safe_cli app](#authorise-the-safe_cli-app)
-	- [Keys](#keys)
+  - [Keys](#keys)
 		- [Create](#keys-creation)
 		- [Balance](#keys-balance)
 		- [Key pair generation](#key-pair-generation)
-	- [Wallet](#wallet)
+  - [Wallet](#wallet)
 		- [Create](#wallet-creation)
 		- [Insert](#wallet-insert)
 		- [Balance](#wallet-balance)
@@ -38,7 +38,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 In order to build this CLI from source code you need to make sure you have `rustc v1.35.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install `cargo` tool since this guide makes use of it.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe_cli` crate (the build process may take several minutes the first time you run it on this crate):
-```
+```shell
 $ git clone https://github.com/maidsafe/safe-cli.git
 $ cd safe-cli
 $ cargo build
@@ -52,7 +52,7 @@ The base command, if built is `$ safe_cli`, or all commands can be run via `$ ca
 
 Various global flags are available (those commented out are not yet implemented):
 
-```bash
+```
 # --dry-run              Dry run of command. No data will be written. No coins spent.
 -h, --help               Prints help information
 --pretty                 Print human readable responses. (Alias to --output human-readable.)
@@ -79,7 +79,7 @@ This command simply sends an authorisation request to the Authenticator availabl
 You need the [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli) running locally and exposing its WebService interface for authorising applications, and also be logged in to a SAFE account created on the mock network (i.e. `MockVault` file), making sure the port number you set is `41805`, and enabling the `mock-network` feature.
 
 Please open a second/separate terminal console to execute the following commands (again, please make sure you have `rustc v1.35.0` or higher):
-```
+```shell
 $ git clone https://github.com/maidsafe/safe-authenticator-cli.git
 $ cd safe-authenticator-cli
 $ cargo run --features mock-network -- --daemon 41805
@@ -88,7 +88,7 @@ $ cargo run --features mock-network -- --daemon 41805
 #### Authorise the safe_cli app
 
 Now that the Authenticator is running and ready to authorise applications, we can simply invoke the `auth` command:
-```bash
+```shell
 $ safe_cli auth
 ```
 
@@ -124,7 +124,9 @@ But we can also create a `Key` with test-coins since we are using the mock netwo
 ```shell
 $ safe_cli keys create --test-coins --preload 15.342 --pretty
 New Key created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
-Key pair generated: pk="b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61", sk="c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965"
+Key pair generated:
+pk="b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61"
+sk="c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965"
 ```
 
 Once we have some `Key`'s with some test-coins we can use them as the `source` for the creation of new `Key`'s, thus if we use the `Key` we just created with test-coins we can create a second `Key`:
@@ -138,7 +140,7 @@ sk="2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c"
 ```
 
 Other optional args that can be used with `keys create` sub-command are:
-```shell
+```
 --pk <pk>            Don't generate a key pair and just use the provided public key
 --preload <preload>  Preload the Key with a coin balance
 ```
@@ -148,7 +150,7 @@ Other optional args that can be used with `keys create` sub-command are:
 We can retrieve a given `Key`'s balance using its XorUrl.
 
 The target `Key` can be passed as an argument (or it will be retrieved from `stdin`)
-```
+```shell
 $ safe_cli keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks --pretty
 Key's current balance: 15.342
 ```
@@ -157,16 +159,18 @@ Key's current balance: 15.342
 
 There are some scenarios that being able to generate a sign/encryption key-pair, without creating and/or storing a `Key` on the network, is required.
 
-As an example, if we want to have a friend create a `Key` for us, and preload it with some safecoins, we can generate a key-pair, and share with our friend only the public key so he can generate the `Key` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
+As an example, if we want to have a friend to create a `Key` for us, and preload it with some safecoins, we can generate a key-pair, and share with our friend only the public key so he can generate the `Key` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
 
 Thus, let's see how this use case would work. First we create a key-pair:
-```
+```shell
 $ safe_cli keys keypair --pretty
-Key pair generated: pk="b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833", sk="62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a"
+Key pair generated:
+pk="b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833"
+sk="62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a"
 ```
 
 We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `Key` to be owned by it and preload it with some test-coins:
-```
+```shell
 $ safe_cli keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833 --pretty
 New Key created at: "safe://bbkulcbmrxdx2inbg4srljrd2fwvwxmqg7moev72r5ptxelr43e25cndjf"
 ```
@@ -181,7 +185,7 @@ A `Wallet` effectively contains links to `Key`'s which have safecoin balances at
 
 There are several sub-commands that can be used to manage the `Wallet`'s with the `safe_cli wallet` command (those commented out are not yet implemented):
 
-```shell
+```
 SUBCOMMANDS:
     balance       Query a Wallet's total balance
     # check-tx    Check the status of a given transaction
