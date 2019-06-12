@@ -519,6 +519,27 @@ fn test_keys_create_preload() {
 }
 
 #[test]
+fn test_keys_create_preload_invalid_amounts() {
+    let mut safe = Safe::new("base32".to_string());
+    match safe.keys_create_preload_test_coins(".45".to_string(), None) {
+        Err(msg) => assert_eq!(
+            msg,
+            "Invalid safecoins amount '.45', expected a numeric value"
+        ),
+        Ok(_) => panic!("Key with test-coins was created unexpectedly"),
+    };
+
+    let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12".to_string(), None));
+    match safe.keys_create(unwrap!(key_pair), Some(".003".to_string()), None) {
+        Err(msg) => assert_eq!(
+            msg,
+            "Invalid safecoins amount '.003', expected a numeric value"
+        ),
+        Ok(_) => panic!("Key was created unexpectedly"),
+    };
+}
+
+#[test]
 fn test_keys_create_pk() {
     let mut safe = Safe::new("base32".to_string());
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1".to_string(), None));

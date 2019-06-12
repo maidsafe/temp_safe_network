@@ -92,9 +92,24 @@ pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey, String> {
 }
 
 pub fn parse_coins_amount(amount_str: &str) -> Result<f64, String> {
-    let amount: f64 = amount_str
-        .parse::<f64>()
-        .map_err(|_| "Invalid safecoins amount, expected a numeric value".to_string())?;
+    // TODO: implement our Error struct which is used across the lib and its API
+    let mut itr = amount_str.splitn(2, '.');
+    let _ = itr
+        .next()
+        .and_then(|s| s.parse::<u64>().ok())
+        .ok_or_else(|| {
+            format!(
+                "Invalid safecoins amount '{}', expected a numeric value",
+                amount_str
+            )
+        })?;
+
+    let amount: f64 = amount_str.parse::<f64>().map_err(|_| {
+        format!(
+            "Invalid safecoins amount '{}', expected a numeric value",
+            amount_str
+        )
+    })?;
     Ok(amount)
 }
 
