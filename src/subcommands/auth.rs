@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use dirs;
 use log::debug;
 use safe_cli::Safe;
-use std::env;
 use std::fs::{DirBuilder, File};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -17,7 +17,6 @@ use structopt::StructOpt;
 static APP_ID: &str = "net.maidsafe.cli";
 static APP_NAME: &str = "SAFE CLI";
 static APP_VENDOR: &str = "MaidSafe.net Ltd";
-static ENV_VAR_HOME: &str = "HOME";
 static AUTH_CREDENTIALS_FOLDER: &str = ".safe";
 static AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
@@ -79,8 +78,8 @@ pub fn auth_connect(safe: &mut Safe) -> Result<(), String> {
 }
 
 fn credentials_file_path() -> Result<String, String> {
-    let home_path = env::var(ENV_VAR_HOME)
-        .map_err(|err| format!("Couldn't find {} env var: {}", ENV_VAR_HOME, err))?;
+    let home_path =
+        dirs::home_dir().ok_or_else(|| "Couldn't find user's home directory".to_string())?;
 
     let path = Path::new(&home_path).join(AUTH_CREDENTIALS_FOLDER);
     if !Path::new(&path).exists() {

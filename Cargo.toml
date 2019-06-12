@@ -29,6 +29,7 @@ cid = "0.3.0"
 multihash = "0.8.0"
 multibase = "0.6.0"
 reqwest = "0.9.5"
+dirs = "2.0.1"
 
 [features]
 default = ["uuid/v4"]
