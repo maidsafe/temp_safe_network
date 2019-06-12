@@ -59,6 +59,7 @@ pub fn create_auth_req(
     NativeAuthReq {
         app: app_info,
         app_container,
+        app_permissions: Default::default(),
         containers,
     }
 }

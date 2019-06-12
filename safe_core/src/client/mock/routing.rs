@@ -12,7 +12,7 @@ use super::vault::{self, Data, Vault, VaultGuard};
 use super::DataId;
 use crate::client::MsgIdConverter;
 use crate::config_handler::{get_config, Config};
-use maidsafe_utilities::serialisation::deserialise;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread;
 use rand;
 use routing::{
@@ -21,7 +21,7 @@ use routing::{
     XorName, TYPE_TAG_SESSION_PACKET,
 };
 use rust_sodium::crypto::sign;
-use safe_nd::response::Response as RpcResponse;
+use safe_nd::{AppPermissions, Message};
 use std;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -144,30 +144,18 @@ impl Routing {
             // Responses are sent to client authorities
             Authority::Client { .. } => {
                 // TODO: Getting message_id without deserializing this
-                let resp: RpcResponse = unwrap!(deserialise(&payload.to_vec()));
-                // Also make this better
-                let message_id = match resp {
-                    RpcResponse::GetUnseqMData { msg_id, .. }
-                    | RpcResponse::GetSeqMData { msg_id, .. }
-                    | RpcResponse::PutUnseqMData { msg_id, .. }
-                    | RpcResponse::GetSeqMDataShell { msg_id, .. }
-                    | RpcResponse::GetUnseqMDataShell { msg_id, .. }
-                    | RpcResponse::GetMDataVersion { msg_id, .. }
-                    | RpcResponse::ListUnseqMDataEntries { msg_id, .. }
-                    | RpcResponse::ListSeqMDataEntries { msg_id, .. }
-                    | RpcResponse::ListMDataKeys { msg_id, .. }
-                    | RpcResponse::ListSeqMDataValues { msg_id, .. }
-                    | RpcResponse::ListUnseqMDataValues { msg_id, .. }
-                    | RpcResponse::PutSeqMData { msg_id, .. }
-                    | RpcResponse::DeleteMData { msg_id, .. } => msg_id,
-                    _ => {
-                        // Return random msg_id for now
-                        // Other responses should be handled with their data types
-                        MessageId::new().to_new()
-                    }
+                let msg: Message = unwrap!(deserialise(&payload.to_vec()));
+                let (message_id, response) = if let Message::Response {
+                    message_id,
+                    response,
+                } = msg
+                {
+                    (message_id, response)
+                } else {
+                    return Err(InterfaceError::InvalidState);
                 };
                 let response = Response::RpcResponse {
-                    res: Ok(payload.to_vec()),
+                    res: Ok(unwrap!(serialise(&response))),
                     msg_id: MessageId::from_new(message_id),
                 };
                 self.send_response(DEFAULT_DELAY_MS, src, dst, response);
@@ -782,7 +770,10 @@ impl Routing {
 
             let vault = self.lock_vault(false);
             if let Some(account) = vault.get_account(&name) {
-                Ok((account.auth_keys().clone(), account.version()))
+                Ok((
+                    account.auth_keys().keys().cloned().collect::<BTreeSet<_>>(),
+                    account.version(),
+                ))
             } else {
                 Err(ClientError::NoSuchAccount)
             }
@@ -802,21 +793,22 @@ impl Routing {
         &mut self,
         dst: Authority<XorName>,
         key: sign::PublicKey,
+        permissions: AppPermissions,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
         let client_auth = self.client_auth;
 
-        let skip = self.intercept_request(INS_AUTH_KEY_DELAY_MS, dst, client_auth, || {
-            Request::InsAuthKey {
-                key,
-                version,
-                msg_id,
-            }
-        });
-        if skip {
-            return Ok(());
-        }
+        // let skip = self.intercept_request(INS_AUTH_KEY_DELAY_MS, dst, client_auth, || {
+        //     Request::InsAuthKey {
+        //         key,
+        //         version,
+        //         msg_id,
+        //     }
+        // });
+        // if skip {
+        //     return Ok(());
+        // }
 
         let res = if let Err(err) = self.verify_network_limits(msg_id, "ins_auth_key") {
             Err(err)
@@ -828,7 +820,7 @@ impl Routing {
 
             let mut vault = self.lock_vault(true);
             if let Some(account) = vault.get_account_mut(&name) {
-                account.ins_auth_key(key, version)
+                account.ins_auth_key(key, permissions, version)
             } else {
                 Err(ClientError::NoSuchAccount)
             }

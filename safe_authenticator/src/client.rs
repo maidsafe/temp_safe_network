@@ -31,6 +31,10 @@ use safe_core::crypto::{shared_box, shared_secretbox, shared_sign};
 #[cfg(any(test, feature = "testing"))]
 use safe_core::utils::seed::{divide_seed, SEED_SUBPARTS};
 use safe_core::{utils, Client, ClientKeys, CoreError, FutureExt, MDataInfo, NetworkTx};
+use safe_nd::{
+    request::{Request, Requester},
+    Message, MessageId as NewMessageId,
+};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -527,6 +531,23 @@ impl Client for AuthClient {
     fn owner_key(&self) -> Option<sign::PublicKey> {
         let auth_inner = self.auth_inner.borrow();
         Some(auth_inner.acc.maid_keys.sign_pk)
+    }
+
+    fn compose_message(&self, request: Request) -> Message {
+        let auth_inner = self.auth_inner.borrow();
+        let message_id = NewMessageId::new();
+
+        let sig = auth_inner
+            .acc
+            .maid_keys
+            .bls_sk
+            .sign(&unwrap!(serialise(&(&request, message_id))));
+
+        Message::Request {
+            request,
+            message_id,
+            requester: Requester::Owner(sig),
+        }
     }
 }
 

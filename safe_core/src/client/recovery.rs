@@ -16,6 +16,7 @@ use routing::{
     Action, ClientError, EntryAction, EntryError, MutableData, PermissionSet, User, Value, XorName,
 };
 use rust_sodium::crypto::sign;
+use safe_nd::AppPermissions;
 use std::collections::BTreeMap;
 
 const MAX_ATTEMPTS: usize = 10;
@@ -302,6 +303,7 @@ fn union_permission_sets(a: PermissionSet, b: PermissionSet) -> PermissionSet {
 pub fn ins_auth_key(
     client: &impl Client,
     key: sign::PublicKey,
+    permissions: AppPermissions,
     version: u64,
 ) -> Box<CoreFuture<()>> {
     let state = (0, version);
@@ -309,7 +311,7 @@ pub fn ins_auth_key(
 
     future::loop_fn(state, move |(attempts, version)| {
         client
-            .ins_auth_key(key, version)
+            .ins_auth_key(key, permissions.clone(), version)
             .map(|_| Loop::Break(()))
             .or_else(move |error| match error {
                 CoreError::RoutingClientError(ClientError::InvalidSuccessor(current_version)) => {

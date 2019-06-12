@@ -98,6 +98,7 @@ mod tests {
         let auth_req = AuthReq {
             app: rand_app(),
             app_container: false,
+            app_permissions: Default::default(),
             containers,
         };
         let auth_req = unwrap!(auth_req.into_repr_c());

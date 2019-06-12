@@ -130,7 +130,7 @@ fn md_created_by_app_2() {
                 .list_auth_keys_and_version()
                 .then(move |res| {
                     let (_, version) = unwrap!(res);
-                    cl2.ins_auth_key(sign_pk, version + 1)
+                    cl2.ins_auth_key(sign_pk, Default::default(), version + 1)
                 })
                 .then(move |res| {
                     unwrap!(res);
@@ -240,7 +240,7 @@ fn md_created_by_app_3() {
                 .list_auth_keys_and_version()
                 .then(move |res| {
                     let (_, version) = unwrap!(res);
-                    cl2.ins_auth_key(app_sign_pk, version + 1)
+                    cl2.ins_auth_key(app_sign_pk, Default::default(), version + 1)
                 })
                 .then(move |res| {
                     unwrap!(res);
@@ -387,7 +387,7 @@ fn md_created_by_app_4() {
                 .list_auth_keys_and_version()
                 .then(move |res| {
                     let (_, version) = unwrap!(res);
-                    cl2.ins_auth_key(app_sign_pk, version + 1)
+                    cl2.ins_auth_key(app_sign_pk, Default::default(), version + 1)
                 })
                 .then(move |res| {
                     unwrap!(res);

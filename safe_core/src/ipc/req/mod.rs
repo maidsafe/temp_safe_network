@@ -408,6 +408,7 @@ mod tests {
         let a = AuthReq {
             app,
             app_container: false,
+            app_permissions: Default::default(),
             containers: HashMap::new(),
         };
 

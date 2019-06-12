@@ -52,9 +52,9 @@ use rust_sodium::crypto::{box_, sign};
 use safe_nd::mutable_data::{
     MutableData as NewMutableData, MutableDataRef, SeqMutableData, UnseqMutableData, Value as Val,
 };
-use safe_nd::request::{Request, Requester};
-use safe_nd::response::Response;
-use safe_nd::{MessageId as NewMessageId, XorName as NewXorName};
+use safe_nd::request::Request;
+use safe_nd::response::{Response, Transaction};
+use safe_nd::{AppPermissions, Coins, Message, MessageId as NewMessageId, XorName as NewXorName};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io;
@@ -138,11 +138,15 @@ pub trait Client: Clone + 'static {
     /// Return the secret signing key.
     fn secret_signing_key(&self) -> Option<shared_sign::SecretKey>;
 
-    /// Return the public BLS key
+    /// Return the public BLS key.
     fn public_bls_key(&self) -> Option<threshold_crypto::PublicKey>;
 
-    /// Return the secret BLS key
+    /// Return the secret BLS key.
     fn secret_bls_key(&self) -> Option<threshold_crypto::SecretKey>;
+
+    /// Create a `Message` from the given request.
+    /// This function adds the requester signature and message ID.
+    fn compose_message(&self, req: Request) -> Message;
 
     /// Return the public and secret signing keys.
     fn signing_keypair(&self) -> Option<(sign::PublicKey, shared_sign::SecretKey)> {
@@ -199,7 +203,8 @@ pub trait Client: Clone + 'static {
         }
 
         let inner = Rc::downgrade(&self.inner());
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.get_idata(Authority::NaeManager(name), name, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetIData))
@@ -220,7 +225,8 @@ pub trait Client: Clone + 'static {
     fn put_idata(&self, data: ImmutableData) -> Box<CoreFuture<()>> {
         trace!("PutIData for {:?}", data);
 
-        send_mutation(self, move |routing, dst, msg_id| {
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.put_idata(dst, data.clone(), msg_id)
         })
     }
@@ -230,7 +236,8 @@ pub trait Client: Clone + 'static {
         trace!("PutMData for {:?}", data);
 
         let requester = some_or_err!(self.public_signing_key());
-        send_mutation(self, move |routing, dst, msg_id| {
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.put_mdata(dst, data.clone(), msg_id, requester)
         })
     }
@@ -238,62 +245,40 @@ pub trait Client: Clone + 'static {
     /// Put unsequenced mutable data to the network
     fn put_unseq_mutable_data(&self, data: UnseqMutableData) -> Box<CoreFuture<()>> {
         trace!("Put Unsequenced MData at {:?}", data.name());
-
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send_mutation(self, move |routing, dst, message_id| {
-            let request = Request::PutUnseqMData {
-                data: data.clone(),
-                requester: Requester::Key(requester),
-                message_id: message_id.to_new(),
-            };
-            routing.send(client, dst, &unwrap!(serialise(&request)))
-        })
+        send_mutation_new(self, Request::PutUnseqMData { data: data.clone() })
     }
 
-    /// Put sequenced mutable data to the network
-    fn put_seq_mutable_data(&self, data: SeqMutableData) -> Box<CoreFuture<()>> {
-        trace!("Put Sequenced MData at {:?}", data.name());
+    /// Transfer coin balance
+    fn transfer_coins(
+        &self,
+        destination: XorName,
+        amount: Coins,
+        transaction_id: Option<u64>,
+    ) -> Box<CoreFuture<()>> {
+        trace!("Transfer {} coins to {:?}", amount, destination);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send_mutation(self, move |routing, dst, message_id| {
-            let request = Request::PutSeqMData {
-                data: data.clone(),
-                requester: Requester::Key(requester),
-                message_id: message_id.to_new(),
-            };
-            routing.send(client, dst, &unwrap!(serialise(&request)))
-        })
+        let transaction_id = transaction_id.unwrap_or_else(rand::random);
+
+        send_mutation_new(
+            self,
+            Request::TransferCoins {
+                destination: destination.to_new(),
+                amount,
+                transaction_id,
+            },
+        )
     }
 
-    /// Fetch unpublished mutable data from the network
-    fn get_unseq_mdata(&self, name: XorName, tag: u64) -> Box<CoreFuture<UnseqMutableData>> {
-        trace!("Fetch Unpublished Mutable Data");
+    /// Get the current coin balance.
+    fn get_balance(&self, destination: XorName) -> Box<CoreFuture<Coins>> {
+        trace!("Get balance for {:?}", destination);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::GetUnseqMData {
-                address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+        send_new(
+            self,
+            Request::GetBalance {
+                coins_balance_id: destination.to_new(),
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -302,7 +287,68 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::GetUnseqMData { res, .. } => res.map_err(CoreError::from),
+                Response::GetBalance(res) => res.map_err(CoreError::from),
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            }
+        })
+        .into_box()
+    }
+
+    /// Get a transaction.
+    fn get_transaction(
+        &self,
+        destination: XorName,
+        transaction_id: u64,
+    ) -> Box<CoreFuture<Transaction>> {
+        trace!("Get transaction {} for {:?}", transaction_id, destination);
+
+        send_new(
+            self,
+            Request::GetTransaction {
+                coins_balance_id: destination.to_new(),
+                transaction_id,
+            },
+        )
+        .and_then(|event| {
+            let res = match event {
+                CoreEvent::RpcResponse(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            };
+            let result_buffer = unwrap!(res);
+            let res: Response = unwrap!(deserialise(&result_buffer));
+            match res {
+                Response::GetTransaction(res) => res.map_err(CoreError::from),
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            }
+        })
+        .into_box()
+    }
+
+    /// Put sequenced mutable data to the network
+    fn put_seq_mutable_data(&self, data: SeqMutableData) -> Box<CoreFuture<()>> {
+        trace!("Put Sequenced MData at {:?}", data.name());
+        send_mutation_new(self, Request::PutSeqMData { data: data.clone() })
+    }
+
+    /// Fetch unpublished mutable data from the network
+    fn get_unseq_mdata(&self, name: XorName, tag: u64) -> Box<CoreFuture<UnseqMutableData>> {
+        trace!("Fetch Unpublished Mutable Data");
+
+        send_new(
+            self,
+            Request::GetUnseqMData {
+                address: MutableDataRef::new(name.to_new(), tag),
+            },
+        )
+        .and_then(|event| {
+            let res = match event {
+                CoreEvent::RpcResponse(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            };
+            let result_buffer = unwrap!(res);
+            let res: Response = unwrap!(deserialise(&result_buffer));
+            match res {
+                Response::GetUnseqMData(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -313,23 +359,12 @@ pub trait Client: Clone + 'static {
     fn get_seq_mdata(&self, name: XorName, tag: u64) -> Box<CoreFuture<SeqMutableData>> {
         trace!("Fetch entries from  Mutable Data");
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::GetSeqMData {
+        send_new(
+            self,
+            Request::GetSeqMData {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -338,7 +373,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::GetSeqMData { res, .. } => res.map_err(CoreError::from),
+                Response::GetSeqMData(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -349,20 +384,12 @@ pub trait Client: Clone + 'static {
     fn delete_mdata(&self, mdataref: MutableDataRef) -> Box<CoreFuture<()>> {
         trace!("Delete entire Mutable Data");
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-
-        send_mutation(self, move |routing, dst, msg_id| {
-            let request = Request::DeleteMData {
+        send_mutation_new(
+            self,
+            Request::DeleteMData {
                 address: mdataref.clone(),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-            routing.send(client, dst, &unwrap!(serialise(&request)))
-        })
+            },
+        )
     }
 
     /// Mutates `MutableData` entries in bulk.
@@ -375,7 +402,9 @@ pub trait Client: Clone + 'static {
         trace!("PutMData for {:?}", name);
 
         let requester = some_or_err!(self.public_signing_key());
-        send_mutation(self, move |routing, dst, msg_id| {
+
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.mutate_mdata_entries(dst, name, tag, actions.clone(), msg_id, requester)
         })
     }
@@ -384,7 +413,8 @@ pub trait Client: Clone + 'static {
     fn get_mdata(&self, name: XorName, tag: u64) -> Box<CoreFuture<MutableData>> {
         trace!("GetMData for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.get_mdata(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetMData))
@@ -395,7 +425,8 @@ pub trait Client: Clone + 'static {
     fn get_mdata_shell(&self, name: XorName, tag: u64) -> Box<CoreFuture<MutableData>> {
         trace!("GetMDataShell for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.get_mdata_shell(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetMDataShell))
@@ -406,24 +437,12 @@ pub trait Client: Clone + 'static {
     fn get_seq_mdata_shell(&self, name: XorName, tag: u64) -> Box<CoreFuture<SeqMutableData>> {
         trace!("GetMDataShell for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::GetSeqMDataShell {
+        send_new(
+            self,
+            Request::GetSeqMDataShell {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -432,7 +451,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::GetSeqMDataShell { res, .. } => res.map_err(CoreError::from),
+                Response::GetSeqMDataShell(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -443,24 +462,12 @@ pub trait Client: Clone + 'static {
     fn get_unseq_mdata_shell(&self, name: XorName, tag: u64) -> Box<CoreFuture<UnseqMutableData>> {
         trace!("GetMDataShell for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::GetUnseqMDataShell {
+        send_new(
+            self,
+            Request::GetUnseqMDataShell {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -469,7 +476,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::GetUnseqMDataShell { res, .. } => res.map_err(CoreError::from),
+                Response::GetUnseqMDataShell(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -480,24 +487,12 @@ pub trait Client: Clone + 'static {
     fn get_mdata_version_new(&self, name: XorName, tag: u64) -> Box<CoreFuture<u64>> {
         trace!("GetMDataVersion for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::GetMDataVersion {
+        send_new(
+            self,
+            Request::GetMDataVersion {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -506,7 +501,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::GetMDataVersion { res, .. } => res.map_err(CoreError::from),
+                Response::GetMDataVersion(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -517,7 +512,8 @@ pub trait Client: Clone + 'static {
     fn get_mdata_version(&self, name: XorName, tag: u64) -> Box<CoreFuture<u64>> {
         trace!("GetMDataVersion for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetMDataVersion))
@@ -532,7 +528,8 @@ pub trait Client: Clone + 'static {
     ) -> Box<CoreFuture<BTreeMap<Vec<u8>, Value>>> {
         trace!("ListMDataEntries for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.list_mdata_entries(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::ListMDataEntries))
@@ -547,24 +544,12 @@ pub trait Client: Clone + 'static {
     ) -> Box<CoreFuture<BTreeMap<Vec<u8>, Vec<u8>>>> {
         trace!("ListMDataEntries for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::ListUnseqMDataEntries {
+        send_new(
+            self,
+            Request::ListUnseqMDataEntries {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -573,7 +558,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::ListUnseqMDataEntries { res, .. } => res.map_err(CoreError::from),
+                Response::ListUnseqMDataEntries(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -586,26 +571,14 @@ pub trait Client: Clone + 'static {
         name: XorName,
         tag: u64,
     ) -> Box<CoreFuture<BTreeMap<Vec<u8>, Val>>> {
-        trace!("ListMDataEntries for {:?}", name);
+        trace!("ListSeqMDataEntries for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::ListSeqMDataEntries {
+        send_new(
+            self,
+            Request::ListSeqMDataEntries {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -614,7 +587,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::ListSeqMDataEntries { res, .. } => res.map_err(CoreError::from),
+                Response::ListSeqMDataEntries(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -625,7 +598,8 @@ pub trait Client: Clone + 'static {
     fn list_mdata_keys(&self, name: XorName, tag: u64) -> Box<CoreFuture<BTreeSet<Vec<u8>>>> {
         trace!("ListMDataKeys for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.list_mdata_keys(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::ListMDataKeys))
@@ -636,24 +610,12 @@ pub trait Client: Clone + 'static {
     fn list_mdata_keys_new(&self, name: XorName, tag: u64) -> Box<CoreFuture<BTreeSet<Vec<u8>>>> {
         trace!("ListMDataKeys for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::ListMDataKeys {
+        send_new(
+            self,
+            Request::ListMDataKeys {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -662,7 +624,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::ListMDataKeys { res, .. } => res.map_err(CoreError::from),
+                Response::ListMDataKeys(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -673,24 +635,12 @@ pub trait Client: Clone + 'static {
     fn list_seq_mdata_values(&self, name: XorName, tag: u64) -> Box<CoreFuture<Vec<Val>>> {
         trace!("List MDataValues for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::ListSeqMDataValues {
+        send_new(
+            self,
+            Request::ListSeqMDataValues {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -699,7 +649,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::ListSeqMDataValues { res, .. } => res.map_err(CoreError::from),
+                Response::ListSeqMDataValues(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -710,24 +660,12 @@ pub trait Client: Clone + 'static {
     fn list_unseq_mdata_values(&self, name: XorName, tag: u64) -> Box<CoreFuture<Vec<Vec<u8>>>> {
         trace!("List MDataValues for {:?}", name);
 
-        let requester = some_or_err!(self.public_bls_key());
-        let client = Authority::Client {
-            client_id: *some_or_err!(self.full_id()).public_id(),
-            proxy_node_name: rand::random(),
-        };
-        send(self, move |routing, msg_id| {
-            let request = Request::ListUnseqMDataValues {
+        send_new(
+            self,
+            Request::ListUnseqMDataValues {
                 address: MutableDataRef::new(name.to_new(), tag),
-                requester: Requester::Key(requester),
-                message_id: msg_id.to_new(),
-            };
-
-            routing.send(
-                client,
-                Authority::NaeManager(name),
-                &unwrap!(serialise(&request)),
-            )
-        })
+            },
+        )
         .and_then(|event| {
             let res = match event {
                 CoreEvent::RpcResponse(res) => res,
@@ -736,7 +674,7 @@ pub trait Client: Clone + 'static {
             let result_buffer = unwrap!(res);
             let res: Response = unwrap!(deserialise(&result_buffer));
             match res {
-                Response::ListUnseqMDataValues { res, .. } => res.map_err(CoreError::from),
+                Response::ListUnseqMDataValues(res) => res.map_err(CoreError::from),
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             }
         })
@@ -747,7 +685,8 @@ pub trait Client: Clone + 'static {
     fn list_mdata_values(&self, name: XorName, tag: u64) -> Box<CoreFuture<Vec<Value>>> {
         trace!("ListMDataValues for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.list_mdata_values(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::ListMDataValues))
@@ -758,7 +697,8 @@ pub trait Client: Clone + 'static {
     fn get_mdata_value(&self, name: XorName, tag: u64, key: Vec<u8>) -> Box<CoreFuture<Value>> {
         trace!("GetMDataValue for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.get_mdata_value(Authority::NaeManager(name), name, tag, key.clone(), msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetMDataValue))
@@ -770,7 +710,8 @@ pub trait Client: Clone + 'static {
         trace!("Account info GET issued.");
 
         let dst = some_or_err!(self.cm_addr());
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.get_account_info(dst, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetAccountInfo))
@@ -785,7 +726,8 @@ pub trait Client: Clone + 'static {
     ) -> Box<CoreFuture<BTreeMap<User, PermissionSet>>> {
         trace!("ListMDataPermissions for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.list_mdata_permissions(Authority::NaeManager(name), name, tag, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::ListMDataPermissions))
@@ -801,7 +743,8 @@ pub trait Client: Clone + 'static {
     ) -> Box<CoreFuture<PermissionSet>> {
         trace!("ListMDataUserPermissions for {:?}", name);
 
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             let dst = Authority::NaeManager(name);
             routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
         })
@@ -821,7 +764,8 @@ pub trait Client: Clone + 'static {
         trace!("SetMDataUserPermissions for {:?}", name);
 
         let requester = some_or_err!(self.public_signing_key());
-        send_mutation(self, move |routing, dst, msg_id| {
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.set_mdata_user_permissions(
                 dst,
                 name,
@@ -846,7 +790,8 @@ pub trait Client: Clone + 'static {
         trace!("DelMDataUserPermissions for {:?}", name);
 
         let requester = some_or_err!(self.public_signing_key());
-        send_mutation(self, move |routing, dst, msg_id| {
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.del_mdata_user_permissions(dst, name, tag, user, version, msg_id, requester)
         })
     }
@@ -861,7 +806,8 @@ pub trait Client: Clone + 'static {
     ) -> Box<CoreFuture<()>> {
         trace!("ChangeMDataOwner for {:?}", name);
 
-        send_mutation(self, move |routing, dst, msg_id| {
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.change_mdata_owner(dst, name, tag, btree_set![new_owner], version, msg_id)
         })
     }
@@ -871,7 +817,8 @@ pub trait Client: Clone + 'static {
         trace!("ListAuthKeysAndVersion");
 
         let dst = some_or_err!(self.cm_addr());
-        send(self, move |routing, msg_id| {
+        let msg_id = MessageId::new();
+        send(self, msg_id, move |routing| {
             routing.list_auth_keys_and_version(dst, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::ListAuthKeysAndVersion))
@@ -879,11 +826,17 @@ pub trait Client: Clone + 'static {
     }
 
     /// Adds a new authorised key to MaidManager.
-    fn ins_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
+    fn ins_auth_key(
+        &self,
+        key: sign::PublicKey,
+        permissions: AppPermissions,
+        version: u64,
+    ) -> Box<CoreFuture<()>> {
         trace!("InsAuthKey ({:?})", key);
 
-        send_mutation(self, move |routing, dst, msg_id| {
-            routing.ins_auth_key(dst, key, version, msg_id)
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
+            routing.ins_auth_key(dst, key, permissions.clone(), version, msg_id)
         })
     }
 
@@ -891,7 +844,8 @@ pub trait Client: Clone + 'static {
     fn del_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
         trace!("DelAuthKey ({:?})", key);
 
-        send_mutation(self, move |routing, dst, msg_id| {
+        let msg_id = MessageId::new();
+        send_mutation(self, msg_id, move |routing, dst| {
             routing.del_auth_key(dst, key, version, msg_id)
         })
     }
@@ -1018,16 +972,32 @@ pub fn setup_routing(
     Ok((routing, routing_rx))
 }
 
+fn send_new(client: &impl Client, request: Request) -> Box<CoreFuture<CoreEvent>> {
+    let dst = some_or_err!(client.cm_addr());
+
+    let src = Authority::Client {
+        client_id: *some_or_err!(client.full_id()).public_id(),
+        proxy_node_name: rand::random(),
+    };
+
+    let request = client.compose_message(request);
+
+    send(
+        client,
+        MessageId::from_new(request.message_id()),
+        move |routing| routing.send(src, dst, &unwrap!(serialise(&request))),
+    )
+}
+
 /// Send a request and return a future that resolves to the response.
-fn send<F>(client: &impl Client, req: F) -> Box<CoreFuture<CoreEvent>>
+fn send<F>(client: &impl Client, msg_id: MessageId, req: F) -> Box<CoreFuture<CoreEvent>>
 where
-    F: Fn(&mut Routing, MessageId) -> Result<(), InterfaceError> + 'static,
+    F: Fn(&mut Routing) -> Result<(), InterfaceError> + 'static,
 {
     let inner = Rc::downgrade(&client.inner());
     let func = move |_| {
         if let Some(inner) = inner.upgrade() {
-            let msg_id = MessageId::new();
-            if let Err(error) = req(&mut inner.borrow_mut().routing, msg_id) {
+            if let Err(error) = req(&mut inner.borrow_mut().routing) {
                 return future::err(CoreError::from(error)).into_box();
             }
 
@@ -1052,22 +1022,39 @@ where
     future::loop_fn((), func).into_box()
 }
 
+/// Sends a mutation request to a new routing.
+fn send_mutation_new(client: &impl Client, req: Request) -> Box<CoreFuture<()>> {
+    let src = Authority::Client {
+        client_id: *some_or_err!(client.full_id()).public_id(),
+        proxy_node_name: rand::random(),
+    };
+
+    let message = client.compose_message(req);
+
+    send_mutation(
+        client,
+        MessageId::from_new(message.message_id()),
+        move |routing, dst| routing.send(src, dst, &unwrap!(serialise(&message))),
+    )
+}
+
 /// Sends a mutation request.
-fn send_mutation<F>(client: &impl Client, req: F) -> Box<CoreFuture<()>>
+fn send_mutation<F>(client: &impl Client, msg_id: MessageId, req: F) -> Box<CoreFuture<()>>
 where
-    F: Fn(&mut Routing, Authority<XorName>, MessageId) -> Result<(), InterfaceError> + 'static,
+    F: Fn(&mut Routing, Authority<XorName>) -> Result<(), InterfaceError> + 'static,
 {
     let dst = some_or_err!(client.cm_addr());
 
-    send(client, move |routing, msg_id| req(routing, dst, msg_id))
+    send(client, msg_id, move |routing| req(routing, dst))
         .and_then(|event| match event {
             CoreEvent::RpcResponse(res) => {
                 let response_buffer = unwrap!(res);
                 let response: Response = unwrap!(deserialise(&response_buffer));
                 match response {
-                    Response::PutUnseqMData { res, .. }
-                    | Response::PutSeqMData { res, .. }
-                    | Response::DeleteMData { res, .. } => res.map_err(CoreError::from),
+                    Response::TransferCoins(res)
+                    | Response::PutUnseqMData(res)
+                    | Response::PutSeqMData(res)
+                    | Response::DeleteMData(res) => res.map_err(CoreError::from),
                     _ => Err(CoreError::ReceivedUnexpectedEvent),
                 }
             }
@@ -1198,7 +1185,8 @@ impl MsgIdConverter for MessageId {
 mod tests {
     use super::*;
     use crate::utils::test_utils::random_client;
-    use safe_nd::XorName as SndXorName;
+    use safe_nd::{Coins, Error, XorName as SndXorName};
+    use std::str::FromStr;
 
     #[test]
     pub fn unseq_mdata_test() {
@@ -1386,6 +1374,75 @@ mod tests {
                     client3.get_unseq_mdata(XorName::from_new(*data.name()), data.tag())
                 })
                 .then(|res| res)
+        });
+    }
+
+    // 1. Create 2 accounts with 2 wallets (A and B).
+    // 2. Try to request balance of wallet A from account B. This request should fail.
+    // 3. Try to request transaction from wallet A using account B. This request should fail.
+    #[test]
+    fn coin_permissions() {
+        let wallet1 =
+            *random_client(move |client| Ok::<_, Error>(*unwrap!(client.full_id()).public_id()))
+                .name();
+
+        random_client(move |client| {
+            let c2 = client.clone();
+
+            client
+                .get_balance(wallet1)
+                .then(move |res| {
+                    match res {
+                        Err(CoreError::NewRoutingClientError(Error::AccessDenied)) => (),
+                        res => panic!("Unexpected result: {:?}", res),
+                    }
+
+                    c2.get_transaction(wallet1, 1)
+                })
+                .then(move |res| {
+                    match res {
+                        Err(CoreError::NewRoutingClientError(Error::AccessDenied)) => (),
+                        res => panic!("Unexpected result: {:?}", res),
+                    }
+                    Ok::<_, Error>(())
+                })
+        });
+    }
+
+    // 1. Create 2 accounts with 2 wallets.
+    // 2. Transfer 5 coins from wallet A to wallet B.
+    // 3. Check that the balance of wallet A is credited for 5 coins and the balance of
+    //    wallet B is debited for 5 coins.
+    #[test]
+    fn coin_balance_transfer() {
+        let wallet1 =
+            *random_client(move |client| Ok::<_, Error>(*unwrap!(client.full_id()).public_id()))
+                .name();
+
+        random_client(move |client| {
+            let wallet2 = *unwrap!(client.full_id()).public_id().name();
+
+            let c2 = client.clone();
+            let c3 = client.clone();
+
+            client
+                .get_balance(wallet2)
+                .and_then(move |orig_balance| {
+                    c2.transfer_coins(wallet1, unwrap!(Coins::from_str("5.0")), None)
+                        .map(move |_| orig_balance)
+                })
+                .and_then(move |orig_balance| {
+                    c3.get_balance(wallet2)
+                        .map(move |new_balance| (new_balance, orig_balance))
+                })
+                .and_then(move |(new_balance, orig_balance)| {
+                    assert_eq!(
+                        new_balance,
+                        unwrap!(orig_balance.checked_sub(unwrap!(Coins::from_str("5.0")))),
+                    );
+                    // TODO check the other wallet balance has been incremented
+                    Ok(())
+                })
         });
     }
 

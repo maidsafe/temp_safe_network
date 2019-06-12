@@ -174,6 +174,7 @@ pub fn register_rand_app(
     let auth_req = AuthReq {
         app: rand_app(),
         app_container,
+        app_permissions: Default::default(),
         containers: containers_req,
     };
 

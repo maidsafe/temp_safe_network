@@ -10,6 +10,7 @@ use super::{containers_from_repr_c, containers_into_vec, AppExchangeInfo, Contai
 use crate::ffi::ipc::req as ffi;
 use crate::ipc::errors::IpcError;
 use ffi_utils::{vec_into_raw_parts, ReprC, StringError};
+use safe_nd::AppPermissions;
 use std::collections::HashMap;
 
 /// Represents an authorisation request.
@@ -19,6 +20,8 @@ pub struct AuthReq {
     pub app: AppExchangeInfo,
     /// `true` if the app wants dedicated container for itself. `false` otherwise.
     pub app_container: bool,
+    /// Stores app permissions, e.g. allowing to work with the user's coin balance.
+    pub app_permissions: AppPermissions,
     /// The list of containers the app wishes to access (and desired permissions).
     pub containers: HashMap<String, ContainerPermissions>,
 }
@@ -29,6 +32,7 @@ impl AuthReq {
         let AuthReq {
             app,
             app_container,
+            app_permissions,
             containers,
         } = self;
 
@@ -38,6 +42,7 @@ impl AuthReq {
         Ok(ffi::AuthReq {
             app: app.into_repr_c()?,
             app_container,
+            app_permission_transfer_coins: app_permissions.transfer_coins,
             containers: containers_ptr,
             containers_len,
             containers_cap,
@@ -56,6 +61,9 @@ impl ReprC for AuthReq {
         Ok(Self {
             app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
             app_container: (*repr_c).app_container,
+            app_permissions: AppPermissions {
+                transfer_coins: (*repr_c).app_permission_transfer_coins,
+            },
             containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
         })
     }

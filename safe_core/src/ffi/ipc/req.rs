@@ -107,6 +107,9 @@ pub struct AuthReq {
     /// otherwise.
     pub app_container: bool,
 
+    /// App has permission to transfer coins on behalf of the user.
+    pub app_permission_transfer_coins: bool,
+
     /// Array of `ContainerPermissions`
     pub containers: *const ContainerPermissions,
 

@@ -110,6 +110,13 @@ mod codes {
     pub const ERR_INVALID_PERMISSIONS_SUCCESSOR: i32 = -3002;
     pub const ERR_SIGN_KEYTYPE_MISMATCH: i32 = -3003;
     pub const ERR_INVALID_SIGNATURE: i32 = -3004;
+
+    // Coin errors.
+    pub const ERR_LOSS_OF_PRECISION: i32 = -4000;
+    pub const ERR_EXCESSIVE_VALUE: i32 = -4001;
+    pub const ERR_FAILED_TO_PARSE: i32 = -4002;
+    pub const ERR_TRANSACTION_ID_EXISTS: i32 = -4003;
+    pub const ERR_INSUFFICIENT_BALANCE: i32 = -4004;
 }
 
 /// App error.
@@ -431,6 +438,11 @@ fn core_error_code(err: &CoreError) -> i32 {
             SndError::InvalidPermissionsSuccessor(_) => ERR_INVALID_PERMISSIONS_SUCCESSOR,
             SndError::SigningKeyTypeMismatch => ERR_SIGN_KEYTYPE_MISMATCH,
             SndError::InvalidSignature => ERR_INVALID_SIGNATURE,
+            SndError::LossOfPrecision => ERR_LOSS_OF_PRECISION,
+            SndError::ExcessiveValue => ERR_EXCESSIVE_VALUE,
+            SndError::FailedToParse => ERR_FAILED_TO_PARSE,
+            SndError::TransactionIdExists => ERR_TRANSACTION_ID_EXISTS,
+            SndError::InsufficientBalance => ERR_INSUFFICIENT_BALANCE,
         },
         CoreError::UnsupportedSaltSizeForPwHash => ERR_UNSUPPORTED_SALT_SIZE_FOR_PW_HASH,
         CoreError::UnsuccessfulPwHash => ERR_UNSUCCESSFUL_PW_HASH,

@@ -30,6 +30,8 @@ use routing::{
 };
 use rust_sodium::crypto::sign::Seed;
 use rust_sodium::crypto::{box_, sign};
+use safe_nd::request::{Request, Requester};
+use safe_nd::{Message, MessageId as NewMessageId};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
@@ -231,6 +233,21 @@ impl Client for CoreClient {
 
     fn owner_key(&self) -> Option<sign::PublicKey> {
         Some(self.keys.sign_pk)
+    }
+
+    fn compose_message(&self, request: Request) -> Message {
+        let message_id = NewMessageId::new();
+
+        let sig = self
+            .keys
+            .bls_sk
+            .sign(&unwrap!(serialise(&(&request, message_id))));
+
+        Message::Request {
+            request,
+            message_id,
+            requester: Requester::Owner(sig),
+        }
     }
 }
 

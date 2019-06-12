@@ -175,6 +175,7 @@ fn test_app_container_name() {
         &auth,
         &AuthReq {
             app: app_info,
+            app_permissions: Default::default(),
             app_container: true,
             containers: HashMap::new(),
         },
@@ -203,6 +204,7 @@ fn app_authentication() {
     let containers = create_containers_req();
     let auth_req = AuthReq {
         app: app_exchange_info.clone(),
+        app_permissions: Default::default(),
         app_container: true,
         containers,
     };
