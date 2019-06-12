@@ -148,6 +148,21 @@ pub fn xorurl_to_xorname(xorurl: &str) -> Result<XorName, String> {
     Ok(xorname)
 }
 
+pub fn xorurl_to_xorname2(xorurl: &str) -> Result<Vec<u8>, String> {
+    let min_len = SAFE_URL_PROTOCOL.len();
+    if xorurl.len() < min_len {
+        return Err("Invalid XOR-URL".to_string());
+    }
+
+    let cid_str = &xorurl[min_len..];
+    let cid = Cid::from(cid_str).map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
+    let hash = multihash::decode(&cid.hash)
+        .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
+//    let mut xorname = XorName::default();
+//    xorname.0.copy_from_slice(&hash.digest);
+    Ok(hash.digest.to_vec())
+}
+
 // FIXME: temp_multihash_encode is a temporary solution until a PR in multihash project is
 // merged and solves the problem of the 'encode' which not only encodes but also hashes the string.
 // Issue: https://github.com/multiformats/rust-multihash/issues/32

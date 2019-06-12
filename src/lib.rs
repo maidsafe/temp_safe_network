@@ -12,7 +12,7 @@ mod scl_mock;
 pub use lib_helpers::vec_to_hex;
 use lib_helpers::{
     decode_ipc_msg, encode_ipc_msg, parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex,
-    xorname_to_xorurl, xorurl_to_xorname, KeyPair,
+    xorname_to_xorurl, xorurl_to_xorname, xorurl_to_xorname2, KeyPair,
 };
 use log::{debug, info, warn};
 use reqwest::get as httpget;
@@ -20,7 +20,7 @@ use reqwest::get as httpget;
 use safe_app::test_utils::create_app;
 use safe_app::{App, run, AppError};
 use safe_core::client::{Client/*, CoreError*/};
-use safe_nd::{/*XorName,*/ Error};
+use safe_nd::{/*XorName,*/ PublicKey, Error};
 use safe_nd::mutable_data::{SeqMutableData, PermissionSet, Action};
 use routing::{XorName, MutableData};
 use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
@@ -331,9 +331,9 @@ impl Safe {
             permission_set = permission_set.allow(Action::Delete);
             permission_set = permission_set.allow(Action::ManagePermissions);
             let mut permission_map = BTreeMap::new();
-            //let owner = &unwrap!(client.owner_key()).0;
-            let app_pk = safe_nd::PublicKey::Bls(KeyPair::random().pk); // TODO: set app pk
-            permission_map.insert(app_pk, permission_set);
+            let sign_pk = unwrap!(client.public_bls_key());
+            let app_pk = PublicKey::Bls(sign_pk);
+            permission_map.insert(app_pk, permission_set); // FIXME: permissions seem to be wrong as it cannot get it afterwards
 
             let mdata = SeqMutableData::new_with_data(
                 safe_nd::XorName(xorname),
@@ -391,8 +391,28 @@ impl Safe {
     // Check the total balance of a Wallet found at a given XOR-URL
     pub fn wallet_balance(&mut self, xorurl: &str, _sk: &str) -> Result<String, String> {
         let mut total_balance: f64 = 0.0;
-        let wallet_xorname = xorurl_to_xorname(&xorurl)?;
-        let spendable_balances = self
+
+        let safe_app: &App = match &self.safe_app {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string())
+        };
+
+        fn from_slice(bytes: &[u8]) -> [u8; 32] {
+            let mut array = [0; 32];
+            let bytes = &bytes[..array.len()]; // panics if not enough data
+            array.copy_from_slice(bytes);
+            array
+        }
+
+        let xorurl: String = xorurl.to_string();
+        let x = unwrap!(run(safe_app, move |client, _app_context| {
+            let wallet_xorname = unwrap!(xorurl_to_xorname2(&xorurl));
+            client
+                .get_seq_mdata(XorName(from_slice(&wallet_xorname)), WALLET_TYPE_TAG)
+                .map_err(|e| panic!("Failed to get MD: {:?}", e))
+        }));
+        println!("MD: {:?}", x.values());
+/*        let spendable_balances = self
             .safe_app_mock
             .mutable_data_get_entries(&wallet_xorname, WALLET_TYPE_TAG);
 
@@ -410,7 +430,7 @@ impl Safe {
                 );
                 total_balance += unwrap!(parse_coins_amount(&current_balance));
             }
-        });
+        });*/
         Ok(total_balance.to_string())
     }
 
