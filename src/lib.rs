@@ -18,15 +18,23 @@ use log::{debug, info, warn};
 use reqwest::get as httpget;
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
-use safe_app::App;
+use safe_app::{App, run, AppError};
+use safe_core::client::{Client/*, CoreError*/};
+use safe_nd::{/*XorName,*/ Error};
+use safe_nd::mutable_data::{SeqMutableData, PermissionSet, Action};
+use routing::{XorName, MutableData};
 use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
 use scl_mock::MockSCL;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap, BTreeSet};
 use std::io::Read;
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 use uuid::Uuid;
+use tiny_keccak::sha3_256;
+use futures::future::Future;
+use rand::{OsRng, Rng};
+use rand_core::RngCore;
 
 // Type tag used for the Wallet container
 static WALLET_TYPE_TAG: u64 = 10_000;
@@ -35,6 +43,8 @@ static WALLET_DEFAULT: &str = "_default";
 
 // Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
 const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
+
+const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
 // The XOR-URL type (in the future in can be a struct with different functions)
 pub type XorUrl = String;
@@ -63,7 +73,7 @@ pub struct Safe {
 impl Safe {
     pub fn new(xorurl_base: String) -> Self {
         Self {
-            safe_app: None,
+            safe_app: None, // TODO: perhaps create an unregistered App instead
             safe_app_mock: MockSCL::new(), // TODO: this will need to be replaced by auth process
             xorurl_base,
         }
@@ -260,9 +270,32 @@ impl Safe {
         let secret_key: SecretKey =
             sk_from_hex(sk).map_err(|_| "Invalid secret key provided".to_string())?;
         let xorname = xorurl_to_xorname(xorurl)?;
-        self.safe_app_mock
+        //let safe_app: &App = self.safe_app.ok_or_else(|| APP_NOT_CONNECTED)?;
+        let safe_app: &App = match &self.safe_app {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string())
+        };
+
+        unwrap!(run(safe_app, |client, _app_context| {
+            let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
+
+            client
+                .get_balance(owner_wallet)
+                .then(move |res| {
+                    match res {
+                        Err(/*CoreError::NewRoutingClientError(Error::AccessDenied)*/_) => {println!("No permissions to access owner's wallet"); ()},
+                        res => panic!("Unexpected result: {:?}", res),
+                    }
+
+                    Ok::<_, AppError>(())
+                })
+
+        }));
+
+        Ok("3434.3434".to_string())
+/*      Ok(self.safe_app_mock
             .get_balance_from_xorname(&xorname, &secret_key)
-            .map_err(|_| "No Key found at specified location".to_string())
+            .map_err(|_| "No Key found at specified location".to_string())*/
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
@@ -277,8 +310,45 @@ impl Safe {
 
     // Create an empty Wallet and return its XOR-URL
     pub fn wallet_create(&mut self) -> Result<XorUrl, String> {
-        let xorname = self.safe_app_mock.mutable_data_put(None, None, None, false);
-        xorname_to_xorurl(&xorname, &self.xorurl_base)
+        //let xorname = self.safe_app_mock.mutable_data_put(None, None, None, false);
+
+        let safe_app: &App = match &self.safe_app {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string())
+        };
+
+        let x = unwrap!(run(safe_app, |client, _app_context| {
+            let owners = KeyPair::random().pk;
+            let mut rng = unwrap!(OsRng::new());
+            //let name: XorName = rng.gen();
+            let mut xorname = [0u8; 32];
+            rng.fill_bytes(&mut xorname);
+
+            let mut permission_set = PermissionSet::new();
+            permission_set = permission_set.allow(Action::Read);
+            permission_set = permission_set.allow(Action::Insert);
+            permission_set = permission_set.allow(Action::Update);
+            permission_set = permission_set.allow(Action::Delete);
+            permission_set = permission_set.allow(Action::ManagePermissions);
+            let mut permission_map = BTreeMap::new();
+            //let owner = &unwrap!(client.owner_key()).0;
+            let app_pk = safe_nd::PublicKey::Bls(KeyPair::random().pk); // TODO: set app pk
+            permission_map.insert(app_pk, permission_set);
+
+            let mdata = SeqMutableData::new_with_data(
+                safe_nd::XorName(xorname),
+                WALLET_TYPE_TAG,
+                BTreeMap::new(),
+                permission_map,
+                owners,
+            );
+            client
+                .put_seq_mutable_data(mdata)
+                .map_err(|e| panic!("{:?}", e))
+                .map(move |_| xorname)
+        }));
+
+        xorname_to_xorurl(&safe_nd::XorName(x), &self.xorurl_base)
     }
 
     // Add a Key to a Wallet to make it spendable

@@ -114,7 +114,7 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<f64, String> {
 }
 
 pub fn xorname_to_xorurl(xorname: &XorName, base: &str) -> Result<String, String> {
-    let h = temp_multihash_encode(multihash::Hash::SHA3256, xorname).unwrap();
+    let h = temp_multihash_encode(multihash::Hash::SHA3256, &xorname.0).unwrap();
     let cid = Cid::new(Codec::Raw, Version::V1, &h);
     let base_encoding = match base {
         "base32z" => Base::Base32z,
@@ -144,7 +144,7 @@ pub fn xorurl_to_xorname(xorurl: &str) -> Result<XorName, String> {
     let hash = multihash::decode(&cid.hash)
         .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
     let mut xorname = XorName::default();
-    xorname.copy_from_slice(&hash.digest);
+    xorname.0.copy_from_slice(&hash.digest);
     Ok(xorname)
 }
 
