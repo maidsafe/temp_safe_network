@@ -7,34 +7,40 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod lib_helpers;
+mod mutable_data_apis;
 mod scl_mock;
 
+use futures::future::Future;
 pub use lib_helpers::vec_to_hex;
 use lib_helpers::{
     decode_ipc_msg, encode_ipc_msg, parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex,
     xorname_to_xorurl, xorurl_to_xorname, xorurl_to_xorname2, KeyPair,
 };
+use mutable_data_apis::{
+	get_seq_mutable_data, get_seq_mutable_data_entries, seq_mutable_data_insert, seq_mutable_data_update
+};
 use log::{debug, info, warn};
-use reqwest::get as httpget;
-#[cfg(feature = "fake-auth")]
-use safe_app::test_utils::create_app;
-use safe_app::{App, run, AppError};
-use safe_core::client::{Client/*, CoreError*/};
-use safe_nd::{/*XorName,*/ PublicKey, Error};
-use safe_nd::mutable_data::{SeqMutableData, PermissionSet, Action};
-use routing::{XorName, MutableData};
-use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
-use scl_mock::MockSCL;
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap, BTreeSet};
-use std::io::Read;
-use threshold_crypto::SecretKey;
-use unwrap::unwrap;
-use uuid::Uuid;
-use tiny_keccak::sha3_256;
-use futures::future::Future;
 use rand::{OsRng, Rng};
 use rand_core::RngCore;
+use reqwest::get as httpget;
+use routing::XorName;
+#[cfg(feature = "fake-auth")]
+use safe_app::test_utils::create_app;
+use safe_app::{run, App, AppError};
+use safe_core::client::Client;
+use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
+use safe_nd::mutable_data::{
+    Action, MutableData, PermissionSet, SeqEntryAction, SeqMutableData, Value,
+};
+use safe_nd::{Error, /*XorName,*/ PublicKey};
+use scl_mock::MockSCL;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::io::Read;
+use threshold_crypto::SecretKey;
+use tiny_keccak::sha3_256;
+use unwrap::unwrap;
+use uuid::Uuid;
 
 // Type tag used for the Wallet container
 static WALLET_TYPE_TAG: u64 = 10_000;
@@ -70,10 +76,12 @@ pub struct Safe {
     xorurl_base: String,
 }
 
+
+
 impl Safe {
     pub fn new(xorurl_base: String) -> Self {
         Self {
-            safe_app: None, // TODO: perhaps create an unregistered App instead
+            safe_app: None,                // TODO: perhaps create an unregistered App instead
             safe_app_mock: MockSCL::new(), // TODO: this will need to be replaced by auth process
             xorurl_base,
         }
@@ -273,26 +281,32 @@ impl Safe {
         //let safe_app: &App = self.safe_app.ok_or_else(|| APP_NOT_CONNECTED)?;
         let safe_app: &App = match &self.safe_app {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string())
+            None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        unwrap!(run(safe_app, |client, _app_context| {
-            let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
+		// TODO: Make this work with SCL.
 
-            client
-                .get_balance(owner_wallet)
-                .then(move |res| {
-                    match res {
-                        Err(/*CoreError::NewRoutingClientError(Error::AccessDenied)*/_) => {println!("No permissions to access owner's wallet"); ()},
-                        res => panic!("Unexpected result: {:?}", res),
-                    }
+        // let balance = unwrap!(run(safe_app, |client, _app_context| {
+        //     let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
+		//
+        //     client.get_balance(owner_wallet)
+		// 		.map_err(|e| panic!("Failed to get balance: {:?}", e))
+		//
+		// 	// .then(move |res| {
+        //     //     match res {
+        //     //         Err(/*CoreError::NewRoutingClientError(Error::AccessDenied)*/ _) => {
+        //     //             println!("No permissions to access owner's wallet");
+        //     //             ()
+        //     //         }
+        //     //         res => panic!("Unexpected result: {:?}", res),
+        //     //     }
+		// 	//
+        //     //     Ok::<_, AppError>(())
+        //     // })
+        // }));
 
-                    Ok::<_, AppError>(())
-                })
-
-        }));
-
-        Ok("3434.3434".to_string())
+        Ok("42".to_string())
+        // Ok(balance.to_string())
 /*      Ok(self.safe_app_mock
             .get_balance_from_xorname(&xorname, &secret_key)
             .map_err(|_| "No Key found at specified location".to_string())*/
@@ -314,7 +328,7 @@ impl Safe {
 
         let safe_app: &App = match &self.safe_app {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string())
+            None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
         let x = unwrap!(run(safe_app, |client, _app_context| {
@@ -324,16 +338,17 @@ impl Safe {
             let mut xorname = [0u8; 32];
             rng.fill_bytes(&mut xorname);
 
-            let mut permission_set = PermissionSet::new();
-            permission_set = permission_set.allow(Action::Read);
-            permission_set = permission_set.allow(Action::Insert);
-            permission_set = permission_set.allow(Action::Update);
-            permission_set = permission_set.allow(Action::Delete);
-            permission_set = permission_set.allow(Action::ManagePermissions);
+            let mut permission_set = PermissionSet::new()
+                .allow(Action::Read)
+                .allow(Action::Insert)
+                .allow(Action::Update)
+                .allow(Action::Delete)
+                .allow(Action::ManagePermissions);
+
             let mut permission_map = BTreeMap::new();
             let sign_pk = unwrap!(client.public_bls_key());
             let app_pk = PublicKey::Bls(sign_pk);
-            permission_map.insert(app_pk, permission_set); // FIXME: permissions seem to be wrong as it cannot get it afterwards
+            permission_map.insert(app_pk, permission_set);
 
             let mdata = SeqMutableData::new_with_data(
                 safe_nd::XorName(xorname),
@@ -364,28 +379,33 @@ impl Safe {
             xorurl: key_xorurl.to_string(),
             sk: key_pair.sk.clone(),
         };
+        let safe_app: &App = match &self.safe_app {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
         let serialised_value = unwrap!(serde_json::to_string(&value));
         // FIXME: it should return error if the name already exists
-        let k = name.to_string().into_bytes();
-        let wallet_xorname = xorurl_to_xorname(&wallet_xorurl)?;
-        self.safe_app_mock.mutable_data_insert(
-            &wallet_xorname,
-            WALLET_TYPE_TAG,
-            &k,
-            &serialised_value.into_bytes(),
-        );
+        let md_key = name.to_string().into_bytes();
 
-        if default {
-            // add the _default key
-            self.safe_app_mock.mutable_data_insert(
-                &wallet_xorname,
-                WALLET_TYPE_TAG,
-                &WALLET_DEFAULT.to_string().into_bytes(),
-                &k,
-            );
-        }
+        let data = get_seq_mutable_data(safe_app, wallet_xorurl, WALLET_TYPE_TAG);
+
+        println!("wallet inseting {:?}", data.values());
+
+		// TODO, check if key already exists and throw errors or update
+        seq_mutable_data_insert(
+            &safe_app,
+            wallet_xorurl,
+            WALLET_TYPE_TAG,
+            &md_key,
+            &serialised_value.into_bytes()
+        );
+        println!("UPDATEDDDDDDDDDDDDD",);
+		let entriesafter = get_seq_mutable_data_entries(safe_app, wallet_xorurl, WALLET_TYPE_TAG);
+        println!("wallet entries afterrrrr{:?}", entriesafter);
 
         Ok(())
+
     }
 
     // Check the total balance of a Wallet found at a given XOR-URL
@@ -394,43 +414,43 @@ impl Safe {
 
         let safe_app: &App = match &self.safe_app {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string())
+            None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        fn from_slice(bytes: &[u8]) -> [u8; 32] {
-            let mut array = [0; 32];
-            let bytes = &bytes[..array.len()]; // panics if not enough data
-            array.copy_from_slice(bytes);
-            array
-        }
+        let x = get_seq_mutable_data(safe_app, xorurl, WALLET_TYPE_TAG);
 
-        let xorurl: String = xorurl.to_string();
-        let x = unwrap!(run(safe_app, move |client, _app_context| {
-            let wallet_xorname = unwrap!(xorurl_to_xorname2(&xorurl));
-            client
-                .get_seq_mdata(XorName(from_slice(&wallet_xorname)), WALLET_TYPE_TAG)
-                .map_err(|e| panic!("Failed to get MD: {:?}", e))
-        }));
-        println!("MD: {:?}", x.values());
-/*        let spendable_balances = self
-            .safe_app_mock
-            .mutable_data_get_entries(&wallet_xorname, WALLET_TYPE_TAG);
+        println!("Wallet Balance MD vals: {:?}", x.values());
+        println!("Wallet Balance MD vals: {:?}", x.name());
+        println!("Wallet Balance MD vals: {:?}", x.tag());
+        // println!("Wallet Balance MD keys: {:?}", x.keys());
+        println!("Wallet Balance MD version: {:?}", x.version());
+
+		// let updated_version = data.version() + 1;
+		let spendable_balances = get_seq_mutable_data_entries(safe_app, xorurl, WALLET_TYPE_TAG);
+
+		println!("wallet spendable_balances {:?}", spendable_balances);
+
 
         // Iterate through the Keys and query the balance for each
         spendable_balances.iter().for_each(|(name, balance)| {
             let thename = String::from_utf8_lossy(name).to_string();
+
+			// TODO, get string of name and actual balance
+
             // ignore the _default Wallet MDkey
             if thename != WALLET_DEFAULT {
-                let current_balance = String::from_utf8_lossy(balance).to_string();
+                let the_balance = String::from_utf8_lossy(&balance.data()).to_string();
                 let spendable_balance: WalletSpendableBalance =
-                    unwrap!(serde_json::from_str(&current_balance));
+                    unwrap!(serde_json::from_str(&the_balance));
 
+				println!("WHAT WALLET BALANCE {:?}", the_balance );
                 let current_balance = unwrap!(
                     self.keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk)
                 );
+				println!("WHAT WALLET BALANCE tooooo {:?}", current_balance );
                 total_balance += unwrap!(parse_coins_amount(&current_balance));
             }
-        });*/
+        });
         Ok(total_balance.to_string())
     }
 
@@ -833,12 +853,14 @@ fn test_wallet_create() {
 #[test]
 fn test_wallet_insert_and_balance() {
     let mut safe = Safe::new("base32".to_string());
+    unwrap!(safe.connect("dummy", "dummy"));
     let sk = String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
     let wallet_xorurl = unwrap!(safe.wallet_create());
     let (key1_xorurl, key_pair1) =
         unwrap!(safe.keys_create_preload_test_coins("12.23".to_string(), None));
     let (key2_xorurl, key_pair2) =
         unwrap!(safe.keys_create_preload_test_coins("1.53".to_string(), None));
+
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
         "myfirstbalance",
@@ -846,6 +868,7 @@ fn test_wallet_insert_and_balance() {
         &unwrap!(key_pair1),
         &key1_xorurl,
     ));
+
     let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl, &sk));
     assert_eq!("12.23", current_balance);
 

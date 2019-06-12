@@ -10,10 +10,14 @@ use crate::scl_mock::XorName;
 use cid::{Cid, Codec, Version};
 use multibase::{encode, Base};
 use multihash;
-use safe_app::AppError;
+use safe_app::{run, App, AppError};
+// use safe_core::client::{Client/*, CoreError*/, XorNameConverter};
+// use routing::{XorName as OldXorName, /*MutableData*/};
+
 use safe_core::ipc::{
     decode_msg, encode_msg, gen_req_id, resp::AuthGranted, IpcMsg, IpcReq, IpcResp,
 };
+use safe_nd::mutable_data::{Action, MutableData, PermissionSet, SeqMutableData};
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
@@ -158,8 +162,8 @@ pub fn xorurl_to_xorname2(xorurl: &str) -> Result<Vec<u8>, String> {
     let cid = Cid::from(cid_str).map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
     let hash = multihash::decode(&cid.hash)
         .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
-//    let mut xorname = XorName::default();
-//    xorname.0.copy_from_slice(&hash.digest);
+    //    let mut xorname = XorName::default();
+    //    xorname.0.copy_from_slice(&hash.digest);
     Ok(hash.digest.to_vec())
 }
 

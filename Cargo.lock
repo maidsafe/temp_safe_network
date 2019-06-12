@@ -1443,7 +1443,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "num-integer 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2057,7 +2057,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "safe-nd"
 version = "0.1.0"
-source = "git+https://github.com/lionel1704/safe-nd?branch=for-cli#ced33f06456aad4851862e571134fec869528853"
+source = "git+https://github.com/lionel1704/safe-nd?branch=for-cli#6b01504bf30ace56fa5f6cc748a399b4d8a8ec1f"
 dependencies = [
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "ed25519-dalek 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
