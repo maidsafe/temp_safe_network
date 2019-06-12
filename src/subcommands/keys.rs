@@ -98,7 +98,7 @@ pub fn create_new_key(
         // '--source' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
         // TODO: support Key XOR-URL and pk, we now support only Key XOR-URL
         // Prompt the user for the secret key since 'source' is a Key and not a Wallet
-        let source_xorurl = source.unwrap_or_else(|| "Missing the 'source' argument".to_string());
+        let source_xorurl = source.ok_or_else(|| "Missing the 'source' argument".to_string())?;
         let sk = prompt_user(
             &format!(
                 "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
