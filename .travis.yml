@@ -1,25 +1,8 @@
 env:
   global:
-    - secure: GXW0WyMkipF5lh29QHMxSKl6Dpvd4Qqggu5SBGymS5KQ7VPuqgEE2A8YwQDIGf4IEZUoAcAb1W7oPwQ0/kv7omlF2S8gmals1BeGKStU1np6lIIH64B87w4RIDhD+limVAfKgWb3Oldj6PDAm8gjbWjPiZF/6oxH4hd/+d9r2GY=
-    - PROJECT_NAME=safe_vault
     - RUST_BACKTRACE=1
     - PATH=$PATH:$HOME/.cargo/bin
-    - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
 language: rust
-matrix:
-  include:
-    - os: linux
-      env: >
-        PLATFORM=linux-x64
-      addons:
-        apt:
-          packages:
-            - rpm
-            - sshpass
-    - os: osx
-      env: >
-        PLATFORM=osx-x64
-        SKIP_SIGN_PACKAGE=1
 rust: stable
 branches:
   only:
@@ -30,30 +13,16 @@ before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
   - rustup component add rustfmt clippy
-script:
-  - set -x;
-    cargo fmt -- --check &&
-    cargo check --verbose --lib --tests &&
-    cargo check --verbose --bin safe_vault --tests &&
-    cargo clippy --all-targets &&
-    cargo clippy --all-targets --features use-mock-crust &&
-    cargo clippy --all-targets --features use-mock-routing &&
-    cargo test --verbose --release --features use-mock-routing &&
-    cargo test --verbose --release --features use-mock-crust &&
-    cargo test --verbose --release --features "use-mock-crust,use-mock-crypto";
+jobs:
+  include:
+    - script: scripts/clippy --verbose
+      env: CACHE_NAME=clippy_linux
+      os: linux
+    - script: scripts/tests --verbose
+      env: CACHE_NAME=tests_linux
+      os: linux
+    - script: scripts/tests --verbose
+      env: CACHE_NAME=tests_osx
+      os: osx
 before_cache:
   - cargo prune
-before_deploy:
-  - export PROJECT_VERSION=$(git log -1 | grep -i "version change to" | sed "s/.*[vV]ersion change to v\{0,1\}//")
-  - ./ci/travis/before_deploy.sh
-deploy:
-  # Deploy tarballs to GitHub releases
-  - provider: releases
-    api_key: ${GH_TOKEN}
-    file: ${PROJECT_NAME}-v${PROJECT_VERSION}-${PLATFORM}.tar.gz
-    skip_cleanup: true
-    draft: true
-    tag_name: ${PROJECT_VERSION}
-    on:
-      rust: stable
-      condition: -n "$PROJECT_VERSION"

@@ -5,3 +5,15 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
+
+use safe_nd::XorName;
+use serde::{de::DeserializeOwned, Serialize};
+
+pub(crate) trait Chunk: Serialize + DeserializeOwned {
+    type Id: ChunkId;
+    fn id(&self) -> &Self::Id;
+}
+
+pub(crate) trait ChunkId: Serialize + PartialEq + Eq {
+    fn raw_name(&self) -> &XorName;
+}

@@ -5,3 +5,12 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
+
+use pickledb::PickleDb;
+
+pub struct CoinsHandler {
+    // The total safecoin farmed from this section.
+    farmed: PickleDb,
+}
+
+impl CoinsHandler {}

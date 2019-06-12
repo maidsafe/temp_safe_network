@@ -2,7 +2,6 @@ environment:
   global:
     GH_TOKEN:
       secure: Plf6CbvLc5BWpB51EU9Sk/RMow47fZp74uSKt1Wv20kFRf1OQS2pVuEzgXQPuyhW
-    PROJECT_NAME: safe_vault
     RUST_BACKTRACE: 1
   matrix:
     - RUST_TOOLCHAIN: stable
@@ -21,13 +20,6 @@ install:
         Invoke-WebRequest $url -OutFile "install_rustup.ps1"
         . ".\install_rustup.ps1"
 
-        $commit_message = "$env:APPVEYOR_REPO_COMMIT_MESSAGE $env:APPVEYOR_REPO_COMMIT_MESSAGE_EXTENDED"
-
-        if ($commit_message -match "[vV]ersion change to v?(.*)") {
-          $env:PROJECT_VERSION = $matches[1]
-          $env:DEPLOY = "true"
-        }
-
 platform:
   - x86
   - x64
@@ -36,9 +28,7 @@ configuration:
   - Release
 
 build_script:
-  - cargo check --verbose --lib --tests
-  - cargo check --verbose --features use-mock-routing --lib --tests
-  - cargo check --verbose --features use-mock-crust --lib --tests
+  - cargo check --verbose --release --all-targets
 
 after_build:
   - ps: |
@@ -49,19 +39,4 @@ after_build:
         }
 
 test_script:
-  - cargo test --verbose --release --features use-mock-routing
-  - cargo test --verbose --release --features use-mock-crust
-
-before_deploy:
-  - ps: . ".\ci\appveyor\before_deploy.ps1"
-
-deploy:
-  provider: GitHub
-  auth_token: $(GH_TOKEN)
-  # Deploy the archive (zip) and the installer (exe)
-  artifact: /.*\.zip|.*\.exe/
-  draft: true
-  tag: $(PROJECT_VERSION)
-  on:
-    DEPLOY: true
-    RUST_VERSION: stable
+  - cargo test --verbose --release

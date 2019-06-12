@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e -x
+
+cargo fmt -- --check
+cargo clippy $@ --all-targets

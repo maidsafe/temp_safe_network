@@ -1,9 +1,0 @@
-#
-# @note: The README.md file is included to ensure the ./target/release/
-#        directory is copied to the container. If the safe_vault executable
-#        doesn't exist on the host machine and the README.md file is not
-#        included in the build, it will fail.
-#
-target/
-!target/release/README.md
-!target/release/safe_vault
