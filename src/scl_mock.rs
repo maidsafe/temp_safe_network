@@ -167,7 +167,7 @@ impl MockSCL {
         to_pk: &PublicKey,
         tx_id: &Uuid,
         amount: &str,
-    ) -> Result<Uuid, String> {
+    ) -> Result<Uuid, &str> {
         let to_xorname = xorname_from_pk(to_pk);
         let from_xorname = xorname_from_pk(from_pk);
 
@@ -185,7 +185,7 @@ impl MockSCL {
             .txs
             .insert(vec_to_hex(to_xorname.to_vec()), txs_for_xorname);
 
-        let amount_coin = unwrap!(Coins::from_str(amount));
+        let amount_coin = (Coins::from_str(amount)).map_err(|_| "InvalidAmount")?;
 
         // reduce balance from safecoin_transferer
         let from_balance = unwrap!(Coins::from_str(&unwrap!(
@@ -193,7 +193,10 @@ impl MockSCL {
         )));
         let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
         let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
-        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num())); // TODO: check it has enough balance
+        if from_nano_balance.num() < amount_nano.num() {
+            return Err("NotEnoughBalance");
+        }
+        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
         self.mock_data.coin_balances.insert(
             vec_to_hex(from_xorname.to_vec()),
             CoinBalance {
