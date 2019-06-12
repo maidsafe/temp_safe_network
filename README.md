@@ -17,12 +17,13 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 
 1. [Build](#build)
 2. [Using the CLI](#using-the-cli)
-    - [Auth](#auth)
-        - [Prerequisite: run the Authenticator](#prerequisite-run-the-authenticator)
-        - [Authorise the safe_cli app](#authorise-the-safe_cli-app)
+  - [Auth](#auth)
+    - [Prerequisite: run the Authenticator](#prerequisite-run-the-authenticator)
+    - [Authorise the safe_cli app](#authorise-the-safe_cli-app)
 	- [Keys](#keys)
 		- [Create](#keys-creation)
 		- [Balance](#keys-balance)
+		- [Key pair generation](#key-pair-generation)
 	- [Wallet](#wallet)
 		- [Create](#wallet-creation)
 		- [Insert](#wallet-insert)
@@ -151,6 +152,26 @@ The target `Key` can be passed as an argument (or it will be retrieved from `std
 $ safe_cli keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks --pretty
 Key's current balance: 15.342
 ```
+
+#### Key pair generation
+
+There are some scenarios that being able to generate a sign/encryption key-pair, without creating and/or storing a `Key` on the network, is required.
+
+As an example, if we want to have a friend create a `Key` for us, and preload it with some safecoins, we can generate a key-pair, and share with our friend only the public key so he can generate the `Key` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
+
+Thus, let's see how this use case would work. First we create a key-pair:
+```
+$ safe_cli keys keypair --pretty
+Key pair generated: pk="b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833", sk="62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a"
+```
+
+We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `Key` to be owned by it and preload it with some test-coins:
+```
+$ safe_cli keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833 --pretty
+New Key created at: "safe://bbkulcbmrxdx2inbg4srljrd2fwvwxmqg7moev72r5ptxelr43e25cndjf"
+```
+
+Finally, he gives us the XOR-URL of the `Key` he created for us, and we can now use the `Key` for any other operation, we own the balance it contains since we have the secret key associated to it.
 
 ### Wallet
 
