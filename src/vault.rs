@@ -10,36 +10,53 @@ use crate::{
     adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder, error::Result,
     source_elder::SourceElder,
 };
+use log::info;
 use pickledb::PickleDb;
-use quic_p2p::QuicP2p;
+use quic_p2p::{Config as QuickP2pConfig, Event, QuicP2p};
 use safe_nd::{ClientPublicId, NodeFullId};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::mpsc::Receiver,
+};
 
 #[allow(clippy::large_enum_variant)]
 enum State {
     Elder {
         src: SourceElder,
-        dst: DestinationElder,
-        coins_handler: CoinsHandler,
+        //dst: DestinationElder,
+        //coins_handler: CoinsHandler,
     },
     Adult(Adult),
 }
 
 /// Main vault struct.
 pub struct Vault {
-    id: NodeFullId,
+    //id: NodeFullId,
     state: State,
-    quic_p2p: QuicP2p,
+    event_receiver: Receiver<Event>,
 }
 
 impl Vault {
     /// Construct a new vault instance.
-    pub fn new() -> Result<Self> {
-        unimplemented!();
+    pub fn new(config: QuickP2pConfig) -> Result<Self> {
+        let (src, event_receiver) = SourceElder::new(config);
+
+        Ok(Self {
+            //id: Default::default(),
+            state: State::Elder { src },
+            event_receiver,
+        })
     }
 
     /// Run the main event loop.  Blocks until the vault is terminated.
     pub fn run(&mut self) {
-        unimplemented!();
+        for event in self.event_receiver.iter() {
+            match event {
+                Event::ConnectedTo { peer } => {
+                    info!("Connected to {:?}", peer);
+                }
+                event => info!("Unexpected event: {:?}", event),
+            }
+        }
     }
 }

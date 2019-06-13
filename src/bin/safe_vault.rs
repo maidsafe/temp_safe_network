@@ -58,12 +58,24 @@
     variant_size_differences
 )]
 
-// use clap::{App, Arg};
 use env_logger;
 use log::info;
 use log4rs;
+use quic_p2p::Config as QuickP2pConfig;
 use safe_vault::{self, Vault};
-use std::env;
+use std::{
+    env,
+    net::{IpAddr, Ipv4Addr},
+};
+use structopt::StructOpt;
+
+/// Vault configuration
+#[derive(StructOpt)]
+pub struct Config {
+    #[allow(missing_docs)]
+    #[structopt(flatten)]
+    pub quic_p2p_config: QuickP2pConfig,
+}
 
 /// Runs a SAFE Network vault.
 pub fn main() {
@@ -74,22 +86,20 @@ pub fn main() {
         env_logger::init();
     }
 
-    let name = exe_name().unwrap_or_else(|| "vault".to_string());
+    let config = {
+        let mut config = Config::from_args();
+        // Override the existing default 0.0.0.0
+        let default_listening_ip = Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        config.quic_p2p_config.ip = config.quic_p2p_config.ip.or(default_listening_ip);
+        config
+    };
 
-    // let matches = App::new(name)
-    //     .arg(
-    //         Arg::with_name("first")
-    //             .short("f")
-    //             .long("first")
-    //             .help("Run as the first Vault of a new network."),
-    //     )
-    //     .version(env!("CARGO_PKG_VERSION"))
-    //     .get_matches();
+    let name = exe_name().unwrap_or_else(|| "vault".to_string());
 
     let message = format!("Running {} v{}", name, env!("CARGO_PKG_VERSION"));
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    match Vault::new() {
+    match Vault::new(config.quic_p2p_config) {
         Ok(mut vault) => vault.run(),
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
