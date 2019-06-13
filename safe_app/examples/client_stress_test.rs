@@ -70,9 +70,9 @@ extern crate unwrap;
 use clap::{App, Arg};
 use futures::Future;
 use rand::{Rng, SeedableRng};
-use rust_sodium::crypto::sign::PublicKey;
 use safe_app::{Client, CoreError, CoreFuture, FutureExt, ImmutableData, MutableData};
 use safe_authenticator::{AuthClient, Authenticator};
+use safe_nd::{PublicKey, XorName};
 use std::sync::mpsc;
 
 fn random_mutable_data<R: Rng>(type_tag: u64, public_key: &PublicKey, rng: &mut R) -> MutableData {
@@ -80,7 +80,7 @@ fn random_mutable_data<R: Rng>(type_tag: u64, public_key: &PublicKey, rng: &mut 
     let data = btree_map![];
 
     unwrap!(MutableData::new(
-        rng.gen(),
+        XorName(rng.gen()),
         type_tag,
         permissions,
         data,
@@ -225,7 +225,7 @@ fn main() {
     let (tx, rx) = mpsc::channel();
 
     unwrap!(auth.send(move |client| {
-        let public_key = unwrap!(client.public_signing_key());
+        let public_key = PublicKey::from(unwrap!(client.public_bls_key()));
 
         unwrap!(tx.send(public_key));
 

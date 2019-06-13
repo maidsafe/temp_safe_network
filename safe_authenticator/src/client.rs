@@ -18,8 +18,8 @@ use futures::Future;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{
-    AccountPacket, Authority, BootstrapConfig, EntryAction, Event, FullId, MessageId, MutableData,
-    Response, Value, XorName, ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
+    AccountPacket, Authority, BootstrapConfig, EntryAction, Event, FullId, MutableData, Response,
+    Value, XorName, ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
 };
 use rust_sodium::crypto::sign::Seed;
 use rust_sodium::crypto::{box_, sign};
@@ -31,9 +31,10 @@ use safe_core::crypto::{shared_box, shared_secretbox, shared_sign};
 #[cfg(any(test, feature = "testing"))]
 use safe_core::utils::seed::{divide_seed, SEED_SUBPARTS};
 use safe_core::{utils, Client, ClientKeys, CoreError, FutureExt, MDataInfo, NetworkTx};
+use safe_nd::MessageId;
 use safe_nd::{
     request::{Request, Requester},
-    Message, MessageId as NewMessageId,
+    Message, MessageId as NewMessageId, PublicKey,
 };
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -151,7 +152,7 @@ where {
         let user_cred = UserCred::new(password, pin);
 
         let maid_keys = ClientKeys::new(id_seed);
-        let pub_key = maid_keys.sign_pk;
+        let pub_key = PublicKey::from(maid_keys.bls_pk);
         let full_id = Some(maid_keys.clone().into());
 
         let (mut routing, routing_rx) = setup_routing(full_id, None)?;
@@ -183,8 +184,7 @@ where {
         )
         .map_err(CoreError::from)?;
 
-        let digest = sha3_256(&pub_key.0);
-        let cm_addr = Authority::ClientManager(XorName(digest));
+        let cm_addr = Authority::ClientManager(XorName::from(pub_key));
 
         let msg_id = MessageId::new();
         routing
@@ -331,9 +331,8 @@ where {
 
         let id_packet = acc.maid_keys.clone().into();
 
-        let pub_key = acc.maid_keys.sign_pk;
-        let digest = sha3_256(&pub_key.0);
-        let cm_addr = Authority::ClientManager(XorName(digest));
+        let pub_key = PublicKey::from(acc.maid_keys.bls_pk);
+        let cm_addr = Authority::ClientManager(XorName::from(pub_key));
 
         trace!("Creating an actual routing...");
         let (mut routing, routing_rx) = setup_routing(Some(id_packet), None)?;
@@ -528,9 +527,9 @@ impl Client for AuthClient {
         Some(auth_inner.acc.maid_keys.bls_sk.clone())
     }
 
-    fn owner_key(&self) -> Option<sign::PublicKey> {
+    fn owner_key(&self) -> Option<PublicKey> {
         let auth_inner = self.auth_inner.borrow();
-        Some(auth_inner.acc.maid_keys.sign_pk)
+        Some(PublicKey::from(auth_inner.acc.maid_keys.bls_pk))
     }
 
     fn compose_message(&self, request: Request) -> Message {
@@ -823,8 +822,7 @@ mod tests {
     #[test]
     fn timeout() {
         use crate::test_utils::random_client;
-        use rand;
-        use routing::ImmutableData;
+        use safe_nd::ImmutableData;
         use std::time::Duration;
 
         // Get
@@ -835,7 +833,7 @@ mod tests {
             client.set_timeout(Duration::from_millis(250));
 
             client
-                .get_idata(rand::random())
+                .get_idata(new_rand::random())
                 .then(|result| match result {
                     Ok(_) => panic!("Unexpected success"),
                     Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),

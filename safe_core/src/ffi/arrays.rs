@@ -28,6 +28,9 @@ pub type SymSecretKey = [u8; SYM_KEY_LEN];
 /// Array containing nonce bytes.
 pub type SymNonce = [u8; SYM_NONCE_LEN];
 
+/// Array containing BLS public key.
+pub type BlsPublicKey = [u8; threshold_crypto::PK_SIZE];
+
 /// Array containing sign public key bytes.
 pub type SignPublicKey = [u8; SIGN_PUBLIC_KEY_LEN];
 /// Array containing sign private key bytes.

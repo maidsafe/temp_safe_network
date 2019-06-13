@@ -249,6 +249,7 @@ mod tests {
             &AuthReq {
                 app: app_info.clone(),
                 app_container: false,
+                app_permissions: Default::default(),
                 containers: HashMap::new(),
             },
         ));
@@ -308,6 +309,7 @@ mod tests {
             &AuthReq {
                 app: app_info.clone(),
                 app_container: true,
+                app_permissions: Default::default(),
                 containers: HashMap::new(),
             },
         ));
@@ -366,6 +368,7 @@ mod tests {
             &AuthReq {
                 app: app_info,
                 app_container: true,
+                app_permissions: Default::default(),
                 containers: HashMap::new(),
             },
         ));

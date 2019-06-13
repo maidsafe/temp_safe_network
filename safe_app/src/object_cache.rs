@@ -19,6 +19,7 @@ use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
 use safe_core::crypto::{shared_box, shared_sign};
 use safe_core::SelfEncryptionStorage;
+use safe_nd::PublicKey;
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, HashMap};
@@ -36,6 +37,7 @@ pub struct ObjectCache {
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppClient>>>,
     pub_sign_key: Store<sign::PublicKey>,
     sec_sign_key: Store<shared_sign::SecretKey>,
+    pub_key: Store<PublicKey>,
     file: Store<FileContext>,
 }
 
@@ -54,6 +56,7 @@ impl ObjectCache {
             se_writer: Store::new(),
             pub_sign_key: Store::new(),
             sec_sign_key: Store::new(),
+            pub_key: Store::new(),
             file: Store::new(),
         }
     }
@@ -71,6 +74,7 @@ impl ObjectCache {
         self.se_writer.clear();
         self.pub_sign_key.clear();
         self.sec_sign_key.clear();
+        self.pub_key.clear();
         self.file.clear();
     }
 }
@@ -185,6 +189,15 @@ impl_cache!(
     get_sec_sign_key,
     insert_sec_sign_key,
     remove_sec_sign_key
+);
+impl_cache!(
+    pub_key,
+    PublicKey,
+    PubKeyHandle,
+    InvalidPubKeyHandle,
+    get_pub_key,
+    insert_pub_key,
+    remove_pub_key
 );
 impl_cache!(
     file,

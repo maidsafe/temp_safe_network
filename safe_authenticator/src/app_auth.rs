@@ -21,7 +21,7 @@ use safe_core::client;
 use safe_core::ipc::req::{AuthReq, ContainerPermissions, Permission};
 use safe_core::ipc::resp::{AccessContInfo, AccessContainerEntry, AppKeys, AuthGranted};
 use safe_core::{app_container_name, recovery, Client, CoreError, FutureExt, MDataInfo};
-use safe_nd::AppPermissions;
+use safe_nd::{AppPermissions, PublicKey};
 use std::collections::HashMap;
 use tiny_keccak::sha3_256;
 
@@ -214,7 +214,7 @@ fn authenticated_app(
     let c3 = client.clone();
 
     let app_keys = app.keys.clone();
-    let sign_pk = app.keys.sign_pk;
+    let sign_pk = PublicKey::from(app.keys.bls_pk);
     let bootstrap_config = fry!(client::bootstrap_config());
 
     access_container::fetch_entry(client, &app_id, app_keys.clone())
@@ -270,7 +270,7 @@ fn authenticate_new_app(
     let c5 = client.clone();
     let c6 = client.clone();
 
-    let sign_pk = app.keys.sign_pk;
+    let sign_pk = PublicKey::from(app.keys.bls_pk);
     let app_keys = app.keys.clone();
     let app_keys_auth = app.keys.clone();
     let app_id = app.info.id.clone();
@@ -278,7 +278,12 @@ fn authenticate_new_app(
     client
         .list_auth_keys_and_version()
         .and_then(move |(_, version)| {
-            recovery::ins_auth_key(&c2, app_keys.sign_pk, app_permissions, version + 1)
+            recovery::ins_auth_key(
+                &c2,
+                PublicKey::from(app_keys.bls_pk),
+                app_permissions,
+                version + 1,
+            )
         })
         .map_err(AuthError::from)
         .and_then(move |_| {

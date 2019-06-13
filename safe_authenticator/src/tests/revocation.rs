@@ -21,6 +21,7 @@ use routing::{AccountInfo, EntryActions, User};
 use safe_core::ipc::{AuthReq, Permission};
 use safe_core::nfs::NfsError;
 use safe_core::{app_container_name, Client, CoreError, MDataInfo};
+use safe_nd::PublicKey;
 use std::collections::HashMap;
 
 #[cfg(feature = "mock-network")]
@@ -80,6 +81,7 @@ mod mock_routing {
         let auth_req = AuthReq {
             app: rand_app(),
             app_container: false,
+            app_permissions: Default::default(),
             containers: create_containers_req(),
         };
         let app_id = auth_req.app.id.clone();
@@ -157,7 +159,7 @@ mod mock_routing {
                 .map(move |(auth_keys, _version)| auth_keys)
                 .map_err(AuthError::from)
         }));
-        assert!(!auth_keys.contains(&auth_granted.app_keys.sign_pk));
+        assert!(!auth_keys.contains_key(&PublicKey::from(auth_granted.app_keys.bls_pk)));
 
         // Login and try to revoke the app again, now without interfering with responses
         let auth = unwrap!(Authenticator::login(
@@ -210,6 +212,7 @@ mod mock_routing {
         let auth_req = AuthReq {
             app: rand_app(),
             app_container: false,
+            app_permissions: Default::default(),
             containers: create_containers_req(),
         };
 
@@ -248,6 +251,7 @@ mod mock_routing {
         let auth_req = AuthReq {
             app: rand_app(),
             app_container: false,
+            app_permissions: Default::default(),
             containers: create_containers_req(),
         };
 
@@ -258,6 +262,7 @@ mod mock_routing {
         let auth_req = AuthReq {
             app: rand_app(),
             app_container: false,
+            app_permissions: Default::default(),
             containers: create_containers_req(),
         };
 
@@ -586,7 +591,7 @@ mod mock_routing {
                 let state = app_state(&c0, &apps, &app_id);
 
                 let app_hash = sha3_256(app_id.as_bytes());
-                let app_key = unwrap!(apps.get(&app_hash)).keys.sign_pk;
+                let app_key = PublicKey::from(unwrap!(apps.get(&app_hash)).keys.bls_pk);
 
                 auth_keys
                     .join(state)
@@ -596,7 +601,7 @@ mod mock_routing {
                 let (auth_keys, app_key, state) = unwrap!(res);
 
                 // Verify the app is no longer authenticated.
-                assert!(!auth_keys.contains(&app_key));
+                assert!(!auth_keys.contains_key(&app_key));
 
                 // Verify its state is `Revoked` (meaning it has no entry in the
                 // access container)
@@ -665,10 +670,10 @@ mod mock_routing {
             })
             .then(move |res| {
                 let (auth_keys, app_id, app_keys) = unwrap!(res);
-                let app_key = app_keys.sign_pk;
+                let app_key = PublicKey::from(app_keys.bls_pk);
 
                 // Verify the app is authenticated.
-                assert!(auth_keys.contains(&app_key));
+                assert!(auth_keys.contains_key(&app_key));
 
                 // Fetch the access container entry
                 access_container::fetch_entry(&c1, &app_id, app_keys)
@@ -727,6 +732,7 @@ fn app_revocation() {
     let auth_req1 = AuthReq {
         app: rand_app(),
         app_container: false,
+        app_permissions: Default::default(),
         containers: create_containers_req(),
     };
     let app_id1 = auth_req1.app.id.clone();
@@ -735,6 +741,7 @@ fn app_revocation() {
     let auth_req2 = AuthReq {
         app: rand_app(),
         app_container: true,
+        app_permissions: Default::default(),
         containers: create_containers_req(),
     };
     let app_id2 = auth_req2.app.id.clone();
@@ -794,8 +801,8 @@ fn app_revocation() {
     let perms = unwrap!(run(&authenticator, move |client| {
         client.list_mdata_permissions(name, tag).map_err(From::from)
     }));
-    assert!(!perms.contains_key(&User::Key(auth_granted1.app_keys.sign_pk),));
-    assert!(perms.contains_key(&User::Key(auth_granted2.app_keys.sign_pk),));
+    assert!(!perms.contains_key(&User::Key(PublicKey::from(auth_granted1.app_keys.bls_pk)),));
+    assert!(perms.contains_key(&User::Key(PublicKey::from(auth_granted2.app_keys.bls_pk)),));
 
     // The first app can no longer access the files.
     match fetch_file(&authenticator, videos_md1.clone(), "1.mp4") {
@@ -895,6 +902,7 @@ fn revocation_symmetric_decipher_failure() {
     let auth_req1 = AuthReq {
         app: rand_app(),
         app_container: false,
+        app_permissions: Default::default(),
         containers: create_containers_req(),
     };
     let app_id1 = auth_req1.app.id.clone();
@@ -904,6 +912,7 @@ fn revocation_symmetric_decipher_failure() {
     let auth_req2 = AuthReq {
         app: rand_app(),
         app_container: true,
+        app_permissions: Default::default(),
         containers: corrupt_containers,
     };
     let app_id2 = auth_req2.app.id.clone();
@@ -913,6 +922,7 @@ fn revocation_symmetric_decipher_failure() {
     let auth_req3 = AuthReq {
         app: rand_app(),
         app_container: false,
+        app_permissions: Default::default(),
         containers: create_containers_req(),
     };
     let app_id3 = auth_req3.app.id.clone();
@@ -1022,6 +1032,7 @@ fn flushing_empty_app_revocation_queue_does_not_mutate_network() {
     let auth_req = AuthReq {
         app: rand_app(),
         app_container: false,
+        app_permissions: Default::default(),
         containers: create_containers_req(),
     };
     let _ = unwrap!(register_app(&auth, &auth_req));

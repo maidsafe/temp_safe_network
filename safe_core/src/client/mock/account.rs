@@ -8,9 +8,8 @@
 
 use crate::client::mock::routing::unlimited_muts;
 use crate::config_handler::Config;
-use routing::{AccountInfo, ClientError};
-use rust_sodium::crypto::sign;
-use safe_nd::{AppPermissions, Coins, Error};
+use routing::AccountInfo;
+use safe_nd::{AppPermissions, Coins, Error, PublicKey};
 use std::collections::{BTreeMap, VecDeque};
 use std::str::FromStr;
 
@@ -27,7 +26,7 @@ pub struct Credit {
 #[derive(Deserialize, Serialize)]
 pub struct Account {
     account_info: AccountInfo,
-    auth_keys: BTreeMap<sign::PublicKey, AppPermissions>,
+    auth_keys: BTreeMap<PublicKey, AppPermissions>,
     version: u64,
     config: Config,
     balance: Coins,
@@ -102,10 +101,10 @@ impl Account {
     // is not one more than the current version.
     pub fn ins_auth_key(
         &mut self,
-        key: sign::PublicKey,
+        key: PublicKey,
         permissions: AppPermissions,
         version: u64,
-    ) -> Result<(), ClientError> {
+    ) -> Result<(), Error> {
         self.validate_version(version)?;
 
         let _ = self.auth_keys.insert(key, permissions);
@@ -115,18 +114,18 @@ impl Account {
 
     // Remove the auth key and bump the version. Returns false if the given version
     // is not one more than the current version.
-    pub fn del_auth_key(&mut self, key: &sign::PublicKey, version: u64) -> Result<(), ClientError> {
+    pub fn del_auth_key(&mut self, key: &PublicKey, version: u64) -> Result<(), Error> {
         self.validate_version(version)?;
 
         if self.auth_keys.remove(key).is_some() {
             self.version = version;
             Ok(())
         } else {
-            Err(ClientError::NoSuchKey)
+            Err(Error::NoSuchKey)
         }
     }
 
-    pub fn auth_keys(&self) -> &BTreeMap<sign::PublicKey, AppPermissions> {
+    pub fn auth_keys(&self) -> &BTreeMap<PublicKey, AppPermissions> {
         &self.auth_keys
     }
 
@@ -140,11 +139,11 @@ impl Account {
         self.version += 1;
     }
 
-    fn validate_version(&self, version: u64) -> Result<(), ClientError> {
+    fn validate_version(&self, version: u64) -> Result<(), Error> {
         if version == self.version + 1 {
             Ok(())
         } else {
-            Err(ClientError::InvalidSuccessor(self.version))
+            Err(Error::InvalidSuccessor(self.version))
         }
     }
 }

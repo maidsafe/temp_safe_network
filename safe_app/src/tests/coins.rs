@@ -12,12 +12,10 @@
 use crate::test_utils::{create_app, create_app_by_req, create_random_auth_req};
 use crate::{run, AppError};
 use futures::Future;
-use rand::{self, Rand};
 use routing::XorName;
 use safe_core::{Client, CoreError};
 use safe_nd::{AppPermissions, Coins, Error};
 use std::str::FromStr;
-use tiny_keccak::sha3_256;
 
 // Apps should not be able to request the wallet balance if they don't have
 // explicit permissions.
@@ -31,7 +29,7 @@ fn coin_app_deny_permissions() {
     let app = create_app();
 
     unwrap!(run(&app, |client, _app_context| {
-        let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
+        let owner_wallet = XorName::from(unwrap!(client.owner_key()));
         let c2 = client.clone();
         let c3 = client.clone();
 
@@ -43,11 +41,7 @@ fn coin_app_deny_permissions() {
                     res => panic!("Unexpected result: {:?}", res),
                 }
 
-                c2.transfer_coins(
-                    XorName::rand(&mut rand::thread_rng()),
-                    unwrap!(Coins::from_str("1.0")),
-                    None,
-                )
+                c2.transfer_coins(new_rand::random(), unwrap!(Coins::from_str("1.0")), None)
             })
             .then(move |res| {
                 match res {
@@ -76,7 +70,7 @@ fn coin_app_allow_permissions() {
     let app = create_app();
 
     let wallet2 = unwrap!(run(&app, |client, _app_context| {
-        Ok(XorName(sha3_256(&unwrap!(client.owner_key()).0)))
+        Ok(XorName::from(unwrap!(client.owner_key())))
     }));
 
     // Create an app that can access the owner's coin balance.
@@ -89,7 +83,7 @@ fn coin_app_allow_permissions() {
 
     // Test the basic coin operations.
     unwrap!(run(&app, move |client, _app_context| {
-        let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
+        let owner_wallet = XorName::from(unwrap!(client.owner_key()));
         let c2 = client.clone();
         let c3 = client.clone();
 

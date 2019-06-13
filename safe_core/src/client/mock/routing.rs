@@ -10,18 +10,14 @@
 
 use super::vault::{self, Data, Vault, VaultGuard};
 use super::DataId;
-use crate::client::MsgIdConverter;
 use crate::config_handler::{get_config, Config};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread;
-use rand;
 use routing::{
-    Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
-    InterfaceError, MessageId, MutableData, PermissionSet, Request, Response, RoutingError, User,
-    XorName, TYPE_TAG_SESSION_PACKET,
+    Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, InterfaceError,
+    MutableData, PermissionSet, Request, Response, RoutingError, User, TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
-use safe_nd::{AppPermissions, Message};
+use safe_nd::{ImmutableData, Message, MessageId, PublicKey, XorName};
 use std;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -29,7 +25,6 @@ use std::env;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tiny_keccak::sha3_256;
 
 /// Function that is used to tap into routing requests and return preconditioned responses.
 pub type RequestHookFn = FnMut(&Request) -> Option<Response> + 'static;
@@ -56,10 +51,6 @@ const SET_MDATA_ENTRIES_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const GET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const SET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const CHANGE_MDATA_OWNER_DELAY_MS: u64 = DEFAULT_DELAY_MS;
-
-const LIST_AUTH_KEYS_AND_VERSION_DELAY_MS: u64 = DEFAULT_DELAY_MS;
-const INS_AUTH_KEY_DELAY_MS: u64 = DEFAULT_DELAY_MS;
-const DEL_AUTH_KEY_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
 lazy_static! {
     static ref VAULT: Arc<Mutex<Vault>> = Arc::new(Mutex::new(Vault::new(get_config())));
@@ -112,7 +103,7 @@ impl Routing {
 
         let client_auth = Authority::Client {
             client_id: *FullId::new().public_id(),
-            proxy_node_name: rand::random(),
+            proxy_node_name: new_rand::random(),
         };
 
         Ok(Routing {
@@ -128,12 +119,12 @@ impl Routing {
     }
 
     /// Send a routing message
-    pub fn send(
-        &mut self,
-        src: Authority<XorName>,
-        dst: Authority<XorName>,
-        payload: &[u8],
-    ) -> Result<(), InterfaceError> {
+    pub fn send(&mut self, dst: Authority<XorName>, payload: &[u8]) -> Result<(), InterfaceError> {
+        let src = Authority::Client {
+            client_id: *self.full_id.public_id(),
+            proxy_node_name: new_rand::random(),
+        };
+
         let response = match dst {
             // Mutation requests are sent to Client manager
             Authority::ClientManager(_) => {
@@ -156,7 +147,7 @@ impl Routing {
                 };
                 let response = Response::RpcResponse {
                     res: Ok(unwrap!(serialise(&response))),
-                    msg_id: MessageId::from_new(message_id),
+                    msg_id: message_id,
                 };
                 self.send_response(DEFAULT_DELAY_MS, src, dst, response);
                 None
@@ -167,10 +158,10 @@ impl Routing {
                 let res = unwrap!(vault.process_request(src, dst, payload.to_vec()));
                 Some(res)
             }
-            _ => None,
+            // _ => None,
         };
         if let Some(res) = response {
-            let _ = self.send(res.0, src, &res.1);
+            let _ = self.send(src, &res.1);
         }
         Ok(())
     }
@@ -245,7 +236,7 @@ impl Routing {
             let mut vault = self.lock_vault(true);
 
             self.verify_network_limits(msg_id, "put_idata")
-                .and_then(|_| vault.authorise_mutation(&dst, self.client_key()))
+                .and_then(|_| vault.authorise_mutation(&dst, &self.client_key()))
                 .and_then(|_| {
                     match vault.get_data(&DataId::immutable(*data.name())) {
                         // Immutable data is de-duplicated so always allowed
@@ -316,7 +307,7 @@ impl Routing {
         dst: Authority<XorName>,
         data: MutableData,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicKey,
     ) -> Result<(), InterfaceError> {
         let data_name = DataId::mutable(*data.name(), data.tag());
         let client_auth = self.client_auth;
@@ -355,7 +346,7 @@ impl Routing {
             } else {
                 // Put normal data.
                 vault
-                    .authorise_mutation(&dst, self.client_key())
+                    .authorise_mutation(&dst, &self.client_key())
                     .and_then(|_| Self::verify_owner(&dst, data.owners()))
                     .and_then(|_| {
                         if vault.contains_data(&data_name) {
@@ -538,7 +529,7 @@ impl Routing {
         tag: u64,
         actions: BTreeMap<Vec<u8>, EntryAction>,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicKey,
     ) -> Result<(), InterfaceError> {
         let actions2 = actions.clone();
 
@@ -618,7 +609,7 @@ impl Routing {
         permissions: PermissionSet,
         version: u64,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicKey,
     ) -> Result<(), InterfaceError> {
         self.mutate_mdata(
             dst,
@@ -650,7 +641,7 @@ impl Routing {
         user: User,
         version: u64,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicKey,
     ) -> Result<(), InterfaceError> {
         self.mutate_mdata(
             dst,
@@ -678,13 +669,13 @@ impl Routing {
         dst: Authority<XorName>,
         name: XorName,
         tag: u64,
-        new_owners: BTreeSet<sign::PublicKey>,
+        new_owners: BTreeSet<PublicKey>,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
         let new_owners_len = new_owners.len();
         let new_owner = match new_owners.into_iter().next() {
-            Some(owner) if new_owners_len == 1 => owner,
+            Some(ref owner) if new_owners_len == 1 => owner.clone(),
             Some(_) | None => {
                 // `new_owners` must have exactly 1 element.
                 let client_auth = self.client_auth;
@@ -701,8 +692,8 @@ impl Routing {
             }
         };
 
-        let requester = *self.client_key();
-        let requester_name = XorName(sha3_256(&requester[..]));
+        let requester = self.client_key();
+        let requester_name = XorName::from(requester);
 
         self.mutate_mdata(
             dst,
@@ -739,146 +730,6 @@ impl Routing {
             },
             |res| Response::ChangeMDataOwner { res, msg_id },
         )
-    }
-
-    /// Fetches a list of authorised keys and version in MaidManager
-    pub fn list_auth_keys_and_version(
-        &mut self,
-        dst: Authority<XorName>,
-        msg_id: MessageId,
-    ) -> Result<(), InterfaceError> {
-        let client_auth = self.client_auth;
-
-        let skip = self.intercept_request(
-            LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
-            dst,
-            client_auth,
-            || Request::ListAuthKeysAndVersion(msg_id),
-        );
-        if skip {
-            return Ok(());
-        }
-
-        let res = if let Err(err) = self.verify_network_limits(msg_id, "list_auth_keys_and_version")
-        {
-            Err(err)
-        } else {
-            let name = match dst {
-                Authority::ClientManager(name) => name,
-                x => panic!("Unexpected authority: {:?}", x),
-            };
-
-            let vault = self.lock_vault(false);
-            if let Some(account) = vault.get_account(&name) {
-                Ok((
-                    account.auth_keys().keys().cloned().collect::<BTreeSet<_>>(),
-                    account.version(),
-                ))
-            } else {
-                Err(ClientError::NoSuchAccount)
-            }
-        };
-
-        self.send_response(
-            LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
-            dst,
-            client_auth,
-            Response::ListAuthKeysAndVersion { res, msg_id },
-        );
-        Ok(())
-    }
-
-    /// Adds a new authorised key to MaidManager
-    pub fn ins_auth_key(
-        &mut self,
-        dst: Authority<XorName>,
-        key: sign::PublicKey,
-        permissions: AppPermissions,
-        version: u64,
-        msg_id: MessageId,
-    ) -> Result<(), InterfaceError> {
-        let client_auth = self.client_auth;
-
-        // let skip = self.intercept_request(INS_AUTH_KEY_DELAY_MS, dst, client_auth, || {
-        //     Request::InsAuthKey {
-        //         key,
-        //         version,
-        //         msg_id,
-        //     }
-        // });
-        // if skip {
-        //     return Ok(());
-        // }
-
-        let res = if let Err(err) = self.verify_network_limits(msg_id, "ins_auth_key") {
-            Err(err)
-        } else {
-            let name = match dst {
-                Authority::ClientManager(name) => name,
-                x => panic!("Unexpected authority: {:?}", x),
-            };
-
-            let mut vault = self.lock_vault(true);
-            if let Some(account) = vault.get_account_mut(&name) {
-                account.ins_auth_key(key, permissions, version)
-            } else {
-                Err(ClientError::NoSuchAccount)
-            }
-        };
-
-        self.send_response(
-            INS_AUTH_KEY_DELAY_MS,
-            dst,
-            client_auth,
-            Response::InsAuthKey { res, msg_id },
-        );
-        Ok(())
-    }
-
-    /// Removes an authorised key from MaidManager
-    pub fn del_auth_key(
-        &mut self,
-        dst: Authority<XorName>,
-        key: sign::PublicKey,
-        version: u64,
-        msg_id: MessageId,
-    ) -> Result<(), InterfaceError> {
-        let client_auth = self.client_auth;
-
-        let skip = self.intercept_request(DEL_AUTH_KEY_DELAY_MS, dst, client_auth, || {
-            Request::DelAuthKey {
-                key,
-                version,
-                msg_id,
-            }
-        });
-        if skip {
-            return Ok(());
-        }
-
-        let res = if let Err(err) = self.verify_network_limits(msg_id, "del_auth_key") {
-            Err(err)
-        } else {
-            let name = match dst {
-                Authority::ClientManager(name) => name,
-                x => panic!("Unexpected authority: {:?}", x),
-            };
-
-            let mut vault = self.lock_vault(true);
-            if let Some(account) = vault.get_account_mut(&name) {
-                account.del_auth_key(&key, version)
-            } else {
-                Err(ClientError::NoSuchAccount)
-            }
-        };
-
-        self.send_response(
-            DEL_AUTH_KEY_DELAY_MS,
-            dst,
-            client_auth,
-            Response::DelAuthKey { res, msg_id },
-        );
-        Ok(())
     }
 
     fn send_response(
@@ -955,7 +806,7 @@ impl Routing {
         name: XorName,
         tag: u64,
         request: Request,
-        requester: sign::PublicKey,
+        requester: PublicKey,
         log_label: &str,
         delay_ms: u64,
         f: F,
@@ -965,7 +816,7 @@ impl Routing {
         F: FnOnce(&mut MutableData) -> Result<R, ClientError>,
         G: FnOnce(Result<R, ClientError>) -> Response,
     {
-        let client_key = *self.client_key();
+        let client_key = self.client_key();
         let mutate = |mut data: MutableData, vault: &mut Vault| {
             vault.authorise_mutation(&dst, &client_key)?;
 
@@ -994,7 +845,7 @@ impl Routing {
         name: XorName,
         tag: u64,
         request: Request,
-        requester: Option<sign::PublicKey>,
+        requester: Option<PublicKey>,
         log_label: &str,
         delay_ms: u64,
         write: bool,
@@ -1037,17 +888,16 @@ impl Routing {
 
     fn verify_owner(
         dst: &Authority<XorName>,
-        owner_keys: &BTreeSet<sign::PublicKey>,
+        owner_keys: &BTreeSet<PublicKey>,
     ) -> Result<(), ClientError> {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
             _ => return Err(ClientError::InvalidOwners),
         };
 
-        let ok = owner_keys.iter().any(|owner_key| {
-            let owner_name = XorName(sha3_256(&owner_key.0));
-            owner_name == dst_name
-        });
+        let ok = owner_keys
+            .iter()
+            .any(|owner_key| XorName::from(*owner_key) == dst_name);
 
         if ok {
             Ok(())
@@ -1056,13 +906,13 @@ impl Routing {
         }
     }
 
-    fn verify_requester(&self, requester: Option<sign::PublicKey>) -> Result<(), ClientError> {
+    fn verify_requester(&self, requester: Option<PublicKey>) -> Result<(), ClientError> {
         let requester = match requester {
             Some(key) => key,
             None => return Ok(()),
         };
 
-        if *self.client_key() == requester {
+        if self.client_key() == requester {
             Ok(())
         } else {
             Err(ClientError::from("Invalid requester"))
@@ -1143,8 +993,8 @@ impl Routing {
         false
     }
 
-    fn client_key(&self) -> &sign::PublicKey {
-        self.full_id.public_id().signing_public_key()
+    fn client_key(&self) -> PublicKey {
+        PublicKey::Bls(self.full_id.bls_key().public_key())
     }
 }
 

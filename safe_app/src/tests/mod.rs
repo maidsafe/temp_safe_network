@@ -133,14 +133,14 @@ pub fn login_registered_with_low_balance() {
                     res: Err(ClientError::LowBalance),
                     msg_id,
                 }),
-                Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
-                    res: Err(ClientError::LowBalance),
-                    msg_id,
-                }),
-                Request::DelAuthKey { msg_id, .. } => Some(Response::DelAuthKey {
-                    res: Err(ClientError::LowBalance),
-                    msg_id,
-                }),
+                // Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
+                //     res: Err(ClientError::LowBalance),
+                //     msg_id,
+                // }),
+                // Request::DelAuthKey { msg_id, .. } => Some(Response::DelAuthKey {
+                //     res: Err(ClientError::LowBalance),
+                //     msg_id,
+                // }),
                 // Pass-through
                 _ => None,
             }

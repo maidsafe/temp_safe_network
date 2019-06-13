@@ -9,16 +9,16 @@
 
 use crate::errors::AppError;
 use crate::ffi::mutable_data::permissions::USER_ANYONE;
-use crate::ffi::object_cache::{MDataPermissionsHandle, SignPubKeyHandle};
+use crate::ffi::object_cache::{MDataPermissionsHandle, PubKeyHandle};
 use crate::object_cache::ObjectCache;
 use routing::{PermissionSet, User};
 use std::collections::BTreeMap;
 
 // Retrieve the sign key corresponding to the handle from the object cache and wrap it
 // in `User`. If the handle is 0, return `User::Anyone`.
-pub fn get_user(object_cache: &ObjectCache, handle: SignPubKeyHandle) -> Result<User, AppError> {
+pub fn get_user(object_cache: &ObjectCache, handle: PubKeyHandle) -> Result<User, AppError> {
     let user = if handle != USER_ANYONE {
-        let sign_key = object_cache.get_pub_sign_key(handle)?;
+        let sign_key = object_cache.get_pub_key(handle)?;
         User::Key(*sign_key)
     } else {
         User::Anyone

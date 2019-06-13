@@ -21,8 +21,9 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::PermissionSet;
 use routing::Value;
 use routing::{BootstrapConfig, XorName};
-use rust_sodium::crypto::sign::PublicKey;
+use rust_sodium::crypto::sign;
 use rust_sodium::crypto::{box_, secretbox};
+use safe_nd::PublicKey;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::collections::HashMap;
 use std::ffi::{CString, NulError};
@@ -124,14 +125,12 @@ impl ReprC for AuthGranted {
 /// Represents the needed keys to work with the data.
 #[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct AppKeys {
-    /// Owner signing public key.
+    /// Owner public key.
     pub owner_key: PublicKey,
     /// Data symmetric encryption key.
     pub enc_key: shared_secretbox::Key,
     /// Asymmetric sign public key.
-    ///
-    /// This is the identity of the App in the Network.
-    pub sign_pk: PublicKey,
+    pub sign_pk: sign::PublicKey,
     /// Asymmetric sign private key.
     pub sign_sk: shared_sign::SecretKey,
     /// Asymmetric enc public key.
@@ -141,6 +140,7 @@ pub struct AppKeys {
     /// BLS secret key
     pub bls_sk: threshold_crypto::SecretKey,
     /// BLS public key
+    /// This is the identity of the App in the Network.
     pub bls_pk: threshold_crypto::PublicKey,
 }
 
@@ -194,8 +194,14 @@ impl AppKeys {
             enc_sk,
             ..
         } = self;
+
+        let owner_pk = match owner_key {
+            PublicKey::Bls(pk) => pk.to_bytes(),
+            _ => panic!("unexpected owner key type"), // TODO and FIXME: use proper ReprC for PublicKey
+        };
+
         ffi::AppKeys {
-            owner_key: owner_key.0,
+            owner_key: owner_pk,
             enc_key: enc_key.0,
             sign_pk: sign_pk.0,
             sign_sk: sign_sk.0,
@@ -212,9 +218,12 @@ impl ReprC for AppKeys {
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         let bls_sk = threshold_crypto::SecretKey::random();
         Ok(Self {
-            owner_key: PublicKey(repr_c.owner_key),
+            owner_key: PublicKey::from(
+                threshold_crypto::PublicKey::from_bytes(repr_c.owner_key)
+                    .map_err(|_| IpcError::EncodeDecodeError)?,
+            ),
             enc_key: shared_secretbox::Key::from_raw(&repr_c.enc_key),
-            sign_pk: PublicKey(repr_c.sign_pk),
+            sign_pk: sign::PublicKey(repr_c.sign_pk),
             sign_sk: shared_sign::SecretKey::from_raw(&repr_c.sign_sk),
             enc_pk: box_::PublicKey(repr_c.enc_pk),
             enc_sk: shared_box::SecretKey::from_raw(&repr_c.enc_sk),
@@ -372,8 +381,13 @@ impl AppAccess {
             None => ptr::null(),
         };
 
+        let key = match sign_key {
+            PublicKey::Bls(bls_key) => bls_key.to_bytes(),
+            _ => return Err(IpcError::from("Unsupported key type")), // TODO: FFI repr for PublicKey
+        };
+
         Ok(ffi::AppAccess {
-            sign_key: sign_key.0,
+            sign_key: key,
             permissions: permission_set_into_repr_c(permissions),
             name,
             app_id,
@@ -394,7 +408,10 @@ impl ReprC for AppAccess {
         } = *repr_c;
 
         Ok(Self {
-            sign_key: PublicKey(sign_key),
+            sign_key: PublicKey::from(
+                threshold_crypto::PublicKey::from_bytes(sign_key)
+                    .map_err(|_| IpcError::EncodeDecodeError)?,
+            ),
             permissions: permission_set_clone_from_repr_c(permissions)?,
             name: if name.is_null() {
                 None

@@ -20,7 +20,7 @@ use std::ptr;
 #[derive(Clone, Copy)]
 pub struct AppKeys {
     /// Owner signing public key
-    pub owner_key: SignPublicKey,
+    pub owner_key: BlsPublicKey,
     /// Data symmetric encryption key
     pub enc_key: SymSecretKey,
     /// Asymmetric sign public key.
@@ -123,7 +123,7 @@ impl Drop for AuthGranted {
 #[repr(C)]
 pub struct AppAccess {
     /// App's or user's public key.
-    pub sign_key: SignPublicKey,
+    pub sign_key: BlsPublicKey,
     /// A list of permissions.
     pub permissions: PermissionSet,
     /// App's user-facing name.

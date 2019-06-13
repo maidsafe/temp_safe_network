@@ -23,20 +23,18 @@ use crate::event_loop::CoreMsgTx;
 use crate::utils;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::serialise;
-use routing::XorName;
 use routing::{
-    AccountPacket, Authority, BootstrapConfig, Event, FullId, MessageId, MutableData, Response,
-    Value, ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
+    AccountPacket, Authority, BootstrapConfig, Event, FullId, MutableData, Response, Value,
+    ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
 };
 use rust_sodium::crypto::sign::Seed;
 use rust_sodium::crypto::{box_, sign};
 use safe_nd::request::{Request, Requester};
-use safe_nd::{Message, MessageId as NewMessageId};
+use safe_nd::{Message, MessageId, PublicKey, XorName};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 use std::time::Duration;
-use tiny_keccak::sha3_256;
 use tokio_core::reactor::Handle;
 
 /// Wait for a response from the `$rx` receiver with path `$res` and message ID `$msg_id`.
@@ -120,7 +118,7 @@ impl CoreClient {
         let acc_loc = ClientAccount::generate_network_id(&keyword, &pin)?;
 
         let maid_keys = ClientKeys::new(id_seed);
-        let pub_key = maid_keys.sign_pk;
+        let pub_key = PublicKey::Bls(maid_keys.bls_pk);
         let full_id = Some(maid_keys.clone().into());
 
         let (mut routing, routing_rx) = setup_routing(full_id, None)?;
@@ -148,15 +146,14 @@ impl CoreClient {
             TYPE_TAG_SESSION_PACKET,
             BTreeMap::new(),
             acc_data,
-            btree_set![pub_key],
+            btree_set![pub_key.clone()],
         )?;
 
-        let digest = sha3_256(&pub_key.0);
-        let cm_addr = Authority::ClientManager(XorName(digest));
+        let cm_addr = Authority::ClientManager(XorName::from(pub_key.clone()));
 
         let msg_id = MessageId::new();
         routing
-            .put_mdata(cm_addr, acc_md.clone(), msg_id, pub_key)
+            .put_mdata(cm_addr.clone(), acc_md.clone(), msg_id, pub_key)
             .map_err(CoreError::from)
             .and_then(|_| wait_for_response!(routing_rx, Response::PutMData, msg_id))
             .map_err(|e| {
@@ -178,7 +175,7 @@ impl CoreClient {
                 net_tx,
                 core_tx,
             })),
-            cm_addr,
+            cm_addr: cm_addr.clone(),
             keys: maid_keys,
         })
     }
@@ -196,7 +193,7 @@ impl Client for CoreClient {
     }
 
     fn cm_addr(&self) -> Option<Authority<XorName>> {
-        Some(self.cm_addr)
+        Some(self.cm_addr.clone())
     }
 
     fn inner(&self) -> Rc<RefCell<ClientInner<Self, Self::MsgType>>> {
@@ -231,12 +228,12 @@ impl Client for CoreClient {
         Some(self.keys.bls_sk.clone())
     }
 
-    fn owner_key(&self) -> Option<sign::PublicKey> {
-        Some(self.keys.sign_pk)
+    fn owner_key(&self) -> Option<PublicKey> {
+        Some(PublicKey::from(self.keys.bls_pk))
     }
 
     fn compose_message(&self, request: Request) -> Message {
-        let message_id = NewMessageId::new();
+        let message_id = MessageId::new();
 
         let sig = self
             .keys
@@ -255,7 +252,7 @@ impl Clone for CoreClient {
     fn clone(&self) -> Self {
         CoreClient {
             inner: Rc::clone(&self.inner),
-            cm_addr: self.cm_addr,
+            cm_addr: self.cm_addr.clone(),
             keys: self.keys.clone(),
         }
     }

@@ -102,6 +102,7 @@ mod codes {
     pub const ERR_INVALID_FILE_MODE: i32 = -1016;
     pub const ERR_INVALID_SIGN_SEC_KEY_HANDLE: i32 = -1017;
     pub const ERR_UNREGISTERED_CLIENT_ACCESS: i32 = -1018;
+    pub const ERR_INVALID_PUB_KEY_HANDLE: i32 = -1019;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 
@@ -158,6 +159,8 @@ pub enum AppError {
     InvalidSignPubKeyHandle,
     /// Invalid secret sign key handle.
     InvalidSignSecKeyHandle,
+    /// Invalid public key handle.
+    InvalidPubKeyHandle,
     /// Invalid file writer handle.
     InvalidFileContextHandle,
 
@@ -213,6 +216,7 @@ impl Display for AppError {
             AppError::InvalidSignSecKeyHandle => {
                 write!(formatter, "Invalid sign secret key handle")
             }
+            AppError::InvalidPubKeyHandle => write!(formatter, "Invalid public key handle"),
             AppError::InvalidEncryptSecKeyHandle => write!(formatter, "Invalid secret key handle"),
             AppError::InvalidFileContextHandle => write!(formatter, "Invalid file context handle"),
             AppError::SelfEncryption(ref error) => {
@@ -375,6 +379,7 @@ impl ErrorCode for AppError {
             AppError::InvalidSignPubKeyHandle => ERR_INVALID_SIGN_PUB_KEY_HANDLE,
             AppError::InvalidSignSecKeyHandle => ERR_INVALID_SIGN_SEC_KEY_HANDLE,
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
+            AppError::InvalidPubKeyHandle => ERR_INVALID_PUB_KEY_HANDLE,
             AppError::InvalidFileContextHandle => ERR_INVALID_FILE_CONTEXT_HANDLE,
             AppError::InvalidFileMode => ERR_INVALID_FILE_MODE,
             AppError::UnregisteredClientAccess => ERR_UNREGISTERED_CLIENT_ACCESS,

@@ -1,0 +1,21 @@
+[package]
+authors = ["MaidSafe Developers <dev@maidsafe.net>"]
+description = "Mock routing"
+documentation = "https://docs.rs/safe_core"
+homepage = "https://maidsafe.net"
+license = "GPL-3.0"
+name = "mock_routing"
+readme = "README.md"
+repository = "https://github.com/maidsafe/safe_client_libs"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+safe-nd = { path = "../../safe-nd" }
+maidsafe_utilities = "~0.18.0"
+rust_sodium = "~0.10.2"
+rand = "~0.3.18"
+serde = "~1.0.27"
+serde_derive = "~1.0.27"
+threshold_crypto = { git = "https://github.com/nbaksalyar/threshold_crypto.git", branch = "pks-copy" }
+tiny-keccak = "~1.4.3"

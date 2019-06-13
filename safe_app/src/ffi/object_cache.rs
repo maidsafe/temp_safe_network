@@ -44,6 +44,8 @@ pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SignPubKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
+pub type PubKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
 pub type SignSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type FileContextHandle = ObjectHandle;

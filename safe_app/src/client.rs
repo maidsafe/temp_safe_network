@@ -31,7 +31,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
-use tiny_keccak::sha3_256;
 use tokio_core::reactor::Handle;
 
 /// Client object used by safe_app.
@@ -74,7 +73,7 @@ impl AppClient {
     /// apps to authorise using an existing pair of keys.
     pub(crate) fn from_keys(
         keys: ClientKeys,
-        owner: sign::PublicKey,
+        owner: PublicKey,
         el_handle: Handle,
         core_tx: AppMsgTx,
         net_tx: NetworkTx,
@@ -92,7 +91,7 @@ impl AppClient {
     ))]
     pub(crate) fn from_keys_with_hook<F>(
         keys: ClientKeys,
-        owner: sign::PublicKey,
+        owner: PublicKey,
         el_handle: Handle,
         core_tx: AppMsgTx,
         net_tx: NetworkTx,
@@ -115,7 +114,7 @@ impl AppClient {
 
     fn from_keys_impl<F>(
         keys: ClientKeys,
-        owner: sign::PublicKey,
+        owner: PublicKey,
         el_handle: Handle,
         core_tx: AppMsgTx,
         net_tx: NetworkTx,
@@ -131,8 +130,7 @@ impl AppClient {
         routing = routing_wrapper_fn(routing);
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
-        let digest = sha3_256(&owner.0);
-        let cm_addr = Authority::ClientManager(XorName(digest));
+        let cm_addr = Authority::ClientManager(XorName::from(owner));
 
         Ok(Self {
             inner: Rc::new(RefCell::new(ClientInner::new(
@@ -212,7 +210,7 @@ impl Client for AppClient {
         Some(app_inner.keys.clone()?.bls_sk)
     }
 
-    fn owner_key(&self) -> Option<sign::PublicKey> {
+    fn owner_key(&self) -> Option<PublicKey> {
         let app_inner = self.app_inner.borrow();
         app_inner.owner_key
     }
@@ -244,7 +242,7 @@ impl fmt::Debug for AppClient {
 
 struct AppInner {
     keys: Option<ClientKeys>,
-    owner_key: Option<sign::PublicKey>,
+    owner_key: Option<PublicKey>,
     cm_addr: Option<Authority<XorName>>,
     config: Option<BootstrapConfig>,
 }
@@ -252,7 +250,7 @@ struct AppInner {
 impl AppInner {
     pub fn new(
         keys: Option<ClientKeys>,
-        owner_key: Option<sign::PublicKey>,
+        owner_key: Option<PublicKey>,
         cm_addr: Option<Authority<XorName>>,
         config: Option<BootstrapConfig>,
     ) -> AppInner {

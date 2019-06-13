@@ -18,7 +18,6 @@ use futures::{future, Future, IntoFuture};
 use rand::{self, Rng};
 use routing::User;
 use routing::XorName;
-use rust_sodium::crypto::sign;
 use safe_core::client::Client;
 use safe_core::crypto::shared_secretbox;
 use safe_core::ffi::ipc::req::{
@@ -37,6 +36,7 @@ use safe_core::utils::test_utils::setup_client_with_net_obs;
 #[cfg(feature = "mock-network")]
 use safe_core::MockRouting;
 use safe_core::{utils, MDataInfo, NetworkEvent};
+use safe_nd::PublicKey;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt::Debug;
@@ -335,13 +335,13 @@ pub fn get_container_from_authenticator_entry(
 /// Check that the given permission set is contained in the access container
 pub fn compare_access_container_entries(
     authenticator: &Authenticator,
-    app_sign_pk: sign::PublicKey,
+    app_pk: PublicKey,
     mut access_container: AccessContainerEntry,
     expected: HashMap<String, ContainerPermissions>,
 ) {
     let results = unwrap!(run(authenticator, move |client| {
         let mut reqs = Vec::new();
-        let user = User::Key(app_sign_pk);
+        let user = User::Key(app_pk);
 
         for (container, expected_perms) in expected {
             // Check the requested permissions in the access container.

@@ -9,18 +9,16 @@
 use super::Account;
 use super::DataId;
 use crate::client::mock::routing::unlimited_muts;
-use crate::client::XorNameConverter;
 use crate::config_handler::{Config, DevConfig};
 use fs2::FileExt;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Authority, ClientError, ImmutableData, MutableData as OldMutableData, XorName};
-use rust_sodium::crypto::sign;
+use routing::{Authority, ClientError, MutableData as OldMutableData};
 use safe_nd::mutable_data::{
     MutableData as NewMutableData, MutableDataRef, SeqMutableData, UnseqMutableData,
 };
 use safe_nd::request::{Request, Requester};
 use safe_nd::response::{Response, Transaction};
-use safe_nd::{Coins, Error, Message, MessageId};
+use safe_nd::{Coins, Error, ImmutableData, Message, MessageId, PublicKey, XorName};
 use std::collections::HashMap;
 use std::env;
 use std::fs::{File, OpenOptions};
@@ -30,7 +28,6 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use std::time::SystemTime;
-use tiny_keccak::sha3_256;
 
 const FILE_NAME: &str = "MockVault";
 
@@ -137,46 +134,51 @@ impl Vault {
     // Authorise coin operation.
     pub fn authorise_coin_operation(
         &self,
-        _dst: &Authority<XorName>,
-        _requester: &Requester,
+        dst: &Authority<XorName>,
+        _req: &Request,
+        _msg_id: MessageId,
+        requester: &Requester,
     ) -> Result<(), Error> {
-        // let dst_name = match *dst {
-        //     Authority::ClientManager(name) => name,
-        //     x => {
-        //         debug!("Unexpected authority: {:?}", x);
-        //         return Err(ClientError::InvalidOperation);
-        //     }
-        // };
+        let dst_name = match *dst {
+            Authority::ClientManager(name) => name,
+            x => {
+                debug!("Unexpected authority: {:?}", x);
+                return Err(Error::InvalidOperation);
+            }
+        };
 
-        // let account = match self.get_account(&dst_name) {
-        //     Some(account) => account,
-        //     None => {
-        //         debug!("Account not found for {:?}", dst);
-        //         return Err(ClientError::NoSuchAccount);
-        //     }
-        // };
+        let account = match self.get_account(&dst_name) {
+            Some(account) => account,
+            None => {
+                debug!("Account not found for {:?}", dst);
+                return Err(Error::NoSuchAccount);
+            }
+        };
 
         // Check if we are the owner or app.
-        // match requester {
-        //     Requester::Owner(..) => true,
-        //     Requester::Key(sign_pk) => match account.auth_keys().get(sign_pk) {
-        //         Some(perms) => {
-        //             if !perms.transfer_coins {
-        //                 debug!("Mutation not authorised");
-        //                 return Err(ClientError::AccessDenied);
-        //             }
-        //         }
-        //     },
-        // }
-
-        Ok(())
+        match requester {
+            Requester::Owner(_sig) => Ok(()), // owner_pk.verify(sig, &serialise(&(req, message_id))),
+            Requester::Key(sign_pk) => match account.auth_keys().get(sign_pk) {
+                Some(perms) => {
+                    if !perms.transfer_coins {
+                        debug!("Mutation not authorised");
+                        return Err(Error::AccessDenied);
+                    }
+                    Ok(())
+                }
+                None => {
+                    debug!("App not found");
+                    Err(Error::AccessDenied)
+                }
+            },
+        }
     }
 
     // Authorise mutation operation.
     pub fn authorise_mutation(
         &self,
         dst: &Authority<XorName>,
-        sign_pk: &sign::PublicKey,
+        sign_pk: &PublicKey,
     ) -> Result<(), ClientError> {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
@@ -195,7 +197,7 @@ impl Vault {
         };
 
         // Check if we are the owner or app.
-        let owner_name = XorName(sha3_256(&sign_pk[..]));
+        let owner_name = XorName::from(*sign_pk);
         if owner_name != dst_name && !account.auth_keys().contains_key(sign_pk) {
             debug!("Mutation not authorised");
             return Err(ClientError::AccessDenied);
@@ -267,7 +269,7 @@ impl Vault {
     fn transfer_coins(
         &mut self,
         src: Authority<XorName>,
-        _dest: Authority<XorName>,
+        _dst: Authority<XorName>,
         destination: XorName,
         amount: Coins,
         transaction_id: u64,
@@ -369,36 +371,57 @@ impl Vault {
         };
 
         let response = match request {
+            Request::ListAuthKeysAndVersion => {
+                let name = dest.name();
+                if let Some(account) = self.get_account(&name) {
+                    Response::ListAuthKeysAndVersion(Ok((
+                        account.auth_keys().clone(),
+                        account.version(),
+                    )))
+                } else {
+                    return Err(Error::NoSuchAccount);
+                }
+            }
+            Request::InsAuthKey {
+                key,
+                permissions,
+                version,
+            } => {
+                let name = dest.name();
+                if let Some(account) = self.get_account_mut(&name) {
+                    Response::InsAuthKey(account.ins_auth_key(key, permissions, version))
+                } else {
+                    return Err(Error::NoSuchAccount);
+                }
+            }
+            Request::DelAuthKey { key, version } => {
+                let name = dest.name();
+                if let Some(account) = self.get_account_mut(&name) {
+                    Response::DelAuthKey(account.del_auth_key(&key, version))
+                } else {
+                    return Err(Error::NoSuchAccount);
+                }
+            }
             Request::TransferCoins {
                 destination,
                 amount,
                 transaction_id,
             } => {
-                let res = self.transfer_coins(
-                    src,
-                    dest,
-                    XorName::from_new(destination),
-                    amount,
-                    transaction_id,
-                    requester,
-                );
+                let res =
+                    self.transfer_coins(src, dest, destination, amount, transaction_id, requester);
                 Response::TransferCoins(res)
             }
             Request::GetBalance { coins_balance_id } => {
-                self.authorise_coin_operation(&dest, &requester)?;
-                let res = self.get_balance(src, &XorName::from_new(coins_balance_id), requester);
+                // self.authorise_coin_operation(&dest, &requester)?;
+                let res = self.get_balance(src, &coins_balance_id, requester);
                 Response::GetBalance(res)
             }
             Request::GetTransaction {
                 coins_balance_id,
                 transaction_id,
             } => {
-                let transaction = self.get_transaction(
-                    src,
-                    &XorName::from_new(coins_balance_id),
-                    transaction_id,
-                    requester,
-                );
+                let transaction =
+                    self.get_transaction(src, &coins_balance_id, transaction_id, requester);
                 Response::GetTransaction(transaction)
             }
             Request::PutUnseqMData { data } => {
@@ -609,18 +632,12 @@ impl Vault {
                     )
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => {
-                            self.delete_data(DataId::mutable(
-                                XorName::from_new(*mdata.name()),
-                                mdata.tag(),
-                            ));
+                            self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
                             self.commit_mutation(&dest);
                             Ok(())
                         }
                         MutableDataKind::Unsequenced(mdata) => {
-                            self.delete_data(DataId::mutable(
-                                XorName::from_new(*mdata.name()),
-                                mdata.tag(),
-                            ));
+                            self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
                             self.commit_mutation(&dest);
                             Ok(())
                         }
@@ -639,7 +656,7 @@ impl Vault {
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(XorName::from_new(address.clone().name())),
+                        Authority::NaeManager(address.clone().name()),
                         address.clone(),
                         requester.clone(),
                         request.clone(),
@@ -680,7 +697,7 @@ impl Vault {
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(XorName::from_new(address.clone().name())),
+                        Authority::NaeManager(address.clone().name()),
                         address.clone(),
                         requester.clone(),
                         request,
@@ -758,7 +775,7 @@ impl Vault {
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(XorName::from_new(address.clone().name())),
+                        Authority::NaeManager(address.clone().name()),
                         address.clone(),
                         requester.clone(),
                         request.clone(),
@@ -796,7 +813,7 @@ impl Vault {
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(XorName::from_new(address.clone().name())),
+                        Authority::NaeManager(address.clone().name()),
                         address.clone(),
                         requester.clone(),
                         request.clone(),
@@ -850,8 +867,8 @@ impl Vault {
         msg_id: MessageId,
         sequenced: Option<bool>,
     ) -> Result<MutableDataKind, Error> {
-        let data_name = DataId::mutable(XorName::from_new(address.name()), address.tag());
-        // self.authorise_read(&dst, &XorName::from_new(address.name()))
+        let data_name = DataId::mutable(address.name(), address.tag());
+        // self.authorise_read(&dst, &address.name())
         // .map_err(|err| Error::from(err.description()))
         // .and_then(|_| match self.get_data(&data_name) {
         dbg!(request.clone());
@@ -958,8 +975,8 @@ pub enum MutableDataKind {
 impl MutableDataKind {
     fn name(&self) -> XorName {
         match self {
-            MutableDataKind::Sequenced(data) => XorName::from_new(*data.name()),
-            MutableDataKind::Unsequenced(data) => XorName::from_new(*data.name()),
+            MutableDataKind::Sequenced(data) => *data.name(),
+            MutableDataKind::Unsequenced(data) => *data.name(),
         }
     }
     fn tag(&self) -> u64 {

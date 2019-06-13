@@ -13,7 +13,7 @@ use crate::self_encryption_storage::SelfEncryptionStorage;
 use crate::utils::{self, FutureExt};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{ImmutableData, XorName};
+use safe_nd::{ImmutableData, XorName};
 use self_encryption::{DataMap, SelfEncryptor};
 
 #[derive(Serialize, Deserialize)]
