@@ -151,7 +151,7 @@ pub fn wallet_commander(
             safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname)?;
             if pretty {
                 println!(
-                    "Spendable balance inserted with name '{}' in Wallet located at XOR-URL \"{}\"",
+                    "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",
                     the_name, target
                 );
             } else {

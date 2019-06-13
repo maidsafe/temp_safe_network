@@ -122,13 +122,19 @@ $ safe_cli keys create <source>
 But we can also create a `Key` with test-coins since we are using the mock network:
 ```shell
 $ safe_cli keys create --test-coins --preload 15.342 --pretty
-
 New Key created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
 Key pair generated: pk="b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61", sk="c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965"
 ```
 
-Once we have some `Key`'s with some test-coins we can use them as the `source` for the creation of new `Key`'s, as shown in the first command above.
-
+Once we have some `Key`'s with some test-coins we can use them as the `source` for the creation of new `Key`'s, thus if we use the `Key` we just created with test-coins we can create a second `Key`:
+```shell
+$ safe_cli keys create --preload 8.15 safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks --pretty
+Enter secret key corresponding to public key at XOR-URL "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks":
+New Key created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
+Key pair generated:
+pk="9754a42c0b568e692b10401c4129bff61088df6ae51bef883b28693d8c3e0e8ce23054e236bd64edc45791549ef60ce1"
+sk="2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c"
+```
 
 Other optional args that can be used with `keys create` sub-command are:
 ```shell
