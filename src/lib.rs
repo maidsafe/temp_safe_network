@@ -170,28 +170,40 @@ impl Safe {
     ) -> Result<(XorUrl, Option<BlsKeyPair>), String> {
         let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk)?;
         let _ = parse_coins_amount(&preload_amount.clone().unwrap_or_else(|| "0".to_string()))?;
-        let create_key = |pk| match preload_amount {
-            Some(amount) => self.safe_app_mock.create_balance(
-                &from_key_pair.pk,
-                &from_key_pair.sk,
-                &pk,
-                &amount,
-            ),
-            None => {
-                self.safe_app_mock
-                    .create_balance(&from_key_pair.pk, &from_key_pair.sk, &pk, "0")
+
+        let mut create_coin_balance = |to_pk, amount: &str| match self.safe_app_mock.create_balance(
+            &from_key_pair.pk,
+            &from_key_pair.sk,
+            &to_pk,
+            amount,
+        ) {
+            Err("InvalidAmount") => Err(format!(
+                "The amount '{}' specified for the transfer is invalid",
+                amount
+            )),
+            Err("NotEnoughBalance") => {
+                Err("Not enough balance at 'source' for the operation".to_string())
             }
+            Err(other_error) => Err(format!(
+                "Unexpected error when attempting to create Key: {}",
+                other_error
+            )),
+            Ok(xorname) => Ok(xorname),
         };
+
+        let amount = preload_amount.unwrap_or_else(|| "0.0".to_string());
 
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
                 let pk = unwrap!(pk_from_hex(&pk_str));
-                (create_key(pk), None)
+                let xorname = create_coin_balance(pk, &amount)?;
+                (xorname, None)
             }
             None => {
                 let key_pair = KeyPair::random();
                 let (pk, sk) = key_pair.to_hex_key_pair();
-                (create_key(key_pair.pk), Some(BlsKeyPair { pk, sk }))
+                let xorname = create_coin_balance(key_pair.pk, &amount)?;
+                (xorname, Some(BlsKeyPair { pk, sk }))
             }
         };
 
@@ -536,11 +548,17 @@ fn test_keys_create_preload_invalid_amounts() {
     };
 
     let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12".to_string(), None));
-    match safe.keys_create(unwrap!(key_pair), Some(".003".to_string()), None) {
+    match safe.keys_create(unwrap!(key_pair.clone()), Some(".003".to_string()), None) {
         Err(msg) => assert_eq!(
             msg,
             "Invalid safecoins amount '.003', expected a numeric value"
         ),
+        Ok(_) => panic!("Key was created unexpectedly"),
+    };
+
+    // test fail to preload with more than available balance in source (which has only 12 coins)
+    match safe.keys_create(unwrap!(key_pair), Some("12.00001".to_string()), None) {
+        Err(msg) => assert_eq!(msg, "Not enough balance at 'source' for the operation"),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
 }

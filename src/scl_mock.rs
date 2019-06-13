@@ -89,7 +89,7 @@ impl MockSCL {
         from_sk: &SecretKey,
         new_balance_owner: &PublicKey,
         amount: &str,
-    ) -> XorName {
+    ) -> Result<XorName, &str> {
         let from_xorname = xorname_from_pk(from_pk);
         let from_balance = unwrap!(Coins::from_str(&unwrap!(
             self.get_balance_from_pk(from_pk, from_sk)
@@ -97,7 +97,10 @@ impl MockSCL {
         let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
         let amount_coin = unwrap!(Coins::from_str(amount));
         let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
-        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num())); // TODO: check it has enough balance
+        if from_nano_balance.num() < amount_nano.num() {
+            return Err("NotEnoughBalance");
+        }
+        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
         self.mock_data.coin_balances.insert(
             vec_to_hex(from_xorname.to_vec()),
             CoinBalance {
@@ -115,7 +118,7 @@ impl MockSCL {
             },
         );
 
-        to_xorname
+        Ok(to_xorname)
     }
 
     pub fn allocate_test_coins(&mut self, to_pk: &PublicKey, amount: &str) -> XorName {
