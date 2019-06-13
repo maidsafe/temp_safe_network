@@ -1015,10 +1015,21 @@ fn mutable_data_ownership() {
     let (mut app_routing, app_routing_rx, app_full_id) = setup();
     let app_sign_key = PublicKey::from(*app_full_id.public_id().bls_public_key());
 
-    // TODO: fixme
-    // let msg_id = MessageId::new();
-    // unwrap!(owner_routing.ins_auth_key(client_mgr, app_sign_key, Default::default(), 1, msg_id));
-    // expect_success!(owner_routing_rx, msg_id, Response::InsAuthKey);
+    let message_id = MessageId::new();
+
+    let ins_auth_key_req = Message::Request {
+        request: RpcRequest::InsAuthKey {
+            key: app_sign_key,
+            version: 1,
+            permissions: Default::default(),
+        },
+        requester: Requester::Key(owner_key),
+        message_id,
+    };
+
+    let req_buffer = unwrap!(serialise(&ins_auth_key_req));
+    unwrap!(owner_routing.send(client_mgr, &req_buffer));
+    let _response = expect_success!(owner_routing_rx, message_id, Response::RpcResponse);
 
     // Attempt to put MutableData using the app sign key as owner key should fail.
     let name = new_rand::random();
@@ -1158,7 +1169,7 @@ fn unpub_md() {
     let put_request = Message::Request {
         request: RpcRequest::PutUnseqMData { data: data.clone() },
         requester: Requester::Key(PublicKey::Bls(bls_key)),
-        message_id: message_id,
+        message_id,
     };
 
     let put_req_buffer = unwrap!(serialise(&put_request));

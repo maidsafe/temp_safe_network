@@ -248,7 +248,7 @@ impl Vault {
         let owner_name = XorName::from(*sign_pk);
         if owner_name != dst_name && !account.auth_keys().contains_key(sign_pk) {
             debug!("Mutation not authorised");
-            return Err(ClientError::AccessDenied);
+            return Err(ClientError::from("Error here"));
         }
 
         let unlimited_mut = unlimited_muts(&self.config);
@@ -342,7 +342,7 @@ impl Vault {
                 Some(amount) => Ok(Transaction::Success(amount)),
                 None => Ok(Transaction::NoSuchTransaction),
             },
-            None => return Ok(Transaction::NoSuchCoinBalance),
+            None => Ok(Transaction::NoSuchCoinBalance),
         }
     }
 
@@ -485,7 +485,7 @@ impl Vault {
                 let result = self
                     .get_mdata(
                         dest,
-                        address.clone(),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -501,7 +501,7 @@ impl Vault {
                 let result = self
                     .get_mdata(
                         dest,
-                        address.clone(),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -595,7 +595,7 @@ impl Vault {
                 let result = self
                     .get_mdata(
                         dest,
-                        address.clone(),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -611,7 +611,7 @@ impl Vault {
                 let result = self
                     .get_mdata(
                         dest,
-                        address.clone(),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -625,14 +625,7 @@ impl Vault {
             }
             Request::ListMDataKeys { address } => {
                 let result = self
-                    .get_mdata(
-                        dest,
-                        address.clone(),
-                        requester.clone(),
-                        request,
-                        message_id,
-                        None,
-                    )
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.keys().clone()),
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.keys().clone()),
@@ -643,7 +636,7 @@ impl Vault {
                 let result = self
                     .get_mdata(
                         dest,
-                        address.clone(),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -659,7 +652,7 @@ impl Vault {
                 let result = self
                     .get_mdata(
                         dest,
-                        address.clone(),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -672,28 +665,20 @@ impl Vault {
                 Response::ListUnseqMDataValues(result)
             }
             Request::DeleteMData { address } => {
-                // let res = self.delete_mdata(dest, address.clone(), requester);
                 let res = self.authorise_mutation1(&dest).and_then(|_| {
-                    self.get_mdata(
-                        dest,
-                        address.clone(),
-                        requester.clone(),
-                        request,
-                        message_id,
-                        None,
-                    )
-                    .and_then(|data| match data {
-                        MutableDataKind::Sequenced(mdata) => {
-                            self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
-                            self.commit_mutation(&dest);
-                            Ok(())
-                        }
-                        MutableDataKind::Unsequenced(mdata) => {
-                            self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
-                            self.commit_mutation(&dest);
-                            Ok(())
-                        }
-                    })
+                    self.get_mdata(dest, address, requester.clone(), request, message_id, None)
+                        .and_then(|data| match data {
+                            MutableDataKind::Sequenced(mdata) => {
+                                self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                            MutableDataKind::Unsequenced(mdata) => {
+                                self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                        })
                 });
                 Response::DeleteMData(res)
             }
@@ -704,12 +689,12 @@ impl Vault {
                 version,
             } => {
                 let permissions = permissions.clone();
-                let user = user.clone();
+                let user = user;
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(address.clone().name()),
-                        address.clone(),
+                        Authority::NaeManager(address.name()),
+                        address,
                         requester.clone(),
                         request.clone(),
                         message_id,
@@ -719,7 +704,7 @@ impl Vault {
                         let data_name = DataId::mutable(data.name(), data.tag());
                         match data.clone() {
                             MutableDataKind::Unsequenced(mut mdata) => {
-                                unwrap!(mdata.set_user_permissions(user, permissions, version));
+                                unwrap!(mdata.set_user_permissions(*user, permissions, version));
                                 self.insert_data(
                                     data_name,
                                     Data::NewMutable(MutableDataKind::Unsequenced(mdata)),
@@ -728,7 +713,7 @@ impl Vault {
                                 Ok(())
                             }
                             MutableDataKind::Sequenced(mut mdata) => {
-                                unwrap!(mdata.set_user_permissions(user, permissions, version));
+                                unwrap!(mdata.set_user_permissions(*user, permissions, version));
                                 self.insert_data(
                                     data_name,
                                     Data::NewMutable(MutableDataKind::Sequenced(mdata)),
@@ -745,12 +730,12 @@ impl Vault {
                 ref user,
                 version,
             } => {
-                let user = user.clone();
+                let user = *user;
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(address.clone().name()),
-                        address.clone(),
+                        Authority::NaeManager(address.name()),
+                        address,
                         requester.clone(),
                         request,
                         message_id,
@@ -782,17 +767,10 @@ impl Vault {
                 Response::DelMDataUserPermissions(result)
             }
             Request::ListMDataUserPermissions { address, ref user } => {
-                let user = user.clone();
+                let user = *user;
 
                 let result = self
-                    .get_mdata(
-                        dest,
-                        address.clone(),
-                        requester.clone(),
-                        request,
-                        message_id,
-                        None,
-                    )
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
                     .and_then(|data| match data {
                         MutableDataKind::Unsequenced(mdata) => {
                             Ok((*unwrap!(mdata.user_permissions(user))).clone())
@@ -805,14 +783,7 @@ impl Vault {
             }
             Request::ListMDataPermissions { address } => {
                 let result = self
-                    .get_mdata(
-                        dest,
-                        address.clone(),
-                        requester.clone(),
-                        request,
-                        message_id,
-                        None,
-                    )
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
                     .and_then(|data| match data {
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.permissions()),
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.permissions()),
@@ -827,8 +798,8 @@ impl Vault {
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(address.clone().name()),
-                        address.clone(),
+                        Authority::NaeManager(address.name()),
+                        address,
                         requester.clone(),
                         request.clone(),
                         message_id,
@@ -865,8 +836,8 @@ impl Vault {
 
                 let result = self
                     .get_mdata(
-                        Authority::NaeManager(address.clone().name()),
-                        address.clone(),
+                        Authority::NaeManager(address.name()),
+                        address,
                         requester.clone(),
                         request.clone(),
                         message_id,

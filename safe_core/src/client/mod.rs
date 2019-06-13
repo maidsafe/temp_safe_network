@@ -479,12 +479,7 @@ pub trait Client: Clone + 'static {
     fn delete_mdata(&self, mdataref: MutableDataRef) -> Box<CoreFuture<()>> {
         trace!("Delete entire Mutable Data");
 
-        send_mutation_new(
-            self,
-            Request::DeleteMData {
-                address: mdataref.clone(),
-            },
-        )
+        send_mutation_new(self, Request::DeleteMData { address: mdataref })
     }
 
     /// Mutates `MutableData` entries in bulk.
@@ -806,7 +801,7 @@ pub trait Client: Clone + 'static {
             self,
             Request::ListMDataUserPermissions {
                 address: MutableDataRef::new(name, tag),
-                user: user.clone(),
+                user,
             },
         )
         .and_then(|event| {
@@ -880,7 +875,7 @@ pub trait Client: Clone + 'static {
         let dst = some_or_err!(self.cm_addr());
         let msg_id = MessageId::new();
         send(self, msg_id, move |routing| {
-            routing.get_account_info(dst.clone(), msg_id)
+            routing.get_account_info(dst, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::GetAccountInfo))
         .into_box()
@@ -943,7 +938,7 @@ pub trait Client: Clone + 'static {
         let msg_id = MessageId::new();
         send(self, msg_id, move |routing| {
             let dst = Authority::NaeManager(name);
-            routing.list_mdata_user_permissions(dst, name, tag, user.clone(), msg_id)
+            routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
         })
         .and_then(|event| match_event!(event, CoreEvent::ListMDataUserPermissions))
         .into_box()
@@ -967,7 +962,7 @@ pub trait Client: Clone + 'static {
                 dst,
                 name,
                 tag,
-                user.clone(),
+                user,
                 permissions,
                 version,
                 msg_id,
@@ -991,7 +986,7 @@ pub trait Client: Clone + 'static {
             self,
             Request::SetMDataUserPermissions {
                 address: MutableDataRef::new(name, tag),
-                user: user.clone(),
+                user,
                 permissions: permissions.clone(),
                 version,
             },
@@ -1012,7 +1007,7 @@ pub trait Client: Clone + 'static {
             self,
             Request::DelMDataUserPermissions {
                 address: MutableDataRef::new(name, tag),
-                user: user.clone(),
+                user,
                 version,
             },
         )
@@ -1035,7 +1030,7 @@ pub trait Client: Clone + 'static {
                 dst,
                 name,
                 tag,
-                user.clone(),
+                user,
                 version,
                 msg_id,
                 PublicKey::from(requester),
@@ -1055,14 +1050,7 @@ pub trait Client: Clone + 'static {
 
         let msg_id = MessageId::new();
         send_mutation(self, msg_id, move |routing, dst| {
-            routing.change_mdata_owner(
-                dst,
-                name,
-                tag,
-                btree_set![new_owner.clone()],
-                version,
-                msg_id,
-            )
+            routing.change_mdata_owner(dst, name, tag, btree_set![new_owner], version, msg_id)
         })
     }
 
@@ -1258,7 +1246,7 @@ fn send_new(client: &impl Client, request: Request) -> Box<CoreFuture<CoreEvent>
     let dst = some_or_err!(client.cm_addr());
     let request = client.compose_message(request);
     send(client, request.message_id(), move |routing| {
-        routing.send(dst.clone(), &unwrap!(serialise(&request)))
+        routing.send(dst, &unwrap!(serialise(&request)))
     })
 }
 
@@ -1311,7 +1299,7 @@ where
 {
     let dst = some_or_err!(client.cm_addr());
 
-    send(client, msg_id, move |routing| req(routing, dst.clone()))
+    send(client, msg_id, move |routing| req(routing, dst))
         .and_then(|event| match event {
             CoreEvent::RpcResponse(res) => {
                 let response_buffer = unwrap!(res);
@@ -1619,7 +1607,7 @@ mod tests {
     // 2. Try getting the data object. It should panic
     #[test]
     pub fn del_seq_mdata_test() {
-        let _ = random_client(move |client| {
+        random_client(move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
             let name = XorName(rand::random());
@@ -1832,10 +1820,10 @@ mod tests {
                 .allow(Action::Insert)
                 .allow(Action::ManagePermissions);
             let user = PublicKey::Bls(unwrap!(client.public_bls_key()));
-            let user2 = user.clone();
+            let user2 = user;
             let random_user = PublicKey::Bls(threshold_crypto::SecretKey::random().public_key());
-            let _ = permissions.insert(user.clone(), permission_set.clone());
-            let _ = permissions.insert(random_user.clone(), permission_set.clone());
+            let _ = permissions.insert(user, permission_set.clone());
+            let _ = permissions.insert(random_user, permission_set.clone());
             let data = SeqMutableData::new_with_data(
                 name,
                 tag,
@@ -1910,7 +1898,7 @@ mod tests {
                 .allow(Action::Update)
                 .allow(Action::Delete);
             let user = PublicKey::Bls(unwrap!(client.public_bls_key()));
-            let _ = permissions.insert(user.clone(), permission_set.clone());
+            let _ = permissions.insert(user, permission_set.clone());
             let mut entries: BTreeMap<Vec<u8>, Val> = Default::default();
             let _ = entries.insert(b"key1".to_vec(), Val::new(b"value".to_vec(), 0));
             let _ = entries.insert(b"key2".to_vec(), Val::new(b"value".to_vec(), 0));
@@ -1984,7 +1972,7 @@ mod tests {
                 .allow(Action::Update)
                 .allow(Action::Delete);
             let user = PublicKey::Bls(unwrap!(client.public_bls_key()));
-            let _ = permissions.insert(user.clone(), permission_set.clone());
+            let _ = permissions.insert(user, permission_set.clone());
             let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = Default::default();
             let _ = entries.insert(b"key1".to_vec(), b"value".to_vec());
             let _ = entries.insert(b"key2".to_vec(), b"value".to_vec());

@@ -91,7 +91,7 @@ pub fn set_mdata_user_permissions(
 
     future::loop_fn(state, move |(attempts, version)| {
         client
-            .set_mdata_user_permissions(name, tag, user.clone(), permissions, version)
+            .set_mdata_user_permissions(name, tag, user, permissions, version)
             .map(|_| Loop::Break(()))
             .or_else(move |error| match error {
                 CoreError::RoutingClientError(ClientError::InvalidSuccessor(current_version)) => {
@@ -310,7 +310,7 @@ pub fn ins_auth_key(
 
     future::loop_fn(state, move |(attempts, version)| {
         client
-            .ins_auth_key(key, permissions.clone(), version)
+            .ins_auth_key(key, permissions, version)
             .map(|_| Loop::Break(()))
             .or_else(move |error| match error {
                 CoreError::RoutingClientError(ClientError::InvalidSuccessor(current_version)) => {

@@ -146,14 +146,14 @@ impl CoreClient {
             TYPE_TAG_SESSION_PACKET,
             BTreeMap::new(),
             acc_data,
-            btree_set![pub_key.clone()],
+            btree_set![pub_key],
         )?;
 
-        let cm_addr = Authority::ClientManager(XorName::from(pub_key.clone()));
+        let cm_addr = Authority::ClientManager(XorName::from(pub_key));
 
         let msg_id = MessageId::new();
         routing
-            .put_mdata(cm_addr.clone(), acc_md.clone(), msg_id, pub_key)
+            .put_mdata(cm_addr, acc_md.clone(), msg_id, pub_key)
             .map_err(CoreError::from)
             .and_then(|_| wait_for_response!(routing_rx, Response::PutMData, msg_id))
             .map_err(|e| {
@@ -175,7 +175,7 @@ impl CoreClient {
                 net_tx,
                 core_tx,
             })),
-            cm_addr: cm_addr.clone(),
+            cm_addr,
             keys: maid_keys,
         })
     }
@@ -193,7 +193,7 @@ impl Client for CoreClient {
     }
 
     fn cm_addr(&self) -> Option<Authority<XorName>> {
-        Some(self.cm_addr.clone())
+        Some(self.cm_addr)
     }
 
     fn inner(&self) -> Rc<RefCell<ClientInner<Self, Self::MsgType>>> {
@@ -252,7 +252,7 @@ impl Clone for CoreClient {
     fn clone(&self) -> Self {
         CoreClient {
             inner: Rc::clone(&self.inner),
-            cm_addr: self.cm_addr.clone(),
+            cm_addr: self.cm_addr,
             keys: self.keys.clone(),
         }
     }

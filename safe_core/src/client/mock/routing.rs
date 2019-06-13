@@ -680,7 +680,7 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let new_owners_len = new_owners.len();
         let new_owner = match new_owners.into_iter().next() {
-            Some(ref owner) if new_owners_len == 1 => owner.clone(),
+            Some(ref owner) if new_owners_len == 1 => *owner,
             Some(_) | None => {
                 // `new_owners` must have exactly 1 element.
                 let client_auth = self.client_auth;
