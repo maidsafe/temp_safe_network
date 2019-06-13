@@ -213,9 +213,9 @@ mod tests {
     use super::*;
     use crate::ffi::auth_is_mock;
     use ffi_utils::test_utils::call_1;
-    use routing::ImmutableData;
     use safe_core::ffi::AccountInfo;
     use safe_core::utils;
+    use safe_nd::ImmutableData;
     use std::ffi::CString;
     use std::os::raw::c_void;
     use Authenticator;

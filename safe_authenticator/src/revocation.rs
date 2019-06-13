@@ -15,9 +15,9 @@ use crate::config::{self, AppInfo, RevocationQueue};
 use futures::future::{self, Either, Loop};
 use futures::Future;
 use routing::{ClientError, EntryActions, User, Value};
-use rust_sodium::crypto::sign;
 use safe_core::recovery;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo};
+use safe_nd::PublicKey;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -139,7 +139,9 @@ fn revoke_single_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<()>> {
     // 4. Re-encrypt private containers that the app had access to
     // 5. Remove the revoked app from the access container
     config::get_app(client, app_id)
-        .and_then(move |app| delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app))
+        .and_then(move |app| {
+            delete_app_auth_key(&c2, PublicKey::from(app.keys.bls_pk)).map(move |_| app)
+        })
         .and_then(move |app| {
             access_container::fetch_entry(&c3, &app.info.id, app.keys.clone()).and_then(
                 move |(version, ac_entry)| {
@@ -165,13 +167,13 @@ fn revoke_single_app(client: &AuthClient, app_id: &str) -> Box<AuthFuture<()>> {
 
 // Delete the app auth key from the Maid Manager - this prevents the app from
 // performing any more mutations.
-fn delete_app_auth_key(client: &AuthClient, key: sign::PublicKey) -> Box<AuthFuture<()>> {
+fn delete_app_auth_key(client: &AuthClient, key: PublicKey) -> Box<AuthFuture<()>> {
     let client = client.clone();
 
     client
         .list_auth_keys_and_version()
         .and_then(move |(listed_keys, version)| {
-            if listed_keys.contains(&key) {
+            if listed_keys.contains_key(&key) {
                 client.del_auth_key(key, version + 1)
             } else {
                 // The key has been removed already
@@ -194,7 +196,7 @@ fn clear_from_access_container_entry(
     let c2 = client.clone();
     let c3 = client.clone();
 
-    revoke_container_perms(client, &containers, app.keys.sign_pk)
+    revoke_container_perms(client, &containers, PublicKey::from(app.keys.bls_pk))
         .map(move |_| (app, ac_entry_version, containers))
         .and_then(move |(app, ac_entry_version, containers)| {
             let container_names = containers.into_iter().map(|(name, _)| name).collect();
@@ -211,7 +213,7 @@ fn clear_from_access_container_entry(
 fn revoke_container_perms(
     client: &AuthClient,
     containers: &Containers,
-    sign_pk: sign::PublicKey,
+    pk: PublicKey,
 ) -> Box<AuthFuture<()>> {
     let reqs: Vec<_> = containers
         .values()
@@ -227,7 +229,7 @@ fn revoke_container_perms(
                         &c2,
                         mdata_info.name,
                         mdata_info.type_tag,
-                        User::Key(sign_pk),
+                        User::Key(pk),
                         version + 1,
                     )
                 })

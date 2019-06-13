@@ -82,13 +82,14 @@ extern crate unwrap;
 // Re-export functions used in FFI so that they are accessible through the Rust API.
 
 pub use routing::{
-    Action, ClientError, EntryAction, ImmutableData, MutableData, PermissionSet, User, Value,
-    XorName, XOR_NAME_LEN,
+    Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value, XorName,
+    XOR_NAME_LEN,
 };
 pub use safe_core::{
     app_container_name, immutable_data, ipc, mdata_info, nfs, utils, Client, ClientKeys, CoreError,
     CoreFuture, FutureExt, MDataInfo, DIR_TAG, MAIDSAFE_TAG,
 };
+pub use safe_nd::ImmutableData;
 
 // Export FFI interface.
 
@@ -186,7 +187,7 @@ impl App {
     where
         N: FnMut() + Send + 'static,
     {
-        Self::new(disconnect_notifier, |el_h, core_tx, net_tx| {
+        Self::new(disconnect_notifier, move |el_h, core_tx, net_tx| {
             let client = AppClient::unregistered(el_h, core_tx, net_tx, config)?;
             let context = AppContext::unregistered();
             Ok((client, context))
@@ -222,14 +223,13 @@ impl App {
                     enc_sk,
                     sign_pk,
                     sign_sk,
+                    bls_sk,
+                    bls_pk,
                 },
             access_container_info,
             bootstrap_config,
             ..
         } = auth_granted;
-
-        // Create a random BLS key-pair for now
-        let bls_sk = threshold_crypto::SecretKey::random();
 
         let client_keys = ClientKeys {
             sign_pk,
@@ -237,7 +237,7 @@ impl App {
             enc_pk,
             enc_sk,
             enc_key: enc_key.clone(),
-            bls_pk: bls_sk.public_key(),
+            bls_pk,
             bls_sk,
         };
 
@@ -276,14 +276,13 @@ impl App {
                     enc_sk,
                     sign_pk,
                     sign_sk,
+                    bls_pk,
+                    bls_sk,
                 },
             access_container_info,
             bootstrap_config,
             ..
         } = auth_granted;
-
-        // Create a random BLS key-pair for now
-        let bls_sk = threshold_crypto::SecretKey::random();
 
         let client_keys = ClientKeys {
             sign_pk,
@@ -291,7 +290,7 @@ impl App {
             enc_pk,
             enc_sk,
             enc_key: enc_key.clone(),
-            bls_pk: bls_sk.public_key(),
+            bls_pk,
             bls_sk,
         };
 

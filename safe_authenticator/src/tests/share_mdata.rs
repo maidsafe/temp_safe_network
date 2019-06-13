@@ -14,13 +14,12 @@ use crate::test_utils::{self, Payload};
 use ffi_utils::test_utils::{call_1, call_vec};
 use futures::Future;
 use maidsafe_utilities::serialisation::serialise;
-use rand;
 use routing::{Action, MutableData, PermissionSet, User, Value};
-use rust_sodium::crypto::sign;
 use safe_core::ipc::req::AppExchangeInfo;
 use safe_core::ipc::resp::{AppAccess, UserMetadata, METADATA_KEY};
 use safe_core::ipc::{self, AuthReq, IpcError, IpcMsg, IpcReq, IpcResp, ShareMData, ShareMDataReq};
 use safe_core::Client;
+use safe_nd::PublicKey;
 use std::collections::BTreeMap;
 
 // Test making an empty request to share mutable data.
@@ -62,7 +61,7 @@ fn share_some_mdatas() {
     let authenticator = test_utils::create_account_and_login();
 
     let user = unwrap!(run(&authenticator, move |client| {
-        ok!(unwrap!(client.public_signing_key()))
+        ok!(PublicKey::from(unwrap!(client.public_bls_key())))
     }));
 
     const NUM_MDATAS: usize = 3;
@@ -71,7 +70,7 @@ fn share_some_mdatas() {
     let mut metadatas = Vec::new();
 
     for _ in 0..NUM_MDATAS {
-        let name = rand::random();
+        let name = new_rand::random();
         let tag = 0;
         let mdata = {
             let owners = btree_set![user];
@@ -133,7 +132,7 @@ fn share_invalid_mdatas() {
     let mut share_mdatas = Vec::new();
 
     for _ in 0..NUM_MDATAS {
-        let name = rand::random();
+        let name = new_rand::random();
         let tag = 15_000;
 
         share_mdatas.push(ShareMData {
@@ -167,14 +166,15 @@ fn share_some_mdatas_with_valid_metadata() {
     let auth_req = AuthReq {
         app: app_id.clone(),
         app_container: false,
+        app_permissions: Default::default(),
         containers: Default::default(),
     };
 
     let app_auth = unwrap!(test_utils::register_app(&authenticator, &auth_req));
-    let app_key = app_auth.app_keys.sign_pk;
+    let app_key = PublicKey::from(app_auth.app_keys.bls_pk);
 
     let user = unwrap!(run(&authenticator, move |client| {
-        ok!(unwrap!(client.public_signing_key()))
+        ok!(PublicKey::from(unwrap!(client.public_bls_key())))
     }));
 
     const NUM_MDATAS: usize = 3;
@@ -188,7 +188,7 @@ fn share_some_mdatas_with_valid_metadata() {
             description: Some(format!("description {}", i)),
         };
 
-        let name = rand::random();
+        let name = new_rand::random();
         let tag = 10_000;
         let mdata = {
             let value = Value {
@@ -279,10 +279,10 @@ fn share_some_mdatas_with_ownership_error() {
     let authenticator = test_utils::create_account_and_login();
 
     let user = unwrap!(run(&authenticator, move |client| {
-        ok!(unwrap!(client.public_signing_key()))
+        ok!(PublicKey::from(unwrap!(client.public_bls_key())))
     }));
 
-    let (someone_else, _) = sign::gen_keypair();
+    let someone_else = PublicKey::from(threshold_crypto::SecretKey::random().public_key());
 
     let ownerss = vec![
         btree_set![user /* , someone_else */], // currently can't handle having multiple owners
@@ -293,7 +293,7 @@ fn share_some_mdatas_with_ownership_error() {
 
     let mut mdatas = Vec::new();
     for owners in ownerss {
-        let name = rand::random();
+        let name = new_rand::random();
         let mdata = {
             unwrap!(MutableData::new(
                 name,
@@ -375,7 +375,7 @@ fn auth_apps_accessing_mdatas() {
     let authenticator = test_utils::create_account_and_login();
 
     let user = unwrap!(run(&authenticator, move |client| {
-        ok!(unwrap!(client.public_signing_key()))
+        ok!(PublicKey::from(unwrap!(client.public_bls_key())))
     }));
 
     const NUM_MDATAS: usize = 3;
@@ -385,7 +385,7 @@ fn auth_apps_accessing_mdatas() {
     let perms = PermissionSet::new().allow(Action::Insert);
     let mut mdatas = Vec::new();
     let mut metadatas = Vec::new();
-    let unregistered = sign::gen_keypair().0;
+    let unregistered = PublicKey::from(threshold_crypto::SecretKey::random().public_key());
 
     for i in 0..(NUM_MDATAS + NUM_MDATAS_NO_META) {
         let metadata = if i < NUM_MDATAS {
@@ -397,7 +397,7 @@ fn auth_apps_accessing_mdatas() {
             None
         };
 
-        let name = rand::random();
+        let name = new_rand::random();
         let tag = 10_000 + i as u64;
         let mdata = {
             let owners = btree_set![user];
@@ -438,18 +438,19 @@ fn auth_apps_accessing_mdatas() {
 
     const NUM_APPS: usize = 3;
 
-    let mut apps: Vec<(sign::PublicKey, AppExchangeInfo)> = Vec::with_capacity(NUM_APPS);
+    let mut apps: Vec<(PublicKey, AppExchangeInfo)> = Vec::with_capacity(NUM_APPS);
     for _ in 0..NUM_APPS {
         // Create an app and register it.
         let app_id = test_utils::rand_app();
         let auth_req = AuthReq {
             app: app_id.clone(),
             app_container: false,
+            app_permissions: Default::default(),
             containers: Default::default(),
         };
 
         let app_auth = unwrap!(test_utils::register_app(&authenticator, &auth_req));
-        let app_key = app_auth.app_keys.sign_pk;
+        let app_key = PublicKey::from(app_auth.app_keys.bls_pk);
 
         // Share the Mdatas with the app.
         let req_id = ipc::gen_req_id();

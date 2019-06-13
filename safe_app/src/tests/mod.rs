@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod coins;
 mod mutable_data;
 
 use crate::ffi::test_utils::test_create_app_with_access;
@@ -132,14 +133,14 @@ pub fn login_registered_with_low_balance() {
                     res: Err(ClientError::LowBalance),
                     msg_id,
                 }),
-                Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
-                    res: Err(ClientError::LowBalance),
-                    msg_id,
-                }),
-                Request::DelAuthKey { msg_id, .. } => Some(Response::DelAuthKey {
-                    res: Err(ClientError::LowBalance),
-                    msg_id,
-                }),
+                // Request::InsAuthKey { msg_id, .. } => Some(Response::InsAuthKey {
+                //     res: Err(ClientError::LowBalance),
+                //     msg_id,
+                // }),
+                // Request::DelAuthKey { msg_id, .. } => Some(Response::DelAuthKey {
+                //     res: Err(ClientError::LowBalance),
+                //     msg_id,
+                // }),
                 // Pass-through
                 _ => None,
             }
@@ -159,6 +160,7 @@ pub fn login_registered_with_low_balance() {
         &AuthReq {
             app: app_info,
             app_container: false,
+            app_permissions: Default::default(),
             containers: HashMap::new(),
         },
     ));
@@ -183,6 +185,7 @@ fn authorise_app(
         &AuthReq {
             app: app_info.clone(),
             app_container,
+            app_permissions: Default::default(),
             containers: HashMap::new(),
         },
     ));

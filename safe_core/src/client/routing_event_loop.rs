@@ -10,7 +10,8 @@ use crate::client::Client;
 use crate::errors::CoreError;
 use crate::event::{CoreEvent, NetworkEvent, NetworkTx};
 use crate::event_loop::{CoreMsg, CoreMsgTx};
-use routing::{Event, MessageId, Response};
+use routing::{Event, Response};
+use safe_nd::MessageId;
 use std::sync::mpsc::Receiver;
 
 /// Run the routing event loop - this will receive messages from routing.
@@ -56,9 +57,7 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
         | Response::SetMDataUserPermissions { res, msg_id }
         | Response::MutateMDataEntries { res, msg_id }
         | Response::PutMData { res, msg_id }
-        | Response::PutIData { res, msg_id }
-        | Response::InsAuthKey { res, msg_id }
-        | Response::DelAuthKey { res, msg_id } => {
+        | Response::PutIData { res, msg_id } => {
             (msg_id, CoreEvent::Mutation(res.map_err(CoreError::from)))
         }
         Response::RpcResponse { res, msg_id } => {
@@ -105,10 +104,6 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
         Response::ListMDataUserPermissions { res, msg_id } => (
             msg_id,
             CoreEvent::ListMDataUserPermissions(res.map_err(CoreError::from)),
-        ),
-        Response::ListAuthKeysAndVersion { res, msg_id } => (
-            msg_id,
-            CoreEvent::ListAuthKeysAndVersion(res.map_err(CoreError::from)),
         ),
     })
 }

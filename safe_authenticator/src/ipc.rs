@@ -16,7 +16,6 @@ use futures::future::{self, Either};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
 use routing::{ClientError, User, XorName};
-use rust_sodium::crypto::sign;
 use safe_core::ffi::ipc::resp::MetadataResponse as FfiUserMetadata;
 use safe_core::ipc::req::{
     container_perms_into_permission_set, ContainerPermissions, IpcReq, ShareMDataReq,
@@ -24,6 +23,7 @@ use safe_core::ipc::req::{
 use safe_core::ipc::resp::{AccessContainerEntry, IpcResp, UserMetadata, METADATA_KEY};
 use safe_core::ipc::{self, IpcError, IpcMsg};
 use safe_core::{recovery, Client, CoreError, FutureExt};
+use safe_nd::PublicKey;
 use std::collections::HashMap;
 use std::ffi::CString;
 
@@ -103,7 +103,7 @@ pub fn decode_ipc_msg(
 pub fn update_container_perms(
     client: &AuthClient,
     permissions: HashMap<String, ContainerPermissions>,
-    sign_pk: sign::PublicKey,
+    app_pk: PublicKey,
 ) -> Box<AuthFuture<AccessContainerEntry>> {
     let c2 = client.clone();
 
@@ -126,7 +126,7 @@ pub fn update_container_perms(
                             &c2,
                             mdata_info.name,
                             mdata_info.type_tag,
-                            User::Key(sign_pk),
+                            User::Key(app_pk),
                             perm_set,
                             version + 1,
                         )
@@ -163,9 +163,9 @@ pub fn decode_share_mdata_req(
     client: &AuthClient,
     req: &ShareMDataReq,
 ) -> Box<AuthFuture<Vec<Option<FfiUserMetadata>>>> {
-    let user = fry!(client
-        .public_signing_key()
-        .ok_or_else(|| AuthError::Unexpected("Public signing key not found".to_string())));
+    let user = PublicKey::from(fry!(client
+        .public_bls_key()
+        .ok_or_else(|| AuthError::Unexpected("Public signing key not found".to_string()))));
     let num_mdata = req.mdata.len();
     let mut futures = Vec::with_capacity(num_mdata);
 

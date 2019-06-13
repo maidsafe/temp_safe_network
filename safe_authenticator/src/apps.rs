@@ -25,6 +25,7 @@ use safe_core::ipc::resp::{AccessContainerEntry, AppAccess};
 use safe_core::ipc::{access_container_enc_key, AppExchangeInfo, IpcError};
 use safe_core::utils::symmetric_decrypt;
 use safe_core::FutureExt;
+use safe_nd::PublicKey;
 use std::collections::HashMap;
 
 /// Represents an application that is registered with the Authenticator.
@@ -198,7 +199,7 @@ pub fn apps_accessing_mutable_data(
         .map_err(AuthError::from)
         .join(config::list_apps(&c2).map(|(_, apps)| {
             apps.into_iter()
-                .map(|(_, app_info)| (app_info.keys.sign_pk, app_info.info))
+                .map(|(_, app_info)| (PublicKey::from(app_info.keys.bls_pk), app_info.info))
                 .collect::<HashMap<_, _>>()
         }))
         .and_then(move |(permissions, apps)| {
@@ -207,7 +208,7 @@ pub fn apps_accessing_mutable_data(
             let mut app_access_vec: Vec<AppAccess> = Vec::new();
             for (user, perm_set) in permissions {
                 if let Key(public_key) = user {
-                    let app_access = match apps.get(&public_key) {
+                    let app_access = match apps.get(&PublicKey::from(public_key)) {
                         Some(app_info) => AppAccess {
                             sign_key: public_key,
                             permissions: perm_set,

@@ -37,6 +37,7 @@ use safe_core::ipc::{AuthGranted, Permission};
 use safe_core::nfs::{Mode, NfsError};
 use safe_core::MDataInfo;
 use safe_core::{utils, CoreError};
+use safe_nd::AppPermissions;
 use serde_json;
 use std::collections::HashMap;
 use std::env;
@@ -620,6 +621,9 @@ fn ffi_authorise_app(auth_h: *mut Authenticator, app_info: &AppExchangeInfo) -> 
     let auth_req = AuthReq {
         app: app_info.clone(),
         app_container: false,
+        app_permissions: AppPermissions {
+            transfer_coins: true,
+        },
         containers: create_containers_req(),
     };
     let ffi_auth_req = unwrap!(auth_req.clone().into_repr_c());

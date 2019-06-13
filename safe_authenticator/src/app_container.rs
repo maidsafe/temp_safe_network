@@ -13,8 +13,8 @@ use crate::client::AuthClient;
 use crate::{AuthError, AuthFuture};
 use futures::Future;
 use routing::{Action, EntryActions, PermissionSet, User};
-use rust_sodium::crypto::sign;
 use safe_core::{app_container_name, nfs, Client, FutureExt, MDataInfo, DIR_TAG};
+use safe_nd::PublicKey;
 
 /// Returns an app's dedicated container if available and stored in the access container,
 /// `None` otherwise.
@@ -32,7 +32,7 @@ pub fn fetch(client: &AuthClient, app_id: &str) -> Box<AuthFuture<Option<MDataIn
 pub fn fetch_or_create(
     client: &AuthClient,
     app_id: &str,
-    app_sign_pk: sign::PublicKey,
+    app_pk: PublicKey,
 ) -> Box<AuthFuture<MDataInfo>> {
     let c2 = client.clone();
     let c3 = client.clone();
@@ -55,7 +55,7 @@ pub fn fetch_or_create(
                             c2.set_mdata_user_permissions(
                                 mdata_info.name,
                                 mdata_info.type_tag,
-                                User::Key(app_sign_pk),
+                                User::Key(app_pk),
                                 ps,
                                 version + 1,
                             )
@@ -66,7 +66,7 @@ pub fn fetch_or_create(
                 }
                 None => {
                     // If the container is not found, create it
-                    create(&c2, app_sign_pk)
+                    create(&c2, app_pk)
                         .and_then(move |md_info| {
                             let _ = ac_entries.insert(app_cont_name, md_info.clone());
 
@@ -138,13 +138,13 @@ pub fn remove(client: AuthClient, app_id: &str) -> Box<AuthFuture<bool>> {
 }
 
 // Creates a new app's dedicated container
-fn create(client: &AuthClient, app_sign_pk: sign::PublicKey) -> Box<AuthFuture<MDataInfo>> {
+fn create(client: &AuthClient, app_pk: PublicKey) -> Box<AuthFuture<MDataInfo>> {
     let dir = fry!(MDataInfo::random_private(DIR_TAG).map_err(AuthError::from));
     nfs::create_dir(
         client,
         &dir,
         btree_map![],
-        btree_map![User::Key(app_sign_pk) => PermissionSet::new()
+        btree_map![User::Key(app_pk) => PermissionSet::new()
                 .allow(Action::Insert)
                 .allow(Action::Update)
                 .allow(Action::Delete)

@@ -65,6 +65,7 @@ extern crate ffi_utils;
 extern crate futures;
 extern crate safe_app;
 extern crate safe_authenticator;
+extern crate safe_nd;
 #[macro_use]
 extern crate safe_core;
 #[macro_use]

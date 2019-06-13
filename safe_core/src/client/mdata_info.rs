@@ -13,9 +13,9 @@ use crate::ffi::MDataInfo as FfiMDataInfo;
 use crate::ipc::IpcError;
 use crate::utils::{symmetric_decrypt, symmetric_encrypt};
 use ffi_utils::ReprC;
-use rand::{OsRng, Rng};
-use routing::{EntryAction, Value, XorName};
+use routing::{EntryAction, Value};
 use rust_sodium::crypto::secretbox;
+use safe_nd::XorName;
 use std::collections::{BTreeMap, BTreeSet};
 use tiny_keccak::sha3_256;
 
@@ -60,15 +60,13 @@ impl MDataInfo {
 
     /// Generate random `MDataInfo` for private (encrypted) mutable data.
     pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
-        let mut rng = os_rng()?;
         let enc_info = (shared_secretbox::gen_key(), secretbox::gen_nonce());
-        Ok(Self::new_private(rng.gen(), type_tag, enc_info))
+        Ok(Self::new_private(new_rand::random(), type_tag, enc_info))
     }
 
     /// Generate random `MDataInfo` for public mutable data.
     pub fn random_public(type_tag: u64) -> Result<Self, CoreError> {
-        let mut rng = os_rng()?;
-        Ok(Self::new_public(rng.gen(), type_tag))
+        Ok(Self::new_public(new_rand::random(), type_tag))
     }
 
     /// Returns the encryption key, if any.
@@ -151,10 +149,6 @@ impl MDataInfo {
             new_enc_nonce,
         }
     }
-}
-
-fn os_rng() -> Result<OsRng, CoreError> {
-    OsRng::new().map_err(|_| CoreError::RandomDataGenerationFailure)
 }
 
 /// Encrypt the entries (both keys and values) using the `MDataInfo`.

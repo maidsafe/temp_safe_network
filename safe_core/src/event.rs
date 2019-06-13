@@ -8,8 +8,9 @@
 
 use crate::errors::CoreError;
 use futures::sync::mpsc;
-use routing::{AccountInfo, ImmutableData, MutableData, PermissionSet, User, Value};
+use routing::{AccountInfo, MutableData, PermissionSet, User, Value};
 use rust_sodium::crypto::sign;
+use safe_nd::ImmutableData;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Network Events will be translated into values starting from this number for

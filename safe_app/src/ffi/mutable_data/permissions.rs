@@ -143,7 +143,7 @@ pub unsafe extern "C" fn mdata_list_permission_sets(
                 .iter()
                 .map(|(user_key, permission_set)| {
                     let user_h = match *user_key {
-                        User::Key(key) => context.object_cache().insert_pub_sign_key(key),
+                        User::Key(key) => context.object_cache().insert_pub_key(key),
                         User::Anyone => USER_ANYONE,
                     };
                     permissions::UserPermissionSet {

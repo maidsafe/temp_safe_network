@@ -102,6 +102,7 @@ mod codes {
     pub const ERR_INVALID_FILE_MODE: i32 = -1016;
     pub const ERR_INVALID_SIGN_SEC_KEY_HANDLE: i32 = -1017;
     pub const ERR_UNREGISTERED_CLIENT_ACCESS: i32 = -1018;
+    pub const ERR_INVALID_PUB_KEY_HANDLE: i32 = -1019;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 
@@ -110,6 +111,13 @@ mod codes {
     pub const ERR_INVALID_PERMISSIONS_SUCCESSOR: i32 = -3002;
     pub const ERR_SIGN_KEYTYPE_MISMATCH: i32 = -3003;
     pub const ERR_INVALID_SIGNATURE: i32 = -3004;
+
+    // Coin errors.
+    pub const ERR_LOSS_OF_PRECISION: i32 = -4000;
+    pub const ERR_EXCESSIVE_VALUE: i32 = -4001;
+    pub const ERR_FAILED_TO_PARSE: i32 = -4002;
+    pub const ERR_TRANSACTION_ID_EXISTS: i32 = -4003;
+    pub const ERR_INSUFFICIENT_BALANCE: i32 = -4004;
 }
 
 /// App error.
@@ -151,6 +159,8 @@ pub enum AppError {
     InvalidSignPubKeyHandle,
     /// Invalid secret sign key handle.
     InvalidSignSecKeyHandle,
+    /// Invalid public key handle.
+    InvalidPubKeyHandle,
     /// Invalid file writer handle.
     InvalidFileContextHandle,
 
@@ -206,6 +216,7 @@ impl Display for AppError {
             AppError::InvalidSignSecKeyHandle => {
                 write!(formatter, "Invalid sign secret key handle")
             }
+            AppError::InvalidPubKeyHandle => write!(formatter, "Invalid public key handle"),
             AppError::InvalidEncryptSecKeyHandle => write!(formatter, "Invalid secret key handle"),
             AppError::InvalidFileContextHandle => write!(formatter, "Invalid file context handle"),
             AppError::SelfEncryption(ref error) => {
@@ -368,6 +379,7 @@ impl ErrorCode for AppError {
             AppError::InvalidSignPubKeyHandle => ERR_INVALID_SIGN_PUB_KEY_HANDLE,
             AppError::InvalidSignSecKeyHandle => ERR_INVALID_SIGN_SEC_KEY_HANDLE,
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
+            AppError::InvalidPubKeyHandle => ERR_INVALID_PUB_KEY_HANDLE,
             AppError::InvalidFileContextHandle => ERR_INVALID_FILE_CONTEXT_HANDLE,
             AppError::InvalidFileMode => ERR_INVALID_FILE_MODE,
             AppError::UnregisteredClientAccess => ERR_UNREGISTERED_CLIENT_ACCESS,
@@ -431,6 +443,11 @@ fn core_error_code(err: &CoreError) -> i32 {
             SndError::InvalidPermissionsSuccessor(_) => ERR_INVALID_PERMISSIONS_SUCCESSOR,
             SndError::SigningKeyTypeMismatch => ERR_SIGN_KEYTYPE_MISMATCH,
             SndError::InvalidSignature => ERR_INVALID_SIGNATURE,
+            SndError::LossOfPrecision => ERR_LOSS_OF_PRECISION,
+            SndError::ExcessiveValue => ERR_EXCESSIVE_VALUE,
+            SndError::FailedToParse => ERR_FAILED_TO_PARSE,
+            SndError::TransactionIdExists => ERR_TRANSACTION_ID_EXISTS,
+            SndError::InsufficientBalance => ERR_INSUFFICIENT_BALANCE,
         },
         CoreError::UnsupportedSaltSizeForPwHash => ERR_UNSUPPORTED_SALT_SIZE_FOR_PW_HASH,
         CoreError::UnsuccessfulPwHash => ERR_UNSUCCESSFUL_PW_HASH,

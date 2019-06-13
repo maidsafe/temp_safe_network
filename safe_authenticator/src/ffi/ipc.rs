@@ -26,6 +26,7 @@ use safe_core::ipc::req::{
 use safe_core::ipc::resp::IpcResp;
 use safe_core::ipc::{decode_msg, IpcError, IpcMsg};
 use safe_core::{client, Client, CoreError, FutureExt};
+use safe_nd::PublicKey;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
 
@@ -364,7 +365,7 @@ pub unsafe extern "C" fn encode_containers_resp(
 
                 config::get_app(client, &app_id)
                     .and_then(move |app| {
-                        let sign_pk = app.keys.sign_pk;
+                        let sign_pk = PublicKey::from(app.keys.bls_pk);
                         update_container_perms(&c2, permissions, sign_pk)
                             .map(move |perms| (app, perms))
                     })
@@ -463,7 +464,7 @@ pub unsafe extern "C" fn encode_share_mdata_resp(
 
                 config::get_app(client, &share_mdata_req.app.id)
                     .and_then(move |app_info| {
-                        let user = User::Key(app_info.keys.sign_pk);
+                        let user = User::Key(PublicKey::from(app_info.keys.bls_pk));
                         let num_mdata = share_mdata_req.mdata.len();
                         stream::iter_ok(share_mdata_req.mdata.into_iter())
                             .map(move |mdata| {

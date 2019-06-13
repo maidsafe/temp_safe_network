@@ -13,9 +13,9 @@ use crate::utils::FutureExt;
 use futures::future::{self, Either, Loop};
 use futures::Future;
 use routing::{
-    Action, ClientError, EntryAction, EntryError, MutableData, PermissionSet, User, Value, XorName,
+    Action, ClientError, EntryAction, EntryError, MutableData, PermissionSet, User, Value,
 };
-use rust_sodium::crypto::sign;
+use safe_nd::{AppPermissions, PublicKey, XorName};
 use std::collections::BTreeMap;
 
 const MAX_ATTEMPTS: usize = 10;
@@ -301,7 +301,8 @@ fn union_permission_sets(a: PermissionSet, b: PermissionSet) -> PermissionSet {
 /// Covers the `InvalidSuccessor` error case (it should not fail if the key already exists).
 pub fn ins_auth_key(
     client: &impl Client,
-    key: sign::PublicKey,
+    key: PublicKey,
+    permissions: AppPermissions,
     version: u64,
 ) -> Box<CoreFuture<()>> {
     let state = (0, version);
@@ -309,7 +310,7 @@ pub fn ins_auth_key(
 
     future::loop_fn(state, move |(attempts, version)| {
         client
-            .ins_auth_key(key, version)
+            .ins_auth_key(key, permissions, version)
             .map(|_| Loop::Break(()))
             .or_else(move |error| match error {
                 CoreError::RoutingClientError(ClientError::InvalidSuccessor(current_version)) => {
@@ -466,9 +467,7 @@ mod tests {
 mod tests_with_mock_routing {
     use super::*;
     use crate::utils::test_utils::random_client;
-    use rand;
     use routing::{Action, EntryActions, MutableData};
-    use rust_sodium::crypto::sign;
 
     // Test putting mdata and recovering from errors
     #[test]
@@ -478,9 +477,9 @@ mod tests_with_mock_routing {
             let client3 = client.clone();
             let client4 = client.clone();
 
-            let name = rand::random();
+            let name = new_rand::random();
             let tag = 10_000;
-            let owners = btree_set![unwrap!(client.public_signing_key())];
+            let owners = btree_set![PublicKey::Bls(unwrap!(client.public_bls_key()))];
 
             let entries = btree_map![
                 vec![0] => Value {
@@ -522,7 +521,9 @@ mod tests_with_mock_routing {
                 }
             ];
 
-            let user = User::Key(sign::gen_keypair().0);
+            let bls_sk = threshold_crypto::SecretKey::random();
+            let user = User::Key(PublicKey::Bls(bls_sk.public_key()));
+
             let permissions = btree_map![
                 User::Anyone => PermissionSet::new().allow(Action::Insert).allow(Action::Update),
                 user => PermissionSet::new().allow(Action::Delete)
@@ -586,7 +587,7 @@ mod tests_with_mock_routing {
             let client2 = client.clone();
             let client3 = client.clone();
 
-            let name = rand::random();
+            let name = new_rand::random();
             let tag = 10_000;
             let entries = btree_map![
                 vec![1] => Value {
@@ -610,7 +611,7 @@ mod tests_with_mock_routing {
                     entry_version: 0,
                 }
             ];
-            let owners = btree_set![unwrap!(client.public_signing_key())];
+            let owners = btree_set![PublicKey::Bls(unwrap!(client.public_bls_key()))];
             let data = unwrap!(MutableData::new(
                 name,
                 tag,
@@ -711,9 +712,9 @@ mod tests_with_mock_routing {
             let client5 = client.clone();
             let client6 = client.clone();
 
-            let name = rand::random();
+            let name = new_rand::random();
             let tag = 10_000;
-            let owners = btree_set![unwrap!(client.public_signing_key())];
+            let owners = btree_set![PublicKey::from(unwrap!(client.public_bls_key()))];
             let data = unwrap!(MutableData::new(
                 name,
                 tag,
@@ -722,8 +723,11 @@ mod tests_with_mock_routing {
                 owners,
             ));
 
-            let user0 = User::Key(sign::gen_keypair().0);
-            let user1 = User::Key(sign::gen_keypair().0);
+            let bls_sk1 = threshold_crypto::SecretKey::random();
+            let bls_sk2 = threshold_crypto::SecretKey::random();
+
+            let user0 = User::Key(PublicKey::from(bls_sk1.public_key()));
+            let user1 = User::Key(PublicKey::from(bls_sk2.public_key()));
             let permissions = PermissionSet::new().allow(Action::Insert);
 
             client

@@ -23,18 +23,18 @@ use crate::event_loop::CoreMsgTx;
 use crate::utils;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::serialise;
-use routing::XorName;
 use routing::{
-    AccountPacket, Authority, BootstrapConfig, Event, FullId, MessageId, MutableData, Response,
-    Value, ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
+    AccountPacket, Authority, BootstrapConfig, Event, FullId, MutableData, Response, Value,
+    ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
 };
 use rust_sodium::crypto::sign::Seed;
 use rust_sodium::crypto::{box_, sign};
+use safe_nd::request::{Request, Requester};
+use safe_nd::{Message, MessageId, PublicKey, XorName};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 use std::time::Duration;
-use tiny_keccak::sha3_256;
 use tokio_core::reactor::Handle;
 
 /// Wait for a response from the `$rx` receiver with path `$res` and message ID `$msg_id`.
@@ -118,7 +118,7 @@ impl CoreClient {
         let acc_loc = ClientAccount::generate_network_id(&keyword, &pin)?;
 
         let maid_keys = ClientKeys::new(id_seed);
-        let pub_key = maid_keys.sign_pk;
+        let pub_key = PublicKey::Bls(maid_keys.bls_pk);
         let full_id = Some(maid_keys.clone().into());
 
         let (mut routing, routing_rx) = setup_routing(full_id, None)?;
@@ -149,8 +149,7 @@ impl CoreClient {
             btree_set![pub_key],
         )?;
 
-        let digest = sha3_256(&pub_key.0);
-        let cm_addr = Authority::ClientManager(XorName(digest));
+        let cm_addr = Authority::ClientManager(XorName::from(pub_key));
 
         let msg_id = MessageId::new();
         routing
@@ -229,8 +228,23 @@ impl Client for CoreClient {
         Some(self.keys.bls_sk.clone())
     }
 
-    fn owner_key(&self) -> Option<sign::PublicKey> {
-        Some(self.keys.sign_pk)
+    fn owner_key(&self) -> Option<PublicKey> {
+        Some(PublicKey::from(self.keys.bls_pk))
+    }
+
+    fn compose_message(&self, request: Request) -> Message {
+        let message_id = MessageId::new();
+
+        let sig = self
+            .keys
+            .bls_sk
+            .sign(&unwrap!(bincode::serialize(&(&request, message_id))));
+
+        Message::Request {
+            request,
+            message_id,
+            requester: Requester::Owner(sig),
+        }
     }
 }
 

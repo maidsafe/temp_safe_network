@@ -6,21 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Account;
 use super::DataId;
+use super::{Account, CoinBalance};
 use crate::client::mock::routing::unlimited_muts;
-use crate::client::XorNameConverter;
 use crate::config_handler::{Config, DevConfig};
 use fs2::FileExt;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Authority, ClientError, ImmutableData, MutableData as OldMutableData, XorName};
-use rust_sodium::crypto::sign;
+use routing::{Authority, ClientError, MutableData as OldMutableData};
 use safe_nd::mutable_data::{
-    Action, MutableData as NewMutableData, MutableDataRef, SeqMutableData, UnseqMutableData,
+    MutableData as NewMutableData, MutableDataRef, SeqMutableData, UnseqMutableData,
 };
 use safe_nd::request::{Request, Requester};
-use safe_nd::response::Response;
-use safe_nd::{Error, UnpubImmutableData, XorName as NewXorName};
+use safe_nd::response::{Response, Transaction};
+use safe_nd::{
+    Coins, Error, ImmutableData, Message, MessageId, PublicKey, UnpubImmutableData, XorName,
+};
 use std::collections::HashMap;
 use std::env;
 use std::fs::{File, OpenOptions};
@@ -30,7 +30,6 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use std::time::SystemTime;
-use tiny_keccak::sha3_256;
 
 const FILE_NAME: &str = "MockVault";
 
@@ -88,6 +87,7 @@ impl Vault {
 
         Vault {
             cache: Cache {
+                coin_balances: HashMap::new(),
                 client_manager: HashMap::new(),
                 nae_manager: HashMap::new(),
             },
@@ -104,6 +104,16 @@ impl Vault {
     // Get mutable reference to account for the client manager name.
     pub fn get_account_mut(&mut self, name: &XorName) -> Option<&mut Account> {
         self.cache.client_manager.get_mut(name)
+    }
+
+    // Get coin balance for the client manager name.
+    pub fn get_coin_balance(&self, name: &XorName) -> Option<&CoinBalance> {
+        self.cache.coin_balances.get(name)
+    }
+
+    // Get mutable reference to account for the client manager name.
+    pub fn get_coin_balance_mut(&mut self, name: &XorName) -> Option<&mut CoinBalance> {
+        self.cache.coin_balances.get_mut(name)
     }
 
     // Get the config for this vault.
@@ -134,114 +144,81 @@ impl Vault {
         }
     }
 
-    // Authorise read (non-mutation) operation.
-    pub fn new_authorise_read(
-        &self,
-        dst: &Authority<XorName>,
-        data_name: &XorName,
-    ) -> Result<(), Error> {
-        match *dst {
-            Authority::NaeManager(name) if name == *data_name => Ok(()),
-            x => {
-                debug!("Unexpected authority for read: {:?}", x);
-                Err(Error::InvalidOperation)
-            }
-        }
+    /// Instantly creates new balance.
+    pub fn mock_create_balance(
+        &mut self,
+        coin_balance_name: &XorName,
+        amount: Coins,
+        owner: threshold_crypto::PublicKey,
+    ) {
+        let _ = self
+            .cache
+            .coin_balances
+            .insert(*coin_balance_name, CoinBalance::new(amount, owner));
     }
 
-    pub fn verify_requester(&self, data_name: DataId, requester: Requester) -> Result<(), Error> {
-        // FIXME: Handle permissions properly
-        let public_key_res = match requester {
-            Requester::Owner(_) => Err(Error::AccessDenied),
-            Requester::Key(key) => Ok(key),
+    // Authorise coin operation.
+    pub fn authorise_coin_operation(
+        &self,
+        dst: Authority<XorName>,
+        coin_balance_name: &XorName,
+        req: &Request,
+        msg_id: MessageId,
+        requester: &Requester,
+    ) -> Result<(), Error> {
+        // Check if we are the owner or app.
+        let balance = match self.get_coin_balance(&coin_balance_name) {
+            Some(balance) => balance,
+            None => {
+                debug!("Account not found for {:?}", dst);
+                return Err(Error::NoSuchAccount);
+            }
         };
-        let public_key = unwrap!(public_key_res);
+        let owner_cm = XorName::from(PublicKey::from(*balance.owner()));
 
-        match self.get_data(&data_name) {
-            Some(data_type) => match data_type {
-                Data::NewMutable(data) => match data.clone() {
-                    MutableDataKind::Sequenced(mdata) => {
-                        if mdata.is_action_allowed(public_key, Action::Read) {
-                            Ok(())
-                        } else {
-                            Err(Error::AccessDenied)
-                        }
+        match requester {
+            Requester::Owner(sig) => {
+                if balance
+                    .owner()
+                    .verify(sig, &unwrap!(serialise(&(req, &msg_id))))
+                {
+                    Ok(())
+                } else {
+                    Err(Error::AccessDenied)
+                }
+            }
+            Requester::Key(sign_pk) => {
+                let dst_name = match dst {
+                    Authority::ClientManager(name) => name,
+                    x => {
+                        debug!("Unexpected authority for mutation: {:?}", x);
+                        return Err(Error::InvalidOperation);
                     }
-                    MutableDataKind::Unsequenced(mdata) => {
-                        if mdata.is_action_allowed(public_key, Action::Read) {
-                            Ok(())
-                        } else {
-                            Err(Error::AccessDenied)
-                        }
+                };
+                if dst_name != owner_cm {
+                    return Err(Error::InvalidOperation);
+                }
+                let account = match self.get_account(&owner_cm) {
+                    Some(account) => account,
+                    None => {
+                        debug!("Account not found for {:?}", dst);
+                        return Err(Error::NoSuchAccount);
                     }
-                },
-                Data::Immutable(data) => match data {
-                    ImmutableDataKind::Unpublished(idata) => {
-                        // Only the owners can read unpub idata.
-                        if public_key == *idata.owners() {
-                            Ok(())
-                        } else {
-                            Err(Error::AccessDenied)
+                };
+                match account.auth_keys().get(sign_pk) {
+                    Some(perms) => {
+                        if !perms.transfer_coins {
+                            debug!("Mutation not authorised");
+                            return Err(Error::AccessDenied);
                         }
-                    }
-                    ImmutableDataKind::Published(_) => {
-                        // Everyone can read public idata.
                         Ok(())
                     }
-                },
-                // Handle other types
-                _ => Err(Error::NoSuchData),
-            },
-            _ => Err(Error::NoSuchData),
-        }
-    }
-
-    pub fn authorise_delete(
-        &self,
-        dst: &Authority<XorName>,
-        data_name: &XorName,
-    ) -> Result<(), Error> {
-        match *dst {
-            Authority::NaeManager(name) if name == *data_name => Ok(()),
-            x => {
-                debug!("Unexpected authority for delete: {:?}", x);
-                Err(Error::InvalidOperation)
+                    None => {
+                        debug!("App not found");
+                        Err(Error::AccessDenied)
+                    }
+                }
             }
-        }
-    }
-
-    pub fn authorised_delete(
-        &self,
-        data_name: DataId,
-        requester: Requester,
-    ) -> Result<Data, Error> {
-        let req = if let Requester::Key(req) = requester {
-            req
-        } else {
-            return Err(Error::AccessDenied);
-        };
-        match self.get_data(&data_name) {
-            Some(data_type) => match data_type {
-                Data::NewMutable(kind) => match kind {
-                    MutableDataKind::Unsequenced(data) => {
-                        if data.owners() == &req {
-                            Ok(unwrap!(self.get_data(&data_name)))
-                        } else {
-                            Err(Error::AccessDenied)
-                        }
-                    }
-                    MutableDataKind::Sequenced(data) => {
-                        if data.owners() == &req {
-                            Ok(unwrap!(self.get_data(&data_name)))
-                        } else {
-                            Err(Error::AccessDenied)
-                        }
-                    }
-                },
-                // Handle other types
-                _ => Ok(unwrap!(self.get_data(&data_name))),
-            },
-            _ => Err(Error::NoSuchData),
         }
     }
 
@@ -249,7 +226,7 @@ impl Vault {
     pub fn authorise_mutation(
         &self,
         dst: &Authority<XorName>,
-        sign_pk: &sign::PublicKey,
+        sign_pk: &PublicKey,
     ) -> Result<(), ClientError> {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
@@ -268,10 +245,10 @@ impl Vault {
         };
 
         // Check if we are the owner or app.
-        let owner_name = XorName(sha3_256(&sign_pk[..]));
-        if owner_name != dst_name && !account.auth_keys().contains(sign_pk) {
+        let owner_name = XorName::from(*sign_pk);
+        if owner_name != dst_name && !account.auth_keys().contains_key(sign_pk) {
             debug!("Mutation not authorised");
-            return Err(ClientError::AccessDenied);
+            return Err(ClientError::from("Error here"));
         }
 
         let unlimited_mut = unlimited_muts(&self.config);
@@ -337,22 +314,67 @@ impl Vault {
         let _ = self.cache.nae_manager.remove(&name);
     }
 
+    fn transfer_coins(
+        &mut self,
+        source: XorName,
+        destination: XorName,
+        amount: Coins,
+        transaction_id: u64,
+    ) -> Result<(), Error> {
+        match self.get_coin_balance_mut(&source) {
+            Some(balance) => balance.credit_balance(amount, transaction_id)?,
+            None => return Err(Error::NoSuchAccount),
+        };
+        match self.get_coin_balance_mut(&destination) {
+            Some(balance) => balance.debit_balance(amount)?,
+            None => return Err(Error::NoSuchAccount),
+        };
+        Ok(())
+    }
+
+    fn get_transaction(
+        &self,
+        coins_balance_id: &XorName,
+        transaction_id: u64,
+    ) -> Result<Transaction, Error> {
+        match self.get_coin_balance(coins_balance_id) {
+            Some(balance) => match balance.find_transaction(transaction_id) {
+                Some(amount) => Ok(Transaction::Success(amount)),
+                None => Ok(Transaction::NoSuchTransaction),
+            },
+            None => Ok(Transaction::NoSuchCoinBalance),
+        }
+    }
+
+    fn get_balance(&self, coins_balance_id: &XorName) -> Result<Coins, Error> {
+        match self.get_coin_balance(coins_balance_id) {
+            Some(balance) => Ok(balance.balance()),
+            None => Err(Error::NoSuchAccount),
+        }
+    }
+
     pub fn process_request(
         &mut self,
         _src: Authority<XorName>,
         dest: Authority<XorName>,
         payload: Vec<u8>,
     ) -> Result<(Authority<XorName>, Vec<u8>), Error> {
-        let request: Request = unwrap!(deserialise(&payload));
-        match request {
+        let (request, message_id, requester) = if let Message::Request {
+            request,
+            message_id,
+            requester,
+        } = unwrap!(deserialise(&payload))
+        {
+            (request, message_id, requester)
+        } else {
+            return Err(Error::from("Unexpected Message type"));
+        };
+
+        let response = match request {
             //
             // Immutable Data
             //
-            Request::GetUnpubIData {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::GetUnpubIData { address } => {
                 let result = self
                     .get_idata(
                         dest,
@@ -366,36 +388,17 @@ impl Vault {
                         ImmutableDataKind::Unpublished(data) => Ok(data),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::GetUnpubIData {
-                    res: result,
-                    msg_id: message_id,
-                }));
-                Ok((dest, payload))
+                Response::GetUnpubIData(result)
             }
-            Request::PutUnpubIData {
-                data,
-                requester,
-                message_id,
-            } => {
+            Request::PutUnpubIData { data } => {
                 let result = self.put_idata(
                     dest,
                     ImmutableDataKind::Unpublished(data.clone()),
                     requester,
                 );
-                let payload = unwrap!(serialise(&Response::PutUnpubIData {
-                    res: result,
-                    msg_id: message_id,
-                }));
-                Ok((
-                    Authority::NaeManager(XorName::from_new(*data.name())),
-                    payload,
-                ))
+                Response::PutUnpubIData(result)
             }
-            Request::DeleteUnpubIData {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::DeleteUnpubIData { address } => {
                 let result = self.delete_idata(
                     dest,
                     ImmutableDataRef {
@@ -404,255 +407,498 @@ impl Vault {
                     },
                     requester,
                 );
-                let payload = unwrap!(serialise(&Response::DeleteUnpubIData {
-                    res: result,
-                    msg_id: message_id,
-                }));
-                Ok((dest, payload))
+                Response::DeleteUnpubIData(result)
             }
-            //
-            // Mutable Data
-            //
-            Request::PutUnseqMData {
-                data,
-                requester,
-                message_id,
+            Request::ListAuthKeysAndVersion => {
+                let name = dest.name();
+                if let Some(account) = self.get_account(&name) {
+                    Response::ListAuthKeysAndVersion(Ok((
+                        account.auth_keys().clone(),
+                        account.version(),
+                    )))
+                } else {
+                    return Err(Error::NoSuchAccount);
+                }
+            }
+            Request::InsAuthKey {
+                key,
+                permissions,
+                version,
             } => {
+                let name = dest.name();
+                if let Some(account) = self.get_account_mut(&name) {
+                    Response::InsAuthKey(account.ins_auth_key(key, permissions, version))
+                } else {
+                    return Err(Error::NoSuchAccount);
+                }
+            }
+            Request::DelAuthKey { key, version } => {
+                let name = dest.name();
+                if let Some(account) = self.get_account_mut(&name) {
+                    Response::DelAuthKey(account.del_auth_key(&key, version))
+                } else {
+                    return Err(Error::NoSuchAccount);
+                }
+            }
+            Request::TransferCoins {
+                source,
+                destination,
+                amount,
+                transaction_id,
+            } => {
+                if let Err(e) =
+                    self.authorise_coin_operation(dest, &source, &request, message_id, &requester)
+                {
+                    Response::TransferCoins(Err(e))
+                } else {
+                    let res = self.transfer_coins(source, destination, amount, transaction_id);
+                    Response::TransferCoins(res)
+                }
+            }
+            Request::GetBalance { coins_balance_id } => {
+                if let Err(e) = self.authorise_coin_operation(
+                    dest,
+                    &coins_balance_id,
+                    &request,
+                    message_id,
+                    &requester,
+                ) {
+                    Response::GetBalance(Err(e))
+                } else {
+                    let res = self.get_balance(&coins_balance_id);
+                    Response::GetBalance(res)
+                }
+            }
+            Request::GetTransaction {
+                coins_balance_id,
+                transaction_id,
+            } => {
+                let transaction = self.get_transaction(&coins_balance_id, transaction_id);
+                Response::GetTransaction(transaction)
+            }
+            Request::PutUnseqMData { data } => {
                 let result =
                     self.put_mdata(dest, MutableDataKind::Unsequenced(data.clone()), requester);
-                let payload = unwrap!(serialise(&Response::PutUnseqMData {
-                    res: result,
-                    msg_id: message_id,
-                }));
-                Ok((
-                    Authority::NaeManager(XorName::from_new(*data.name())),
-                    payload,
-                ))
+                Response::PutUnseqMData(result)
             }
-            Request::GetSeqMData {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::GetSeqMData { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(true),
+                    )
                     .and_then(|data| match data {
-                        MutableDataKind::Sequenced(data) => Ok(data),
-                        _ => Err(Error::from("Unexpected data returned")),
+                        MutableDataKind::Sequenced(mdata) => Ok(mdata),
+                        _ => Err(Error::from("Unexpected data")),
                     });
-                let payload = unwrap!(serialise(&Response::GetSeqMData {
-                    res: result,
-                    msg_id: message_id,
-                }));
-                Ok((dest, payload))
+                Response::GetSeqMData(result)
             }
-            Request::GetUnseqMData {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::GetUnseqMData { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(false),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata),
-                        _ => Err(Error::from("Unexpected data returned")),
+                        _ => Err(Error::from("Unexpected data")),
                     });
-                let payload = unwrap!(serialise(&Response::GetUnseqMData {
-                    res: result,
-                    msg_id: message_id,
-                }));
-                Ok((dest, payload))
+                Response::GetUnseqMData(result)
             }
-            Request::PutSeqMData {
-                data,
-                requester,
-                message_id,
-            } => {
+            Request::PutSeqMData { data } => {
                 let result =
                     self.put_mdata(dest, MutableDataKind::Sequenced(data.clone()), requester);
-                let payload = unwrap!(serialise(&Response::PutSeqMData {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((
-                    Authority::NaeManager(XorName::from_new(*data.name())),
-                    payload,
-                ))
+                Response::PutSeqMData(result)
             }
-            Request::GetSeqMDataShell {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::GetSeqMDataValue { address, ref key } => {
                 let result = self
-                    .get_mdata(dest, address, requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request.clone(),
+                        message_id,
+                        Some(true),
+                    )
+                    .and_then(|data| match data {
+                        MutableDataKind::Sequenced(mdata) => Ok(mdata.get(&key).unwrap().clone()),
+                        _ => Err(Error::from("Unexpected data returned")),
+                    });
+                Response::GetSeqMDataValue(result)
+            }
+            Request::GetUnseqMDataValue { address, ref key } => {
+                let result = self
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request.clone(),
+                        message_id,
+                        Some(false),
+                    )
+                    .and_then(|data| match data {
+                        MutableDataKind::Unsequenced(mdata) => Ok(mdata.get(&key).unwrap().clone()),
+                        _ => Err(Error::from("Unexpected data returned")),
+                    });
+                Response::GetUnseqMDataValue(result)
+            }
+            Request::GetSeqMDataShell { address } => {
+                let result = self
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(true),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.shell()),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::GetSeqMDataShell {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::GetSeqMDataShell(result)
             }
-            Request::GetUnseqMDataShell {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::GetUnseqMDataShell { address } => {
                 let result = self
-                    .get_mdata(dest, address, requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(false),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.shell()),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::GetUnseqMDataShell {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::GetUnseqMDataShell(result)
             }
-            Request::GetMDataVersion {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::GetMDataVersion { address } => {
                 let result = self
-                    .get_mdata(dest, address, requester)
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.version()),
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.version()),
                     });
-                let payload = unwrap!(serialise(&Response::GetMDataVersion {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::GetMDataVersion(result)
             }
-            Request::ListUnseqMDataEntries {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::ListUnseqMDataEntries { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(false),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.entries().clone()),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::ListUnseqMDataEntries {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::ListUnseqMDataEntries(result)
             }
-            Request::ListSeqMDataEntries {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::ListSeqMDataEntries { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(true),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.entries().clone()),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::ListSeqMDataEntries {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::ListSeqMDataEntries(result)
             }
-            Request::ListMDataKeys {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::ListMDataKeys { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.keys().clone()),
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.keys().clone()),
                     });
-                let payload = unwrap!(serialise(&Response::ListMDataKeys {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::ListMDataKeys(result)
             }
-            Request::ListSeqMDataValues {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::ListSeqMDataValues { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(true),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Sequenced(mdata) => Ok(mdata.values()),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::ListSeqMDataValues {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::ListSeqMDataValues(result)
             }
-            Request::ListUnseqMDataValues {
-                address,
-                requester,
-                message_id,
-            } => {
+            Request::ListUnseqMDataValues { address } => {
                 let result = self
-                    .get_mdata(dest, address.clone(), requester)
+                    .get_mdata(
+                        dest,
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        Some(false),
+                    )
                     .and_then(|data| match data {
                         MutableDataKind::Unsequenced(mdata) => Ok(mdata.values()),
                         _ => Err(Error::from("Unexpected data returned")),
                     });
-                let payload = unwrap!(serialise(&Response::ListUnseqMDataValues {
-                    res: result,
-                    msg_id: message_id
-                }));
-                Ok((dest, payload))
+                Response::ListUnseqMDataValues(result)
             }
-            Request::DeleteMData {
+            Request::DeleteMData { address } => {
+                let res = self.authorise_mutation1(&dest).and_then(|_| {
+                    self.get_mdata(dest, address, requester.clone(), request, message_id, None)
+                        .and_then(|data| match data {
+                            MutableDataKind::Sequenced(mdata) => {
+                                self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                            MutableDataKind::Unsequenced(mdata) => {
+                                self.delete_data(DataId::mutable(*mdata.name(), mdata.tag()));
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                        })
+                });
+                Response::DeleteMData(res)
+            }
+            Request::SetMDataUserPermissions {
                 address,
-                requester,
-                message_id,
+                ref user,
+                ref permissions,
+                version,
             } => {
-                let name = address.name();
-                let res = self.delete_mdata(dest, address.clone(), requester);
-                let payload = unwrap!(serialise(&Response::DeleteMData {
-                    res,
-                    msg_id: message_id,
-                }));
-                Ok((Authority::NaeManager(XorName::from_new(name)), payload))
+                let permissions = permissions.clone();
+                let user = user;
+
+                let result = self
+                    .get_mdata(
+                        Authority::NaeManager(address.name()),
+                        address,
+                        requester.clone(),
+                        request.clone(),
+                        message_id,
+                        None,
+                    )
+                    .and_then(|data| {
+                        let data_name = DataId::mutable(data.name(), data.tag());
+                        match data.clone() {
+                            MutableDataKind::Unsequenced(mut mdata) => {
+                                unwrap!(mdata.set_user_permissions(*user, permissions, version));
+                                self.insert_data(
+                                    data_name,
+                                    Data::NewMutable(MutableDataKind::Unsequenced(mdata)),
+                                );
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                            MutableDataKind::Sequenced(mut mdata) => {
+                                unwrap!(mdata.set_user_permissions(*user, permissions, version));
+                                self.insert_data(
+                                    data_name,
+                                    Data::NewMutable(MutableDataKind::Sequenced(mdata)),
+                                );
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                        }
+                    });
+                Response::SetMDataUserPermissions(result)
+            }
+            Request::DelMDataUserPermissions {
+                address,
+                ref user,
+                version,
+            } => {
+                let user = *user;
+
+                let result = self
+                    .get_mdata(
+                        Authority::NaeManager(address.name()),
+                        address,
+                        requester.clone(),
+                        request,
+                        message_id,
+                        None,
+                    )
+                    .and_then(|data| {
+                        let data_name = DataId::mutable(data.name(), data.tag());
+                        match data.clone() {
+                            MutableDataKind::Unsequenced(mut mdata) => {
+                                unwrap!(mdata.del_user_permissions(user, version));
+                                self.insert_data(
+                                    data_name,
+                                    Data::NewMutable(MutableDataKind::Unsequenced(mdata)),
+                                );
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                            MutableDataKind::Sequenced(mut mdata) => {
+                                unwrap!(mdata.del_user_permissions(user, version));
+                                self.insert_data(
+                                    data_name,
+                                    Data::NewMutable(MutableDataKind::Sequenced(mdata)),
+                                );
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                        }
+                    });
+                Response::DelMDataUserPermissions(result)
+            }
+            Request::ListMDataUserPermissions { address, ref user } => {
+                let user = *user;
+
+                let result = self
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
+                    .and_then(|data| match data {
+                        MutableDataKind::Unsequenced(mdata) => {
+                            Ok((*unwrap!(mdata.user_permissions(user))).clone())
+                        }
+                        MutableDataKind::Sequenced(mdata) => {
+                            Ok((*unwrap!(mdata.user_permissions(user))).clone())
+                        }
+                    });
+                Response::ListMDataUserPermissions(result)
+            }
+            Request::ListMDataPermissions { address } => {
+                let result = self
+                    .get_mdata(dest, address, requester.clone(), request, message_id, None)
+                    .and_then(|data| match data {
+                        MutableDataKind::Unsequenced(mdata) => Ok(mdata.permissions()),
+                        MutableDataKind::Sequenced(mdata) => Ok(mdata.permissions()),
+                    });
+                Response::ListMDataPermissions(result)
+            }
+            Request::MutateSeqMDataEntries {
+                address,
+                ref actions,
+            } => {
+                let request = request.clone();
+
+                let result = self
+                    .get_mdata(
+                        Authority::NaeManager(address.name()),
+                        address,
+                        requester.clone(),
+                        request.clone(),
+                        message_id,
+                        Some(true),
+                    )
+                    .and_then(move |data| {
+                        let data_name = DataId::mutable(data.name(), data.tag());
+                        match data.clone() {
+                            MutableDataKind::Sequenced(mut mdata) => {
+                                unwrap!(mdata.mutate_entries(
+                                    actions.clone(),
+                                    request,
+                                    requester,
+                                    message_id
+                                ));
+                                self.insert_data(
+                                    data_name,
+                                    Data::NewMutable(MutableDataKind::Sequenced(mdata)),
+                                );
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                            _ => Err(Error::from("Unexpected data returned")),
+                        }
+                    });
+                Response::MutateSeqMDataEntries(result)
+            }
+            Request::MutateUnseqMDataEntries {
+                address,
+                ref actions,
+            } => {
+                let request = request.clone();
+                let actions = actions.clone();
+
+                let result = self
+                    .get_mdata(
+                        Authority::NaeManager(address.name()),
+                        address,
+                        requester.clone(),
+                        request.clone(),
+                        message_id,
+                        Some(false),
+                    )
+                    .and_then(move |data| {
+                        let data_name = DataId::mutable(data.name(), data.tag());
+                        match data.clone() {
+                            MutableDataKind::Unsequenced(mut mdata) => {
+                                unwrap!(mdata.mutate_entries(
+                                    actions.clone(),
+                                    request,
+                                    requester,
+                                    message_id
+                                ));
+                                self.insert_data(
+                                    data_name,
+                                    Data::NewMutable(MutableDataKind::Unsequenced(mdata)),
+                                );
+                                self.commit_mutation(&dest);
+                                Ok(())
+                            }
+                            _ => Err(Error::from("Unexpected data returned")),
+                        }
+                    });
+                Response::MutateUnseqMDataEntries(result)
             }
             _ => {
                 // Dummy return
                 // other requests to be handled by their data type impls
-                Ok((dest, payload))
+                return Ok((dest, payload));
             }
-        }
+        };
+
+        Ok((
+            dest,
+            unwrap!(serialise(&Message::Response {
+                response,
+                message_id,
+            })),
+        ))
     }
 
     pub fn get_idata(
         &mut self,
-        dst: Authority<XorName>,
+        _dst: Authority<XorName>,
         address: ImmutableDataRef,
-        requester: Requester,
+        _requester: Requester,
     ) -> Result<ImmutableDataKind, Error> {
-        let name = XorName::from_new(address.name);
+        let name = address.name;
         let data_name = DataId::immutable(name, address.published);
-        self.new_authorise_read(&dst, &name)
-            .and_then(|_| self.verify_requester(data_name, requester))
-            .and_then(|_| match self.get_data(&data_name) {
-                Some(data_type) => match data_type {
-                    Data::Immutable(data) => Ok(data),
-                    _ => Err(Error::NoSuchData),
-                },
-                None => Err(Error::NoSuchData),
-            })
+        //self.new_authorise_read(&dst, &name)
+        // .and_then(|_| self.verify_requester(data_name, requester))
+        //.and_then(|_| match self.get_data(&data_name) {
+        match self.get_data(&data_name) {
+            Some(data_type) => match data_type {
+                Data::Immutable(data) => Ok(data),
+                _ => Err(Error::NoSuchData),
+            },
+            None => Err(Error::NoSuchData),
+        }
     }
 
     pub fn put_idata(
@@ -661,7 +907,7 @@ impl Vault {
         data: ImmutableDataKind,
         _requester: Requester,
     ) -> Result<(), Error> {
-        let data_name = DataId::immutable(XorName::from_new(data.name()), data.published());
+        let data_name = DataId::immutable(data.name(), data.published());
         /*
         self.authorise_mutation(&dst, &requester)
             .and_then(|_| {
@@ -688,11 +934,11 @@ impl Vault {
         &mut self,
         dst: Authority<XorName>,
         address: ImmutableDataRef,
-        requester: Requester,
+        _requester: Requester,
     ) -> Result<(), Error> {
-        let data_name = DataId::immutable(XorName::from_new(address.name), address.published);
+        let data_name = DataId::immutable(address.name, address.published);
         self.authorise_mutation1(&dst)
-            .and_then(|_| self.authorised_delete(data_name, requester))
+            // .and_then(|_| self.authorised_delete(data_name, requester))
             .and_then(|_| {
                 if !self.contains_data(&data_name) {
                     Err(Error::NoSuchData)
@@ -706,21 +952,45 @@ impl Vault {
 
     pub fn get_mdata(
         &mut self,
-        dst: Authority<XorName>,
+        _dst: Authority<XorName>,
         address: MutableDataRef,
         requester: Requester,
+        request: Request,
+        msg_id: MessageId,
+        sequenced: Option<bool>,
     ) -> Result<MutableDataKind, Error> {
-        let name = XorName::from_new(address.name());
-        let data_name = DataId::mutable(name, address.tag());
-        self.new_authorise_read(&dst, &name)
-            .and_then(|_| self.verify_requester(data_name, requester))
-            .and_then(|_| match self.get_data(&data_name) {
-                Some(data_type) => match data_type {
-                    Data::NewMutable(data) => Ok(data),
-                    _ => Err(Error::NoSuchData),
+        let data_name = DataId::mutable(address.name(), address.tag());
+        // self.authorise_read(&dst, &address.name())
+        // .map_err(|err| Error::from(err.description()))
+        // .and_then(|_| match self.get_data(&data_name) {
+        dbg!(request.clone());
+        match self.get_data(&data_name) {
+            Some(data_type) => match data_type {
+                Data::NewMutable(data) => match data.clone() {
+                    MutableDataKind::Sequenced(mdata) => {
+                        if sequenced.is_some() && !unwrap!(sequenced) {
+                            Err(Error::from("Unexpected data returned"))
+                        } else if mdata.check_permissions(request, requester, msg_id).is_err() {
+                            Err(Error::AccessDenied)
+                        } else {
+                            Ok(data)
+                        }
+                    }
+                    MutableDataKind::Unsequenced(mdata) => {
+                        if sequenced.is_some() && unwrap!(sequenced) {
+                            Err(Error::from("Unexpected data returned"))
+                        } else if mdata.check_permissions(request, requester, msg_id).is_err() {
+                            Err(Error::AccessDenied)
+                        } else {
+                            Ok(data)
+                        }
+                    }
                 },
-                None => Err(Error::NoSuchData),
-            })
+                _ => Err(Error::NoSuchData),
+            },
+            None => Err(Error::NoSuchData),
+        }
+        // })
     }
 
     pub fn put_mdata(
@@ -730,42 +1000,12 @@ impl Vault {
         _requester: Requester,
     ) -> Result<(), Error> {
         let data_name = DataId::mutable(data.name(), data.tag());
-        /*
-        self.authorise_mutation(&dst, &requester)
+        self.authorise_mutation1(&dst)
             .and_then(|_| {
                 if self.contains_data(&data_name) {
                     Err(Error::DataExists)
                 } else {
                     self.insert_data(data_name, Data::NewMutable(data));
-                    Ok(())
-                }
-            })
-            .map(|_| self.commit_mutation(&dst))
-        */
-        // FIXME: Put requests verify the app's public key - Usage of BLS-key TBD
-        if self.contains_data(&data_name) {
-            Err(Error::DataExists)
-        } else {
-            self.insert_data(data_name, Data::NewMutable(data));
-            self.commit_mutation(&dst);
-            Ok(())
-        }
-    }
-
-    pub fn delete_mdata(
-        &mut self,
-        dst: Authority<XorName>,
-        address: MutableDataRef,
-        requester: Requester,
-    ) -> Result<(), Error> {
-        let data_name = DataId::mutable(XorName::from_new(address.name()), address.tag());
-        self.authorise_mutation1(&dst)
-            .and_then(|_| self.authorised_delete(data_name, requester))
-            .and_then(|_| {
-                if !self.contains_data(&data_name) {
-                    Err(Error::NoSuchData)
-                } else {
-                    self.delete_data(data_name);
                     Ok(())
                 }
             })
@@ -807,6 +1047,7 @@ pub fn lock(vault: &Mutex<Vault>, writing: bool) -> VaultGuard {
 
 #[derive(Deserialize, Serialize)]
 struct Cache {
+    coin_balances: HashMap<XorName, CoinBalance>,
     client_manager: HashMap<XorName, Account>,
     nae_manager: HashMap<DataId, Data>,
 }
@@ -819,7 +1060,7 @@ pub enum Data {
 }
 
 pub struct ImmutableDataRef {
-    name: NewXorName,
+    name: XorName,
     published: bool,
 }
 
@@ -830,10 +1071,10 @@ pub enum ImmutableDataKind {
 }
 
 impl ImmutableDataKind {
-    fn name(&self) -> NewXorName {
+    fn name(&self) -> XorName {
         match self {
             ImmutableDataKind::Unpublished(data) => *data.name(),
-            ImmutableDataKind::Published(data) => data.name().to_new(),
+            ImmutableDataKind::Published(data) => *data.name(),
         }
     }
 
@@ -854,8 +1095,8 @@ pub enum MutableDataKind {
 impl MutableDataKind {
     fn name(&self) -> XorName {
         match self {
-            MutableDataKind::Sequenced(data) => XorName::from_new(*data.name()),
-            MutableDataKind::Unsequenced(data) => XorName::from_new(*data.name()),
+            MutableDataKind::Sequenced(data) => *data.name(),
+            MutableDataKind::Unsequenced(data) => *data.name(),
         }
     }
     fn tag(&self) -> u64 {

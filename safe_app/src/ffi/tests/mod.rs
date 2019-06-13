@@ -15,7 +15,6 @@ use crate::ffi::ipc::decode_ipc_msg;
 use crate::test_utils::create_app;
 use crate::test_utils::gen_app_exchange_info;
 use ffi_utils::test_utils::call_1;
-use routing::ImmutableData;
 use safe_authenticator::ffi::ipc::encode_auth_resp;
 use safe_authenticator::test_utils;
 use safe_core::ffi::ipc::resp::AuthGranted as FfiAuthGranted;
@@ -23,6 +22,7 @@ use safe_core::ffi::AccountInfo;
 use safe_core::ipc::req::{AuthReq, ContainerPermissions};
 use safe_core::ipc::{gen_req_id, AuthGranted, Permission};
 use safe_core::Client;
+use safe_nd::ImmutableData;
 use std::collections::HashMap;
 use App;
 
@@ -175,6 +175,7 @@ fn test_app_container_name() {
         &auth,
         &AuthReq {
             app: app_info,
+            app_permissions: Default::default(),
             app_container: true,
             containers: HashMap::new(),
         },
@@ -203,6 +204,7 @@ fn app_authentication() {
     let containers = create_containers_req();
     let auth_req = AuthReq {
         app: app_exchange_info.clone(),
+        app_permissions: Default::default(),
         app_container: true,
         containers,
     };
