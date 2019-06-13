@@ -25,7 +25,7 @@ use safe_nd::mutable_data::{
 };
 use safe_nd::request::{Request as RpcRequest, Requester};
 use safe_nd::response::Response as RpcResponse;
-use safe_nd::{ImmutableData, Message, MessageId, PublicKey, XorName};
+use safe_nd::{ImmutableData, Message, MessageId, PublicKey, UnpubImmutableData, XorName};
 use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
@@ -1102,6 +1102,40 @@ fn mutable_data_ownership() {
 }
 
 #[test]
+fn unpub_idata_rpc() {
+    let (mut routing, routing_rx, full_id) = setup();
+    let owner_key = PublicKey::from(*full_id.public_id().bls_public_key());
+    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+    let bls_key = *full_id.public_id().bls_public_key();
+
+    let data = UnpubImmutableData::new(Default::default(), bls_key);
+    let name = data.name();
+
+    // Construct put request.
+    let _ = routing.req_as_app(
+        &routing_rx,
+        client_mgr,
+        PublicKey::from(bls_key),
+        RpcRequest::PutUnpubIData { data: data.clone() },
+    );
+
+    // Construct get request.
+    let rpc_response = routing.req_as_app(
+        &routing_rx,
+        client_mgr,
+        PublicKey::from(bls_key),
+        RpcRequest::GetUnpubIData { address: *name },
+    );
+    match rpc_response {
+        RpcResponse::GetUnpubIData(res) => {
+            let unpub_idata: UnpubImmutableData = unwrap!(res);
+            assert_eq!(unpub_idata.name(), name);
+        }
+        _ => panic!("Unexpected response"),
+    }
+}
+
+#[test]
 fn unpub_md() {
     let (mut routing, routing_rx, full_id) = setup();
     let owner_key = PublicKey::from(*full_id.public_id().bls_public_key());
@@ -1118,6 +1152,7 @@ fn unpub_md() {
     );
     let data = UnseqMutableData::new_with_data(name, tag, Default::default(), permissions, bls_key);
 
+    // Construct put request.
     let message_id = MessageId::new();
 
     let put_request = Message::Request {
@@ -1130,6 +1165,7 @@ fn unpub_md() {
     unwrap!(routing.send(client_mgr, &put_req_buffer));
     let _response = expect_success!(routing_rx, message_id, Response::RpcResponse);
 
+    // Construct get request.
     let message_id2 = MessageId::new();
     let get_request = Message::Request {
         request: RpcRequest::GetUnseqMData {

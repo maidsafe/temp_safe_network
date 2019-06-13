@@ -18,7 +18,9 @@ use safe_nd::mutable_data::{
 };
 use safe_nd::request::{Request, Requester};
 use safe_nd::response::{Response, Transaction};
-use safe_nd::{Coins, Error, ImmutableData, Message, MessageId, PublicKey, XorName};
+use safe_nd::{
+    Coins, Error, ImmutableData, Message, MessageId, PublicKey, UnpubImmutableData, XorName,
+};
 use std::collections::HashMap;
 use std::env;
 use std::fs::{File, OpenOptions};
@@ -369,6 +371,44 @@ impl Vault {
         };
 
         let response = match request {
+            //
+            // Immutable Data
+            //
+            Request::GetUnpubIData { address } => {
+                let result = self
+                    .get_idata(
+                        dest,
+                        ImmutableDataRef {
+                            name: address,
+                            published: false,
+                        },
+                        requester,
+                    )
+                    .and_then(|kind| match kind {
+                        ImmutableDataKind::Unpublished(data) => Ok(data),
+                        _ => Err(Error::from("Unexpected data returned")),
+                    });
+                Response::GetUnpubIData(result)
+            }
+            Request::PutUnpubIData { data } => {
+                let result = self.put_idata(
+                    dest,
+                    ImmutableDataKind::Unpublished(data.clone()),
+                    requester,
+                );
+                Response::PutUnpubIData(result)
+            }
+            Request::DeleteUnpubIData { address } => {
+                let result = self.delete_idata(
+                    dest,
+                    ImmutableDataRef {
+                        name: address,
+                        published: false,
+                    },
+                    requester,
+                );
+                Response::DeleteUnpubIData(result)
+            }
             Request::ListAuthKeysAndVersion => {
                 let name = dest.name();
                 if let Some(account) = self.get_account(&name) {
@@ -870,6 +910,75 @@ impl Vault {
         ))
     }
 
+    pub fn get_idata(
+        &mut self,
+        _dst: Authority<XorName>,
+        address: ImmutableDataRef,
+        _requester: Requester,
+    ) -> Result<ImmutableDataKind, Error> {
+        let name = address.name;
+        let data_name = DataId::immutable(name, address.published);
+        //self.new_authorise_read(&dst, &name)
+        // .and_then(|_| self.verify_requester(data_name, requester))
+        //.and_then(|_| match self.get_data(&data_name) {
+        match self.get_data(&data_name) {
+            Some(data_type) => match data_type {
+                Data::Immutable(data) => Ok(data),
+                _ => Err(Error::NoSuchData),
+            },
+            None => Err(Error::NoSuchData),
+        }
+    }
+
+    pub fn put_idata(
+        &mut self,
+        dst: Authority<XorName>,
+        data: ImmutableDataKind,
+        _requester: Requester,
+    ) -> Result<(), Error> {
+        let data_name = DataId::immutable(data.name(), data.published());
+        /*
+        self.authorise_mutation(&dst, &requester)
+            .and_then(|_| {
+                if self.contains_data(&data_name) {
+                    Err(Error::DataExists)
+                } else {
+                    self.insert_data(data_name, Data::NewMutable(data));
+                    Ok(())
+                }
+            })
+            .map(|_| self.commit_mutation(&dst))
+        */
+        // FIXME: Put requests verify the app's public key - Usage of BLS-key TBD
+        if self.contains_data(&data_name) {
+            Err(Error::DataExists)
+        } else {
+            self.insert_data(data_name, Data::Immutable(data));
+            self.commit_mutation(&dst);
+            Ok(())
+        }
+    }
+
+    pub fn delete_idata(
+        &mut self,
+        dst: Authority<XorName>,
+        address: ImmutableDataRef,
+        _requester: Requester,
+    ) -> Result<(), Error> {
+        let data_name = DataId::immutable(address.name, address.published);
+        self.authorise_mutation1(&dst)
+            // .and_then(|_| self.authorised_delete(data_name, requester))
+            .and_then(|_| {
+                if !self.contains_data(&data_name) {
+                    Err(Error::NoSuchData)
+                } else {
+                    self.delete_data(data_name);
+                    Ok(())
+                }
+            })
+            .map(|_| self.commit_mutation(&dst))
+    }
+
     pub fn get_mdata(
         &mut self,
         _dst: Authority<XorName>,
@@ -974,9 +1083,36 @@ struct Cache {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub enum Data {
-    Immutable(ImmutableData),
+    Immutable(ImmutableDataKind),
     OldMutable(OldMutableData),
     NewMutable(MutableDataKind),
+}
+
+pub struct ImmutableDataRef {
+    name: XorName,
+    published: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub enum ImmutableDataKind {
+    Unpublished(UnpubImmutableData),
+    Published(ImmutableData),
+}
+
+impl ImmutableDataKind {
+    fn name(&self) -> XorName {
+        match self {
+            ImmutableDataKind::Unpublished(data) => *data.name(),
+            ImmutableDataKind::Published(data) => *data.name(),
+        }
+    }
+
+    fn published(&self) -> bool {
+        match self {
+            ImmutableDataKind::Unpublished(_) => false,
+            ImmutableDataKind::Published(_) => true,
+        }
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]

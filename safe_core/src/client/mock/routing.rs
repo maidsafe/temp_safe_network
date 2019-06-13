@@ -8,7 +8,7 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use super::vault::{self, Data, Vault, VaultGuard};
+use super::vault::{self, Data, ImmutableDataKind, Vault, VaultGuard};
 use super::DataId;
 use crate::config_handler::{get_config, Config};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -240,12 +240,15 @@ impl Routing {
             self.verify_network_limits(msg_id, "put_idata")
                 .and_then(|_| vault.authorise_mutation(&dst, &self.client_key()))
                 .and_then(|_| {
-                    match vault.get_data(&DataId::immutable(*data.name())) {
+                    match vault.get_data(&DataId::immutable(*data.name(), true)) {
                         // Immutable data is de-duplicated so always allowed
                         Some(Data::Immutable(_)) => Ok(()),
                         Some(_) => Err(ClientError::DataExists),
                         None => {
-                            vault.insert_data(DataId::immutable(data_name), Data::Immutable(data));
+                            vault.insert_data(
+                                DataId::immutable(data_name, true),
+                                Data::Immutable(ImmutableDataKind::Published(data)),
+                            );
                             Ok(())
                         }
                     }
@@ -287,8 +290,8 @@ impl Routing {
             } else if let Err(err) = vault.authorise_read(&dst, &name) {
                 Err(err)
             } else {
-                match vault.get_data(&DataId::immutable(name)) {
-                    Some(Data::Immutable(data)) => Ok(data),
+                match vault.get_data(&DataId::immutable(name, true)) {
+                    Some(Data::Immutable(ImmutableDataKind::Published(data))) => Ok(data),
                     _ => Err(ClientError::NoSuchData),
                 }
             }
