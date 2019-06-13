@@ -50,6 +50,9 @@ pub enum SubCommands {
         #[structopt(subcommand)]
         cmd: Option<files::FilesSubCommands>,
     },
+    #[structopt(name = "keypair")]
+    /// Generate a key pair without creating and/or storing a Key on the network
+    Keypair {},
     #[structopt(name = "pns")]
     /// Manage public names on the network
     Pns {

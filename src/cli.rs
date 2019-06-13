@@ -56,6 +56,15 @@ pub fn run() -> Result<(), String> {
 
     match args.cmd {
         SubCommands::Auth { cmd } => auth_commander(cmd, &mut safe),
+        SubCommands::Keypair {} => {
+            let key_pair = safe.keys_keypair()?;
+            if pretty {
+                println!("Key pair generated:");
+            }
+            println!("pk={}", key_pair.pk);
+            println!("sk={}", key_pair.sk);
+            Ok(())
+        }
         _ => {
             // We treat SubCommands::Auth separatelly since we need to connect before
             // handling any command but auth

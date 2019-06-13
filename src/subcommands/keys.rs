@@ -13,9 +13,9 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
-    #[structopt(name = "keypair")]
-    /// Generate a key pair without creating and/or storing a Key on the network
-    Keypair {},
+    // #[structopt(name = "keypair")]
+    // /// Generate a key pair without creating and/or storing a Key on the network
+    // Keypair {},
     #[structopt(name = "create")]
     /// Create a new KeyPair
     Create {
@@ -46,15 +46,15 @@ pub fn key_commander(
 ) -> Result<(), String> {
     // Is it a create subcommand?
     match cmd {
-        Some(KeysSubCommands::Keypair {}) => {
-            let key_pair = safe.keys_keypair()?;
-            if pretty {
-                println!("Key pair generated:");
-            }
-            println!("pk={}", key_pair.pk);
-            println!("sk={}", key_pair.sk);
-            Ok(())
-        }
+        // Some(KeysSubCommands::Keypair {}) => {
+        //     // let key_pair = safe.keys_keypair()?;
+        //     // if pretty {
+        //     //     println!("Key pair generated:");
+        //     // }
+        //     // println!("pk={}", key_pair.pk);
+        //     // println!("sk={}", key_pair.sk);
+        //     Ok(())
+        // }
         Some(KeysSubCommands::Create {
             preload,
             pk,
