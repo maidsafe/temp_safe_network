@@ -252,6 +252,7 @@ pub trait Client: Clone + 'static {
     /// Transfer coin balance
     fn transfer_coins(
         &self,
+        source: XorName,
         destination: XorName,
         amount: Coins,
         transaction_id: Option<u64>,
@@ -263,6 +264,7 @@ pub trait Client: Clone + 'static {
         send_mutation_new(
             self,
             Request::TransferCoins {
+                source,
                 destination,
                 amount,
                 transaction_id,
@@ -1106,6 +1108,24 @@ pub trait Client: Clone + 'static {
         let inner = self.inner();
         inner.borrow_mut().routing.set_simulate_timeout(enabled);
     }
+
+    /// Create a new mock balance at an arbitrary address.
+    #[cfg(any(
+        all(test, feature = "mock-network"),
+        all(feature = "testing", feature = "mock-network")
+    ))]
+    fn create_coin_balance(
+        &self,
+        coin_balance_name: &XorName,
+        amount: Coins,
+        owner: threshold_crypto::PublicKey,
+    ) {
+        let inner = self.inner();
+        inner
+            .borrow_mut()
+            .routing
+            .create_coin_balance(coin_balance_name, amount, owner);
+    }
 }
 
 // TODO: Consider deprecating this struct once trait fields are stable. See
@@ -1588,12 +1608,19 @@ mod tests {
 
     // 1. Create 2 accounts with 2 wallets (A and B).
     // 2. Try to request balance of wallet A from account B. This request should fail.
-    // 3. Try to request transaction from wallet A using account B. This request should fail.
+    // 3. Try to transfer balance from wallet A to wallet B using account B. This request should fail. -- TODO
+    // 4. Try to request transaction from wallet A using account B. This request should succeed (because transactions are always open).
     #[test]
     fn coin_permissions() {
-        let wallet1 =
-            *random_client(move |client| Ok::<_, Error>(*unwrap!(client.full_id()).public_id()))
-                .name();
+        let wallet1 = random_client(move |client| {
+            let name: XorName = new_rand::random();
+            client.create_coin_balance(
+                &name,
+                unwrap!(Coins::from_str("1000.0")),
+                unwrap!(client.public_bls_key()),
+            );
+            Ok::<_, Error>(name)
+        });
 
         random_client(move |client| {
             let c2 = client.clone();
@@ -1610,7 +1637,7 @@ mod tests {
                 })
                 .then(move |res| {
                     match res {
-                        Err(CoreError::NewRoutingClientError(Error::AccessDenied)) => (),
+                        Ok(Transaction::NoSuchTransaction) => (),
                         res => panic!("Unexpected result: {:?}", res),
                     }
                     Ok::<_, Error>(())
@@ -1624,12 +1651,23 @@ mod tests {
     //    wallet B is debited for 5 coins.
     #[test]
     fn coin_balance_transfer() {
-        let wallet1 =
-            *random_client(move |client| Ok::<_, Error>(*unwrap!(client.full_id()).public_id()))
-                .name();
+        let wallet1 = random_client(move |client| {
+            let name: XorName = new_rand::random();
+            client.create_coin_balance(
+                &name,
+                unwrap!(Coins::from_str("0.0")),
+                unwrap!(client.public_bls_key()),
+            );
+            Ok::<_, Error>(name)
+        });
 
         random_client(move |client| {
-            let wallet2 = *unwrap!(client.full_id()).public_id().name();
+            let wallet2 = new_rand::random();
+            client.create_coin_balance(
+                &wallet2,
+                unwrap!(Coins::from_str("100.0")),
+                unwrap!(client.public_bls_key()),
+            );
 
             let c2 = client.clone();
             let c3 = client.clone();
@@ -1637,7 +1675,7 @@ mod tests {
             client
                 .get_balance(wallet2)
                 .and_then(move |orig_balance| {
-                    c2.transfer_coins(wallet1, unwrap!(Coins::from_str("5.0")), None)
+                    c2.transfer_coins(wallet2, wallet1, unwrap!(Coins::from_str("5.0")), None)
                         .map(move |_| orig_balance)
                 })
                 .and_then(move |orig_balance| {
@@ -1649,6 +1687,7 @@ mod tests {
                         new_balance,
                         unwrap!(orig_balance.checked_sub(unwrap!(Coins::from_str("5.0")))),
                     );
+                    // TODO check the transaction
                     // TODO check the other wallet balance has been incremented
                     Ok(())
                 })

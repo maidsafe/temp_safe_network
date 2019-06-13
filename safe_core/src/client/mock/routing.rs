@@ -17,6 +17,8 @@ use routing::{
     Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, InterfaceError,
     MutableData, PermissionSet, Request, Response, RoutingError, User, TYPE_TAG_SESSION_PACKET,
 };
+#[cfg(any(feature = "testing", test))]
+use safe_nd::Coins;
 use safe_nd::{ImmutableData, Message, MessageId, PublicKey, XorName};
 use std;
 use std::cell::Cell;
@@ -1037,6 +1039,17 @@ impl Routing {
     /// Simulates network timeouts
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
+    }
+
+    /// Create coin balance in the mock network arbitrarily.
+    pub fn create_coin_balance(
+        &self,
+        coin_balance_name: &XorName,
+        amount: Coins,
+        owner: threshold_crypto::PublicKey,
+    ) {
+        let mut vault = self.lock_vault(true);
+        vault.mock_create_balance(coin_balance_name, amount, owner);
     }
 }
 

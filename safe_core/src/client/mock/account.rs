@@ -11,46 +11,31 @@ use crate::config_handler::Config;
 use routing::AccountInfo;
 use safe_nd::{AppPermissions, Coins, Error, PublicKey};
 use std::collections::{BTreeMap, VecDeque};
-use std::str::FromStr;
+use threshold_crypto::PublicKey as BlsPublicKey;
 
 pub const DEFAULT_MAX_MUTATIONS: u64 = 1000;
 pub const DEFAULT_MAX_CREDITS: usize = 100;
-pub const DEFAULT_COINS: &str = "100";
+// pub const DEFAULT_COINS: &str = "100";
 
 #[derive(Deserialize, Serialize)]
-pub struct Credit {
-    amount: Coins,
-    transaction_id: u64, // TODO: use Uuid
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Account {
-    account_info: AccountInfo,
-    auth_keys: BTreeMap<PublicKey, AppPermissions>,
-    version: u64,
-    config: Config,
-    balance: Coins,
+pub struct CoinBalance {
+    owner: BlsPublicKey,
+    value: Coins,
     credits: VecDeque<Credit>,
 }
 
-impl Account {
-    pub fn new(config: Config) -> Self {
-        Account {
-            account_info: AccountInfo {
-                mutations_done: 0,
-                mutations_available: DEFAULT_MAX_MUTATIONS,
-            },
-            auth_keys: Default::default(),
-            version: 0,
-            credits: VecDeque::with_capacity(DEFAULT_MAX_CREDITS),
-            balance: unwrap!(Coins::from_str(DEFAULT_COINS)),
-            config,
+impl CoinBalance {
+    pub fn new(value: Coins, owner: BlsPublicKey) -> Self {
+        Self {
+            owner,
+            value,
+            credits: VecDeque::new(),
         }
     }
 
     pub fn credit_balance(&mut self, amount: Coins, transaction_id: u64) -> Result<(), Error> {
-        if let Some(new_balance) = self.balance.checked_sub(amount) {
-            self.balance = new_balance;
+        if let Some(new_balance) = self.value.checked_sub(amount) {
+            self.value = new_balance;
             self.add_transaction(amount, transaction_id);
             Ok(())
         } else {
@@ -59,8 +44,8 @@ impl Account {
     }
 
     pub fn debit_balance(&mut self, amount: Coins) -> Result<(), Error> {
-        if let Some(new_balance) = self.balance.checked_add(amount) {
-            self.balance = new_balance;
+        if let Some(new_balance) = self.value.checked_add(amount) {
+            self.value = new_balance;
             Ok(())
         } else {
             Err(Error::ExcessiveValue)
@@ -68,11 +53,7 @@ impl Account {
     }
 
     pub fn balance(&self) -> Coins {
-        self.balance
-    }
-
-    pub fn version(&self) -> u64 {
-        self.version
+        self.value
     }
 
     pub fn find_transaction(&self, transaction_id: u64) -> Option<Coins> {
@@ -91,6 +72,42 @@ impl Account {
             transaction_id,
         };
         self.credits.push_front(credit);
+    }
+
+    pub fn owner(&self) -> &BlsPublicKey {
+        &self.owner
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Credit {
+    amount: Coins,
+    transaction_id: u64, // TODO: use Uuid
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Account {
+    account_info: AccountInfo,
+    auth_keys: BTreeMap<PublicKey, AppPermissions>,
+    version: u64,
+    config: Config,
+}
+
+impl Account {
+    pub fn new(config: Config) -> Self {
+        Account {
+            account_info: AccountInfo {
+                mutations_done: 0,
+                mutations_available: DEFAULT_MAX_MUTATIONS,
+            },
+            auth_keys: Default::default(),
+            version: 0,
+            config,
+        }
+    }
+
+    pub fn version(&self) -> u64 {
+        self.version
     }
 
     pub fn account_info(&self) -> &AccountInfo {

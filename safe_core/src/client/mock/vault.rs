@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Account;
 use super::DataId;
+use super::{Account, CoinBalance};
 use crate::client::mock::routing::unlimited_muts;
 use crate::config_handler::{Config, DevConfig};
 use fs2::FileExt;
@@ -85,6 +85,7 @@ impl Vault {
 
         Vault {
             cache: Cache {
+                coin_balances: HashMap::new(),
                 client_manager: HashMap::new(),
                 nae_manager: HashMap::new(),
             },
@@ -101,6 +102,16 @@ impl Vault {
     // Get mutable reference to account for the client manager name.
     pub fn get_account_mut(&mut self, name: &XorName) -> Option<&mut Account> {
         self.cache.client_manager.get_mut(name)
+    }
+
+    // Get coin balance for the client manager name.
+    pub fn get_coin_balance(&self, name: &XorName) -> Option<&CoinBalance> {
+        self.cache.coin_balances.get(name)
+    }
+
+    // Get mutable reference to account for the client manager name.
+    pub fn get_coin_balance_mut(&mut self, name: &XorName) -> Option<&mut CoinBalance> {
+        self.cache.coin_balances.get_mut(name)
     }
 
     // Get the config for this vault.
@@ -131,46 +142,81 @@ impl Vault {
         }
     }
 
+    /// Instantly creates new balance.
+    pub fn mock_create_balance(
+        &mut self,
+        coin_balance_name: &XorName,
+        amount: Coins,
+        owner: threshold_crypto::PublicKey,
+    ) {
+        let _ = self
+            .cache
+            .coin_balances
+            .insert(*coin_balance_name, CoinBalance::new(amount, owner));
+    }
+
     // Authorise coin operation.
     pub fn authorise_coin_operation(
         &self,
-        dst: &Authority<XorName>,
-        _req: &Request,
-        _msg_id: MessageId,
+        dst: Authority<XorName>,
+        coin_balance_name: &XorName,
+        req: &Request,
+        msg_id: MessageId,
         requester: &Requester,
     ) -> Result<(), Error> {
-        let dst_name = match *dst {
-            Authority::ClientManager(name) => name,
-            x => {
-                debug!("Unexpected authority: {:?}", x);
-                return Err(Error::InvalidOperation);
-            }
-        };
-
-        let account = match self.get_account(&dst_name) {
-            Some(account) => account,
+        // Check if we are the owner or app.
+        let balance = match self.get_coin_balance(&coin_balance_name) {
+            Some(balance) => balance,
             None => {
                 debug!("Account not found for {:?}", dst);
                 return Err(Error::NoSuchAccount);
             }
         };
+        let owner_cm = XorName::from(PublicKey::from(*balance.owner()));
 
-        // Check if we are the owner or app.
         match requester {
-            Requester::Owner(_sig) => Ok(()), // owner_pk.verify(sig, &serialise(&(req, message_id))),
-            Requester::Key(sign_pk) => match account.auth_keys().get(sign_pk) {
-                Some(perms) => {
-                    if !perms.transfer_coins {
-                        debug!("Mutation not authorised");
-                        return Err(Error::AccessDenied);
-                    }
+            Requester::Owner(sig) => {
+                if balance
+                    .owner()
+                    .verify(sig, &unwrap!(serialise(&(req, &msg_id))))
+                {
                     Ok(())
-                }
-                None => {
-                    debug!("App not found");
+                } else {
                     Err(Error::AccessDenied)
                 }
-            },
+            }
+            Requester::Key(sign_pk) => {
+                let dst_name = match dst {
+                    Authority::ClientManager(name) => name,
+                    x => {
+                        debug!("Unexpected authority for mutation: {:?}", x);
+                        return Err(Error::InvalidOperation);
+                    }
+                };
+                if dst_name != owner_cm {
+                    return Err(Error::InvalidOperation);
+                }
+                let account = match self.get_account(&owner_cm) {
+                    Some(account) => account,
+                    None => {
+                        debug!("Account not found for {:?}", dst);
+                        return Err(Error::NoSuchAccount);
+                    }
+                };
+                match account.auth_keys().get(sign_pk) {
+                    Some(perms) => {
+                        if !perms.transfer_coins {
+                            debug!("Mutation not authorised");
+                            return Err(Error::AccessDenied);
+                        }
+                        Ok(())
+                    }
+                    None => {
+                        debug!("App not found");
+                        Err(Error::AccessDenied)
+                    }
+                }
+            }
         }
     }
 
@@ -268,25 +314,17 @@ impl Vault {
 
     fn transfer_coins(
         &mut self,
-        src: Authority<XorName>,
-        _dst: Authority<XorName>,
+        source: XorName,
         destination: XorName,
         amount: Coins,
         transaction_id: u64,
-        _requester: Requester,
     ) -> Result<(), Error> {
-        let client_id = if let Authority::Client { client_id, .. } = src {
-            client_id
-        } else {
-            return Err(Error::AccessDenied); // wrong authority
-        };
-
-        match self.get_account_mut(client_id.name()) {
-            Some(account) => account.credit_balance(amount, transaction_id)?,
+        match self.get_coin_balance_mut(&source) {
+            Some(balance) => balance.credit_balance(amount, transaction_id)?,
             None => return Err(Error::NoSuchAccount),
         };
-        match self.get_account_mut(&destination) {
-            Some(account) => account.debit_balance(amount)?,
+        match self.get_coin_balance_mut(&destination) {
+            Some(balance) => balance.debit_balance(amount)?,
             None => return Err(Error::NoSuchAccount),
         };
         Ok(())
@@ -294,68 +332,28 @@ impl Vault {
 
     fn get_transaction(
         &self,
-        src: Authority<XorName>,
         coins_balance_id: &XorName,
         transaction_id: u64,
-        _requester: Requester,
     ) -> Result<Transaction, Error> {
-        let client_id = if let Authority::Client { client_id, .. } = src {
-            client_id
-        } else {
-            return Err(Error::AccessDenied); // wrong authority
-        };
-
-        // Check if we're the owner of the account
-        if coins_balance_id != client_id.name() {
-            return Err(Error::AccessDenied);
-        }
-
-        let account = match self.get_account(coins_balance_id) {
-            Some(account) => account,
+        match self.get_coin_balance(coins_balance_id) {
+            Some(balance) => match balance.find_transaction(transaction_id) {
+                Some(amount) => Ok(Transaction::Success(amount)),
+                None => Ok(Transaction::NoSuchTransaction),
+            },
             None => return Ok(Transaction::NoSuchCoinBalance),
-        };
-
-        match account.find_transaction(transaction_id) {
-            Some(amount) => Ok(Transaction::Success(amount)),
-            None => Ok(Transaction::NoSuchTransaction),
         }
     }
 
-    fn get_balance(
-        &self,
-        src: Authority<XorName>,
-        coins_balance_id: &XorName,
-        requester: Requester,
-    ) -> Result<Coins, Error> {
-        let client_id = if let Authority::Client { client_id, .. } = src {
-            client_id
-        } else {
-            return Err(Error::AccessDenied); // wrong authority
-        };
-
-        // Check if we're the owner of the account
-        match requester {
-            Requester::Key(_pk) => {}
-            Requester::Owner(_sig) => {
-                // TODO: verify owner signature
-
-                if coins_balance_id != client_id.name() {
-                    return Err(Error::AccessDenied);
-                }
-            }
+    fn get_balance(&self, coins_balance_id: &XorName) -> Result<Coins, Error> {
+        match self.get_coin_balance(coins_balance_id) {
+            Some(balance) => Ok(balance.balance()),
+            None => Err(Error::NoSuchAccount),
         }
-
-        let account = match self.get_account(coins_balance_id) {
-            Some(account) => account,
-            None => return Err(Error::NoSuchAccount),
-        };
-
-        Ok(account.balance())
     }
 
     pub fn process_request(
         &mut self,
-        src: Authority<XorName>,
+        _src: Authority<XorName>,
         dest: Authority<XorName>,
         payload: Vec<u8>,
     ) -> Result<(Authority<XorName>, Vec<u8>), Error> {
@@ -403,25 +401,39 @@ impl Vault {
                 }
             }
             Request::TransferCoins {
+                source,
                 destination,
                 amount,
                 transaction_id,
             } => {
-                let res =
-                    self.transfer_coins(src, dest, destination, amount, transaction_id, requester);
-                Response::TransferCoins(res)
+                if let Err(e) =
+                    self.authorise_coin_operation(dest, &source, &request, message_id, &requester)
+                {
+                    Response::TransferCoins(Err(e))
+                } else {
+                    let res = self.transfer_coins(source, destination, amount, transaction_id);
+                    Response::TransferCoins(res)
+                }
             }
             Request::GetBalance { coins_balance_id } => {
-                // self.authorise_coin_operation(&dest, &requester)?;
-                let res = self.get_balance(src, &coins_balance_id, requester);
-                Response::GetBalance(res)
+                if let Err(e) = self.authorise_coin_operation(
+                    dest,
+                    &coins_balance_id,
+                    &request,
+                    message_id,
+                    &requester,
+                ) {
+                    Response::GetBalance(Err(e))
+                } else {
+                    let res = self.get_balance(&coins_balance_id);
+                    Response::GetBalance(res)
+                }
             }
             Request::GetTransaction {
                 coins_balance_id,
                 transaction_id,
             } => {
-                let transaction =
-                    self.get_transaction(src, &coins_balance_id, transaction_id, requester);
+                let transaction = self.get_transaction(&coins_balance_id, transaction_id);
                 Response::GetTransaction(transaction)
             }
             Request::PutUnseqMData { data } => {
@@ -955,6 +967,7 @@ pub fn lock(vault: &Mutex<Vault>, writing: bool) -> VaultGuard {
 
 #[derive(Deserialize, Serialize)]
 struct Cache {
+    coin_balances: HashMap<XorName, CoinBalance>,
     client_manager: HashMap<XorName, Account>,
     nae_manager: HashMap<DataId, Data>,
 }
