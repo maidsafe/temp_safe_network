@@ -261,7 +261,10 @@ impl Safe {
     // Fetch Key's pk from the network from a given XOR-URL
     pub fn keys_fetch_pk(&self, xorurl: &str) -> Result<String, String> {
         let xorname = xorurl_to_xorname(xorurl)?;
-        let public_key = self.safe_app_mock.keys_fetch_pk(&xorname);
+        let public_key = self
+            .safe_app_mock
+            .keys_fetch_pk(&xorname)
+            .map_err(|_| "No Key found at specified location".to_string())?;
         Ok(pk_to_hex(&public_key))
     }
 
@@ -438,13 +441,13 @@ impl Safe {
         let from_wallet_balance = self.wallet_get_default_balance(&from_wallet_xorurl)?;
         let to_wallet_balance = self.wallet_get_default_balance(&to)?;
 
-        let from_pk = self
+        let from_pk = unwrap!(self
             .safe_app_mock
-            .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xorurl)?);
+            .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xorurl)?));
 
-        let to_pk = self
+        let to_pk = unwrap!(self
             .safe_app_mock
-            .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xorurl)?);
+            .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xorurl)?));
 
         let from_sk = unwrap!(sk_from_hex(&from_wallet_balance.sk));
         let tx_id = Uuid::new_v4();
@@ -549,6 +552,17 @@ fn test_keys_create_preload_invalid_amounts() {
 
     let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12".to_string(), None));
     match safe.keys_create(unwrap!(key_pair.clone()), Some(".003".to_string()), None) {
+        Err(msg) => assert_eq!(
+            msg,
+            "Invalid safecoins amount '.003', expected a numeric value"
+        ),
+        Ok(_) => panic!("Key was created unexpectedly"),
+    };
+
+    // test fail with corrupted secret key
+    let mut unwrapped_key_pair = unwrap!(key_pair.clone());
+    unwrapped_key_pair.sk.replace_range(..6, "ababab");
+    match safe.keys_create(unwrapped_key_pair, Some(".003".to_string()), None) {
         Err(msg) => assert_eq!(
             msg,
             "Invalid safecoins amount '.003', expected a numeric value"

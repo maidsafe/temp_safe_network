@@ -112,7 +112,6 @@ pub fn create_new_key(
             pk: pk_source_xor,
             sk,
         };
-
         safe.keys_create(source_key_pair, preload, pk)?
     };
 

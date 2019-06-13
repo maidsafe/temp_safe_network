@@ -134,7 +134,7 @@ impl MockSCL {
         xorname
     }
 
-    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> Result<String, String> {
+    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> Result<String, &str> {
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname, &sk)
     }
@@ -143,13 +143,13 @@ impl MockSCL {
         &self,
         xorname: &XorName,
         _sk: &SecretKey,
-    ) -> Result<String, String> {
+    ) -> Result<String, &str> {
         match &self
             .mock_data
             .coin_balances
             .get(&vec_to_hex(xorname.to_vec()))
         {
-            None => Err("CoinBalance data not found".to_string()),
+            None => Err("CoinBalance data not found"),
             Some(coin_balance) => Ok(coin_balance
                 .value
                 .to_string()
@@ -158,9 +158,15 @@ impl MockSCL {
         }
     }
 
-    pub fn keys_fetch_pk(&self, xorname: &XorName) -> PublicKey {
-        let coin_balance = &self.mock_data.coin_balances[&vec_to_hex(xorname.to_vec())];
-        coin_balance.owner
+    pub fn keys_fetch_pk(&self, xorname: &XorName) -> Result<PublicKey, &str> {
+        match &self
+            .mock_data
+            .coin_balances
+            .get(&vec_to_hex(xorname.to_vec()))
+        {
+            None => Err("CoinBalance data not found"),
+            Some(coin_balance) => Ok(coin_balance.owner),
+        }
     }
 
     pub fn safecoin_transfer(
