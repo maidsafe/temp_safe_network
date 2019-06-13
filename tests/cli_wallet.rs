@@ -17,9 +17,6 @@ use std::process::Command;
 
 static CLI: &str = "safe_cli";
 static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-#[allow(dead_code)]
-static PRETTY_WALLET_BALANCE_EMPTY_RESPONSE: &str = "has a total balance of 0 safecoins";
-static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at:";
 static SAFE_PROTOCOL: &str = "safe://";
 
 fn get_bin_location() -> &'static str {
@@ -59,11 +56,11 @@ fn calling_safe_wallet_transfer() {
 
     // FROM
     let wallet_from = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet_from.contains("safe://"));
+    assert!(wallet_from.contains(SAFE_PROTOCOL));
 
     // TO
     let wallet_to = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet_to.contains("safe://"));
+    assert!(wallet_to.contains(SAFE_PROTOCOL));
 
     let (pk_from_xorurl, from_sk) = create_preload_and_get_keys("123");
 
@@ -138,7 +135,7 @@ fn calling_safe_wallet_balance_pretty_no_sk() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet.contains("safe://"));
+    assert!(wallet.contains(SAFE_PROTOCOL));
 
     let (pk_to_xorurl, to_sk) = create_preload_and_get_keys("300");
 
@@ -165,7 +162,7 @@ fn calling_safe_wallet_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet.contains("safe://"));
+    assert!(wallet.contains(SAFE_PROTOCOL));
 
     cmd.args(&vec![
         "wallet", "balance", &wallet,
@@ -181,7 +178,7 @@ fn calling_safe_wallet_insert_w_preload() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet.contains("safe://"));
+    assert!(wallet.contains(SAFE_PROTOCOL));
 
     let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
 

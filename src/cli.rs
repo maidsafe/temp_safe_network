@@ -57,7 +57,7 @@ pub fn run() -> Result<(), String> {
     match args.cmd {
         SubCommands::Auth { cmd } => auth_commander(cmd, &mut safe),
         SubCommands::Keypair {} => {
-            let key_pair = safe.keys_keypair()?;
+            let key_pair = safe.keypair()?;
             if pretty {
                 println!("Key pair generated:");
             }

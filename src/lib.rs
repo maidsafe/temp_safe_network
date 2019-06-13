@@ -162,7 +162,7 @@ impl Safe {
     }
 
     // Generate a key pair without creating and/or storing a Key on the network
-    pub fn keys_keypair(&self) -> Result<BlsKeyPair, String> {
+    pub fn keypair(&self) -> Result<BlsKeyPair, String> {
         let key_pair = KeyPair::random();
         let (pk, sk) = key_pair.to_hex_key_pair();
         Ok(BlsKeyPair { pk, sk })

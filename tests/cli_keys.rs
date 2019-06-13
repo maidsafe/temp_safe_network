@@ -16,9 +16,6 @@ use predicates::prelude::*;
 use std::process::Command;
 
 static CLI: &str = "safe_cli";
-static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-#[allow(dead_code)]
-static PRETTY_WALLET_BALANCE_EMPTY_RESPONSE: &str = "has a total balance of 0 safecoins";
 static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at:";
 static SAFE_PROTOCOL: &str = "safe://";
 
