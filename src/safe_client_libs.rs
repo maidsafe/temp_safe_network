@@ -8,39 +8,30 @@
 
 use futures::future::Future;
 
-use crate::lib_helpers::{decode_ipc_msg, xorname_from_pk, xorurl_to_xorname, xorurl_to_xorname2};
+#[cfg(not(feature = "fake-auth"))]
+use crate::lib_helpers::decode_ipc_msg;
+use crate::lib_helpers::{xorname_from_pk, xorurl_to_xorname};
+
 use crate::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
-use log::{debug, info, warn};
-use rand::{OsRng, Rng};
+use log::warn;
+use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App};
 
-#[cfg(feature = "fake-auth")]
-use safe_app::AppError;
 //#[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
-use safe_nd::mutable_data::{
-    Action, MutableData, PermissionSet, SeqEntryAction, SeqMutableData, Value,
-};
-use safe_nd::{Error, PublicKey, XorName};
+use safe_nd::mutable_data::{Action, PermissionSet, SeqEntryAction, SeqMutableData, Value};
+use safe_nd::{PublicKey, XorName};
 
 use std::collections::BTreeMap;
-use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 use uuid::Uuid;
 
-// Type tag used for the Wallet container
-static WALLET_TYPE_TAG: u64 = 10_000;
-
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
-fn from_slice(bytes: &[u8]) -> [u8; 32] {
-    let mut array = [0; 32];
-    let bytes = &bytes[..array.len()]; // panics if not enough data
-    array.copy_from_slice(bytes);
-    array
-}
+//Temporary untill SCL allows to pass a SeqEntryActions to mutate_seq_mdata_entries
+type SeqEntryActions = BTreeMap<Vec<u8>, SeqEntryAction>;
 
 pub struct SafeApp {
     safe_conn: Option<App>,
@@ -100,26 +91,16 @@ impl SafeApp {
 
     // TODO: replace with code
     pub fn allocate_test_coins(&mut self, to_pk: &PublicKeyMock, amount: &str) -> XorName {
-        let xorname = xorname_from_pk(to_pk);
-        // 	self.mock_data.coin_balances.insert(
-        // 		xorname_to_hex(&xorname),
-        // 		CoinBalance {
-        // 			owner: (*to_pk),
-        // 			value: amount.to_string(),
-        // 		},
-        // 	);
-        //
-        xorname
+        self.scl_mock.allocate_test_coins(to_pk, amount)
     }
 
-    // TODO: replace with actual code
     pub fn get_balance_from_pk(
         &self,
         pk: &PublicKeyMock,
         sk: &SecretKeyMock,
     ) -> Result<String, &str> {
         let xorname = xorname_from_pk(pk);
-        self.get_balance_from_xorname(&xorname, &sk)
+        self.get_balance_from_xorname(&xorname, sk)
     }
 
     // TODO: replace with actual code
@@ -127,17 +108,38 @@ impl SafeApp {
     pub fn get_balance_from_xorname(
         &self,
         xorname: &XorName,
-        _sk: &SecretKeyMock,
+        sk: &SecretKeyMock,
     ) -> Result<String, &str> {
-        // match &self.scl_mock.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
-        //     None => Err("CoinBalance data not found"),
-        //     Some(coin_balance) => Ok(coin_balance
-        //         .value
-        //         .to_string()
-        //         .replace("Coins(", "")
-        //         .replace(")", "")),
-        // }
-        Ok("".to_string())
+        //let safe_app: &App = self.safe_app.ok_or_else(|| APP_NOT_CONNECTED)?;
+        //let safe_app: &App = match &self.safe_app {
+        //    Some(app) => &app,
+        //    None => return Err(APP_NOT_CONNECTED.to_string()),
+        //};
+
+        // TODO: Make this work with SCL.
+
+        // let balance = unwrap!(run(safe_app, |client, _app_context| {
+        //     let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
+        //
+        //     client.get_balance(owner_wallet)
+        // 		.map_err(|e| panic!("Failed to get balance: {:?}", e))
+        //
+        // 	// .then(move |res| {
+        //     //     match res {
+        //     //         Err(/*CoreError::NewRoutingClientError(Error::AccessDenied)*/ _) => {
+        //     //             println!("No permissions to access owner's wallet");
+        //     //             ()
+        //     //         }
+        //     //         res => panic!("Unexpected result: {:?}", res),
+        //     //     }
+        // 	//
+        //     //     Ok::<_, AppError>(())
+        //     // })
+        // }));
+
+        // Ok(balance.to_string())
+
+        self.scl_mock.get_balance_from_xorname(xorname, sk)
     }
 
     // TODO: replace with actual code for calling SCL
@@ -160,12 +162,8 @@ impl SafeApp {
 
     //TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKeyMock, _sk: &SecretKeyMock) -> String {
-        // let xorname = xorname_from_pk(pk);
-        // let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
-        // let tx_state = unwrap!(txs_for_xorname.get(&tx_id.to_string()));
-        // tx_state.to_string()
-        "tx_state".to_string()
+    pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKeyMock, sk: &SecretKeyMock) -> String {
+        self.scl_mock.get_transaction(tx_id, pk, sk)
     }
 
     //TODO: Replace with SCL calling code
@@ -173,45 +171,22 @@ impl SafeApp {
     pub fn unpublished_append_only_put(
         &mut self,
         pk: &PublicKeyMock,
-        _sk: &SecretKeyMock,
+        sk: &SecretKeyMock,
         data: &[u8],
     ) -> XorName {
-        let xorname = xorname_from_pk(pk);
-        // let mut uao_for_xorname = match self
-        //     .mock_data
-        //     .unpublished_append_only
-        //     .get(&xorname_to_hex(&xorname))
-        // {
-        //     Some(uao) => uao.clone(),
-        //     None => BTreeMap::new(),
-        // };
-        // uao_for_xorname.insert(uao_for_xorname.len(), data.to_vec());
-        // self.mock_data
-        //     .unpublished_append_only
-        //     .insert(xorname_to_hex(&xorname), uao_for_xorname);
-
-        xorname
+        self.scl_mock.unpublished_append_only_put(pk, sk, data)
     }
 
     //TODO: Replace with SCL calling code
-
-    // #[allow(dead_code)]
-    // pub fn unpublished_append_only_get(
-    //     &self,
-    //     pk: &PublicKeyMock,
-    //     _sk: &SecretKeyMock,
-    //     version: Option<usize>,
-    // ) -> Vec<u8> {
-    //     // let xorname = xorname_from_pk(pk);
-    //     // let uao_for_xorname = &self.mock_data.unpublished_append_only[&xorname_to_hex(&xorname)];
-    //     // let data = match version {
-    //     //     Some(version) => unwrap!(uao_for_xorname.get(&version)),
-    //     //     None => unwrap!(uao_for_xorname.get(&self.mock_data.unpublished_append_only.len())),
-    //     // };
-    //
-    //     // data.to_vec()
-    //     data.to_vec()
-    // }
+    #[allow(dead_code)]
+    pub fn unpublished_append_only_get(
+        &self,
+        pk: &PublicKeyMock,
+        sk: &SecretKeyMock,
+        version: Option<usize>,
+    ) -> Vec<u8> {
+        self.scl_mock.unpublished_append_only_get(pk, sk, version)
+    }
 
     pub fn put_seq_mutable_data(
         &self,
@@ -228,14 +203,15 @@ impl SafeApp {
         let xorname = unwrap!(run(safe_app, move |client, _app_context| {
             let owners = match client.owner_key() {
                 Some(PublicKey::Bls(pk)) => pk,
-                other => panic!("Couldn't get account's owner pk"),
+                _ => panic!("Couldn't get account's owner pk"), // FIXME: return error instead of panic
             };
 
-            let mut rng = unwrap!(OsRng::new());
-            //let name: XorName = rng.gen();
-            let mut random_bytes = [0u8; 32];
-            rng.fill_bytes(&mut random_bytes);
-            let xorname = XorName(random_bytes);
+            let xorname = name.unwrap_or_else(|| {
+                let mut rng = unwrap!(OsRng::new());
+                let mut xorname = XorName::default();
+                rng.fill_bytes(&mut xorname.0);
+                xorname
+            });
 
             let permission_set = PermissionSet::new()
                 .allow(Action::Read)
@@ -273,11 +249,10 @@ impl SafeApp {
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        let xorurl_string: String = xorurl.to_string();
+        let xorname = xorurl_to_xorname(xorurl)?;
         let md = unwrap!(run(safe_app, move |client, _app_context| {
-            let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
             client
-                .get_seq_mdata(XorName(from_slice(&xorname)), tag)
+                .get_seq_mdata(xorname, tag)
                 .map_err(|e| panic!("Failed to get MD: {:?}", e))
         }));
         Ok(md)
@@ -286,76 +261,41 @@ impl SafeApp {
     pub fn seq_mutable_data_insert(
         &self,
         xorurl: &str,
-        type_tag: u64,
+        tag: u64,
         key: Vec<u8>,
         value: &[u8],
     ) -> Result<(), String> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
-        };
-
-        let mut entry_actions: BTreeMap<Vec<u8>, SeqEntryAction> = Default::default();
+        let mut entry_actions: SeqEntryActions = Default::default();
         let _ = entry_actions.insert(
             key.to_vec(),
             SeqEntryAction::Ins(Value::new(value.to_vec(), 0)),
         );
 
-        let xorurl_string: String = xorurl.to_string();
-        unwrap!(run(safe_app, move |client, _app_context| {
-            let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
-
-            client
-                .mutate_seq_mdata_entries(
-                    XorName(from_slice(&xorname)),
-                    type_tag,
-                    entry_actions.clone(),
-                )
-                .map_err(|e| panic!("Failed to insert to MD: {:?}", e))
-        }));
-
-        Ok(())
+        self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to insert to MD")
     }
 
     // TODO: Replace with real scl calling code
     #[allow(dead_code)]
-    pub fn mutable_data_delete(&mut self, xorname: &XorName, _tag: u64, key: &[u8]) {}
+    pub fn mutable_data_delete(&mut self, xorname: &XorName, tag: u64, key: &[u8]) {
+        self.scl_mock.mutable_data_delete(xorname, tag, key)
+    }
 
     pub fn seq_mutable_data_get_value(
         &mut self,
         xorurl: &str,
-        type_tag: u64,
+        tag: u64,
         key: Vec<u8>,
     ) -> Result<Value, String> {
-        // fn get_seq_mdata_value(&self, name: XorName, tag: u64, key: Vec<u8>) -> Box<CoreFuture<Val>> {
-
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        // let entries = unwrap!(run(safe_app, move |client, _app_context| {
-        // 	let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
-        // 	client
-        // 		.list_seq_mdata_entries(XorName(from_slice(&xorname)), type_tag)
-        // 		.map_err(|e| panic!("Failed to get MD: {:?}", e))
-        // }));
-        // Ok(entries)
-
-        let xorurl_string: String = xorurl.to_string();
-        // let key_to_use = key.clone();
+        let xorname = xorurl_to_xorname(xorurl)?;
         let data = unwrap!(run(safe_app, move |client, _app_context| {
-            // let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
-            let xorname = xorurl_to_xorname(&xorurl_string).unwrap();
-
             client
-                .get_seq_mdata_value(
-                    xorname,
-                    // XorName(from_slice(&xorname)),
-                    type_tag,
-                    key.to_vec(),
-                )
-                .map_err(|e| panic!("Failed to retrieve key. {:?}", e))
+                .get_seq_mdata_value(xorname, tag, key.to_vec())
+                .map_err(|e| panic!("Failed to retrieve key. {:?}", e)) // FIXME: return error instead of panic
         }));
 
         Ok(data)
@@ -364,53 +304,58 @@ impl SafeApp {
     pub fn list_seq_mdata_entries(
         &self,
         xorurl: &str,
-        type_tag: u64,
+        tag: u64,
     ) -> Result<BTreeMap<Vec<u8>, Value>, String> {
-        let xorurl_string: String = xorurl.to_string();
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
+        let xorname = xorurl_to_xorname(xorurl)?;
         let entries = unwrap!(run(safe_app, move |client, _app_context| {
-            let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
             client
-                .list_seq_mdata_entries(XorName(from_slice(&xorname)), type_tag)
-                .map_err(|e| panic!("Failed to get MD: {:?}", e))
+                .list_seq_mdata_entries(xorname, tag)
+                .map_err(|e| panic!("Failed to get MD: {:?}", e)) // FIXME: return error instead of panic
         }));
         Ok(entries)
     }
 
+    #[allow(dead_code)]
     pub fn seq_mutable_data_update(
         &self,
         xorurl: &str,
-        type_tag: u64,
+        tag: u64,
         key: &[u8],
         value: &[u8],
         version: u64,
     ) -> Result<(), String> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
-        };
-
-        let mut entry_actions: BTreeMap<Vec<u8>, SeqEntryAction> = Default::default();
+        let mut entry_actions: SeqEntryActions = Default::default();
         let _ = entry_actions.insert(
             key.to_vec(),
             SeqEntryAction::Update(Value::new(value.to_vec(), version)),
         );
 
-        let xorurl_string: String = xorurl.to_string();
-        unwrap!(run(safe_app, move |client, _app_context| {
-            let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
+        self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to update MD")
+    }
 
+    // private helper method
+    fn mutate_seq_mdata_entries(
+        &self,
+        xorurl: &str,
+        tag: u64,
+        entry_actions: SeqEntryActions,
+        error_msg: &str,
+    ) -> Result<(), String> {
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+        let xorname = xorurl_to_xorname(xorurl)?;
+        let message = error_msg.to_string();
+        unwrap!(run(safe_app, move |client, _app_context| {
             client
-                .mutate_seq_mdata_entries(
-                    XorName(from_slice(&xorname)),
-                    type_tag,
-                    entry_actions.clone(),
-                )
-                .map_err(|e| panic!("Failed to update MD: {:?}", e))
+                .mutate_seq_mdata_entries(xorname, tag, entry_actions)
+                .map_err(move |err| panic!(format!("{}: {}", message, err))) // FIXME: return error instead of panic
         }));
 
         Ok(())

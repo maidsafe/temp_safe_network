@@ -6,18 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::scl_mock::XorName;
 use cid::{Cid, Codec, Version};
 use multibase::{encode, Base};
 use multihash;
 use safe_app::AppError;
-// use safe_core::client::{Client/*, CoreError*/, XorNameConverter};
-// use routing::{XorName as OldXorName, /*MutableData*/};
-
 use safe_core::ipc::{
     decode_msg, encode_msg, gen_req_id, resp::AuthGranted, IpcMsg, IpcReq, IpcResp,
 };
-pub use safe_nd::XOR_NAME_LEN;
+use safe_nd::{XorName, XOR_NAME_LEN};
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
@@ -161,21 +157,6 @@ pub fn xorurl_to_xorname(xorurl: &str) -> Result<XorName, String> {
     let mut xorname = XorName::default();
     xorname.0.copy_from_slice(&hash.digest);
     Ok(xorname)
-}
-
-pub fn xorurl_to_xorname2(xorurl: &str) -> Result<Vec<u8>, String> {
-    let min_len = SAFE_URL_PROTOCOL.len();
-    if xorurl.len() < min_len {
-        return Err("Invalid XOR-URL".to_string());
-    }
-
-    let cid_str = &xorurl[min_len..];
-    let cid = Cid::from(cid_str).map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
-    let hash = multihash::decode(&cid.hash)
-        .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?;
-    //    let mut xorname = XorName::default();
-    //    xorname.0.copy_from_slice(&hash.digest);
-    Ok(hash.digest.to_vec())
 }
 
 // FIXME: temp_multihash_encode is a temporary solution until a PR in multihash project is

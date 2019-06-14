@@ -7,32 +7,26 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod lib_helpers;
+#[cfg(not(feature = "mock"))]
 mod safe_client_libs;
+//#[cfg(feature = "mock")]
 mod scl_mock;
 
-use futures::future::Future;
 pub use lib_helpers::vec_to_hex;
 use lib_helpers::{
     decode_ipc_msg, encode_ipc_msg, parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex,
-    xorname_to_hex, xorname_to_xorurl, xorurl_to_xorname, /*xorurl_to_xorname2,*/ KeyPair,
+    xorname_to_xorurl, xorurl_to_xorname, KeyPair,
 };
-use log::{debug, info, warn};
-use rand::OsRng;
-use rand_core::RngCore;
+use log::{debug, info};
 use reqwest::get as httpget;
-use safe_app::{run, App};
 #[cfg(not(feature = "mock"))]
 use safe_client_libs::SafeApp;
-use safe_core::client::Client;
 use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
-use safe_nd::mutable_data::{
-    Action, MutableData, PermissionSet, /*SeqEntryAction,*/ SeqMutableData, /*, Value,*/
-};
-use safe_nd::{AppPermissions, PublicKey, /*Error,*/ XorName};
+use safe_nd::AppPermissions;
 #[cfg(feature = "mock")]
 use scl_mock::SafeApp;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::io::Read;
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
@@ -42,12 +36,10 @@ use uuid::Uuid;
 static WALLET_TYPE_TAG: u64 = 10_000;
 
 static WALLET_DEFAULT: &str = "_default";
-// static WALLET_DEFAULT_BYTES : Vec<u8> = WALLET_DEFAULT.to_string().into_bytes();
+static WALLET_DEFAULT_BYTES: &[u8] = b"_default";
 
 // Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
 const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
-
-const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
 // The XOR-URL type (in the future in can be a struct with different functions)
 pub type XorUrl = String;
@@ -249,35 +241,6 @@ impl Safe {
             sk_from_hex(sk).map_err(|_| "Invalid secret key provided".to_string())?;
         let xorname = xorurl_to_xorname(xorurl)?;
 
-        //let safe_app: &App = self.safe_app.ok_or_else(|| APP_NOT_CONNECTED)?;
-        //let safe_app: &App = match &self.safe_app {
-        //    Some(app) => &app,
-        //    None => return Err(APP_NOT_CONNECTED.to_string()),
-        //};
-
-        // TODO: Make this work with SCL.
-
-        // let balance = unwrap!(run(safe_app, |client, _app_context| {
-        //     let owner_wallet = XorName(sha3_256(&unwrap!(client.owner_key()).0));
-        //
-        //     client.get_balance(owner_wallet)
-        // 		.map_err(|e| panic!("Failed to get balance: {:?}", e))
-        //
-        // 	// .then(move |res| {
-        //     //     match res {
-        //     //         Err(/*CoreError::NewRoutingClientError(Error::AccessDenied)*/ _) => {
-        //     //             println!("No permissions to access owner's wallet");
-        //     //             ()
-        //     //         }
-        //     //         res => panic!("Unexpected result: {:?}", res),
-        //     //     }
-        // 	//
-        //     //     Ok::<_, AppError>(())
-        //     // })
-        // }));
-
-        // Ok(balance.to_string())
-
         Ok(self
             .safe_app
             .get_balance_from_xorname(&xorname, &secret_key)
@@ -326,12 +289,12 @@ impl Safe {
             md_key.clone().into_bytes().to_vec(),
             &serialised_value.into_bytes(),
         )?;
-        let WALLET_DEFAULT_BYTES: Vec<u8> = WALLET_DEFAULT.to_string().into_bytes();
+
         if default {
             self.safe_app.seq_mutable_data_insert(
                 wallet_xorurl,
                 WALLET_TYPE_TAG,
-                WALLET_DEFAULT_BYTES,
+                WALLET_DEFAULT_BYTES.to_vec(),
                 &md_key.into_bytes(),
             )?;
         }
@@ -342,7 +305,7 @@ impl Safe {
     // Check the total balance of a Wallet found at a given XOR-URL
     pub fn wallet_balance(&mut self, xorurl: &str, _sk: &str) -> Result<String, String> {
         let mut total_balance: f64 = 0.0;
-
+        // Let's get the list of balances from the Wallet
         let spendable_balances = self
             .safe_app
             .list_seq_mdata_entries(xorurl, WALLET_TYPE_TAG)?;
@@ -351,22 +314,16 @@ impl Safe {
         spendable_balances.iter().for_each(|(name, balance)| {
             let thename = String::from_utf8_lossy(name).to_string();
 
-            // TODO, get string of name and actual balance
-
             // Ignore the _default Wallet MD entry key
             if thename != WALLET_DEFAULT {
                 let the_balance = String::from_utf8_lossy(&balance.data).to_string();
-                println!("BALANCE: {} => {}", thename, the_balance);
                 let spendable_balance: WalletSpendableBalance =
                     unwrap!(serde_json::from_str(&the_balance));
 
                 let current_balance = unwrap!(
                     self.keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk)
                 );
-                println!(
-                    "WHAT WALLET BALANCE {} => {:?}",
-                    the_balance, current_balance
-                );
+
                 total_balance += unwrap!(parse_coins_amount(&current_balance));
             }
         });
@@ -377,21 +334,25 @@ impl Safe {
         &mut self,
         wallet_xorurl: &str,
     ) -> Result<WalletSpendableBalance, String> {
-        let xorname = xorurl_to_xorname(&wallet_xorurl)?;
-        let WALLET_DEFAULT_BYTES: Vec<u8> = WALLET_DEFAULT.to_string().into_bytes();
         let default = self
             .safe_app
-            .seq_mutable_data_get_value(wallet_xorurl, WALLET_TYPE_TAG, WALLET_DEFAULT_BYTES)
-            .map_err(|_| format!("No default balance found at Wallet \"{}\"", wallet_xorurl))?;
-
-        let default_key = String::from_utf8_lossy(&default.data).to_string();
-
-        let the_balance: WalletSpendableBalance = {
-            let default_balance_vec = self.safe_app.seq_mutable_data_get_value(
+            .seq_mutable_data_get_value(
                 wallet_xorurl,
                 WALLET_TYPE_TAG,
-                default.data,
-            )?;
+                WALLET_DEFAULT_BYTES.to_vec(),
+            )
+            .map_err(|_| format!("No default balance found at Wallet \"{}\"", wallet_xorurl))?;
+
+        let the_balance: WalletSpendableBalance = {
+            let default_balance_vec = self
+                .safe_app
+                .seq_mutable_data_get_value(wallet_xorurl, WALLET_TYPE_TAG, default.data)
+                .map_err(|_| {
+                    format!(
+                        "Default balance set but not found at Wallet \"{}\"",
+                        wallet_xorurl
+                    )
+                })?;
 
             let default_balance = String::from_utf8_lossy(&default_balance_vec.data).to_string();
             let spendable_balance: WalletSpendableBalance =
