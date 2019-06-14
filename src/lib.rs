@@ -57,6 +57,7 @@
 // TODO - Fix before committing.
 #![allow(unused)]
 
+mod action;
 mod adult;
 mod chunk_store;
 mod coins_handler;

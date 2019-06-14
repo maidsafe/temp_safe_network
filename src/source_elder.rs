@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use log::{info, trace};
+use crate::action::Action;
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuickP2pConfig, Event, QuicP2p};
 use safe_nd::ClientPublicId;
@@ -46,5 +47,13 @@ impl SourceElder {
             },
             event_receiver,
         )
+    }
+
+    pub fn handle_client_request(
+        &mut self,
+        client_id: &ClientPublicId,
+        msg: Vec<u8>,
+    ) -> Option<Action> {
+        unimplemented!();
     }
 }

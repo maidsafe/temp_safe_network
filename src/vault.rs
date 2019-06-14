@@ -7,16 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder, error::Result,
-    source_elder::SourceElder,
+    action::Action, adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder,
+    error::Result, source_elder::SourceElder,
 };
 use log::info;
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuickP2pConfig, Event, QuicP2p};
-use safe_nd::{ClientPublicId, NodeFullId};
+use safe_nd::{ClientPublicId, NodeFullId, Request};
 use std::{
     collections::{HashMap, HashSet},
     sync::mpsc::Receiver,
+    net::SocketAddr,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -57,6 +58,29 @@ impl Vault {
                 }
                 event => info!("Unexpected event: {:?}", event),
             }
+        }
+    }
+
+    fn handle_client_request(
+        &mut self,
+        client_id: &ClientPublicId,
+        msg: Vec<u8>,
+    ) -> Option<Action> {
+        self.source_elder_mut()
+            .and_then(|source_elder| source_elder.handle_client_request(client_id, msg))
+    }
+
+    fn source_elder(&self) -> Option<&SourceElder> {
+        match &self.state {
+            State::Elder { ref src, .. } => Some(src),
+            State::Adult(_) => None,
+        }
+    }
+
+    fn source_elder_mut(&mut self) -> Option<&mut SourceElder> {
+        match &mut self.state {
+            State::Elder { ref mut src, .. } => Some(src),
+            State::Adult(_) => None,
         }
     }
 }
