@@ -6,14 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#[cfg(not(feature = "fake-auth"))]
 pub mod auth;
 pub mod container;
+#[cfg(feature = "fake-auth")]
+pub mod fake_auth;
 pub mod files;
 mod helpers;
 pub mod keys;
 pub mod pns;
 pub mod safe_id;
 pub mod wallet;
+
+#[cfg(not(feature = "fake-auth"))]
+use auth::AuthSubCommands;
+#[cfg(feature = "fake-auth")]
+pub use fake_auth::{self as auth, AuthSubCommands};
 
 use structopt::StructOpt;
 
@@ -24,7 +32,7 @@ pub enum SubCommands {
     Auth {
         /// subcommands
         #[structopt(subcommand)]
-        cmd: Option<auth::AuthSubCommands>,
+        cmd: Option<AuthSubCommands>,
     },
     #[structopt(name = "container")]
     /// Create a new SAFE Network account with the credentials provided

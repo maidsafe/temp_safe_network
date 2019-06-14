@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod lib_helpers;
-#[cfg(not(feature = "mock"))]
+#[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
-//#[cfg(feature = "mock")]
+//#[cfg(feature = "scl-mock")]
 mod scl_mock;
 
 pub use lib_helpers::vec_to_hex;
@@ -19,11 +19,11 @@ use lib_helpers::{
 };
 use log::{debug, info};
 use reqwest::get as httpget;
-#[cfg(not(feature = "mock"))]
+#[cfg(not(feature = "scl-mock"))]
 use safe_client_libs::SafeApp;
 use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
 use safe_nd::AppPermissions;
-#[cfg(feature = "mock")]
+#[cfg(feature = "scl-mock")]
 use scl_mock::SafeApp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

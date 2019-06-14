@@ -13,7 +13,7 @@ use crate::lib_helpers::decode_ipc_msg;
 use crate::lib_helpers::{xorname_from_pk, xorurl_to_xorname};
 
 use crate::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
-use log::warn;
+use log::{debug, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App};

@@ -39,7 +39,7 @@ futures = "~0.1.17"
 default = ["uuid/v4"]
 mock-network = ["safe_app/mock-network"]
 fake-auth = ["safe_app/testing"]
-mock = []
+scl-mock = []
 
 [patch.crates-io]
 safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }
