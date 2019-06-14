@@ -6,36 +6,39 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::lib_helpers::vec_to_hex;
+use crate::lib_helpers::{parse_hex, vec_to_hex, xorname_to_hex, xorurl_to_xorname, KeyPair};
 use log::debug;
 use rand::rngs::OsRng;
-use rand::Rng;
+//use rand::Rng;
 use rand_core::RngCore;
-use safe_nd::mutable_data::{MutableData, /*MutableDataKind, Permission, User,*/ Value};
-pub use safe_nd::{XorName, XOR_NAME_LEN};
+use safe_nd::mutable_data::{
+    Action, MutableData, PermissionSet, SeqEntryAction, SeqMutableData, Value,
+};
+pub use safe_nd::{PublicKey, XorName, XOR_NAME_LEN};
 
 use safecoin::{Coins, NanoCoins};
 //use safe_nd::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::io::Write;
 use std::str::FromStr;
 use std::{fs, str};
-use threshold_crypto::{PublicKey, SecretKey};
+pub use threshold_crypto::{PublicKey as PublicKeyMock, SecretKey as SecretKeyMock};
 use unwrap::unwrap;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct CoinBalance {
-    owner: PublicKey,
+    owner: PublicKeyMock,
     value: String,
 }
 
 type AppendOnlyDataMock = BTreeMap<usize, Vec<u8>>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
+type SeqMutableDataMock = BTreeMap<String, Value>;
 
 static MOCK_FILE: &str = "./mock_data.txt";
 
@@ -44,22 +47,22 @@ struct MockData {
     coin_balances: BTreeMap<XorNameStr, CoinBalance>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
     unpublished_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
-    mutable_data: BTreeMap<XorNameStr, u64 /*MutableData*/>,
+    mutable_data: BTreeMap<XorNameStr, SeqMutableDataMock>,
 }
 
-fn xorname_from_pk(pk: &PublicKey) -> XorName {
+fn xorname_from_pk(pk: &PublicKeyMock) -> XorName {
     let pk_as_bytes: [u8; 48] = pk.to_bytes();
     let mut xorname = XorName::default();
     xorname.0.copy_from_slice(&pk_as_bytes[..XOR_NAME_LEN]);
     xorname
 }
 
-pub struct MockSCL {
+pub struct SafeApp {
     mock_data: MockData,
 }
 
 /// Writes the mock data onto the mock file
-impl Drop for MockSCL {
+impl Drop for SafeApp {
     fn drop(&mut self) {
         let serialised = unwrap!(serde_json::to_string(&self.mock_data));
         debug!("serialised = {}", serialised);
@@ -69,7 +72,7 @@ impl Drop for MockSCL {
     }
 }
 
-impl MockSCL {
+impl SafeApp {
     pub fn new() -> Self {
         let mock_data = match fs::File::open(&MOCK_FILE) {
             Ok(file) => {
@@ -85,16 +88,21 @@ impl MockSCL {
         Self { mock_data }
     }
 
+    pub fn connect(&mut self, _app_id: &str, _auth_credentials: &str) -> Result<(), String> {
+        debug!("Using mock so there is no connection to network");
+        Ok(())
+    }
+
     pub fn create_balance(
         &mut self,
-        from_pk: &PublicKey,
-        from_sk: &SecretKey,
-        new_balance_owner: &PublicKey,
+        from_pk: &PublicKeyMock,
+        from_sk: &SecretKeyMock,
+        new_balance_owner: &PublicKeyMock,
         amount: &str,
     ) -> Result<XorName, &str> {
         let from_xorname = xorname_from_pk(from_pk);
         let from_balance = unwrap!(Coins::from_str(&unwrap!(
-            self.get_balance_from_pk(from_pk, from_sk)
+            self.get_balance_from_xorname(&from_xorname, from_sk)
         )));
         let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
         let amount_coin = unwrap!(Coins::from_str(amount));
@@ -104,7 +112,7 @@ impl MockSCL {
         }
         let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
         self.mock_data.coin_balances.insert(
-            vec_to_hex(from_xorname.0.to_vec()),
+            xorname_to_hex(&from_xorname),
             CoinBalance {
                 owner: (*from_pk),
                 value: Coins::from(from_new_amount).to_string(),
@@ -113,7 +121,7 @@ impl MockSCL {
 
         let to_xorname = xorname_from_pk(new_balance_owner);
         self.mock_data.coin_balances.insert(
-            vec_to_hex(to_xorname.0.to_vec()),
+            xorname_to_hex(&to_xorname),
             CoinBalance {
                 owner: (*new_balance_owner),
                 value: amount.to_string(),
@@ -123,10 +131,10 @@ impl MockSCL {
         Ok(to_xorname)
     }
 
-    pub fn allocate_test_coins(&mut self, to_pk: &PublicKey, amount: &str) -> XorName {
+    pub fn allocate_test_coins(&mut self, to_pk: &PublicKeyMock, amount: &str) -> XorName {
         let xorname = xorname_from_pk(to_pk);
         self.mock_data.coin_balances.insert(
-            vec_to_hex(xorname.0.to_vec()),
+            xorname_to_hex(&xorname),
             CoinBalance {
                 owner: (*to_pk),
                 value: amount.to_string(),
@@ -136,35 +144,42 @@ impl MockSCL {
         xorname
     }
 
-    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> Result<String, &str> {
+    pub fn get_balance_from_pk(
+        &self,
+        pk: &PublicKeyMock,
+        sk: &SecretKeyMock,
+    ) -> Result<String, &str> {
         let xorname = xorname_from_pk(pk);
-        let coin_balance = &self.mock_data.coin_balances[&vec_to_hex(xorname.0.to_vec())];
-        coin_balance
-            .value
-            .to_string()
-            .replace("Coins(", "")
-            .replace(")", "")
+        self.get_balance_from_xorname(&xorname, &sk)
     }
 
-    pub fn get_balance_from_xorname(&self, xorname: &XorName, _sk: &SecretKey) -> String {
-        let coin_balance = &self.mock_data.coin_balances[&vec_to_hex(xorname.0.to_vec())];
-        coin_balance
-            .value
-            .to_string()
-            .replace("Coins(", "")
-            .replace(")", "")
+    pub fn get_balance_from_xorname(
+        &self,
+        xorname: &XorName,
+        _sk: &SecretKeyMock,
+    ) -> Result<String, &str> {
+        match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+            None => Err("CoinBalance data not found"),
+            Some(coin_balance) => Ok(coin_balance
+                .value
+                .to_string()
+                .replace("Coins(", "")
+                .replace(")", "")),
+        }
     }
 
-    pub fn keys_fetch_pk(&self, xorname: &XorName) -> PublicKey {
-        let coin_balance = &self.mock_data.coin_balances[&vec_to_hex(xorname.0.to_vec())];
-        coin_balance.owner
+    pub fn keys_fetch_pk(&self, xorname: &XorName) -> Result<PublicKeyMock, &str> {
+        match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+            None => Err("CoinBalance data not found"),
+            Some(coin_balance) => Ok(coin_balance.owner),
+        }
     }
 
     pub fn safecoin_transfer(
         &mut self,
-        from_pk: &PublicKey,
-        from_sk: &SecretKey,
-        to_pk: &PublicKey,
+        from_pk: &PublicKeyMock,
+        from_sk: &SecretKeyMock,
+        to_pk: &PublicKeyMock,
         tx_id: &Uuid,
         amount: &str,
     ) -> Result<Uuid, &str> {
@@ -173,7 +188,7 @@ impl MockSCL {
 
         let the_tx_id = *tx_id;
         // generate TX in destination section (to_pk)
-        let mut txs_for_xorname = match self.mock_data.txs.get(&vec_to_hex(to_xorname.0.to_vec())) {
+        let mut txs_for_xorname = match self.mock_data.txs.get(&xorname_to_hex(&to_xorname)) {
             Some(txs) => txs.clone(),
             None => BTreeMap::new(),
         };
@@ -183,7 +198,7 @@ impl MockSCL {
         );
         self.mock_data
             .txs
-            .insert(vec_to_hex(to_xorname.0.to_vec()), txs_for_xorname);
+            .insert(xorname_to_hex(&to_xorname), txs_for_xorname);
 
         let amount_coin = (Coins::from_str(amount)).map_err(|_| "InvalidAmount")?;
 
@@ -198,7 +213,7 @@ impl MockSCL {
         }
         let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
         self.mock_data.coin_balances.insert(
-            vec_to_hex(from_xorname.0.to_vec()),
+            xorname_to_hex(&from_xorname),
             CoinBalance {
                 owner: (*from_pk),
                 value: Coins::from(from_new_amount).to_string(),
@@ -212,7 +227,7 @@ impl MockSCL {
         let to_nano_balance = unwrap!(NanoCoins::try_from(to_balance));
         let to_new_amount = unwrap!(NanoCoins::new(to_nano_balance.num() + amount_nano.num()));
         self.mock_data.coin_balances.insert(
-            vec_to_hex(to_xorname.0.to_vec()),
+            xorname_to_hex(&to_xorname),
             CoinBalance {
                 owner: (*to_pk),
                 value: Coins::from(to_new_amount).to_string(),
@@ -223,9 +238,9 @@ impl MockSCL {
     }
 
     #[allow(dead_code)]
-    pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKey, _sk: &SecretKey) -> String {
+    pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKeyMock, _sk: &SecretKeyMock) -> String {
         let xorname = xorname_from_pk(pk);
-        let txs_for_xorname = &self.mock_data.txs[&vec_to_hex(xorname.0.to_vec())];
+        let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
         let tx_state = unwrap!(txs_for_xorname.get(&tx_id.to_string()));
         tx_state.to_string()
     }
@@ -233,15 +248,15 @@ impl MockSCL {
     #[allow(dead_code)]
     pub fn unpublished_append_only_put(
         &mut self,
-        pk: &PublicKey,
-        _sk: &SecretKey,
+        pk: &PublicKeyMock,
+        _sk: &SecretKeyMock,
         data: &[u8],
     ) -> XorName {
         let xorname = xorname_from_pk(pk);
         let mut uao_for_xorname = match self
             .mock_data
             .unpublished_append_only
-            .get(&vec_to_hex(xorname.0.to_vec()))
+            .get(&xorname_to_hex(&xorname))
         {
             Some(uao) => uao.clone(),
             None => BTreeMap::new(),
@@ -249,7 +264,7 @@ impl MockSCL {
         uao_for_xorname.insert(uao_for_xorname.len(), data.to_vec());
         self.mock_data
             .unpublished_append_only
-            .insert(vec_to_hex(xorname.0.to_vec()), uao_for_xorname);
+            .insert(xorname_to_hex(&xorname), uao_for_xorname);
 
         xorname
     }
@@ -257,13 +272,12 @@ impl MockSCL {
     #[allow(dead_code)]
     pub fn unpublished_append_only_get(
         &self,
-        pk: &PublicKey,
-        _sk: &SecretKey,
+        pk: &PublicKeyMock,
+        _sk: &SecretKeyMock,
         version: Option<usize>,
     ) -> Vec<u8> {
         let xorname = xorname_from_pk(pk);
-        let uao_for_xorname =
-            &self.mock_data.unpublished_append_only[&vec_to_hex(xorname.0.to_vec())];
+        let uao_for_xorname = &self.mock_data.unpublished_append_only[&xorname_to_hex(&xorname)];
         let data = match version {
             Some(version) => unwrap!(uao_for_xorname.get(&version)),
             None => unwrap!(uao_for_xorname.get(&self.mock_data.unpublished_append_only.len())),
@@ -272,14 +286,12 @@ impl MockSCL {
         data.to_vec()
     }
 
-    #[allow(dead_code)]
-    pub fn mutable_data_put(
+    pub fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,
-        tag: Option<u64>,
+        tag: u64,
         // _data: Option<String>,
-        permissions: Option<String>,
-        sequenced: bool,
+        _permissions: Option<String>,
     ) -> XorName {
         let xorname = name.unwrap_or_else(|| {
             let mut os_rng = OsRng::new().unwrap();
@@ -287,159 +299,94 @@ impl MockSCL {
             os_rng.fill_bytes(&mut xorname);
             XorName(xorname)
         });
-        /*
-        let mut permission_map: BTreeMap<User, BTreeSet<Permission>> = BTreeMap::new();
-        let perms_string: String;
-        if let Some(perms) = permissions {
-            perms_string = perms;
-        } else {
-            perms_string = String::from("read insert update delete permissions");
-        }
-        let permission_set: BTreeSet<Permission> = perms_string
-            .split_whitespace()
-            .map(|permission| match permission.to_lowercase().as_str() {
-                "read" => Ok(Permission::Read),
-                "insert" => Ok(Permission::Insert),
-                "update" => Ok(Permission::Update),
-                "delete" => Ok(Permission::Delete),
-                "permissions" => Ok(Permission::ManagePermissions),
-                _ => Err("Invalid permission"),
-            })
-            .filter_map(Result::ok)
-            .collect();
-        permission_map.insert(User::Anyone, permission_set);
 
-        let md_kind = if sequenced {
-            // if let Some(data_string) = data {
-            // }
-            let inner: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-            //inner.insert(String::from("testkeyseq"), b"testvalueseq".to_vec());
-            MutableDataKind::Sequenced { data: inner }
-        } else {
-            // An unsequenced MD doesn't need data versioning. Noted here: https://github.com/maidsafe/safe-nd/issues/7
-
-            // if let Some(data_string) = data {
-            // }
-            let inner: BTreeMap<String, Value> = BTreeMap::new();
-            /*inner.insert(
-                String::from("testkeyunseq"),
-                Value {
-                    data: b"testvalueunseq".to_vec(),
-                    version: 0,
-                },
-            );*/
-            MutableDataKind::Unsequenced { data: inner }
+        let mut seq_md = match self.mock_data.mutable_data.get(&xorname_to_hex(&xorname)) {
+            Some(uao) => uao.clone(),
+            None => BTreeMap::new(),
         };
 
-        let md_tag: u64;
-        if let Some(t) = tag {
-            md_tag = t;
-        } else {
-            let mut rng = rand::thread_rng();
-            md_tag = rng.gen();
-        }
-        let sk = SecretKey::random();
-        let pk = sk.public_key();
-        let md = MutableData::new(xorname, md_tag, md_kind, permission_map, pk);
-
-        let xorname_as_string: String = vec_to_hex(md.name().to_vec());
         self.mock_data
             .mutable_data
-            .insert(xorname_as_string.clone(), md.clone());
-
-        md.name()*/
+            .insert(xorname_to_hex(&xorname), seq_md);
 
         xorname
     }
 
-    pub fn mutable_data_insert(&mut self, xorname: &XorName, _tag: u64, key: &[u8], value: &[u8]) {
-        /*        let xorname_as_string: String = vec_to_hex(xorname.0.to_vec());
-        let md = &self.mock_data.mutable_data[&xorname_as_string];
-        if let MutableDataKind::Unsequenced { data } = &md.data {
-            let mut inner: BTreeMap<String, Value> = data.clone();
-            inner.insert(
-                String::from_utf8_lossy(key).to_string(),
-                Value {
-                    data: value.to_vec(),
-                    version: 0,
-                },
-            );
-            let mut updated_md = md.clone();
-            updated_md.data = MutableDataKind::Unsequenced { data: inner };
-            self.mock_data
-                .mutable_data
-                .insert(xorname_as_string, updated_md);
-        }*/
+    fn get_seq_mdata(&self, xorname: &XorName, _tag: u64) -> Result<SeqMutableDataMock, String> {
+        match self.mock_data.mutable_data.get(&xorname_to_hex(&xorname)) {
+            Some(seq_md) => Ok(seq_md.clone()),
+            None => Err("SeqMutableDataNotFound".to_string()),
+        }
+    }
+
+    pub fn seq_mutable_data_insert(
+        &mut self,
+        xorurl: &str,
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<(), String> {
+        let xorname = xorurl_to_xorname(xorurl)?;
+        let mut seq_md = self.get_seq_mdata(&xorname, tag)?;
+
+        seq_md.insert(
+            vec_to_hex(key.to_vec()),
+            Value {
+                //data: String::from_utf8_lossy(key).to_string(),
+                data: value.to_vec(),
+                version: 0,
+            },
+        );
+
+        self.mock_data
+            .mutable_data
+            .insert(xorname_to_hex(&xorname), seq_md);
+
+        Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn mutable_data_delete(&mut self, xorname: &XorName, _tag: u64, key: &[u8]) {
-        /*        let xorname_as_string: String = vec_to_hex(xorname.0.to_vec());
-        let md = &self.mock_data.mutable_data[&xorname_as_string];
-        if let MutableDataKind::Unsequenced { data } = &md.data {
-            let mut inner: BTreeMap<String, Value> = data.clone();
-            inner.remove(&String::from_utf8_lossy(key).to_string());
-            let mut updated_md = md.clone();
-            updated_md.data = MutableDataKind::Unsequenced { data: inner };
-            self.mock_data
-                .mutable_data
-                .insert(xorname_as_string, updated_md);
-        }*/
-    }
+    pub fn mutable_data_delete(&mut self, xorname: &XorName, _tag: u64, key: &[u8]) {}
 
     pub fn mutable_data_get_key(
         &mut self,
-        key: &str,
-        xorname: &XorName,
-        _tag: u64,
-    ) -> Result<Option<Vec<u8>>, String> {
-        /*        let xorname_as_string: String = vec_to_hex(xorname.0.to_vec());
-        let md = &self.mock_data.mutable_data[&xorname_as_string];
-        let mut res = None;
-        if let MutableDataKind::Unsequenced { data } = &md.data {
-            data.iter().for_each(|elem| {
-                let this_key = elem.0.clone();
-
-                if this_key == key {
-                    res = Some(elem.1.data.clone())
-                }
-                // res.insert(elem.0.clone().into_bytes(), elem.1.data.clone());
-            });
+        xorurl: &str,
+        tag: u64,
+        key: &[u8],
+    ) -> Result<Value, String> {
+        let xorname = xorurl_to_xorname(xorurl)?;
+        let mut seq_md = self.get_seq_mdata(&xorname, tag)?;
+        match seq_md.get(&vec_to_hex(key.to_vec())) {
+            Some(value) => Ok(value.clone()),
+            None => Err("EntryNotFound".to_string()),
         }
-        // let the_key = unwrap!(res[$key]);
-
-        Ok(res)*/
-
-        Ok(Some(vec![]))
     }
 
-    pub fn mutable_data_get_entries(
-        &mut self,
-        xorname: &XorName,
-        _tag: u64,
-    ) -> BTreeMap<Vec<u8>, Vec<u8>> {
-        /*        let xorname_as_string: String = vec_to_hex(xorname.0.to_vec());
-        let md = &self.mock_data.mutable_data[&xorname_as_string];
-        let mut res = BTreeMap::new();
-        if let MutableDataKind::Unsequenced { data } = &md.data {
-            data.iter().for_each(|elem| {
-                res.insert(elem.0.clone().into_bytes(), elem.1.data.clone());
-            });
-        }
-        res.clone()*/
+    pub fn list_seq_mdata_entries(
+        &self,
+        xorurl: &str,
+        tag: u64,
+    ) -> Result<BTreeMap<Vec<u8>, Value>, String> {
+        let xorname = xorurl_to_xorname(xorurl)?;
+        let mut seq_md = self.get_seq_mdata(&xorname, tag)?;
 
-        BTreeMap::new()
+        let mut res = BTreeMap::new();
+        seq_md.iter().for_each(|elem| {
+            res.insert(parse_hex(elem.0), elem.1.clone());
+        });
+
+        Ok(res)
     }
 }
 
 #[test]
 fn test_unpublished_append_only_put() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
+    use self::SafeApp;
+    use threshold_crypto::SecretKey as SecretKeyMock;
 
-    let mut mock = MockSCL::new();
+    let mut mock = SafeApp::new();
 
-    let sk = SecretKey::random();
+    let sk = SecretKeyMock::random();
     let pk = sk.public_key();
     println!(
         "New Unpublished AppendOnlyData at: {:?}",
@@ -449,12 +396,12 @@ fn test_unpublished_append_only_put() {
 
 #[test]
 fn test_unpublished_append_only_get() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
+    use self::SafeApp;
+    use threshold_crypto::SecretKey as SecretKeyMock;
 
-    let mut mock = MockSCL::new();
+    let mut mock = SafeApp::new();
 
-    let sk = SecretKey::random();
+    let sk = SecretKeyMock::random();
     let pk = sk.public_key();
     let data = vec![1, 2, 3];
     println!(
@@ -474,12 +421,12 @@ fn test_unpublished_append_only_get() {
 
 #[test]
 fn test_allocate_test_coins() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
+    use self::SafeApp;
+    use threshold_crypto::SecretKey as SecretKeyMock;
 
-    let mut mock = MockSCL::new();
+    let mut mock = SafeApp::new();
 
-    let sk_to = SecretKey::random();
+    let sk_to = SecretKeyMock::random();
     let pk_to = sk_to.public_key();
 
     let balance = "2.345678912";
@@ -491,18 +438,18 @@ fn test_allocate_test_coins() {
 
 #[test]
 fn test_create_balance() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
+    use self::SafeApp;
+    use threshold_crypto::SecretKey as SecretKeyMock;
 
-    let mut mock = MockSCL::new();
+    let mut mock = SafeApp::new();
 
-    let sk = SecretKey::random();
+    let sk = SecretKeyMock::random();
     let pk = sk.public_key();
 
     let balance = "2.345678912";
     mock.allocate_test_coins(&pk, balance);
 
-    let sk_to = SecretKey::random();
+    let sk_to = SecretKeyMock::random();
     let pk_to = sk_to.public_key();
     println!(
         "New CoinBalance at: {:?}",
@@ -512,12 +459,12 @@ fn test_create_balance() {
 
 #[test]
 fn test_check_balance() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
+    use self::SafeApp;
+    use threshold_crypto::SecretKey as SecretKeyMock;
 
-    let mut mock = MockSCL::new();
+    let mut mock = SafeApp::new();
 
-    let sk = SecretKey::random();
+    let sk = SecretKeyMock::random();
     let pk = sk.public_key();
 
     let balance = "2.3";
@@ -526,7 +473,7 @@ fn test_check_balance() {
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
 
-    let sk_to = SecretKey::random();
+    let sk_to = SecretKeyMock::random();
     let pk_to = sk_to.public_key();
     let preload = "1.234567891";
     println!(
@@ -547,15 +494,15 @@ fn test_check_balance() {
 
 #[test]
 fn test_safecoin_transfer() {
-    use self::MockSCL;
-    use threshold_crypto::SecretKey;
+    use self::SafeApp;
+    use threshold_crypto::SecretKey as SecretKeyMock;
 
-    let mut mock = MockSCL::new();
+    let mut mock = SafeApp::new();
 
-    let sk1 = SecretKey::random();
+    let sk1 = SecretKeyMock::random();
     let pk1 = sk1.public_key();
 
-    let sk2 = SecretKey::random();
+    let sk2 = SecretKeyMock::random();
     let pk2 = sk2.public_key();
 
     let balance1 = "2.5";

@@ -12,9 +12,11 @@ log = "0.4.6"
 safe_app = "0.9.1"
 safe_core = "0.32.1"
 #routing = "~0.37.0"
-routing = { git = "https://github.com/lionel1704/routing", branch = "patch" }
+#routing = { git = "https://github.com/lionel1704/routing", branch = "patch" }
+routing = { package = "mock_routing", git = "https://github.com/maidsafe/safe_client_libs", branch = "experimental" }
 #safe-nd = { git = "https://github.com/bochaco/safe-nd", branch = "make-fields-public" }
-safe-nd = { git = "https://github.com/lionel1704/safe-nd", branch = "for-cli" }
+#safe-nd = { git = "https://github.com/lionel1704/safe-nd", branch = "for-cli" }
+safe-nd = { git = "https://github.com/maidsafe/safe-nd" }
 rpassword = "3.0.1"
 structopt = "0.2.15"
 env_logger = "0.6.0"
@@ -22,7 +24,8 @@ rand = "0.6.5"
 rand_core = "0.4.0"
 prettytable-rs = "^0.8"
 unwrap = "~1.2.1"
-threshold_crypto = "0.3.1"
+#threshold_crypto = "0.3.1"
+threshold_crypto = { git = "https://github.com/nbaksalyar/threshold_crypto.git", branch = "pks-copy" }
 uuid = "0.7"
 safecoin = "0.5.0"
 serde = "1.0.91"
@@ -40,13 +43,14 @@ futures = "~0.1.17"
 default = ["uuid/v4"]
 mock-network = ["safe_app/mock-network"]
 fake-auth = ["safe_app/testing"]
+mock = []
 
 [patch.crates-io]
 safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }
 #safe_app = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
 #safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "temp" }
-safe_app = { git = "https://github.com/lionel1704/safe_client_libs", branch = "for-cli" }
-safe_core = { git = "https://github.com/lionel1704/safe_client_libs", branch = "for-cli" }
+safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "experimental" }
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "experimental" }
 #safe_app = { path = "/home/bochaco/safe/bochaco-safe_client_libs/safe_app" }
 #safe_core = { path = "/home/bochaco/safe/bochaco-safe_client_libs/safe_core" }
 
