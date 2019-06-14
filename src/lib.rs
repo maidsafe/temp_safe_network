@@ -42,6 +42,7 @@ use uuid::Uuid;
 static WALLET_TYPE_TAG: u64 = 10_000;
 
 static WALLET_DEFAULT: &str = "_default";
+// static WALLET_DEFAULT_BYTES : Vec<u8> = WALLET_DEFAULT.to_string().into_bytes();
 
 // Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
 const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
@@ -284,11 +285,11 @@ impl Safe {
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
-    pub fn keys_fetch_pk(&self, xorurl: &str) -> Result<String, String> {
+    pub fn fetch_pk_from_xorname(&self, xorurl: &str) -> Result<String, String> {
         let xorname = xorurl_to_xorname(xorurl)?;
         let public_key = self
             .safe_app
-            .keys_fetch_pk(&xorname)
+            .fetch_pk_from_xorname(&xorname)
             .map_err(|_| "No Key found at specified location".to_string())?;
         Ok(pk_to_hex(&public_key))
     }
@@ -298,7 +299,7 @@ impl Safe {
         let xorname = self
             .safe_app
             .put_seq_mutable_data(None, WALLET_TYPE_TAG, None);
-        xorname_to_xorurl(&xorname, &self.xorurl_base)
+        xorname_to_xorurl(&xorname.unwrap(), &self.xorurl_base)
     }
 
     // Add a Key to a Wallet to make it spendable
@@ -322,15 +323,15 @@ impl Safe {
         self.safe_app.seq_mutable_data_insert(
             wallet_xorurl,
             WALLET_TYPE_TAG,
-            &md_key.clone().into_bytes(),
+            md_key.clone().into_bytes().to_vec(),
             &serialised_value.into_bytes(),
         )?;
-
+        let WALLET_DEFAULT_BYTES: Vec<u8> = WALLET_DEFAULT.to_string().into_bytes();
         if default {
             self.safe_app.seq_mutable_data_insert(
                 wallet_xorurl,
                 WALLET_TYPE_TAG,
-                &WALLET_DEFAULT.to_string().into_bytes(),
+                WALLET_DEFAULT_BYTES,
                 &md_key.into_bytes(),
             )?;
         }
@@ -377,22 +378,19 @@ impl Safe {
         wallet_xorurl: &str,
     ) -> Result<WalletSpendableBalance, String> {
         let xorname = xorurl_to_xorname(&wallet_xorurl)?;
+        let WALLET_DEFAULT_BYTES: Vec<u8> = WALLET_DEFAULT.to_string().into_bytes();
         let default = self
             .safe_app
-            .mutable_data_get_key(
-                wallet_xorurl,
-                WALLET_TYPE_TAG,
-                &WALLET_DEFAULT.to_string().into_bytes(),
-            )
+            .seq_mutable_data_get_value(wallet_xorurl, WALLET_TYPE_TAG, WALLET_DEFAULT_BYTES)
             .map_err(|_| format!("No default balance found at Wallet \"{}\"", wallet_xorurl))?;
 
         let default_key = String::from_utf8_lossy(&default.data).to_string();
 
         let the_balance: WalletSpendableBalance = {
-            let default_balance_vec = self.safe_app.mutable_data_get_key(
+            let default_balance_vec = self.safe_app.seq_mutable_data_get_value(
                 wallet_xorurl,
                 WALLET_TYPE_TAG,
-                &default.data,
+                default.data,
             )?;
 
             let default_balance = String::from_utf8_lossy(&default_balance_vec.data).to_string();
@@ -470,11 +468,11 @@ impl Safe {
 
         let from_pk = unwrap!(self
             .safe_app
-            .keys_fetch_pk(&xorurl_to_xorname(&from_wallet_balance.xorurl)?));
+            .fetch_pk_from_xorname(&xorurl_to_xorname(&from_wallet_balance.xorurl)?));
 
         let to_pk = unwrap!(self
             .safe_app
-            .keys_fetch_pk(&xorurl_to_xorname(&to_wallet_balance.xorurl)?));
+            .fetch_pk_from_xorname(&xorurl_to_xorname(&to_wallet_balance.xorurl)?));
 
         let from_sk = unwrap!(sk_from_hex(&from_wallet_balance.sk));
         let tx_id = Uuid::new_v4();
@@ -737,25 +735,25 @@ fn test_keys_balance_xorname() {
 }
 
 #[test]
-fn test_keys_fetch_pk_test_coins() {
+fn test_fetch_pk_from_xorname_test_coins() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32".to_string());
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("23.22".to_string(), None));
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = unwrap!(safe.keys_fetch_pk(&xorurl));
+    let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
 
 #[test]
-fn test_keys_fetch_pk() {
+fn test_fetch_pk_from_xorname() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32".to_string());
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("0.56".to_string(), None));
 
     let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, None));
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = unwrap!(safe.keys_fetch_pk(&xorurl));
+    let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
 

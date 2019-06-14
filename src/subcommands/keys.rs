@@ -106,7 +106,7 @@ pub fn create_new_key(
             "Invalid input, expected secret key string",
         )?;
 
-        let pk_source_xor = safe.keys_fetch_pk(&source_xorurl)?;
+        let pk_source_xor = safe.fetch_pk_from_xorname(&source_xorurl)?;
         let source_key_pair = BlsKeyPair {
             pk: pk_source_xor,
             sk,

@@ -136,7 +136,7 @@ pub fn wallet_commander(
                         )?;
                     }
 
-                    let pk = safe.keys_fetch_pk(&linked_key)?;
+                    let pk = safe.fetch_pk_from_xorname(&linked_key)?;
 
                     (linked_key, Some(BlsKeyPair { pk, sk }))
                 }

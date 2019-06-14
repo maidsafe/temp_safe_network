@@ -17,6 +17,7 @@ use safe_app::AppError;
 use safe_core::ipc::{
     decode_msg, encode_msg, gen_req_id, resp::AuthGranted, IpcMsg, IpcReq, IpcResp,
 };
+pub use safe_nd::XOR_NAME_LEN;
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
@@ -51,6 +52,13 @@ impl KeyPair {
 
         (pk, sk)
     }
+}
+
+pub fn xorname_from_pk(pk: &PublicKey) -> XorName {
+    let pk_as_bytes: [u8; 48] = pk.to_bytes();
+    let mut xorname = XorName::default();
+    xorname.0.copy_from_slice(&pk_as_bytes[..XOR_NAME_LEN]);
+    xorname
 }
 
 pub fn vec_to_hex(hash: Vec<u8>) -> String {

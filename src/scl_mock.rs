@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::lib_helpers::{parse_hex, vec_to_hex, xorname_to_hex, xorurl_to_xorname, KeyPair};
+use crate::lib_helpers::{
+    parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex, xorurl_to_xorname, KeyPair,
+};
 use log::debug;
 use rand::rngs::OsRng;
 //use rand::Rng;
@@ -48,13 +50,6 @@ struct MockData {
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
     unpublished_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataMock>,
-}
-
-fn xorname_from_pk(pk: &PublicKeyMock) -> XorName {
-    let pk_as_bytes: [u8; 48] = pk.to_bytes();
-    let mut xorname = XorName::default();
-    xorname.0.copy_from_slice(&pk_as_bytes[..XOR_NAME_LEN]);
-    xorname
 }
 
 pub struct SafeApp {
@@ -168,7 +163,7 @@ impl SafeApp {
         }
     }
 
-    pub fn keys_fetch_pk(&self, xorname: &XorName) -> Result<PublicKeyMock, &str> {
+    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKeyMock, &str> {
         match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
             None => Err("CoinBalance data not found"),
             Some(coin_balance) => Ok(coin_balance.owner),
@@ -292,7 +287,7 @@ impl SafeApp {
         tag: u64,
         // _data: Option<String>,
         _permissions: Option<String>,
-    ) -> XorName {
+    ) -> Result<XorName, String> {
         let xorname = name.unwrap_or_else(|| {
             let mut os_rng = OsRng::new().unwrap();
             let mut xorname = [0u8; 32];
@@ -309,7 +304,7 @@ impl SafeApp {
             .mutable_data
             .insert(xorname_to_hex(&xorname), seq_md);
 
-        xorname
+        Ok(xorname)
     }
 
     fn get_seq_mdata(&self, xorname: &XorName, _tag: u64) -> Result<SeqMutableDataMock, String> {
@@ -323,7 +318,7 @@ impl SafeApp {
         &mut self,
         xorurl: &str,
         tag: u64,
-        key: &[u8],
+        key: Vec<u8>,
         value: &[u8],
     ) -> Result<(), String> {
         let xorname = xorurl_to_xorname(xorurl)?;
@@ -348,11 +343,11 @@ impl SafeApp {
     #[allow(dead_code)]
     pub fn mutable_data_delete(&mut self, xorname: &XorName, _tag: u64, key: &[u8]) {}
 
-    pub fn mutable_data_get_key(
+    pub fn seq_mutable_data_get_value(
         &mut self,
         xorurl: &str,
         tag: u64,
-        key: &[u8],
+        key: Vec<u8>,
     ) -> Result<Value, String> {
         let xorname = xorurl_to_xorname(xorurl)?;
         let mut seq_md = self.get_seq_mdata(&xorname, tag)?;
@@ -376,6 +371,37 @@ impl SafeApp {
         });
 
         Ok(res)
+    }
+
+    //TODO: Replace with real mock code
+    pub fn seq_mutable_data_update(
+        &self,
+        xorurl: &str,
+        type_tag: u64,
+        key: &[u8],
+        value: &[u8],
+        version: u64,
+    ) -> Result<(), String> {
+        // let mut entry_actions: BTreeMap<Vec<u8>, SeqEntryAction> = Default::default();
+        // let _ = entry_actions.insert(
+        //     key.to_vec(),
+        //     SeqEntryAction::Update(Value::new(value.to_vec(), version)),
+        // );
+        //
+        // let xorurl_string: String = xorurl.to_string();
+        // unwrap!(run(safe_app, move |client, _app_context| {
+        //     let xorname = unwrap!(xorurl_to_xorname2(&xorurl_string));
+        //
+        //     client
+        //         .mutate_seq_mdata_entries(
+        //             XorName(from_slice(&xorname)),
+        //             type_tag,
+        //             entry_actions.clone(),
+        //         )
+        //         .map_err(|e| panic!("Failed to update MD: {:?}", e))
+        // }));
+
+        Ok(())
     }
 }
 
