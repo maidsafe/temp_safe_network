@@ -6,4 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub(crate) enum Action {}
+use quic_p2p::Peer;
+use safe_nd::{ClientPublicId, Requester};
+use std::net::SocketAddr;
+
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum Action {
+    ClientRequest {
+        client_id: ClientPublicId,
+        msg: Vec<u8>,
+    },
+}
