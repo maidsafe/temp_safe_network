@@ -35,13 +35,13 @@ type SeqEntryActions = BTreeMap<Vec<u8>, SeqEntryAction>;
 
 pub struct SafeApp {
     safe_conn: Option<App>,
-    scl_mock: SafeAppMock,
+    scl_mock: SafeAppMock, // TODO: this is temporary until we don't rely on our scl-mock anymore
 }
 
 impl SafeApp {
     pub fn new() -> Self {
         Self {
-            safe_conn: if cfg!(test) { Some(create_app()) } else { None },
+            safe_conn: Some(create_app()), // TODO: initialise with None once we don't rely on our scl-mock anymore
             scl_mock: SafeAppMock::new(),
         }
     }

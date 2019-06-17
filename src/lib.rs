@@ -763,6 +763,7 @@ fn test_wallet_insert_and_balance() {
 }
 
 #[test]
+#[cfg(not(feature = "mock-network"))] // TODO: this is temporary until issue #82 is fixed
 fn test_wallet_transfer_no_default() {
     let mut safe = Safe::new("base32".to_string());
     let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance

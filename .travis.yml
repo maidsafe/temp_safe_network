@@ -34,5 +34,5 @@ install:
   - cargo check --release
 
 script:
-  - cargo test --release --features=scl-mock,fake-auth -- --test-threads=1
-  #- cargo test --release --features=mock-network,fake-auth // to be enabled when integration with SCL is complete
+  - cargo test --release --features=scl-mock -- --test-threads=1
+  #- cargo test --release --features=mock-network // to be enabled when integration with SCL is complete
