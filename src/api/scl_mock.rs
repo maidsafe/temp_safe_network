@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::lib_helpers::{
+use crate::api::helpers::{
     parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex, xorurl_to_xorname,
 };
 use log::debug;

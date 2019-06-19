@@ -9,10 +9,10 @@
 use futures::future::Future;
 
 #[cfg(not(feature = "fake-auth"))]
-use crate::lib_helpers::decode_ipc_msg;
-use crate::lib_helpers::{xorname_from_pk, xorurl_to_xorname};
+use crate::api::helpers::decode_ipc_msg;
+use crate::api::helpers::{xorname_from_pk, xorurl_to_xorname};
 
-use crate::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
+use crate::api::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
 use log::{debug, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
