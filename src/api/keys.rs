@@ -6,36 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use super::helpers::vec_to_hex;
-use super::helpers::{
-    parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex,
-    xorname_to_xorurl, xorurl_to_xorname, KeyPair,
-};
-
-use log::{debug, info};
-// #[cfg(not(feature = "scl-mock"))]
-// use safe_client_libs::SafeApp;
-// use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
-// use safe_nd::AppPermissions;
-// #[cfg(feature = "scl-mock")]
-// use scl_mock::SafeApp;
-
+use super::helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
+use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, XorUrl};
+use super::{BlsKeyPair, Safe};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
-use uuid::Uuid;
-
-// Type tag used for the Wallet container
-static WALLET_TYPE_TAG: u64 = 10_000;
-
-static WALLET_DEFAULT: &str = "_default";
-static WALLET_DEFAULT_BYTES: &[u8] = b"_default";
-
-// use safe_cli::Safe;
-use super::safe::{Safe, BlsKeyPair, WalletSpendableBalance, XorUrl};
-
 
 impl Safe {
-
     // Generate a key pair without creating and/or storing a Key on the network
     pub fn keypair(&self) -> Result<BlsKeyPair, String> {
         let key_pair = KeyPair::random();
@@ -142,7 +119,15 @@ impl Safe {
             .map_err(|_| "No Key found at specified location".to_string())?)
     }
 
-
+    // Fetch Key's pk from the network from a given XOR-URL
+    pub fn fetch_pk_from_xorname(&self, xorurl: &str) -> Result<String, String> {
+        let xorname = xorurl_to_xorname(xorurl)?;
+        let public_key = self
+            .safe_app
+            .fetch_pk_from_xorname(&xorname)
+            .map_err(|_| "No Key found at specified location".to_string())?;
+        Ok(pk_to_hex(&public_key))
+    }
 }
 
 // Unit Tests
@@ -390,5 +375,16 @@ fn test_fetch_pk_from_xorname_test_coins() {
     let key_pair_unwrapped = unwrap!(key_pair);
     let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
     assert_eq!(pk, key_pair_unwrapped.pk);
+}
 
+#[test]
+fn test_fetch_pk_from_xorname() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32".to_string());
+    let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("0.56".to_string(), None));
+
+    let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, None));
+    let key_pair_unwrapped = unwrap!(key_pair);
+    let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
+    assert_eq!(pk, key_pair_unwrapped.pk);
 }

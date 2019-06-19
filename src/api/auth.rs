@@ -6,16 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use super::helpers::vec_to_hex;
-use super::helpers::{decode_ipc_msg, encode_ipc_msg};
-use super::safe::Safe;
-
+use super::helpers::decode_ipc_msg;
+use super::Safe;
 use log::{debug, info};
 use reqwest::get as httpget;
-
-use safe_core::ipc::{AppExchangeInfo, AuthReq, IpcReq};
+use safe_app::AppError;
+use safe_core::ipc::{
+    decode_msg, encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq,
+};
 use safe_nd::AppPermissions;
 use std::collections::HashMap;
+use std::io::Read;
 
 // Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
 const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
@@ -58,12 +59,12 @@ impl Safe {
                 let mut res = httpget(&authenticator_webservice_url)
                     .map_err(|err| format!("Failed to send request to Authenticator: {}", err))?;
                 let mut auth_res = String::new();
-                // res.read_to_string(&mut auth_res).map_err(|err| {
-                // 	format!(
-                // 		"Failed read authorisation response received from Authenticator: {}",
-                // 		err
-                // 	)
-                // })?;
+                res.read_to_string(&mut auth_res).map_err(|err| {
+                    format!(
+                        "Failed read authorisation response received from Authenticator: {}",
+                        err
+                    )
+                })?;
                 info!("SAFE authorisation response received!");
 
                 // Check if the app has been authorised
@@ -89,4 +90,12 @@ impl Safe {
     pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> Result<(), String> {
         self.safe_app.connect(app_id, auth_credentials)
     }
+}
+
+// Helper functions
+
+fn encode_ipc_msg(req: IpcReq) -> Result<String, AppError> {
+    let req_id: u32 = gen_req_id();
+    let encoded = encode_msg(&IpcMsg::Req { req_id, req })?;
+    Ok(encoded)
 }

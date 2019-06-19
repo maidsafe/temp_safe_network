@@ -6,13 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::helpers::{decode_ipc_msg, xorname_from_pk};
+use super::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
+use super::xorurl::xorurl_to_xorname;
 use futures::future::Future;
-
-#[cfg(not(feature = "fake-auth"))]
-use crate::api::helpers::decode_ipc_msg;
-use crate::api::helpers::{xorname_from_pk, xorurl_to_xorname};
-
-use crate::api::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
 use log::{debug, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
