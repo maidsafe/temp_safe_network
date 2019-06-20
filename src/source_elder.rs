@@ -9,10 +9,15 @@
 use crate::{action::Action, utils, vault::Init, Result};
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
-use log::info;
+use lazy_static::lazy_static;
+use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
-use safe_nd::{Challenge, Message, MessageId, NodePublicId, PublicId, Request, Signature};
+use safe_nd::{
+    AppPermissions, Challenge, ClientPublicId, Coins, Message, MessageId, NodePublicId, PublicId,
+    PublicKey, Request, Signature,
+};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
@@ -22,10 +27,19 @@ use std::{
 use unwrap::unwrap;
 
 const CLIENT_ACCOUNTS_DB_NAME: &str = "client_accounts.db";
+lazy_static! {
+    static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ClientAccount {
+    apps: HashMap<PublicKey, AppPermissions>,
+    balance: Coins,
+}
 
 pub(crate) struct SourceElder {
-    _id: NodePublicId,
-    _client_accounts: PickleDb,
+    id: NodePublicId,
+    client_accounts: PickleDb,
     clients: HashMap<SocketAddr, PublicId>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
@@ -39,11 +53,11 @@ impl SourceElder {
         config: &QuicP2pConfig,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let _client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
+        let client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
         let src_elder = Self {
-            _id: id,
-            _client_accounts,
+            id,
+            client_accounts,
             clients: Default::default(),
             client_candidates: Default::default(),
             quic_p2p,
@@ -159,13 +173,150 @@ impl SourceElder {
         client_id: &PublicId,
         request: Request,
         message_id: MessageId,
-        _signature: Option<Signature>,
+        signature: Option<Signature>,
     ) -> Option<Action> {
-        info!(
+        use Request::*;
+        trace!(
             "{}: Received ({:?} {:?}) from {}",
-            self, request, message_id, client_id
+            self,
+            request,
+            message_id,
+            client_id
         );
-        unimplemented!();
+        if let Some(sig) = signature.as_ref() {
+            if !self.is_valid_client_signature(client_id, &request, &message_id, sig) {
+                return None;
+            }
+        }
+        // TODO - remove this
+        #[allow(unused)]
+        match request {
+            //
+            // ===== Immutable Data =====
+            //
+            PutIData(_) => {
+                let owner = utils::owner(client_id)?;
+                let balance = self.balance(owner)?;
+                let new_balance = balance.checked_sub(*COST_OF_PUT)?;
+
+                self.has_signature(client_id, &request, &message_id, &signature)?;
+
+                self.set_balance(owner, new_balance)?;
+                // No need to forward the signature for ImmutableData
+                Some(Action::ForwardClientRequest {
+                    client_name: *client_id.name(),
+                    request,
+                    message_id,
+                    signature: None,
+                })
+            }
+            PutPubIData(_) => unimplemented!(),
+            GetIData(ref address) => unimplemented!(),
+            DeleteUnpubIData(ref address) => unimplemented!(),
+            //
+            // ===== Mutable Data =====
+            //
+            PutUnseqMData(_) => unimplemented!(),
+            PutSeqMData(_) => unimplemented!(),
+            GetMData(ref address) => unimplemented!(),
+            GetMDataValue { ref address, .. } => unimplemented!(),
+            DeleteMData(ref address) => unimplemented!(),
+            GetMDataShell(ref address) => unimplemented!(),
+            GetMDataVersion(ref address) => unimplemented!(),
+            ListMDataEntries(ref address) => unimplemented!(),
+            ListMDataKeys(ref address) => unimplemented!(),
+            ListMDataValues(ref address) => unimplemented!(),
+            SetMDataUserPermissions { ref address, .. } => unimplemented!(),
+            DelMDataUserPermissions { ref address, .. } => unimplemented!(),
+            ListMDataPermissions(ref address) => unimplemented!(),
+            ListMDataUserPermissions { ref address, .. } => unimplemented!(),
+            MutateSeqMDataEntries { ref address, .. } => unimplemented!(),
+            MutateUnseqMDataEntries { ref address, .. } => unimplemented!(),
+            //
+            // ===== Append Only Data =====
+            //
+            PutAData(_) => unimplemented!(),
+            GetAData(ref address) => unimplemented!(),
+            GetADataShell { ref address, .. } => unimplemented!(),
+            DeleteAData(ref address) => unimplemented!(),
+            GetADataRange { ref address, .. } => unimplemented!(),
+            GetADataIndices(ref address) => unimplemented!(),
+            GetADataLastEntry(ref address) => unimplemented!(),
+            GetADataPermissions { ref address, .. } => unimplemented!(),
+            GetPubADataUserPermissions { ref address, .. } => unimplemented!(),
+            GetUnpubADataUserPermissions { ref address, .. } => unimplemented!(),
+            GetADataOwners { ref address, .. } => unimplemented!(),
+            AddPubADataPermissions { ref address, .. } => unimplemented!(),
+            AddUnpubADataPermissions { ref address, .. } => unimplemented!(),
+            SetADataOwner { ref address, .. } => unimplemented!(),
+            AppendSeq { ref append, .. } => unimplemented!(),
+            AppendUnseq(ref append) => unimplemented!(),
+            //
+            // ===== Coins =====
+            //
+            TransferCoins {
+                ref source,
+                ref amount,
+                ..
+            } => unimplemented!(),
+            GetTransaction { .. } => unimplemented!(),
+            GetBalance(ref address) => unimplemented!(),
+            //
+            // ===== Client (Owner) to SrcElders =====
+            //
+            ListAuthKeysAndVersion => unimplemented!(),
+            InsAuthKey {
+                ref key,
+                version,
+                ref permissions,
+            } => unimplemented!(),
+            DelAuthKey { ref key, version } => unimplemented!(),
+        }
+    }
+
+    fn is_valid_client_signature(
+        &self,
+        client_id: &PublicId,
+        request: &Request,
+        message_id: &MessageId,
+        signature: &Signature,
+    ) -> bool {
+        let pub_key = match client_id {
+            PublicId::Node(_) => {
+                error!("Logic error.  This should be unreachable.");
+                return false;
+            }
+            PublicId::Client(pub_id) => pub_id.public_key(),
+            PublicId::App(pub_id) => pub_id.public_key(),
+        };
+        match pub_key.verify(signature, utils::serialise(&(request, message_id))) {
+            Ok(_) => true,
+            Err(error) => {
+                warn!(
+                    "{}: ({:?}/{:?}) from {} is invalid: {}",
+                    self, request, message_id, client_id, error
+                );
+                false
+            }
+        }
+    }
+
+    // This method only exists to avoid duplicating the log line in many places.
+    fn has_signature(
+        &self,
+        client_id: &PublicId,
+        request: &Request,
+        message_id: &MessageId,
+        signature: &Option<Signature>,
+    ) -> Option<()> {
+        if signature.is_none() {
+            warn!(
+                "{}: ({:?}/{:?}) from {} is unsigned",
+                self, request, message_id, client_id
+            );
+            return None;
+        }
+        Some(())
     }
 
     /// Handles a received challenge response.
@@ -211,10 +362,30 @@ impl SourceElder {
             self.quic_p2p.disconnect_from(peer_addr);
         }
     }
+
+    fn balance(&self, client_id: &ClientPublicId) -> Option<Coins> {
+        self.client_accounts
+            .get(&client_id.to_string())
+            .map(|account: ClientAccount| account.balance)
+    }
+
+    fn set_balance(&mut self, client_id: &ClientPublicId, balance: Coins) -> Option<()> {
+        let db_key = client_id.to_string();
+        let mut account = self.client_accounts.get::<ClientAccount>(&db_key)?;
+        account.balance = balance;
+        if let Err(error) = self.client_accounts.set(&db_key, &account) {
+            error!(
+                "{}: Failed to update balance for {}: {}",
+                self, client_id, error
+            );
+            return None;
+        }
+        Some(())
+    }
 }
 
 impl Display for SourceElder {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self._id)
+        write!(formatter, "{}", self.id)
     }
 }

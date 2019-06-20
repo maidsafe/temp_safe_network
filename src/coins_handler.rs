@@ -17,7 +17,7 @@ use std::{
 const COINS_DB_NAME: &str = "coins.db";
 
 pub(crate) struct CoinsHandler {
-    _id: NodePublicId,
+    id: NodePublicId,
     // The total safecoin farmed from this section.
     _farmed: PickleDb,
 }
@@ -25,12 +25,12 @@ pub(crate) struct CoinsHandler {
 impl CoinsHandler {
     pub fn new<P: AsRef<Path>>(id: NodePublicId, root_dir: P, init_mode: Init) -> Result<Self> {
         let _farmed = utils::new_db(root_dir, COINS_DB_NAME, init_mode)?;
-        Ok(Self { _id: id, _farmed })
+        Ok(Self { id, _farmed })
     }
 }
 
 impl Display for CoinsHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self._id)
+        write!(formatter, "{}", self.id)
     }
 }

@@ -6,4 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub(crate) enum Action {}
+use safe_nd::{MessageId, Request, Signature, XorName};
+
+#[derive(Debug)]
+pub(crate) enum Action {
+    // Send a validated client request from src elders to dst elders
+    ForwardClientRequest {
+        // TODO - confirm this.  ATM, this represents the owner's name if the src is an app.
+        client_name: XorName,
+        request: Request,
+        message_id: MessageId,
+        signature: Option<Signature>,
+    },
+}

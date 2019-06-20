@@ -7,13 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    action::Action,
     chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
     utils,
     vault::Init,
     Result,
 };
 use pickledb::PickleDb;
-use safe_nd::NodePublicId;
+use safe_nd::{MessageId, NodePublicId, Request, Signature, XorName};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -86,6 +87,16 @@ impl DestinationElder {
             mutable_chunks,
             append_only_chunks,
         })
+    }
+
+    pub fn handle_request(
+        &mut self,
+        _src: XorName,
+        _request: Request,
+        _message_id: MessageId,
+        _signature: Option<Signature>,
+    ) -> Option<Action> {
+        None
     }
 }
 

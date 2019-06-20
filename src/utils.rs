@@ -11,6 +11,7 @@ use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
+use safe_nd::{ClientPublicId, MutableData, PublicId, Request, XorName};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -38,10 +39,68 @@ pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     Ok(result?)
 }
 
-pub fn random_vec(size: usize) -> Vec<u8> {
+pub(crate) fn random_vec(size: usize) -> Vec<u8> {
     thread_rng().sample_iter(&Standard).take(size).collect()
 }
 
-pub fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
+pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
     unwrap!(bincode::serialize(data))
+}
+
+pub(crate) fn owner(public_id: &PublicId) -> Option<&ClientPublicId> {
+    match public_id {
+        PublicId::Node(_) => None,
+        PublicId::Client(pub_id) => Some(pub_id),
+        PublicId::App(pub_id) => Some(pub_id.owner()),
+    }
+}
+
+pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
+    use Request::*;
+    match request {
+        PutIData(ref data) => Some(data.name()),
+        PutPubIData(ref data) => Some(data.name()),
+        GetIData(ref address) => Some(address.name()),
+        DeleteUnpubIData(ref address) => Some(address.name()),
+        PutUnseqMData(ref data) => Some(data.name()),
+        PutSeqMData(ref data) => Some(data.name()),
+        GetMData(ref address)
+        | GetMDataValue { ref address, .. }
+        | DeleteMData(ref address)
+        | GetMDataShell(ref address)
+        | GetMDataVersion(ref address)
+        | ListMDataEntries(ref address)
+        | ListMDataKeys(ref address)
+        | ListMDataValues(ref address)
+        | SetMDataUserPermissions { ref address, .. }
+        | DelMDataUserPermissions { ref address, .. }
+        | ListMDataPermissions(ref address)
+        | ListMDataUserPermissions { ref address, .. }
+        | MutateSeqMDataEntries { ref address, .. }
+        | MutateUnseqMDataEntries { ref address, .. } => Some(address.name()),
+        PutAData(ref data) => Some(data.name()),
+        GetAData(ref address)
+        | GetADataShell { ref address, .. }
+        | DeleteAData(ref address)
+        | GetADataRange { ref address, .. }
+        | GetADataIndices(ref address)
+        | GetADataLastEntry(ref address)
+        | GetADataPermissions { ref address, .. }
+        | GetPubADataUserPermissions { ref address, .. }
+        | GetUnpubADataUserPermissions { ref address, .. }
+        | GetADataOwners { ref address, .. }
+        | AddPubADataPermissions { ref address, .. }
+        | AddUnpubADataPermissions { ref address, .. }
+        | SetADataOwner { ref address, .. } => Some(address.name()),
+        AppendSeq { ref append, .. } | AppendUnseq(ref append) => Some(append.address.name()),
+        TransferCoins {
+            ref destination, ..
+        } => Some(destination),
+        GetTransaction {
+            ref coins_balance_id,
+            ..
+        } => Some(coins_balance_id),
+        GetBalance(ref name) => Some(name),
+        ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => None,
+    }
 }

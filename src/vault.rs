@@ -12,9 +12,9 @@ use crate::{
 };
 use bincode;
 use crossbeam_channel::Receiver;
-use log::info;
+use log::{error, info};
 use quic_p2p::Event;
-use safe_nd::NodeFullId;
+use safe_nd::{NodeFullId, XorName};
 use std::{
     fmt::{self, Display, Formatter},
     fs,
@@ -23,8 +23,6 @@ use std::{
 
 const STATE_FILENAME: &str = "state";
 
-// TODO - remove this
-#[allow(unused)]
 #[allow(clippy::large_enum_variant)]
 enum State {
     Elder {
@@ -32,6 +30,8 @@ enum State {
         dst: DestinationElder,
         coins_handler: CoinsHandler,
     },
+    // TODO - remove this
+    #[allow(unused)]
     Adult(Adult),
 }
 
@@ -117,7 +117,7 @@ impl Vault {
                 }
             }
         } else {
-            info!("{}: Event receiver not available!", self);
+            error!("{}: Event receiver not available!", self);
         }
     }
 
@@ -138,8 +138,42 @@ impl Vault {
         None
     }
 
-    fn handle_action(&mut self, _action: Action) -> Option<Action> {
-        None
+    fn handle_action(&mut self, action: Action) -> Option<Action> {
+        use Action::*;
+        match action {
+            ForwardClientRequest {
+                client_name,
+                request,
+                message_id,
+                signature,
+            } => {
+                let dst_elders_address = match utils::dst_elders_address(&request) {
+                    Some(address) => address,
+                    None => {
+                        error!("{}: Logic error - no dst address available.", self);
+                        return None;
+                    }
+                };
+
+                // TODO - once Routing is integrated, we'll construct the full message to send
+                //        onwards, and then if we're also part of the dst elders, we'll call that
+                //        same handler which Routing will call after receiving a message.
+
+                if self.self_is_dst_elder_for(&dst_elders_address) {
+                    return self.destination_elder_mut()?.handle_request(
+                        client_name,
+                        request,
+                        message_id,
+                        signature,
+                    );
+                }
+                None
+            }
+        }
+    }
+
+    fn self_is_dst_elder_for(&self, _address: &XorName) -> bool {
+        true
     }
 
     fn source_elder(&self) -> Option<&SourceElder> {
