@@ -21,10 +21,14 @@ const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
 const APPEND_ONLY_META_DB_NAME: &str = "append_only_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 
+// TODO - remove this
+#[allow(unused)]
 struct ChunkMetadata {
     holders: Vec<NodePublicId>,
 }
 
+// TODO - remove this
+#[allow(unused)]
 pub(crate) struct DestinationElder {
     immutable_metadata: PickleDb,
     mutable_metadata: PickleDb,

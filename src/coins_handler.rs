@@ -14,12 +14,12 @@ const COINS_DB_NAME: &str = "coins.db";
 
 pub(crate) struct CoinsHandler {
     // The total safecoin farmed from this section.
-    farmed: PickleDb,
+    _farmed: PickleDb,
 }
 
 impl CoinsHandler {
     pub fn new<P: AsRef<Path>>(root_dir: P, init_mode: Init) -> Result<Self> {
-        let farmed = utils::new_db(root_dir, COINS_DB_NAME, init_mode)?;
-        Ok(Self { farmed })
+        let _farmed = utils::new_db(root_dir, COINS_DB_NAME, init_mode)?;
+        Ok(Self { _farmed })
     }
 }

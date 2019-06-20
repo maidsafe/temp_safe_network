@@ -12,19 +12,15 @@ use crate::{
 };
 use bincode;
 use crossbeam_channel::Receiver;
-use log::{info, trace};
-use pickledb::PickleDb;
-use quic_p2p::{Config as QuickP2pConfig, Event, Peer};
-use safe_nd::{Challenge, Message, NodeFullId, PublicId, Request, Signature};
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    net::SocketAddr,
-    path::PathBuf,
-};
+use log::info;
+use quic_p2p::Event;
+use safe_nd::NodeFullId;
+use std::{fs, path::PathBuf};
 
 const STATE_FILENAME: &str = "state";
 
+// TODO - remove this
+#[allow(unused)]
 #[allow(clippy::large_enum_variant)]
 enum State {
     Elder {
@@ -50,6 +46,8 @@ pub struct Vault {
     event_receiver: Option<Receiver<Event>>,
 }
 
+// TODO - remove this
+#[allow(unused)]
 impl Vault {
     /// Construct a new vault instance.
     pub fn new(config: Config) -> Result<Self> {

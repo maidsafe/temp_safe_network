@@ -8,22 +8,18 @@
 
 use crate::{action::Action, utils, vault::Init, Result};
 use bytes::Bytes;
-use crossbeam_channel::{self, Receiver, Sender};
-use log::{info, trace};
+use crossbeam_channel::{self, Receiver};
+use log::info;
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
-use safe_nd::{Challenge, Message, MessageId, PublicId, Request, Response, Signature};
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::Path,
-};
+use safe_nd::{Challenge, Message, MessageId, PublicId, Request, Signature};
+use std::{collections::HashMap, net::SocketAddr, path::Path};
 use unwrap::unwrap;
 
 const CLIENT_ACCOUNTS_DB_NAME: &str = "client_accounts.db";
 
 pub(crate) struct SourceElder {
-    client_accounts: PickleDb,
+    _client_accounts: PickleDb,
     clients: HashMap<SocketAddr, PublicId>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
@@ -36,10 +32,10 @@ impl SourceElder {
         config: &QuicP2pConfig,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
+        let _client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
         let src_elder = Self {
-            client_accounts,
+            _client_accounts,
             clients: Default::default(),
             client_candidates: Default::default(),
             quic_p2p,
@@ -143,7 +139,7 @@ impl SourceElder {
         client_id: &PublicId,
         request: Request,
         message_id: MessageId,
-        signature: Option<Signature>,
+        _signature: Option<Signature>,
     ) -> Option<Action> {
         info!(
             "Received ({:?} {:?}) from {}",

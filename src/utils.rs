@@ -33,7 +33,7 @@ pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     trace!("Loading database at {}", db_path.display());
     let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
     if let Err(ref error) = &result {
-        error!("Failed to load {}", db_path.display());
+        error!("Failed to load {}: {}", db_path.display(), error);
     }
     Ok(result?)
 }
