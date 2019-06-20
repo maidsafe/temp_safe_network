@@ -6,11 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod common;
 extern crate serde_json;
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
+use common::{create_preload_and_get_keys, create_wallet_with_balance, get_bin_location};
 use predicates::prelude::*;
 
 use std::process::Command;
@@ -18,89 +20,30 @@ use std::process::Command;
 static CLI: &str = "safe_cli";
 static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
 static SAFE_PROTOCOL: &str = "safe://";
-
-fn get_bin_location() -> &'static str {
-    let mut location = "./target/release/safe_cli";
-    if cfg!(debug_assertions) {
-        location = "./target/debug/safe_cli";
-    }
-    location
-}
-
-fn create_preload_and_get_keys(preload: &str) -> (String, String) {
-    // KEY_FROM
-    let pk_command_result = cmd!(
-        get_bin_location(),
-        "keys",
-        "create",
-        "--test-coins",
-        "---preload",
-        preload
-    )
-    .read()
-    .unwrap();
-
-    let mut lines = pk_command_result.lines();
-    let pk_xor = lines.next().unwrap();
-    let _pk = lines.next().unwrap();
-    let sk_line = lines.next().unwrap();
-    let sk_eq = String::from("sk=");
-    let sk = &sk_line[sk_eq.chars().count()..];
-
-    (pk_xor.to_string(), sk.to_string())
-}
+static NO_SOURCE: &str = "Missing the 'source' argument";
 
 #[test]
 fn calling_safe_wallet_transfer() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    // FROM
-    let wallet_from = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
+    let (wallet_from, _pk, _sk) = create_wallet_with_balance("160");
     assert!(wallet_from.contains(SAFE_PROTOCOL));
-
-    // TO
-    let wallet_to = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
+    let (wallet_to, _pk, _sk) = create_wallet_with_balance("5");
     assert!(wallet_to.contains(SAFE_PROTOCOL));
 
-    let (pk_from_xorurl, from_sk) = create_preload_and_get_keys("123");
+    // To got coins?
+    let to_starts_with = cmd!(get_bin_location(), "wallet", "balance", &wallet_to)
+        .read()
+        .unwrap();
 
-    let wallet_from_insert = cmd!(
-        get_bin_location(),
-        "wallet",
-        "insert",
-        &pk_from_xorurl,
-        &wallet_from,
-        &pk_from_xorurl,
-        "--name",
-        "our_from_wallet",
-        "--default",
-        "--secret-key",
-        &from_sk
-    )
-    .read()
-    .unwrap();
+    assert_eq!(to_starts_with, "5");
 
-    assert_eq!(&wallet_from, &wallet_from_insert);
+    // To got coins?
+    let from_starts_with = cmd!(get_bin_location(), "wallet", "balance", &wallet_from)
+        .read()
+        .unwrap();
 
-    let (pk_to_xorurl, to_sk) = create_preload_and_get_keys("3");
-
-    let wallet_to_insert = cmd!(
-        get_bin_location(),
-        "wallet",
-        "insert",
-        &pk_to_xorurl,
-        &wallet_to,
-        &pk_to_xorurl,
-        "--name",
-        "our_to_wallet",
-        "--default",
-        "--secret-key",
-        &to_sk
-    )
-    .read()
-    .unwrap();
-
-    assert_eq!(&wallet_to, &wallet_to_insert);
+    assert_eq!(from_starts_with, "160");
 
     cmd.args(&vec![
         "wallet",
@@ -120,92 +63,130 @@ fn calling_safe_wallet_transfer() {
         .read()
         .unwrap();
 
-    assert_eq!(to_has, "103");
+    assert_eq!(to_has, "105");
 
     // from lost coins?
     let from_has = cmd!(get_bin_location(), "wallet", "balance", &wallet_from)
         .read()
         .unwrap();
 
-    assert_eq!(from_has, "23")
+    assert_eq!(from_has, "60")
 }
 
-#[test]
-fn calling_safe_wallet_balance_pretty_no_sk() {
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
-
-    let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet.contains(SAFE_PROTOCOL));
-
-    let (pk_to_xorurl, to_sk) = create_preload_and_get_keys("300");
-
-    let _wallet_to_insert = cmd!(
-        get_bin_location(),
-        "wallet",
-        "insert",
-        &pk_to_xorurl,
-        &wallet,
-        &pk_to_xorurl
-    )
-    .input(to_sk)
-    .read()
-    .unwrap();
-
-    cmd.args(&vec!["wallet", "balance", &wallet])
-        .assert()
-        .stdout("300\n")
-        .success();
-}
+// TODO: this test should check for lack of SK when querying a balance not owned by user.
+// And should fail.
+// Blocked: until SCL queries of random balances
+//
+// #[test]
+// fn calling_safe_wallet_balance_pretty_no_sk() {
+//     let mut cmd = Command::cargo_bin(CLI).unwrap();
+//
+//     let wallet = cmd!(get_bin_location(), "wallet", "create", "--preload", "300", "--test-coins").read().unwrap();
+//     assert!(wallet.contains(SAFE_PROTOCOL));
+//
+//     cmd.args(&vec!["wallet", "balance", &wallet])
+//         .assert()
+//         .stdout("300\n")
+//         .success();
+// }
 
 #[test]
 fn calling_safe_wallet_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet.contains(SAFE_PROTOCOL));
+    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("10");
 
     cmd.args(&vec![
-        "wallet", "balance", &wallet,
+        "wallet",
+        "balance",
+        &wallet_xor,
         // "--pretty",
     ])
     .assert()
-    .stdout("0\n")
+    .stdout("10\n")
     .success();
 }
 
 #[test]
-fn calling_safe_wallet_insert_w_preload() {
+fn calling_safe_wallet_insert() {
+    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("50");
+
+    let (pk_xor, sk) = create_preload_and_get_keys("300");
+
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let wallet = cmd!(get_bin_location(), "wallet", "create").read().unwrap();
-    assert!(wallet.contains(SAFE_PROTOCOL));
-
-    let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
-
-    let _wallet_to_insert = cmd!(
+    let wallet_insert_result = cmd!(
         get_bin_location(),
         "wallet",
         "insert",
-        &pk_pay_xor,
-        &wallet,
-        "--test-coins",
-        "--preload",
-        "150",
+        &pk_xor,
+        &wallet_xor,
+        &wallet_xor,
+        "--secret-key",
+        &sk
     )
     .read()
     .unwrap();
 
-    cmd.args(&vec!["wallet", "balance", &wallet])
+    cmd.args(&vec!["wallet", "balance", &wallet_xor])
         .assert()
-        .stdout("150\n")
+        .stdout("350\n")
         .success();
 }
 
 #[test]
-fn calling_safe_wallet_create() {
+fn calling_safe_wallet_create_no_source() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["wallet", "create", "--pretty"])
+
+    cmd.args(&vec!["wallet", "create"])
         .assert()
-        .stdout(predicate::str::starts_with(PRETTY_WALLET_CREATION_RESPONSE).from_utf8())
+        .stderr(predicate::str::contains(NO_SOURCE))
+        .failure();
+}
+
+#[test]
+fn calling_safe_wallet_no_balance() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    cmd.args(&vec!["wallet", "create", "--no-balance", "--pretty"])
+        .assert()
+        .stdout(predicate::str::contains(PRETTY_WALLET_CREATION_RESPONSE))
         .success();
+}
+
+#[test]
+fn calling_safe_wallet_create_w_preload_has_balance() {
+    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("55");
+
+    let balance = cmd!(get_bin_location(), "wallet", "balance", &wallet_xor)
+        .read()
+        .unwrap();
+    assert_eq!("55", balance);
+}
+
+#[test]
+fn calling_safe_wallet_create_w_premade_keys_has_balance() {
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+
+    let wallet_create_result = cmd!(
+        get_bin_location(),
+        "wallet",
+        "create",
+        &pk_pay_xor,
+        &pk_pay_xor,
+        "--secret-key",
+        pay_sk
+    )
+    .read()
+    .unwrap();
+
+    let balance = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_create_result
+    )
+    .read()
+    .unwrap();
+    assert_eq!("300", balance);
 }

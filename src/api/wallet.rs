@@ -9,6 +9,7 @@
 use super::helpers::{parse_coins_amount, sk_from_hex};
 use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, XorUrl};
 use super::{BlsKeyPair, Safe};
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use unwrap::unwrap;
 use uuid::Uuid;
@@ -60,6 +61,11 @@ impl Safe {
             &serialised_value.into_bytes(),
         )?;
 
+        debug!(
+            "{:?} had a spendable balance added with name: {:?}.",
+            &wallet_xorurl, &name
+        );
+
         if default {
             self.safe_app.seq_mutable_data_insert(
                 wallet_xorurl,
@@ -67,6 +73,8 @@ impl Safe {
                 WALLET_DEFAULT_BYTES.to_vec(),
                 &md_key.into_bytes(),
             )?;
+
+            debug!("Default wallet set.");
         }
 
         Ok(())
@@ -74,18 +82,21 @@ impl Safe {
 
     // Check the total balance of a Wallet found at a given XOR-URL
     pub fn wallet_balance(&mut self, xorurl: &str, _sk: &str) -> Result<String, String> {
+        debug!("Finding total wallet balance for: {:?}", xorurl);
         let mut total_balance: f64 = 0.0;
         // Let's get the list of balances from the Wallet
         let spendable_balances = self
             .safe_app
             .list_seq_mdata_entries(xorurl, WALLET_TYPE_TAG)?;
 
+        debug!("Spendable balances: {:?}", spendable_balances);
         // Iterate through the Keys and query the balance for each
         spendable_balances.iter().for_each(|(name, balance)| {
             let thename = String::from_utf8_lossy(name).to_string();
 
             // Ignore the _default Wallet MD entry key
             if thename != WALLET_DEFAULT {
+                debug!("Checking wallet of name: {:?}", thename);
                 let the_balance = String::from_utf8_lossy(&balance.data).to_string();
                 let spendable_balance: WalletSpendableBalance =
                     unwrap!(serde_json::from_str(&the_balance));
@@ -93,6 +104,7 @@ impl Safe {
                 let current_balance = unwrap!(
                     self.keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk)
                 );
+                debug!("{:?}: balance: {:?}", thename, current_balance);
 
                 total_balance += unwrap!(parse_coins_amount(&current_balance));
             }

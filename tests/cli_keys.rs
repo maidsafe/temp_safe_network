@@ -6,26 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod common;
+
 extern crate serde_json;
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
+use common::{create_preload_and_get_keys, get_bin_location};
 use predicates::prelude::*;
-
 use std::process::Command;
 
 static CLI: &str = "safe_cli";
 static PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at:";
 static SAFE_PROTOCOL: &str = "safe://";
-
-fn get_bin_location() -> &'static str {
-    let mut location = "./target/release/safe_cli";
-    if cfg!(debug_assertions) {
-        location = "./target/debug/safe_cli";
-    }
-    location
-}
 
 #[test]
 fn calling_safe_keys_create_pretty() {
@@ -77,23 +71,12 @@ fn calling_safe_keypair_pretty() {
 
 #[test]
 fn calling_safe_keys_balance() {
-    let pk_command_result = cmd!(
-        get_bin_location(),
-        "keys",
-        "create",
-        "--test-coins",
-        "---preload",
-        "123"
-    )
-    .read()
-    .unwrap();
+    let (pk_xor, sk) = create_preload_and_get_keys("123");
 
-    let mut lines = pk_command_result.lines();
-    let pk_xorurl = lines.next().unwrap();
-    assert!(pk_xorurl.contains("safe://"));
+    assert!(pk_xor.contains("safe://"));
 
     let mut cmd = Command::cargo_bin("safe_cli").unwrap();
-    cmd.args(&vec!["keys", "balance", pk_xorurl])
+    cmd.args(&vec!["keys", "balance", &pk_xor])
         .assert()
         .stdout("123\n")
         .success();

@@ -197,11 +197,37 @@ SUBCOMMANDS:
 
 #### Wallet Creation
 
-We can create a new `Wallet` by simply running:
 ```shell
-$ safe_cli wallet create --pretty
-Wallet created at: "safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy"
+USAGE:
+    safe_cli wallet create [FLAGS] [OPTIONS] [ARGS]
+
+OPTIONS:
+        --name <name>             The name to give the spendable balance
+        --preload <preload>       Preload the key with a balance
+    -s, --secret-key <secret>     Optionally pass the secret key to make the balance spendable
+
+ARGS:
+    <key>       An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
+    <source>    The source Wallet for funds.
+	<no_balance>    If true, do not create a spendable balance
 ```
+
+- The `<source>` is the `Wallet` paying for data creation/mutation.
+- `<no_balance>` will prevent the command from automatically creating a spendable balance if non is supplied.
+- The `<key>` allows passing an existing `Key` XorUrl, which we'll be used to generate the spendable balance.
+
+For example, we can create a new `Wallet` with a new spendable balance by simply running:
+
+```shell
+$ safe_cli wallet create --pretty --source <source wallet to pay for storage costs>
+New Key created at: "safe://bbkulcbjyino6h67nnpw2abkm2z2m72rvl733ffuchrdn4hoorw3sf33ai"
+Key pair generated:
+pk=a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
+sk=65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
+Wallet created at: "safe://bbkulcamiji5j7jcewxwqzqfk5hybac4tvit3544xa7ka5yp5qhrwy2xnd"
+```
+
+Or if you already have a public key to preload into the wallet, you can do so with the `--key` argument.
 
 #### Wallet Balance
 
@@ -215,9 +241,10 @@ Wallet at "safe://bbkulcakdcx2jxw2gfyvh7klkacht652c2pog3pohhpmiri73qjjpd2vks" ha
 
 #### Wallet Insert
 
-As mentioned before, a `Key` doesn't hold the secret key on the network, therefore even if it has some non-zero coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `Key`'s, and making their balances spendable by storing the correspondig secret keys.
+As mentioned before, a `Key` doesn't hold the secret key on the network, therefore even if it has some non-zero coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `Key`'s, and making their balances spendable by storing the corresponding secret keys.
 
-We achieve this by `insert`-ing into a `Wallet` a link to a `Key`, making it a spendable balance.
+
+Aside from at wallet creation, we can add _more_ keys to use as spendable balances by `insert`-ing into a `Wallet` a link to a `Key`, making it a spendable balance.
 
 ```shell
 USAGE:
@@ -228,9 +255,9 @@ OPTIONS:
     -s, --secret-key <secret>  Optionally pass the secret key to make the balance spendable
 
 ARGS:
+    <key>        An existing `Key`'s safe://xor-url.
     <source>     The source Wallet for funds
     <target>     The target Wallet to insert the spendable balance
-    <key>        An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
 ```
 
 - The `<source>` is the `Wallet` paying for data creation/mutation.

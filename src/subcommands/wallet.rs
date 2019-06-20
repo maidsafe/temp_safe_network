@@ -13,27 +13,22 @@ use unwrap::unwrap;
 
 use crate::subcommands::helpers::{get_target_location, prompt_user};
 use crate::subcommands::keys::create_new_key;
+use log::{debug, error};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
     #[structopt(name = "insert")]
     /// Insert a spendable balance into a Wallet
     Insert {
+        /// An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
+        key: String,
         /// The source Wallet for funds
-        source: String,
+        source: Option<String>,
         /// The target Wallet to insert the spendable balance
         target: Option<String>,
-        /// An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
-        key: Option<String>,
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
-        /// Create a Key, allocate test-coins onto it, and add it to the Wallet
-        #[structopt(long = "test-coins")]
-        test_coins: bool,
-        /// Preload the key with a balance
-        #[structopt(long = "preload")]
-        preload: Option<String>,
         /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
@@ -52,7 +47,27 @@ pub enum WalletSubCommands {
     CheckTx {},
     #[structopt(name = "create")]
     /// Create a new Wallet
-    Create {},
+    Create {
+        /// An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
+        key: Option<String>,
+        /// The source Wallet for funds
+        source: Option<String>,
+        /// If true, do not create a spendable balance
+        #[structopt(long = "no-balance")]
+        no_balance: bool,
+        /// The name to give the spendable balance
+        #[structopt(long = "name")]
+        name: Option<String>,
+        /// Optionally pass the secret key to make the balance spendable
+        #[structopt(short = "sk", long = "secret-key")]
+        secret: Option<String>,
+        /// Create a Key, allocate test-coins onto it, and add it to the Wallet
+        #[structopt(long = "test-coins")]
+        test_coins: bool,
+        /// Preload the key with a balance
+        #[structopt(long = "preload")]
+        preload: Option<String>,
+    },
     #[structopt(name = "transfer")]
     /// Transfer safecoins from one Wallet, Key or pk, to another
     Transfer {
@@ -81,13 +96,61 @@ pub fn wallet_commander(
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(WalletSubCommands::Create {}) => {
-            let xorname = safe.wallet_create()?;
+        Some(WalletSubCommands::Create {
+            preload,
+            test_coins,
+            no_balance,
+            key,
+            name,
+            source,
+            secret,
+        }) => {
+            // create wallet
+            let wallet_xorname = safe.wallet_create()?;
+
+            if !no_balance {
+                // get or create keypair
+                let (xorname, key_pair) = match key {
+                    Some(linked_key) => {
+                        let mut sk = secret.unwrap_or_else(|| String::from(""));
+
+                        if sk.is_empty() {
+                            // Get pk source Key, and prompt user for the corresponding sk
+                            sk = prompt_user(
+                                &format!(
+                                    "Enter secret key corresponding to public key at \"{}\": ",
+                                    linked_key
+                                ),
+                                "Invalid input",
+                            )?;
+                        }
+
+                        let pk = safe.fetch_pk_from_xorname(&linked_key)?;
+
+                        (linked_key, Some(BlsKeyPair { pk, sk }))
+                    }
+                    None => create_new_key(safe, test_coins, source, preload, None, pretty)?,
+                };
+
+                let the_name = match name {
+                    Some(name_str) => name_str.to_string(),
+                    None => xorname.clone(),
+                };
+
+                // insert and set as default
+                safe.wallet_insert(
+                    &wallet_xorname,
+                    &the_name,
+                    true,
+                    &unwrap!(key_pair),
+                    &xorname,
+                )?;
+            }
 
             if pretty {
-                println!("Wallet created at: \"{}\"", xorname);
+                println!("Wallet created at: \"{}\"", &wallet_xorname);
             } else {
-                println!("{}", xorname);
+                println!("{}", &wallet_xorname);
             }
             Ok(())
         }
@@ -96,6 +159,8 @@ pub fn wallet_commander(
             let sk =
                 String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
+
+            debug!("Got target location {:?}", target);
             let balance = safe.wallet_balance(&target, &sk)?;
 
             if pretty {
@@ -110,9 +175,7 @@ pub fn wallet_commander(
             Ok(())
         }
         Some(WalletSubCommands::Insert {
-            preload,
             source,
-            test_coins,
             target,
             key,
             name,
@@ -121,26 +184,23 @@ pub fn wallet_commander(
         }) => {
             let target = get_target_location(target)?;
 
-            let (xorname, key_pair) = match key {
-                Some(linked_key) => {
-                    let mut sk = secret.unwrap_or_else(|| String::from(""));
+            let (xorname, key_pair) = {
+                let mut sk = secret.unwrap_or_else(|| String::from(""));
 
-                    if sk.is_empty() {
-                        // Get pk source Key, and prompt user for the corresponding sk
-                        sk = prompt_user(
-                            &format!(
-                                "Enter secret key corresponding to public key at \"{}\": ",
-                                linked_key
-                            ),
-                            "Invalid input",
-                        )?;
-                    }
-
-                    let pk = safe.fetch_pk_from_xorname(&linked_key)?;
-
-                    (linked_key, Some(BlsKeyPair { pk, sk }))
+                if sk.is_empty() {
+                    // Get pk source Key, and prompt user for the corresponding sk
+                    sk = prompt_user(
+                        &format!(
+                            "Enter secret key corresponding to public key at \"{}\": ",
+                            &key
+                        ),
+                        "Invalid input",
+                    )?;
                 }
-                None => create_new_key(safe, test_coins, Some(source), preload, None, pretty)?,
+
+                let pk = safe.fetch_pk_from_xorname(&key)?;
+
+                (key, Some(BlsKeyPair { pk, sk }))
             };
 
             let the_name = match name {
