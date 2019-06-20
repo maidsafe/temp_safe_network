@@ -7,14 +7,26 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{chunk_store::ImmutableChunkStore, vault::Init, Result};
-use std::{cell::RefCell, path::Path, rc::Rc};
+use safe_nd::NodePublicId;
+use std::{
+    cell::RefCell,
+    fmt::{self, Display, Formatter},
+    path::Path,
+    rc::Rc,
+};
 
 pub(crate) struct Adult {
+    _id: NodePublicId,
     _immutable_chunks: ImmutableChunkStore,
 }
 
 impl Adult {
-    pub fn new<P: AsRef<Path>>(root_dir: P, max_capacity: u64, init_mode: Init) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(
+        id: NodePublicId,
+        root_dir: P,
+        max_capacity: u64,
+        init_mode: Init,
+    ) -> Result<Self> {
         let total_used_space = Rc::new(RefCell::new(0));
         let _immutable_chunks = ImmutableChunkStore::new(
             root_dir,
@@ -22,6 +34,15 @@ impl Adult {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
-        Ok(Self { _immutable_chunks })
+        Ok(Self {
+            _id: id,
+            _immutable_chunks,
+        })
+    }
+}
+
+impl Display for Adult {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self._id)
     }
 }

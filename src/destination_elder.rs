@@ -14,7 +14,12 @@ use crate::{
 };
 use pickledb::PickleDb;
 use safe_nd::NodePublicId;
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{
+    cell::RefCell,
+    fmt::{self, Display, Formatter},
+    path::Path,
+    rc::Rc,
+};
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
@@ -30,6 +35,7 @@ struct ChunkMetadata {
 // TODO - remove this
 #[allow(unused)]
 pub(crate) struct DestinationElder {
+    id: NodePublicId,
     immutable_metadata: PickleDb,
     mutable_metadata: PickleDb,
     append_only_metadata: PickleDb,
@@ -41,6 +47,7 @@ pub(crate) struct DestinationElder {
 
 impl DestinationElder {
     pub fn new<P: AsRef<Path> + Copy>(
+        id: NodePublicId,
         root_dir: P,
         max_capacity: u64,
         init_mode: Init,
@@ -70,6 +77,7 @@ impl DestinationElder {
             init_mode,
         )?;
         Ok(Self {
+            id,
             immutable_metadata,
             mutable_metadata,
             append_only_metadata,
@@ -78,5 +86,11 @@ impl DestinationElder {
             mutable_chunks,
             append_only_chunks,
         })
+    }
+}
+
+impl Display for DestinationElder {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.id)
     }
 }

@@ -8,18 +8,29 @@
 
 use crate::{utils, vault::Init, Result};
 use pickledb::PickleDb;
-use std::path::Path;
+use safe_nd::NodePublicId;
+use std::{
+    fmt::{self, Display, Formatter},
+    path::Path,
+};
 
 const COINS_DB_NAME: &str = "coins.db";
 
 pub(crate) struct CoinsHandler {
+    _id: NodePublicId,
     // The total safecoin farmed from this section.
     _farmed: PickleDb,
 }
 
 impl CoinsHandler {
-    pub fn new<P: AsRef<Path>>(root_dir: P, init_mode: Init) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(id: NodePublicId, root_dir: P, init_mode: Init) -> Result<Self> {
         let _farmed = utils::new_db(root_dir, COINS_DB_NAME, init_mode)?;
-        Ok(Self { _farmed })
+        Ok(Self { _id: id, _farmed })
+    }
+}
+
+impl Display for CoinsHandler {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self._id)
     }
 }

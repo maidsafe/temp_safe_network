@@ -15,7 +15,11 @@ use crossbeam_channel::Receiver;
 use log::info;
 use quic_p2p::Event;
 use safe_nd::NodeFullId;
-use std::{fs, path::PathBuf};
+use std::{
+    fmt::{self, Display, Formatter},
+    fs,
+    path::PathBuf,
+};
 
 const STATE_FILENAME: &str = "state";
 
@@ -62,10 +66,19 @@ impl Vault {
         let root_dir = config.root_dir();
 
         let (state, event_receiver) = if is_elder {
-            let (src, event_receiver) =
-                SourceElder::new(&root_dir, config.quic_p2p_config(), init_mode)?;
-            let dst = DestinationElder::new(&root_dir, config.max_capacity(), init_mode)?;
-            let coins_handler = CoinsHandler::new(&root_dir, init_mode)?;
+            let (src, event_receiver) = SourceElder::new(
+                id.public_id().clone(),
+                &root_dir,
+                config.quic_p2p_config(),
+                init_mode,
+            )?;
+            let dst = DestinationElder::new(
+                id.public_id().clone(),
+                &root_dir,
+                config.max_capacity(),
+                init_mode,
+            )?;
+            let coins_handler = CoinsHandler::new(id.public_id().clone(), &root_dir, init_mode)?;
             (
                 State::Elder {
                     src,
@@ -75,7 +88,12 @@ impl Vault {
                 Some(event_receiver),
             )
         } else {
-            let _adult = Adult::new(&root_dir, config.max_capacity(), init_mode)?;
+            let _adult = Adult::new(
+                id.public_id().clone(),
+                &root_dir,
+                config.max_capacity(),
+                init_mode,
+            )?;
             unimplemented!();
         };
 
@@ -99,7 +117,7 @@ impl Vault {
                 }
             }
         } else {
-            info!("Event receiver not available!");
+            info!("{}: Event receiver not available!", self);
         }
     }
 
@@ -114,7 +132,7 @@ impl Vault {
                 return source_elder.handle_client_message(peer_addr, msg);
             }
             event => {
-                info!("Unexpected event: {}", event);
+                info!("{}: Unexpected event: {}", self, event);
             }
         }
         None
@@ -202,5 +220,11 @@ impl Vault {
         }
         let contents = fs::read(path)?;
         Ok(Some(bincode::deserialize(&contents)?))
+    }
+}
+
+impl Display for Vault {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.id.public_id())
     }
 }

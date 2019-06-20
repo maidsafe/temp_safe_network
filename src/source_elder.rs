@@ -12,13 +12,19 @@ use crossbeam_channel::{self, Receiver};
 use log::info;
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
-use safe_nd::{Challenge, Message, MessageId, PublicId, Request, Signature};
-use std::{collections::HashMap, net::SocketAddr, path::Path};
+use safe_nd::{Challenge, Message, MessageId, NodePublicId, PublicId, Request, Signature};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+    net::SocketAddr,
+    path::Path,
+};
 use unwrap::unwrap;
 
 const CLIENT_ACCOUNTS_DB_NAME: &str = "client_accounts.db";
 
 pub(crate) struct SourceElder {
+    _id: NodePublicId,
     _client_accounts: PickleDb,
     clients: HashMap<SocketAddr, PublicId>,
     // Map of new client connections to the challenge value we sent them.
@@ -28,6 +34,7 @@ pub(crate) struct SourceElder {
 
 impl SourceElder {
     pub fn new<P: AsRef<Path>>(
+        id: NodePublicId,
         root_dir: P,
         config: &QuicP2pConfig,
         init_mode: Init,
@@ -35,6 +42,7 @@ impl SourceElder {
         let _client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
         let src_elder = Self {
+            _id: id,
             _client_accounts,
             clients: Default::default(),
             client_candidates: Default::default(),
@@ -72,8 +80,8 @@ impl SourceElder {
         let peer_addr = match peer {
             Peer::Node { node_info } => {
                 info!(
-                    "Rejecting connection attempt by node on {}",
-                    node_info.peer_addr
+                    "{}: Rejecting connection attempt by node on {}",
+                    self, node_info.peer_addr
                 );
                 self.quic_p2p.disconnect_from(node_info.peer_addr);
                 return;
@@ -85,15 +93,21 @@ impl SourceElder {
         let msg = utils::serialise(&Challenge::Request(challenge.clone()));
         self.quic_p2p.send(peer.clone(), Bytes::from(msg));
         let _ = self.client_candidates.insert(peer.peer_addr(), challenge);
-        info!("Connected to new client on {}", peer_addr);
+        info!("{}: Connected to new client on {}", self, peer_addr);
     }
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
         if let Some(client_id) = self.clients.remove(&peer_addr) {
-            info!("Disconnected from {:?} on {}", client_id, peer_addr);
+            info!(
+                "{}: Disconnected from {:?} on {}",
+                self, client_id, peer_addr
+            );
         } else {
             let _ = self.client_candidates.remove(&peer_addr);
-            info!("Disconnected from client candidate on {}", peer_addr);
+            info!(
+                "{}: Disconnected from client candidate on {}",
+                self, peer_addr
+            );
         }
     }
 
@@ -108,10 +122,13 @@ impl SourceElder {
                     return self.handle_client_request(&client_id, request, message_id, signature);
                 }
                 Ok(Message::Response { response, .. }) => {
-                    info!("{} invalidly sent {:?}", client_id, response);
+                    info!("{}: {} invalidly sent {:?}", self, client_id, response);
                 }
                 Err(err) => {
-                    info!("Unable to deserialise message from {}: {}", client_id, err);
+                    info!(
+                        "{}: Unable to deserialise message from {}: {}",
+                        self, client_id, err
+                    );
                 }
             }
         } else {
@@ -120,13 +137,16 @@ impl SourceElder {
                     self.handle_challenge(peer_addr, public_id, signature);
                 }
                 Ok(Challenge::Request(_)) => {
-                    info!("Received unexpected challenge request from {}", peer_addr);
+                    info!(
+                        "{}: Received unexpected challenge request from {}",
+                        self, peer_addr
+                    );
                     self.quic_p2p.disconnect_from(peer_addr);
                 }
                 Err(err) => {
                     info!(
-                        "Unable to deserialise challenge from {}: {}",
-                        peer_addr, err
+                        "{}: Unable to deserialise challenge from {}: {}",
+                        self, peer_addr, err
                     );
                 }
             }
@@ -142,8 +162,8 @@ impl SourceElder {
         _signature: Option<Signature>,
     ) -> Option<Action> {
         info!(
-            "Received ({:?} {:?}) from {}",
-            request, message_id, client_id
+            "{}: Received ({:?} {:?}) from {}",
+            self, request, message_id, client_id
         );
         unimplemented!();
     }
@@ -162,8 +182,8 @@ impl SourceElder {
             PublicId::App(ref pub_id) => pub_id.public_key(),
             PublicId::Node(_) => {
                 info!(
-                    "Client on {} identifies as a node: {}",
-                    peer_addr, public_id
+                    "{}: Client on {} identifies as a node: {}",
+                    self, peer_addr, public_id
                 );
                 self.quic_p2p.disconnect_from(peer_addr);
                 return;
@@ -172,23 +192,29 @@ impl SourceElder {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    info!("Accepted {} on {}", public_id, peer_addr);
+                    info!("{}: Accepted {} on {}", self, public_id, peer_addr);
                     let _ = self.clients.insert(peer_addr, public_id);
                 }
                 Err(err) => {
                     info!(
-                        "Challenge failed for {} on {}: {}",
-                        public_id, peer_addr, err
+                        "{}: Challenge failed for {} on {}: {}",
+                        self, public_id, peer_addr, err
                     );
                     self.quic_p2p.disconnect_from(peer_addr);
                 }
             }
         } else {
             info!(
-                "{} on {} supplied challenge response without us providing it.",
-                public_id, peer_addr
+                "{}: {} on {} supplied challenge response without us providing it.",
+                self, public_id, peer_addr
             );
             self.quic_p2p.disconnect_from(peer_addr);
         }
+    }
+}
+
+impl Display for SourceElder {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self._id)
     }
 }
