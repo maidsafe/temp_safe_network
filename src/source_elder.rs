@@ -86,10 +86,8 @@ impl SourceElder {
         };
 
         let challenge = utils::random_vec(8);
-        match bincode::serialize(&Challenge::Request(challenge.clone())) {
-            Ok(msg) => self.quic_p2p.send(peer.clone(), Bytes::from(msg)),
-            Err(err) => info!("Unable to serialise Challenge::Request: {}", err),
-        }
+        let msg = utils::serialise(&Challenge::Request(challenge.clone()));
+        self.quic_p2p.send(peer.clone(), Bytes::from(msg));
         let _ = self.client_candidates.insert(peer.peer_addr(), challenge);
         info!("Connected to new client on {}", peer_addr);
     }

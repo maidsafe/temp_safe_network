@@ -8,7 +8,7 @@
 
 use crate::{
     action::Action, adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder,
-    source_elder::SourceElder, Config, Result,
+    source_elder::SourceElder, utils, Config, Result,
 };
 use bincode;
 use crossbeam_channel::Receiver;
@@ -193,7 +193,7 @@ impl Vault {
             State::Elder { .. } => true,
             State::Adult(_) => false,
         };
-        Ok(fs::write(path, bincode::serialize(&(is_elder, &self.id))?)?)
+        Ok(fs::write(path, utils::serialise(&(is_elder, &self.id)))?)
     }
 
     /// Returns Some((is_elder, ID)) or None if file doesn't exist.

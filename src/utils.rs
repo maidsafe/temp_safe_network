@@ -7,10 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{vault::Init, Result};
+use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
+use serde::Serialize;
 use std::{fs, path::Path};
+use unwrap::unwrap;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
@@ -37,4 +40,8 @@ pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
 
 pub fn random_vec(size: usize) -> Vec<u8> {
     thread_rng().sample_iter(&Standard).take(size).collect()
+}
+
+pub fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
+    unwrap!(bincode::serialize(data))
 }
