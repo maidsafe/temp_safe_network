@@ -9,6 +9,8 @@
 use cid::{Cid, Codec, Version};
 use multibase::{encode, Base};
 use multihash;
+use rand::rngs::OsRng;
+use rand_core::RngCore;
 use safe_nd::XorName;
 
 static SAFE_URL_PROTOCOL: &str = "safe://";
@@ -16,6 +18,13 @@ static SAFE_URL_PROTOCOL: &str = "safe://";
 // The XOR-URL type
 // TODO: make it a struct with all the helpers below to be methods
 pub type XorUrl = String;
+
+pub fn create_random_xorname() -> XorName {
+    let mut os_rng = OsRng::new().unwrap();
+    let mut xorname = XorName::default();
+    os_rng.fill_bytes(&mut xorname.0);
+    xorname
+}
 
 pub fn xorname_to_xorurl(xorname: &XorName, base: &str) -> Result<String, String> {
     let h = temp_multihash_encode(multihash::Hash::SHA3256, &xorname.0).unwrap();

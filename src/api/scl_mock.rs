@@ -6,11 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::xorurl::xorurl_to_xorname;
+use super::xorurl::{create_random_xorname, xorurl_to_xorname};
 use crate::api::helpers::{parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex};
 use log::debug;
-use rand::rngs::OsRng;
-use rand_core::RngCore;
 use safe_nd::mutable_data::Value;
 use safe_nd::XorName;
 
@@ -45,6 +43,7 @@ struct MockData {
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
     unpublished_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataMock>,
+    published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
 
 pub struct SafeApp {
@@ -235,6 +234,29 @@ impl SafeApp {
         tx_state.to_string()
     }
 
+    pub fn put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
+        let xorname = create_random_xorname();
+        // TODO: hash to get xorname.
+        self.mock_data
+            .published_immutable_data
+            .insert(xorname_to_hex(&xorname), data.to_vec());
+
+        Ok(xorname)
+    }
+
+    pub fn get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
+        let data = match self
+            .mock_data
+            .published_immutable_data
+            .get(&xorname_to_hex(&xorname))
+        {
+            Some(data) => data.clone(),
+            None => return Err("No immutable data found at this address".to_string()),
+        };
+
+        Ok(data)
+    }
+
     #[allow(dead_code)]
     pub fn unpublished_append_only_put(
         &mut self,
@@ -286,12 +308,7 @@ impl SafeApp {
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName, String> {
-        let xorname = name.unwrap_or_else(|| {
-            let mut os_rng = OsRng::new().unwrap();
-            let mut xorname = XorName::default();
-            os_rng.fill_bytes(&mut xorname.0);
-            xorname
-        });
+        let xorname = name.unwrap_or_else(|| create_random_xorname());
 
         let seq_md = match self.mock_data.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(uao) => uao.clone(),

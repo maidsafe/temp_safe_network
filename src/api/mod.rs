@@ -13,6 +13,7 @@ pub mod keys;
 pub mod safe_client_libs;
 pub mod xorurl;
 // #[cfg(feature = "scl-mock")]
+pub mod files;
 pub mod scl_mock;
 pub mod wallet;
 

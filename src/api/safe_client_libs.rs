@@ -8,7 +8,7 @@
 
 use super::helpers::{decode_ipc_msg, xorname_from_pk};
 use super::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
-use super::xorurl::xorurl_to_xorname;
+use super::xorurl::{create_random_xorname, xorurl_to_xorname};
 use futures::future::Future;
 use log::{debug, warn};
 use rand::rngs::OsRng;
@@ -161,6 +161,31 @@ impl SafeApp {
     #[allow(dead_code)]
     pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKeyMock, sk: &SecretKeyMock) -> String {
         self.scl_mock.get_transaction(tx_id, pk, sk)
+    }
+
+    #[allow(dead_code)]
+    pub fn put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
+        let xorname = create_random_xorname();
+        // // TODO: hash to get xorname.
+        // self.scl_mock
+        //     .published_immutable_data
+        //     .insert(xorname_to_hex(&xorname), data.to_vec());
+
+        Ok(xorname)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
+        // let data = match self
+        //     .mock_data
+        //     .published_immutable_data
+        //     .get(&xorname_to_hex(&xorname))
+        // {
+        //     Some(data) => data.clone(),
+        //     None => return Err("No immutable data found at this address".to_string()),
+        // };
+
+        Ok(vec![])
     }
 
     //TODO: Replace with SCL calling code

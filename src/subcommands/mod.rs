@@ -8,6 +8,7 @@
 
 #[cfg(not(feature = "fake-auth"))]
 pub mod auth;
+pub mod cat;
 pub mod container;
 #[cfg(feature = "fake-auth")]
 pub mod fake_auth;
@@ -44,12 +45,11 @@ pub enum SubCommands {
     #[structopt(name = "cat")]
     /// Read data on the network.
     Cat {
-        /// The key to cat
-        #[structopt(short = "k", long = "key")]
-        key: String,
-        /// Version of the resource to cat
+        /// The safe:// location to retrieve
+        location: Option<String>,
+        /// Version of the resource to retrieve
         #[structopt(long = "version")]
-        version: String,
+        version: Option<String>,
     },
     #[structopt(name = "files")]
     /// Manage files on the network
