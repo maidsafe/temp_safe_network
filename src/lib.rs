@@ -54,8 +54,6 @@
     missing_debug_implementations,
     variant_size_differences
 )]
-// TODO - Fix before committing.
-#![allow(unused)]
 
 mod action;
 mod adult;

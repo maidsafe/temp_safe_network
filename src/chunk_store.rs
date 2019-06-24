@@ -21,7 +21,7 @@ mod immutable;
 mod mutable;
 mod used_space;
 
-use crate::vault::Init;
+use crate::{utils, vault::Init};
 use append_only::AppendOnlyChunk;
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
@@ -116,7 +116,7 @@ impl<T: Chunk> ChunkStore<T> {
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
     pub fn put(&mut self, chunk: &T) -> Result<()> {
-        let serialised_chunk = bincode::serialize(chunk)?;
+        let serialised_chunk = utils::serialise(chunk);
         let consumed_space = serialised_chunk.len() as u64;
         if self.used_space.total().saturating_add(consumed_space) > self.max_capacity {
             return Err(Error::NotEnoughSpace);
@@ -196,9 +196,7 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     fn file_path(&self, id: &T::Id) -> Result<PathBuf> {
-        Ok(self
-            .dir
-            .join(&hex::encode(bincode::serialize(id.raw_name())?)))
+        Ok(self.dir.join(&hex::encode(utils::serialise(id.raw_name()))))
     }
 }
 

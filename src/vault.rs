@@ -8,18 +8,16 @@
 
 use crate::{
     action::Action, adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder,
-    source_elder::SourceElder, Config, Result,
+    source_elder::SourceElder, utils, Config, Result,
 };
 use bincode;
 use crossbeam_channel::Receiver;
-use log::{info, trace};
-use pickledb::PickleDb;
-use quic_p2p::{Config as QuickP2pConfig, Event, Peer};
-use safe_nd::{Challenge, Message, NodeFullId, PublicId, Request, Signature};
+use log::{error, info};
+use quic_p2p::Event;
+use safe_nd::{NodeFullId, XorName};
 use std::{
-    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
     fs,
-    net::SocketAddr,
     path::PathBuf,
 };
 
@@ -32,6 +30,8 @@ enum State {
         dst: DestinationElder,
         coins_handler: CoinsHandler,
     },
+    // TODO - remove this
+    #[allow(unused)]
     Adult(Adult),
 }
 
@@ -50,6 +50,8 @@ pub struct Vault {
     event_receiver: Option<Receiver<Event>>,
 }
 
+// TODO - remove this
+#[allow(unused)]
 impl Vault {
     /// Construct a new vault instance.
     pub fn new(config: Config) -> Result<Self> {
@@ -64,10 +66,19 @@ impl Vault {
         let root_dir = config.root_dir();
 
         let (state, event_receiver) = if is_elder {
-            let (src, event_receiver) =
-                SourceElder::new(&root_dir, config.quic_p2p_config(), init_mode)?;
-            let dst = DestinationElder::new(&root_dir, config.max_capacity(), init_mode)?;
-            let coins_handler = CoinsHandler::new(&root_dir, init_mode)?;
+            let (src, event_receiver) = SourceElder::new(
+                id.public_id().clone(),
+                &root_dir,
+                config.quic_p2p_config(),
+                init_mode,
+            )?;
+            let dst = DestinationElder::new(
+                id.public_id().clone(),
+                &root_dir,
+                config.max_capacity(),
+                init_mode,
+            )?;
+            let coins_handler = CoinsHandler::new(id.public_id().clone(), &root_dir, init_mode)?;
             (
                 State::Elder {
                     src,
@@ -77,7 +88,12 @@ impl Vault {
                 Some(event_receiver),
             )
         } else {
-            let _adult = Adult::new(&root_dir, config.max_capacity(), init_mode)?;
+            let _adult = Adult::new(
+                id.public_id().clone(),
+                &root_dir,
+                config.max_capacity(),
+                init_mode,
+            )?;
             unimplemented!();
         };
 
@@ -101,7 +117,7 @@ impl Vault {
                 }
             }
         } else {
-            info!("Event receiver not available!");
+            error!("{}: Event receiver not available!", self);
         }
     }
 
@@ -116,14 +132,48 @@ impl Vault {
                 return source_elder.handle_client_message(peer_addr, msg);
             }
             event => {
-                info!("Unexpected event: {}", event);
+                info!("{}: Unexpected event: {}", self, event);
             }
         }
         None
     }
 
-    fn handle_action(&mut self, _action: Action) -> Option<Action> {
-        None
+    fn handle_action(&mut self, action: Action) -> Option<Action> {
+        use Action::*;
+        match action {
+            ForwardClientRequest {
+                client_name,
+                request,
+                message_id,
+                signature,
+            } => {
+                let dst_elders_address = match utils::dst_elders_address(&request) {
+                    Some(address) => address,
+                    None => {
+                        error!("{}: Logic error - no dst address available.", self);
+                        return None;
+                    }
+                };
+
+                // TODO - once Routing is integrated, we'll construct the full message to send
+                //        onwards, and then if we're also part of the dst elders, we'll call that
+                //        same handler which Routing will call after receiving a message.
+
+                if self.self_is_dst_elder_for(&dst_elders_address) {
+                    return self.destination_elder_mut()?.handle_request(
+                        client_name,
+                        request,
+                        message_id,
+                        signature,
+                    );
+                }
+                None
+            }
+        }
+    }
+
+    fn self_is_dst_elder_for(&self, _address: &XorName) -> bool {
+        true
     }
 
     fn source_elder(&self) -> Option<&SourceElder> {
@@ -193,7 +243,7 @@ impl Vault {
             State::Elder { .. } => true,
             State::Adult(_) => false,
         };
-        Ok(fs::write(path, bincode::serialize(&(is_elder, &self.id))?)?)
+        Ok(fs::write(path, utils::serialise(&(is_elder, &self.id)))?)
     }
 
     /// Returns Some((is_elder, ID)) or None if file doesn't exist.
@@ -204,5 +254,11 @@ impl Vault {
         }
         let contents = fs::read(path)?;
         Ok(Some(bincode::deserialize(&contents)?))
+    }
+}
+
+impl Display for Vault {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.id.public_id())
     }
 }

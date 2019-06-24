@@ -7,25 +7,36 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    action::Action,
     chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
     utils,
     vault::Init,
     Result,
 };
 use pickledb::PickleDb;
-use safe_nd::NodePublicId;
-use std::{cell::RefCell, path::Path, rc::Rc};
+use safe_nd::{MessageId, NodePublicId, Request, Signature, XorName};
+use std::{
+    cell::RefCell,
+    fmt::{self, Display, Formatter},
+    path::Path,
+    rc::Rc,
+};
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
 const APPEND_ONLY_META_DB_NAME: &str = "append_only_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 
+// TODO - remove this
+#[allow(unused)]
 struct ChunkMetadata {
     holders: Vec<NodePublicId>,
 }
 
+// TODO - remove this
+#[allow(unused)]
 pub(crate) struct DestinationElder {
+    id: NodePublicId,
     immutable_metadata: PickleDb,
     mutable_metadata: PickleDb,
     append_only_metadata: PickleDb,
@@ -37,6 +48,7 @@ pub(crate) struct DestinationElder {
 
 impl DestinationElder {
     pub fn new<P: AsRef<Path> + Copy>(
+        id: NodePublicId,
         root_dir: P,
         max_capacity: u64,
         init_mode: Init,
@@ -66,6 +78,7 @@ impl DestinationElder {
             init_mode,
         )?;
         Ok(Self {
+            id,
             immutable_metadata,
             mutable_metadata,
             append_only_metadata,
@@ -74,5 +87,21 @@ impl DestinationElder {
             mutable_chunks,
             append_only_chunks,
         })
+    }
+
+    pub fn handle_request(
+        &mut self,
+        _src: XorName,
+        _request: Request,
+        _message_id: MessageId,
+        _signature: Option<Signature>,
+    ) -> Option<Action> {
+        None
+    }
+}
+
+impl Display for DestinationElder {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.id)
     }
 }

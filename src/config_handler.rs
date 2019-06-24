@@ -10,7 +10,6 @@ use crate::Result;
 use directories::ProjectDirs;
 use log::trace;
 use quic_p2p::Config as QuicP2pConfig;
-use safe_nd::ClientPublicId;
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::fs;
@@ -19,7 +18,7 @@ use std::{
     fs::File,
     io::{self, BufReader},
     net::{IpAddr, Ipv4Addr},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use structopt::StructOpt;
 use unwrap::unwrap;
@@ -200,9 +199,8 @@ fn dirs() -> Result<ProjectDirs> {
 #[cfg(test)]
 mod test {
     use super::{Config, ARGS};
-    use quic_p2p::SerialisableCertificate;
     use serde_json;
-    use std::{env, fs::File, io::Read, mem, path::Path};
+    use std::{fs::File, io::Read, mem, path::Path};
     use structopt::StructOpt;
     use unwrap::unwrap;
 
