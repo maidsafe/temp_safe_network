@@ -156,6 +156,22 @@ impl Vault {
             .insert(*coin_balance_name, CoinBalance::new(amount, owner));
     }
 
+    /// Increment coin balance for testing
+    pub fn mock_increment_balance(
+        &mut self,
+        coin_balance_name: &XorName,
+        amount: Coins,
+    ) -> Result<(), Error> {
+        let balance = match self.get_coin_balance_mut(coin_balance_name) {
+            Some(balance) => balance,
+            None => {
+                debug!("Account not found for {:?}", coin_balance_name);
+                return Err(Error::NoSuchAccount);
+            }
+        };
+        balance.credit_balance(amount, new_rand::random())
+    }
+
     // Authorise coin operation.
     pub fn authorise_coin_operation(
         &self,

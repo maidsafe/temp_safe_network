@@ -51,6 +51,8 @@ use routing::{
     User, Value,
 };
 use rust_sodium::crypto::{box_, sign};
+#[cfg(any(feature = "testing", test))]
+use safe_nd::Error;
 use safe_nd::{
     AData, ADataAddress, ADataAppend, ADataIndex, ADataIndices, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
@@ -1493,6 +1495,20 @@ pub trait Client: Clone + 'static {
             .routing
             .create_coin_balance(coin_balance_name, amount, owner);
     }
+
+    /// Add coins to a coinbalance for testing
+    #[cfg(any(
+        all(test, feature = "mock-network"),
+        all(feature = "testing", feature = "mock-network")
+    ))]
+    fn allocate_test_coins(&self, coin_balance_name: &XorName, amount: Coins) -> Result<(), Error> {
+        let inner = self.inner();
+        let result = inner
+            .borrow_mut()
+            .routing
+            .allocate_test_coins(coin_balance_name, amount);
+        result.clone()
+    }
 }
 
 // TODO: Consider deprecating this struct once trait fields are stable. See
@@ -2147,14 +2163,23 @@ mod tests {
     //    wallet A is debited for 5 coins.
     #[test]
     fn coin_balance_transfer() {
-        let wallet1 = random_client(move |client| {
-            let name: XorName = new_rand::random();
+        let wallet1: XorName = new_rand::random();
+
+        random_client(move |client| {
+            let client1 = client.clone();
+            let client2 = client.clone();
             client.create_coin_balance(
-                &name,
+                &wallet1,
                 unwrap!(Coins::from_str("0.0")),
                 unwrap!(client.public_bls_key()),
             );
-            Ok::<_, Error>(name)
+
+            unwrap!(client1.allocate_test_coins(&wallet1, unwrap!(Coins::from_str("100.0"))));
+
+            client2.get_balance(wallet1).and_then(|balance| {
+                assert_eq!(balance, unwrap!(Coins::from_str("100.0")));
+                Ok(())
+            })
         });
 
         random_client(move |client| {

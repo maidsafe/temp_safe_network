@@ -15,12 +15,12 @@ use routing::{
     Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, InterfaceError,
     MutableData, PermissionSet, Request, Response, RoutingError, User, TYPE_TAG_SESSION_PACKET,
 };
-#[cfg(any(feature = "testing", test))]
-use safe_nd::Coins;
 use safe_nd::{
     AppFullId, ClientFullId, IDataKind, ImmutableData, Message, MessageId, PublicId, PublicKey,
     Signature, XorName,
 };
+#[cfg(any(feature = "testing", test))]
+use safe_nd::{Coins, Error};
 use std;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1065,6 +1065,16 @@ impl Routing {
     ) {
         let mut vault = self.lock_vault(true);
         vault.mock_create_balance(coin_balance_name, amount, owner);
+    }
+
+    /// Add some coins to a wallet's PublicKey
+    pub fn allocate_test_coins(
+        &self,
+        coin_balance_name: &XorName,
+        amount: Coins,
+    ) -> Result<(), Error> {
+        let mut vault = self.lock_vault(true);
+        vault.mock_increment_balance(coin_balance_name, amount)
     }
 }
 
