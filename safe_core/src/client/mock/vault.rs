@@ -515,10 +515,18 @@ impl Vault {
 
                 match (address, result) {
                     (MDataAddress::Seq { .. }, Ok(MutableDataKind::Sequenced(mdata))) => {
-                        Response::GetSeqMDataValue(Ok(mdata.get(&key).unwrap().clone()))
+                        let res = match mdata.get(&key) {
+                            Some(value) => Ok(value.clone()),
+                            None => Err(Error::NoSuchEntry),
+                        };
+                        Response::GetSeqMDataValue(res)
                     }
                     (MDataAddress::Unseq { .. }, Ok(MutableDataKind::Unsequenced(mdata))) => {
-                        Response::GetUnseqMDataValue(Ok(mdata.get(&key).unwrap().clone()))
+                        let res = match mdata.get(&key) {
+                            Some(value) => Ok(value.clone()),
+                            None => Err(Error::NoSuchEntry),
+                        };
+                        Response::GetUnseqMDataValue(res)
                     }
                     (MDataAddress::Seq { .. }, Err(err)) => Response::GetSeqMDataValue(Err(err)),
                     (MDataAddress::Unseq { .. }, Err(err)) => {

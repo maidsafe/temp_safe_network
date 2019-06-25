@@ -2439,6 +2439,7 @@ mod tests {
             let client3 = client.clone();
             let client4 = client.clone();
             let client5 = client.clone();
+            let client6 = client.clone();
             let name = XorName(rand::random());
             let tag = 15001;
             let mut permissions: BTreeMap<_, _> = Default::default();
@@ -2506,6 +2507,18 @@ mod tests {
                             Ok(())
                         })
                 })
+                .then(move |_| {
+                    client6
+                        .get_seq_mdata_value(name, tag, b"wrongKey".to_vec())
+                        .then(|res| {
+                            match res {
+                                Ok(_) => panic!("Unexpected: Entry should not exist"),
+                                Err(CoreError::NewRoutingClientError(Error::NoSuchEntry)) => (),
+                                Err(err) => panic!("Unexpected error: {:?}", err),
+                            }
+                            Ok::<_, Error>(())
+                        })
+                })
         });
 
         random_client(|client| {
@@ -2513,6 +2526,7 @@ mod tests {
             let client3 = client.clone();
             let client4 = client.clone();
             let client5 = client.clone();
+            let client6 = client.clone();
             let name = XorName(rand::random());
             let tag = 15001;
             let mut permissions: BTreeMap<_, _> = Default::default();
@@ -2574,6 +2588,18 @@ mod tests {
                         .and_then(|fetched_value| {
                             assert_eq!(fetched_value, b"newValue".to_vec());
                             Ok(())
+                        })
+                })
+                .then(move |_| {
+                    client6
+                        .get_unseq_mdata_value(name, tag, b"wrongKey".to_vec())
+                        .then(|res| {
+                            match res {
+                                Ok(_) => panic!("Unexpected: Entry should not exist"),
+                                Err(CoreError::NewRoutingClientError(Error::NoSuchEntry)) => (),
+                                Err(err) => panic!("Unexpected error: {:?}", err),
+                            }
+                            Ok::<_, Error>(())
                         })
                 })
         });
