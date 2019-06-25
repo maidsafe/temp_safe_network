@@ -37,10 +37,26 @@ struct ClientAccount {
     balance: Coins,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ClientState {
+    Registered,
+    Unregistered,
+}
+
+impl ClientState {
+    fn from_bool(is_registered: bool) -> Self {
+        if is_registered {
+            ClientState::Registered
+        } else {
+            ClientState::Unregistered
+        }
+    }
+}
+
 pub(crate) struct SourceElder {
     id: NodePublicId,
     client_accounts: PickleDb,
-    clients: HashMap<SocketAddr, PublicId>,
+    clients: HashMap<SocketAddr, (PublicId, ClientState)>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
     quic_p2p: QuicP2p,
@@ -111,7 +127,7 @@ impl SourceElder {
     }
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
-        if let Some(client_id) = self.clients.remove(&peer_addr) {
+        if let Some((client_id, _)) = self.clients.remove(&peer_addr) {
             info!(
                 "{}: Disconnected from {:?} on {}",
                 self, client_id, peer_addr
@@ -126,7 +142,7 @@ impl SourceElder {
     }
 
     pub fn handle_client_message(&mut self, peer_addr: SocketAddr, bytes: Bytes) -> Option<Action> {
-        if let Some(client_id) = self.clients.get(&peer_addr).cloned() {
+        if let Some((client_id, _)) = self.clients.get(&peer_addr).cloned() {
             match bincode::deserialize(&bytes) {
                 Ok(Message::Request {
                     request,
@@ -174,6 +190,7 @@ impl SourceElder {
         request: Request,
         message_id: MessageId,
         signature: Option<Signature>,
+        registered_client: ClientState,
     ) -> Option<Action> {
         use Request::*;
         trace!(
@@ -340,8 +357,34 @@ impl SourceElder {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    info!("{}: Accepted {} on {}", self, public_id, peer_addr);
-                    let _ = self.clients.insert(peer_addr, public_id);
+                    let registered = ClientState::from_bool(match public_id {
+                        PublicId::Client(ref pub_id) => {
+                            self.client_accounts.exists(&pub_id.to_db_key())
+                        }
+                        PublicId::App(ref app_pub_id) => {
+                            let owner = app_pub_id.owner();
+                            let app_pub_key = app_pub_id.public_key();
+                            let permissions = self
+                                .client_accounts
+                                .get(&owner.to_db_key())
+                                .and_then(|account: ClientAccount| {
+                                    account.apps.get(app_pub_key).map(|perm| *perm)
+                                })
+                                .is_some();
+                            // TODO: actually check permissions
+                            permissions
+                        }
+                        PublicId::Node(_) => {
+                            error!("{}: Logic error.  This should be unreachable.", self);
+                            false
+                        }
+                    });
+
+                    info!(
+                        "{}: Accepted {} on {} as {:?}",
+                        self, public_id, peer_addr, registered
+                    );
+                    let _ = self.clients.insert(peer_addr, (public_id, registered));
                 }
                 Err(err) => {
                     info!(
