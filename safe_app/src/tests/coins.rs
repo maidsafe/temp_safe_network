@@ -45,7 +45,7 @@ fn coin_app_deny_permissions() {
         let c3 = client.clone();
 
         client
-            .get_balance(owner_coin_balance)
+            .get_balance(owner_coin_balance, None)
             .then(move |res| {
                 match res {
                     Err(CoreError::NewRoutingClientError(Error::AccessDenied)) => (),
@@ -54,6 +54,7 @@ fn coin_app_deny_permissions() {
 
                 c2.transfer_coins(
                     owner_coin_balance,
+                    None,
                     new_rand::random(),
                     unwrap!(Coins::from_str("1.0")),
                     None,
@@ -126,7 +127,7 @@ fn coin_app_allow_permissions() {
         let c3 = client.clone();
 
         client
-            .get_balance(owner_coin_balance)
+            .get_balance(owner_coin_balance, None)
             .then(move |res| {
                 match res {
                     Ok(balance) => println!("{:?}", balance),
@@ -135,6 +136,7 @@ fn coin_app_allow_permissions() {
 
                 c2.transfer_coins(
                     owner_coin_balance,
+                    None,
                     coin_balance2,
                     unwrap!(Coins::from_str("1.0")),
                     Some(1),
