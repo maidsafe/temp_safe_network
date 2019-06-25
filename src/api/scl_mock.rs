@@ -9,8 +9,7 @@
 use super::xorurl::{create_random_xorname, xorurl_to_xorname};
 use crate::api::helpers::{parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex};
 use log::debug;
-use safe_nd::mutable_data::Value;
-use safe_nd::XorName;
+use safe_nd::{MDataValue, XorName};
 
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
@@ -33,7 +32,7 @@ struct CoinBalance {
 type AppendOnlyDataMock = BTreeMap<usize, Vec<u8>>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
-type SeqMutableDataMock = BTreeMap<String, Value>;
+type SeqMutableDataMock = BTreeMap<String, MDataValue>;
 
 static MOCK_FILE: &str = "./mock_data.txt";
 
@@ -346,7 +345,7 @@ impl SafeApp {
 
         seq_md.insert(
             vec_to_hex(key.to_vec()),
-            Value {
+            MDataValue {
                 data: value.to_vec(),
                 version: 0,
             },
@@ -367,7 +366,7 @@ impl SafeApp {
         xorurl: &str,
         tag: u64,
         key: Vec<u8>,
-    ) -> Result<Value, String> {
+    ) -> Result<MDataValue, String> {
         let xorname = xorurl_to_xorname(xorurl)?;
         let seq_md = self.get_seq_mdata(&xorname, tag)?;
         match seq_md.get(&vec_to_hex(key.to_vec())) {
@@ -380,7 +379,7 @@ impl SafeApp {
         &self,
         xorurl: &str,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, Value>, String> {
+    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, String> {
         debug!("Listing seq_mdata_entries for: {}", xorurl);
         let xorname = xorurl_to_xorname(xorurl)?;
         let seq_md = self.get_seq_mdata(&xorname, tag)?;

@@ -18,8 +18,10 @@ use safe_app::{run, App};
 //#[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
-use safe_nd::mutable_data::{Action, PermissionSet, SeqEntryAction, SeqMutableData, Value};
-use safe_nd::{PublicKey, XorName};
+use safe_nd::{
+    MDataAction, MDataPermissionSet, MDataSeqEntryAction, MDataValue, PublicKey, SeqMutableData,
+    XorName,
+};
 
 use std::collections::BTreeMap;
 use unwrap::unwrap;
@@ -28,7 +30,7 @@ use uuid::Uuid;
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
 //Temporary untill SCL allows to pass a SeqEntryActions to mutate_seq_mdata_entries
-type SeqEntryActions = BTreeMap<Vec<u8>, SeqEntryAction>;
+type SeqEntryActions = BTreeMap<Vec<u8>, MDataSeqEntryAction>;
 
 pub struct SafeApp {
     safe_conn: Option<App>,
@@ -235,12 +237,12 @@ impl SafeApp {
                 xorname
             });
 
-            let permission_set = PermissionSet::new()
-                .allow(Action::Read)
-                .allow(Action::Insert)
-                .allow(Action::Update)
-                .allow(Action::Delete)
-                .allow(Action::ManagePermissions);
+            let permission_set = MDataPermissionSet::new()
+                .allow(MDataAction::Read)
+                .allow(MDataAction::Insert)
+                .allow(MDataAction::Update)
+                .allow(MDataAction::Delete)
+                .allow(MDataAction::ManagePermissions);
 
             let mut permission_map = BTreeMap::new();
             let sign_pk = unwrap!(client.public_bls_key());
@@ -252,7 +254,7 @@ impl SafeApp {
                 tag.clone(),
                 BTreeMap::new(),
                 permission_map,
-                owners,
+                PublicKey::Bls(owners),
             );
             client
                 .put_seq_mutable_data(mdata)
@@ -290,7 +292,7 @@ impl SafeApp {
         let mut entry_actions: SeqEntryActions = Default::default();
         let _ = entry_actions.insert(
             key.to_vec(),
-            SeqEntryAction::Ins(Value::new(value.to_vec(), 0)),
+            MDataSeqEntryAction::Ins(MDataValue::new(value.to_vec(), 0)),
         );
 
         self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to insert to MD")
@@ -307,7 +309,7 @@ impl SafeApp {
         xorurl: &str,
         tag: u64,
         key: Vec<u8>,
-    ) -> Result<Value, String> {
+    ) -> Result<MDataValue, String> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
@@ -327,7 +329,7 @@ impl SafeApp {
         &self,
         xorurl: &str,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, Value>, String> {
+    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, String> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
@@ -354,7 +356,7 @@ impl SafeApp {
         let mut entry_actions: SeqEntryActions = Default::default();
         let _ = entry_actions.insert(
             key.to_vec(),
-            SeqEntryAction::Update(Value::new(value.to_vec(), version)),
+            MDataSeqEntryAction::Update(MDataValue::new(value.to_vec(), version)),
         );
 
         self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to update MD")

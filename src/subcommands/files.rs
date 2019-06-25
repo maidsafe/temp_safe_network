@@ -64,9 +64,7 @@ fn upload_file(path: &Path, safe: &mut Safe) -> Result<XorUrl, String> {
     // add FilesMap style thing.
     // Do we create ONE per file?
 
-    let xorurl = unwrap!(safe.put_published_immutable(&data));
-
-    Ok(xorurl)
+    safe.put_published_immutable(&data)
 }
 
 #[derive(StructOpt, Debug)]
@@ -85,11 +83,11 @@ pub enum FilesSubCommands {
     //     link: String,
     // },
     #[structopt(name = "put")]
-    /// Put a file onto the network
+    /// Put a file or folder's files onto the network
     Put {
-        /// The soure file location
+        /// The source file/folder local path
         location: String,
-        /// The recursively upload folders?
+        /// The recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
     },
@@ -116,7 +114,8 @@ pub fn files_commander(
         }) => {
             let path = Path::new(&location);
             info!("Getting data from {}", &path.display());
-            let metadata = unwrap!(fs::metadata(&path));
+            let metadata =
+                fs::metadata(&path).map_err(|_| "Couldn't read metadata from source path")?;
 
             debug!("Metadata for location: {:?}", metadata);
             let mut content_map: ContentMap = Default::default();
@@ -124,11 +123,8 @@ pub fn files_commander(
             // TODO: Enable source for funds / ownership
             // Warn about ownership?
             if recursive {
-                // return Err("Not doing recursive yet.....".to_string())
-                content_map = unwrap!(upload_dir_contents(&path, safe));
-            }
-
-            if !recursive {
+                content_map = upload_dir_contents(&path, safe)?;
+            } else {
                 if metadata.is_dir() {
                     return Err(format!(
                         "{:?} is a directory. Use \"-r\" to recursively upload folders.",
@@ -136,7 +132,7 @@ pub fn files_commander(
                     ));
                 }
 
-                let xorurl = unwrap!(upload_file(&path, safe));
+                let xorurl = upload_file(&path, safe)?;
 
                 content_map.insert(location, xorurl);
             }
