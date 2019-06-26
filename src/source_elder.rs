@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, utils, vault::Init, Result};
+use crate::{action::Action, utils, vault::Init, Result, ToDbKey};
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
@@ -452,12 +452,12 @@ impl SourceElder {
 
     fn balance(&self, client_id: &ClientPublicId) -> Option<Coins> {
         self.client_accounts
-            .get(&client_id.to_string())
+            .get(&client_id.to_db_key())
             .map(|account: ClientAccount| account.balance)
     }
 
     fn set_balance(&mut self, client_id: &ClientPublicId, balance: Coins) -> Option<()> {
-        let db_key = client_id.to_string();
+        let db_key = client_id.to_db_key();
         let mut account = self.client_accounts.get::<ClientAccount>(&db_key)?;
         account.balance = balance;
         if let Err(error) = self.client_accounts.set(&db_key, &account) {

@@ -11,6 +11,7 @@ repository = "https://github.com/maidsafe/safe_vault"
 version = "0.18.0"
 
 [dependencies]
+base64 = "~0.10.1"
 # Ensure bincode version is identical to that in SAFE Client Libs and SAFE Network Data.
 bincode = "=1.1.4"
 bytes = { version = "~0.4.12", features = ["serde"] }

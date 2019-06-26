@@ -63,8 +63,11 @@ mod config_handler;
 mod destination_elder;
 mod error;
 mod source_elder;
+mod to_db_key;
 mod utils;
 mod vault;
+
+pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
     chunk_store::error::Error as ChunkStoreError,

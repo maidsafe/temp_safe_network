@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{MessageId, Request, XorName};
+use safe_nd::{MessageId, Request, Response, XorName};
 
 #[derive(Debug)]
 pub(crate) enum Action {
@@ -15,6 +15,12 @@ pub(crate) enum Action {
         // TODO - confirm this.  ATM, this represents the owner's name if the src is an app.
         client_name: XorName,
         request: Request,
+        message_id: MessageId,
+    },
+    // Send a response as an adult or elder to own section's elders
+    RespondToOurDstElders {
+        sender: XorName,
+        response: Response,
         message_id: MessageId,
     },
 }
