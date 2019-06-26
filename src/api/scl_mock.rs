@@ -29,7 +29,7 @@ struct CoinBalance {
     value: String,
 }
 
-type AppendOnlyDataMock = BTreeMap<usize, Vec<u8>>;
+type AppendOnlyDataMock = Vec<(Vec<u8>, Vec<u8>)>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
 type SeqMutableDataMock = BTreeMap<String, MDataValue>;
@@ -41,6 +41,7 @@ struct MockData {
     coin_balances: BTreeMap<XorNameStr, CoinBalance>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
     unpublished_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
+    published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataMock>,
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
@@ -264,18 +265,21 @@ impl SafeApp {
         data: &[u8],
     ) -> XorName {
         let xorname = xorname_from_pk(pk);
-        let mut unpublished_append_only = match self
-            .mock_data
-            .unpublished_append_only
-            .get(&xorname_to_hex(&xorname))
-        {
-            Some(uao) => uao.clone(),
-            None => BTreeMap::new(),
-        };
-        unpublished_append_only.insert(unpublished_append_only.len(), data.to_vec());
-        self.mock_data
-            .unpublished_append_only
-            .insert(xorname_to_hex(&xorname), unpublished_append_only);
+
+        //TODO: Convert to updated AppendOnlyDataMock Vec setup
+
+        // let mut unpublished_append_only = match self
+        //     .mock_data
+        //     .unpublished_append_only
+        //     .get(&xorname_to_hex(&xorname))
+        // {
+        //     Some(uao) => uao.clone(),
+        //     None => BTreeMap::new(),
+        // };
+        // unpublished_append_only.insert(unpublished_append_only.len(), data.to_vec());
+        // self.mock_data
+        //     .unpublished_append_only
+        //     .insert(xorname_to_hex(&xorname), unpublished_append_only);
 
         xorname
     }
@@ -288,16 +292,36 @@ impl SafeApp {
         version: Option<usize>,
     ) -> Vec<u8> {
         let xorname = xorname_from_pk(pk);
-        let unpublished_append_only =
-            &self.mock_data.unpublished_append_only[&xorname_to_hex(&xorname)];
-        let data = match version {
-            Some(version) => unwrap!(unpublished_append_only.get(&version)),
-            None => {
-                unwrap!(unpublished_append_only.get(&self.mock_data.unpublished_append_only.len()))
-            }
-        };
 
-        data.to_vec()
+        //TODO: Convert to updated AppendOnlyDataMock Vec setup
+
+        // let unpublished_append_only =
+        //     &self.mock_data.unpublished_append_only[&xorname_to_hex(&xorname)];
+        // let data = match version {
+        //     Some(version) => unwrap!(unpublished_append_only.get(&version)),
+        //     None => {
+        //         unwrap!(unpublished_append_only.get(&self.mock_data.unpublished_append_only.len()))
+        //     }
+        // };
+
+        // data.to_vec()
+        b"placeholder".to_vec()
+    }
+
+    pub fn put_seq_appendable_data(
+        &mut self,
+        data: AppendOnlyDataMock, // Vec( Key, Value )
+        name: Option<XorName>,
+        _tag: u64,
+        _permissions: Option<String>,
+    ) -> Result<XorName, String> {
+        let xorname = name.unwrap_or_else(|| create_random_xorname());
+
+        self.mock_data
+            .published_seq_append_only
+            .insert(xorname_to_hex(&xorname), data);
+
+        Ok(xorname)
     }
 
     pub fn put_seq_mutable_data(

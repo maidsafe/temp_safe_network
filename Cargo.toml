@@ -40,6 +40,7 @@ tiny-keccak = "~1.4.0"
 futures = "~0.1.17"
 walkdir = "~2.0.1" #ffi utils needs this version
 chrono = "0.4.6"
+human-panic = "1.0.1"
 
 [features]
 default = ["uuid/v4"]
