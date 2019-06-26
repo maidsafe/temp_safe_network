@@ -7,6 +7,10 @@ publish = false
 license = "GPL-3.0"
 edition = "2018"
 
+[[bin]]
+name = "safe"
+path = "src/main.rs"
+
 [dependencies]
 log = "0.4.6"
 safe_app = "0.9.1"

@@ -14,6 +14,8 @@ use cli::run;
 use env_logger;
 use log::{debug, error};
 use std::process;
+#[macro_use]
+extern crate prettytable;
 
 fn main() {
     env_logger::init();

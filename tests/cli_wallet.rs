@@ -7,19 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod common;
-extern crate serde_json;
+
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{create_preload_and_get_keys, create_wallet_with_balance, get_bin_location};
+use common::{
+    create_preload_and_get_keys, create_wallet_with_balance, get_bin_location, CLI, SAFE_PROTOCOL,
+};
 use predicates::prelude::*;
-
 use std::process::Command;
 
-static CLI: &str = "safe_cli";
 static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-static SAFE_PROTOCOL: &str = "safe://";
 static NO_SOURCE: &str = "Missing the 'source' argument";
 
 #[test]
@@ -115,7 +114,7 @@ fn calling_safe_wallet_insert() {
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let wallet_insert_result = cmd!(
+    let _wallet_insert_result = cmd!(
         get_bin_location(),
         "wallet",
         "insert",

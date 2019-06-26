@@ -6,39 +6,32 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-extern crate serde_json;
+mod common;
 
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use predicates::prelude::*;
-
+use common::{get_bin_location, CLI};
+use safe_cli::ContentMap;
+use serde_json;
 use std::process::Command;
 
-use safe_cli::ContentMap;
-
-static CLI: &str = "safe_cli";
 static OUR_DATA: &str = "hello tests!\n\n"; //one \n from file. one from prntln!
-static SAFE_PROTOCOL: &str = "safe://";
 static TEST_FILE: &str = "./tests/testfolder/test.md";
-fn get_bin_location() -> &'static str {
-    let mut location = "./target/release/safe_cli";
-    if cfg!(debug_assertions) {
-        location = "./target/debug/safe_cli";
-    }
-    location
-}
 
 #[test]
 fn calling_safe_cat() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE,)
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE)
         .read()
         .unwrap();
 
-    let map: ContentMap = match serde_json::from_str(&content) {
+    let (_container_xorurl, map): (String, ContentMap) = match serde_json::from_str(&content) {
         Ok(s) => s,
-        Err(e) => panic!("Failed to parse output of `safe file put`"),
+        Err(err) => panic!(format!(
+            "Failed to parse output of `safe file put`: {}",
+            err
+        )),
     };
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();

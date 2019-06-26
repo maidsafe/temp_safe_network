@@ -7,15 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use log::{debug, error, info};
-use safe_cli::ContentMap;
-use safe_cli::{Safe, XorUrl};
-use structopt::StructOpt;
-
+use prettytable::{format::FormatBuilder, Table};
+use safe_cli::{ContentMap, Safe, XorUrl};
 use std::fs;
 use std::path::Path;
+use structopt::StructOpt;
 use unwrap::unwrap;
 
 use walkdir::{DirEntry, WalkDir};
+
+static FILE_ADDED_SIGN: &str = "+";
 
 // TODO: Decide at what point does this functinality go into our lib/apis?
 
@@ -113,7 +114,7 @@ pub fn files_commander(
             recursive,
         }) => {
             let path = Path::new(&location);
-            info!("Getting data from {}", &path.display());
+            info!("Reading files from {}", &path.display());
             let metadata =
                 fs::metadata(&path).map_err(|_| "Couldn't read metadata from source path")?;
 
@@ -137,10 +138,23 @@ pub fn files_commander(
                 content_map.insert(location, xorurl);
             }
 
+            // TODO: create FilesContainer with the content of content_map
+            let files_container_xorurl = "safe://<FilesContainer XOR-URL>".to_string();
+
             if pretty {
-                println!("File uploaded to: {:?}", &content_map);
+                println!("FilesContainer created at: \"{}\"", files_container_xorurl);
+                let mut table = Table::new();
+                let format = FormatBuilder::new()
+                    .column_separator(' ')
+                    .padding(0, 1)
+                    .build();
+                table.set_format(format);
+                for (key, value) in content_map.iter() {
+                    table.add_row(row![FILE_ADDED_SIGN, key, value]);
+                }
+                table.printstd();
             } else {
-                println!("{:?}", &content_map);
+                println!("[\"{}\", {:?}]", files_container_xorurl, &content_map);
             }
 
             Ok(())

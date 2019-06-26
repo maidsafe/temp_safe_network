@@ -19,8 +19,8 @@ use unwrap::unwrap;
 // To use for mapping path to xorurl
 pub type ContentMap = BTreeMap<String, XorUrl>;
 
-pub type FilesMapData = String; //json serialised
-pub type FilesMap = Vec<(DateTime<Utc>, FilesMapData)>;
+pub type FilesContainer = String; //json serialised
+pub type FilesMap = Vec<(DateTime<Utc>, FilesContainer)>;
 
 impl Safe {
     /// # Create a map of paths to xorurls
