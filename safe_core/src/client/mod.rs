@@ -51,14 +51,16 @@ use routing::{
     User, Value,
 };
 use rust_sodium::crypto::{box_, sign};
+#[cfg(any(feature = "testing", test))]
+use safe_nd::Error;
 use safe_nd::{
     AData, ADataAddress, ADataAppend, ADataIndex, ADataIndices, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
     Coins, IDataAddress, IDataKind, ImmutableData, MDataAddress,
     MDataPermissionSet as NewPermissionSet, MDataSeqEntryAction as SeqEntryAction,
     MDataUnseqEntryAction as UnseqEntryAction, MDataValue as Val, Message, MessageId,
-    MutableData as NewMutableData, PublicKey, Request, Response, SeqMutableData, Transaction,
-    UnpubImmutableData, UnseqMutableData, XorName,
+    MutableData as NewMutableData, PublicKey, Request, Response, SeqMutableData, Signature,
+    Transaction, UnpubImmutableData, UnseqMutableData, XorName,
 };
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -260,6 +262,7 @@ pub trait Client: Clone + 'static {
     fn transfer_coins(
         &self,
         source: XorName,
+        secret_key: Option<&threshold_crypto::SecretKey>,
         destination: XorName,
         amount: Coins,
         transaction_id: Option<u64>,
@@ -267,38 +270,53 @@ pub trait Client: Clone + 'static {
         trace!("Transfer {} coins to {:?}", amount, destination);
 
         let transaction_id = transaction_id.unwrap_or_else(rand::random);
-
-        send_mutation_new(
-            self,
-            Request::TransferCoins {
-                source,
-                destination,
-                amount,
-                transaction_id,
-            },
-        )
+        let req = Request::TransferCoins {
+            source,
+            destination,
+            amount,
+            transaction_id,
+        };
+        let message = match secret_key {
+            Some(key) => sign_request_with_key(req, key),
+            None => self.compose_message(req),
+        };
+        send_mutation(self, message.message_id(), move |routing, dst| {
+            routing.send(dst, &unwrap!(serialise(&message)))
+        })
         .map(move |_| transaction_id)
         .into_box()
     }
 
     /// Get the current coin balance.
-    fn get_balance(&self, destination: XorName) -> Box<CoreFuture<Coins>> {
+    fn get_balance(
+        &self,
+        destination: XorName,
+        secret_key: Option<&threshold_crypto::SecretKey>,
+    ) -> Box<CoreFuture<Coins>> {
         trace!("Get balance for {:?}", destination);
 
-        send_new(self, Request::GetBalance(destination))
-            .and_then(|event| {
-                let res = match event {
-                    CoreEvent::RpcResponse(res) => res,
-                    _ => Err(CoreError::ReceivedUnexpectedEvent),
-                };
-                let result_buffer = unwrap!(res);
-                let res: Response = unwrap!(deserialise(&result_buffer));
-                match res {
-                    Response::GetBalance(res) => res.map_err(CoreError::from),
-                    _ => Err(CoreError::ReceivedUnexpectedEvent),
-                }
-            })
-            .into_box()
+        let req = Request::GetBalance(destination);
+        let dst = some_or_err!(self.cm_addr());
+        let request = match secret_key {
+            Some(key) => sign_request_with_key(req, key),
+            None => self.compose_message(req),
+        };
+        send(self, request.message_id(), move |routing| {
+            routing.send(dst, &unwrap!(serialise(&request)))
+        })
+        .and_then(|event| {
+            let res = match event {
+                CoreEvent::RpcResponse(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            };
+            let result_buffer = unwrap!(res);
+            let res: Response = unwrap!(deserialise(&result_buffer));
+            match res {
+                Response::GetBalance(res) => res.map_err(CoreError::from),
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            }
+        })
+        .into_box()
     }
 
     /// Get published immutable data from the network.
@@ -1493,6 +1511,34 @@ pub trait Client: Clone + 'static {
             .routing
             .create_coin_balance(coin_balance_name, amount, owner);
     }
+
+    /// Add coins to a coinbalance for testing
+    #[cfg(any(
+        all(test, feature = "mock-network"),
+        all(feature = "testing", feature = "mock-network")
+    ))]
+    fn allocate_test_coins(&self, coin_balance_name: &XorName, amount: Coins) -> Result<(), Error> {
+        let inner = self.inner();
+        let result = inner
+            .borrow_mut()
+            .routing
+            .allocate_test_coins(coin_balance_name, amount);
+        result.clone()
+    }
+}
+
+fn sign_request_with_key(request: Request, key: &threshold_crypto::SecretKey) -> Message {
+    let message_id = MessageId::new();
+
+    let signature = Some(Signature::from(
+        key.sign(&unwrap!(bincode::serialize(&(&request, message_id)))),
+    ));
+
+    Message::Request {
+        request,
+        message_id,
+        signature,
+    }
 }
 
 // TODO: Consider deprecating this struct once trait fields are stable. See
@@ -2122,7 +2168,7 @@ mod tests {
             let c2 = client.clone();
 
             client
-                .get_balance(wallet1)
+                .get_balance(wallet1, None)
                 .then(move |res| {
                     match res {
                         Err(CoreError::NewRoutingClientError(Error::AccessDenied)) => (),
@@ -2141,20 +2187,80 @@ mod tests {
         });
     }
 
+    // 1. Create a client and an anonymous coin balance using a random key-pair
+    // 2. Create another wallet using the client's keys.
+    // 3. Transfer some safecoin to the client's wallet and verify the transaction.
+    #[test]
+    fn anonymous_wallet() {
+        let wallet1: XorName = new_rand::random();
+        let wallet2: XorName = new_rand::random();
+        random_client(move |client| {
+            let client1 = client.clone();
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
+            let bls_sk = threshold_crypto::SecretKey::random();
+            let bls_sk2 = bls_sk.clone();
+            client.create_coin_balance(
+                &wallet1,
+                unwrap!(Coins::from_str("50.0")),
+                bls_sk.public_key(),
+            );
+
+            client1.create_coin_balance(
+                &wallet2,
+                unwrap!(Coins::from_str("0.0")),
+                unwrap!(client.public_bls_key()),
+            );
+
+            client2
+                .transfer_coins(
+                    wallet1,
+                    Some(&bls_sk),
+                    wallet2,
+                    unwrap!(Coins::from_str("5.0")),
+                    None,
+                )
+                .and_then(move |_| {
+                    client3
+                        .get_balance(wallet1, Some(&bls_sk2))
+                        .and_then(|balance| {
+                            assert_eq!(balance, unwrap!(Coins::from_str("45.0")));
+                            Ok(())
+                        })
+                })
+                .and_then(move |_| {
+                    client4.get_balance(wallet2, None).and_then(|balance| {
+                        assert_eq!(balance, unwrap!(Coins::from_str("5.0")));
+                        Ok(())
+                    })
+                })
+        });
+    }
+
     // 1. Create 2 accounts with 2 wallets.
     // 2. Transfer 5 coins from wallet A to wallet B.
     // 3. Check that the balance of wallet B is credited for 5 coins and the balance of
     //    wallet A is debited for 5 coins.
     #[test]
     fn coin_balance_transfer() {
-        let wallet1 = random_client(move |client| {
-            let name: XorName = new_rand::random();
+        let wallet1: XorName = new_rand::random();
+
+        random_client(move |client| {
+            let client1 = client.clone();
+            let client2 = client.clone();
             client.create_coin_balance(
-                &name,
+                &wallet1,
                 unwrap!(Coins::from_str("0.0")),
                 unwrap!(client.public_bls_key()),
             );
-            Ok::<_, Error>(name)
+
+            unwrap!(client1.allocate_test_coins(&wallet1, unwrap!(Coins::from_str("100.0"))));
+
+            client2.get_balance(wallet1, None).and_then(|balance| {
+                assert_eq!(balance, unwrap!(Coins::from_str("100.0")));
+                Ok(())
+            })
         });
 
         random_client(move |client| {
@@ -2170,13 +2276,19 @@ mod tests {
             let c4 = client.clone();
 
             client
-                .get_balance(wallet2)
+                .get_balance(wallet2, None)
                 .and_then(move |orig_balance| {
-                    c2.transfer_coins(wallet2, wallet1, unwrap!(Coins::from_str("5.0")), None)
-                        .map(move |transaction_id| (transaction_id, orig_balance))
+                    c2.transfer_coins(
+                        wallet2,
+                        None,
+                        wallet1,
+                        unwrap!(Coins::from_str("5.0")),
+                        None,
+                    )
+                    .map(move |transaction_id| (transaction_id, orig_balance))
                 })
                 .and_then(move |(transaction_id, orig_balance)| {
-                    c3.get_balance(wallet2)
+                    c3.get_balance(wallet2, None)
                         .map(move |new_balance| (transaction_id, new_balance, orig_balance))
                 })
                 .and_then(move |(transaction_id, new_balance, orig_balance)| {
@@ -2327,6 +2439,7 @@ mod tests {
             let client3 = client.clone();
             let client4 = client.clone();
             let client5 = client.clone();
+            let client6 = client.clone();
             let name = XorName(rand::random());
             let tag = 15001;
             let mut permissions: BTreeMap<_, _> = Default::default();
@@ -2394,6 +2507,18 @@ mod tests {
                             Ok(())
                         })
                 })
+                .then(move |_| {
+                    client6
+                        .get_seq_mdata_value(name, tag, b"wrongKey".to_vec())
+                        .then(|res| {
+                            match res {
+                                Ok(_) => panic!("Unexpected: Entry should not exist"),
+                                Err(CoreError::NewRoutingClientError(Error::NoSuchEntry)) => (),
+                                Err(err) => panic!("Unexpected error: {:?}", err),
+                            }
+                            Ok::<_, Error>(())
+                        })
+                })
         });
 
         random_client(|client| {
@@ -2401,6 +2526,7 @@ mod tests {
             let client3 = client.clone();
             let client4 = client.clone();
             let client5 = client.clone();
+            let client6 = client.clone();
             let name = XorName(rand::random());
             let tag = 15001;
             let mut permissions: BTreeMap<_, _> = Default::default();
@@ -2462,6 +2588,18 @@ mod tests {
                         .and_then(|fetched_value| {
                             assert_eq!(fetched_value, b"newValue".to_vec());
                             Ok(())
+                        })
+                })
+                .then(move |_| {
+                    client6
+                        .get_unseq_mdata_value(name, tag, b"wrongKey".to_vec())
+                        .then(|res| {
+                            match res {
+                                Ok(_) => panic!("Unexpected: Entry should not exist"),
+                                Err(CoreError::NewRoutingClientError(Error::NoSuchEntry)) => (),
+                                Err(err) => panic!("Unexpected error: {:?}", err),
+                            }
+                            Ok::<_, Error>(())
                         })
                 })
         });
