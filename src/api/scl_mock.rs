@@ -40,7 +40,6 @@ static MOCK_FILE: &str = "./mock_data.txt";
 struct MockData {
     coin_balances: BTreeMap<XorNameStr, CoinBalance>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
-    unpublished_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
     published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataMock>,
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
@@ -234,7 +233,7 @@ impl SafeApp {
         tx_state.to_string()
     }
 
-    pub fn put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
+    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
         let xorname = create_random_xorname();
         // TODO: hash to get xorname.
         self.mock_data
@@ -244,73 +243,22 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
+    pub fn files_get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
         let data = match self
             .mock_data
             .published_immutable_data
             .get(&xorname_to_hex(&xorname))
         {
             Some(data) => data.clone(),
-            None => return Err("No immutable data found at this address".to_string()),
+            None => return Err("No ImmutableData found at this address".to_string()),
         };
 
         Ok(data)
     }
 
-    #[allow(dead_code)]
-    pub fn unpublished_append_only_put(
-        &mut self,
-        pk: &PublicKeyMock,
-        _sk: &SecretKeyMock,
-        data: &[u8],
-    ) -> XorName {
-        let xorname = xorname_from_pk(pk);
-
-        //TODO: Convert to updated AppendOnlyDataMock Vec setup
-
-        // let mut unpublished_append_only = match self
-        //     .mock_data
-        //     .unpublished_append_only
-        //     .get(&xorname_to_hex(&xorname))
-        // {
-        //     Some(uao) => uao.clone(),
-        //     None => BTreeMap::new(),
-        // };
-        // unpublished_append_only.insert(unpublished_append_only.len(), data.to_vec());
-        // self.mock_data
-        //     .unpublished_append_only
-        //     .insert(xorname_to_hex(&xorname), unpublished_append_only);
-
-        xorname
-    }
-
-    #[allow(dead_code)]
-    pub fn unpublished_append_only_get(
-        &self,
-        pk: &PublicKeyMock,
-        _sk: &SecretKeyMock,
-        version: Option<usize>,
-    ) -> Vec<u8> {
-        let xorname = xorname_from_pk(pk);
-
-        //TODO: Convert to updated AppendOnlyDataMock Vec setup
-
-        // let unpublished_append_only =
-        //     &self.mock_data.unpublished_append_only[&xorname_to_hex(&xorname)];
-        // let data = match version {
-        //     Some(version) => unwrap!(unpublished_append_only.get(&version)),
-        //     None => {
-        //         unwrap!(unpublished_append_only.get(&self.mock_data.unpublished_append_only.len()))
-        //     }
-        // };
-
-        // data.to_vec()
-        b"placeholder".to_vec()
-    }
-
     pub fn put_seq_appendable_data(
         &mut self,
-        data: AppendOnlyDataMock, // Vec( Key, Value )
+        data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
         _tag: u64,
         _permissions: Option<String>,
@@ -322,6 +270,47 @@ impl SafeApp {
             .insert(xorname_to_hex(&xorname), data);
 
         Ok(xorname)
+    }
+
+    #[allow(dead_code)]
+    pub fn append_seq_appendable_data(
+        &mut self,
+        data: (Vec<u8>, Vec<u8>), // TODO: support appending more than one entry at a time
+        name: XorName,
+        _tag: u64,
+    ) -> Result<u64, String> {
+        let xorname_hex = xorname_to_hex(&name);
+        let mut seq_append_only = match self.mock_data.published_seq_append_only.get(&xorname_hex) {
+            Some(seq_append_only) => seq_append_only.clone(),
+            None => return Err("SeqAppendOnlyDataNotFound".to_string()),
+        };
+
+        seq_append_only.push(data);
+        self.mock_data
+            .published_seq_append_only
+            .insert(xorname_hex, seq_append_only.to_vec());
+
+        Ok(self.mock_data.published_seq_append_only.len() as u64)
+    }
+
+    pub fn get_seq_appendable_latest(
+        &self,
+        name: XorName,
+        _tag: u64,
+    ) -> Result<(Vec<u8>, Vec<u8>), &str> {
+        let xorname_hex = xorname_to_hex(&name);
+        debug!("attempting to locate scl mock mdata: {:?}", xorname_hex);
+
+        match self.mock_data.published_seq_append_only.get(&xorname_hex) {
+            Some(seq_append_only) => {
+                let latest_index = seq_append_only.len() - 1;
+                let last_entry = seq_append_only
+                    .get(latest_index)
+                    .ok_or("SeqAppendOnlyDataEmpty")?;
+                Ok(last_entry.clone())
+            }
+            None => Err("SeqAppendOnlyDataNotFound"),
+        }
     }
 
     pub fn put_seq_mutable_data(
@@ -428,46 +417,6 @@ impl SafeApp {
     ) -> Result<(), String> {
         Ok(())
     }
-}
-
-#[test]
-fn test_unpublished_append_only_put() {
-    use self::SafeApp;
-    use threshold_crypto::SecretKey as SecretKeyMock;
-
-    let mut mock = SafeApp::new();
-
-    let sk = SecretKeyMock::random();
-    let pk = sk.public_key();
-    println!(
-        "New Unpublished AppendOnlyData at: {:?}",
-        mock.unpublished_append_only_put(&pk, &sk, &vec![])
-    );
-}
-
-#[test]
-fn test_unpublished_append_only_get() {
-    use self::SafeApp;
-    use threshold_crypto::SecretKey as SecretKeyMock;
-
-    let mut mock = SafeApp::new();
-
-    let sk = SecretKeyMock::random();
-    let pk = sk.public_key();
-    let data = vec![1, 2, 3];
-    println!(
-        "New Unpublished AppendOnlyData at: {:?}",
-        mock.unpublished_append_only_put(&pk, &sk, &data)
-    );
-
-    let curr_data = mock.unpublished_append_only_get(&pk, &sk, Some(0));
-
-    println!(
-        "Current data at Unpublished AppendOnlyData at: {:?}",
-        curr_data
-    );
-
-    assert_eq!(data, curr_data);
 }
 
 #[test]

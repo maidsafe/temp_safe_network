@@ -13,8 +13,8 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use common::{get_bin_location, CLI};
-use safe_cli::ContentMap;
 use serde_json;
+use std::collections::BTreeMap;
 use std::process::Command;
 
 static OUR_DATA: &str = "hello tests!\n\n"; //one \n from file. one from prntln!
@@ -26,13 +26,14 @@ fn calling_safe_cat() {
         .read()
         .unwrap();
 
-    let (_container_xorurl, map): (String, ContentMap) = match serde_json::from_str(&content) {
-        Ok(s) => s,
-        Err(err) => panic!(format!(
-            "Failed to parse output of `safe file put`: {}",
-            err
-        )),
-    };
+    let (_container_xorurl, map): (String, BTreeMap<String, String>) =
+        match serde_json::from_str(&content) {
+            Ok(s) => s,
+            Err(err) => panic!(format!(
+                "Failed to parse output of `safe file put`: {}",
+                err
+            )),
+        };
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["cat", &map[TEST_FILE]])

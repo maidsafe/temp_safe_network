@@ -8,7 +8,4 @@
 
 mod api;
 
-pub use api::files::ContentMap;
-
-// pub use ContentMap;
-pub use api::{BlsKeyPair, Safe, XorUrl};
+pub use api::{BlsKeyPair, Safe, SafeData, XorUrl};

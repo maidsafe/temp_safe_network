@@ -159,57 +159,50 @@ impl SafeApp {
             .safecoin_transfer(from_pk, from_sk, to_pk, tx_id, amount)
     }
 
-    //TODO: Replace with SCL calling code
+    // TODO: Replace with SCL calling code
     #[allow(dead_code)]
     pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKeyMock, sk: &SecretKeyMock) -> String {
         self.scl_mock.get_transaction(tx_id, pk, sk)
     }
 
+    // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
-        let xorname = create_random_xorname();
-        // // TODO: hash to get xorname.
-        // self.scl_mock
-        //     .published_immutable_data
-        //     .insert(xorname_to_hex(&xorname), data.to_vec());
-
-        Ok(xorname)
+    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
+        self.scl_mock.files_put_published_immutable(data)
     }
 
+    // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
-        // let data = match self
-        //     .mock_data
-        //     .published_immutable_data
-        //     .get(&xorname_to_hex(&xorname))
-        // {
-        //     Some(data) => data.clone(),
-        //     None => return Err("No immutable data found at this address".to_string()),
-        // };
-
-        Ok(vec![])
+    pub fn files_get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
+        self.scl_mock.files_get_published_immutable(xorname)
     }
 
-    //TODO: Replace with SCL calling code
-    #[allow(dead_code)]
-    pub fn unpublished_append_only_put(
+    // TODO: Replace with SCL calling code
+    pub fn put_seq_appendable_data(
         &mut self,
-        pk: &PublicKeyMock,
-        sk: &SecretKeyMock,
-        data: &[u8],
-    ) -> XorName {
-        self.scl_mock.unpublished_append_only_put(pk, sk, data)
+        data: Vec<(Vec<u8>, Vec<u8>)>,
+        name: Option<XorName>,
+        tag: u64,
+        permissions: Option<String>,
+    ) -> Result<XorName, String> {
+        // client.put_adata
+        self.scl_mock
+            .put_seq_appendable_data(data, name, tag, permissions)
     }
 
-    //TODO: Replace with SCL calling code
-    #[allow(dead_code)]
-    pub fn unpublished_append_only_get(
-        &self,
-        pk: &PublicKeyMock,
-        sk: &SecretKeyMock,
-        version: Option<usize>,
-    ) -> Vec<u8> {
-        self.scl_mock.unpublished_append_only_get(pk, sk, version)
+    // TODO: Replace with SCL calling code
+    pub fn append_seq_appendable_data(
+        &mut self,
+        data: Vec<(Vec<u8>, Vec<u8>)>,
+        name: XorName,
+        tag: u64,
+    ) -> Result<u64, String> {
+        self.scl_mock.append_seq_append_only(data, name, tag)
+    }
+
+    // TODO: Replace with SCL calling code
+    pub fn get_seq_appendable_latest(name: XorName, tag: u64) -> Result<(Vec<u8>, Vec<u8>), &str> {
+        self.scl_mock.get_seq_appendable_latest(name, tag)
     }
 
     pub fn put_seq_mutable_data(

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub mod auth;
+pub mod fetch;
 pub mod helpers;
 pub mod keys;
 #[cfg(not(feature = "scl-mock"))]
@@ -17,6 +18,7 @@ pub mod files;
 pub mod scl_mock;
 pub mod wallet;
 
+pub use fetch::SafeData;
 pub use xorurl::XorUrl;
 
 #[cfg(not(feature = "scl-mock"))]
