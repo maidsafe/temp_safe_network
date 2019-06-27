@@ -20,9 +20,8 @@ extern crate prettytable;
 #[macro_use]
 extern crate human_panic;
 
-
 fn main() {
-	setup_panic!();
+    setup_panic!();
     env_logger::init();
     debug!("Starting SAFE CLI...");
 

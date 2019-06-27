@@ -42,7 +42,7 @@ impl Safe {
     /// let top_xorurl = safe.put_published_immutable(top).unwrap();
     /// let second = b"Something second level";
     /// let second_xorurl = safe.put_published_immutable(second).unwrap();
-	/// let mut content_map = BTreeMap::new();
+    /// let mut content_map = BTreeMap::new();
     /// content_map.insert("./tests/testfolder/test.md".to_string(), top_xorurl);
     /// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
     /// let file_map = safe.create_files_map( content_map ).unwrap();
@@ -51,8 +51,6 @@ impl Safe {
     /// ```
     pub fn create_files_map(&mut self, content: ContentMap) -> Result<String, String> {
         let mut files_map = FilesMap::default();
-
-        // let mut file_map : FilesMap =
         let now = Utc::now().to_string().to_string();
 
         for (key, value) in content.iter() {
@@ -84,13 +82,6 @@ impl Safe {
             &files_map.insert(key.to_string(), file);
         }
 
-        //create this data!.
-        /*let xorname = self
-            .safe_app
-            .put_seq_appendable_data(data, None, FILES_MAP_TYPE_TAG, None);
-
-        xorname_to_xorurl(&xorname.unwrap(), &self.xorurl_base)*/
-
         // TODO: use RDF format and serialise it
         let serialised_rdf = serde_json::to_string(&files_map)
             .map_err(|err| format!("Couldn't serialise the FilesMap generated: {:?}", err))?;
@@ -98,42 +89,41 @@ impl Safe {
         Ok(serialised_rdf)
     }
 
+    /// # Create versioned data.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// # use safe_cli::Safe;
+    /// # use unwrap::unwrap;
+    /// # use std::collections::BTreeMap;
+    /// # let mut safe = Safe::new("base32".to_string());
+    /// let top = b"Something top level";
+    /// let top_xorurl = safe.put_published_immutable(top).unwrap();
+    /// let second = b"Something second level";
+    /// let second_xorurl = safe.put_published_immutable(second).unwrap();
+    /// let mut content_map = BTreeMap::new();
+    /// content_map.insert("./tests/testfolder/test.md".to_string(), top_xorurl);
+    /// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
+    /// let file_map = safe.create_files_map( content_map ).unwrap();
+    /// # assert!(file_map.contains("\"md\""));
+    /// # assert!(file_map.contains("\"./tests/testfolder/test.md\""));
+    /// let xor_url = safe.put_versioned_data(file_map.into_bytes().to_vec(), 21321 ).unwrap();
+    /// assert!(xor_url.contains("safe://"))
+    /// ```
+    pub fn put_versioned_data(&mut self, data: Vec<u8>, type_tag: u64) -> Result<XorUrl, String> {
+        // let mut file_map : FilesMap =
+        let now = Utc::now().to_string().to_string();
 
-	/// # Create versioned data.
-	///
-	/// ## Example
-	///
-	/// ```rust
-	/// # use safe_cli::Safe;
-	/// # use unwrap::unwrap;
-	/// # use std::collections::BTreeMap;
-	/// # let mut safe = Safe::new("base32".to_string());
-	/// let top = b"Something top level";
-	/// let top_xorurl = safe.put_published_immutable(top).unwrap();
-	/// let second = b"Something second level";
-	/// let second_xorurl = safe.put_published_immutable(second).unwrap();
-	/// let mut content_map = BTreeMap::new();
-	/// content_map.insert("./tests/testfolder/test.md".to_string(), top_xorurl);
-	/// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
-	/// let file_map = safe.create_files_map( content_map ).unwrap();
-	/// # assert_eq!(true, file_map.contains("\"md\""));
-	/// # assert_eq!(true, file_map.contains("\"./tests/testfolder/test.md\""));
-	/// ```
-	pub fn put_versioned_data(&mut self, data: Vec<u8>, type_tag: u64 ) -> Result<XorUrl, String> {
+        let appendable_data = vec![(now.into_bytes().to_vec(), data)];
 
+        //create this data!.
+        let xorname = self
+            .safe_app
+            .put_seq_appendable_data(appendable_data, None, type_tag, None);
 
-		// let mut file_map : FilesMap =
-		let now = Utc::now().to_string().to_string();
-
-		let appendable_data = vec!( (now.into_bytes().to_vec(), data ));
-
-		//create this data!.
-		let xorname = self
-			.safe_app
-			.put_seq_appendable_data(appendable_data, None, type_tag, None);
-
-		xorname_to_xorurl(&xorname.unwrap(), &self.xorurl_base)
-	}
+        xorname_to_xorurl(&xorname.unwrap(), &self.xorurl_base)
+    }
 
     // TODO:
     // Upload files as ImmutableData
