@@ -16,11 +16,11 @@ use common::{CLI, SAFE_PROTOCOL};
 use predicates::prelude::*;
 use std::process::Command;
 
-static PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at:";
-static TEST_FILE: &str = "./tests/testfolder/test.md";
-static TEST_FOLDER: &str = "./tests/testfolder/";
-static TEST_FOLDER_SUBFOLDER: &str = "./tests/testfolder/subfolder/";
-static TEST_EMPTY_FOLDER: &str = "./tests/testfolder/emptyfolder/";
+const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at:";
+const TEST_FILE: &str = "./tests/testfolder/test.md";
+const TEST_FOLDER: &str = "./tests/testfolder/";
+const TEST_FOLDER_SUBFOLDER: &str = "./tests/testfolder/subfolder/";
+const TEST_EMPTY_FOLDER: &str = "./tests/testfolder/emptyfolder/";
 
 #[test]
 fn calling_safe_files_put_pretty() {

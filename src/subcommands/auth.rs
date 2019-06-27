@@ -14,11 +14,11 @@ use std::io::{Read, Write};
 use std::path::Path;
 use structopt::StructOpt;
 
-static APP_ID: &str = "net.maidsafe.cli";
-static APP_NAME: &str = "SAFE CLI";
-static APP_VENDOR: &str = "MaidSafe.net Ltd";
-static AUTH_CREDENTIALS_FOLDER: &str = ".safe";
-static AUTH_CREDENTIALS_FILENAME: &str = "credentials";
+const APP_ID: &str = "net.maidsafe.cli";
+const APP_NAME: &str = "SAFE CLI";
+const APP_VENDOR: &str = "MaidSafe.net Ltd";
+const AUTH_CREDENTIALS_FOLDER: &str = ".safe";
+const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {

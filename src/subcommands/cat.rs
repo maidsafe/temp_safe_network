@@ -20,8 +20,6 @@ pub fn cat_command(
     safe: &mut Safe,
 ) -> Result<(), String> {
     // TODO: Get specific versions.
-    // Handle mutable types
-    // Pretty print tables for key-value data.
     let xorurl = get_target_location(location)?;
     let content = safe.fetch(&xorurl)?;
     match content {

@@ -173,7 +173,7 @@ impl SafeApp {
 
     // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn files_get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
+    pub fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>, String> {
         self.scl_mock.files_get_published_immutable(xorname)
     }
 

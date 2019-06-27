@@ -16,7 +16,7 @@ use structopt::StructOpt;
 use unwrap::unwrap;
 use walkdir::{DirEntry, WalkDir};
 
-static FILE_ADDED_SIGN: &str = "+";
+const FILE_ADDED_SIGN: &str = "+";
 
 #[derive(StructOpt, Debug)]
 pub enum FilesSubCommands {

@@ -24,7 +24,7 @@ pub type FileItem = BTreeMap<String, String>;
 pub type FilesMap = BTreeMap<String, FileItem>;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
-static FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
+const FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
 
 impl Safe {
     /// # Create a map of paths to xorurls
@@ -218,7 +218,7 @@ impl Safe {
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_get_published_immutable(&mut self, xorurl: &str) -> Result<Vec<u8>, String> {
+    pub fn files_get_published_immutable(&self, xorurl: &str) -> Result<Vec<u8>, String> {
         // TODO: do we want ownership from other PKs yet?
         let xorname = xorurl_to_xorname(&xorurl)?;
         self.safe_app.files_get_published_immutable(xorname)

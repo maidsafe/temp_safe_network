@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub static CLI: &str = "safe";
+pub const CLI: &str = "safe";
 #[allow(dead_code)]
-pub static SAFE_PROTOCOL: &str = "safe://";
+pub const SAFE_PROTOCOL: &str = "safe://";
 
 #[allow(dead_code)]
 pub fn get_bin_location() -> &'static str {

@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::xorurl::xorurl_to_xorname;
-use super::Safe;
+use super::xorurl::{xorurl_to_xorname, SafeContentType};
+use super::{Safe, XorUrlEncoder};
 
 pub enum SafeData {
     FilesContainer(FilesMap),
@@ -17,11 +17,18 @@ pub enum SafeData {
 
 impl Safe {
     pub fn fetch(&self, xorurl: &str) -> Result<SafeData, String> {
-        //let XorUrl = XorUrlEncoder::from_url(xorurl)?;
-        let files_map = self.files_container_get_latest(&xorurl)?;
-        //let data = safe.files_get_published_immutable(&xorurl)?;
-
-        Ok(SafeData::FilesContainer({ files_map }))
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        match xorurl_encoder.content_type() {
+            SafeContentType::FilesContainer => {
+                let files_map = self.files_container_get_latest(&xorurl)?;
+                Ok(SafeData::FilesContainer({ files_map }))
+            }
+            SafeContentType::ImmutableData => {
+                let data = self.files_get_published_immutable(&xorurl)?;
+                Ok(SafeData::ImmutableData(data))
+            }
+            other => Err("Content tpe not supported yet by fetch".to_string()),
+        }
     }
 }
 

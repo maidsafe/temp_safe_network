@@ -18,8 +18,8 @@ use common::{
 use predicates::prelude::*;
 use std::process::Command;
 
-static PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-static NO_SOURCE: &str = "Missing the 'source' argument";
+const PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
+const NO_SOURCE: &str = "Missing the 'source' argument";
 
 #[test]
 fn calling_safe_wallet_transfer() {

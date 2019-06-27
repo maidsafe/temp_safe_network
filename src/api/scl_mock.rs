@@ -34,7 +34,7 @@ type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
 type SeqMutableDataMock = BTreeMap<String, MDataValue>;
 
-static MOCK_FILE: &str = "./mock_data.txt";
+const MOCK_FILE: &str = "./mock_data.txt";
 
 #[derive(Default, Serialize, Deserialize)]
 struct MockData {
@@ -243,7 +243,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn files_get_published_immutable(&mut self, xorname: XorName) -> Result<Vec<u8>, String> {
+    pub fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>, String> {
         let data = match self
             .mock_data
             .published_immutable_data

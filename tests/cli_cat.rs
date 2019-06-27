@@ -13,12 +13,13 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use common::{get_bin_location, CLI};
+use predicates::prelude::*;
 use serde_json;
 use std::collections::BTreeMap;
 use std::process::Command;
 
-static OUR_DATA: &str = "hello tests!\n\n"; //one \n from file. one from prntln!
-static TEST_FILE: &str = "./tests/testfolder/test.md";
+const OUR_DATA: &str = "hello tests!\n"; //one \n from file. one from prntln!
+const TEST_FILE: &str = "./tests/testfolder/test.md";
 
 #[test]
 fn calling_safe_cat() {
@@ -38,6 +39,6 @@ fn calling_safe_cat() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["cat", &map[TEST_FILE]])
         .assert()
-        .stdout(OUR_DATA)
+        .stdout(predicate::str::contains(OUR_DATA))
         .success();
 }
