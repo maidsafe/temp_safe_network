@@ -14,8 +14,8 @@ use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
 use safe_nd::{
-    AppPermissions, Challenge, ClientPublicId, Coins, Message, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Signature, XorName,
+    AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId,
+    NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -142,14 +142,21 @@ impl SourceElder {
     }
 
     pub fn handle_client_message(&mut self, peer_addr: SocketAddr, bytes: Bytes) -> Option<Action> {
-        if let Some((client_id, _)) = self.clients.get(&peer_addr).cloned() {
+        if let Some((client_id, registered_client)) = self.clients.get(&peer_addr).cloned() {
             match bincode::deserialize(&bytes) {
                 Ok(Message::Request {
                     request,
                     message_id,
                     signature,
                 }) => {
-                    return self.handle_client_request(&client_id, request, message_id, signature);
+                    return self.handle_client_request(
+                        &peer_addr,
+                        &client_id,
+                        request,
+                        message_id,
+                        signature,
+                        registered_client,
+                    );
                 }
                 Ok(Message::Response { response, .. }) => {
                     info!("{}: {} invalidly sent {:?}", self, client_id, response);
@@ -186,6 +193,7 @@ impl SourceElder {
 
     fn handle_client_request(
         &mut self,
+        peer_addr: &SocketAddr,
         client_id: &PublicId,
         request: Request,
         message_id: MessageId,
@@ -225,7 +233,24 @@ impl SourceElder {
                     message_id,
                 })
             }
-            GetIData(ref address) => unimplemented!(),
+            GetIData(ref address) => {
+                let owner = utils::owner(client_id)?;
+                if address.published() || registered_client == ClientState::Registered {
+                    Some(Action::ForwardClientRequest {
+                        client_name: *client_id.name(),
+                        request,
+                        message_id,
+                    })
+                } else {
+                    let response = Response::GetIData(Err(NdError::AccessDenied));
+                    let msg = utils::serialise(&response);
+                    let peer = Peer::Client {
+                        peer_addr: *peer_addr,
+                    };
+                    self.quic_p2p.send(peer, Bytes::from(msg));
+                    None
+                }
+            }
             DeleteUnpubIData(ref address) => unimplemented!(),
             //
             // ===== Mutable Data =====
@@ -364,15 +389,13 @@ impl SourceElder {
                         PublicId::App(ref app_pub_id) => {
                             let owner = app_pub_id.owner();
                             let app_pub_key = app_pub_id.public_key();
-                            let permissions = self
-                                .client_accounts
+                            self.client_accounts
                                 .get(&owner.to_db_key())
                                 .and_then(|account: ClientAccount| {
-                                    account.apps.get(app_pub_key).map(|perm| *perm)
+                                    account.apps.get(app_pub_key).cloned()
                                 })
-                                .is_some();
+                                .is_some()
                             // TODO: actually check permissions
-                            permissions
                         }
                         PublicId::Node(_) => {
                             error!("{}: Logic error.  This should be unreachable.", self);
