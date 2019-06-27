@@ -167,6 +167,18 @@ impl Vault {
                 }
                 None
             }
+            RespondToOurDstElders {
+                sender,
+                response,
+                message_id,
+            } => {
+                // TODO - once Routing is integrated, we'll construct the full message to send
+                //        onwards, and then if we're also part of the dst elders, we'll call that
+                //        same handler which Routing will call after receiving a message.
+
+                self.destination_elder_mut()?
+                    .handle_response(sender, response, message_id)
+            }
         }
     }
 

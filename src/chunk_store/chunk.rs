@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::ToDbKey;
 use safe_nd::XorName;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -14,6 +15,7 @@ pub(crate) trait Chunk: Serialize + DeserializeOwned {
     fn id(&self) -> &Self::Id;
 }
 
-pub(crate) trait ChunkId: Serialize + PartialEq + Eq {
+pub(crate) trait ChunkId: ToDbKey + PartialEq + Eq {
+    /// The XorName represented by this identifier.
     fn raw_name(&self) -> &XorName;
 }

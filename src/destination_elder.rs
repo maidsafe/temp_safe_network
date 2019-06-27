@@ -11,11 +11,11 @@ use crate::{
     chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
     utils,
     vault::Init,
-    Result,
+    Result, ToDbKey,
 };
 use log::{error, trace, warn};
 use pickledb::PickleDb;
-use safe_nd::{IDataKind, MessageId, NodePublicId, Request, Response, XorName};
+use safe_nd::{IDataKind, MessageId, NodePublicId, Request, Response, Result as NdResult, XorName};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -113,7 +113,7 @@ impl DestinationElder {
             //
             // ===== Immutable Data =====
             //
-            PutIData(kind) => self.handle_put_idata(src, kind, message_id),
+            PutIData(kind) => self.handle_put_idata_req(src, kind, message_id),
             GetIData(address) => unimplemented!(),
             DeleteUnpubIData(address) => unimplemented!(),
             //
@@ -212,7 +212,7 @@ impl DestinationElder {
         }
     }
 
-    pub fn _handle_response(
+    pub fn handle_response(
         &mut self,
         src: XorName,
         response: Response,
@@ -232,7 +232,7 @@ impl DestinationElder {
             //
             // ===== Immutable Data =====
             //
-            PutIData(result) => unimplemented!(),
+            PutIData(result) => self.handle_put_idata_resp(src, result, message_id),
             GetIData(result) => unimplemented!(),
             DeleteUnpubIData(result) => unimplemented!(),
             //
@@ -297,7 +297,7 @@ impl DestinationElder {
         }
     }
 
-    fn handle_put_idata(
+    fn handle_put_idata_req(
         &mut self,
         src: XorName,
         kind: IDataKind,
@@ -310,7 +310,7 @@ impl DestinationElder {
         } else {
             // We're acting as dst elder, received request from src elders
             // TODO - should we add the chunk to our store until we get 3 success responses, and
-            // then remove if we're not a designated holder?
+            //        then remove if we're not a designated holder?
             let mut metadata = ChunkMetadata::default();
             for adult in self
                 .non_full_adults_sorted(kind.name())
@@ -320,6 +320,8 @@ impl DestinationElder {
                 // For Routing msg, src = data.name() and dst = adult.
                 metadata.holders.push(*adult);
             }
+            // TODO - should we just store it right now, or wait until we get the message from our
+            //        section elders?  For now, do both.
             let mut self_should_store = false;
             for elder in self
                 .elders_sorted(kind.name())
@@ -333,8 +335,8 @@ impl DestinationElder {
                     // For Routing msg, src = data.name() and dst = elder.
                 }
             }
-            // TODO - handle data name to string properly
-            if let Err(error) = self.immutable_metadata.set("", &metadata) {
+            let db_key = utils::work_arounds::idata_address(&kind).to_db_key();
+            if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
                 warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                 // TODO - send failure back to src elders (hopefully won't accumulate), or
                 //        maybe self-terminate if we can't fix this error?
@@ -347,10 +349,41 @@ impl DestinationElder {
         }
     }
 
-    fn store_idata(&mut self, kind: IDataKind, _message_id: MessageId) -> Option<Action> {
-        let _result = self.immutable_chunks.put(&kind);
-        // send result to dst elders
-        None
+    fn handle_put_idata_resp(
+        &mut self,
+        _sender: XorName,
+        _result: NdResult<()>,
+        _message_id: MessageId,
+    ) -> Option<Action> {
+        // TODO -
+        // - if Ok, and this is the final of the three responses send success back to src elders and
+        //   then on to the client.  Note: there's no functionality in place yet to know whether
+        //   this is the last response or not.
+        // - if Ok, and this is not the last response, just return `None` here.
+        // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
+        //   next closest non-full adult, or elder if none.  Also update the metadata for this
+        //   chunk.  Not known yet where we'll get the chunk from to do that.
+        //
+        // For phase 1, we can leave many of these unanswered.
+        unimplemented!()
+    }
+
+    fn store_idata(&mut self, kind: IDataKind, message_id: MessageId) -> Option<Action> {
+        let result = if self
+            .immutable_chunks
+            .has(utils::work_arounds::idata_address(&kind))
+        {
+            Ok(())
+        } else {
+            self.immutable_chunks
+                .put(&kind)
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToOurDstElders {
+            sender: *self.id.name(),
+            response: Response::PutIData(result),
+            message_id,
+        })
     }
 
     // Returns an iterator over all of our section's non-full adults' names, sorted by closest to
