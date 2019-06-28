@@ -15,7 +15,10 @@ use crate::{
 };
 use log::{error, trace, warn};
 use pickledb::PickleDb;
-use safe_nd::{IDataKind, MessageId, NodePublicId, Request, Response, Result as NdResult, XorName};
+use safe_nd::{
+    IDataAddress, IDataKind, MessageId, NodePublicId, Request, Response, Result as NdResult,
+    XorName,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -114,7 +117,7 @@ impl DestinationElder {
             // ===== Immutable Data =====
             //
             PutIData(kind) => self.handle_put_idata_req(src, kind, message_id),
-            GetIData(address) => unimplemented!(),
+            GetIData(address) => self.handle_get_idata_req(src, address, message_id),
             DeleteUnpubIData(address) => unimplemented!(),
             //
             // ===== Mutable Data =====
@@ -233,7 +236,7 @@ impl DestinationElder {
             // ===== Immutable Data =====
             //
             PutIData(result) => self.handle_put_idata_resp(src, result, message_id),
-            GetIData(result) => unimplemented!(),
+            GetIData(result) => self.handle_get_idata_resp(src, result, message_id),
             DeleteUnpubIData(result) => unimplemented!(),
             //
             // ===== Mutable Data =====
@@ -395,6 +398,81 @@ impl DestinationElder {
     // Returns an iterator over all of our section's elders' names, sorted by closest to `target`.
     fn elders_sorted(&self, _target: &XorName) -> impl Iterator<Item = &XorName> {
         iter::once(self.id.name())
+    }
+
+    fn handle_get_idata_req(
+        &mut self,
+        src: XorName,
+        address: IDataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if &src == address.name() {
+            // The message was sent by the dst elders to us as the one who is supposed to store the
+            // chunk. See the sent Get request below.
+            self.get_idata(address, message_id)
+        } else {
+            // We're acting as dst elder, received request from src elders
+            let metadata = if let Some(metadata) = self
+                .immutable_metadata
+                .get::<ChunkMetadata>(&address.to_db_key())
+            {
+                metadata
+            } else {
+                warn!("{}: Failed to get metadata from DB: {:?}", self, address);
+                return None;
+            };
+
+            // TODO - Should we try the 3 holders in serial checking for responses between each
+            //        send or simply broadcast and get the first response?
+            // We just get the first for now. In phase 1 this is ourself anyway.
+            let metadata_holder = if let Some(metadata_holder) = metadata.holders.first() {
+                metadata_holder
+            } else {
+                warn!(
+                    "{}: Failed to get location from metadata holders: {:?}",
+                    self, metadata.holders
+                );
+                return None;
+            };
+
+            if metadata_holder == self.id.name() {
+                self.get_idata(address, message_id)
+            } else {
+                // TODO - Send Get request to adult (or elder occasionally) with src = data.
+                None
+            }
+        }
+    }
+
+    fn handle_get_idata_resp(
+        &mut self,
+        sender: XorName,
+        result: NdResult<IDataKind>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardResponseToClient {
+            sender,
+            response: Response::GetIData(result),
+            message_id,
+        })
+    }
+
+    fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {
+        let result = self
+            .immutable_chunks
+            .get(&address)
+            .map_err(|error| error.to_string().into())
+            .map(|kind| {
+                if !kind.published() {
+                    // TODO - Verify ownership
+                }
+                kind
+            });
+        Some(Action::RespondToOurDstElders {
+            sender: *self.id.name(),
+            response: Response::GetIData(result),
+            message_id,
+        })
     }
 }
 

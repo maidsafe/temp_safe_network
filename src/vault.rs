@@ -179,6 +179,17 @@ impl Vault {
                 self.destination_elder_mut()?
                     .handle_response(sender, response, message_id)
             }
+            ForwardResponseToClient {
+                sender,
+                response,
+                message_id,
+            } => {
+                let dst_elders = sender;
+                // TODO - simplification during phase 1
+                let src_elders = *self.id.public_id().name();
+                self.source_elder_mut()?
+                    .handle_node_response(dst_elders, src_elders, response, message_id)
+            }
         }
     }
 

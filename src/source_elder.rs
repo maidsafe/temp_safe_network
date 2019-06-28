@@ -14,8 +14,8 @@ use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
 use safe_nd::{
-    AppPermissions, Challenge, ClientPublicId, Coins, Message, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Signature, XorName,
+    AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId,
+    NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -37,10 +37,26 @@ struct ClientAccount {
     balance: Coins,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ClientState {
+    Registered,
+    Unregistered,
+}
+
+impl ClientState {
+    fn from_bool(is_registered: bool) -> Self {
+        if is_registered {
+            ClientState::Registered
+        } else {
+            ClientState::Unregistered
+        }
+    }
+}
+
 pub(crate) struct SourceElder {
     id: NodePublicId,
     client_accounts: PickleDb,
-    clients: HashMap<SocketAddr, PublicId>,
+    clients: HashMap<SocketAddr, (PublicId, ClientState)>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
     quic_p2p: QuicP2p,
@@ -111,7 +127,7 @@ impl SourceElder {
     }
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
-        if let Some(client_id) = self.clients.remove(&peer_addr) {
+        if let Some((client_id, _)) = self.clients.remove(&peer_addr) {
             info!(
                 "{}: Disconnected from {:?} on {}",
                 self, client_id, peer_addr
@@ -126,14 +142,21 @@ impl SourceElder {
     }
 
     pub fn handle_client_message(&mut self, peer_addr: SocketAddr, bytes: Bytes) -> Option<Action> {
-        if let Some(client_id) = self.clients.get(&peer_addr).cloned() {
+        if let Some((client_id, registered_client)) = self.clients.get(&peer_addr).cloned() {
             match bincode::deserialize(&bytes) {
                 Ok(Message::Request {
                     request,
                     message_id,
                     signature,
                 }) => {
-                    return self.handle_client_request(&client_id, request, message_id, signature);
+                    return self.handle_client_request(
+                        &peer_addr,
+                        &client_id,
+                        request,
+                        message_id,
+                        signature,
+                        registered_client,
+                    );
                 }
                 Ok(Message::Response { response, .. }) => {
                     info!("{}: {} invalidly sent {:?}", self, client_id, response);
@@ -170,10 +193,12 @@ impl SourceElder {
 
     fn handle_client_request(
         &mut self,
+        peer_addr: &SocketAddr,
         client_id: &PublicId,
         request: Request,
         message_id: MessageId,
         signature: Option<Signature>,
+        registered_client: ClientState,
     ) -> Option<Action> {
         use Request::*;
         trace!(
@@ -208,7 +233,24 @@ impl SourceElder {
                     message_id,
                 })
             }
-            GetIData(ref address) => unimplemented!(),
+            GetIData(ref address) => {
+                let owner = utils::owner(client_id)?;
+                if address.published() || registered_client == ClientState::Registered {
+                    Some(Action::ForwardClientRequest {
+                        client_name: *client_id.name(),
+                        request,
+                        message_id,
+                    })
+                } else {
+                    let response = Response::GetIData(Err(NdError::AccessDenied));
+                    let msg = utils::serialise(&response);
+                    let peer = Peer::Client {
+                        peer_addr: *peer_addr,
+                    };
+                    self.quic_p2p.send(peer, Bytes::from(msg));
+                    None
+                }
+            }
             DeleteUnpubIData(ref address) => unimplemented!(),
             //
             // ===== Mutable Data =====
@@ -340,8 +382,32 @@ impl SourceElder {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    info!("{}: Accepted {} on {}", self, public_id, peer_addr);
-                    let _ = self.clients.insert(peer_addr, public_id);
+                    let registered = ClientState::from_bool(match public_id {
+                        PublicId::Client(ref pub_id) => {
+                            self.client_accounts.exists(&pub_id.to_db_key())
+                        }
+                        PublicId::App(ref app_pub_id) => {
+                            let owner = app_pub_id.owner();
+                            let app_pub_key = app_pub_id.public_key();
+                            self.client_accounts
+                                .get(&owner.to_db_key())
+                                .and_then(|account: ClientAccount| {
+                                    account.apps.get(app_pub_key).cloned()
+                                })
+                                .is_some()
+                            // TODO: actually check permissions
+                        }
+                        PublicId::Node(_) => {
+                            error!("{}: Logic error.  This should be unreachable.", self);
+                            false
+                        }
+                    });
+
+                    info!(
+                        "{}: Accepted {} on {} as {:?}",
+                        self, public_id, peer_addr, registered
+                    );
+                    let _ = self.clients.insert(peer_addr, (public_id, registered));
                 }
                 Err(err) => {
                     info!(
@@ -360,7 +426,7 @@ impl SourceElder {
         }
     }
 
-    pub fn _handle_node_response(
+    pub fn handle_node_response(
         &mut self,
         dst_elders: XorName,
         src_elders: XorName,
@@ -383,7 +449,11 @@ impl SourceElder {
             // ===== Immutable Data =====
             //
             PutIData(result) => unimplemented!(),
-            GetIData(result) => unimplemented!(),
+            GetIData(ref result) => {
+                let _msg = utils::serialise(&response);
+                // TODO - Send this msg back to the client
+                None
+            }
             DeleteUnpubIData(result) => unimplemented!(),
             //
             // ===== Mutable Data =====
