@@ -159,7 +159,6 @@ impl SourceElder {
                     signature,
                 }) => {
                     return self.handle_client_request(
-                        &peer_addr,
                         &client_id,
                         request,
                         message_id,
@@ -202,7 +201,6 @@ impl SourceElder {
 
     fn handle_client_request(
         &mut self,
-        peer_addr: &SocketAddr,
         client_id: &PublicId,
         request: Request,
         message_id: MessageId,
@@ -251,13 +249,11 @@ impl SourceElder {
                         message_id,
                     })
                 } else {
-                    let response = Response::GetIData(Err(NdError::AccessDenied));
-                    let msg = utils::serialise(&response);
-                    let peer = Peer::Client {
-                        peer_addr: *peer_addr,
-                    };
-                    self.quic_p2p.send(peer, Bytes::from(msg));
-                    None
+                    Some(Action::RespondToClient {
+                        sender: *self.id.name(),
+                        response: Response::GetIData(Err(NdError::AccessDenied)),
+                        message_id,
+                    })
                 }
             }
             DeleteUnpubIData(ref address) => unimplemented!(),

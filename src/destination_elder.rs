@@ -450,7 +450,7 @@ impl DestinationElder {
         result: NdResult<IDataKind>,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ForwardResponseToClient {
+        Some(Action::RespondToClient {
             sender,
             response: Response::GetIData(result),
             message_id,

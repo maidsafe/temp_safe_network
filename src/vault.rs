@@ -204,7 +204,7 @@ impl Vault {
                 self.destination_elder_mut()?
                     .handle_response(sender, response, message_id)
             }
-            ForwardResponseToClient {
+            RespondToClient {
                 sender,
                 response,
                 message_id,
