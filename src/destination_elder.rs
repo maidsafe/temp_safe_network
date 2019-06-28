@@ -446,12 +446,15 @@ impl DestinationElder {
 
     fn handle_get_idata_resp(
         &mut self,
-        _sender: XorName,
-        _result: NdResult<IDataKind>,
-        _message_id: MessageId,
+        sender: XorName,
+        result: NdResult<IDataKind>,
+        message_id: MessageId,
     ) -> Option<Action> {
-        // TODO - For phase 1 this is unused.
-        unimplemented!()
+        Some(Action::ForwardResponseToClient {
+            sender,
+            response: Response::GetIData(result),
+            message_id,
+        })
     }
 
     fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {

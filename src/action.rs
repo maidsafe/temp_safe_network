@@ -23,4 +23,9 @@ pub(crate) enum Action {
         response: Response,
         message_id: MessageId,
     },
+    ForwardResponseToClient {
+        sender: XorName,
+        response: Response,
+        message_id: MessageId,
+    },
 }

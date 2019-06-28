@@ -426,7 +426,7 @@ impl SourceElder {
         }
     }
 
-    pub fn _handle_node_response(
+    pub fn handle_node_response(
         &mut self,
         dst_elders: XorName,
         src_elders: XorName,
@@ -449,7 +449,11 @@ impl SourceElder {
             // ===== Immutable Data =====
             //
             PutIData(result) => unimplemented!(),
-            GetIData(result) => unimplemented!(),
+            GetIData(ref result) => {
+                let _msg = utils::serialise(&response);
+                // TODO - Send this msg back to the client
+                None
+            }
             DeleteUnpubIData(result) => unimplemented!(),
             //
             // ===== Mutable Data =====
