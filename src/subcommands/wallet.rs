@@ -13,7 +13,7 @@ use unwrap::unwrap;
 
 use crate::subcommands::helpers::{get_target_location, prompt_user};
 use crate::subcommands::keys::create_new_key;
-use log::{debug, error};
+use log::debug;
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -175,12 +175,12 @@ pub fn wallet_commander(
             Ok(())
         }
         Some(WalletSubCommands::Insert {
-            source,
             target,
             key,
             name,
             default,
             secret,
+            ..
         }) => {
             let target = get_target_location(target)?;
 

@@ -8,15 +8,15 @@
 
 pub mod auth;
 pub mod fetch;
+pub mod files;
 pub mod helpers;
 pub mod keys;
 #[cfg(not(feature = "scl-mock"))]
 pub mod safe_client_libs;
-pub mod xorurl;
-// #[cfg(feature = "scl-mock")]
-pub mod files;
+#[cfg(feature = "scl-mock")]
 pub mod scl_mock;
 pub mod wallet;
+pub mod xorurl;
 
 pub use fetch::SafeData;
 pub use safe_nd::{XorName, XOR_NAME_LEN};

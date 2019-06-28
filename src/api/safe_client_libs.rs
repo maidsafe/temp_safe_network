@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{decode_ipc_msg, xorname_from_pk};
-use super::scl_mock::{PublicKeyMock, SafeApp as SafeAppMock, SecretKeyMock};
-use super::xorurl::{create_random_xorname, xorurl_to_xorname};
+use super::helpers::{decode_ipc_msg, xorname_from_pk, KeyPair};
+use super::xorurl::{create_random_xorname, XorUrlEncoder};
 use futures::future::Future;
 use log::{debug, warn};
 use rand::rngs::OsRng;
@@ -19,9 +18,10 @@ use safe_app::{run, App};
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
-    MDataAction, MDataPermissionSet, MDataSeqEntryAction, MDataValue, PublicKey, SeqMutableData,
-    XorName,
+    MDataAction, MDataPermissionSet, MDataSeqEntryAction, MDataValue, PublicKey as SafeNdPublicKey,
+    SeqMutableData, XorName,
 };
+pub use threshold_crypto::{PublicKey, SecretKey};
 
 use std::collections::BTreeMap;
 use unwrap::unwrap;
@@ -34,14 +34,14 @@ type SeqEntryActions = BTreeMap<Vec<u8>, MDataSeqEntryAction>;
 
 pub struct SafeApp {
     safe_conn: Option<App>,
-    scl_mock: SafeAppMock, // TODO: this is temporary until we don't rely on our scl-mock anymore
+    // scl_mock: SafeAppMock, // TODO: this is temporary until we don't rely on our scl-mock anymore
 }
 
 impl SafeApp {
     pub fn new() -> Self {
         Self {
             safe_conn: Some(create_app()), // TODO: initialise with None once we don't rely on our scl-mock anymore
-            scl_mock: SafeAppMock::new(),
+                                           // scl_mock: SafeAppMock::new(),
         }
     }
 
@@ -79,25 +79,23 @@ impl SafeApp {
     // TODO: replace with actual code for calling SCL
     pub fn create_balance(
         &mut self,
-        from_pk: &PublicKeyMock,
-        from_sk: &SecretKeyMock,
-        new_balance_owner: &PublicKeyMock,
-        amount: &str,
+        _from_pk: &PublicKey,
+        _from_sk: &SecretKey,
+        _new_balance_owner: &PublicKey,
+        _amount: &str,
     ) -> Result<XorName, &str> {
-        self.scl_mock
-            .create_balance(from_pk, from_sk, new_balance_owner, amount)
+        //self.scl_mock
+        //    .create_balance(from_pk, from_sk, new_balance_owner, amount)
+        Ok(create_random_xorname())
     }
 
     // TODO: replace with code
-    pub fn allocate_test_coins(&mut self, to_pk: &PublicKeyMock, amount: &str) -> XorName {
-        self.scl_mock.allocate_test_coins(to_pk, amount)
+    pub fn allocate_test_coins(&mut self, _to_pk: &PublicKey, _amount: &str) -> XorName {
+        // self.scl_mock.allocate_test_coins(to_pk, amount)
+        create_random_xorname()
     }
 
-    pub fn get_balance_from_pk(
-        &self,
-        pk: &PublicKeyMock,
-        sk: &SecretKeyMock,
-    ) -> Result<String, &str> {
+    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> Result<String, &str> {
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname, sk)
     }
@@ -106,8 +104,8 @@ impl SafeApp {
     // some exisits but: https://github.com/maidsafe/safe_client_libs/blob/experimental/safe_core/src/client/mod.rs#L299 is missing SK for arbitrary / anon coin balance
     pub fn get_balance_from_xorname(
         &self,
-        xorname: &XorName,
-        sk: &SecretKeyMock,
+        _xorname: &XorName,
+        _sk: &SecretKey,
     ) -> Result<String, &str> {
         //let safe_app: &App = self.safe_app.ok_or_else(|| APP_NOT_CONNECTED)?;
         //let safe_app: &App = match &self.safe_app {
@@ -138,75 +136,84 @@ impl SafeApp {
 
         // Ok(balance.to_string())
 
-        self.scl_mock.get_balance_from_xorname(xorname, sk)
+        // self.scl_mock.get_balance_from_xorname(xorname, sk)
+        Ok("0".to_string())
     }
 
     // TODO: replace with actual code for calling SCL
-    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKeyMock, &str> {
-        self.scl_mock.fetch_pk_from_xorname(xorname)
+    pub fn fetch_pk_from_xorname(&self, _xorname: &XorName) -> Result<PublicKey, &str> {
+        // self.scl_mock.fetch_pk_from_xorname(xorname)
+        Ok(KeyPair::random().pk)
     }
 
     // TODO: replace with actual code for calling SCL
     pub fn safecoin_transfer(
         &mut self,
-        from_pk: &PublicKeyMock,
-        from_sk: &SecretKeyMock,
-        to_pk: &PublicKeyMock,
-        tx_id: &Uuid,
-        amount: &str,
+        _from_pk: &PublicKey,
+        _from_sk: &SecretKey,
+        _to_pk: &PublicKey,
+        _tx_id: &Uuid,
+        _amount: &str,
     ) -> Result<Uuid, &str> {
-        self.scl_mock
-            .safecoin_transfer(from_pk, from_sk, to_pk, tx_id, amount)
+        // self.scl_mock
+        //    .safecoin_transfer(from_pk, from_sk, to_pk, tx_id, amount)
+        Ok(Uuid::new_v4())
     }
 
     // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn get_transaction(&self, tx_id: &Uuid, pk: &PublicKeyMock, sk: &SecretKeyMock) -> String {
-        self.scl_mock.get_transaction(tx_id, pk, sk)
+    pub fn get_transaction(&self, _tx_id: &Uuid, _pk: &PublicKey, _sk: &SecretKey) -> String {
+        // self.scl_mock.get_transaction(tx_id, pk, sk)
+        "Success(0)".to_string()
     }
 
     // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
-        self.scl_mock.files_put_published_immutable(data)
+    pub fn files_put_published_immutable(&mut self, _data: &[u8]) -> Result<XorName, String> {
+        // self.scl_mock.files_put_published_immutable(data)
+        Ok(create_random_xorname())
     }
 
     // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>, String> {
-        self.scl_mock.files_get_published_immutable(xorname)
+    pub fn files_get_published_immutable(&self, _xorname: XorName) -> Result<Vec<u8>, String> {
+        // self.scl_mock.files_get_published_immutable(xorname)
+        Ok(vec![])
     }
 
     // TODO: Replace with SCL calling code
     pub fn put_seq_appendable_data(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
-        name: Option<XorName>,
-        tag: u64,
-        permissions: Option<String>,
+        _data: Vec<(Vec<u8>, Vec<u8>)>,
+        _name: Option<XorName>,
+        _tag: u64,
+        _permissions: Option<String>,
     ) -> Result<XorName, String> {
         // client.put_adata
-        self.scl_mock
-            .put_seq_appendable_data(data, name, tag, permissions)
+        // self.scl_mock
+        //    .put_seq_appendable_data(data, name, tag, permissions)
+        Ok(create_random_xorname())
     }
 
     // TODO: Replace with SCL calling code
     pub fn append_seq_appendable_data(
         &mut self,
-        data: (Vec<u8>, Vec<u8>),
-        name: XorName,
-        tag: u64,
+        _data: (Vec<u8>, Vec<u8>),
+        _name: XorName,
+        _tag: u64,
     ) -> Result<u64, String> {
-        self.scl_mock.append_seq_appendable_data(data, name, tag)
+        // self.scl_mock.append_seq_appendable_data(data, name, tag)
+        Ok(1)
     }
 
     // TODO: Replace with SCL calling code
     pub fn get_seq_appendable_latest(
         &self,
-        name: XorName,
-        tag: u64,
+        _name: XorName,
+        _tag: u64,
     ) -> Result<(Vec<u8>, Vec<u8>), &str> {
-        self.scl_mock.get_seq_appendable_latest(name, tag)
+        // self.scl_mock.get_seq_appendable_latest(name, tag)
+        Ok((vec![], vec![]))
     }
 
     pub fn put_seq_mutable_data(
@@ -223,7 +230,7 @@ impl SafeApp {
 
         let xorname = unwrap!(run(safe_app, move |client, _app_context| {
             let owners = match client.owner_key() {
-                Some(PublicKey::Bls(pk)) => pk,
+                Some(SafeNdPublicKey::Bls(pk)) => pk,
                 _ => panic!("Couldn't get account's owner pk"), // FIXME: return error instead of panic
             };
 
@@ -243,15 +250,15 @@ impl SafeApp {
 
             let mut permission_map = BTreeMap::new();
             let sign_pk = unwrap!(client.public_bls_key());
-            let app_pk = PublicKey::Bls(sign_pk);
+            let app_pk = SafeNdPublicKey::Bls(sign_pk);
             permission_map.insert(app_pk, permission_set);
 
             let mdata = SeqMutableData::new_with_data(
                 xorname,
-                tag.clone(),
+                tag,
                 BTreeMap::new(),
                 permission_map,
-                PublicKey::Bls(owners),
+                SafeNdPublicKey::Bls(owners),
             );
             client
                 .put_seq_mutable_data(mdata)
@@ -270,7 +277,7 @@ impl SafeApp {
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let md = unwrap!(run(safe_app, move |client, _app_context| {
             client
                 .get_seq_mdata(xorname, tag)
@@ -297,8 +304,8 @@ impl SafeApp {
 
     // TODO: Replace with real scl calling code
     #[allow(dead_code)]
-    pub fn mutable_data_delete(&mut self, xorname: &XorName, tag: u64, key: &[u8]) {
-        self.scl_mock.mutable_data_delete(xorname, tag, key)
+    pub fn mutable_data_delete(&mut self, _xorname: &XorName, _tag: u64, _key: &[u8]) {
+        // self.scl_mock.mutable_data_delete(xorname, tag, key)
     }
 
     pub fn seq_mutable_data_get_value(
@@ -312,7 +319,7 @@ impl SafeApp {
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let data = unwrap!(run(safe_app, move |client, _app_context| {
             client
                 .get_seq_mdata_value(xorname, tag, key.to_vec())
@@ -332,7 +339,7 @@ impl SafeApp {
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let entries = unwrap!(run(safe_app, move |client, _app_context| {
             client
                 .list_seq_mdata_entries(xorname, tag)
@@ -371,7 +378,7 @@ impl SafeApp {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let message = error_msg.to_string();
         unwrap!(run(safe_app, move |client, _app_context| {
             client

@@ -6,14 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use log::{debug, error, info};
+use log::{debug, info};
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::{Safe, XorUrl};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use structopt::StructOpt;
-use unwrap::unwrap;
 use walkdir::{DirEntry, WalkDir};
 
 const FILE_ADDED_SIGN: &str = "+";
@@ -110,10 +109,7 @@ pub fn files_commander(
 
             Ok(())
         }
-        Some(FilesSubCommands::Sync {
-            location,
-            recursive,
-        }) => {
+        Some(FilesSubCommands::Sync { .. }) => {
             // TODO: pull a given dir / file.
             // Get metadatas.
             // Check dates / sizes.
@@ -131,7 +127,7 @@ fn is_not_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| entry.depth() == 0 || !s.starts_with("."))
+        .map(|s| entry.depth() == 0 || !s.starts_with('.'))
         .unwrap_or(false)
 }
 

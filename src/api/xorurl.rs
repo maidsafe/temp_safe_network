@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::xorname_to_hex;
 use multibase::{decode, encode, Base};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
@@ -115,7 +114,7 @@ impl XorUrlEncoder {
 
         Ok(Self {
             version,
-            xorname: xorname,
+            xorname,
             type_tag,
             content_type,
         })

@@ -11,9 +11,7 @@ use super::Safe;
 use log::{debug, info};
 use reqwest::get as httpget;
 use safe_app::AppError;
-use safe_core::ipc::{
-    decode_msg, encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq,
-};
+use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
 use std::collections::HashMap;
 use std::io::Read;

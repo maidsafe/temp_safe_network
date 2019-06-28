@@ -79,7 +79,7 @@ fn test_fetch_coin_balance() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     let preload_amount = "1324.12";
-    let (xorurl, key_pair) =
+    let (xorurl, _key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
@@ -160,7 +160,7 @@ fn test_fetch_immutable_data() {
 fn test_fetch_unknown() {
     use super::xorurl::create_random_xorname;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let safe = Safe::new("base32z".to_string());
     let xorname = create_random_xorname();
     let type_tag = 575756443;
     let xorurl = unwrap!(XorUrlEncoder::encode(
@@ -177,7 +177,7 @@ fn test_fetch_unknown() {
 fn test_fetch_unsupported() {
     use super::xorurl::create_random_xorname;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let safe = Safe::new("base32z".to_string());
     let xorname = create_random_xorname();
     let type_tag = 575756443;
     let xorurl = unwrap!(XorUrlEncoder::encode(

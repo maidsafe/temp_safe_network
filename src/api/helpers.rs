@@ -53,6 +53,7 @@ pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+#[allow(dead_code)]
 pub fn xorname_to_hex(xorname: &XorName) -> String {
     xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
 }

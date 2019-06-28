@@ -9,9 +9,6 @@
 use crate::subcommands::helpers::get_target_location;
 use prettytable::Table;
 use safe_cli::{Safe, SafeData};
-use std::fs;
-use structopt::StructOpt;
-use unwrap::unwrap;
 
 pub fn cat_command(
     location: Option<String>,

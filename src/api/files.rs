@@ -7,15 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::xorurl::SafeContentType;
-use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
-use chrono::{DateTime, Utc};
+use super::{Safe, XorUrl, XorUrlEncoder};
+use chrono::Utc;
 use log::debug;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use threshold_crypto::SecretKey;
-use unwrap::unwrap;
 
 // Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL
 pub type FileItem = BTreeMap<String, String>;
@@ -80,7 +77,7 @@ impl Safe {
 
             debug!("FileItem item: {:?}", file_item);
 
-            &files_map.insert(key.to_string(), file_item);
+            files_map.insert(key.to_string(), file_item);
         }
 
         // TODO: use RDF format and serialise it

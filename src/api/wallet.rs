@@ -9,7 +9,7 @@
 use super::helpers::{parse_coins_amount, sk_from_hex};
 use super::xorurl::SafeContentType;
 use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
-use log::{debug, error};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use unwrap::unwrap;
 use uuid::Uuid;
