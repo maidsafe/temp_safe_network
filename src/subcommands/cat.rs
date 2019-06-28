@@ -23,7 +23,7 @@ pub fn cat_command(
     let xorurl = get_target_location(location)?;
     let content = safe.fetch(&xorurl)?;
     match content {
-        SafeData::FilesContainer(files_map) => {
+        SafeData::FilesContainer { files_map, .. } => {
             // Render FilesContainer
             if pretty {
                 let mut table = Table::new();
@@ -42,7 +42,7 @@ pub fn cat_command(
                 println!("[{}, {:?}]", xorurl, files_map);
             }
         }
-        SafeData::ImmutableData(data) => {
+        SafeData::ImmutableData { data, .. } => {
             // Render ImmutableData file
             let data_string = match String::from_utf8(data) {
                 Ok(string) => string,
@@ -52,6 +52,10 @@ pub fn cat_command(
             // data always has \n at end?
             println!("{}", data_string);
         }
+        other => println!(
+            "Content type '{:?}' not supported yet by cat command",
+            other
+        ),
     }
 
     Ok(())

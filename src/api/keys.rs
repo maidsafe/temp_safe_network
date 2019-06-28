@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
-use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, SafeContentType, XorUrl};
-use super::{BlsKeyPair, Safe};
+use super::xorurl::SafeContentType;
+use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 
@@ -67,7 +67,7 @@ impl Safe {
         };
 
         let xorurl =
-            xorname_to_xorurl(&xorname, 0, SafeContentType::CoinBalance, &self.xorurl_base)?;
+            XorUrlEncoder::encode(xorname, 0, SafeContentType::CoinBalance, &self.xorurl_base)?;
         Ok((xorurl, key_pair))
     }
 
@@ -97,7 +97,7 @@ impl Safe {
         };
 
         let xorurl =
-            xorname_to_xorurl(&xorname, 0, SafeContentType::CoinBalance, &self.xorurl_base)?;
+            XorUrlEncoder::encode(xorname, 0, SafeContentType::CoinBalance, &self.xorurl_base)?;
         Ok((xorurl, key_pair))
     }
 
@@ -113,20 +113,20 @@ impl Safe {
     pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> Result<String, String> {
         let secret_key: SecretKey =
             sk_from_hex(sk).map_err(|_| "Invalid secret key provided".to_string())?;
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
 
         Ok(self
             .safe_app
-            .get_balance_from_xorname(&xorname, &secret_key)
+            .get_balance_from_xorname(&xorurl_encoder.xorname(), &secret_key)
             .map_err(|_| "No Key found at specified location".to_string())?)
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
     pub fn fetch_pk_from_xorname(&self, xorurl: &str) -> Result<String, String> {
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         let public_key = self
             .safe_app
-            .fetch_pk_from_xorname(&xorname)
+            .fetch_pk_from_xorname(&xorurl_encoder.xorname())
             .map_err(|_| "No Key found at specified location".to_string())?;
         Ok(pk_to_hex(&public_key))
     }
@@ -298,7 +298,7 @@ fn test_keys_test_coins_balance_wrong_location() {
     assert_eq!(amount, current_balance);
 
     // let's corrupt the XOR-URL
-    xorurl.replace_range(8..13, "ccccc");
+    xorurl.replace_range(11..16, "ccccc");
     let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
     match current_balance {
         Err(msg) => assert!(msg.contains("No Key found at specified location")),

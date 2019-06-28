@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, SafeContentType, XorUrl};
-use super::{BlsKeyPair, Safe};
+use super::xorurl::SafeContentType;
+use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
 use chrono::{DateTime, Utc};
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -126,8 +126,8 @@ impl Safe {
             None,
         )?;
 
-        xorname_to_xorurl(
-            &xorname,
+        XorUrlEncoder::encode(
+            xorname,
             FILES_CONTAINER_TYPE_TAG,
             SafeContentType::FilesContainer,
             &self.xorurl_base,
@@ -135,10 +135,10 @@ impl Safe {
     }
 
     pub fn files_container_get_latest(&self, xorurl: &str) -> Result<FilesMap, String> {
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         match self
             .safe_app
-            .get_seq_appendable_latest(xorname, FILES_CONTAINER_TYPE_TAG)
+            .get_seq_appendable_latest(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
         {
             Ok(latest_entry) => {
                 // TODO: use RDF format and deserialise it
@@ -170,13 +170,13 @@ impl Safe {
         let now = Utc::now().to_string().to_string();
         let files_container_data = (now.into_bytes().to_vec(), files_map_data);
 
-        let xorname = xorurl_to_xorname(xorurl)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
 
         // Append new entry in the FilesContainer, which is a Published AppendOnlyData
         let new_version = self.safe_app.append_seq_appendable_data(
             files_container_data,
-            xorname,
-            FILES_CONTAINER_TYPE_TAG,
+            xorurl_encoder.xorname(),
+            xorurl_encoder.type_tag(),
         )?;
 
         Ok(new_version)
@@ -207,8 +207,8 @@ impl Safe {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_app.files_put_published_immutable(&data)?;
 
-        xorname_to_xorurl(
-            &xorname,
+        XorUrlEncoder::encode(
+            xorname,
             0,
             SafeContentType::ImmutableData,
             &self.xorurl_base,
@@ -230,8 +230,9 @@ impl Safe {
     /// ```
     pub fn files_get_published_immutable(&self, xorurl: &str) -> Result<Vec<u8>, String> {
         // TODO: do we want ownership from other PKs yet?
-        let xorname = xorurl_to_xorname(&xorurl)?;
-        self.safe_app.files_get_published_immutable(xorname)
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        self.safe_app
+            .files_get_published_immutable(xorurl_encoder.xorname())
     }
 }
 

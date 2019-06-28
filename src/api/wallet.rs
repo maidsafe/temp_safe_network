@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{parse_coins_amount, sk_from_hex};
-use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, SafeContentType, XorUrl};
-use super::{BlsKeyPair, Safe};
+use super::xorurl::SafeContentType;
+use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use unwrap::unwrap;
@@ -32,9 +32,9 @@ impl Safe {
     pub fn wallet_create(&mut self) -> Result<XorUrl, String> {
         let xorname = self
             .safe_app
-            .put_seq_mutable_data(None, WALLET_TYPE_TAG, None);
-        xorname_to_xorurl(
-            &xorname.unwrap(),
+            .put_seq_mutable_data(None, WALLET_TYPE_TAG, None)?;
+        XorUrlEncoder::encode(
+            xorname,
             WALLET_TYPE_TAG,
             SafeContentType::Wallet,
             &self.xorurl_base,
@@ -214,13 +214,13 @@ impl Safe {
         let from_wallet_balance = self.wallet_get_default_balance(&from_wallet_xorurl)?;
         let to_wallet_balance = self.wallet_get_default_balance(&to)?;
 
-        let from_pk = unwrap!(self
-            .safe_app
-            .fetch_pk_from_xorname(&xorurl_to_xorname(&from_wallet_balance.xorurl)?));
+        let from_pk = unwrap!(self.safe_app.fetch_pk_from_xorname(
+            &XorUrlEncoder::from_url(&from_wallet_balance.xorurl)?.xorname()
+        ));
 
         let to_pk = unwrap!(self
             .safe_app
-            .fetch_pk_from_xorname(&xorurl_to_xorname(&to_wallet_balance.xorurl)?));
+            .fetch_pk_from_xorname(&XorUrlEncoder::from_url(&to_wallet_balance.xorurl)?.xorname()));
 
         let from_sk = unwrap!(sk_from_hex(&from_wallet_balance.sk));
         let tx_id = Uuid::new_v4();

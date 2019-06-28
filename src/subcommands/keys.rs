@@ -117,7 +117,7 @@ pub fn create_new_key(
     if pretty {
         println!("New Key created at: \"{}\"", xorname);
     } else {
-        println!("pk xor={}", xorname);
+        println!("pk-xorurl={}", xorname);
     }
 
     if let Some(pair) = &key_pair {

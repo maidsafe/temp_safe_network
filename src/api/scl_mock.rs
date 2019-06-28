@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::xorurl::{create_random_xorname, xorurl_to_xorname};
+use super::xorurl::create_random_xorname;
+use super::XorUrlEncoder;
 use crate::api::helpers::{parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex};
 use log::debug;
 use safe_nd::{MDataValue, XorName};
-
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -353,8 +353,8 @@ impl SafeApp {
         key: Vec<u8>,
         value: &[u8],
     ) -> Result<(), String> {
-        let xorname = xorurl_to_xorname(xorurl)?;
-        let mut seq_md = self.get_seq_mdata(&xorname, tag)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        let mut seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
 
         seq_md.insert(
             vec_to_hex(key.to_vec()),
@@ -366,7 +366,7 @@ impl SafeApp {
 
         self.mock_data
             .mutable_data
-            .insert(xorname_to_hex(&xorname), seq_md);
+            .insert(xorname_to_hex(&xorurl_encoder.xorname()), seq_md);
 
         Ok(())
     }
@@ -380,8 +380,8 @@ impl SafeApp {
         tag: u64,
         key: Vec<u8>,
     ) -> Result<MDataValue, String> {
-        let xorname = xorurl_to_xorname(xorurl)?;
-        let seq_md = self.get_seq_mdata(&xorname, tag)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        let seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
         match seq_md.get(&vec_to_hex(key.to_vec())) {
             Some(value) => Ok(value.clone()),
             None => Err("EntryNotFound".to_string()),
@@ -394,8 +394,8 @@ impl SafeApp {
         tag: u64,
     ) -> Result<BTreeMap<Vec<u8>, MDataValue>, String> {
         debug!("Listing seq_mdata_entries for: {}", xorurl);
-        let xorname = xorurl_to_xorname(xorurl)?;
-        let seq_md = self.get_seq_mdata(&xorname, tag)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        let seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
 
         let mut res = BTreeMap::new();
         seq_md.iter().for_each(|elem| {

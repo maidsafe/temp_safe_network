@@ -19,6 +19,7 @@ pub mod scl_mock;
 pub mod wallet;
 
 pub use fetch::SafeData;
+pub use safe_nd::{XorName, XOR_NAME_LEN};
 pub use xorurl::{XorUrl, XorUrlEncoder};
 
 #[cfg(not(feature = "scl-mock"))]

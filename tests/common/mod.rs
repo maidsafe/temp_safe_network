@@ -35,12 +35,10 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
 
     let mut lines = pk_command_result.lines();
     let pk_xor_line = lines.next().unwrap();
-    let pk_xor_eq = String::from("pk xor=");
-    let pk_xor = &pk_xor_line[pk_xor_eq.chars().count()..];
+    let pk_xor = &pk_xor_line["pk-xorurl=".len()..];
     let _pk = lines.next().unwrap();
     let sk_line = lines.next().unwrap();
-    let sk_eq = String::from("sk=");
-    let sk = &sk_line[sk_eq.chars().count()..];
+    let sk = &sk_line["sk=".len()..];
 
     (pk_xor.to_string(), sk.to_string())
 }
