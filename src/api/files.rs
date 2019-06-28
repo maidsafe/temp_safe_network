@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, XorUrl};
+use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, SafeContentType, XorUrl};
 use super::{BlsKeyPair, Safe};
 use chrono::{DateTime, Utc};
 use log::debug;
@@ -126,7 +126,12 @@ impl Safe {
             None,
         )?;
 
-        xorname_to_xorurl(&xorname, &self.xorurl_base)
+        xorname_to_xorurl(
+            &xorname,
+            FILES_CONTAINER_TYPE_TAG,
+            SafeContentType::FilesContainer,
+            &self.xorurl_base,
+        )
     }
 
     pub fn files_container_get_latest(&self, xorurl: &str) -> Result<FilesMap, String> {
@@ -202,7 +207,12 @@ impl Safe {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_app.files_put_published_immutable(&data)?;
 
-        xorname_to_xorurl(&xorname, &self.xorurl_base)
+        xorname_to_xorurl(
+            &xorname,
+            0,
+            SafeContentType::ImmutableData,
+            &self.xorurl_base,
+        )
     }
 
     /// # Get Published ImmutableData

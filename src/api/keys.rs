@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
-use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, XorUrl};
+use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, SafeContentType, XorUrl};
 use super::{BlsKeyPair, Safe};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
@@ -66,7 +66,8 @@ impl Safe {
             }
         };
 
-        let xorurl = xorname_to_xorurl(&xorname, &self.xorurl_base)?;
+        let xorurl =
+            xorname_to_xorurl(&xorname, 0, SafeContentType::CoinBalance, &self.xorurl_base)?;
         Ok((xorurl, key_pair))
     }
 
@@ -95,7 +96,8 @@ impl Safe {
             }
         };
 
-        let xorurl = xorname_to_xorurl(&xorname, &self.xorurl_base)?;
+        let xorurl =
+            xorname_to_xorurl(&xorname, 0, SafeContentType::CoinBalance, &self.xorurl_base)?;
         Ok((xorurl, key_pair))
     }
 
@@ -296,7 +298,7 @@ fn test_keys_test_coins_balance_wrong_location() {
     assert_eq!(amount, current_balance);
 
     // let's corrupt the XOR-URL
-    xorurl.replace_range(xorurl.len() - 5.., "ccccc");
+    xorurl.replace_range(8..13, "ccccc");
     let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
     match current_balance {
         Err(msg) => assert!(msg.contains("No Key found at specified location")),

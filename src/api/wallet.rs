@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{parse_coins_amount, sk_from_hex};
-use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, XorUrl};
+use super::xorurl::{xorname_to_xorurl, xorurl_to_xorname, SafeContentType, XorUrl};
 use super::{BlsKeyPair, Safe};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
@@ -33,7 +33,12 @@ impl Safe {
         let xorname = self
             .safe_app
             .put_seq_mutable_data(None, WALLET_TYPE_TAG, None);
-        xorname_to_xorurl(&xorname.unwrap(), &self.xorurl_base)
+        xorname_to_xorurl(
+            &xorname.unwrap(),
+            WALLET_TYPE_TAG,
+            SafeContentType::Wallet,
+            &self.xorurl_base,
+        )
     }
 
     // Add a Key to a Wallet to make it spendable
