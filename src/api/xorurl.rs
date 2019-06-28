@@ -35,7 +35,6 @@ pub fn create_random_xorname() -> XorName {
     xorname
 }
 
-#[derive(Debug)]
 pub struct XorUrlEncoder {
     version: u32, // currently only v1 supported
     xorname: XorName,

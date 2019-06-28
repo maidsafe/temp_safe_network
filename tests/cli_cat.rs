@@ -18,7 +18,7 @@ use serde_json;
 use std::collections::BTreeMap;
 use std::process::Command;
 
-const OUR_DATA: &str = "hello tests!\n"; //one \n from file. one from prntln!
+const OUR_DATA: &str = "hello tests!";
 const TEST_FILE: &str = "./tests/testfolder/test.md";
 
 #[test]

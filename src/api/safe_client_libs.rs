@@ -193,15 +193,19 @@ impl SafeApp {
     // TODO: Replace with SCL calling code
     pub fn append_seq_appendable_data(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
+        data: (Vec<u8>, Vec<u8>),
         name: XorName,
         tag: u64,
     ) -> Result<u64, String> {
-        self.scl_mock.append_seq_append_only(data, name, tag)
+        self.scl_mock.append_seq_appendable_data(data, name, tag)
     }
 
     // TODO: Replace with SCL calling code
-    pub fn get_seq_appendable_latest(name: XorName, tag: u64) -> Result<(Vec<u8>, Vec<u8>), &str> {
+    pub fn get_seq_appendable_latest(
+        &self,
+        name: XorName,
+        tag: u64,
+    ) -> Result<(Vec<u8>, Vec<u8>), &str> {
         self.scl_mock.get_seq_appendable_latest(name, tag)
     }
 
