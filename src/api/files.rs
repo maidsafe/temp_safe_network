@@ -10,8 +10,10 @@ use super::xorurl::SafeContentType;
 use super::{Safe, XorUrl, XorUrlEncoder};
 use chrono::Utc;
 use log::debug;
+use relative_path::RelativePath;
 use std::collections::BTreeMap;
 use std::fs;
+
 // use std::path::Path;
 use common_path::common_path_all;
 use std::path::{Path, PathBuf};
@@ -42,7 +44,7 @@ impl Safe {
     /// let mut content_map = BTreeMap::new();
     /// content_map.insert("./tests/testfolder/test.md".to_string(), top_xorurl);
     /// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
-    /// let file_map = safe.files_map_create( &content_map ).unwrap();
+    /// let file_map = safe.files_map_create( &content_map, None ).unwrap();
     /// # assert!(file_map.contains("\"md\""));
     /// # assert!(file_map.contains("\"/test.md\""));
     /// # assert!(file_map.contains("\"/subfolder/subexists.md\""));
@@ -51,9 +53,15 @@ impl Safe {
     pub fn files_map_create(
         &mut self,
         content: &BTreeMap<String, String>,
+        set_root: Option<String>,
     ) -> Result<String, String> {
         let mut files_map = FilesMap::default();
         let now = Utc::now().to_string().to_string();
+
+        let mut replacement_root = set_root.unwrap_or_else(|| "".to_string());
+        if !replacement_root.starts_with("/") {
+            replacement_root = format!("/{}", replacement_root)
+        }
 
         let keys: Vec<&String> = content.keys().collect();
         let mut paths: Vec<&Path> = vec![];
@@ -89,10 +97,17 @@ impl Safe {
             file_item.insert("created".to_string(), now.clone());
 
             debug!("FileItem item: {:?}", file_item);
-            let new_file_name = key.to_string().replace(prefix.to_str().unwrap(), "");
+            let new_file_name = RelativePath::new(
+                &key.to_string()
+                    .replace(prefix.to_str().unwrap(), &replacement_root),
+            )
+            .normalize();
 
-            debug!("FileItem item inserted as {:?}", &new_file_name);
-            files_map.insert(new_file_name.to_string(), file_item);
+            // above normalize removes initial slash
+            let final_name = format!("/{}", new_file_name.as_str());
+
+            debug!("FileItem item inserted as {:?}", &final_name);
+            files_map.insert(final_name.to_string(), file_item);
         }
 
         // TODO: use RDF format and serialise it
@@ -118,7 +133,7 @@ impl Safe {
     /// let mut content_map = BTreeMap::new();
     /// content_map.insert("./tests/testfolder/test.md".to_string(), top_xorurl);
     /// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
-    /// let file_map = safe.files_map_create( &content_map ).unwrap();
+    /// let file_map = safe.files_map_create( &content_map, None ).unwrap();
     /// # assert!(file_map.contains("\"md\""));
     /// # assert!(file_map.contains("\"/test.md\""));
     /// let xor_url = safe.files_container_create(file_map.into_bytes().to_vec() ).unwrap();

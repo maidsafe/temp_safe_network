@@ -40,6 +40,8 @@ pub enum FilesSubCommands {
         /// The recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
+        #[structopt(long = "set-root")]
+        set_root: Option<String>,
     },
     #[structopt(name = "sync")]
     /// Sync files to the network
@@ -61,6 +63,7 @@ pub fn files_commander(
         Some(FilesSubCommands::Put {
             location,
             recursive,
+            set_root,
         }) => {
             let path = Path::new(&location);
             info!("Reading files from {}", &path.display());
@@ -87,7 +90,7 @@ pub fn files_commander(
             };
 
             // create FilesContainer with the content of content_map
-            let serialised_files_map = safe.files_map_create(&content_map)?;
+            let serialised_files_map = safe.files_map_create(&content_map, set_root)?;
             let files_container_xorurl =
                 safe.files_container_create(serialised_files_map.as_bytes().to_vec())?;
 

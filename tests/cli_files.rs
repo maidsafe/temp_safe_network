@@ -12,11 +12,11 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{CLI, SAFE_PROTOCOL};
+use common::{get_bin_location, CLI, SAFE_PROTOCOL};
 use predicates::prelude::*;
 use std::process::Command;
 
-const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at:";
+const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "./tests/testfolder/test.md";
 const TEST_FOLDER: &str = "./tests/testfolder/";
 const TEST_FOLDER_SUBFOLDER: &str = "./tests/testfolder/subfolder/";
@@ -54,6 +54,36 @@ fn calling_safe_files_put_recursive() {
         .stdout(predicate::str::contains("./tests/testfolder/another.md").count(1))
         .stdout(predicate::str::contains("./tests/testfolder/subfolder/subexists.md").count(1))
         .success();
+}
+
+#[test]
+fn calling_safe_files_put_recursive_and_change_root() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let file_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--pretty",
+        "--set-root",
+        "aha"
+    )
+    .read()
+    .unwrap();
+
+    let mut lines = file_container.lines();
+    let file_container_xor_line = lines.next().unwrap();
+    let file_container_xor =
+        &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+
+    let file = format!("{}/aha/test.md", file_container_xor);
+    let subfile = format!("{}/aha/subfolder/subexists.md", file_container_xor);
+    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
+
+    assert_eq!(file_cat, "hello tests!");
+    assert_eq!(subfile_cat, "the sub");
 }
 
 #[test]

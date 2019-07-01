@@ -60,7 +60,7 @@ impl Safe {
     ///     "./tests/testfolder/subfolder/subexists.md".to_string(),
     ///     second_xorurl,
     /// );
-    /// let files_map = unwrap!(safe.files_map_create(&content_map));
+	/// let files_map = safe.files_map_create( &content_map, None ).unwrap();
     /// let xorurl = unwrap!(safe.files_container_create(files_map.clone().into_bytes().to_vec()));
     ///
     /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl ) ) );
@@ -209,7 +209,7 @@ fn test_fetch_files_container() {
         "./tests/testfolder/subfolder/subexists.md".to_string(),
         second_xorurl,
     );
-    let files_map = unwrap!(safe.files_map_create(&content_map));
+	let files_map = safe.files_map_create( &content_map, None ).unwrap();
     let xorurl = unwrap!(safe.files_container_create(files_map.clone().into_bytes().to_vec()));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
