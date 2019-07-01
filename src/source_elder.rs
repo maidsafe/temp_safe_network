@@ -387,27 +387,7 @@ impl SourceElder {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    let registered = ClientState::from_bool(match public_id {
-                        PublicId::Client(ref pub_id) => {
-                            self.client_accounts.exists(&pub_id.to_db_key())
-                        }
-                        PublicId::App(ref app_pub_id) => {
-                            let owner = app_pub_id.owner();
-                            let app_pub_key = app_pub_id.public_key();
-                            self.client_accounts
-                                .get(&owner.to_db_key())
-                                .and_then(|account: ClientAccount| {
-                                    account.apps.get(app_pub_key).cloned()
-                                })
-                                .is_some()
-                            // TODO: actually check permissions
-                        }
-                        PublicId::Node(_) => {
-                            error!("{}: Logic error.  This should be unreachable.", self);
-                            false
-                        }
-                    });
-
+                    let registered = self.determine_connecting_client_state(&public_id);
                     info!(
                         "{}: Accepted {} on {} as {:?}",
                         self, public_id, peer_addr, registered
@@ -429,6 +409,24 @@ impl SourceElder {
             );
             self.quic_p2p.disconnect_from(peer_addr);
         }
+    }
+
+    fn determine_connecting_client_state(&self, public_id: &PublicId) -> ClientState {
+        ClientState::from_bool(match public_id {
+            PublicId::Client(ref pub_id) => self.client_accounts.exists(&pub_id.to_db_key()),
+            PublicId::App(ref app_pub_id) => {
+                let owner = app_pub_id.owner();
+                let app_pub_key = app_pub_id.public_key();
+                self.client_accounts
+                    .get(&owner.to_db_key())
+                    .and_then(|account: ClientAccount| account.apps.get(app_pub_key).cloned())
+                    .is_some()
+            }
+            PublicId::Node(_) => {
+                error!("{}: Logic error.  This should be unreachable.", self);
+                false
+            }
+        })
     }
 
     pub fn handle_node_response(
