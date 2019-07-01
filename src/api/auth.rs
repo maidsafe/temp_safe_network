@@ -19,6 +19,7 @@ use std::io::Read;
 // Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
 const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
 
+#[allow(dead_code)]
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
     // Ir returns the credentials necessary to connect to the network, encoded in a single string.

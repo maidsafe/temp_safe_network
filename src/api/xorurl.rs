@@ -121,6 +121,7 @@ impl XorUrlEncoder {
         })
     }
 
+    #[cfg(test)]
     pub fn version(&self) -> u8 {
         self.version
     }

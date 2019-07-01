@@ -14,7 +14,7 @@ use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App};
 
-//#[cfg(feature = "fake-auth")]
+#[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
@@ -34,15 +34,11 @@ type SeqEntryActions = BTreeMap<Vec<u8>, MDataSeqEntryAction>;
 
 pub struct SafeApp {
     safe_conn: Option<App>,
-    // scl_mock: SafeAppMock, // TODO: this is temporary until we don't rely on our scl-mock anymore
 }
 
 impl SafeApp {
     pub fn new() -> Self {
-        Self {
-            safe_conn: Some(create_app()), // TODO: initialise with None once we don't rely on our scl-mock anymore
-                                           // scl_mock: SafeAppMock::new(),
-        }
+        Self { safe_conn: None }
     }
 
     #[cfg(feature = "fake-auth")]
@@ -168,14 +164,12 @@ impl SafeApp {
     }
 
     // TODO: Replace with SCL calling code
-    #[allow(dead_code)]
     pub fn files_put_published_immutable(&mut self, _data: &[u8]) -> Result<XorName, String> {
         // self.scl_mock.files_put_published_immutable(data)
         Ok(create_random_xorname())
     }
 
     // TODO: Replace with SCL calling code
-    #[allow(dead_code)]
     pub fn files_get_published_immutable(&self, _xorname: XorName) -> Result<Vec<u8>, String> {
         // self.scl_mock.files_get_published_immutable(xorname)
         Ok(vec![])

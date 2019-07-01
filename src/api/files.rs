@@ -27,6 +27,7 @@ pub type FilesMap = BTreeMap<String, FileItem>;
 // Type tag to use for the FilesContainer stored on AppendOnlyData
 const FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
 
+#[allow(dead_code)]
 impl Safe {
     /// # Create a map of paths to xorurls
     ///

@@ -58,7 +58,6 @@ fn calling_safe_files_put_recursive() {
 
 #[test]
 fn calling_safe_files_put_recursive_and_change_root() {
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
     let file_container = cmd!(
         get_bin_location(),
         "files",

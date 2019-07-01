@@ -27,6 +27,7 @@ struct WalletSpendableBalance {
     pub sk: String,
 }
 
+#[allow(dead_code)]
 impl Safe {
     // Create an empty Wallet and return its XOR-URL
     pub fn wallet_create(&mut self) -> Result<XorUrl, String> {

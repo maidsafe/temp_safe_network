@@ -8,10 +8,19 @@
 
 use super::helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
 use super::xorurl::SafeContentType;
-use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
+use super::{Safe, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 
+// We expose a BLS key pair as two hex encoded strings
+// TODO: consider supporting other encodings like base32 or just expose Vec<u8>
+#[derive(Clone)]
+pub struct BlsKeyPair {
+    pub pk: String,
+    pub sk: String,
+}
+
+#[allow(dead_code)]
 impl Safe {
     // Generate a key pair without creating and/or storing a Key on the network
     pub fn keypair(&self) -> Result<BlsKeyPair, String> {
