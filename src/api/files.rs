@@ -12,7 +12,9 @@ use chrono::Utc;
 use log::debug;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+// use std::path::Path;
+use common_path::common_path_all;
+use std::path::{Path, PathBuf};
 
 // Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL
 pub type FileItem = BTreeMap<String, String>;
@@ -41,8 +43,10 @@ impl Safe {
     /// content_map.insert("./tests/testfolder/test.md".to_string(), top_xorurl);
     /// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
     /// let file_map = safe.files_map_create( &content_map ).unwrap();
-    /// # assert_eq!(true, file_map.contains("\"md\""));
-    /// # assert_eq!(true, file_map.contains("\"./tests/testfolder/test.md\""));
+    /// # assert!(file_map.contains("\"md\""));
+    /// # assert!(file_map.contains("\"/test.md\""));
+    /// # assert!(file_map.contains("\"/subfolder/subexists.md\""));
+    /// # assert!(!file_map.contains("tests/testfolder"));
     /// ```
     pub fn files_map_create(
         &mut self,
@@ -50,6 +54,15 @@ impl Safe {
     ) -> Result<String, String> {
         let mut files_map = FilesMap::default();
         let now = Utc::now().to_string().to_string();
+
+        let keys: Vec<&String> = content.keys().collect();
+        let mut paths: Vec<&Path> = vec![];
+
+        for key in keys.iter() {
+            paths.push(Path::new(key))
+        }
+
+        let prefix = common_path_all(paths).unwrap_or_else(|| PathBuf::new());
 
         for (key, value) in content.iter() {
             let mut file_item = FileItem::new();
@@ -76,8 +89,10 @@ impl Safe {
             file_item.insert("created".to_string(), now.clone());
 
             debug!("FileItem item: {:?}", file_item);
+            let new_file_name = key.to_string().replace(prefix.to_str().unwrap(), "");
 
-            files_map.insert(key.to_string(), file_item);
+            debug!("FileItem item inserted as {:?}", &new_file_name);
+            files_map.insert(new_file_name.to_string(), file_item);
         }
 
         // TODO: use RDF format and serialise it
@@ -105,7 +120,7 @@ impl Safe {
     /// content_map.insert("./tests/testfolder/subfolder/subexists.md".to_string(), second_xorurl);
     /// let file_map = safe.files_map_create( &content_map ).unwrap();
     /// # assert!(file_map.contains("\"md\""));
-    /// # assert!(file_map.contains("\"./tests/testfolder/test.md\""));
+    /// # assert!(file_map.contains("\"/test.md\""));
     /// let xor_url = safe.files_container_create(file_map.into_bytes().to_vec() ).unwrap();
     /// assert!(xor_url.contains("safe://"))
     /// ```

@@ -71,6 +71,7 @@ impl XorUrlEncoder {
             return Err("Invalid XOR-URL".to_string());
         }
         let cid_str = &xorurl[min_len..];
+
         let decoded_xorurl = decode(&cid_str)
             .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?
             .1;

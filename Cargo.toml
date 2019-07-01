@@ -39,6 +39,8 @@ futures = "~0.1.17"
 walkdir = "~2.0.1" #ffi utils needs this version
 chrono = "0.4.6"
 human-panic = "1.0.1"
+url = "1.7.2"
+common-path = "1.0.0"
 
 [features]
 default = ["uuid/v4"]

@@ -37,6 +37,7 @@ fn calling_safe_cat() {
         };
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
+
     cmd.args(&vec!["cat", &map[TEST_FILE]])
         .assert()
         .stdout(predicate::str::contains(OUR_DATA))
