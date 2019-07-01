@@ -240,7 +240,9 @@ impl SourceElder {
                 })
             }
             GetIData(ref address) => {
-                let owner = utils::owner(client_id)?;
+                if !address.published() {
+                    self.has_signature(client_id, &request, &message_id, &signature)?;
+                }
                 if address.published() || registered_client == ClientState::Registered {
                     Some(Action::ForwardClientRequest {
                         client_name: *client_id.name(),
@@ -250,6 +252,7 @@ impl SourceElder {
                 } else {
                     Some(Action::RespondToClient {
                         sender: *self.id.name(),
+                        client_name: *client_id.name(),
                         response: Response::GetIData(Err(NdError::AccessDenied)),
                         message_id,
                     })

@@ -15,22 +15,23 @@ use crate::{
     vault::Init,
     Result, ToDbKey,
 };
-use idata_op::IDataOp;
+use idata_op::{IDataOp, RpcState};
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    IDataAddress, IDataKind, MessageId, NodePublicId, Request, Response, Result as NdResult,
-    XorName,
+    Error as NdError, IDataAddress, IDataKind, MessageId, NodePublicId, Request, Response,
+    Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    collections::BTreeMap,
+    collections::{btree_map::Entry, BTreeMap},
     fmt::{self, Display, Formatter},
     iter,
     path::Path,
     rc::Rc,
 };
+use unwrap::unwrap;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
@@ -436,39 +437,34 @@ impl DestinationElder {
                 return None;
             };
 
-            // TODO - Should we try the 3 holders in serial checking for responses between each
-            //        send or simply broadcast and get the first response?
-            // We just get the first for now. In phase 1 this is ourself anyway.
-            let metadata_holder = if let Some(metadata_holder) = metadata.holders.first() {
-                metadata_holder
-            } else {
-                warn!(
-                    "{}: Failed to get location from metadata holders: {:?}",
-                    self, metadata.holders
-                );
-                return None;
-            };
-
-            if metadata_holder == self.id.name() {
-                self.get_idata(address, message_id)
-            } else {
-                // TODO - Send Get request to adult (or elder occasionally) with src = data.
-                None
+            // Can't fail
+            let idata_op = unwrap!(IDataOp::new(
+                src,
+                Request::GetIData(address),
+                metadata.holders.clone()
+            ));
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => {
+                    // TODO - Consider return another Error
+                    Some(Action::RespondToClient {
+                        sender: *self.id.name(),
+                        client_name: src,
+                        response: Response::GetIData(Err(NdError::NetworkOther(
+                            "Duplicate Immutable data op entry detected.".to_string(),
+                        ))),
+                        message_id,
+                    })
+                }
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        targets: metadata.holders,
+                        request: idata_op.request().clone(),
+                        message_id,
+                    })
+                }
             }
         }
-    }
-
-    fn handle_get_idata_resp(
-        &mut self,
-        sender: XorName,
-        result: NdResult<IDataKind>,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::RespondToClient {
-            sender,
-            response: Response::GetIData(result),
-            message_id,
-        })
     }
 
     fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {
@@ -487,6 +483,49 @@ impl DestinationElder {
             response: Response::GetIData(result),
             message_id,
         })
+    }
+
+    fn handle_get_idata_resp(
+        &mut self,
+        sender: XorName,
+        result: NdResult<IDataKind>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        let idata_ops = self.idata_ops.get_mut(&message_id).or_else(|| {
+            warn!(
+                "{}: Received response to non-existent message_id: {:?}",
+                own_id, message_id
+            );
+            None
+        })?;
+
+        let is_already_actioned = idata_ops.is_actioned();
+        let client_name = *idata_ops.client();
+
+        idata_ops
+            .rpc_states
+            .get_mut(&sender)
+            .or_else(|| {
+                warn!(
+                    "{}: Received response from sender {} that we didn't expect.",
+                    own_id, sender
+                );
+                None
+            })
+            .map(|rpc_state| *rpc_state = RpcState::Actioned)
+            .and_then(|()| {
+                if is_already_actioned {
+                    None
+                } else {
+                    Some(Action::RespondToClient {
+                        sender,
+                        client_name,
+                        response: Response::GetIData(result),
+                        message_id,
+                    })
+                }
+            })
     }
 }
 

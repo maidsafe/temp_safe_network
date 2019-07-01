@@ -28,7 +28,7 @@ pub(super) enum RpcState {
 pub(super) struct IDataOp {
     client: XorName,
     request: Request,
-    rpc_states: BTreeMap<XorName, RpcState>,
+    pub rpc_states: BTreeMap<XorName, RpcState>,
 }
 
 #[allow(unused)]
@@ -61,11 +61,9 @@ impl IDataOp {
         &self.request
     }
 
-    pub(super) fn rpc_states(&self) -> &BTreeMap<XorName, RpcState> {
-        &self.rpc_states
-    }
-
-    pub(super) fn rpc_states_mut(&mut self) -> &mut BTreeMap<XorName, RpcState> {
-        &mut self.rpc_states
+    pub(super) fn is_actioned(&self) -> bool {
+        self.rpc_states
+            .values()
+            .any(|rpc_state| rpc_state == &RpcState::Actioned)
     }
 }

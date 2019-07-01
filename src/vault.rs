@@ -206,16 +206,26 @@ impl Vault {
             }
             RespondToClient {
                 sender,
+                client_name,
                 response,
                 message_id,
             } => {
                 let dst_elders = sender;
-                // TODO - simplification during phase 1
-                let src_elders = *self.id.public_id().name();
+                let src_elders = client_name;
                 self.source_elder_mut()?
                     .handle_node_response(dst_elders, src_elders, response, message_id)
             }
-            SendToPeers { .. } => unimplemented!(),
+            SendToPeers {
+                targets,
+                request,
+                message_id,
+            } => {
+                // TODO - Phase 1 is only 1 target
+                targets.first().and_then(|target| {
+                    self.destination_elder_mut()?
+                        .handle_request(*target, request, message_id)
+                })
+            }
         }
     }
 
