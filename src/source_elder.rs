@@ -460,8 +460,20 @@ impl SourceElder {
             //
             PutIData(result) => unimplemented!(),
             GetIData(ref result) => {
-                let _msg = utils::serialise(&response);
-                // TODO - Send this msg back to the client
+                if let Some(peer_addr) = self.lookup_client_peer_addr(src_elders) {
+                    let peer = Peer::Client {
+                        peer_addr: *peer_addr,
+                    };
+                    self.send(
+                        peer,
+                        &Message::Response {
+                            response,
+                            message_id,
+                        },
+                    );
+                } else {
+                    info!("{}: client {} not found", self, src_elders);
+                }
                 None
             }
             DeleteUnpubIData(result) => unimplemented!(),
@@ -563,6 +575,13 @@ impl SourceElder {
                 message_id,
             },
         )
+    }
+
+    fn lookup_client_peer_addr(&self, name: XorName) -> Option<&SocketAddr> {
+        self.clients
+            .iter()
+            .find(|(_, (pub_id, _))| pub_id.name() == &name)
+            .map(|(peer_addr, _)| peer_addr)
     }
 
     fn balance(&self, client_id: &ClientPublicId) -> Option<Coins> {

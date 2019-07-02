@@ -15,7 +15,7 @@ use crate::{
     vault::Init,
     Result, ToDbKey,
 };
-use idata_op::{IDataOp, RpcState};
+use idata_op::IDataOp;
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
@@ -248,7 +248,7 @@ impl DestinationElder {
             // ===== Immutable Data =====
             //
             PutIData(result) => self.handle_put_idata_resp(src, result, message_id),
-            GetIData(result) => self.handle_get_idata_resp(src, result, message_id),
+            GetIData(_) => self.handle_get_idata_resp(src, response, message_id),
             DeleteUnpubIData(result) => unimplemented!(),
             //
             // ===== Mutable Data =====
@@ -426,6 +426,13 @@ impl DestinationElder {
             // chunk. See the sent Get request below.
             self.get_idata(address, message_id)
         } else {
+            let error_response = |error: NdError| Action::RespondToClient {
+                sender: *address.name(),
+                client_name: src,
+                response: Response::GetIData(Err(error)),
+                message_id,
+            };
+
             // We're acting as dst elder, received request from src elders
             let metadata = if let Some(metadata) = self
                 .immutable_metadata
@@ -434,8 +441,13 @@ impl DestinationElder {
                 metadata
             } else {
                 warn!("{}: Failed to get metadata from DB: {:?}", self, address);
-                return None;
+                return Some(error_response(NdError::NoSuchData));
             };
+
+            if metadata.holders.is_empty() {
+                warn!("{}: Metadata holders is empty for: {:?}", self, address);
+                return Some(error_response(NdError::NoSuchData));
+            }
 
             // Can't fail
             let idata_op = unwrap!(IDataOp::new(
@@ -445,15 +457,10 @@ impl DestinationElder {
             ));
             match self.idata_ops.entry(message_id) {
                 Entry::Occupied(_) => {
-                    // TODO - Consider return another Error
-                    Some(Action::RespondToClient {
-                        sender: *self.id.name(),
-                        client_name: src,
-                        response: Response::GetIData(Err(NdError::NetworkOther(
-                            "Duplicate Immutable data op entry detected.".to_string(),
-                        ))),
-                        message_id,
-                    })
+                    // TODO - Change to NdError::DuplicateMessageId
+                    Some(error_response(NdError::NetworkOther(
+                        "Duplicate Immutable data op entry detected".to_string(),
+                    )))
                 }
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
@@ -488,44 +495,20 @@ impl DestinationElder {
     fn handle_get_idata_resp(
         &mut self,
         sender: XorName,
-        result: NdResult<IDataKind>,
+        response: Response,
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        let idata_ops = self.idata_ops.get_mut(&message_id).or_else(|| {
-            warn!(
-                "{}: Received response to non-existent message_id: {:?}",
-                own_id, message_id
-            );
-            None
-        })?;
-
-        let is_already_actioned = idata_ops.is_actioned();
-        let client_name = *idata_ops.client();
-
-        idata_ops
-            .rpc_states
-            .get_mut(&sender)
+        self.idata_ops
+            .get_mut(&message_id)
             .or_else(|| {
                 warn!(
-                    "{}: Received response from sender {} that we didn't expect.",
-                    own_id, sender
+                    "{}: Received response to non-existent message_id: {:?}",
+                    own_id, message_id
                 );
                 None
             })
-            .map(|rpc_state| *rpc_state = RpcState::Actioned)
-            .and_then(|()| {
-                if is_already_actioned {
-                    None
-                } else {
-                    Some(Action::RespondToClient {
-                        sender,
-                        client_name,
-                        response: Response::GetIData(result),
-                        message_id,
-                    })
-                }
-            })
+            .and_then(|idata_ops| idata_ops.handle_response(sender, response, own_id, message_id))
     }
 }
 
