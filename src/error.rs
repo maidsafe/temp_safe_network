@@ -81,6 +81,8 @@ quick_error! {
         InvalidMessage {}
         /// Account doesn't exist.
         NoSuchAccount {}
+        /// Logic error.
+        Logic {}
     }
 }
 

@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod idata_op;
+
 use crate::{
     action::Action,
     chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
@@ -13,6 +15,7 @@ use crate::{
     vault::Init,
     Result, ToDbKey,
 };
+use idata_op::IDataOp;
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
@@ -22,6 +25,7 @@ use safe_nd::{
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     iter,
     path::Path,
@@ -44,6 +48,7 @@ struct ChunkMetadata {
 #[allow(unused)]
 pub(crate) struct DestinationElder {
     id: NodePublicId,
+    idata_ops: BTreeMap<MessageId, IDataOp>,
     immutable_metadata: PickleDb,
     mutable_metadata: PickleDb,
     append_only_metadata: PickleDb,
@@ -86,6 +91,7 @@ impl DestinationElder {
         )?;
         Ok(Self {
             id,
+            idata_ops: Default::default(),
             immutable_metadata,
             mutable_metadata,
             append_only_metadata,

@@ -54,6 +54,8 @@
     missing_debug_implementations,
     variant_size_differences
 )]
+// For quick error
+#![recursion_limit = "128"]
 
 mod action;
 mod adult;

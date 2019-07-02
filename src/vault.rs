@@ -215,6 +215,7 @@ impl Vault {
                 self.source_elder_mut()?
                     .handle_node_response(dst_elders, src_elders, response, message_id)
             }
+            SendToPeers { .. } => unimplemented!(),
         }
     }
 

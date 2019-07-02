@@ -28,4 +28,11 @@ pub(crate) enum Action {
         response: Response,
         message_id: MessageId,
     },
+    // Send the same request to each individual peer (used to send IData requests to adults).
+    #[allow(unused)]
+    SendToPeers {
+        targets: Vec<XorName>,
+        request: Request,
+        message_id: MessageId,
+    },
 }
