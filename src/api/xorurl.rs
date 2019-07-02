@@ -188,7 +188,7 @@ impl XorUrlEncoder {
             }
         };
         let cid_str = encode(base_encoding, cid_vec);
-        Ok(format!("{}{}", SAFE_URL_PROTOCOL, cid_str))
+        Ok(format!("{}{}{}", SAFE_URL_PROTOCOL, cid_str, self.path))
     }
 }
 
@@ -231,20 +231,10 @@ fn test_xorurl_base32z_encoding() {
 
 #[test]
 fn test_xorurl_decoding() {
-    use unwrap::unwrap;
     let xorname = XorName(*b"12345678901234567890123456789012");
     let type_tag: u64 = 0x0eef;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeContentType::ImmutableData,
-        &"base32z".to_string()
-    ));
-
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&format!(
-        "{}/subfolder/file",
-        xorurl
-    )));
+    let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, SafeContentType::ImmutableData);
+    assert_eq!("", xorurl_encoder.path());
     assert_eq!(1, xorurl_encoder.version());
     assert_eq!(xorname, xorurl_encoder.xorname());
     assert_eq!(type_tag, xorurl_encoder.type_tag());
@@ -252,5 +242,32 @@ fn test_xorurl_decoding() {
         SafeContentType::ImmutableData,
         xorurl_encoder.content_type()
     );
-    assert_eq!("/subfolder/file", xorurl_encoder.path());
+}
+
+#[test]
+fn test_xorurl_decoding_with_path() {
+    use unwrap::unwrap;
+    let xorname = XorName(*b"12345678901234567890123456789012");
+    let type_tag: u64 = 0x0eef;
+    let xorurl = unwrap!(XorUrlEncoder::encode(
+        xorname,
+        type_tag,
+        SafeContentType::ImmutableData,
+        "base32z"
+    ));
+
+    let xorurl_with_path = format!("{}/subfolder/file", xorurl);
+    let xorurl_encoder_with_path = unwrap!(XorUrlEncoder::from_url(&xorurl_with_path));
+    assert_eq!(
+        xorurl_with_path,
+        unwrap!(xorurl_encoder_with_path.to_string("base32z"))
+    );
+    assert_eq!("/subfolder/file", xorurl_encoder_with_path.path());
+    assert_eq!(1, xorurl_encoder_with_path.version());
+    assert_eq!(xorname, xorurl_encoder_with_path.xorname());
+    assert_eq!(type_tag, xorurl_encoder_with_path.type_tag());
+    assert_eq!(
+        SafeContentType::ImmutableData,
+        xorurl_encoder_with_path.content_type()
+    );
 }
