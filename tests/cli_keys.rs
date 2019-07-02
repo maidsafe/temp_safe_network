@@ -21,28 +21,28 @@ const PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at:";
 #[test]
 fn calling_safe_keys_create_pretty() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["keys", "create", "--test-coins", "--preload", "123"])
+        .assert()
+        .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE))
+        .stdout(predicate::str::contains(SAFE_PROTOCOL).from_utf8())
+        .success();
+}
+
+#[test]
+fn calling_safe_keys_create() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec![
         "keys",
         "create",
         "--test-coins",
         "--preload",
         "123",
-        "--pretty",
+        "--json",
     ])
     .assert()
-    .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE))
+    .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE).count(0))
     .stdout(predicate::str::contains(SAFE_PROTOCOL).from_utf8())
     .success();
-}
-
-#[test]
-fn calling_safe_keys_create() {
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["keys", "create", "--test-coins", "--preload", "123"])
-        .assert()
-        .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE).count(0))
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).from_utf8())
-        .success();
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn calling_safe_keypair() {
 #[test]
 fn calling_safe_keypair_pretty() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["keypair", "--pretty"])
+    cmd.args(&vec!["keypair"])
         .assert()
         .stdout(predicate::str::contains("Key pair generated:"))
         .stdout(predicate::str::contains("sk="))
@@ -73,7 +73,7 @@ fn calling_safe_keys_balance() {
     assert!(pk_xor.contains("safe://"));
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["keys", "balance", &pk_xor])
+    cmd.args(&vec!["keys", "balance", &pk_xor, "--output", "json"])
         .assert()
         .stdout("123\n")
         .success();

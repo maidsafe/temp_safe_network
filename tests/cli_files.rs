@@ -25,7 +25,7 @@ const TEST_EMPTY_FOLDER: &str = "./tests/testfolder/emptyfolder/";
 #[test]
 fn calling_safe_files_put_pretty() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "put", TEST_FILE, "--pretty"])
+    cmd.args(&vec!["files", "put", TEST_FILE])
         .assert()
         .stdout(predicate::str::contains(PRETTY_FILES_CREATION_RESPONSE))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
@@ -36,7 +36,7 @@ fn calling_safe_files_put_pretty() {
 #[test]
 fn calling_safe_files_put() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "put", TEST_FILE])
+    cmd.args(&vec!["files", "put", TEST_FILE, "--json"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_FILES_CREATION_RESPONSE).count(0))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
@@ -47,7 +47,7 @@ fn calling_safe_files_put() {
 #[test]
 fn calling_safe_files_put_recursive() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive"])
+    cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(4))
         .stdout(predicate::str::contains("./tests/testfolder/test.md").count(1))
@@ -64,9 +64,8 @@ fn calling_safe_files_put_recursive_and_change_root() {
         "put",
         TEST_FOLDER,
         "--recursive",
-        "--pretty",
         "--set-root",
-        "aha"
+        "aha",
     )
     .read()
     .unwrap();
@@ -88,21 +87,33 @@ fn calling_safe_files_put_recursive_and_change_root() {
 #[test]
 fn calling_safe_files_put_recursive_subfolder() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "put", TEST_FOLDER_SUBFOLDER, "--recursive"])
-        .assert()
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
-        .stdout(predicate::str::contains("./tests/testfolder/test.md").count(0))
-        .stdout(predicate::str::contains("./tests/testfolder/another.md").count(0))
-        .stdout(predicate::str::contains("./tests/testfolder/subfolder/subexists.md").count(1))
-        .success();
+    cmd.args(&vec![
+        "files",
+        "put",
+        TEST_FOLDER_SUBFOLDER,
+        "--recursive",
+        "--json",
+    ])
+    .assert()
+    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(2))
+    .stdout(predicate::str::contains("./tests/testfolder/test.md").count(0))
+    .stdout(predicate::str::contains("./tests/testfolder/another.md").count(0))
+    .stdout(predicate::str::contains("./tests/testfolder/subfolder/subexists.md").count(1))
+    .success();
 }
 
 #[test]
 fn calling_safe_files_put_emptyfolder() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "put", TEST_EMPTY_FOLDER, "--recursive"])
-        .assert()
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
-        .stdout(predicate::str::contains("./tests/testfolder/emptyfolder/").count(0))
-        .success();
+    cmd.args(&vec![
+        "files",
+        "put",
+        TEST_EMPTY_FOLDER,
+        "--recursive",
+        "--json",
+    ])
+    .assert()
+    .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
+    .stdout(predicate::str::contains("./tests/testfolder/emptyfolder/").count(0))
+    .success();
 }

@@ -28,7 +28,8 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
         "create",
         "--test-coins",
         "---preload",
-        preload
+        preload,
+        "--json",
     )
     .read()
     .unwrap();
@@ -53,7 +54,8 @@ pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
         &pk,
         &pk,
         "--secret-key",
-        &sk
+        &sk,
+        "--json",
     )
     .read()
     .unwrap();

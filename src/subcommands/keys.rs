@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::subcommands::helpers::{get_target_location, prompt_user};
+use super::helpers::{get_target_location, prompt_user};
+use super::OutputFmt;
 use log::warn;
 use safe_cli::{BlsKeyPair, Safe};
 use structopt::StructOpt;
@@ -38,7 +39,7 @@ pub enum KeysSubCommands {
 
 pub fn key_commander(
     cmd: Option<KeysSubCommands>,
-    pretty: bool,
+    output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -49,7 +50,7 @@ pub fn key_commander(
             preload_test_coins,
             ..
         }) => {
-            create_new_key(safe, preload_test_coins, source, preload, pk, pretty)?;
+            create_new_key(safe, preload_test_coins, source, preload, pk, output_fmt)?;
             Ok(())
         }
         Some(KeysSubCommands::Balance { target }) => {
@@ -59,7 +60,7 @@ pub fn key_commander(
             let target = get_target_location(target)?;
             let current_balance = safe.keys_balance_from_xorurl(&target, &sk)?;
 
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!("Key's current balance: {}", current_balance);
             } else {
                 println!("{}", current_balance);
@@ -76,7 +77,7 @@ pub fn create_new_key(
     source: Option<String>,
     preload: Option<String>,
     pk: Option<String>,
-    pretty: bool,
+    output_fmt: OutputFmt,
 ) -> Result<(String, Option<BlsKeyPair>), String> {
     let (xorname, key_pair) = if preload_test_coins {
         /*if cfg!(not(feature = "mock-network")) {
@@ -114,14 +115,14 @@ pub fn create_new_key(
         safe.keys_create(source_key_pair, preload, pk)?
     };
 
-    if pretty {
+    if OutputFmt::Pretty == output_fmt {
         println!("New Key created at: \"{}\"", xorname);
     } else {
         println!("pk-xorurl={}", xorname);
     }
 
     if let Some(pair) = &key_pair {
-        if pretty {
+        if OutputFmt::Pretty == output_fmt {
             println!("Key pair generated:");
         }
         println!("pk={}", pair.pk);

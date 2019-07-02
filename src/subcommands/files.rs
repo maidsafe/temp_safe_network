@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::OutputFmt;
 use log::{debug, info};
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::{Safe, XorUrl};
@@ -56,7 +57,7 @@ pub enum FilesSubCommands {
 
 pub fn files_commander(
     cmd: Option<FilesSubCommands>,
-    pretty: bool,
+    output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -94,7 +95,7 @@ pub fn files_commander(
             let files_container_xorurl =
                 safe.files_container_create(serialised_files_map.as_bytes().to_vec())?;
 
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!("FilesContainer created at: \"{}\"", files_container_xorurl);
                 let mut table = Table::new();
                 let format = FormatBuilder::new()

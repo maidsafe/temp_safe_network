@@ -23,9 +23,16 @@ const TEST_FILE: &str = "./tests/testfolder/test.md";
 
 #[test]
 fn calling_safe_cat() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE)
-        .read()
-        .unwrap();
+    let content = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FILE,
+        "--output",
+        "json"
+    )
+    .read()
+    .unwrap();
 
     let (_container_xorurl, map): (String, BTreeMap<String, String>) =
         match serde_json::from_str(&content) {

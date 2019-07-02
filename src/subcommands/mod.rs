@@ -26,6 +26,12 @@ pub use fake_auth::{self as auth, AuthSubCommands};
 
 use structopt::StructOpt;
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum OutputFmt {
+    Pretty,
+    Json,
+}
+
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {
     #[structopt(name = "auth")]

@@ -8,12 +8,12 @@
 
 use structopt::StructOpt;
 
+use super::helpers::{get_target_location, prompt_user};
+use super::keys::create_new_key;
+use super::OutputFmt;
+use log::debug;
 use safe_cli::{BlsKeyPair, Safe};
 use unwrap::unwrap;
-
-use crate::subcommands::helpers::{get_target_location, prompt_user};
-use crate::subcommands::keys::create_new_key;
-use log::debug;
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -92,7 +92,7 @@ pub enum WalletSubCommands {
 
 pub fn wallet_commander(
     cmd: Option<WalletSubCommands>,
-    pretty: bool,
+    output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -129,7 +129,7 @@ pub fn wallet_commander(
 
                         (linked_key, Some(BlsKeyPair { pk, sk }))
                     }
-                    None => create_new_key(safe, test_coins, source, preload, None, pretty)?,
+                    None => create_new_key(safe, test_coins, source, preload, None, output_fmt)?,
                 };
 
                 let the_name = match name {
@@ -147,7 +147,7 @@ pub fn wallet_commander(
                 )?;
             }
 
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!("Wallet created at: \"{}\"", &wallet_xorname);
             } else {
                 println!("{}", &wallet_xorname);
@@ -163,7 +163,7 @@ pub fn wallet_commander(
             debug!("Got target location {:?}", target);
             let balance = safe.wallet_balance(&target, &sk)?;
 
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Wallet at \"{}\" has a total balance of {} safecoins",
                     target, balance
@@ -209,7 +209,7 @@ pub fn wallet_commander(
             };
 
             safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname)?;
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",
                     the_name, target
@@ -223,7 +223,7 @@ pub fn wallet_commander(
             //TODO: if from/to start without safe://, i.e. if they are PK hex strings.
             let tx_id = safe.wallet_transfer(&amount, from, &to)?;
 
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {:?}", &tx_id);
             } else {
                 println!("{}", &tx_id)

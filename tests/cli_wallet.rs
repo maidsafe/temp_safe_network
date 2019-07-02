@@ -31,43 +31,60 @@ fn calling_safe_wallet_transfer() {
     assert!(wallet_to.contains(SAFE_PROTOCOL));
 
     // To got coins?
-    let to_starts_with = cmd!(get_bin_location(), "wallet", "balance", &wallet_to)
-        .read()
-        .unwrap();
+    let to_starts_with = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_to,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     assert_eq!(to_starts_with, "5");
 
     // To got coins?
-    let from_starts_with = cmd!(get_bin_location(), "wallet", "balance", &wallet_from)
-        .read()
-        .unwrap();
+    let from_starts_with = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_from,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     assert_eq!(from_starts_with, "160");
 
-    cmd.args(&vec![
-        "wallet",
-        "transfer",
-        "100",
-        &wallet_to,
-        &wallet_from,
-        "--pretty",
-    ])
-    .assert()
-    .stdout(predicate::str::contains("Success"))
-    .stdout(predicate::str::contains("TX_ID"))
-    .success();
+    cmd.args(&vec!["wallet", "transfer", "100", &wallet_to, &wallet_from])
+        .assert()
+        .stdout(predicate::str::contains("Success"))
+        .stdout(predicate::str::contains("TX_ID"))
+        .success();
 
     // To got coins?
-    let to_has = cmd!(get_bin_location(), "wallet", "balance", &wallet_to)
-        .read()
-        .unwrap();
+    let to_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_to,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     assert_eq!(to_has, "105");
 
     // from lost coins?
-    let from_has = cmd!(get_bin_location(), "wallet", "balance", &wallet_from)
-        .read()
-        .unwrap();
+    let from_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_from,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     assert_eq!(from_has, "60")
 }
@@ -80,10 +97,10 @@ fn calling_safe_wallet_transfer() {
 // fn calling_safe_wallet_balance_pretty_no_sk() {
 //     let mut cmd = Command::cargo_bin(CLI).unwrap();
 //
-//     let wallet = cmd!(get_bin_location(), "wallet", "create", "--preload", "300", "--test-coins").read().unwrap();
+//     let wallet = cmd!(get_bin_location(), "wallet", "create", "--preload", "300", "--test-coins", "--json").read().unwrap();
 //     assert!(wallet.contains(SAFE_PROTOCOL));
 //
-//     cmd.args(&vec!["wallet", "balance", &wallet])
+//     cmd.args(&vec!["wallet", "balance", &wallet, "--json"])
 //         .assert()
 //         .stdout("300\n")
 //         .success();
@@ -95,15 +112,10 @@ fn calling_safe_wallet_balance() {
 
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("10");
 
-    cmd.args(&vec![
-        "wallet",
-        "balance",
-        &wallet_xor,
-        // "--pretty",
-    ])
-    .assert()
-    .stdout("10\n")
-    .success();
+    cmd.args(&vec!["wallet", "balance", &wallet_xor, "--json"])
+        .assert()
+        .stdout("10\n")
+        .success();
 }
 
 #[test]
@@ -122,12 +134,13 @@ fn calling_safe_wallet_insert() {
         &wallet_xor,
         &wallet_xor,
         "--secret-key",
-        &sk
+        &sk,
+        "--json"
     )
     .read()
     .unwrap();
 
-    cmd.args(&vec!["wallet", "balance", &wallet_xor])
+    cmd.args(&vec!["wallet", "balance", &wallet_xor, "--json"])
         .assert()
         .stdout("350\n")
         .success();
@@ -147,7 +160,7 @@ fn calling_safe_wallet_create_no_source() {
 fn calling_safe_wallet_no_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    cmd.args(&vec!["wallet", "create", "--no-balance", "--pretty"])
+    cmd.args(&vec!["wallet", "create", "--no-balance"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_WALLET_CREATION_RESPONSE))
         .success();
@@ -157,9 +170,15 @@ fn calling_safe_wallet_no_balance() {
 fn calling_safe_wallet_create_w_preload_has_balance() {
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("55");
 
-    let balance = cmd!(get_bin_location(), "wallet", "balance", &wallet_xor)
-        .read()
-        .unwrap();
+    let balance = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_xor,
+        "--json"
+    )
+    .read()
+    .unwrap();
     assert_eq!("55", balance);
 }
 
@@ -174,7 +193,8 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
         &pk_pay_xor,
         &pk_pay_xor,
         "--secret-key",
-        pay_sk
+        pay_sk,
+        "--json"
     )
     .read()
     .unwrap();
@@ -183,7 +203,8 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
         get_bin_location(),
         "wallet",
         "balance",
-        &wallet_create_result
+        &wallet_create_result,
+        "--json"
     )
     .read()
     .unwrap();

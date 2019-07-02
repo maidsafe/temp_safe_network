@@ -14,7 +14,7 @@ use crate::subcommands::cat::cat_command;
 use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
 use crate::subcommands::wallet::wallet_commander;
-use crate::subcommands::SubCommands;
+use crate::subcommands::{OutputFmt, SubCommands};
 use safe_cli::Safe;
 
 #[derive(StructOpt, Debug)]
@@ -27,12 +27,12 @@ struct CmdArgs {
     /// The account's Root Container address
     #[structopt(long = "root", raw(global = "true"))]
     root: bool,
-    /// Output data serlialisation
+    /// Output data serlialisation. Currently only supported 'json'
     #[structopt(short = "o", long = "output", raw(global = "true"))]
-    output: Option<String>,
-    /// Print human readable responses. (Alias to --output human-readable.)
-    #[structopt(long = "pretty", raw(global = "true"))]
-    pretty: bool,
+    output_fmt: Option<String>,
+    /// Sets JSON as output serialisation format (alias of '--output json')
+    #[structopt(long = "json", raw(global = "true"))]
+    output_json: bool,
     /// Increase output verbosity. (More logs!)
     #[structopt(short = "v", long = "verbose", raw(global = "true"))]
     verbose: bool,
@@ -52,16 +52,33 @@ pub fn run() -> Result<(), String> {
     let args = CmdArgs::from_args();
 
     let mut safe = Safe::new(args.xorurl_base.clone().unwrap_or_else(|| "".to_string()));
-    let pretty = args.pretty;
+
+    let output_fmt = if args.output_json {
+        OutputFmt::Json
+    } else {
+        let fmt = args.output_fmt.clone().unwrap_or_else(|| "".to_string());
+        match fmt.as_ref() {
+            "json" => OutputFmt::Json,
+            "" => OutputFmt::Pretty,
+            other => {
+                return Err(format!(
+                    "Output serialisation format '{}' not supported",
+                    other
+                ))
+            }
+        }
+    };
 
     debug!("Processing command: {:?}", args);
 
     match args.cmd {
         SubCommands::Auth { cmd } => auth_commander(cmd, &mut safe),
-        SubCommands::Cat { location, version } => cat_command(location, version, pretty, &mut safe),
+        SubCommands::Cat { location, version } => {
+            cat_command(location, version, output_fmt, &mut safe)
+        }
         SubCommands::Keypair {} => {
             let key_pair = safe.keypair()?;
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 println!("Key pair generated:");
             }
             println!("pk={}", key_pair.pk);
@@ -73,9 +90,9 @@ pub fn run() -> Result<(), String> {
             // handling any command but auth
             auth_connect(&mut safe)?;
             match args.cmd {
-                SubCommands::Keys { cmd } => key_commander(cmd, pretty, &mut safe),
-                SubCommands::Wallet { cmd } => wallet_commander(cmd, pretty, &mut safe),
-                SubCommands::Files { cmd } => files_commander(cmd, pretty, &mut safe),
+                SubCommands::Keys { cmd } => key_commander(cmd, output_fmt, &mut safe),
+                SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
+                SubCommands::Files { cmd } => files_commander(cmd, output_fmt, &mut safe),
                 _ => Err("Command not supported yet".to_string()),
             }
         }

@@ -6,14 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::subcommands::helpers::get_target_location;
+use super::helpers::get_target_location;
+use super::OutputFmt;
 use prettytable::Table;
 use safe_cli::{Safe, SafeData};
 
 pub fn cat_command(
     location: Option<String>,
     _version: Option<String>,
-    pretty: bool,
+    output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
     // TODO: Get specific versions.
@@ -22,7 +23,7 @@ pub fn cat_command(
     match content {
         SafeData::FilesContainer { files_map, .. } => {
             // Render FilesContainer
-            if pretty {
+            if OutputFmt::Pretty == output_fmt {
                 let mut table = Table::new();
                 println!("Files of FilesContainer at: \"{}\"", xorurl);
                 table.add_row(row![bFg->"Name", bFg->"Size", bFg->"Created", bFg->"Link"]);

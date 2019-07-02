@@ -32,6 +32,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
   - [Files](#files)
     - [Put](#files-put)
     - [Sync](#files-sync)
+  - [Cat](#cat)
 3. [Further Help](#further-help)
 4. [License](#license)
 
@@ -56,15 +57,15 @@ The base command, if built is `$ safe`, or all commands can be run via `$ cargo 
 Various global flags are available (those commented out are not yet implemented):
 
 ```
-# --dry-run              Dry run of command. No data will be written. No coins spent.
--h, --help               Prints help information
---pretty                 Print human readable responses. (Alias to --output human-readable.)
-# --root                 The account's Root Container address
--V, --version            Prints version information
-# -v, --verbose          Increase output verbosity. (More logs!)
-# -o, --output <output>  Output data serlialisation
-# -q, --query <query>    Enable to query the output via SPARQL eg.
---xorurl <xorurl_base>   Base encoding to be used for XOR-URLs generated. Currently supported: base32 (default) and base32z
+# --dry-run                Dry run of command. No data will be written. No coins spent.
+-h, --help                 Prints help information
+--json                     Sets JSON as output serialisation format (alias of '--output json')
+# --root                   The account's Root Container address
+-V, --version              Prints version information
+# -v, --verbose            Increase output verbosity. (More logs!)
+-o, --output <output_fmt>  Output data serlialisation. Currently only supported 'json'
+# -q, --query <query>      Enable to query the output via SPARQL eg.
+--xorurl <xorurl_base>     Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default) and base32
 ```
 
 #### `--help`
@@ -124,7 +125,7 @@ $ safe keys create <source>
 
 But we can also create a `Key` with test-coins since we are using the mock network:
 ```shell
-$ safe keys create --test-coins --preload 15.342 --pretty
+$ safe keys create --test-coins --preload 15.342
 New Key created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
 Key pair generated:
 pk="b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61"
@@ -133,7 +134,7 @@ sk="c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965"
 
 Once we have some `Key`'s with some test-coins we can use them as the `source` for the creation of new `Key`'s, thus if we use the `Key` we just created with test-coins we can create a second `Key`:
 ```shell
-$ safe keys create --preload 8.15 safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks --pretty
+$ safe keys create --preload 8.15 safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks
 Enter secret key corresponding to public key at XOR-URL "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks":
 New Key created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
 Key pair generated:
@@ -153,7 +154,7 @@ We can retrieve a given `Key`'s balance using its XorUrl.
 
 The target `Key` can be passed as an argument (or it will be retrieved from `stdin`)
 ```bash
-$ safe keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks --pretty
+$ safe keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks
 Key's current balance: 15.342
 ```
 
@@ -165,7 +166,7 @@ As an example, if we want to have a friend to create a `Key` for us, and preload
 
 Thus, let's see how this use case would work. First we create a key-pair:
 ```shell
-$ safe keypair --pretty
+$ safe keypair
 Key pair generated:
 pk="b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833"
 sk="62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a"
@@ -173,7 +174,7 @@ sk="62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a"
 
 We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `Key` to be owned by it and preload it with some test-coins:
 ```shell
-$ safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833 --pretty
+$ safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
 New Key created at: "safe://bbkulcbmrxdx2inbg4srljrd2fwvwxmqg7moev72r5ptxelr43e25cndjf"
 ```
 
@@ -222,7 +223,7 @@ ARGS:
 For example, we can create a new `Wallet` with a new spendable balance by simply running:
 
 ```shell
-$ safe wallet create --pretty --source <source wallet to pay for storage costs>
+$ safe wallet create --source <source wallet to pay for storage costs>
 New Key created at: "safe://bbkulcbjyino6h67nnpw2abkm2z2m72rvl733ffuchrdn4hoorw3sf33ai"
 Key pair generated:
 pk=a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
@@ -238,7 +239,7 @@ The balance of a given `Wallet` can be queried using its XorUrl. This returns th
 
 The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
 ```shell
-$ safe wallet balance safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy --pretty
+$ safe wallet balance safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy
 Wallet at "safe://bbkulcakdcx2jxw2gfyvh7klkacht652c2pog3pohhpmiri73qjjpd2vks" has a total balance of 0 safecoins
 ```
 
@@ -274,7 +275,7 @@ With the above options, the user will be prompted to input the secret key associ
 Otherwise, there's also the `--secret-key` argument, which when combined with `--key` can pass the `Key` XorUrl as part of the command line instruction itself, e.g.:
 
 ```shell
-$ safe wallet insert <source wallet> --target safe://wallet-xorurl --key safe://key-xor-url --name my_default_balance --default --pretty
+$ safe wallet insert <source wallet> --target safe://wallet-xorurl --key safe://key-xor-url --name my_default_balance --default
 Enter secret key corresponding to public key at safe://key-xor-url:
 b493a84e3b35239cbffdf10b8ebfa49c0013a5d1b59e5ef3c000320e2d303311
 Spendable balance inserted with name 'my_default_balance' in Wallet located at "safe://wallet-xorurl"
@@ -291,7 +292,7 @@ $ safe wallet transfer <amount> <to> <from>
 ```
 E.g.:
 ```shell
-$ safe wallet transfer 323.23 safe://7e0ae5e6ed15a8065ea03218a0903b0be7c9d78384998817331b309e9d23566e safe://6221785c1a20163bbefaf523af15fa525d83b00be7502d28cae5b09ac54f4e75 --pretty
+$ safe wallet transfer 323.23 safe://7e0ae5e6ed15a8065ea03218a0903b0be7c9d78384998817331b309e9d23566e safe://6221785c1a20163bbefaf523af15fa525d83b00be7502d28cae5b09ac54f4e75
 Transaction Success. Tx_id: 44dcd919-0703-4f23-a9a2-6b6be8da0bcc
 ```
 
@@ -304,8 +305,8 @@ Files are uploaded on the Network and stored as `Published ImmutableData` files,
 #### Files Put
 
 The most simple scenario is to upload all files and sub-folders found within a local `./to-upload/` directory, recursively, onto a `FilesContainer` on the Network, obtaining the XOR-URL of the newly created container, as well as the XOR-URL of each of the files uploaded:
-```
-$ safe files put ./to-upload/ --recursive --pretty
+```shell
+$ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://bbkulcb5hsl2zbsia4af5i7myv2ujbet7di4gx5bstduikwgobru67esqu"
 +  ./to-upload/index.html          safe://bbkulcax6ulw7ovqhpsindkybsum4tusmvuc7ovtr2bu5gj6m4ugtu7euh
 +  ./to-upload/myfolder/notes.txt  safe://bbkulcan3may5gmqxqonwaoz2cjlkuc4cflrhwitmzy7ur4paof4u57yxz
@@ -315,15 +316,70 @@ FilesContainer created at: "safe://bbkulcb5hsl2zbsia4af5i7myv2ujbet7di4gx5bstdui
 Note that the `+` sign means the files were all added to the `FilesContainer`, which will make more sense later on when we see how to use the `files sync` command to update and/or delete files.
 
 A single file can also be uploaded using the `files put` command, which will create a `FilesContainer` as well but this time only a single file will be added to the map:
-```
-$ safe files put ./to-upload/myfile.txt --pretty
+```shell
+$ safe files put ./to-upload/myfile.txt
 FilesContainer created at: "safe://bbkulca25xhzwo6mcxlji7ocf5tm5hgn2x3mxtg62qzycculur4aixeywm"
 +  ./to-upload/myfile.txt  safe://bbkulcbxk23cfnj7gz3r4y7624kpb5spwf4b7jogu2rofhuj5xiqa5huh7
 ```
 
+##### Base path of files in a FilesContainer
+
+When uploading files onto a `FilesContainer` with the CLI, the base path for the files in the container is automatically calculated. All the paths at the source are compared and any common base path found among them is used as the root path, and the files are published on the `FilesContainer` with an absolute path based on the calculated root path.
+
+As an example, if we upload three files, which at source are located at `/to-upload/file1.txt`, `/to-upload/myfolder/file2.txt`, and `/to-upload/myotherfolder/subfolder/file3.txt`, the files will be published on the `FilesContainer` with paths `/file1.txt`, `/myfolder/file2.txt`, and `/myotherfolder/subfolder/file3.txt` respectively.
+
+We can additionally use the `--set-root` argument to set a root path which will be prefixed to each of the paths in the `FilesContainer`, e.g. if we provide `--set-root /mychosenroot` argument to the `files put` command when uploading the above files, they will be published on the `FilesContainer` with paths `/mychosenroot/file1.txt`, `/mychosenroot/myfolder/file2.txt`, and `/mychosenroot/myotherfolder/subfolder/file3.txt` respectively. This can be verified by querying the `FilesContainer` content with the `safe cat` command, please see further below for details of how this command.
+
 #### Files Sync
 
 TODO
+
+#### Cat
+
+The `cat` command is probably the more straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
+```shell
+$ safe cat safe://<XOR-URL>
+```
+
+If the XOR-URL targets a published `FilesContainer`, the `cat` command will fetch the content of it and render it showing the list of files contained (linked) from it, along with the corresponding XOR-URLs for each of the linked files.
+
+Let's see this in action, if we upload some folder using the `files put` command, e.g.:
+```shell
+$ safe files put ./tests/testfolder/ --recursive
+FilesContainer created at: "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w"
++  ./tests/testfolder/another.md              safe://hoxd4zdwamygh1yf3ujjzogsr4autg9tqn4uudjdzefx8csu3mqdrw
++  ./tests/testfolder/subfolder/subexists.md  safe://hoxyrscf7679gqix6wfnh4ooaiy76rqd4m85hg5uwcmxe5kero6kud
++  ./tests/testfolder/test.md                 safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud
+```
+
+We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
+```shell
+$ safe cat safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w
+Files of FilesContainer at: "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w"
++-------------------------+------+-----------------------------------+---------------------------------------------------------------+
+| Name                    | Size | Created                           | Link                                                          |
++-------------------------+------+-----------------------------------+---------------------------------------------------------------+
+| /another.md             | 7    | 2019-07-02 16:54:41.756670441 UTC | safe://hoxd4zdwamygh1yf3ujjzogsr4autg9tqn4uudjdzefx8csu3mqdrw |
++-------------------------+------+-----------------------------------+---------------------------------------------------------------+
+| /subfolder/subexists.md | 8    | 2019-07-02 16:54:41.756670441 UTC | safe://hoxyrscf7679gqix6wfnh4ooaiy76rqd4m85hg5uwcmxe5kero6kud |
++-------------------------+------+-----------------------------------+---------------------------------------------------------------+
+| /test.md                | 13   | 2019-07-02 16:54:41.756670441 UTC | safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud |
++-------------------------+------+-----------------------------------+---------------------------------------------------------------+
+```
+
+We could also take any of the XOR-URLs of the individual files and have the `cat` command to fetch the content of the file and show it in the output, e.g. let's use the XOR-URL of the `/test.md` file to fetch its content:
+```shell
+$ safe cat safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud
+hello tests!
+```
+
+Alternatively, we could use the XOR-URL of the `FilesContainer` and provide the path of the file we are trying to fetch, in this case the `cat` command will resolve the path and follow the corresponding link to read the file's content directly for us. E.g. we can also read the content of the `/test.md` file with the following command:
+```shell
+$ safe cat safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w/test.md
+hello tests!
+```
+
+As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network, at this point it only supports files and `FilesContianer`'s but it will be expanded as more types are supported by the CLI and its API.
 
 ## Further Help
 
