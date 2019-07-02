@@ -147,6 +147,8 @@ fn upload_dir_contents(safe: &mut Safe, path: &Path) -> Result<BTreeMap<String, 
             info!("{}", child.path().display());
             let the_path = child.path();
             let the_path_str = the_path.to_str().unwrap_or_else(|| "").to_string();
+            // Let's normalise the path to use '/' (instead of '\' as on Windows)
+            let normalised_path = str::replace(&the_path_str, "\\", "/");
             match fs::metadata(&the_path) {
                 Ok(metadata) => {
                     if metadata.is_dir() {
@@ -155,18 +157,18 @@ fn upload_dir_contents(safe: &mut Safe, path: &Path) -> Result<BTreeMap<String, 
                     } else {
                         match upload_file(safe, &the_path) {
                             Ok(xorurl) => {
-                                content_map.insert(the_path_str, xorurl);
+                                content_map.insert(normalised_path, xorurl);
                             }
                             Err(err) => eprintln!(
                                 "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                                the_path_str, err
+                                normalised_path, err
                             ),
                         };
                     }
                 },
                 Err(err) => eprintln!(
                     "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
-                    the_path_str, err
+                    normalised_path, err
                 )
             }
         });
@@ -177,7 +179,7 @@ fn upload_dir_contents(safe: &mut Safe, path: &Path) -> Result<BTreeMap<String, 
 fn upload_file(safe: &mut Safe, path: &Path) -> Result<XorUrl, String> {
     let data = match fs::read(path) {
         Ok(data) => data,
-        Err(e) => return Err(format!("{}", e)),
+        Err(err) => return Err(err.to_string()),
     };
     safe.files_put_published_immutable(&data)
 }

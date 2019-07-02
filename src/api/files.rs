@@ -59,19 +59,20 @@ impl Safe {
         let mut files_map = FilesMap::default();
         let now = Utc::now().to_string().to_string();
 
-        let mut replacement_root = set_root.unwrap_or_else(|| "".to_string());
-        if !replacement_root.starts_with("/") {
-            replacement_root = format!("/{}", replacement_root)
+        let replacement_root = set_root.unwrap_or_else(|| "".to_string());
+        // Let's normalise the path to use '/' (instead of '\' as on Windows)
+        let mut base_path = str::replace(&replacement_root, "\\", "/").to_string();
+
+        if !base_path.starts_with('/') {
+            base_path = format!("/{}", base_path)
         }
 
-        let keys: Vec<&String> = content.keys().collect();
         let mut paths: Vec<&Path> = vec![];
-
-        for key in keys.iter() {
-            paths.push(Path::new(key))
-        }
-
-        let prefix = common_path_all(paths).unwrap_or_else(|| PathBuf::new());
+        content.keys().for_each(|key| {
+            paths.push(Path::new(key));
+        });
+        let prefix = common_path_all(paths).unwrap_or_else(PathBuf::new);
+        let normalised_prefix = &str::replace(&prefix.to_str().unwrap(), "\\", "/").clone();
 
         for (key, value) in content.iter() {
             let mut file_item = FileItem::new();
@@ -98,14 +99,12 @@ impl Safe {
             file_item.insert("created".to_string(), now.clone());
 
             debug!("FileItem item: {:?}", file_item);
-            let new_file_name = RelativePath::new(
-                &key.to_string()
-                    .replace(prefix.to_str().unwrap(), &replacement_root),
-            )
-            .normalize();
+            let new_file_name =
+                RelativePath::new(&key.to_string().replace(normalised_prefix, &base_path))
+                    .normalize();
 
-            // above normalize removes initial slash
-            let final_name = format!("/{}", new_file_name.as_str());
+            // Above normalize removes initial slash, and uses '\' if it's on Windows
+            let final_name = format!("/{}", str::replace(new_file_name.as_str(), "\\", "/"));
 
             debug!("FileItem item inserted as {:?}", &final_name);
             files_map.insert(final_name.to_string(), file_item);

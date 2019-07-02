@@ -10,6 +10,7 @@ use multibase::{decode, encode, Base};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_nd::{XorName, XOR_NAME_LEN};
+use url::Url;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 
@@ -42,6 +43,7 @@ pub struct XorUrlEncoder {
     xorname: XorName,
     type_tag: u64,
     content_type: SafeContentType,
+    path: String,
 }
 
 impl XorUrlEncoder {
@@ -51,6 +53,7 @@ impl XorUrlEncoder {
             xorname,
             type_tag,
             content_type,
+            path: "".to_string(),
         }
     }
 
@@ -66,11 +69,19 @@ impl XorUrlEncoder {
     }
 
     pub fn from_url(xorurl: &str) -> Result<Self, String> {
-        let min_len = SAFE_URL_PROTOCOL.len();
-        if xorurl.len() < min_len {
-            return Err("Invalid XOR-URL".to_string());
+        let parsing_url =
+            Url::parse(&xorurl).map_err(|err| format!("Problem parsing the XOR-URL: {:?}", err))?;
+
+        if parsing_url.scheme() != "safe" {
+            return Err("Only \"safe://\" URLs may be used.".to_string());
         }
-        let cid_str = &xorurl[min_len..];
+
+        // Get path and normalise it to use '/' (instead of '\' as on Windows)
+        let path = &str::replace(parsing_url.path(), "\\", "/");
+
+        let cid_str = parsing_url
+            .host_str()
+            .unwrap_or_else(|| "Failed parsing the XOR-URL");
 
         let decoded_xorurl = decode(&cid_str)
             .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?
@@ -118,6 +129,7 @@ impl XorUrlEncoder {
             xorname,
             type_tag,
             content_type,
+            path: path.to_string(),
         })
     }
 
@@ -136,6 +148,10 @@ impl XorUrlEncoder {
 
     pub fn type_tag(&self) -> u64 {
         self.type_tag
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
     }
 
     pub fn to_string(&self, base: &str) -> Result<String, String> {
@@ -225,7 +241,10 @@ fn test_xorurl_decoding() {
         &"base32z".to_string()
     ));
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&format!(
+        "{}/subfolder/file",
+        xorurl
+    )));
     assert_eq!(1, xorurl_encoder.version());
     assert_eq!(xorname, xorurl_encoder.xorname());
     assert_eq!(type_tag, xorurl_encoder.type_tag());
@@ -233,4 +252,5 @@ fn test_xorurl_decoding() {
         SafeContentType::ImmutableData,
         xorurl_encoder.content_type()
     );
+    assert_eq!("/subfolder/file", xorurl_encoder.path());
 }

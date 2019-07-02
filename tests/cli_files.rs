@@ -77,11 +77,11 @@ fn calling_safe_files_put_recursive_and_change_root() {
         &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
     let file = format!("{}/aha/test.md", file_container_xor);
-    let subfile = format!("{}/aha/subfolder/subexists.md", file_container_xor);
     let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
-    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
-
     assert_eq!(file_cat, "hello tests!");
+
+    let subfile = format!("{}/aha/subfolder/subexists.md", file_container_xor);
+    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
     assert_eq!(subfile_cat, "the sub");
 }
 

@@ -29,9 +29,10 @@ use uuid::Uuid;
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
-//Temporary untill SCL allows to pass a SeqEntryActions to mutate_seq_mdata_entries
+// Temporary untill SCL allows to pass a SeqEntryActions to mutate_seq_mdata_entries
 type SeqEntryActions = BTreeMap<Vec<u8>, MDataSeqEntryAction>;
 
+#[derive(Default)]
 pub struct SafeApp {
     safe_conn: Option<App>,
 }
