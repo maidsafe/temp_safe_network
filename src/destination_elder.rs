@@ -23,8 +23,8 @@ use idata_op::IDataOp;
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AccountData, Error as NdError, IDataAddress, IDataKind, MessageId, NodePublicId, Request,
-    Response, Result as NdResult, XorName,
+    AccountData, Error as NdError, IDataAddress, IDataKind, MessageId, NodePublicId, PublicKey,
+    Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -547,16 +547,34 @@ impl DestinationElder {
         }
     }
 
+    fn get_client_name(&self, message_id: MessageId) -> Option<&XorName> {
+        self.idata_ops
+            .get(&message_id)
+            .map(IDataOp::client)
+            .or_else(|| {
+                warn!(
+                    "{}: Client not found for message_id: {:?}",
+                    self, message_id
+                );
+                None
+            })
+    }
+
     fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {
+        let client = self.get_client_name(message_id)?;
         let result = self
             .immutable_chunks
             .get(&address)
             .map_err(|error| error.to_string().into())
-            .map(|kind| {
-                if !kind.published() {
-                    // TODO - Verify ownership
+            .and_then(|kind| match kind {
+                IDataKind::Unpub(ref data) => {
+                    if &XorName::from(PublicKey::from(*data.owners())) != client {
+                        Err(NdError::AccessDenied)
+                    } else {
+                        Ok(kind)
+                    }
                 }
-                kind
+                _ => Ok(kind),
             });
         Some(Action::RespondToOurDstElders {
             sender: *self.id.name(),
