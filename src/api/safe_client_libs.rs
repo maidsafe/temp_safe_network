@@ -18,9 +18,12 @@ use safe_app::{run, App};
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
-    MDataAction, MDataPermissionSet, MDataSeqEntryAction, MDataValue, PublicKey as SafeNdPublicKey,
+    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissionSet,
+    ADataPubPermissions, ADataUser, AppendOnlyData, MDataAction, MDataPermissionSet,
+    MDataSeqEntryAction, MDataValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
     SeqMutableData, XorName,
 };
+
 pub use threshold_crypto::{PublicKey, SecretKey};
 
 use std::collections::BTreeMap;
@@ -164,51 +167,189 @@ impl SafeApp {
         "Success(0)".to_string()
     }
 
-    // TODO: Replace with SCL calling code
-    pub fn files_put_published_immutable(&mut self, _data: &[u8]) -> Result<XorName, String> {
-        // self.scl_mock.files_put_published_immutable(data)
-        Ok(create_random_xorname())
+    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
+        let xorname = create_random_xorname();
+
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
+        // unwrap!(run(safe_app, move |client, _app_context| {
+        //
+        //     client
+        //         .put_idata(data)
+        // 		.map_err(|e| panic!("Failed to PUT Published ImmutableData: {:?}", e))
+        //         .map(move |_| xorname)
+        // }));
+
+        Ok(xorname)
     }
 
-    // TODO: Replace with SCL calling code
-    pub fn files_get_published_immutable(&self, _xorname: XorName) -> Result<Vec<u8>, String> {
-        // self.scl_mock.files_get_published_immutable(xorname)
-        Ok(vec![])
+    pub fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>, String> {
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
+        let data = unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .get_idata(xorname)
+                .map_err(|e| panic!("Failed to GET Published ImmutableData: {:?}", e))
+        }));
+
+        Ok([].to_vec())
     }
 
-    // TODO: Replace with SCL calling code
     pub fn put_seq_appendable_data(
         &mut self,
-        _data: Vec<(Vec<u8>, Vec<u8>)>,
-        _name: Option<XorName>,
-        _tag: u64,
+        the_data: Vec<(Vec<u8>, Vec<u8>)>,
+        name: Option<XorName>,
+        tag: u64,
         _permissions: Option<String>,
     ) -> Result<XorName, String> {
-        // client.put_adata
-        // self.scl_mock
-        //    .put_seq_appendable_data(data, name, tag, permissions)
-        Ok(create_random_xorname())
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
+        let xorname = name.unwrap_or_else(|| create_random_xorname());
+
+        unwrap!(run(safe_app, move |client, _app_context| {
+            let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
+            let append_client = client.clone();
+
+            let mut data = PubSeqAppendOnlyData::new(xorname, tag);
+
+            // TODO: setup permissions from props
+            let mut perms = BTreeMap::<ADataUser, ADataPubPermissionSet>::new();
+            let set = ADataPubPermissionSet::new(true, true);
+            let usr = ADataUser::Key(SafeNdPublicKey::Bls(unwrap!(client.public_bls_key())));
+            let _ = perms.insert(usr, set);
+            unwrap!(data.append_permissions(ADataPubPermissions {
+                permissions: perms,
+                data_index: 0,
+                owner_entry_index: 0,
+            }));
+
+            let append = ADataAppend {
+                address: appendable_data_address,
+                values: the_data,
+            };
+
+            let owner = ADataOwner {
+                public_key: SafeNdPublicKey::Bls(unwrap!(client.public_bls_key())),
+                data_index: 0,
+                permissions_index: 1,
+            };
+            unwrap!(data.append_owner(owner));
+
+            client
+                .put_adata(AData::PubSeq(data.clone()))
+                .and_then(move |_| append_client.append_seq_adata(append, 0))
+                .map_err(|e| panic!("Failed to PUT Sequenced Appendable Data: {:?}", e))
+                .map(move |_| xorname)
+        }));
+        Ok(xorname)
     }
 
-    // TODO: Replace with SCL calling code
     pub fn append_seq_appendable_data(
         &mut self,
-        _data: (Vec<u8>, Vec<u8>),
-        _name: XorName,
-        _tag: u64,
+        the_data: Vec<(Vec<u8>, Vec<u8>)>,
+        new_version: u64,
+        xorname: XorName,
+        tag: u64,
     ) -> Result<u64, String> {
-        // self.scl_mock.append_seq_appendable_data(data, name, tag)
-        Ok(1)
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
+        unwrap!(run(safe_app, move |client, _app_context| {
+            let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
+
+            let append = ADataAppend {
+                address: appendable_data_address,
+                values: the_data,
+            };
+
+            client
+                .append_seq_adata(append, new_version)
+                .map_err(|e| panic!("Failed to UPDATE Sequenced Appendable Data: {:?}", e))
+                .map(move |_| xorname)
+        }));
+        Ok(new_version)
     }
 
-    // TODO: Replace with SCL calling code
-    pub fn get_seq_appendable_latest(
+    pub fn get_latest_seq_appendable_data(
         &self,
-        _name: XorName,
-        _tag: u64,
-    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), &str> {
-        // self.scl_mock.get_seq_appendable_latest(name, tag)
-        Ok((0, (vec![], vec![])))
+        xorname: XorName,
+        tag: u64,
+    ) -> Result<(Vec<u8>, Vec<u8>), String> {
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
+        let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
+
+        let data = unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .get_adata_last_entry(appendable_data_address)
+                .map_err(|e| panic!("Failed to get Sequenced Appendable Data: {:?}", e))
+        }));
+
+        Ok(data)
+    }
+
+    pub fn get_seq_appendable_data(
+        &self,
+        name: XorName,
+        tag: u64,
+        version: u64,
+    ) -> Result<(Vec<u8>, Vec<u8>), String> {
+        debug!(
+            "Getting seq appendable data, version: {:?}, from: {:?}",
+            version, name
+        );
+
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+        let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
+
+        let data_length = unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .get_adata_indices(appendable_data_address)
+                .map_err(|e| panic!("Failed to get Sequenced Appendable Data indices: {:?}", e))
+        }))
+        .data_index();
+
+        debug!("AD length is, \"{:?}\"", data_length);
+
+        let mut start = ADataIndex::FromStart(version);
+        let mut end = ADataIndex::FromStart(version + 1);
+
+        if version >= data_length {
+            return Err(format!(
+                "The version, \"{:?}\" of \"{:?}\" does not exist",
+                version, name
+            ));
+        }
+
+        if version == data_length {
+            return self.get_latest_seq_appendable_data(name, tag);
+        }
+
+        let data = unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .get_adata_range(appendable_data_address, (start, end))
+                .map_err(|e| panic!("Failed to get Sequenced Appendable Data: {:?}", e))
+        }));
+
+        let this_version = data[0].clone();
+        Ok(this_version)
     }
 
     pub fn put_seq_mutable_data(
@@ -382,5 +523,111 @@ impl SafeApp {
         }));
 
         Ok(())
+    }
+}
+
+#[test]
+fn test_put_and_get_immutable_data() {
+    use super::Safe;
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", "").unwrap();
+
+    let key1 = b"HELLLOOOOOOO".to_vec();
+}
+
+#[test]
+fn test_put_get_update_seq_appendable_data() {
+    use super::Safe;
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", "").unwrap();
+
+    let key1 = b"KEY1".to_vec();
+    let val1 = b"VALUE1".to_vec();
+    let data1 = [(key1, val1)].to_vec();
+
+    let TYPE = 12322;
+    let xorname = safe
+        .safe_app
+        .put_seq_appendable_data(data1, None, TYPE, None)
+        .unwrap();
+    let data = safe
+        .safe_app
+        .get_latest_seq_appendable_data(xorname, TYPE)
+        .unwrap();
+
+    assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
+    assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
+
+    let key2 = b"KEY2".to_vec();
+    let val2 = b"VALUE2".to_vec();
+    let data2 = [(key2, val2)].to_vec();
+    let new_version = 1;
+
+    let updated_version = safe
+        .safe_app
+        .append_seq_appendable_data(data2, new_version, xorname, TYPE)
+        .unwrap();
+    let data_updated = safe
+        .safe_app
+        .get_latest_seq_appendable_data(xorname, TYPE)
+        .unwrap();
+
+    assert_eq!(
+        std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
+        "KEY2"
+    );
+    assert_eq!(
+        std::str::from_utf8(data_updated.1.as_slice()).unwrap(),
+        "VALUE2"
+    );
+
+    let first_version = 0;
+
+    let first_data = safe
+        .safe_app
+        .get_seq_appendable_data(xorname, TYPE, first_version)
+        .unwrap();
+
+    assert_eq!(
+        std::str::from_utf8(first_data.0.as_slice()).unwrap(),
+        "KEY1"
+    );
+    assert_eq!(
+        std::str::from_utf8(first_data.1.as_slice()).unwrap(),
+        "VALUE1"
+    );
+
+    let second_version = 1;
+    let second_data = safe
+        .safe_app
+        .get_seq_appendable_data(xorname, TYPE, second_version)
+        .unwrap();
+
+    assert_eq!(
+        std::str::from_utf8(second_data.0.as_slice()).unwrap(),
+        "KEY2"
+    );
+    assert_eq!(
+        std::str::from_utf8(second_data.1.as_slice()).unwrap(),
+        "VALUE2"
+    );
+
+    let nonexistant_version = 2;
+    // test cehcking for versions that dont exist
+    match safe
+        .safe_app
+        .get_seq_appendable_data(xorname, TYPE, nonexistant_version)
+    {
+        Ok(data) => {
+            println!("DATA FOUND WHEN IT SHOULD NOT BE>>>>>>");
+            println!("key: {:?}", std::str::from_utf8(data.0.as_slice()).unwrap());
+            println!(
+                "value: {:?}",
+                std::str::from_utf8(data.1.as_slice()).unwrap()
+            );
+            panic!("No error thrown for a version that does not exist")
+        }
+
+        Err(err) => assert!(true),
     }
 }

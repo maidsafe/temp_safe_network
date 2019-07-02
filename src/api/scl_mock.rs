@@ -275,6 +275,7 @@ impl SafeApp {
     pub fn append_seq_appendable_data(
         &mut self,
         data: (Vec<u8>, Vec<u8>), // TODO: support appending more than one entry at a time
+        _new_version: u64,
         name: XorName,
         _tag: u64,
     ) -> Result<u64, String> {
@@ -292,7 +293,7 @@ impl SafeApp {
         Ok(seq_append_only.len() as u64)
     }
 
-    pub fn get_seq_appendable_latest(
+    pub fn get_latest_seq_appendable_data(
         &self,
         name: XorName,
         _tag: u64,
