@@ -274,7 +274,7 @@ impl SafeApp {
 
     pub fn append_seq_appendable_data(
         &mut self,
-        data: (Vec<u8>, Vec<u8>), // TODO: support appending more than one entry at a time
+        data: Vec<(Vec<u8>, Vec<u8>)>, // TODO: support appending more than one entry at a time
         _new_version: u64,
         name: XorName,
         _tag: u64,
@@ -285,7 +285,7 @@ impl SafeApp {
             None => return Err("SeqAppendOnlyDataNotFound".to_string()),
         };
 
-        seq_append_only.push(data);
+        seq_append_only.extend(data);
         self.mock_data
             .published_seq_append_only
             .insert(xorname_hex, seq_append_only.to_vec());

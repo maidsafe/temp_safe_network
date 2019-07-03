@@ -19,7 +19,7 @@ use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
     AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissionSet,
-    ADataPubPermissions, ADataUser, AppendOnlyData, MDataAction, MDataPermissionSet,
+    ADataPubPermissions, ADataUser, AppendOnlyData, ImmutableData, MDataAction, MDataPermissionSet,
     MDataSeqEntryAction, MDataValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
     SeqMutableData, XorName,
 };
@@ -168,22 +168,20 @@ impl SafeApp {
     }
 
     pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
-        let xorname = create_random_xorname();
-
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        // unwrap!(run(safe_app, move |client, _app_context| {
-        //
-        //     client
-        //         .put_idata(data)
-        // 		.map_err(|e| panic!("Failed to PUT Published ImmutableData: {:?}", e))
-        //         .map(move |_| xorname)
-        // }));
+        let the_idata = ImmutableData::new(data.to_vec());
+        let return_idata = the_idata.clone();
+        unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .put_idata(the_idata)
+                .map_err(|e| panic!("Failed to PUT Published ImmutableData: {:?}", e))
+        }));
 
-        Ok(xorname)
+        Ok(*return_idata.name())
     }
 
     pub fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>, String> {
@@ -198,7 +196,7 @@ impl SafeApp {
                 .map_err(|e| panic!("Failed to GET Published ImmutableData: {:?}", e))
         }));
 
-        Ok([].to_vec())
+        Ok(data.value().to_vec())
     }
 
     pub fn put_seq_appendable_data(
@@ -532,7 +530,15 @@ fn test_put_and_get_immutable_data() {
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", "").unwrap();
 
-    let key1 = b"HELLLOOOOOOO".to_vec();
+    let id1 = b"HELLLOOOOOOO".to_vec();
+
+    let xorname = safe.safe_app.files_put_published_immutable(&id1).unwrap();
+    let data = safe
+        .safe_app
+        .files_get_published_immutable(xorname)
+        .unwrap();
+    let text = std::str::from_utf8(data.as_slice()).unwrap();
+    assert_eq!(text.to_string(), "HELLLOOOOOOO");
 }
 
 #[test]
@@ -550,6 +556,7 @@ fn test_put_get_update_seq_appendable_data() {
         .safe_app
         .put_seq_appendable_data(data1, None, TYPE, None)
         .unwrap();
+
     let data = safe
         .safe_app
         .get_latest_seq_appendable_data(xorname, TYPE)
