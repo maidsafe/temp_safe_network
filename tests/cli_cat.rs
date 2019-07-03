@@ -23,18 +23,11 @@ const TEST_FILE: &str = "./tests/testfolder/test.md";
 
 #[test]
 fn calling_safe_cat() {
-    let content = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        TEST_FILE,
-        "--output",
-        "json"
-    )
-    .read()
-    .unwrap();
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json",)
+        .read()
+        .unwrap();
 
-    let (_container_xorurl, map): (String, BTreeMap<String, String>) =
+    let (_container_xorurl, map): (String, BTreeMap<String, (String, String)>) =
         match serde_json::from_str(&content) {
             Ok(s) => s,
             Err(err) => panic!(format!(
@@ -44,8 +37,7 @@ fn calling_safe_cat() {
         };
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-
-    cmd.args(&vec!["cat", &map[TEST_FILE]])
+    cmd.args(&vec!["cat", &map[TEST_FILE].1])
         .assert()
         .stdout(predicate::str::contains(OUR_DATA))
         .success();
