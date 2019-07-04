@@ -23,6 +23,7 @@ pub enum SafeData {
     FilesContainer {
         xorname: XorName,
         type_tag: u64,
+        version: u64,
         files_map: FilesMap,
     },
     ImmutableData {
@@ -81,7 +82,7 @@ impl Safe {
                 type_tag: xorurl_encoder.type_tag(),
             }),
             SafeContentType::FilesContainer => {
-                let files_map = self.files_container_get_latest(&xorurl)?;
+                let (version, files_map) = self.files_container_get_latest(&xorurl)?;
 
                 debug!("FilesMap found: {:?}", files_map);
 
@@ -109,6 +110,7 @@ impl Safe {
                 Ok(SafeData::FilesContainer {
                     xorname: xorurl_encoder.xorname(),
                     type_tag: xorurl_encoder.type_tag(),
+                    version,
                     files_map,
                 })
             }
@@ -175,6 +177,7 @@ fn test_fetch_files_container() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
 
+    // FIXME: we need the FilesMap returned to then compare with 'fetch' output
     let (xorurl, _) = unwrap!(safe.files_container_create("tests/testfolder", true, None));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
@@ -185,6 +188,7 @@ fn test_fetch_files_container() {
             == SafeData::FilesContainer {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 10_100,
+                version: 1,
                 files_map: unwrap!(serde_json::from_str(&files_map))
             }
     );

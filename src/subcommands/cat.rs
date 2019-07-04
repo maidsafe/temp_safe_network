@@ -21,11 +21,16 @@ pub fn cat_command(
     let xorurl = get_target_location(location)?;
     let content = safe.fetch(&xorurl)?;
     match content {
-        SafeData::FilesContainer { files_map, .. } => {
+        SafeData::FilesContainer {
+            version, files_map, ..
+        } => {
             // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
                 let mut table = Table::new();
-                println!("Files of FilesContainer at: \"{}\"", xorurl);
+                println!(
+                    "Files of FilesContainer (version {}) at: \"{}\"",
+                    version, xorurl
+                );
                 table.add_row(row![bFg->"Name", bFg->"Size", bFg->"Created", bFg->"Link"]);
                 files_map.iter().for_each(|(name, file_item)| {
                     table.add_row(row![

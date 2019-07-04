@@ -272,7 +272,6 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    #[allow(dead_code)]
     pub fn append_seq_appendable_data(
         &mut self,
         data: (Vec<u8>, Vec<u8>), // TODO: support appending more than one entry at a time
@@ -290,14 +289,14 @@ impl SafeApp {
             .published_seq_append_only
             .insert(xorname_hex, seq_append_only.to_vec());
 
-        Ok(self.mock_data.published_seq_append_only.len() as u64)
+        Ok(seq_append_only.len() as u64)
     }
 
     pub fn get_seq_appendable_latest(
         &self,
         name: XorName,
         _tag: u64,
-    ) -> Result<(Vec<u8>, Vec<u8>), &str> {
+    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), &str> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("attempting to locate scl mock mdata: {:?}", xorname_hex);
 
@@ -307,7 +306,7 @@ impl SafeApp {
                 let last_entry = seq_append_only
                     .get(latest_index)
                     .ok_or("SeqAppendOnlyDataEmpty")?;
-                Ok(last_entry.clone())
+                Ok((seq_append_only.len() as u64, last_entry.clone()))
             }
             None => Err("SeqAppendOnlyDataNotFound"),
         }

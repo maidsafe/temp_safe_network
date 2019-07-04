@@ -87,25 +87,24 @@ impl Safe {
         Ok((xorurl, content_map))
     }
 
-    pub fn files_container_get_latest(&self, xorurl: &str) -> Result<FilesMap, String> {
+    pub fn files_container_get_latest(&self, xorurl: &str) -> Result<(u64, FilesMap), String> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         match self
             .safe_app
             .get_seq_appendable_latest(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
         {
-            Ok(latest_entry) => {
+            Ok((version, (_key, value))) => {
                 // TODO: use RDF format and deserialise it
-                let files_map =
-                    serde_json::from_str(&String::from_utf8_lossy(&latest_entry.1.as_slice()))
-                        .map_err(|err| {
-                            format!(
+                let files_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
+                    .map_err(|err| {
+                    format!(
                         "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
                         err
                     )
-                        })?;
-                Ok(files_map)
+                })?;
+                Ok((version, files_map))
             }
-            Err("SeqAppendOnlyDataEmpty") => Ok(FilesMap::default()),
+            Err("SeqAppendOnlyDataEmpty") => Ok((0, FilesMap::default())),
             Err("SeqAppendOnlyDataNotFound") | Err(_) => {
                 Err("No FilesContainer found at this address".to_string())
             }
@@ -120,7 +119,8 @@ impl Safe {
         set_root: Option<String>,
         delete: bool,
     ) -> Result<(u64, ContentMap), String> {
-        let current_files_map: FilesMap = self.files_container_get_latest(xorurl)?;
+        let (mut version, current_files_map): (u64, FilesMap) =
+            self.files_container_get_latest(xorurl)?;
 
         let (content_map, new_files_map): (ContentMap, FilesMap) = sync_dir_contents(
             self,
@@ -131,7 +131,7 @@ impl Safe {
             delete,
         )?;
 
-        let version = if !content_map.is_empty() {
+        if !content_map.is_empty() {
             // The FilesContainer is updated adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
             let serialised_files_map = serde_json::to_string(&new_files_map)
@@ -145,15 +145,12 @@ impl Safe {
             let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
 
             // Append new entry in the FilesContainer, which is a Published AppendOnlyData
-            self.safe_app.append_seq_appendable_data(
+            version = self.safe_app.append_seq_appendable_data(
                 files_container_data,
                 xorurl_encoder.xorname(),
                 xorurl_encoder.type_tag(),
-            )?
-        } else {
-            // TODO: return current version number instead of 0
-            0
-        };
+            )?;
+        }
 
         Ok((version, content_map))
     }

@@ -206,9 +206,9 @@ impl SafeApp {
         &self,
         _name: XorName,
         _tag: u64,
-    ) -> Result<(Vec<u8>, Vec<u8>), &str> {
+    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), &str> {
         // self.scl_mock.get_seq_appendable_latest(name, tag)
-        Ok((vec![], vec![]))
+        Ok((0, (vec![], vec![])))
     }
 
     pub fn put_seq_mutable_data(

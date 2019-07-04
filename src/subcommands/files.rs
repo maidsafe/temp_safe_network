@@ -104,17 +104,17 @@ pub fn files_commander(
             let target = get_target_location(target)?;
 
             // Update the FilesContainer on the Network
-            let (new_version, content_map) =
+            let (version, content_map) =
                 safe.files_container_sync(&location, &target, recursive, set_root, delete)?;
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {
                 if content_map.is_empty() {
-                    println!("No changes were required, source location is already in sync with FilesContainer at: \"{}\"", target);
+                    println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 } else {
                     println!(
-                        "FilesContainer synced up (new version {}): \"{}\"",
-                        new_version, target
+                        "FilesContainer synced up (version {}): \"{}\"",
+                        version, target
                     );
                     let mut table = Table::new();
                     let format = FormatBuilder::new()
