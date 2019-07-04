@@ -54,7 +54,7 @@
 mod common;
 
 use self::common::{Environment, TestClient, TestVault};
-use safe_nd::{AccountData, Coins, Error as NdError, Request, Response, XorName};
+use safe_nd::{AccountData, Coins, Error as NdError, IDataAddress, Request, Response, XorName};
 use unwrap::unwrap;
 
 #[test]
@@ -135,4 +135,40 @@ fn accounts() {
         }
         x => unexpected!(x),
     }
+}
+
+#[test]
+fn get_immutable_data() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client = TestClient::new(env.rng());
+    let conn_info = client.establish_connection(&mut env, &mut vault);
+
+    // Get idata that doesn't exist
+    let address: XorName = rand::random();
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetIData(IDataAddress::Pub(address)),
+    );
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::NoSuchData)) => (),
+        x => unexpected!(x),
+    }
+
+    // Unpublished immutable data that we're not the owner of.
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetIData(IDataAddress::Unpub(address)),
+    );
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::AccessDenied)) => (),
+        x => unexpected!(x),
+    }
+
+    // TODO - Get immutable data that exist once we have PutIData working
 }
