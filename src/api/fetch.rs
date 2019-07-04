@@ -181,7 +181,7 @@ fn test_fetch_files_container() {
     /*    use std::collections::BTreeMap;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
-	safe.connect("", "").unwrap();
+    safe.connect("", "").unwrap();
 
     // FIXME: we need the FilesMap returned to then compare with 'fetch' output
     let (xorurl, _) = unwrap!(safe.files_container_create("tests/testfolder", true, None));

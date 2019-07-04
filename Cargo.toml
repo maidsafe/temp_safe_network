@@ -48,9 +48,6 @@ default = ["uuid/v4"]
 mock-network = ["safe_app/mock-network"]
 fake-auth = ["safe_app/testing"]
 scl-mock = ["fake-auth"]
-# The reason we do this is because doctests don't get cfg(test)
-# See: https://github.com/rust-lang/cargo/issues/4669
-test = []
 
 [patch.crates-io]
 safecoin = { git = "https://gitlab.com/Fraser999/SafeCoin" }

@@ -283,7 +283,7 @@ impl SafeApp {
         &self,
         xorname: XorName,
         tag: u64,
-    ) -> Result<(Vec<u8>, Vec<u8>), String> {
+    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), String> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(APP_NOT_CONNECTED.to_string()),
@@ -291,13 +291,46 @@ impl SafeApp {
 
         let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
 
+        let data_length = unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .get_adata_indices(appendable_data_address)
+                .map_err(|e| panic!("Failed to get Sequenced Appendable Data indices: {:?}", e))
+        }))
+        .data_index();
+
         let data = unwrap!(run(safe_app, move |client, _app_context| {
             client
                 .get_adata_last_entry(appendable_data_address)
                 .map_err(|e| panic!("Failed to get Sequenced Appendable Data: {:?}", e))
         }));
 
-        Ok(data)
+        Ok((data_length, data))
+    }
+
+    pub fn get_current_seq_appendable_data_length(
+        &self,
+        name: XorName,
+        tag: u64,
+    ) -> Result<u64, String> {
+        debug!("Getting seq appendable data, length for: {:?}", name);
+
+        let safe_app: &App = match &self.safe_conn {
+            Some(app) => &app,
+            None => return Err(APP_NOT_CONNECTED.to_string()),
+        };
+
+        let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
+
+        let data_length = unwrap!(run(safe_app, move |client, _app_context| {
+            client
+                .get_adata_indices(appendable_data_address)
+                .map_err(|e| panic!("Failed to get Sequenced Appendable Data indices: {:?}", e))
+        }))
+        .data_index();
+
+        debug!("AD length is, \"{:?}\"", data_length);
+
+        Ok(data_length)
     }
 
     pub fn get_seq_appendable_data(
@@ -317,14 +350,9 @@ impl SafeApp {
         };
         let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
 
-        let data_length = unwrap!(run(safe_app, move |client, _app_context| {
-            client
-                .get_adata_indices(appendable_data_address)
-                .map_err(|e| panic!("Failed to get Sequenced Appendable Data indices: {:?}", e))
-        }))
-        .data_index();
-
-        debug!("AD length is, \"{:?}\"", data_length);
+        let data_length = self
+            .get_current_seq_appendable_data_length(name, tag)
+            .unwrap();
 
         let mut start = ADataIndex::FromStart(version);
         let mut end = ADataIndex::FromStart(version + 1);
@@ -337,7 +365,8 @@ impl SafeApp {
         }
 
         if version == data_length {
-            return self.get_latest_seq_appendable_data(name, tag);
+            let (version, data) = self.get_latest_seq_appendable_data(name, tag).unwrap();
+            return Ok(data);
         }
 
         let data = unwrap!(run(safe_app, move |client, _app_context| {
@@ -557,11 +586,12 @@ fn test_put_get_update_seq_appendable_data() {
         .put_seq_appendable_data(data1, None, TYPE, None)
         .unwrap();
 
-    let data = safe
+    let (_this_version, data) = safe
         .safe_app
         .get_latest_seq_appendable_data(xorname, TYPE)
         .unwrap();
 
+    //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
     assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
     assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
 
@@ -574,7 +604,7 @@ fn test_put_get_update_seq_appendable_data() {
         .safe_app
         .append_seq_appendable_data(data2, new_version, xorname, TYPE)
         .unwrap();
-    let data_updated = safe
+    let (_v_updated, data_updated) = safe
         .safe_app
         .get_latest_seq_appendable_data(xorname, TYPE)
         .unwrap();
@@ -625,15 +655,7 @@ fn test_put_get_update_seq_appendable_data() {
         .safe_app
         .get_seq_appendable_data(xorname, TYPE, nonexistant_version)
     {
-        Ok(data) => {
-            println!("DATA FOUND WHEN IT SHOULD NOT BE>>>>>>");
-            println!("key: {:?}", std::str::from_utf8(data.0.as_slice()).unwrap());
-            println!(
-                "value: {:?}",
-                std::str::from_utf8(data.1.as_slice()).unwrap()
-            );
-            panic!("No error thrown for a version that does not exist")
-        }
+        Ok(data) => panic!("No error thrown for a version that does not exist"),
 
         Err(err) => assert!(true),
     }

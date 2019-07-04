@@ -39,7 +39,7 @@ pub fn create_random_xorname() -> XorName {
 
 #[derive(Debug)]
 pub struct XorUrlEncoder {
-    version: u8, // currently only v1 supported
+    version: u64, // currently only v1 supported
     xorname: XorName,
     type_tag: u64,
     content_type: SafeContentType,
@@ -93,7 +93,8 @@ impl XorUrlEncoder {
             ));
         }
 
-        let version: u8 = decoded_xorurl[0];
+        let u8_version: u8 = decoded_xorurl[0];
+        let version: u64 = u8_version as u64;
         if version != 1 {
             return Err(format!("Invalid XOR-URL encoding version: {}", version));
         }
@@ -133,8 +134,7 @@ impl XorUrlEncoder {
         })
     }
 
-    #[cfg(test)]
-    pub fn version(&self) -> u8 {
+    pub fn version(&self) -> u64 {
         self.version
     }
 
