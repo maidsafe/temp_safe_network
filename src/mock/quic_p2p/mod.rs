@@ -237,6 +237,8 @@ pub enum Event {
     ConnectionFailure {
         /// Address of the peer we attempted connecting to.
         peer_addr: SocketAddr,
+        /// Error explaining connection failure.
+        err: Error,
     },
     /// Message sent by us but not delivered due to connection drop.
     UnsentUserMessage {
@@ -276,7 +278,9 @@ impl Display for Event {
 
                 write!(f, "ConnectedTo {{ {}({}) }}", peer_type, peer.peer_addr())
             }
-            ConnectionFailure { peer_addr } => write!(f, "ConnectionFailure {{ {} }}", peer_addr),
+            ConnectionFailure { peer_addr, .. } => {
+                write!(f, "ConnectionFailure {{ {} }}", peer_addr)
+            }
             NewMessage { peer_addr, msg } => write!(
                 f,
                 "NewMessage {{ peer_addr: {}, msg: {:<8} }}",

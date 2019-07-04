@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Builder, Config, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
+use super::{Builder, Config, Error, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, TryRecvError};
 use fxhash::FxHashSet;
@@ -490,7 +490,7 @@ impl Agent {
     fn expect_connection_failure(&self, addr: &SocketAddr) {
         let actual_addr = assert_match!(
             self.rx.try_recv(),
-            Ok(Event::ConnectionFailure { peer_addr }) => peer_addr
+            Ok(Event::ConnectionFailure { peer_addr, err: Error }) => peer_addr
         );
         assert_eq!(actual_addr, *addr);
     }

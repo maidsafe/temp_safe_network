@@ -11,7 +11,7 @@ use crate::{
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     utils,
     vault::Init,
-    Result, ToDbKey,
+    Error, Result, ToDbKey,
 };
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
@@ -134,7 +134,8 @@ impl SourceElder {
         info!("{}: Connected to new client on {}", self, peer_addr);
     }
 
-    pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
+    pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr, error: Error) {
+        info!("{}: {}", self, error);
         if let Some((client_id, _)) = self.clients.remove(&peer_addr) {
             info!(
                 "{}: Disconnected from {:?} on {}",

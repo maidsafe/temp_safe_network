@@ -13,7 +13,7 @@ use crate::{
     destination_elder::DestinationElder,
     quic_p2p::{Event, NodeInfo},
     source_elder::SourceElder,
-    utils, Config, Result,
+    utils, Config, Error, Result,
 };
 use bincode;
 use crossbeam_channel::Receiver;
@@ -150,8 +150,8 @@ impl Vault {
         let source_elder = self.source_elder_mut()?;
         match event {
             Event::ConnectedTo { peer } => source_elder.handle_new_connection(peer),
-            Event::ConnectionFailure { peer_addr } => {
-                source_elder.handle_connection_failure(peer_addr);
+            Event::ConnectionFailure { peer_addr, err } => {
+                source_elder.handle_connection_failure(peer_addr, Error::from(err));
             }
             Event::NewMessage { peer_addr, msg } => {
                 return source_elder.handle_client_message(peer_addr, msg);

@@ -737,7 +737,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.1.1"
-source = "git+https://github.com/maidsafe/quic-p2p#d3715ffce78851c835ae0ac81d45a4137164ca15"
+source = "git+https://github.com/maidsafe/quic-p2p#4a540ca986bc3a5f7497354a13578b278fefab5d"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
