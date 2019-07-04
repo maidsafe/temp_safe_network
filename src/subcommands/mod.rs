@@ -50,13 +50,7 @@ pub enum SubCommands {
     },
     #[structopt(name = "cat")]
     /// Read data on the network.
-    Cat {
-        /// The safe:// location to retrieve
-        location: Option<String>,
-        /// Version of the resource to retrieve
-        #[structopt(long = "version")]
-        version: Option<String>,
-    },
+    Cat(cat::CatCommands),
     #[structopt(name = "files")]
     /// Manage files on the network
     Files {

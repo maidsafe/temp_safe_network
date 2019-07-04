@@ -10,7 +10,7 @@ use log::debug;
 use structopt::StructOpt;
 
 use crate::subcommands::auth::{auth_commander, auth_connect};
-use crate::subcommands::cat::cat_command;
+use crate::subcommands::cat::cat_commander;
 use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
 use crate::subcommands::wallet::wallet_commander;
@@ -73,9 +73,7 @@ pub fn run() -> Result<(), String> {
 
     match args.cmd {
         SubCommands::Auth { cmd } => auth_commander(cmd, &mut safe),
-        SubCommands::Cat { location, version } => {
-            cat_command(location, version, output_fmt, &mut safe)
-        }
+        SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe),
         SubCommands::Keypair {} => {
             let key_pair = safe.keypair()?;
             if OutputFmt::Pretty == output_fmt {

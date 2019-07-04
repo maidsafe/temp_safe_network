@@ -28,6 +28,8 @@ type ContentMap = BTreeMap<String, (String, String)>;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
 const FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
+// Informative string of the SAFE native data type behind a FilesContainer
+const FILES_CONTAINER_NATIVE_TYPE: &str = "AppendOnlyData";
 
 const FILE_ADDED_SIGN: &str = "+";
 const FILE_UPDATED_SIGN: &str = "*";
@@ -87,7 +89,10 @@ impl Safe {
         Ok((xorurl, content_map))
     }
 
-    pub fn files_container_get_latest(&self, xorurl: &str) -> Result<(u64, FilesMap), String> {
+    pub fn files_container_get_latest(
+        &self,
+        xorurl: &str,
+    ) -> Result<(u64, FilesMap, String), String> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         match self
             .safe_app
@@ -102,9 +107,13 @@ impl Safe {
                         err
                     )
                 })?;
-                Ok((version, files_map))
+                Ok((version, files_map, FILES_CONTAINER_NATIVE_TYPE.to_string()))
             }
-            Err("SeqAppendOnlyDataEmpty") => Ok((0, FilesMap::default())),
+            Err("SeqAppendOnlyDataEmpty") => Ok((
+                0,
+                FilesMap::default(),
+                FILES_CONTAINER_NATIVE_TYPE.to_string(),
+            )),
             Err("SeqAppendOnlyDataNotFound") | Err(_) => {
                 Err("No FilesContainer found at this address".to_string())
             }
@@ -119,7 +128,7 @@ impl Safe {
         set_root: Option<String>,
         delete: bool,
     ) -> Result<(u64, ContentMap), String> {
-        let (mut version, current_files_map): (u64, FilesMap) =
+        let (mut version, current_files_map, _): (u64, FilesMap, String) =
             self.files_container_get_latest(xorurl)?;
 
         let (content_map, new_files_map): (ContentMap, FilesMap) = sync_dir_contents(

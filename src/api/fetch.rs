@@ -13,18 +13,20 @@ use log::debug;
 
 #[derive(Debug, PartialEq)]
 pub enum SafeData {
-    CoinBalance {
+    Key {
         xorname: XorName,
     },
     Wallet {
         xorname: XorName,
         type_tag: u64,
+        native_type: String,
     },
     FilesContainer {
         xorname: XorName,
         type_tag: u64,
         version: u64,
         files_map: FilesMap,
+        native_type: String,
     },
     ImmutableData {
         xorname: XorName,
@@ -74,15 +76,16 @@ impl Safe {
         let path = xorurl_encoder.path();
 
         match xorurl_encoder.content_type() {
-            SafeContentType::CoinBalance => Ok(SafeData::CoinBalance {
+            SafeContentType::CoinBalance => Ok(SafeData::Key {
                 xorname: xorurl_encoder.xorname(),
             }),
             SafeContentType::Wallet => Ok(SafeData::Wallet {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: xorurl_encoder.type_tag(),
+                native_type: "MutableData".to_string(), // TODO: to be retrieved from wallet API
             }),
             SafeContentType::FilesContainer => {
-                let (version, files_map) = self.files_container_get_latest(&xorurl)?;
+                let (version, files_map, native_type) = self.files_container_get_latest(&xorurl)?;
 
                 debug!("FilesMap found: {:?}", files_map);
 
@@ -112,6 +115,7 @@ impl Safe {
                     type_tag: xorurl_encoder.type_tag(),
                     version,
                     files_map,
+                    native_type,
                 })
             }
             SafeContentType::ImmutableData => {
@@ -147,7 +151,7 @@ fn test_fetch_coin_balance() {
     let content = unwrap!(safe.fetch(&xorurl));
     assert!(
         content
-            == SafeData::CoinBalance {
+            == SafeData::Key {
                 xorname: xorurl_encoder.xorname()
             }
     );
@@ -165,7 +169,8 @@ fn test_fetch_wallet() {
         content
             == SafeData::Wallet {
                 xorname: xorurl_encoder.xorname(),
-                type_tag: 10_000
+                type_tag: 10_000,
+                native_type: "MutableData".to_string(),
             }
     );
 }
@@ -189,7 +194,8 @@ fn test_fetch_files_container() {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 10_100,
                 version: 1,
-                files_map: unwrap!(serde_json::from_str(&files_map))
+                files_map: unwrap!(serde_json::from_str(&files_map)),
+                native_type: "AppendOnlyData",
             }
     );
 

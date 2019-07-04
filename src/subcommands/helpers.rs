@@ -7,7 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use log::debug;
+use safe_cli::XorName;
 use std::io::{self, stdin, stdout, Write};
+
+// Converts the XOR name bytes into a hex encoded string
+pub fn xorname_to_hex(xorname: &XorName) -> String {
+    xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
+}
 
 // Read the target location from the STDIN if is not an arg provided
 pub fn get_target_location(target_arg: Option<String>) -> Result<String, String> {
