@@ -64,7 +64,7 @@ impl Safe {
     /// };
     ///
     ///
-    /// assert_eq!("hello tests!\n", data_string);
+    /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, xorurl: &str) -> Result<SafeData, String> {
         debug!("Fetching url: {:?}", xorurl);
@@ -171,25 +171,15 @@ fn test_fetch_wallet() {
 #[test]
 #[ignore]
 fn test_fetch_files_container() {
-    use std::collections::BTreeMap;
+    /*    use std::collections::BTreeMap;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
-    let mut content_map = BTreeMap::new();
 
-    let top = b"The Answer from a relative path";
-    let top_xorurl = safe.files_put_published_immutable(top).unwrap();
-    let second = b"Something second level";
-    let second_xorurl = safe.files_put_published_immutable(second).unwrap();
-    content_map.insert("tests/testfolder/test.md".to_string(), top_xorurl);
-    content_map.insert(
-        "tests/testfolder/subfolder/subexists.md".to_string(),
-        second_xorurl,
-    );
-    /*    let files_map = safe.files_map_create(&content_map, None).unwrap();
-    let (xorurl, _) = unwrap!(safe.files_container_create(files_map.clone().into_bytes().to_vec()));
+    let (xorurl, _) = unwrap!(safe.files_container_create("tests/testfolder", true, None));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
     let content = unwrap!(safe.fetch(&xorurl));
+
     assert!(
         content
             == SafeData::FilesContainer {
