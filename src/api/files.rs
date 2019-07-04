@@ -8,7 +8,7 @@
 
 use super::xorurl::SafeContentType;
 use super::{Safe, XorUrl, XorUrlEncoder};
-use chrono::Utc;
+use chrono::{SecondsFormat, Utc};
 use common_path::common_path_all;
 use log::{debug, info};
 use relative_path::RelativePath;
@@ -63,7 +63,7 @@ impl Safe {
         let files_map = files_map_create(&content_map, set_root)?;
         let serialised_files_map = serde_json::to_string(&files_map)
             .map_err(|err| format!("Couldn't serialise the FilesMap generated: {:?}", err))?;
-        let now = Utc::now().to_string().to_string();
+        let now = gen_timestamp();
         let files_container_data = vec![(
             now.into_bytes().to_vec(),
             serialised_files_map.as_bytes().to_vec(),
@@ -136,7 +136,7 @@ impl Safe {
             // entry's key, and the serialised new version of the FilesMap as the entry's value
             let serialised_files_map = serde_json::to_string(&new_files_map)
                 .map_err(|err| format!("Couldn't serialise the FilesMap generated: {:?}", err))?;
-            let now = Utc::now().to_string().to_string();
+            let now = gen_timestamp();
             let files_container_data = (
                 now.into_bytes().to_vec(),
                 serialised_files_map.as_bytes().to_vec(),
@@ -211,6 +211,10 @@ impl Safe {
 
 // Helper functions
 
+fn gen_timestamp() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
 fn gen_normalised_paths(new_content: &ContentMap, set_root: Option<String>) -> (String, String) {
     let replacement_root = set_root.unwrap_or_else(|| "".to_string());
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
@@ -242,7 +246,7 @@ fn gen_new_file_item(
     file_size: &str,
     file_created: Option<&str>,
 ) -> Result<FileItem, String> {
-    let now = Utc::now().to_string().to_string();
+    let now = gen_timestamp();
     let mut file_item = FileItem::new();
     let xorurl = upload_file(safe, file_path)?;
     file_item.insert("link".to_string(), xorurl.to_string());
@@ -499,7 +503,7 @@ fn upload_file(safe: &mut Safe, path: &Path) -> Result<XorUrl, String> {
 
 fn files_map_create(content: &ContentMap, set_root: Option<String>) -> Result<FilesMap, String> {
     let mut files_map = FilesMap::default();
-    let now = Utc::now().to_string().to_string();
+    let now = gen_timestamp();
 
     let (base_path, normalised_prefix) = gen_normalised_paths(content, set_root);
 

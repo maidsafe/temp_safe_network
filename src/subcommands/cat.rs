@@ -31,12 +31,15 @@ pub fn cat_command(
                     "Files of FilesContainer (version {}) at: \"{}\"",
                     version, xorurl
                 );
-                table.add_row(row![bFg->"Name", bFg->"Size", bFg->"Created", bFg->"Link"]);
+                table.add_row(
+                    row![bFg->"Name", bFg->"Size", bFg->"Created", bFg->"Modified", bFg->"Link"],
+                );
                 files_map.iter().for_each(|(name, file_item)| {
                     table.add_row(row![
                         name,
                         file_item["size"],
                         file_item["created"],
+                        file_item["modified"],
                         file_item["link"],
                     ]);
                 });
