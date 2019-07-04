@@ -332,7 +332,36 @@ We can additionally use the `--set-root` argument to set a root path which will 
 
 #### Files Sync
 
-TODO
+Once a set of files, folders and subfolders, have been uploaded to the Network onto a `FilesContainer` using the `file put` command, local changes made to those files and folders can be easily synced up using the `files sync` command. This command takes care of finding the differences/changes on the local files and folders, creating new `Published ImmutableData` files as necessary, and updating the `FilesContainer` by publishing a new version of it at the same location on the Network.
+
+The `files sync` command follows a very similar logic to the well known `rsync` command supporting a subset of the functionality provided by it. The subset of features supported will be gradually expanded with more features. Users knowing how to use `rsync` can easily start using the SAFE CLI and the SAFE Network for uploading files and folders, making it also easy to integrate existing automated systems which are currently making use of `rsync`.
+
+As an example, let's suppose we uploaded all files and subfolders found within the `./to-upload/` local directory, recursively, using `files put` command:
+```shell
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
++  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
++  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
++  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
+```
+
+All the content of the `./to-upload/` local directory is now stored and published on the SAFE Network. Now, let's say we make the following changes to our local files within the `./to-upload/` folder:
+- We edit `./to-upload/another.md` and change it content to "Text file updated!"
+- We create a new file at `./to-upload/new.md` with content "this is to be added"
+- And we remove the file `./to-upload/test.md`
+
+We can now sync up all the changes we just made, recursively, with the `FilesContainer` we previously created:
+```shell
+$ safe files sync ./to-upload/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w --recursive --delete
+FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
+*  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
++  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
+-  /test.md                   safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
+```
+
+The `*`, `+` and `-` signs mean that the files were updated, added, and removed respectively.
+
+Also, please note we provided the optional `--delete` flag to the command above, this forces the deletion of those files which are found at the targeted `FilesContainer` that are not found in the source location, like the case of `./to-upload/test.md` file in our example above. If we didn't provide such flag, only the modification and creation of files would have been updated on the `FilesContainer`, like the case of `./to-upload/another.md` and `./to-upload/new` files in our example above.
 
 #### Cat
 
@@ -345,11 +374,11 @@ If the XOR-URL targets a published `FilesContainer`, the `cat` command will fetc
 
 Let's see this in action, if we upload some folder using the `files put` command, e.g.:
 ```shell
-$ safe files put ./tests/testfolder/ --recursive
+$ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w"
-+  ./tests/testfolder/another.md              safe://hoxd4zdwamygh1yf3ujjzogsr4autg9tqn4uudjdzefx8csu3mqdrw
-+  ./tests/testfolder/subfolder/subexists.md  safe://hoxyrscf7679gqix6wfnh4ooaiy76rqd4m85hg5uwcmxe5kero6kud
-+  ./tests/testfolder/test.md                 safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud
++  ./to-upload/another.md              safe://hoxd4zdwamygh1yf3ujjzogsr4autg9tqn4uudjdzefx8csu3mqdrw
++  ./to-upload/subfolder/subexists.md  safe://hoxyrscf7679gqix6wfnh4ooaiy76rqd4m85hg5uwcmxe5kero6kud
++  ./to-upload/test.md                 safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud
 ```
 
 We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
@@ -379,7 +408,36 @@ $ safe cat safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w/tes
 hello tests!
 ```
 
-As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network, at this point it only supports files and `FilesContianer`'s but it will be expanded as more types are supported by the CLI and its API.
+As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network, at this point it only supports files (`ImmutableData`), and `FilesContainer`'s, but it will be expanded as more types are supported by the CLI and its API.
+
+In order to get additional information about the native data type holding the data of a specific content, we can pass the `--info` flag to the `cat` command:
+```shell
+$ safe cat safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w --info
+Native data type: AppendOnlyData
+Type tag: 10100
+XOR name: 0x63a2bb2da2be0bb01125a2c306be3bba027e074c96223f92fe97e4ad38123049
+
+Files of FilesContainer (version 1) at "safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w":
++-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
+| Name                    | Size | Created              | Modified             | Link                                                          |
++-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
+| /another.md             | 7    | 2019-07-04T21:04:22Z | 2019-07-04T21:04:22Z | safe://hoqywhrsjwjjkn1uebmte9kb4sck4x3orac4k8e3wptatko3ir8e5n |
++-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
+| /subfolder/subexists.md | 8    | 2019-07-04T21:04:22Z | 2019-07-04T21:04:22Z | safe://hoxgjni3c4i4f3pjtdguxquysjb9shcqneuad7nu38zx5w4pztf3px |
++-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
+| /test.md                | 13   | 2019-07-04T21:04:22Z | 2019-07-04T21:04:22Z | safe://hoquc6dbes9m3ma1aduudp9jxh3ubjtjuyg4imixz3kamgko339z37 |
++-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
+```
+
+And of course that can be used also with other type of content like `ImmutableData` files:
+```shell
+$ safe cat safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w/subfolder/subexists.md --info
+Native data type: ImmutableData (published)
+XOR name: 0x9922ae59aae8b96a62334dee982c90fedc638489e07d14f27bbf74d36f12e5af
+
+Raw content of the file:
+hellow from a subfolder!
+```
 
 ## Further Help
 
