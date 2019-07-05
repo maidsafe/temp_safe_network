@@ -157,10 +157,14 @@ impl Safe {
             )];
 
             let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+			let xorname = xorurl_encoder.xorname();
+			let type_tag = xorurl_encoder.type_tag();
+
+			let current_version = self.safe_app.get_current_seq_appendable_data_version( xorname , type_tag ).unwrap();
 
             version = self.safe_app.append_seq_appendable_data(
                 files_container_data,
-                xorurl_encoder.version() + 1,
+                current_version + 1,
                 xorurl_encoder.xorname(),
                 xorurl_encoder.type_tag(),
             )?;

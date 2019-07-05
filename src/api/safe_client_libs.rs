@@ -291,12 +291,7 @@ impl SafeApp {
 
         let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
 
-        let data_length = unwrap!(run(safe_app, move |client, _app_context| {
-            client
-                .get_adata_indices(appendable_data_address)
-                .map_err(|e| panic!("Failed to get Sequenced Appendable Data indices: {:?}", e))
-        }))
-        .data_index();
+        let data_length = self.get_current_seq_appendable_data_version(xorname, tag).unwrap();
 
         let data = unwrap!(run(safe_app, move |client, _app_context| {
             client
@@ -307,7 +302,7 @@ impl SafeApp {
         Ok((data_length, data))
     }
 
-    pub fn get_current_seq_appendable_data_length(
+    pub fn get_current_seq_appendable_data_version(
         &self,
         name: XorName,
         tag: u64,
@@ -351,7 +346,7 @@ impl SafeApp {
         let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
 
         let data_length = self
-            .get_current_seq_appendable_data_length(name, tag)
+            .get_current_seq_appendable_data_version(name, tag)
             .unwrap();
 
         let mut start = ADataIndex::FromStart(version);
