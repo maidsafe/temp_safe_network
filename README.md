@@ -332,7 +332,7 @@ We can additionally use the `--set-root` argument to set a root path which will 
 
 #### Files Sync
 
-Once a set of files, folders and subfolders, have been uploaded to the Network onto a `FilesContainer` using the `file put` command, local changes made to those files and folders can be easily synced up using the `files sync` command. This command takes care of finding the differences/changes on the local files and folders, creating new `Published ImmutableData` files as necessary, and updating the `FilesContainer` by publishing a new version of it at the same location on the Network.
+Once a set of files, folders and subfolders, have been uploaded to the Network onto a `FilesContainer` using the `files put` command, local changes made to those files and folders can be easily synced up using the `files sync` command. This command takes care of finding the differences/changes on the local files and folders, creating new `Published ImmutableData` files as necessary, and updating the `FilesContainer` by publishing a new version of it at the same location on the Network.
 
 The `files sync` command follows a very similar logic to the well known `rsync` command supporting a subset of the functionality provided by it. The subset of features supported will be gradually expanded with more features. Users knowing how to use `rsync` can easily start using the SAFE CLI and the SAFE Network for uploading files and folders, making it also easy to integrate existing automated systems which are currently making use of `rsync`.
 
@@ -346,8 +346,8 @@ FilesContainer created at: "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1ad
 ```
 
 All the content of the `./to-upload/` local directory is now stored and published on the SAFE Network. Now, let's say we make the following changes to our local files within the `./to-upload/` folder:
-- We edit `./to-upload/another.md` and change it content to "Text file updated!"
-- We create a new file at `./to-upload/new.md` with content "this is to be added"
+- We edit `./to-upload/another.md` and change its content
+- We create a new file at `./to-upload/new.md`
 - And we remove the file `./to-upload/test.md`
 
 We can now sync up all the changes we just made, recursively, with the `FilesContainer` we previously created:

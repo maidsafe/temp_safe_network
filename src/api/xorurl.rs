@@ -155,7 +155,7 @@ impl XorUrlEncoder {
     }
 
     pub fn to_string(&self, base: &str) -> Result<String, String> {
-        // Temporary CID format (var length from 35 to 42 bytes):
+        // Temporary CID format (var length from 34 to 42 bytes):
         // 1 byte for version
         // 1 byte for content_type
         // 32 bytes for xorname

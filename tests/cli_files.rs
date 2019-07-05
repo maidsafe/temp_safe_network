@@ -119,8 +119,6 @@ fn calling_safe_files_put_emptyfolder() {
     .success();
 }
 
-
-
 #[test]
 fn calling_safe_files_put_recursive_with_slash() {
     let file_container = cmd!(

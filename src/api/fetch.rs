@@ -50,7 +50,7 @@ impl Safe {
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::new("base32z".to_string());
-    /// let (xorurl, _) = unwrap!(safe.files_container_create("tests/testfolder", true, None));
+    /// let (xorurl, _, _) = unwrap!(safe.files_container_create("tests/testfolder/", true, None));
     ///
     /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl ) ) );
     /// let data_string = match safe_data {
@@ -65,7 +65,6 @@ impl Safe {
     /// 		other
     /// 	)
     /// };
-    ///
     ///
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
@@ -176,15 +175,13 @@ fn test_fetch_wallet() {
 }
 
 #[test]
-#[ignore]
 fn test_fetch_files_container() {
-    /*    use std::collections::BTreeMap;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", "").unwrap();
 
-    // FIXME: we need the FilesMap returned to then compare with 'fetch' output
-    let (xorurl, _) = unwrap!(safe.files_container_create("tests/testfolder", true, None));
+    let (xorurl, _, files_map) =
+        unwrap!(safe.files_container_create("tests/testfolder", true, None));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
     let content = unwrap!(safe.fetch(&xorurl));
@@ -195,8 +192,8 @@ fn test_fetch_files_container() {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 10_100,
                 version: 1,
-                files_map: unwrap!(serde_json::from_str(&files_map)),
-                native_type: "AppendOnlyData",
+                files_map,
+                native_type: "AppendOnlyData".to_string(),
             }
     );
 
@@ -211,7 +208,7 @@ fn test_fetch_files_container() {
     assert_eq!(
         xorurl_encoder_with_path.content_type(),
         xorurl_encoder.content_type()
-    );*/
+    );
 }
 
 #[test]
