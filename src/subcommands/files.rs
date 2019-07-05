@@ -11,6 +11,8 @@ use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::Safe;
 use structopt::StructOpt;
+use log::debug;
+
 
 #[derive(StructOpt, Debug)]
 pub enum FilesSubCommands {
@@ -56,6 +58,27 @@ pub enum FilesSubCommands {
     },
 }
 
+fn get_the_real_root( location : &str, root : Option<String> ) -> Option<String> {
+	// lets check for a trailing / which results in no root.
+	let normalised_location = str::replace(&location, "\\", "/").to_string();
+	let ends_with_slash = normalised_location.ends_with("/");
+
+	match root {
+		Some(root) => Some(root),
+		None => {
+			if !ends_with_slash
+			{
+				let parts_vec : Vec<&str> = normalised_location.split("/").collect();
+				let our_root = parts_vec[ parts_vec.len() - 1 ];
+
+				return Some( our_root.to_string() )
+			}
+
+			None
+		}
+	}
+}
+
 pub fn files_commander(
     cmd: Option<FilesSubCommands>,
     output_fmt: OutputFmt,
@@ -67,9 +90,13 @@ pub fn files_commander(
             recursive,
             set_root,
         }) => {
+
+			let root_to_use = get_the_real_root(&location, set_root);
+
             // create FilesContainer from a given path to local files/folders
             let (files_container_xorurl, content_map) =
-                safe.files_container_create(&location, recursive, set_root)?;
+                safe.files_container_create(&location, recursive, root_to_use )?;
+
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {
@@ -102,10 +129,11 @@ pub fn files_commander(
             delete,
         }) => {
             let target = get_target_location(target)?;
+			let root_to_use = get_the_real_root(&location, set_root);
 
             // Update the FilesContainer on the Network
             let (version, content_map) =
-                safe.files_container_sync(&location, &target, recursive, set_root, delete)?;
+                safe.files_container_sync(&location, &target, recursive, root_to_use, delete)?;
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {

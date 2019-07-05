@@ -19,6 +19,7 @@ use std::process::Command;
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "./tests/testfolder/test.md";
 const TEST_FOLDER: &str = "./tests/testfolder/";
+const TEST_FOLDER_NO_TRAILING_SLASH: &str = "./tests/testfolder";
 const TEST_FOLDER_SUBFOLDER: &str = "./tests/testfolder/subfolder/";
 const TEST_EMPTY_FOLDER: &str = "./tests/testfolder/emptyfolder/";
 
@@ -116,4 +117,58 @@ fn calling_safe_files_put_emptyfolder() {
     .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
     .stdout(predicate::str::contains("./tests/testfolder/emptyfolder/").count(0))
     .success();
+}
+
+
+
+#[test]
+fn calling_safe_files_put_recursive_with_slash() {
+    let file_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive"
+    )
+    .read()
+    .unwrap();
+
+    let mut lines = file_container.lines();
+    let file_container_xor_line = lines.next().unwrap();
+    let file_container_xor =
+        &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+
+    let file = format!("{}/test.md", file_container_xor);
+    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    assert_eq!(file_cat, "hello tests!");
+
+    let subfile = format!("{}/subfolder/subexists.md", file_container_xor);
+    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
+    assert_eq!(subfile_cat, "the sub");
+}
+
+#[test]
+fn calling_safe_files_put_recursive_without_slash() {
+    let file_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER_NO_TRAILING_SLASH,
+        "--recursive"
+    )
+    .read()
+    .unwrap();
+
+    let mut lines = file_container.lines();
+    let file_container_xor_line = lines.next().unwrap();
+    let file_container_xor =
+        &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+
+    let file = format!("{}/testfolder/test.md", file_container_xor);
+    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    assert_eq!(file_cat, "hello tests!");
+
+    let subfile = format!("{}/testfolder/subfolder/subexists.md", file_container_xor);
+    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
+    assert_eq!(subfile_cat, "the sub");
 }
