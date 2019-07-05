@@ -3,18 +3,12 @@ env:
     - RUST_BACKTRACE=1
     # - RUSTFLAGS="-C opt-level=2 -C codegen-units=8"
     - PATH=$PATH:$HOME/.cargo/bin
+    - YARN_GPG=no # otherwise this starts gpg-agent that never exits
+os:
+  - linux
 language: rust
 rust:
   - stable
-
-matrix:
-  include:
-    - os: linux
-    - os: osx
-    - os: windows
-      env:
-        - YARN_GPG=no # otherwise this starts gpg-agent that never exits
-
 sudo: false
 cache:
   # Double the default timeout.

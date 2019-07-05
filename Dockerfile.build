@@ -1,0 +1,38 @@
+FROM rust:latest
+
+RUN addgroup --gid 1000 maidsafe && \
+    adduser --uid 1000 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
+    # The parent container sets this to the 'staff' group, which causes problems
+    # with reading code stored in Cargo's registry.
+    chgrp -R maidsafe /usr/local
+
+# Install fixuid for dealing with permissions issues with mounted volumes.
+# We could perhaps put this into a base container at a later stage.
+RUN USER=maidsafe && \
+    GROUP=maidsafe && \
+    curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - && \
+    chown root:root /usr/local/bin/fixuid && \
+    chmod 4755 /usr/local/bin/fixuid && \
+    mkdir -p /etc/fixuid && \
+    printf "user: $USER\ngroup: $GROUP\n" > /etc/fixuid/config.yml
+
+RUN apt-get update -y && \
+    mkdir /target && \
+    chown maidsafe:maidsafe /target && \
+    mkdir /usr/src/safe-cli && \
+    chown maidsafe:maidsafe /usr/src/safe-cli && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/safe-cli
+COPY . .
+
+# During the build process, ownership of the source directory needs changed in advance because
+# the tests write a file and you need permissions for that.
+RUN chown -R maidsafe:maidsafe /usr/src/safe-cli
+USER maidsafe:maidsafe
+ENV CARGO_TARGET_DIR=/target YARN_GPG=no RUST_BACKTRACE=1
+
+RUN cargo check --release && \
+    cargo test --features="scl-mock" -- --test-threads=1
+ENTRYPOINT ["fixuid", "-q"]

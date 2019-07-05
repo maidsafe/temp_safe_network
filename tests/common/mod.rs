@@ -6,17 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::env;
+
 pub const CLI: &str = "safe";
 #[allow(dead_code)]
 pub const SAFE_PROTOCOL: &str = "safe://";
 
 #[allow(dead_code)]
-pub fn get_bin_location() -> &'static str {
-    let mut location = "./target/release/safe";
+pub fn get_bin_location() -> String {
+    let target_dir = match env::var("CARGO_TARGET_DIR") {
+        Ok(target_dir) => target_dir,
+        Err(_) => "./target".to_string(),
+    };
     if cfg!(debug_assertions) {
-        location = "./target/debug/safe";
+        return format!("{}{}", target_dir, "/debug/safe");
     }
-    location
+    format!("{}{}", target_dir, "/release/safe")
 }
 
 #[allow(dead_code)]
