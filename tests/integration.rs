@@ -257,7 +257,7 @@ fn get_immutable_data() {
         x => unexpected!(x),
     }
 
-    // Unpublished immutable data that we're not the owner of.
+    // Try to get non-existing unpublished immutable data while being an unregistered client
     let message_id = client.send_request(
         conn_info.clone(),
         Request::GetIData(IDataAddress::Unpub(address)),
@@ -270,4 +270,40 @@ fn get_immutable_data() {
     }
 
     // TODO - Get immutable data that exist once we have PutIData working
+}
+
+#[test]
+fn delete_unpublished_immutable_data() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client = TestClient::new(env.rng());
+    let conn_info = client.establish_connection(&mut env, &mut vault);
+
+    // Try to delete published idata
+    let address: XorName = rand::random();
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::DeleteUnpubIData(IDataAddress::Pub(address)),
+    );
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::InvalidOperation)) => (),
+        x => unexpected!(x),
+    }
+
+    // Try to delete unpublished data while being an unregistered client
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetIData(IDataAddress::Unpub(address)),
+    );
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::AccessDenied)) => (),
+        x => unexpected!(x),
+    }
+
+    // TODO - Delete immutable data that exist once we have PutIData working
 }

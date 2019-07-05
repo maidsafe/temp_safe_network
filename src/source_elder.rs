@@ -259,7 +259,31 @@ impl SourceElder {
                     None
                 }
             }
-            DeleteUnpubIData(ref address) => unimplemented!(),
+            DeleteUnpubIData(ref address) => {
+                if address.published() {
+                    self.send_response_to_client(
+                        client_id,
+                        message_id,
+                        // TODO: consider changing this error
+                        Response::GetIData(Err(NdError::InvalidOperation)),
+                    );
+                    return None;
+                }
+                if registered_client == ClientState::Registered {
+                    Some(Action::ForwardClientRequest {
+                        client_name: *client_id.name(),
+                        request,
+                        message_id,
+                    })
+                } else {
+                    self.send_response_to_client(
+                        client_id,
+                        message_id,
+                        Response::Mutation(Err(NdError::AccessDenied)),
+                    );
+                    None
+                }
+            }
             //
             // ===== Mutable Data =====
             //

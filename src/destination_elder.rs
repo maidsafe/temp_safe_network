@@ -140,7 +140,9 @@ impl DestinationElder {
             //
             PutIData(kind) => self.handle_put_idata_req(src, kind, message_id),
             GetIData(address) => self.handle_get_idata_req(src, address, message_id),
-            DeleteUnpubIData(address) => unimplemented!(),
+            DeleteUnpubIData(address) => {
+                self.handle_delete_unpub_idata_req(src, address, message_id)
+            }
             //
             // ===== Mutable Data =====
             //
@@ -412,6 +414,8 @@ impl DestinationElder {
         result: NdResult<()>,
         message_id: MessageId,
     ) -> Option<Action> {
+        // TODO - DeleteUnpubIData needs to be handled here but this function is being redone for
+        //        PutIData so wait for that branch to land first.
         Some(Action::RespondToSrcElders {
             sender: *self.id.name(),
             client_name,
@@ -539,20 +543,10 @@ impl DestinationElder {
             };
 
             // We're acting as dst elder, received request from src elders
-            let metadata = if let Some(metadata) = self
-                .immutable_metadata
-                .get::<ChunkMetadata>(&address.to_db_key())
-            {
-                metadata
-            } else {
-                warn!("{}: Failed to get metadata from DB: {:?}", self, address);
-                return Some(error_response(NdError::NoSuchData));
+            let metadata = match self.get_metadata_for(address) {
+                Ok(metadata) => metadata,
+                Err(error) => return Some(error_response(error)),
             };
-
-            if metadata.holders.is_empty() {
-                warn!("{}: Metadata holders is empty for: {:?}", self, address);
-                return Some(error_response(NdError::NoSuchData));
-            }
 
             // Can't fail
             let idata_op = unwrap!(IDataOp::new(
@@ -561,12 +555,7 @@ impl DestinationElder {
                 metadata.holders.clone()
             ));
             match self.idata_ops.entry(message_id) {
-                Entry::Occupied(_) => {
-                    // TODO - Change to NdError::DuplicateMessageId
-                    Some(error_response(NdError::NetworkOther(
-                        "Duplicate Immutable data op entry detected".to_string(),
-                    )))
-                }
+                Entry::Occupied(_) => Some(error_response(NdError::DuplicateMessageId)),
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
                     Some(Action::SendToPeers {
@@ -579,17 +568,24 @@ impl DestinationElder {
         }
     }
 
-    fn get_client_name(&self, message_id: MessageId) -> Option<&XorName> {
-        self.idata_ops
-            .get(&message_id)
-            .map(IDataOp::client)
-            .or_else(|| {
-                warn!(
-                    "{}: Client not found for message_id: {:?}",
-                    self, message_id
-                );
-                None
-            })
+    fn get_metadata_for(&self, address: IDataAddress) -> NdResult<ChunkMetadata> {
+        match self
+            .immutable_metadata
+            .get::<ChunkMetadata>(&address.to_db_key())
+        {
+            Some(metadata) => {
+                if metadata.holders.is_empty() {
+                    warn!("{}: Metadata holders is empty for: {:?}", self, address);
+                    Err(NdError::NoSuchData)
+                } else {
+                    Ok(metadata)
+                }
+            }
+            None => {
+                warn!("{}: Failed to get metadata from DB: {:?}", self, address);
+                Err(NdError::NoSuchData)
+            }
+        }
     }
 
     fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {
@@ -611,6 +607,101 @@ impl DestinationElder {
         Some(Action::RespondToOurDstElders {
             sender: *self.id.name(),
             response: Response::GetIData(result),
+            message_id,
+        })
+    }
+
+    fn get_client_name(&self, message_id: MessageId) -> Option<&XorName> {
+        self.idata_ops
+            .get(&message_id)
+            .map(IDataOp::client)
+            .or_else(|| {
+                warn!(
+                    "{}: Client not found for message_id: {:?}",
+                    self, message_id
+                );
+                None
+            })
+    }
+
+    fn handle_delete_unpub_idata_req(
+        &mut self,
+        src: XorName,
+        address: IDataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if &src == address.name() {
+            self.delete_unpub_idata(address, message_id)
+        } else {
+            let error_response = |error: NdError| Action::RespondToSrcElders {
+                sender: *address.name(),
+                client_name: src,
+                response: Response::Mutation(Err(error)),
+                message_id,
+            };
+
+            // We're acting as dst elder, received request from src elders
+            let metadata = match self.get_metadata_for(address) {
+                Ok(metadata) => metadata,
+                Err(error) => return Some(error_response(error)),
+            };
+
+            // Can't fail
+            let idata_op = unwrap!(IDataOp::new(
+                src,
+                Request::DeleteUnpubIData(address),
+                metadata.holders.clone()
+            ));
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => Some(error_response(NdError::DuplicateMessageId)),
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        targets: metadata.holders,
+                        request: idata_op.request().clone(),
+                        message_id,
+                    })
+                }
+            }
+        }
+    }
+
+    fn delete_unpub_idata(
+        &mut self,
+        address: IDataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let client = self.get_client_name(message_id)?;
+        // First we need to read the chunk to verify the permissions
+        let result = self
+            .immutable_chunks
+            .get(&address)
+            .map_err(|error| error.to_string().into())
+            .and_then(|kind| match kind {
+                IDataKind::Unpub(ref data) => {
+                    if &XorName::from(PublicKey::from(*data.owners())) != client {
+                        Err(NdError::AccessDenied)
+                    } else {
+                        Ok(())
+                    }
+                }
+                _ => {
+                    error!(
+                        "{}: Invalid DeleteUnpub(IDataKind::Pub) encountered: {:?}",
+                        self, message_id
+                    );
+                    Err(NdError::InvalidOperation)
+                }
+            })
+            .and_then(|_| {
+                self.immutable_chunks
+                    .delete(&address)
+                    .map_err(|error| error.to_string().into())
+            });
+
+        Some(Action::RespondToOurDstElders {
+            sender: *self.id.name(),
+            response: Response::Mutation(result),
             message_id,
         })
     }
