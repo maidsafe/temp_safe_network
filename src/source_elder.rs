@@ -246,11 +246,11 @@ impl SourceElder {
                     self.send_response_to_client(
                         &client.public_id,
                         message_id,
-                        // TODO: consider changing this error
                         Response::GetIData(Err(NdError::InvalidOperation)),
                     );
                     return None;
                 }
+                self.has_signature(&client.public_id, &request, &message_id, &signature)?;
                 if client.has_balance {
                     Some(Action::ForwardClientRequest(Rpc::Request {
                         requester: client.public_id.clone(),

@@ -515,7 +515,7 @@ impl DestinationElder {
         if op_type == OpType::Put {
             self.handle_put_idata_resp(idata_address, sender, result, message_id)
         } else {
-            unimplemented!();
+            self.handle_delete_unpub_idata_resp(idata_address, sender, result, message_id)
         }
     }
 
@@ -557,6 +557,56 @@ impl DestinationElder {
             //        maybe self-terminate if we can't fix this error?
         }
 
+        self.remove_idata_op_if_concluded(&message_id)
+            .map(|idata_op| Action::RespondToSrcElders {
+                sender: *idata_address.name(),
+                message: Rpc::Response {
+                    requester: idata_op.client().clone(),
+                    response: Response::Mutation(Ok(())),
+                    message_id,
+                },
+            })
+    }
+
+    fn handle_delete_unpub_idata_resp(
+        &mut self,
+        idata_address: IDataAddress,
+        sender: XorName,
+        _result: NdResult<()>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        // TODO - Assume deletion on Adult nodes was success for phase 1.
+        let db_key = idata_address.to_db_key();
+        let metadata = self
+            .immutable_metadata
+            .get::<ChunkMetadata>(&db_key)
+            .or_else(|| {
+                warn!(
+                    "{}: Failed to get metadata from DB: {:?}",
+                    self, idata_address
+                );
+                None
+            });
+
+        if let Some(mut metadata) = metadata {
+            if !metadata.holders.remove(&sender) {
+                warn!(
+                    "{}: {} is not registered as a holder for {:?}",
+                    self,
+                    sender,
+                    self.idata_op(&message_id)?
+                );
+            }
+            if metadata.holders.is_empty() {
+                if let Err(error) = self.immutable_metadata.rem(&db_key) {
+                    warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                    // TODO - Send failure back to src elders?
+                }
+            } else if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
+                warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                // TODO - Send failure back to src elders?
+            }
+        };
         self.remove_idata_op_if_concluded(&message_id)
             .map(|idata_op| Action::RespondToSrcElders {
                 sender: *idata_address.name(),
@@ -615,19 +665,21 @@ impl DestinationElder {
             self.get_idata(address, message_id)
         } else {
             let client_id = requester.clone();
-            let error_response = |error: NdError| Action::RespondToSrcElders {
-                sender: *address.name(),
-                message: Rpc::Response {
-                    requester: client_id,
-                    response: Response::GetIData(Err(error)),
-                    message_id,
-                },
+            let respond = |result: NdResult<IData>| {
+                Some(Action::RespondToSrcElders {
+                    sender: *address.name(),
+                    message: Rpc::Response {
+                        requester: client_id,
+                        response: Response::GetIData(result),
+                        message_id,
+                    },
+                })
             };
 
             // We're acting as dst elder, received request from src elders
             let metadata = match self.get_metadata_for(address) {
                 Ok(metadata) => metadata,
-                Err(error) => return Some(error_response(error)),
+                Err(error) => return respond(Err(error)),
             };
 
             // Can't fail
@@ -637,7 +689,7 @@ impl DestinationElder {
                 metadata.holders.clone()
             ));
             match self.idata_ops.entry(message_id) {
-                Entry::Occupied(_) => Some(error_response(NdError::DuplicateMessageId)),
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
                     Some(Action::SendToPeers {
@@ -712,19 +764,21 @@ impl DestinationElder {
             self.delete_unpub_idata(address, message_id)
         } else {
             let client_id = requester.clone();
-            let error_response = |error: NdError| Action::RespondToSrcElders {
-                sender: *address.name(),
-                message: Rpc::Response {
-                    requester: client_id,
-                    response: Response::Mutation(Err(error)),
-                    message_id,
-                },
+            let respond = |result: NdResult<()>| {
+                Some(Action::RespondToSrcElders {
+                    sender: *address.name(),
+                    message: Rpc::Response {
+                        requester: client_id,
+                        response: Response::Mutation(result),
+                        message_id,
+                    },
+                })
             };
 
             // We're acting as dst elder, received request from src elders
             let metadata = match self.get_metadata_for(address) {
                 Ok(metadata) => metadata,
-                Err(error) => return Some(error_response(error)),
+                Err(error) => return respond(Err(error)),
             };
 
             // Can't fail
@@ -734,7 +788,7 @@ impl DestinationElder {
                 metadata.holders.clone()
             ));
             match self.idata_ops.entry(message_id) {
-                Entry::Occupied(_) => Some(error_response(NdError::DuplicateMessageId)),
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
                     Some(Action::SendToPeers {
