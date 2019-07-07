@@ -625,11 +625,19 @@ fn test_files_map_create() {
     let file_item1 = &files_map["/test.md"];
     assert_eq!(file_item1["link"], "safe://top_xorurl");
     assert_eq!(file_item1["type"], "md");
-    assert_eq!(file_item1["size"], "13");
+    if cfg!(windows) {
+        assert_eq!(file_item1["size"], "14"); // due to \r
+    } else {
+        assert_eq!(file_item1["size"], "13");
+    }
     let file_item2 = &files_map["/subfolder/subexists.md"];
     assert_eq!(file_item2["link"], "safe://second_xorurl");
     assert_eq!(file_item2["type"], "md");
-    assert_eq!(file_item2["size"], "8");
+    if cfg!(windows) {
+        assert_eq!(file_item2["size"], "9"); // due to \r
+    } else {
+        assert_eq!(file_item2["size"], "8");
+    }
 }
 
 #[test]
