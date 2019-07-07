@@ -26,8 +26,4 @@ impl Chunk for MutableChunk {
     }
 }
 
-impl ChunkId for MDataAddress {
-    fn raw_name(&self) -> &XorName {
-        self.name()
-    }
-}
+impl ChunkId for MDataAddress {}
