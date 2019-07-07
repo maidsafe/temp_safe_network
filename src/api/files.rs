@@ -37,17 +37,15 @@ const FILE_DELETED_SIGN: &str = "-";
 
 #[allow(dead_code)]
 impl Safe {
-    /// # Create versioned data.
+    /// # Create a FilesContaier.
     ///
     /// ## Example
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # use unwrap::unwrap;
-    /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::new("base32".to_string());
-    /// let (xor_url, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
-    /// assert!(xor_url.contains("safe://"))
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
+    /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn files_container_create(
         &mut self,
@@ -90,6 +88,19 @@ impl Safe {
         Ok((xorurl, processed_files, files_map))
     }
 
+    /// # Fetch an existing FilesContaier.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// # use safe_cli::Safe;
+    /// # let mut safe = Safe::new("base32".to_string());
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
+    /// let (version, files_map, native_type) = safe.files_container_get_latest(&xorurl).unwrap();
+    /// println!("FilesContainer fetched is at version: {}", version);
+    /// println!("FilesContainer is stored on a {} data type", native_type);
+    /// println!("FilesMap of latest fetched version is: {:?}", files_map);
+    /// ```
     pub fn files_container_get_latest(
         &self,
         xorurl: &str,
@@ -126,6 +137,19 @@ impl Safe {
         }
     }
 
+    /// # Sync up local folder with the content on a FilesContaier.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// # use safe_cli::Safe;
+    /// # let mut safe = Safe::new("base32".to_string());
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("./tests/testfolder", &xorurl, true, None, false).unwrap();
+    /// println!("FilesContainer fetched is at version: {}", version);
+    /// println!("The local files that were synced up are: {:?}", new_processed_files);
+    /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    /// ```
     pub fn files_container_sync(
         &mut self,
         location: &str,
@@ -182,7 +206,6 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_cli::Safe;
-    /// # use unwrap::unwrap;
     /// # let mut safe = Safe::new("base32".to_string());
     /// let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data).unwrap();
@@ -207,7 +230,6 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_cli::Safe;
-    /// # use unwrap::unwrap;
     /// # let mut safe = Safe::new("base32".to_string());
     /// # let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data).unwrap();
@@ -860,5 +882,27 @@ fn test_files_container_sync_with_delete() {
     assert_eq!(
         new_processed_files[filename4].1,
         new_files_map["/tests/testfolder/subfolder/subexists.md"]["link"]
+    );
+}
+
+#[test]
+fn test_files_container_get_latest() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    let (xorurl, _processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", true, None));
+
+    let (version, fetched_files_map, native_type) =
+        unwrap!(safe.files_container_get_latest(&xorurl));
+
+    assert_eq!(version, 1);
+    assert_eq!(native_type, FILES_CONTAINER_NATIVE_TYPE);
+    assert_eq!(fetched_files_map.len(), 3);
+    assert_eq!(files_map.len(), fetched_files_map.len());
+    assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
+    assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
+    assert_eq!(
+        files_map["/subfolder/subexists.md"],
+        fetched_files_map["/subfolder/subexists.md"]
     );
 }

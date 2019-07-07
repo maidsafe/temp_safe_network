@@ -42,7 +42,7 @@ struct CmdArgs {
     /// Dry run of command. No data will be written. No coins spent.
     #[structopt(long = "dry-run", raw(global = "true"))]
     dry: bool,
-    /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default) and base32
+    /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
     #[structopt(long = "xorurl", raw(global = "true"))]
     xorurl_base: Option<String>,
 }

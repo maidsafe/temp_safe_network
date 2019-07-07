@@ -59,7 +59,7 @@ fn calling_safe_files_put_recursive() {
 
 #[test]
 fn calling_safe_files_put_recursive_and_change_root() {
-    let file_container = cmd!(
+    let files_container = cmd!(
         get_bin_location(),
         "files",
         "put",
@@ -71,16 +71,16 @@ fn calling_safe_files_put_recursive_and_change_root() {
     .read()
     .unwrap();
 
-    let mut lines = file_container.lines();
-    let file_container_xor_line = lines.next().unwrap();
-    let file_container_xor =
-        &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+    let mut lines = files_container.lines();
+    let files_container_xor_line = lines.next().unwrap();
+    let files_container_xor =
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let file = format!("{}/aha/test.md", file_container_xor);
+    let file = format!("{}/aha/test.md", files_container_xor);
     let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
     assert_eq!(file_cat, "hello tests!");
 
-    let subfile = format!("{}/aha/subfolder/subexists.md", file_container_xor);
+    let subfile = format!("{}/aha/subfolder/subexists.md", files_container_xor);
     let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
     assert_eq!(subfile_cat, "the sub");
 }
@@ -121,7 +121,7 @@ fn calling_safe_files_put_emptyfolder() {
 
 #[test]
 fn calling_safe_files_put_recursive_with_slash() {
-    let file_container = cmd!(
+    let files_container = cmd!(
         get_bin_location(),
         "files",
         "put",
@@ -131,23 +131,23 @@ fn calling_safe_files_put_recursive_with_slash() {
     .read()
     .unwrap();
 
-    let mut lines = file_container.lines();
-    let file_container_xor_line = lines.next().unwrap();
-    let file_container_xor =
-        &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+    let mut lines = files_container.lines();
+    let files_container_xor_line = lines.next().unwrap();
+    let files_container_xor =
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let file = format!("{}/test.md", file_container_xor);
+    let file = format!("{}/test.md", files_container_xor);
     let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
     assert_eq!(file_cat, "hello tests!");
 
-    let subfile = format!("{}/subfolder/subexists.md", file_container_xor);
+    let subfile = format!("{}/subfolder/subexists.md", files_container_xor);
     let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
     assert_eq!(subfile_cat, "the sub");
 }
 
 #[test]
 fn calling_safe_files_put_recursive_without_slash() {
-    let file_container = cmd!(
+    let files_container = cmd!(
         get_bin_location(),
         "files",
         "put",
@@ -157,16 +157,52 @@ fn calling_safe_files_put_recursive_without_slash() {
     .read()
     .unwrap();
 
-    let mut lines = file_container.lines();
-    let file_container_xor_line = lines.next().unwrap();
-    let file_container_xor =
-        &file_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+    let mut lines = files_container.lines();
+    let files_container_xor_line = lines.next().unwrap();
+    let files_container_xor =
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let file = format!("{}/testfolder/test.md", file_container_xor);
+    let file = format!("{}/testfolder/test.md", files_container_xor);
     let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
     assert_eq!(file_cat, "hello tests!");
 
-    let subfile = format!("{}/testfolder/subfolder/subexists.md", file_container_xor);
+    let subfile = format!("{}/testfolder/subfolder/subexists.md", files_container_xor);
     let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
     assert_eq!(subfile_cat, "the sub");
+}
+
+#[test]
+fn calling_safe_files_sync() {
+    let files_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive"
+    )
+    .read()
+    .unwrap();
+
+    let mut lines = files_container.lines();
+    let files_container_xor_line = lines.next().unwrap();
+    let files_container_xor =
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
+
+    let _ = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_FOLDER_SUBFOLDER,
+        files_container_xor,
+        "--recursive"
+    )
+    .read()
+    .unwrap();
+
+    let file = format!(
+        "{}/tests/testfolder/subfolder/subexists.md",
+        files_container_xor
+    );
+    let synced_file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    assert_eq!(synced_file_cat, "the sub");
 }
