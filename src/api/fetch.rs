@@ -94,7 +94,7 @@ impl Safe {
                         Some(item_data) => item_data,
                         None => {
                             return Err(format!(
-                                "No data found for, \"{}\" on the FilesContainer at: {}",
+                                "No data found for path \"{}\" on the FilesContainer at \"{}\"",
                                 &path, &xorurl
                             ))
                         }

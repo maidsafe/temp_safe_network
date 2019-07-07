@@ -77,7 +77,10 @@ impl XorUrlEncoder {
         }
 
         // Get path and normalise it to use '/' (instead of '\' as on Windows)
-        let path = &str::replace(parsing_url.path(), "\\", "/");
+        let mut path = str::replace(parsing_url.path(), "\\", "/");
+        if path == "/" {
+            path = "".to_string();
+        }
 
         let cid_str = parsing_url
             .host_str()
@@ -204,15 +207,6 @@ fn test_xorurl_base32_encoding() {
     ));
     let base32_xorurl = "safe://bedtcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
     assert_eq!(xorurl, base32_xorurl);
-
-    let base32z_xorurl = "safe://hoqcj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        0,
-        SafeContentType::ImmutableData,
-        &"".to_string()
-    ));
-    assert_eq!(xorurl, base32z_xorurl);
 }
 
 #[test]
@@ -226,6 +220,44 @@ fn test_xorurl_base32z_encoding() {
         &"base32z".to_string()
     ));
     let base32z_xorurl = "safe://hoqcj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+    assert_eq!(xorurl, base32z_xorurl);
+}
+
+#[test]
+fn test_xorurl_base64_encoding() {
+    use unwrap::unwrap;
+    let xorname = XorName(*b"12345678901234567890123456789012");
+    let xorurl = unwrap!(XorUrlEncoder::encode(
+        xorname,
+        4584545,
+        SafeContentType::FilesContainer,
+        &"base64".to_string()
+    ));
+    let base64_xorurl = "safe://mBBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+    assert_eq!(xorurl, base64_xorurl);
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&base64_xorurl));
+    assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_string("base64")));
+    assert_eq!("", xorurl_encoder.path());
+    assert_eq!(1, xorurl_encoder.version());
+    assert_eq!(xorname, xorurl_encoder.xorname());
+    assert_eq!(4584545, xorurl_encoder.type_tag());
+    assert_eq!(
+        SafeContentType::FilesContainer,
+        xorurl_encoder.content_type()
+    );
+}
+
+#[test]
+fn test_xorurl_default_base_encoding() {
+    use unwrap::unwrap;
+    let xorname = XorName(*b"12345678901234567890123456789012");
+    let base32z_xorurl = "safe://hoqcj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+    let xorurl = unwrap!(XorUrlEncoder::encode(
+        xorname,
+        0,
+        SafeContentType::ImmutableData,
+        &"".to_string() // forces it to use the default
+    ));
     assert_eq!(xorurl, base32z_xorurl);
 }
 
