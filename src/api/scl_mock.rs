@@ -352,7 +352,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    fn get_seq_mdata(&self, xorname: &XorName, _tag: u64) -> Result<SeqMutableDataMock, String> {
+    fn get_seq_mdata(&self, xorname: &XorName, _tag: u64) -> Result<SeqMutableDataMock, &str> {
         debug!(
             "attempting to locate scl mock mdata: {:?}",
             &xorname_to_hex(&xorname)
@@ -360,7 +360,7 @@ impl SafeApp {
 
         match self.mock_data.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(seq_md) => Ok(seq_md.clone()),
-            None => Err("SeqMutableDataNotFound".to_string()),
+            None => Err("SeqMutableDataNotFound"),
         }
     }
 
@@ -410,9 +410,9 @@ impl SafeApp {
         &self,
         xorurl: &str,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, String> {
+    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, &str> {
         debug!("Listing seq_mdata_entries for: {}", xorurl);
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        let xorurl_encoder = XorUrlEncoder::from_url(xorurl).map_err(|_| "InvalidXorUrl")?;
         let seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
 
         let mut res = BTreeMap::new();

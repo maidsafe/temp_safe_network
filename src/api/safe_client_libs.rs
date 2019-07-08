@@ -494,13 +494,15 @@ impl SafeApp {
         &self,
         xorurl: &str,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, String> {
+    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, &str> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(APP_NOT_CONNECTED),
         };
 
-        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
+        let xorname = XorUrlEncoder::from_url(xorurl)
+            .map_err(|_| "InvalidXorUrl")?
+            .xorname();
         let entries = unwrap!(run(safe_app, move |client, _app_context| {
             client
                 .list_seq_mdata_entries(xorname, tag)

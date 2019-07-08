@@ -91,9 +91,17 @@ impl Safe {
         debug!("Finding total wallet balance for: {:?}", xorurl);
         let mut total_balance: f64 = 0.0;
         // Let's get the list of balances from the Wallet
-        let spendable_balances = self
+        let spendable_balances = match self
             .safe_app
-            .list_seq_mdata_entries(xorurl, WALLET_TYPE_TAG)?;
+            .list_seq_mdata_entries(xorurl, WALLET_TYPE_TAG)
+        {
+            Ok(entries) => entries,
+            Err("SeqMutableDataNotFound") => return Err(format!("No Wallet found at {}", xorurl)),
+            Err("InvalidXorUrl") => {
+                return Err("The XOR-URL provided is invalid and cannot be decoded".to_string())
+            }
+            Err(err) => return Err(format!("Failed to read balances from Wallet: {}", err)),
+        };
 
         debug!("Spendable balances: {:?}", spendable_balances);
         // Iterate through the Keys and query the balance for each
