@@ -293,7 +293,7 @@ $ safe wallet transfer <amount> <to> <from>
 E.g.:
 ```shell
 $ safe wallet transfer 323.23 safe://7e0ae5e6ed15a8065ea03218a0903b0be7c9d78384998817331b309e9d23566e safe://6221785c1a20163bbefaf523af15fa525d83b00be7502d28cae5b09ac54f4e75
-Transaction Success. Tx_id: 44dcd919-0703-4f23-a9a2-6b6be8da0bcc
+Success. TX_ID: 44dcd919-0703-4f23-a9a2-6b6be8da0bcc
 ```
 
 ### Files
@@ -384,7 +384,7 @@ FilesContainer created at: "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw
 We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
 ```shell
 $ safe cat safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w
-Files of FilesContainer at: "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w"
+Files of FilesContainer (version 1) at "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w":
 +-------------------------+------+-----------------------------------+---------------------------------------------------------------+
 | Name                    | Size | Created                           | Link                                                          |
 +-------------------------+------+-----------------------------------+---------------------------------------------------------------+
