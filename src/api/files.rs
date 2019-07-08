@@ -517,8 +517,9 @@ fn files_map_create(content: &ContentMap, set_root: Option<String>) -> Result<Fi
     let now = gen_timestamp();
 
     let (base_path, normalised_prefix) = gen_normalised_paths(content, set_root);
-
     for (file_name, (_change, link)) in content.iter() {
+
+		debug!("FileItem item name:{:?}", &file_name);
         let mut file_item = FileItem::new();
         let metadata = fs::metadata(&file_name).map_err(|err| {
             format!(
@@ -529,10 +530,15 @@ fn files_map_create(content: &ContentMap, set_root: Option<String>) -> Result<Fi
 
         file_item.insert("link".to_string(), link.to_string());
 
-        let file_type = Path::new(&file_name).extension().ok_or("unknown")?;
+        let file_path = Path::new(&file_name);
+        let file_type : &str = match &file_path.extension() {
+			Some(ext) => ext.to_str().unwrap(),
+			None => "unknown"
+		};
+
         file_item.insert(
             "type".to_string(),
-            file_type.to_str().unwrap_or_else(|| "unknown").to_string(),
+            file_type.to_string(),
         );
 
         let file_size = &metadata.len().to_string();

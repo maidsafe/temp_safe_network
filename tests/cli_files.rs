@@ -50,7 +50,7 @@ fn calling_safe_files_put_recursive() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(4))
+        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(5))
         .stdout(predicate::str::contains("./tests/testfolder/test.md").count(1))
         .stdout(predicate::str::contains("./tests/testfolder/another.md").count(1))
         .stdout(predicate::str::contains("./tests/testfolder/subfolder/subexists.md").count(1))
