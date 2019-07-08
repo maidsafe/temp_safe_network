@@ -55,7 +55,7 @@ impl Safe {
     ) -> Result<(XorUrl, ProcessedFiles, FilesMap), String> {
         // TODO: Enable source for funds / ownership
         // Warn about ownership?
-        let processed_files = upload_dir_contents(self, location, recursive)?;
+        let processed_files = file_system_dir_walk(self, location, recursive, true)?;
 
         // The FilesContainer is created as a AppendOnlyData with a single entry containing the
         // timestamp as the entry's key, and the serialised FilesMap as the entry's value
@@ -162,14 +162,9 @@ impl Safe {
             self.files_container_get_latest(xorurl)?;
 
         let root_path = get_root_path(location, set_root)?;
-        let (processed_files, new_files_map): (ProcessedFiles, FilesMap) = sync_dir_contents(
-            self,
-            location,
-            current_files_map,
-            recursive,
-            root_path,
-            delete,
-        )?;
+        let processed_files = file_system_dir_walk(self, location, recursive, false)?;
+        let (processed_files, new_files_map): (ProcessedFiles, FilesMap) =
+            files_map_sync(self, current_files_map, processed_files, root_path, delete)?;
 
         if !processed_files.is_empty() {
             // The FilesContainer is updated adding an entry containing the timestamp as the
@@ -422,14 +417,20 @@ fn files_map_sync(
     Ok((processed_files, updated_files_map))
 }
 
-fn sync_dir_contents(
+fn upload_file(safe: &mut Safe, path: &Path) -> Result<XorUrl, String> {
+    let data = match fs::read(path) {
+        Ok(data) => data,
+        Err(err) => return Err(err.to_string()),
+    };
+    safe.files_put_published_immutable(&data)
+}
+
+fn file_system_dir_walk(
     safe: &mut Safe,
     location: &str,
-    current_files_map: FilesMap,
     recursive: bool,
-    root_path: String,
-    delete: bool,
-) -> Result<(ProcessedFiles, FilesMap), String> {
+    upload_files: bool,
+) -> Result<ProcessedFiles, String> {
     let path = Path::new(location);
     info!("Reading files from {}", &path.display());
     let metadata = fs::metadata(&path).map_err(|err| {
@@ -438,10 +439,9 @@ fn sync_dir_contents(
             location, err
         )
     })?;
-
     debug!("Metadata for location: {:?}", metadata);
 
-    let mut new_processed_files = BTreeMap::new();
+    let mut processed_files = BTreeMap::new();
     if recursive {
         // TODO: option to enable following symlinks and hidden files?
         // We now compare both FilesMaps to upload the missing files
@@ -454,94 +454,25 @@ fn sync_dir_contents(
                 info!("{}", child.path().display());
                 let current_file_path = child.path();
                 let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
+                let normalised_path = normalise_path_separator(&current_path_str);
                 match fs::metadata(&current_file_path) {
                     Ok(metadata) => {
                         if metadata.is_dir() {
                             // Everything is in the iter. We dont need to recurse.
                             // so what do we do with dirs? decide if we want to support empty dirs also
-                        } else {
-                            new_processed_files.insert(current_path_str, ("".to_string(), "SYNC".to_string()));
-                        }
-                    },
-                    Err(err) => eprintln!(
-                        "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
-                        current_path_str, err
-                    )
-                }
-            });
-    } else {
-        if metadata.is_dir() {
-            return Err(format!(
-                "{:?} is a directory. Use \"-r\" to recursively upload folders.",
-                location
-            ));
-        }
-        new_processed_files.insert(location.to_string(), ("".to_string(), "SYNC".to_string()));
-    }
-
-    files_map_sync(
-        safe,
-        current_files_map,
-        new_processed_files,
-        root_path,
-        delete,
-    )
-}
-
-fn is_not_hidden(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| entry.depth() == 0 || !s.starts_with('.'))
-        .unwrap_or(false)
-}
-
-fn upload_dir_contents(
-    safe: &mut Safe,
-    location: &str,
-    recursive: bool,
-) -> Result<ProcessedFiles, String> {
-    let path = Path::new(location);
-    info!("Reading files from {}", &path.display());
-    let metadata = fs::metadata(&path).map_err(|err| {
-        format!(
-            "Couldn't read metadata from source path ('{}'): {}",
-            location, err
-        )
-    })?;
-
-    debug!("Metadata for location: {:?}", metadata);
-
-    let mut processed_files = BTreeMap::new();
-    if recursive {
-        // TODO: option to enable following symlinks and hidden files?
-        WalkDir::new(path)
-            .follow_links(true)
-            .into_iter()
-            .filter_entry(|e| is_not_hidden(e))
-            .filter_map(|v| v.ok())
-            .for_each(|child| {
-                info!("{}", child.path().display());
-                let current_path = child.path();
-                let current_path_str = current_path.to_str().unwrap_or_else(|| "").to_string();
-                // Let's normalise the path to use '/' (instead of '\' as on Windows)
-                let normalised_path = normalise_path_separator(&current_path_str);
-                match fs::metadata(&current_path) {
-                    Ok(metadata) => {
-                        if metadata.is_dir() {
-                            // Everything is in the iter. We dont need to recurse.
-                            // so what do we do with dirs? decide if we want to support empty dirs also
-                        } else {
-                            match upload_file(safe, &current_path) {
-                                Ok(xorurl) => {
-                                    processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
-                                }
-                                Err(err) => eprintln!(
-                                    "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                                    normalised_path, err
-                                ),
-                            };
-                        }
+                        } else if upload_files {
+                                match upload_file(safe, &current_file_path) {
+                                    Ok(xorurl) => {
+                                        processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
+                                    }
+                                    Err(err) => eprintln!(
+                                        "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
+                                        normalised_path, err
+                                    ),
+                                };
+                    } else {
+                        processed_files.insert(current_path_str, ("".to_string(), "SYNC".to_string()));
+                    }
                     },
                     Err(err) => eprintln!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
@@ -556,19 +487,24 @@ fn upload_dir_contents(
                 location
             ));
         }
-        let xorurl = upload_file(safe, &path)?;
-        processed_files.insert(location.to_string(), (FILE_ADDED_SIGN.to_string(), xorurl));
+
+        if upload_files {
+            let xorurl = upload_file(safe, &path)?;
+            processed_files.insert(location.to_string(), (FILE_ADDED_SIGN.to_string(), xorurl));
+        } else {
+            processed_files.insert(location.to_string(), ("".to_string(), "SYNC".to_string()));
+        }
     }
 
     Ok(processed_files)
 }
 
-fn upload_file(safe: &mut Safe, path: &Path) -> Result<XorUrl, String> {
-    let data = match fs::read(path) {
-        Ok(data) => data,
-        Err(err) => return Err(err.to_string()),
-    };
-    safe.files_put_published_immutable(&data)
+fn is_not_hidden(entry: &DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| entry.depth() == 0 || !s.starts_with('.'))
+        .unwrap_or(false)
 }
 
 fn files_map_create(content: &ProcessedFiles, root_path: String) -> Result<FilesMap, String> {
