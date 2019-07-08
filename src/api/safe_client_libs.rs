@@ -18,7 +18,7 @@ use safe_app::{run, App};
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissionSet,
+    AData, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUser, AppendOnlyData, ImmutableData, MDataAction, MDataPermissionSet,
     MDataSeqEntryAction, MDataValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
     SeqMutableData, XorName,
@@ -211,7 +211,7 @@ impl SafeApp {
             None => return Err(APP_NOT_CONNECTED.to_string()),
         };
 
-        let xorname = name.unwrap_or_else(|| create_random_xorname());
+        let xorname = name.unwrap_or_else(create_random_xorname);
 
         unwrap!(run(safe_app, move |client, _app_context| {
             let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
@@ -283,15 +283,17 @@ impl SafeApp {
         &self,
         xorname: XorName,
         tag: u64,
-    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), String> {
+    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), &str> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(APP_NOT_CONNECTED),
         };
 
         let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
 
-        let data_length = self.get_current_seq_appendable_data_version(xorname, tag).unwrap();
+        let data_length = self
+            .get_current_seq_appendable_data_version(xorname, tag)
+            .unwrap();
 
         let data = unwrap!(run(safe_app, move |client, _app_context| {
             client
@@ -306,12 +308,12 @@ impl SafeApp {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<u64, String> {
+    ) -> Result<u64, &str> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(APP_NOT_CONNECTED),
         };
 
         let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
@@ -328,6 +330,7 @@ impl SafeApp {
         Ok(data_length)
     }
 
+    #[allow(dead_code)]
     pub fn get_seq_appendable_data(
         &self,
         name: XorName,
@@ -349,8 +352,8 @@ impl SafeApp {
             .get_current_seq_appendable_data_version(name, tag)
             .unwrap();
 
-        let mut start = ADataIndex::FromStart(version);
-        let mut end = ADataIndex::FromStart(version + 1);
+        let start = ADataIndex::FromStart(version);
+        let end = ADataIndex::FromStart(version + 1);
 
         if version >= data_length {
             return Err(format!(
@@ -360,7 +363,7 @@ impl SafeApp {
         }
 
         if version == data_length {
-            let (version, data) = self.get_latest_seq_appendable_data(name, tag).unwrap();
+            let (_version, data) = self.get_latest_seq_appendable_data(name, tag).unwrap();
             return Ok(data);
         }
 

@@ -34,6 +34,7 @@ const FILES_CONTAINER_NATIVE_TYPE: &str = "AppendOnlyData";
 const FILE_ADDED_SIGN: &str = "+";
 const FILE_UPDATED_SIGN: &str = "*";
 const FILE_DELETED_SIGN: &str = "-";
+const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 
 #[allow(dead_code)]
 impl Safe {
@@ -107,10 +108,6 @@ impl Safe {
     ) -> Result<(u64, FilesMap, String), String> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
 
-        let empty_data = "SeqAppendOnlyDataEmpty".to_string();
-        let data_not_found = "SeqAppendOnlyDataNotFound".to_string();
-        let not_found_err = Err("No FilesContainer found at this address".to_string());
-
         match self
             .safe_app
             .get_latest_seq_appendable_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
@@ -126,14 +123,13 @@ impl Safe {
                 })?;
                 Ok((version, files_map, FILES_CONTAINER_NATIVE_TYPE.to_string()))
             }
-            Err(empty_data) => Ok((
+            Err("SeqAppendOnlyDataEmpty") => Ok((
                 0,
                 FilesMap::default(),
                 FILES_CONTAINER_NATIVE_TYPE.to_string(),
             )),
-            // was getting a not bound error here below after returning String errors as standard...
-            Err(data_not_found) => not_found_err,
-            Err(_) => not_found_err,
+            Err("SeqAppendOnlyDataNotFound") => Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string()),
+            Err(err) => Err(format!("Failed to get current version: {}", err)),
         }
     }
 
@@ -145,7 +141,9 @@ impl Safe {
     /// # use safe_cli::Safe;
     /// # let mut safe = Safe::new("base32".to_string());
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
-    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("./tests/testfolder", &xorurl, true, None, false).unwrap();
+    /// println!("OK: {}", xorurl);
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, None, false).unwrap();
+    /// println!("OK: {}", xorurl);
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("The local files that were synced up are: {:?}", new_processed_files);
     /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
@@ -178,22 +176,30 @@ impl Safe {
             )];
 
             let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-			let xorname = xorurl_encoder.xorname();
-			let type_tag = xorurl_encoder.type_tag();
+            let xorname = xorurl_encoder.xorname();
+            let type_tag = xorurl_encoder.type_tag();
 
-			let current_version = self.safe_app.get_current_seq_appendable_data_version( xorname , type_tag ).unwrap();
+            let current_version = match self
+                .safe_app
+                .get_current_seq_appendable_data_version(xorname, type_tag)
+            {
+                Ok(version) => version,
+                Err("SeqAppendOnlyDataNotFound") => {
+                    return Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string())
+                }
+                Err(err) => return Err(format!("Failed to get current version: {}", err)),
+            };
 
             version = self.safe_app.append_seq_appendable_data(
                 files_container_data,
                 current_version + 1,
-                xorurl_encoder.xorname(),
-                xorurl_encoder.type_tag(),
+                xorname,
+                type_tag,
             )?;
         }
 
         Ok((version, processed_files, new_files_map))
     }
-
 
     /// # Put Published ImmutableData
     /// Put data blobs onto the network.
@@ -340,12 +346,13 @@ fn files_map_sync(
         })?;
 
         let file_path = Path::new(&key);
-        let file_type = file_path
-            .extension()
-            .ok_or("unknown")?
-            .to_str()
-            .unwrap_or_else(|| "unknown")
-            .to_string();
+        let file_type = match &file_path.extension() {
+            Some(ext) => ext
+                .to_str()
+                .unwrap_or_else(|| "Failed to get file extension"),
+            None => "unknown",
+        };
+
         let file_size = metadata.len().to_string();
 
         let file_name =
@@ -455,24 +462,25 @@ fn file_system_dir_walk(
                 let current_file_path = child.path();
                 let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
                 let normalised_path = normalise_path_separator(&current_path_str);
+                info!("Normalised path: {}", normalised_path);
                 match fs::metadata(&current_file_path) {
                     Ok(metadata) => {
                         if metadata.is_dir() {
                             // Everything is in the iter. We dont need to recurse.
                             // so what do we do with dirs? decide if we want to support empty dirs also
                         } else if upload_files {
-                                match upload_file(safe, &current_file_path) {
-                                    Ok(xorurl) => {
-                                        processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
-                                    }
-                                    Err(err) => eprintln!(
-                                        "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                                        normalised_path, err
-                                    ),
-                                };
-                    } else {
-                        processed_files.insert(current_path_str, ("".to_string(), "SYNC".to_string()));
-                    }
+                            match upload_file(safe, &current_file_path) {
+                                Ok(xorurl) => {
+                                    processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
+                                }
+                                Err(err) => eprintln!(
+                                    "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
+                                    normalised_path, err
+                                ),
+                            };
+                        } else {
+                            processed_files.insert(current_path_str, ("".to_string(), "SYNC".to_string()));
+                        }
                     },
                     Err(err) => eprintln!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
@@ -511,10 +519,9 @@ fn files_map_create(content: &ProcessedFiles, root_path: String) -> Result<Files
     let mut files_map = FilesMap::default();
     let now = gen_timestamp();
 
-    let (base_path, normalised_prefix) = gen_normalised_paths(content, set_root);
+    let (base_path, normalised_prefix) = gen_normalised_paths(content, root_path);
     for (file_name, (_change, link)) in content.iter() {
-
-		debug!("FileItem item name:{:?}", &file_name);
+        debug!("FileItem item name:{:?}", &file_name);
         let mut file_item = FileItem::new();
         let metadata = fs::metadata(&file_name).map_err(|err| {
             format!(
@@ -526,15 +533,14 @@ fn files_map_create(content: &ProcessedFiles, root_path: String) -> Result<Files
         file_item.insert("link".to_string(), link.to_string());
 
         let file_path = Path::new(&file_name);
-        let file_type : &str = match &file_path.extension() {
-			Some(ext) => ext.to_str().unwrap(),
-			None => "unknown"
-		};
+        let file_type: &str = match &file_path.extension() {
+            Some(ext) => ext
+                .to_str()
+                .unwrap_or_else(|| "Failed to get file extension"),
+            None => "unknown",
+        };
 
-        file_item.insert(
-            "type".to_string(),
-            file_type.to_string(),
-        );
+        file_item.insert("type".to_string(), file_type.to_string());
 
         let file_size = &metadata.len().to_string();
         file_item.insert("size".to_string(), file_size.to_string());
@@ -625,8 +631,8 @@ fn test_files_container_create_folder_without_end_slash() {
         unwrap!(safe.files_container_create("tests/testfolder", true, None));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 3);
-    assert_eq!(files_map.len(), 3);
+    assert_eq!(processed_files.len(), 4);
+    assert_eq!(files_map.len(), 4);
 
     let filename1 = "tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -648,6 +654,13 @@ fn test_files_container_create_folder_without_end_slash() {
         processed_files[filename3].1,
         files_map["/testfolder/subfolder/subexists.md"]["link"]
     );
+
+    let filename4 = "tests/testfolder/noextension";
+    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename4].1,
+        files_map["/testfolder/noextension"]["link"]
+    );
 }
 
 #[test]
@@ -658,8 +671,8 @@ fn test_files_container_create_folder_with_end_slash() {
         unwrap!(safe.files_container_create("./tests/testfolder/", true, None));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 3);
-    assert_eq!(files_map.len(), 3);
+    assert_eq!(processed_files.len(), 4);
+    assert_eq!(files_map.len(), 4);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -678,6 +691,13 @@ fn test_files_container_create_folder_with_end_slash() {
         processed_files[filename3].1,
         files_map["/subfolder/subexists.md"]["link"]
     );
+
+    let filename4 = "./tests/testfolder/noextension";
+    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename4].1,
+        files_map["/noextension"]["link"]
+    );
 }
 
 #[test]
@@ -691,8 +711,8 @@ fn test_files_container_create_set_root() {
     ));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 3);
-    assert_eq!(files_map.len(), 3);
+    assert_eq!(processed_files.len(), 4);
+    assert_eq!(files_map.len(), 4);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -714,6 +734,13 @@ fn test_files_container_create_set_root() {
         processed_files[filename3].1,
         files_map["/myroot/folder/subfolder/subexists.md"]["link"]
     );
+
+    let filename4 = "./tests/testfolder/noextension";
+    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename4].1,
+        files_map["/myroot/folder/noextension"]["link"]
+    );
 }
 
 #[test]
@@ -723,8 +750,8 @@ fn test_files_container_sync() {
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", true, None));
 
-    assert_eq!(processed_files.len(), 3);
-    assert_eq!(files_map.len(), 3);
+    assert_eq!(processed_files.len(), 4);
+    assert_eq!(files_map.len(), 4);
 
     let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -736,7 +763,7 @@ fn test_files_container_sync() {
 
     assert_eq!(version, 2);
     assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 4);
+    assert_eq!(new_files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -759,11 +786,18 @@ fn test_files_container_sync() {
         new_files_map["/subfolder/subexists.md"]["link"]
     );
 
-    // and finally check the synced file is there
-    let filename4 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename4].0, FILE_ADDED_SIGN);
+    let filename4 = "./tests/testfolder/noextension";
+    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
     assert_eq!(
-        new_processed_files[filename4].1,
+        processed_files[filename4].1,
+        new_files_map["/noextension"]["link"]
+    );
+
+    // and finally check the synced file is there
+    let filename5 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        new_processed_files[filename5].1,
         new_files_map["/tests/testfolder/subfolder/subexists.md"]["link"]
     );
 }
@@ -775,8 +809,8 @@ fn test_files_container_sync_with_delete() {
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", true, None));
 
-    assert_eq!(processed_files.len(), 3);
-    assert_eq!(files_map.len(), 3);
+    assert_eq!(processed_files.len(), 4);
+    assert_eq!(files_map.len(), 4);
 
     let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -787,7 +821,7 @@ fn test_files_container_sync_with_delete() {
     ));
 
     assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 4);
+    assert_eq!(new_processed_files.len(), 5);
     assert_eq!(new_files_map.len(), 1);
 
     // first check all previous files were removed
@@ -812,11 +846,18 @@ fn test_files_container_sync_with_delete() {
         files_map[file_path3]["link"]
     );
 
-    // and finally check the synced file was added
-    let filename4 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename4].0, FILE_ADDED_SIGN);
+    let file_path4 = "/noextension";
+    assert_eq!(new_processed_files[file_path4].0, FILE_DELETED_SIGN);
     assert_eq!(
-        new_processed_files[filename4].1,
+        new_processed_files[file_path4].1,
+        files_map[file_path4]["link"]
+    );
+
+    // and finally check the synced file was added
+    let filename5 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        new_processed_files[filename5].1,
         new_files_map["/tests/testfolder/subfolder/subexists.md"]["link"]
     );
 }
@@ -833,7 +874,7 @@ fn test_files_container_get_latest() {
 
     assert_eq!(version, 1);
     assert_eq!(native_type, FILES_CONTAINER_NATIVE_TYPE);
-    assert_eq!(fetched_files_map.len(), 3);
+    assert_eq!(fetched_files_map.len(), 4);
     assert_eq!(files_map.len(), fetched_files_map.len());
     assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
     assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
@@ -841,4 +882,27 @@ fn test_files_container_get_latest() {
         files_map["/subfolder/subexists.md"],
         fetched_files_map["/subfolder/subexists.md"]
     );
+    assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
+}
+
+#[test]
+fn test_files_container_version() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    let (xorurl, _, _) = unwrap!(safe.files_container_create("./tests/testfolder/", true, None));
+
+    let (version, _, _) = unwrap!(safe.files_container_get_latest(&xorurl));
+    assert_eq!(version, 1);
+
+    let (version, _, _) = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &xorurl,
+        true,
+        None,
+        true // this sets the delete flag
+    ));
+    assert_eq!(version, 2);
+
+    let (version, _, _) = unwrap!(safe.files_container_get_latest(&xorurl));
+    assert_eq!(version, 2);
 }

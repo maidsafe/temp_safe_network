@@ -97,7 +97,7 @@ impl XorUrlEncoder {
         }
 
         let u8_version: u8 = decoded_xorurl[0];
-        let version: u64 = u8_version as u64;
+        let version: u64 = u64::from(u8_version);
         if version != 1 {
             return Err(format!("Invalid XOR-URL encoding version: {}", version));
         }
@@ -137,6 +137,7 @@ impl XorUrlEncoder {
         })
     }
 
+    #[allow(dead_code)]
     pub fn version(&self) -> u64 {
         self.version
     }

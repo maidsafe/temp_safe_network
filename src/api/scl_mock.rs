@@ -313,25 +313,23 @@ impl SafeApp {
         }
     }
 
-
     pub fn get_current_seq_appendable_data_version(
         &self,
         name: XorName,
-        tag: u64,
-    ) -> Result<u64, String> {
+        _tag: u64,
+    ) -> Result<u64, &str> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
-		let xorname_hex = xorname_to_hex(&name);
+        let xorname_hex = xorname_to_hex(&name);
 
-		let length = match self.mock_data.published_seq_append_only.get(&xorname_hex) {
-			Some(seq_append_only) => seq_append_only.len(),
-			None => return Err("SeqAppendOnlyDataNotFound".to_string()),
-		};
+        let length = match self.mock_data.published_seq_append_only.get(&xorname_hex) {
+            Some(seq_append_only) => seq_append_only.len(),
+            None => return Err("SeqAppendOnlyDataNotFound"),
+        };
 
-		//version
-		Ok( length as u64 + 1 )
+        // return the version
+        Ok(length as u64)
     }
-
 
     pub fn put_seq_mutable_data(
         &mut self,
