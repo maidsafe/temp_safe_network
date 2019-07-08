@@ -34,7 +34,15 @@ const FILES_CONTAINER_NATIVE_TYPE: &str = "AppendOnlyData";
 const FILE_ADDED_SIGN: &str = "+";
 const FILE_UPDATED_SIGN: &str = "*";
 const FILE_DELETED_SIGN: &str = "-";
+const FILE_ERROR_SIGN: &str = "E";
+
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
+
+const FILES_MAP_PREDICATE_LINK: &str = "link";
+const FILES_MAP_PREDICATE_TYPE: &str = "type";
+const FILES_MAP_PREDICATE_SIZE: &str = "size";
+const FILES_MAP_PREDICATE_MODIFIED: &str = "modified";
+const FILES_MAP_PREDICATE_CREATED: &str = "created";
 
 #[allow(dead_code)]
 impl Safe {
@@ -44,7 +52,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32".to_string());
+    /// # let mut safe = Safe::new("base32z".to_string());
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
@@ -95,7 +103,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32".to_string());
+    /// # let mut safe = Safe::new("base32z".to_string());
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
     /// let (version, files_map, native_type) = safe.files_container_get_latest(&xorurl).unwrap();
     /// println!("FilesContainer fetched is at version: {}", version);
@@ -139,11 +147,9 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32".to_string());
+    /// # let mut safe = Safe::new("base32z".to_string());
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", true, None).unwrap();
-    /// println!("OK: {}", xorurl);
     /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, None, false).unwrap();
-    /// println!("OK: {}", xorurl);
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("The local files that were synced up are: {:?}", new_processed_files);
     /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
@@ -161,10 +167,10 @@ impl Safe {
 
         let root_path = get_root_path(location, set_root)?;
         let processed_files = file_system_dir_walk(self, location, recursive, false)?;
-        let (processed_files, new_files_map): (ProcessedFiles, FilesMap) =
+        let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
             files_map_sync(self, current_files_map, processed_files, root_path, delete)?;
 
-        if !processed_files.is_empty() {
+        if success_count > 0 {
             // The FilesContainer is updated adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
             let serialised_files_map = serde_json::to_string(&new_files_map)
@@ -207,7 +213,7 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32".to_string());
+    /// # let mut safe = Safe::new("base32z".to_string());
     /// let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data).unwrap();
     /// # let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
@@ -231,7 +237,7 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32".to_string());
+    /// # let mut safe = Safe::new("base32z".to_string());
     /// # let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data).unwrap();
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
@@ -316,12 +322,12 @@ fn gen_new_file_item(
     let now = gen_timestamp();
     let mut file_item = FileItem::new();
     let xorurl = upload_file(safe, file_path)?;
-    file_item.insert("link".to_string(), xorurl.to_string());
-    file_item.insert("type".to_string(), file_type.to_string());
-    file_item.insert("size".to_string(), file_size.to_string());
-    file_item.insert("modified".to_string(), now.clone());
+    file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), xorurl.to_string());
+    file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type.to_string());
+    file_item.insert(FILES_MAP_PREDICATE_SIZE.to_string(), file_size.to_string());
+    file_item.insert(FILES_MAP_PREDICATE_MODIFIED.to_string(), now.clone());
     let created = file_created.unwrap_or_else(|| &now);
-    file_item.insert("created".to_string(), created.to_string());
+    file_item.insert(FILES_MAP_PREDICATE_CREATED.to_string(), created.to_string());
 
     Ok(file_item)
 }
@@ -332,24 +338,26 @@ fn files_map_sync(
     new_content: ProcessedFiles,
     root_path: String,
     delete: bool,
-) -> Result<(ProcessedFiles, FilesMap), String> {
+) -> Result<(ProcessedFiles, FilesMap, u64), String> {
     let (base_path, normalised_prefix) = gen_normalised_paths(&new_content, root_path);
     let mut updated_files_map = FilesMap::new();
     let mut processed_files = ProcessedFiles::new();
+    let mut success_count = 0;
 
-    for (key, _value) in new_content.iter() {
+    for (key, _value) in new_content
+        .iter()
+        .filter(|(_, (change, _))| change != FILE_ERROR_SIGN)
+    {
         let metadata = fs::metadata(&key).map_err(|err| {
             format!(
-                "Couldn't obtain metadata information for local file: {:?}",
-                err,
+                "Couldn't obtain metadata information for local file ('{}'): {:?}",
+                key, err,
             )
         })?;
 
         let file_path = Path::new(&key);
         let file_type = match &file_path.extension() {
-            Some(ext) => ext
-                .to_str()
-                .unwrap_or_else(|| "Failed to get file extension"),
+            Some(ext) => ext.to_str().ok_or("unknown")?,
             None => "unknown",
         };
 
@@ -371,31 +379,59 @@ fn files_map_sync(
                         updated_files_map.insert(normalised_file_name, new_file_item.clone());
                         processed_files.insert(
                             key.to_string(),
-                            (FILE_ADDED_SIGN.to_string(), new_file_item["link"].clone()),
+                            (
+                                FILE_ADDED_SIGN.to_string(),
+                                new_file_item[FILES_MAP_PREDICATE_LINK].clone(),
+                            ),
                         );
+                        success_count += 1;
                     }
-                    Err(err) => eprintln!( // TODO: add it to the report with "E" as change string
+                    Err(err) => {
+                        processed_files.insert(
+                            key.to_string(),
+                            (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                        );
+                        info!(
                         "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                        normalised_file_name, err
-                    ),
+                        normalised_file_name, err);
+                    }
                 };
             }
             Some(file_item) => {
                 // TODO: we don't record the original creation/modified timestamp from the,
                 // filesystem thus we cannot compare to see if they changed
-                if file_item["size"] != file_size || file_item["type"] != file_type {
+                if file_item[FILES_MAP_PREDICATE_SIZE] != file_size
+                    || file_item[FILES_MAP_PREDICATE_TYPE] != file_type
+                {
                     // We need to update the current FileItem, let's upload it first
-                    match gen_new_file_item(safe, &file_path, &file_type, &file_size, Some(&file_item["created"])) {
+                    match gen_new_file_item(
+                        safe,
+                        &file_path,
+                        &file_type,
+                        &file_size,
+                        Some(&file_item[FILES_MAP_PREDICATE_CREATED]),
+                    ) {
                         Ok(new_file_item) => {
                             debug!("Updated FileItem item: {:?}", new_file_item);
                             debug!("Updated FileItem item inserted as {:?}", &file_name);
-                            updated_files_map.insert(normalised_file_name.to_string(), new_file_item.clone());
-                            processed_files.insert(key.to_string(), (FILE_UPDATED_SIGN.to_string(), new_file_item["link"].clone()));
-                        },
-                        Err(err) => eprintln!( // TODO: add to the report with "E" as the change string
-                            "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                            &normalised_file_name, err
-                        )
+                            updated_files_map
+                                .insert(normalised_file_name.to_string(), new_file_item.clone());
+                            processed_files.insert(
+                                key.to_string(),
+                                (
+                                    FILE_UPDATED_SIGN.to_string(),
+                                    new_file_item[FILES_MAP_PREDICATE_LINK].clone(),
+                                ),
+                            );
+                            success_count += 1;
+                        }
+                        Err(err) => {
+                            processed_files.insert(
+                                key.to_string(),
+                                (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                            );
+                            info!("Skipping file \"{}\": {}", &normalised_file_name, err);
+                        }
                     };
                 } else {
                     // No need to update FileItem just copy the existing one
@@ -416,19 +452,20 @@ fn files_map_sync(
         } else {
             processed_files.insert(
                 file_name.to_string(),
-                (FILE_DELETED_SIGN.to_string(), file_item["link"].clone()),
+                (
+                    FILE_DELETED_SIGN.to_string(),
+                    file_item[FILES_MAP_PREDICATE_LINK].clone(),
+                ),
             );
         }
     });
 
-    Ok((processed_files, updated_files_map))
+    Ok((processed_files, updated_files_map, success_count))
 }
 
 fn upload_file(safe: &mut Safe, path: &Path) -> Result<XorUrl, String> {
-    let data = match fs::read(path) {
-        Ok(data) => data,
-        Err(err) => return Err(err.to_string()),
-    };
+    let data = fs::read(path)
+        .map_err(|err| format!("Failed to read file from local location: {}", err))?;
     safe.files_put_published_immutable(&data)
 }
 
@@ -473,19 +510,23 @@ fn file_system_dir_walk(
                                 Ok(xorurl) => {
                                     processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
                                 }
-                                Err(err) => eprintln!(
-                                    "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                                    normalised_path, err
-                                ),
+                                Err(err) => {
+                                    processed_files.insert(normalised_path.clone(), (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)));
+                                    info!(
+                                    "Skipping file \"{}\". {}",
+                                    normalised_path, err);
+                                },
                             };
                         } else {
-                            processed_files.insert(current_path_str, ("".to_string(), "SYNC".to_string()));
+                            processed_files.insert(current_path_str, ("".to_string(), "".to_string()));
                         }
                     },
-                    Err(err) => eprintln!(
+                    Err(err) => {
+                        processed_files.insert(normalised_path.clone(), (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)));
+                        info!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
-                        normalised_path, err
-                    )
+                        normalised_path, err);
+                    }
                 }
             });
     } else {
@@ -500,7 +541,7 @@ fn file_system_dir_walk(
             let xorurl = upload_file(safe, &path)?;
             processed_files.insert(location.to_string(), (FILE_ADDED_SIGN.to_string(), xorurl));
         } else {
-            processed_files.insert(location.to_string(), ("".to_string(), "SYNC".to_string()));
+            processed_files.insert(location.to_string(), ("".to_string(), "".to_string()));
         }
     }
 
@@ -520,7 +561,10 @@ fn files_map_create(content: &ProcessedFiles, root_path: String) -> Result<Files
     let now = gen_timestamp();
 
     let (base_path, normalised_prefix) = gen_normalised_paths(content, root_path);
-    for (file_name, (_change, link)) in content.iter() {
+    for (file_name, (_change, link)) in content
+        .iter()
+        .filter(|(_, (change, _))| change != FILE_ERROR_SIGN)
+    {
         debug!("FileItem item name:{:?}", &file_name);
         let mut file_item = FileItem::new();
         let metadata = fs::metadata(&file_name).map_err(|err| {
@@ -530,24 +574,22 @@ fn files_map_create(content: &ProcessedFiles, root_path: String) -> Result<Files
             )
         })?;
 
-        file_item.insert("link".to_string(), link.to_string());
+        file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), link.to_string());
 
         let file_path = Path::new(&file_name);
         let file_type: &str = match &file_path.extension() {
-            Some(ext) => ext
-                .to_str()
-                .unwrap_or_else(|| "Failed to get file extension"),
+            Some(ext) => ext.to_str().ok_or("unknown")?,
             None => "unknown",
         };
 
-        file_item.insert("type".to_string(), file_type.to_string());
+        file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type.to_string());
 
         let file_size = &metadata.len().to_string();
-        file_item.insert("size".to_string(), file_size.to_string());
+        file_item.insert(FILES_MAP_PREDICATE_SIZE.to_string(), file_size.to_string());
 
         // file_item.insert("permissions", metadata.permissions().to_string());
-        file_item.insert("modified".to_string(), now.clone());
-        file_item.insert("created".to_string(), now.clone());
+        file_item.insert(FILES_MAP_PREDICATE_MODIFIED.to_string(), now.clone());
+        file_item.insert(FILES_MAP_PREDICATE_CREATED.to_string(), now.clone());
 
         debug!("FileItem item: {:?}", file_item);
         let new_file_name = RelativePath::new(
@@ -587,20 +629,20 @@ fn test_files_map_create() {
     let files_map = unwrap!(files_map_create(&processed_files, "".to_string()));
     assert_eq!(files_map.len(), 2);
     let file_item1 = &files_map["/test.md"];
-    assert_eq!(file_item1["link"], "safe://top_xorurl");
-    assert_eq!(file_item1["type"], "md");
+    assert_eq!(file_item1[FILES_MAP_PREDICATE_LINK], "safe://top_xorurl");
+    assert_eq!(file_item1[FILES_MAP_PREDICATE_TYPE], "md");
     if cfg!(windows) {
-        assert_eq!(file_item1["size"], "14"); // due to \r
+        assert_eq!(file_item1[FILES_MAP_PREDICATE_SIZE], "14"); // due to \r
     } else {
-        assert_eq!(file_item1["size"], "13");
+        assert_eq!(file_item1[FILES_MAP_PREDICATE_SIZE], "13");
     }
     let file_item2 = &files_map["/subfolder/subexists.md"];
-    assert_eq!(file_item2["link"], "safe://second_xorurl");
-    assert_eq!(file_item2["type"], "md");
+    assert_eq!(file_item2[FILES_MAP_PREDICATE_LINK], "safe://second_xorurl");
+    assert_eq!(file_item2[FILES_MAP_PREDICATE_TYPE], "md");
     if cfg!(windows) {
-        assert_eq!(file_item2["size"], "9"); // due to \r
+        assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "9"); // due to \r
     } else {
-        assert_eq!(file_item2["size"], "8");
+        assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "8");
     }
 }
 
@@ -620,7 +662,10 @@ fn test_files_container_create_file() {
     assert_eq!(files_map.len(), 1);
     let file_path = "/tests/testfolder/test.md";
     assert_eq!(processed_files[filename].0, FILE_ADDED_SIGN);
-    assert_eq!(processed_files[filename].1, files_map[file_path]["link"]);
+    assert_eq!(
+        processed_files[filename].1,
+        files_map[file_path][FILES_MAP_PREDICATE_LINK]
+    );
 }
 
 #[test]
@@ -638,28 +683,28 @@ fn test_files_container_create_folder_without_end_slash() {
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/testfolder/test.md"]["link"]
+        files_map["/testfolder/test.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename2 = "tests/testfolder/another.md";
     assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/testfolder/another.md"]["link"]
+        files_map["/testfolder/another.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename3 = "tests/testfolder/subfolder/subexists.md";
     assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/testfolder/subfolder/subexists.md"]["link"]
+        files_map["/testfolder/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename4 = "tests/testfolder/noextension";
     assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/testfolder/noextension"]["link"]
+        files_map["/testfolder/noextension"][FILES_MAP_PREDICATE_LINK]
     );
 }
 
@@ -676,27 +721,30 @@ fn test_files_container_create_folder_with_end_slash() {
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
-    assert_eq!(processed_files[filename1].1, files_map["/test.md"]["link"]);
+    assert_eq!(
+        processed_files[filename1].1,
+        files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+    );
 
     let filename2 = "./tests/testfolder/another.md";
     assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/another.md"]["link"]
+        files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
     assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/subfolder/subexists.md"]["link"]
+        files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
     assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/noextension"]["link"]
+        files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
     );
 }
 
@@ -718,28 +766,28 @@ fn test_files_container_create_set_root() {
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/myroot/folder/test.md"]["link"]
+        files_map["/myroot/folder/test.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
     assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/myroot/folder/another.md"]["link"]
+        files_map["/myroot/folder/another.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
     assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/myroot/folder/subfolder/subexists.md"]["link"]
+        files_map["/myroot/folder/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
     assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/myroot/folder/noextension"]["link"]
+        files_map["/myroot/folder/noextension"][FILES_MAP_PREDICATE_LINK]
     );
 }
 
@@ -769,28 +817,28 @@ fn test_files_container_sync() {
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        new_files_map["/test.md"]["link"]
+        new_files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
     assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        new_files_map["/another.md"]["link"]
+        new_files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
     assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"]["link"]
+        new_files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
     assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        new_files_map["/noextension"]["link"]
+        new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
     );
 
     // and finally check the synced file is there
@@ -798,7 +846,7 @@ fn test_files_container_sync() {
     assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/tests/testfolder/subfolder/subexists.md"]["link"]
+        new_files_map["/tests/testfolder/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
 }
 
@@ -829,28 +877,28 @@ fn test_files_container_sync_with_delete() {
     assert_eq!(new_processed_files[file_path1].0, FILE_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path1].1,
-        files_map[file_path1]["link"]
+        files_map[file_path1][FILES_MAP_PREDICATE_LINK]
     );
 
     let file_path2 = "/another.md";
     assert_eq!(new_processed_files[file_path2].0, FILE_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path2].1,
-        files_map[file_path2]["link"]
+        files_map[file_path2][FILES_MAP_PREDICATE_LINK]
     );
 
     let file_path3 = "/subfolder/subexists.md";
     assert_eq!(new_processed_files[file_path3].0, FILE_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path3].1,
-        files_map[file_path3]["link"]
+        files_map[file_path3][FILES_MAP_PREDICATE_LINK]
     );
 
     let file_path4 = "/noextension";
     assert_eq!(new_processed_files[file_path4].0, FILE_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path4].1,
-        files_map[file_path4]["link"]
+        files_map[file_path4][FILES_MAP_PREDICATE_LINK]
     );
 
     // and finally check the synced file was added
@@ -858,7 +906,7 @@ fn test_files_container_sync_with_delete() {
     assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/tests/testfolder/subfolder/subexists.md"]["link"]
+        new_files_map["/tests/testfolder/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
 }
 

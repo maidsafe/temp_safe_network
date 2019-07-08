@@ -109,23 +109,34 @@ pub fn files_commander(
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {
-                if processed_files.is_empty() {
-                    println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
-                } else {
+                let mut table = Table::new();
+                let format = FormatBuilder::new()
+                    .column_separator(' ')
+                    .padding(0, 1)
+                    .build();
+                table.set_format(format);
+                let mut success_count = 0;
+                for (file_name, (change, link)) in processed_files.iter() {
+                    if change != "E" {
+                        success_count += 1;
+                    }
+                    table.add_row(row![change, file_name, link]);
+                }
+
+                if success_count > 0 {
                     println!(
                         "FilesContainer synced up (version {}): \"{}\"",
                         version, target
                     );
-                    let mut table = Table::new();
-                    let format = FormatBuilder::new()
-                        .column_separator(' ')
-                        .padding(0, 1)
-                        .build();
-                    table.set_format(format);
-                    for (file_name, (change, link)) in processed_files.iter() {
-                        table.add_row(row![change, file_name, link]);
-                    }
                     table.printstd();
+                } else if !processed_files.is_empty() {
+                    println!(
+                        "No changes were made to FilesContainer (version {}) at \"{}\"",
+                        version, target
+                    );
+                    table.printstd();
+                } else {
+                    println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
                 println!(
