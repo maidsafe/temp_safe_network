@@ -643,18 +643,15 @@ fn test_files_map_create() {
     let file_item1 = &files_map["/testfolder/test.md"];
     assert_eq!(file_item1[FILES_MAP_PREDICATE_LINK], "safe://top_xorurl");
     assert_eq!(file_item1[FILES_MAP_PREDICATE_TYPE], "md");
-    if cfg!(windows) {
-        assert_eq!(file_item1[FILES_MAP_PREDICATE_SIZE], "14"); // due to \r
-    } else {
-        assert_eq!(file_item1[FILES_MAP_PREDICATE_SIZE], "13");
-    }
+    assert_eq!(file_item1[FILES_MAP_PREDICATE_SIZE], "12");
+
     let file_item2 = &files_map["/testfolder/subfolder/subexists.md"];
     assert_eq!(file_item2[FILES_MAP_PREDICATE_LINK], "safe://second_xorurl");
     assert_eq!(file_item2[FILES_MAP_PREDICATE_TYPE], "md");
     if cfg!(windows) {
         assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "9"); // due to \r
     } else {
-        assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "8");
+        assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "7");
     }
 }
 
@@ -685,8 +682,8 @@ fn test_files_container_create_folder_without_trailing_slash() {
         unwrap!(safe.files_container_create("tests/testfolder", None, true));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
 
     let filename1 = "tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -725,8 +722,8 @@ fn test_files_container_create_folder_with_trailing_slash() {
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -768,8 +765,8 @@ fn test_files_container_create_dest_path_without_trailing_slash() {
     ));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -811,8 +808,8 @@ fn test_files_container_create_dest_path_with_trailing_slash() {
     ));
 
     assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -850,15 +847,15 @@ fn test_files_container_sync() {
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
 
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
 
     let (version, new_processed_files, new_files_map) =
         unwrap!(safe.files_container_sync("./tests/testfolder/subfolder/", &xorurl, true, false));
 
     assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 5);
+    assert_eq!(new_processed_files.len(), 2);
+    assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -904,8 +901,8 @@ fn test_files_container_sync_with_delete() {
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
 
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
 
     let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -915,8 +912,8 @@ fn test_files_container_sync_with_delete() {
     ));
 
     assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 5);
-    assert_eq!(new_files_map.len(), 1);
+    assert_eq!(new_processed_files.len(), 7);
+    assert_eq!(new_files_map.len(), 2);
 
     // first check all previous files were removed
     let file_path1 = "/test.md";
@@ -963,8 +960,8 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
 
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
     let xorurl_with_path = format!("{}/path/when/sync", xorurl);
     let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder",
@@ -974,8 +971,8 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
     ));
 
     assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 5);
+    assert_eq!(new_processed_files.len(), 2);
+    assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -1021,8 +1018,8 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
 
-    assert_eq!(processed_files.len(), 4);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
     let xorurl_with_path = format!("{}/path/when/sync/", xorurl);
     let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder",
@@ -1032,8 +1029,8 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
     ));
 
     assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 5);
+    assert_eq!(new_processed_files.len(), 2);
+    assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
@@ -1084,7 +1081,7 @@ fn test_files_container_get_latest() {
 
     assert_eq!(version, 1);
     assert_eq!(native_type, FILES_CONTAINER_NATIVE_TYPE);
-    assert_eq!(fetched_files_map.len(), 4);
+    assert_eq!(fetched_files_map.len(), 5);
     assert_eq!(files_map.len(), fetched_files_map.len());
     assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
     assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
