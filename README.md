@@ -324,11 +324,11 @@ FilesContainer created at: "safe://bbkulca25xhzwo6mcxlji7ocf5tm5hgn2x3mxtg62qzyc
 
 ##### Base path of files in a FilesContainer
 
-When uploading files onto a `FilesContainer` with the CLI, the base path for the files in the container is automatically calculated. All the paths at the source are compared and any common base path found among them is used as the root path, and the files are published on the `FilesContainer` with an absolute path based on the calculated root path.
+When uploading files onto a `FilesContainer` with the CLI, the base path for the files in the container is set by default to be `/`. All the files at the source are published on the `FilesContainer` with an absolute path with base `/` path.
 
 As an example, if we upload three files, which at source are located at `/to-upload/file1.txt`, `/to-upload/myfolder/file2.txt`, and `/to-upload/myotherfolder/subfolder/file3.txt`, the files will be published on the `FilesContainer` with paths `/file1.txt`, `/myfolder/file2.txt`, and `/myotherfolder/subfolder/file3.txt` respectively.
 
-We can additionally use the `--set-root` argument to set a root path which will be prefixed to each of the paths in the `FilesContainer`, e.g. if we provide `--set-root /mychosenroot` argument to the `files put` command when uploading the above files, they will be published on the `FilesContainer` with paths `/mychosenroot/file1.txt`, `/mychosenroot/myfolder/file2.txt`, and `/mychosenroot/myotherfolder/subfolder/file3.txt` respectively. This can be verified by querying the `FilesContainer` content with the `safe cat` command, please see further below for details of how this command.
+We can additionally pass a destination path argument to set a base path for each of the paths in the `FilesContainer`, e.g. if we provide `/mychosenroot/` destination path argument to the `files put` command when uploading the above files, they will be published on the `FilesContainer` with paths `/mychosenroot/file1.txt`, `/mychosenroot/myfolder/file2.txt`, and `/mychosenroot/myotherfolder/subfolder/file3.txt` respectively. This can be verified by querying the `FilesContainer` content with the `safe cat` command, please see further below for details of how this command.
 
 #### Files Sync
 
@@ -362,6 +362,15 @@ FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiu
 The `*`, `+` and `-` signs mean that the files were updated, added, and removed respectively.
 
 Also, please note we provided the optional `--delete` flag to the command above, this forces the deletion of those files which are found at the targeted `FilesContainer` that are not found in the source location, like the case of `./to-upload/test.md` file in our example above. If we didn't provide such flag, only the modification and creation of files would have been updated on the `FilesContainer`, like the case of `./to-upload/another.md` and `./to-upload/new` files in our example above.
+
+The `files sync` command also supports to be passed a destination path as the `files put` command, but in this case the destination path needs to be provided as part of the target XOR-URL. E.g., we can sync a `FilesContainer` using the local path and provide a specific destination path `new-files` in the target XOR-URL:
+```shell
+$ safe files sync ./other-folder/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/new-files
+FilesContainer synced up (version 3): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
++  ./other-folder/file1.txt     safe://hoqi7papyp7c6riyxiez6y5fh5ugj4xc7syqhmex774ws4g4b1z1xq
+```
+
+The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
 
 #### Cat
 

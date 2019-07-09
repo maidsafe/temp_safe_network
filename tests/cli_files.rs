@@ -58,15 +58,14 @@ fn calling_safe_files_put_recursive() {
 }
 
 #[test]
-fn calling_safe_files_put_recursive_and_change_root() {
+fn calling_safe_files_put_recursive_and_set_dest_path() {
     let files_container = cmd!(
         get_bin_location(),
         "files",
         "put",
         TEST_FOLDER,
+        "/aha",
         "--recursive",
-        "--set-root",
-        "aha",
     )
     .read()
     .unwrap();
@@ -199,10 +198,7 @@ fn calling_safe_files_sync() {
     .read()
     .unwrap();
 
-    let file = format!(
-        "{}/tests/testfolder/subfolder/subexists.md",
-        files_container_xor
-    );
+    let file = format!("{}/subexists.md", files_container_xor);
     let synced_file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
     assert_eq!(synced_file_cat, "the sub");
 }

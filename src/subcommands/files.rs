@@ -32,24 +32,22 @@ pub enum FilesSubCommands {
     Put {
         /// The source file/folder local path
         location: String,
+        /// The destination path (in the FilesContainer) for the uploaded files and folders (default is '/')
+        dest: Option<String>,
         /// Recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
-        #[structopt(long = "set-root")]
-        set_root: Option<String>,
     },
     #[structopt(name = "sync")]
     /// Sync files to the network
     Sync {
         /// The soure location
         location: String,
-        /// The target FilesContainer to sync up source files with
+        /// The target FilesContainer to sync up source files with, optionally including the destination path (default is '/')
         target: Option<String>,
         /// Recursively sync folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
-        #[structopt(long = "set-root")]
-        set_root: Option<String>,
         /// Delete files found at the target FilesContainer that are not in the source location
         #[structopt(short = "d", long = "delete")]
         delete: bool,
@@ -64,12 +62,12 @@ pub fn files_commander(
     match cmd {
         Some(FilesSubCommands::Put {
             location,
+            dest,
             recursive,
-            set_root,
         }) => {
             // create FilesContainer from a given path to local files/folders
             let (files_container_xorurl, processed_files, _files_map) =
-                safe.files_container_create(&location, recursive, set_root)?;
+                safe.files_container_create(&location, dest, recursive)?;
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {
@@ -98,14 +96,13 @@ pub fn files_commander(
             location,
             target,
             recursive,
-            set_root,
             delete,
         }) => {
             let target = get_target_location(target)?;
 
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) =
-                safe.files_container_sync(&location, &target, recursive, set_root, delete)?;
+                safe.files_container_sync(&location, &target, recursive, delete)?;
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {
