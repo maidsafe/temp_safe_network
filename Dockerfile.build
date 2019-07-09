@@ -1,7 +1,7 @@
 FROM rust:latest
 
-RUN addgroup --gid 1000 maidsafe && \
-    adduser --uid 1000 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
+RUN addgroup --gid 1001 maidsafe && \
+    adduser --uid 1001 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
     # The parent container sets this to the 'staff' group, which causes problems
     # with reading code stored in Cargo's registry.
     chgrp -R maidsafe /usr/local
@@ -35,4 +35,4 @@ ENV CARGO_TARGET_DIR=/target YARN_GPG=no RUST_BACKTRACE=1
 
 RUN cargo check --release && \
     cargo test --features="scl-mock" -- --test-threads=1
-ENTRYPOINT ["fixuid", "-q"]
+ENTRYPOINT ["fixuid"]
