@@ -155,8 +155,7 @@ impl<T: Chunk> ChunkStore<T> {
         }
     }
 
-    /// Tests if a data chunk has been previously stored under `id`.  This returns `true` even if
-    /// the variant of chunk type `T` is different to that specified by `id`.
+    /// Tests if a data chunk has been previously stored under `id`.
     pub fn has(&self, id: &T::Id) -> bool {
         if let Ok(path) = self.file_path(id) {
             fs::metadata(path)
