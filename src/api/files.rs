@@ -9,7 +9,7 @@
 use super::xorurl::SafeContentType;
 use super::{Safe, XorUrl, XorUrlEncoder};
 use chrono::{SecondsFormat, Utc};
-use log::{debug, info};
+use log::{debug, info, warn};
 use relative_path::RelativePath;
 use std::collections::BTreeMap;
 use std::fs;
@@ -118,11 +118,19 @@ impl Safe {
     ) -> Result<(u64, FilesMap, String), String> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
 
+        debug!("Getting latest files container for: {:?}", xorurl);
+        let seq_appendable_empty_err: String = "SeqAppendOnlyDataEmpty".to_string();
+        let seq_appendable_not_found_err: String = "SeqAppendOnlyDataNotFound".to_string();
+
         match self
             .safe_app
             .get_latest_seq_appendable_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
         {
             Ok((version, (_key, value))) => {
+                debug!(
+                    "Files map retrieved.... v{:?}, value {:?} ",
+                    &version, &value
+                );
                 // TODO: use RDF format and deserialise it
                 let files_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
                     .map_err(|err| {
@@ -133,12 +141,17 @@ impl Safe {
                 })?;
                 Ok((version, files_map, FILES_CONTAINER_NATIVE_TYPE.to_string()))
             }
-            Err("SeqAppendOnlyDataEmpty") => Ok((
-                0,
-                FilesMap::default(),
-                FILES_CONTAINER_NATIVE_TYPE.to_string(),
-            )),
-            Err("SeqAppendOnlyDataNotFound") => Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string()),
+            Err(seq_appendable_empty_err) => {
+                warn!("Files container found at {:?} was empty", &xorurl);
+                Ok((
+                    0,
+                    FilesMap::default(),
+                    FILES_CONTAINER_NATIVE_TYPE.to_string(),
+                ))
+            }
+            Err(seq_appendable_not_found_err) => {
+                Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string())
+            }
             Err(err) => Err(format!("Failed to get current version: {}", err)),
         }
     }
@@ -192,6 +205,8 @@ impl Safe {
                 serialised_files_map.as_bytes().to_vec(),
             )];
 
+            let seq_appendable_not_found_err: String = "SeqAppendOnlyDataNotFound".to_string();
+
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
 
@@ -200,7 +215,7 @@ impl Safe {
                 .get_current_seq_appendable_data_version(xorname, type_tag)
             {
                 Ok(version) => version,
-                Err("SeqAppendOnlyDataNotFound") => {
+                Err(seq_appendable_not_found_err) => {
                     return Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string())
                 }
                 Err(err) => return Err(format!("Failed to get current version: {}", err)),

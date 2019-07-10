@@ -9,7 +9,7 @@
 use super::files::FilesMap;
 use super::xorurl::SafeContentType;
 use super::{Safe, XorName, XorUrlEncoder};
-use log::debug;
+use log::{debug, info, warn};
 
 #[derive(Debug, PartialEq)]
 pub enum SafeData {
@@ -74,6 +74,10 @@ impl Safe {
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         let path = xorurl_encoder.path();
 
+        debug!(
+            "Fetching content of type: {:?}",
+            xorurl_encoder.content_type()
+        );
         match xorurl_encoder.content_type() {
             SafeContentType::CoinBalance => Ok(SafeData::Key {
                 xorname: xorurl_encoder.xorname(),
@@ -86,7 +90,10 @@ impl Safe {
             SafeContentType::FilesContainer => {
                 let (version, files_map, native_type) = self.files_container_get_latest(&xorurl)?;
 
-                debug!("FilesMap found: {:?}", files_map);
+                debug!(
+                    "Files container found w/ v:{:?}, of type: {:?}, containing: {:?}",
+                    &version, &native_type, &files_map
+                );
 
                 if path != "/" && !path.is_empty() {
                     // TODO: Count how many redirects we've done... prevent looping forever
