@@ -7,14 +7,14 @@ set -e
 # Stash unstaged changes
 git stash -q --keep-index
 
-echo 'Precommit: cargo test'
-cargo test
-echo 'Precommit: cargo clippy -- -D warnings'
+echo 'PrePush: cargo test'
+cargo test --features="scl-mock" -- --test-threads=1
+echo 'PrePush: cargo clippy -- -D warnings'
 cargo clippy -- -D warnings
-echo 'Precommit: cargo fmt'
+echo 'PrePush: cargo fmt -- --check'
 cargo fmt
 
-echo 'Precommit: updating formatted files'
+echo 'PrePush: updating formatted files'
 # Stage updated files
 git add -u
 

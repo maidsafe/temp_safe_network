@@ -207,9 +207,6 @@ fn calling_safe_files_sync() {
     assert_eq!(synced_file_cat, "the sub");
 }
 
-
-
-
 #[test]
 fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     let files_container = cmd!(
@@ -222,16 +219,16 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     .read()
     .unwrap();
 
-	let file_to_delete = format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER);
-	let file_to_modify = format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER);
+    let file_to_delete = format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER);
+    let file_to_modify = format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER);
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines.next().unwrap();
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-	//modify file
-	let file_to_modify_write = OpenOptions::new()
+    //modify file
+    let file_to_modify_write = OpenOptions::new()
         .append(true)
         .open(&file_to_modify)
         .unwrap();
@@ -240,50 +237,47 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
         eprintln!("Couldn't write to file: {}", e);
     }
 
-	//remove another
-	fs::remove_file(&file_to_delete).unwrap();
+    //remove another
+    fs::remove_file(&file_to_delete).unwrap();
 
-	// now sync
-	let files_sync_result = cmd!(
+    // now sync
+    let files_sync_result = cmd!(
         get_bin_location(),
         "files",
         "sync",
         TEST_FOLDER_SUBFOLDER,
         files_container_xor,
         "--recursive",
-		// "--delete"
+        // "--delete"
     )
     .read()
     .unwrap();
 
-
     let file = format!("{}/subexists.md", files_container_xor);
     let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
 
+    // remove modified lines
+    let mut replace_test_md = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&file_to_modify)
+        .unwrap();
 
-	// remove modified lines
-	let mut replace_test_md = OpenOptions::new()
-	.write(true)
-	.truncate(true)
-	.open(&file_to_modify)
-	.unwrap();
+    replace_test_md.seek(SeekFrom::Start(0)).unwrap();
+    replace_test_md.write_all(b"the sub").unwrap();
 
-	replace_test_md.seek(SeekFrom::Start(0)).unwrap();
-	replace_test_md.write_all(b"the sub").unwrap();
+    // readd the removed missing file
+    let mut readd_missing_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(&file_to_delete)
+        .unwrap();
 
-	// readd the removed missing file
-	let mut readd_missing_file = OpenOptions::new()
-	.write(true)
-	.create(true)
-	.open(&file_to_delete)
-	.unwrap();
+    readd_missing_file.seek(SeekFrom::Start(0)).unwrap();
+    readd_missing_file.write_all(b"sub2").unwrap();
 
-	readd_missing_file.seek(SeekFrom::Start(0)).unwrap();
-	readd_missing_file.write_all(b"sub2").unwrap();
-
-
-	// and now the tests...
+    // and now the tests...
     assert_eq!(file_cat, "the sub with more text!");
-	assert!(files_sync_result.contains("*"));
-	assert!(!files_sync_result.contains("+"));
+    assert!(files_sync_result.contains("*"));
+    assert!(!files_sync_result.contains("+"));
 }

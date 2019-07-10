@@ -648,11 +648,8 @@ fn test_files_map_create() {
     let file_item2 = &files_map["/testfolder/subfolder/subexists.md"];
     assert_eq!(file_item2[FILES_MAP_PREDICATE_LINK], "safe://second_xorurl");
     assert_eq!(file_item2[FILES_MAP_PREDICATE_TYPE], "md");
-    if cfg!(windows) {
-        assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "9"); // due to \r
-    } else {
-        assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "7");
-    }
+    assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "7");
+
 }
 
 #[test]
