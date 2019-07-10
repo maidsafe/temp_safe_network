@@ -8,7 +8,7 @@
 
 use super::helpers::{parse_coins_amount, sk_from_hex};
 use super::xorurl::SafeContentType;
-use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
+use super::{validate_key_pair, BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use unwrap::unwrap;
@@ -55,6 +55,12 @@ impl Safe {
             xorurl: key_xorurl.to_string(),
             sk: key_pair.sk.clone(),
         };
+
+        match validate_key_pair(key_pair.clone()) {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }
+
         let serialised_value = unwrap!(serde_json::to_string(&value));
         // FIXME: it should return error if the name already exists
         let md_key = name.to_string();

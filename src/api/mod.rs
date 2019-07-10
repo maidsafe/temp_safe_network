@@ -19,7 +19,7 @@ mod wallet;
 mod xorurl;
 
 pub use fetch::SafeData;
-pub use keys::BlsKeyPair;
+pub use keys::{validate_key_pair, BlsKeyPair};
 pub use safe_nd::{XorName, XOR_NAME_LEN};
 pub use xorurl::{XorUrl, XorUrlEncoder};
 

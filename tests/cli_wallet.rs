@@ -20,6 +20,7 @@ use std::process::Command;
 
 const PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
 const NO_SOURCE: &str = "Missing the 'source' argument";
+const UNMATCHED_PK_SK: &str = "The secret key provided does not match the public key";
 
 #[test]
 fn calling_safe_wallet_transfer() {
@@ -209,4 +210,66 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
     .read()
     .unwrap();
     assert_eq!("300", balance);
+}
+
+#[test]
+fn calling_safe_wallet_create_w_bad_secret() {
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    cmd.args(&vec![
+        "wallet",
+        "create",
+        &pk_pay_xor,
+        &pk_pay_xor,
+        "--secret-key",
+        "badbadbad",
+        "--json",
+    ])
+    .assert()
+    .stderr(predicate::str::contains("64"))
+    .stderr(predicate::str::contains("secret key"))
+    .failure();
+}
+
+#[test]
+fn calling_safe_wallet_create_w_bad_pk() {
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    cmd.args(&vec![
+        "wallet",
+        "create",
+        "safe://nononooOOooo",
+        &pk_pay_xor,
+        "--secret-key",
+        &pay_sk,
+        "--json",
+    ])
+    .assert()
+    .stderr(predicate::str::contains("UnkownBase"))
+    .failure();
+}
+
+#[test]
+fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+    let (pk_pay_xor2, pay_sk2) = create_preload_and_get_keys("300");
+
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    cmd.args(&vec![
+        "wallet",
+        "create",
+        &pk_pay_xor,
+        &pk_pay_xor,
+        "--secret-key",
+        &pay_sk2,
+        "--json",
+    ])
+    .assert()
+    .stderr(predicate::str::contains(UNMATCHED_PK_SK))
+    .failure();
 }

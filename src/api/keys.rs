@@ -12,12 +12,40 @@ use super::{Safe, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 
+// A trait that the Validate derive will impl
+use validator::{Validate, ValidationErrors};
+
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>
-#[derive(Clone)]
+#[derive(Clone, Validate)]
 pub struct BlsKeyPair {
+    #[validate(length(equal = "96"))]
     pub pk: String,
+    #[validate(length(equal = "64"))]
     pub sk: String,
+}
+
+pub fn validate_key_pair(key_pair: BlsKeyPair) -> Result<(), String> {
+    let validation = key_pair.validate();
+
+    if ValidationErrors::has_error(&validation, "sk") {
+        return Err("The secret key must be 64 characters long".to_string());
+    }
+    if ValidationErrors::has_error(&validation, "pk") {
+        return Err("The secret key must be 96 characters long".to_string());
+    }
+
+    let secret_key = sk_from_hex(&key_pair.sk)?;
+
+    let real_pk = secret_key.public_key();
+
+    let real_pk_hex = pk_to_hex(&real_pk);
+
+    if real_pk_hex != key_pair.pk {
+        return Err("The secret key provided does not match the public key.".to_string());
+    }
+
+    Ok(())
 }
 
 #[allow(dead_code)]

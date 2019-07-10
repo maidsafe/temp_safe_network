@@ -42,6 +42,8 @@ human-panic = "1.0.1"
 url = "1.7.2"
 common-path = "1.0.0"
 relative-path = "0.4.0"
+validator = "0.8.0"
+validator_derive = "0.8.0"
 
 [features]
 default = ["uuid/v4"]
