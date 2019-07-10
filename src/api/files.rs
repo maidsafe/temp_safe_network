@@ -43,6 +43,8 @@ const FILES_MAP_PREDICATE_SIZE: &str = "size";
 const FILES_MAP_PREDICATE_MODIFIED: &str = "modified";
 const FILES_MAP_PREDICATE_CREATED: &str = "created";
 
+const MAX_RECURSIVE_DEPTH: usize = 10000;
+
 #[allow(dead_code)]
 impl Safe {
     /// # Create a FilesContaier.
@@ -492,14 +494,14 @@ fn file_system_dir_walk(
     debug!("Metadata for location: {:?}", metadata);
 
     if metadata.is_dir() || !recursive {
-        // TODO: non-recursive
         // TODO: option to enable following symlinks and hidden files?
         // We now compare both FilesMaps to upload the missing files
+        let max_depth = if recursive { MAX_RECURSIVE_DEPTH } else { 1 };
         let mut processed_files = BTreeMap::new();
         WalkDir::new(path)
             .follow_links(true)
             .into_iter()
-            .filter_entry(|e| is_not_hidden(e))
+            .filter_entry(|e| not_hidden_and_valid_depth(e, max_depth))
             .filter_map(|v| v.ok())
             .for_each(|child| {
                 let current_file_path = child.path();
@@ -524,7 +526,7 @@ fn file_system_dir_walk(
                                 },
                             };
                         } else {
-                            processed_files.insert(current_path_str, ("".to_string(), "".to_string()));
+                            processed_files.insert(normalised_path.clone(), ("".to_string(), "".to_string()));
                         }
                     },
                     Err(err) => {
@@ -548,11 +550,11 @@ fn file_system_dir_walk(
     }
 }
 
-fn is_not_hidden(entry: &DirEntry) -> bool {
+fn not_hidden_and_valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| entry.depth() == 0 || !s.starts_with('.'))
+        .map(|s| entry.depth() <= max_depth && (entry.depth() == 0 || !s.starts_with('.')))
         .unwrap_or(false)
 }
 
