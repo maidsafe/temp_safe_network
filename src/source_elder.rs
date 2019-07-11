@@ -223,30 +223,8 @@ impl SourceElder {
             //
             PutIData(chunk) => self.handle_put_idata(client, chunk, message_id, signature),
             GetIData(address) => self.handle_get_idata(client, address, message_id, signature),
-            DeleteUnpubIData(ref address) => {
-                if address.kind() == IDataKind::Pub {
-                    self.send_response_to_client(
-                        &client.public_id,
-                        message_id,
-                        Response::GetIData(Err(NdError::InvalidOperation)),
-                    );
-                    return None;
-                }
-                self.has_signature(&client.public_id, &request, &message_id, &signature)?;
-                if client.has_balance {
-                    Some(Action::ForwardClientRequest(Rpc::Request {
-                        requester: client.public_id.clone(),
-                        request,
-                        message_id,
-                    }))
-                } else {
-                    self.send_response_to_client(
-                        &client.public_id,
-                        message_id,
-                        Response::Mutation(Err(NdError::AccessDenied)),
-                    );
-                    None
-                }
+            DeleteUnpubIData(address) => {
+                self.handle_delete_unpub_idata(client, address, message_id, signature)
             }
             //
             // ===== Mutable Data =====
@@ -471,6 +449,39 @@ impl SourceElder {
                 &client.public_id,
                 message_id,
                 Response::GetIData(Err(NdError::AccessDenied)),
+            );
+            None
+        }
+    }
+
+    fn handle_delete_unpub_idata(
+        &mut self,
+        client: &ClientInfo,
+        address: IDataAddress,
+        message_id: MessageId,
+        signature: Option<Signature>,
+    ) -> Option<Action> {
+        if address.kind() == IDataKind::Pub {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::GetIData(Err(NdError::InvalidOperation)),
+            );
+            return None;
+        }
+        let request = Request::DeleteUnpubIData(address);
+        self.has_signature(&client.public_id, &request, &message_id, &signature)?;
+        if client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::AccessDenied)),
             );
             None
         }
