@@ -498,6 +498,58 @@ impl DestinationElder {
         }
     }
 
+    fn handle_delete_unpub_idata_req(
+        &mut self,
+        requester: PublicId,
+        address: IDataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let requester_pk = utils::own_key(&requester)?;
+        if XorName::from(*requester_pk) == *address.name() {
+            self.delete_unpub_idata(address, message_id)
+        } else {
+            let client_id = requester.clone();
+            let respond = |result: NdResult<()>| {
+                Some(Action::RespondToSrcElders {
+                    sender: *address.name(),
+                    message: Rpc::Response {
+                        requester: client_id,
+                        response: Response::Mutation(result),
+                        message_id,
+                    },
+                })
+            };
+
+            // We're acting as dst elder, received request from src elders
+            let metadata = match self.get_metadata_for(address) {
+                Ok(metadata) => metadata,
+                Err(error) => return respond(Err(error)),
+            };
+
+            // Can't fail
+            let idata_op = unwrap!(IDataOp::new(
+                requester.clone(),
+                Request::DeleteUnpubIData(address),
+                metadata.holders.clone()
+            ));
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        sender: *address.name(),
+                        targets: metadata.holders,
+                        message: Rpc::Request {
+                            request: idata_op.request().clone(),
+                            requester,
+                            message_id,
+                        },
+                    })
+                }
+            }
+        }
+    }
+
     fn handle_mutation_resp(
         &mut self,
         sender: XorName,
@@ -618,40 +670,6 @@ impl DestinationElder {
             })
     }
 
-    fn store_idata(
-        &mut self,
-        kind: IData,
-        requester: PublicId,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = if self.immutable_chunks.has(kind.address()) {
-            Ok(())
-        } else {
-            self.immutable_chunks
-                .put(&kind)
-                .map_err(|error| error.to_string().into())
-        };
-        Some(Action::RespondToOurDstElders {
-            sender: *self.id.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
-    }
-
-    // Returns an iterator over all of our section's non-full adults' names, sorted by closest to
-    // `target`.
-    fn non_full_adults_sorted(&self, _target: &XorName) -> impl Iterator<Item = &XorName> {
-        None.iter()
-    }
-
-    // Returns an iterator over all of our section's elders' names, sorted by closest to `target`.
-    fn elders_sorted(&self, _target: &XorName) -> impl Iterator<Item = &XorName> {
-        iter::once(self.id.name())
-    }
-
     fn handle_get_idata_req(
         &mut self,
         src: XorName,
@@ -706,6 +724,54 @@ impl DestinationElder {
         }
     }
 
+    fn handle_get_idata_resp(
+        &mut self,
+        sender: XorName,
+        result: NdResult<IData>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        let action = self.idata_op_mut(&message_id).and_then(|idata_op| {
+            idata_op.handle_get_idata_resp(sender, result, own_id, message_id)
+        });
+        let _ = self.remove_idata_op_if_concluded(&message_id);
+        action
+    }
+
+    fn store_idata(
+        &mut self,
+        kind: IData,
+        requester: PublicId,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if self.immutable_chunks.has(kind.address()) {
+            Ok(())
+        } else {
+            self.immutable_chunks
+                .put(&kind)
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToOurDstElders {
+            sender: *self.id.name(),
+            message: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
+    }
+
+    // Returns an iterator over all of our section's non-full adults' names, sorted by closest to
+    // `target`.
+    fn non_full_adults_sorted(&self, _target: &XorName) -> impl Iterator<Item = &XorName> {
+        None.iter()
+    }
+
+    // Returns an iterator over all of our section's elders' names, sorted by closest to `target`.
+    fn elders_sorted(&self, _target: &XorName) -> impl Iterator<Item = &XorName> {
+        iter::once(self.id.name())
+    }
+
     fn get_metadata_for(&self, address: IDataAddress) -> NdResult<ChunkMetadata> {
         match self
             .immutable_metadata
@@ -753,58 +819,6 @@ impl DestinationElder {
         })
     }
 
-    fn handle_delete_unpub_idata_req(
-        &mut self,
-        requester: PublicId,
-        address: IDataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let requester_pk = utils::own_key(&requester)?;
-        if XorName::from(*requester_pk) == *address.name() {
-            self.delete_unpub_idata(address, message_id)
-        } else {
-            let client_id = requester.clone();
-            let respond = |result: NdResult<()>| {
-                Some(Action::RespondToSrcElders {
-                    sender: *address.name(),
-                    message: Rpc::Response {
-                        requester: client_id,
-                        response: Response::Mutation(result),
-                        message_id,
-                    },
-                })
-            };
-
-            // We're acting as dst elder, received request from src elders
-            let metadata = match self.get_metadata_for(address) {
-                Ok(metadata) => metadata,
-                Err(error) => return respond(Err(error)),
-            };
-
-            // Can't fail
-            let idata_op = unwrap!(IDataOp::new(
-                requester.clone(),
-                Request::DeleteUnpubIData(address),
-                metadata.holders.clone()
-            ));
-            match self.idata_ops.entry(message_id) {
-                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
-                Entry::Vacant(vacant_entry) => {
-                    let idata_op = vacant_entry.insert(idata_op);
-                    Some(Action::SendToPeers {
-                        sender: *address.name(),
-                        targets: metadata.holders,
-                        message: Rpc::Request {
-                            request: idata_op.request().clone(),
-                            requester,
-                            message_id,
-                        },
-                    })
-                }
-            }
-        }
-    }
-
     fn delete_unpub_idata(
         &mut self,
         address: IDataAddress,
@@ -847,20 +861,6 @@ impl DestinationElder {
                 message_id,
             },
         })
-    }
-
-    fn handle_get_idata_resp(
-        &mut self,
-        sender: XorName,
-        result: NdResult<IData>,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let action = self.idata_op_mut(&message_id).and_then(|idata_op| {
-            idata_op.handle_get_idata_resp(sender, result, own_id, message_id)
-        });
-        let _ = self.remove_idata_op_if_concluded(&message_id);
-        action
     }
 
     fn client_id(&self, message_id: &MessageId) -> Option<&PublicId> {
