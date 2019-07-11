@@ -265,63 +265,51 @@ impl SourceElder {
             //
             // ===== Mutable Data =====
             //
-            PutMData(_) => {
+            GetMData(..)
+            | GetMDataVersion(..)
+            | GetMDataShell(..)
+            | GetMDataValue { .. }
+            | ListMDataPermissions(..)
+            | ListMDataUserPermissions { .. }
+            | PutMData(..)
+            | ListMDataEntries(..)
+            | ListMDataKeys(..)
+            | ListMDataValues(..) => {
+                // TODO: allow only registered clients to send this req
+                // once the coin balances are implemented.
+
+                // if registered_client == ClientState::Registered {
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    requester: client.public_id.clone(),
+                    request,
+                    message_id,
+                }))
+                // } else {
+                //     self.send_response_to_client(
+                //         client_id,
+                //         message_id,
+                //         Response::GetAccount(Err(NdError::AccessDenied)),
+                //     );
+                //     None
+                // }
+            }
+            DeleteMData(..) => {
                 has_signature()?;
                 unimplemented!()
             }
-            GetMData(ref address) => {
+            SetMDataUserPermissions { .. } => {
                 has_signature()?;
                 unimplemented!()
             }
-            GetMDataValue { ref address, .. } => {
+            DelMDataUserPermissions { .. } => {
                 has_signature()?;
                 unimplemented!()
             }
-            DeleteMData(ref address) => {
+            MutateSeqMDataEntries { .. } => {
                 has_signature()?;
                 unimplemented!()
             }
-            GetMDataShell(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            GetMDataVersion(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataEntries(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataKeys(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataValues(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            SetMDataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            DelMDataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataPermissions(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            MutateSeqMDataEntries { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            MutateUnseqMDataEntries { ref address, .. } => {
+            MutateUnseqMDataEntries { .. } => {
                 has_signature()?;
                 unimplemented!()
             }
@@ -919,26 +907,23 @@ impl SourceElder {
             | GetUnpubADataPermissionAtIndex(..)
             | GetPubADataPermissionAtIndex(..)
             | GetADataValue(..)
+            | GetMData(..)
+            | GetMDataShell(..)
+            | GetMDataVersion(..)
+            | ListUnseqMDataEntries(..)
+            | ListSeqMDataEntries(..)
+            | ListMDataKeys(..)
+            | ListSeqMDataValues(..)
+            | ListUnseqMDataValues(..)
+            | ListMDataUserPermissions(..)
+            | ListMDataPermissions(..)
+            | GetSeqMDataValue(..)
+            | GetUnseqMDataValue(..)
             | Mutation(..)
             | Transaction(..) => {
                 self.send_response_to_client(&requester, message_id, response);
                 None
             }
-            //
-            // ===== Mutable Data =====
-            //
-            GetMData(_) => unimplemented!(),
-            GetMDataShell(_) => unimplemented!(),
-            GetMDataVersion(_) => unimplemented!(),
-            ListUnseqMDataEntries(_) => unimplemented!(),
-            ListSeqMDataEntries(_) => unimplemented!(),
-            ListMDataKeys(_) => unimplemented!(),
-            ListSeqMDataValues(_) => unimplemented!(),
-            ListUnseqMDataValues(_) => unimplemented!(),
-            ListMDataUserPermissions(_) => unimplemented!(),
-            ListMDataPermissions(_) => unimplemented!(),
-            GetSeqMDataValue(_) => unimplemented!(),
-            GetUnseqMDataValue(_) => unimplemented!(),
             //
             // ===== Invalid =====
             //
