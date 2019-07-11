@@ -266,17 +266,20 @@ impl SourceElder {
             // ===== Mutable Data =====
             //
             GetMData(..)
-            | GetMDataVersion(..)
+            | PutMData(..)
+            | DeleteMData(..)
             | GetMDataShell(..)
             | GetMDataValue { .. }
+            | GetMDataVersion(..)
             | ListMDataPermissions(..)
             | ListMDataUserPermissions { .. }
-            | PutMData(..)
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..) 
+            | ListMDataValues(..)
             | MutateSeqMDataEntries { .. }
-            | MutateUnseqMDataEntries { .. } => {
+            | MutateUnseqMDataEntries { .. } 
+            | SetMDataUserPermissions { .. }
+            | DelMDataUserPermissions { .. } => {
                 // TODO: allow only registered clients to send this req
                 // once the coin balances are implemented.
 
