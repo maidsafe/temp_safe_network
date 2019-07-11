@@ -159,7 +159,7 @@ impl DestinationElder {
             PutIData(kind) => self.handle_put_idata_req(src, requester, kind, message_id),
             GetIData(address) => self.handle_get_idata_req(src, requester, address, message_id),
             DeleteUnpubIData(address) => {
-                self.handle_delete_unpub_idata_req(requester, address, message_id)
+                self.handle_delete_unpub_idata_req(src, requester, address, message_id)
             }
             //
             // ===== Mutable Data =====
@@ -500,14 +500,17 @@ impl DestinationElder {
 
     fn handle_delete_unpub_idata_req(
         &mut self,
+        src: XorName,
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let requester_pk = utils::own_key(&requester)?;
-        if XorName::from(*requester_pk) == *address.name() {
+        if &src == address.name() {
+            // Since the src is the chunk's name, this message was sent by the dst elders to us as a
+            // single dst elder, implying that we're a dst elder where the chunk is stored.
             self.delete_unpub_idata(address, message_id)
         } else {
+            // We're acting as dst elder, received request from src elders
             let client_id = requester.clone();
             let respond = |result: NdResult<()>| {
                 Some(Action::RespondToSrcElders {
@@ -520,7 +523,6 @@ impl DestinationElder {
                 })
             };
 
-            // We're acting as dst elder, received request from src elders
             let metadata = match self.get_metadata_for(address) {
                 Ok(metadata) => metadata,
                 Err(error) => return respond(Err(error)),
