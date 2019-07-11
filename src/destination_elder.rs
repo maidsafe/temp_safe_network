@@ -20,7 +20,7 @@ use crate::{
     Result, ToDbKey,
 };
 use idata_op::{IDataOp, OpType};
-use log::{error, trace, warn};
+use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     Error as NdError, IData, IDataAddress, LoginPacket, MessageId, NodePublicId, PublicId, Request,
@@ -747,6 +747,11 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = if self.immutable_chunks.has(kind.address()) {
+            info!(
+                "{}: Immutable chunk already exists, not storing: {:?}",
+                self,
+                kind.address()
+            );
             Ok(())
         } else {
             self.immutable_chunks
