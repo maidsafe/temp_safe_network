@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{decode_ipc_msg, xorname_from_pk, KeyPair};
+use super::helpers::{xorname_from_pk, KeyPair};
 use super::xorurl::{create_random_xorname, XorUrlEncoder};
+use super::{Error, ResultReturn};
 use futures::future::Future;
 use log::{debug, info, warn};
 use rand::rngs::OsRng;
@@ -15,6 +16,8 @@ use rand_core::RngCore;
 use safe_app::AppError::CoreError;
 use safe_app::{run, App};
 
+#[cfg(not(feature = "fake-auth"))]
+use super::helpers::decode_ipc_msg;
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
@@ -36,6 +39,8 @@ const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 // Temporary untill SCL allows to pass a SeqEntryActions to mutate_seq_mdata_entries
 type SeqEntryActions = BTreeMap<Vec<u8>, MDataSeqEntryAction>;
 
+type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
+
 #[derive(Default)]
 pub struct SafeApp {
     safe_conn: Option<App>,
@@ -47,7 +52,7 @@ impl SafeApp {
     }
 
     #[cfg(feature = "fake-auth")]
-    pub fn connect(&mut self, _app_id: &str, _auth_credentials: &str) -> Result<(), String> {
+    pub fn connect(&mut self, _app_id: &str, _auth_credentials: &str) -> ResultReturn<()> {
         warn!("Using fake authorisation for testing...");
         self.safe_conn = Some(create_app());
         Ok(())
@@ -55,26 +60,22 @@ impl SafeApp {
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     #[cfg(not(feature = "fake-auth"))]
-    pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> Result<(), String> {
+    pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> ResultReturn<()> {
         debug!("Connecting to SAFE Network...");
 
         let disconnect_cb = || {
             warn!("Connection with the SAFE Network was lost");
         };
 
-        match decode_ipc_msg(auth_credentials) {
-            Ok(auth_granted) => {
-                match App::registered(app_id.to_string(), auth_granted, disconnect_cb) {
-                    Ok(app) => {
-                        self.safe_conn = Some(app);
-                        debug!("Successfully connected to the Network!!!");
-                        Ok(())
-                    }
-                    Err(e) => Err(format!("Failed to connect to the SAFE Network: {:?}", e)),
-                }
-            }
-            Err(e) => Err(e),
-        }
+        let auth_granted = decode_ipc_msg(auth_credentials)?;
+        let app =
+            App::registered(app_id.to_string(), auth_granted, disconnect_cb).map_err(|err| {
+                Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+            })?;
+
+        self.safe_conn = Some(app);
+        debug!("Successfully connected to the Network!!!");
+        Ok(())
     }
 
     // TODO: replace with actual code for calling SCL
@@ -84,19 +85,16 @@ impl SafeApp {
         _from_sk: &SecretKey,
         _new_balance_owner: &PublicKey,
         _amount: &str,
-    ) -> Result<XorName, &str> {
-        //self.scl_mock
-        //    .create_balance(from_pk, from_sk, new_balance_owner, amount)
+    ) -> ResultReturn<XorName> {
         Ok(create_random_xorname())
     }
 
     // TODO: replace with code
     pub fn allocate_test_coins(&mut self, _to_pk: &PublicKey, _amount: &str) -> XorName {
-        // self.scl_mock.allocate_test_coins(to_pk, amount)
         create_random_xorname()
     }
 
-    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> Result<String, &str> {
+    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> ResultReturn<String> {
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname, sk)
     }
@@ -107,11 +105,11 @@ impl SafeApp {
         &self,
         _xorname: &XorName,
         _sk: &SecretKey,
-    ) -> Result<String, &str> {
+    ) -> ResultReturn<String> {
         //let safe_app: &App = self.safe_app.ok_or_else(|| APP_NOT_CONNECTED)?;
         //let safe_app: &App = match &self.safe_app {
         //    Some(app) => &app,
-        //    None => return Err(APP_NOT_CONNECTED.to_string()),
+        //    None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         //};
 
         // TODO: Make this work with SCL.
@@ -142,8 +140,7 @@ impl SafeApp {
     }
 
     // TODO: replace with actual code for calling SCL
-    pub fn fetch_pk_from_xorname(&self, _xorname: &XorName) -> Result<PublicKey, &str> {
-        // self.scl_mock.fetch_pk_from_xorname(xorname)
+    pub fn fetch_pk_from_xorname(&self, _xorname: &XorName) -> ResultReturn<PublicKey> {
         Ok(KeyPair::random().pk)
     }
 
@@ -155,47 +152,53 @@ impl SafeApp {
         _to_pk: &PublicKey,
         _tx_id: &Uuid,
         _amount: &str,
-    ) -> Result<Uuid, &str> {
-        // self.scl_mock
-        //    .safecoin_transfer(from_pk, from_sk, to_pk, tx_id, amount)
+    ) -> ResultReturn<Uuid> {
         Ok(Uuid::new_v4())
     }
 
     // TODO: Replace with SCL calling code
     #[allow(dead_code)]
-    pub fn get_transaction(&self, _tx_id: &Uuid, _pk: &PublicKey, _sk: &SecretKey) -> String {
-        // self.scl_mock.get_transaction(tx_id, pk, sk)
-        "Success(0)".to_string()
+    pub fn get_transaction(
+        &self,
+        _tx_id: &Uuid,
+        _pk: &PublicKey,
+        _sk: &SecretKey,
+    ) -> ResultReturn<String> {
+        Ok("Success(0)".to_string())
     }
 
-    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName, String> {
+    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let the_idata = ImmutableData::new(data.to_vec());
         let return_idata = the_idata.clone();
         run(safe_app, move |client, _app_context| {
-            client.put_idata(the_idata).map_err(|err| CoreError(err))
+            client.put_idata(the_idata).map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to PUT Published ImmutableData: {:?}", e))?;
+        .map_err(|e| {
+            Error::NetDataError(format!("Failed to PUT Published ImmutableData: {:?}", e))
+        })?;
 
         Ok(*return_idata.name())
     }
 
-    pub fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>, String> {
+    pub fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let data = run(safe_app, move |client, _app_context| {
-            client.get_idata(xorname).map_err(|err| CoreError(err))
+            client.get_idata(xorname).map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to GET Published ImmutableData: {:?}", e))?;
+        .map_err(|e| {
+            Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
+        })?;
         debug!("the_data: {:?}", &xorname);
 
         Ok(data.value().to_vec())
@@ -207,7 +210,7 @@ impl SafeApp {
         name: Option<XorName>,
         tag: u64,
         _permissions: Option<String>,
-    ) -> Result<XorName, String> {
+    ) -> ResultReturn<XorName> {
         debug!(
             "Putting appendable data w/ type: {:?}, xorname: {:?}",
             &tag, &name
@@ -215,7 +218,7 @@ impl SafeApp {
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let xorname = name.unwrap_or_else(create_random_xorname);
@@ -253,10 +256,12 @@ impl SafeApp {
             client
                 .put_adata(AData::PubSeq(data.clone()))
                 .and_then(move |_| append_client.append_seq_adata(append, 0))
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
                 .map(move |_| xorname)
         })
-        .map_err(|e| format!("Failed to PUT Sequenced Appendable Data: {:?}", e))
+        .map_err(|e| {
+            Error::NetDataError(format!("Failed to PUT Sequenced Appendable Data: {:?}", e))
+        })
     }
 
     pub fn append_seq_appendable_data(
@@ -265,10 +270,10 @@ impl SafeApp {
         new_version: u64,
         xorname: XorName,
         tag: u64,
-    ) -> Result<u64, String> {
+    ) -> ResultReturn<u64> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         run(safe_app, move |client, _app_context| {
@@ -281,9 +286,14 @@ impl SafeApp {
 
             client
                 .append_seq_adata(append, new_version)
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to UPDATE Sequenced Appendable Data: {:?}", e))?;
+        .map_err(|e| {
+            Error::NetDataError(format!(
+                "Failed to UPDATE Sequenced Appendable Data: {:?}",
+                e
+            ))
+        })?;
 
         Ok(new_version)
     }
@@ -292,12 +302,12 @@ impl SafeApp {
         &self,
         xorname: XorName,
         tag: u64,
-    ) -> Result<(u64, (Vec<u8>, Vec<u8>)), String> {
+    ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
         debug!("Getting latest seq_appendable_data for: {:?}", &xorname);
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
@@ -311,9 +321,11 @@ impl SafeApp {
         let data = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_last_entry(appendable_data_address)
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to get Sequenced Appendable Data: {:?}", e))?;
+        .map_err(|e| {
+            Error::NetDataError(format!("Failed to get Sequenced Appendable Data: {:?}", e))
+        })?;
 
         Ok((data_length, data))
     }
@@ -322,12 +334,12 @@ impl SafeApp {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<u64, String> {
+    ) -> ResultReturn<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
@@ -335,14 +347,15 @@ impl SafeApp {
         run(safe_app, move |client, _app_context| {
             client
                 .get_adata_indices(appendable_data_address)
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to get Sequenced Appendable Data indices: {:?}", e))
+        .map_err(|e| {
+            Error::NetDataError(format!(
+                "Failed to get Sequenced Appendable Data indices: {:?}",
+                e
+            ))
+        })
         .map(|data_returned| data_returned.data_index())
-
-        // debug!("AD length is, \"{:?}\"", data_length);
-        //
-        // Ok(data_length)
     }
 
     #[allow(dead_code)]
@@ -351,7 +364,7 @@ impl SafeApp {
         name: XorName,
         tag: u64,
         version: u64,
-    ) -> Result<(Vec<u8>, Vec<u8>), String> {
+    ) -> ResultReturn<AppendOnlyDataRawData> {
         debug!(
             "Getting seq appendable data, version: {:?}, from: {:?}",
             version, name
@@ -359,7 +372,7 @@ impl SafeApp {
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
         let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
 
@@ -371,10 +384,10 @@ impl SafeApp {
         let end = ADataIndex::FromStart(version + 1);
 
         if version >= data_length {
-            return Err(format!(
+            return Err(Error::NetDataError(format!(
                 "The version, \"{:?}\" of \"{:?}\" does not exist",
                 version, name
-            ));
+            )));
         }
 
         if version == data_length {
@@ -385,9 +398,11 @@ impl SafeApp {
         let data = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_range(appendable_data_address, (start, end))
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to get Sequenced Appendable Data: {:?}", e))?;
+        .map_err(|e| {
+            Error::NetDataError(format!("Failed to get Sequenced Appendable Data: {:?}", e))
+        })?;
 
         let this_version = data[0].clone();
         Ok(this_version)
@@ -399,10 +414,10 @@ impl SafeApp {
         tag: u64,
         // _data: Option<String>,
         _permissions: Option<String>,
-    ) -> Result<XorName, String> {
+    ) -> ResultReturn<XorName> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let owner_key_option = run(safe_app, move |client, _app_context| {
@@ -410,11 +425,15 @@ impl SafeApp {
 
             Ok(key)
         })
-        .map_err(|err| format!("Failed to retrieve public key: {}", err))?;
+        .map_err(|err| Error::Unexpected(format!("Failed to retrieve public key: {}", err)))?;
 
         let owners = match owner_key_option {
             Some(SafeNdPublicKey::Bls(pk)) => pk,
-            _ => return Err("Failed to retrieve public key.".to_string()),
+            _ => {
+                return Err(Error::Unexpected(
+                    "Failed to retrieve public key.".to_string(),
+                ))
+            }
         };
 
         run(safe_app, move |client, _app_context| {
@@ -447,27 +466,25 @@ impl SafeApp {
 
             client
                 .put_seq_mutable_data(mdata)
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
                 .map(move |_| xorname)
         })
-        .map_err(|err| format!("Failed to put mutable data: {}", err))
+        .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
     }
 
     // TODO: we shouldn't need to expose this function, function like list_seq_mdata_entries should be exposed
     #[allow(dead_code)]
-    fn get_seq_mdata(&self, xorurl: &str, tag: u64) -> Result<SeqMutableData, String> {
+    fn get_seq_mdata(&self, xorurl: &str, tag: u64) -> ResultReturn<SeqMutableData> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         run(safe_app, move |client, _app_context| {
-            client
-                .get_seq_mdata(xorname, tag)
-                .map_err(|err| CoreError(err))
+            client.get_seq_mdata(xorname, tag).map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to get MD: {:?}", e))
+        .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
     pub fn seq_mutable_data_insert(
@@ -476,7 +493,7 @@ impl SafeApp {
         tag: u64,
         key: Vec<u8>,
         value: &[u8],
-    ) -> Result<(), String> {
+    ) -> ResultReturn<()> {
         let mut entry_actions: SeqEntryActions = Default::default();
         let _ = entry_actions.insert(
             key.to_vec(),
@@ -488,8 +505,13 @@ impl SafeApp {
 
     // TODO: Replace with real scl calling code
     #[allow(dead_code)]
-    pub fn mutable_data_delete(&mut self, _xorname: &XorName, _tag: u64, _key: &[u8]) {
-        // self.scl_mock.mutable_data_delete(xorname, tag, key)
+    pub fn mutable_data_delete(
+        &mut self,
+        _xorname: &XorName,
+        _tag: u64,
+        _key: &[u8],
+    ) -> ResultReturn<()> {
+        Ok(())
     }
 
     pub fn seq_mutable_data_get_value(
@@ -497,10 +519,10 @@ impl SafeApp {
         xorurl: &str,
         tag: u64,
         key: Vec<u8>,
-    ) -> Result<MDataValue, String> {
+    ) -> ResultReturn<MDataValue> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
@@ -508,31 +530,29 @@ impl SafeApp {
         run(safe_app, move |client, _app_context| {
             client
                 .get_seq_mdata_value(xorname, tag, key.to_vec())
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to retrieve key. {:?}", e))
+        .map_err(|e| Error::NetDataError(format!("Failed to retrieve key. {:?}", e)))
     }
 
     pub fn list_seq_mdata_entries(
         &self,
         xorurl: &str,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataValue>, String> {
+    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
-        let xorname = XorUrlEncoder::from_url(xorurl)
-            .map_err(|_| "InvalidXorUrl")?
-            .xorname();
+        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
 
         run(safe_app, move |client, _app_context| {
             client
                 .list_seq_mdata_entries(xorname, tag)
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
-        .map_err(|e| format!("Failed to get MD: {:?}", e))
+        .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
     #[allow(dead_code)]
@@ -543,7 +563,7 @@ impl SafeApp {
         key: &[u8],
         value: &[u8],
         version: u64,
-    ) -> Result<(), String> {
+    ) -> ResultReturn<()> {
         let mut entry_actions: SeqEntryActions = Default::default();
         let _ = entry_actions.insert(
             key.to_vec(),
@@ -560,10 +580,10 @@ impl SafeApp {
         tag: u64,
         entry_actions: SeqEntryActions,
         error_msg: &str,
-    ) -> Result<(), String> {
+    ) -> ResultReturn<()> {
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
-            None => return Err(APP_NOT_CONNECTED.to_string()),
+            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let message = error_msg.to_string();
@@ -571,16 +591,14 @@ impl SafeApp {
         run(safe_app, move |client, _app_context| {
             client
                 .mutate_seq_mdata_entries(xorname, tag, entry_actions)
-                .map_err(|err| CoreError(err))
+                .map_err(CoreError)
         })
         .map_err(|err| {
-            format!(
+            Error::NetDataError(format!(
                 "Failed to mutate seq mutable data entrues: {}: {}",
                 message, err
-            )
-        });
-
-        Ok(())
+            ))
+        })
     }
 }
 
@@ -611,15 +629,15 @@ fn test_put_get_update_seq_appendable_data() {
     let val1 = b"VALUE1".to_vec();
     let data1 = [(key1, val1)].to_vec();
 
-    let TYPE = 12322;
+    let type_tag = 12322;
     let xorname = safe
         .safe_app
-        .put_seq_appendable_data(data1, None, TYPE, None)
+        .put_seq_appendable_data(data1, None, type_tag, None)
         .unwrap();
 
     let (_this_version, data) = safe
         .safe_app
-        .get_latest_seq_appendable_data(xorname, TYPE)
+        .get_latest_seq_appendable_data(xorname, type_tag)
         .unwrap();
 
     //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
@@ -631,13 +649,13 @@ fn test_put_get_update_seq_appendable_data() {
     let data2 = [(key2, val2)].to_vec();
     let new_version = 1;
 
-    let updated_version = safe
+    let _updated_version = safe
         .safe_app
-        .append_seq_appendable_data(data2, new_version, xorname, TYPE)
+        .append_seq_appendable_data(data2, new_version, xorname, type_tag)
         .unwrap();
     let (_v_updated, data_updated) = safe
         .safe_app
-        .get_latest_seq_appendable_data(xorname, TYPE)
+        .get_latest_seq_appendable_data(xorname, type_tag)
         .unwrap();
 
     assert_eq!(
@@ -653,7 +671,7 @@ fn test_put_get_update_seq_appendable_data() {
 
     let first_data = safe
         .safe_app
-        .get_seq_appendable_data(xorname, TYPE, first_version)
+        .get_seq_appendable_data(xorname, type_tag, first_version)
         .unwrap();
 
     assert_eq!(
@@ -668,7 +686,7 @@ fn test_put_get_update_seq_appendable_data() {
     let second_version = 1;
     let second_data = safe
         .safe_app
-        .get_seq_appendable_data(xorname, TYPE, second_version)
+        .get_seq_appendable_data(xorname, type_tag, second_version)
         .unwrap();
 
     assert_eq!(
@@ -684,10 +702,10 @@ fn test_put_get_update_seq_appendable_data() {
     // test cehcking for versions that dont exist
     match safe
         .safe_app
-        .get_seq_appendable_data(xorname, TYPE, nonexistant_version)
+        .get_seq_appendable_data(xorname, type_tag, nonexistant_version)
     {
-        Ok(data) => panic!("No error thrown for a version that does not exist"),
+        Ok(_data) => panic!("No error thrown for a version that does not exist"),
 
-        Err(err) => assert!(true),
+        Err(_err) => assert!(true),
     }
 }

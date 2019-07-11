@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{Error, ResultReturn};
 use multibase::{decode, encode, Base};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
@@ -63,17 +64,20 @@ impl XorUrlEncoder {
         type_tag: u64,
         content_type: SafeContentType,
         base: &str,
-    ) -> Result<String, String> {
+    ) -> ResultReturn<String> {
         let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, content_type);
         xorurl_encoder.to_string(base)
     }
 
-    pub fn from_url(xorurl: &str) -> Result<Self, String> {
-        let parsing_url =
-            Url::parse(&xorurl).map_err(|err| format!("Problem parsing the XOR-URL: {:?}", err))?;
+    pub fn from_url(xorurl: &str) -> ResultReturn<Self> {
+        let parsing_url = Url::parse(&xorurl).map_err(|err| {
+            Error::InvalidXorUrl(format!("Problem parsing the XOR-URL: {:?}", err))
+        })?;
 
         if parsing_url.scheme() != "safe" {
-            return Err("Only \"safe://\" URLs may be used.".to_string());
+            return Err(Error::InvalidXorUrl(
+                "Only \"safe://\" URLs may be used.".to_string(),
+            ));
         }
 
         // Get path and normalise it to use '/' (instead of '\' as on Windows)
@@ -87,19 +91,22 @@ impl XorUrlEncoder {
             .unwrap_or_else(|| "Failed parsing the XOR-URL");
 
         let decoded_xorurl = decode(&cid_str)
-            .map_err(|err| format!("Failed to decode XOR-URL: {:?}", err))?
+            .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?
             .1;
         if decoded_xorurl.len() > 42 {
-            return Err(format!(
+            return Err(Error::InvalidXorUrl(format!(
                 "Invalid XOR-URL, encoded string too long: {} bytes",
                 decoded_xorurl.len()
-            ));
+            )));
         }
 
         let u8_version: u8 = decoded_xorurl[0];
         let version: u64 = u64::from(u8_version);
         if version != 1 {
-            return Err(format!("Invalid XOR-URL encoding version: {}", version));
+            return Err(Error::InvalidXorUrl(format!(
+                "Invalid XOR-URL encoding version: {}",
+                version
+            )));
         }
         let content_type = match decoded_xorurl[1] {
             0 => SafeContentType::Unknown,
@@ -158,7 +165,7 @@ impl XorUrlEncoder {
         &self.path
     }
 
-    pub fn to_string(&self, base: &str) -> Result<String, String> {
+    pub fn to_string(&self, base: &str) -> ResultReturn<String> {
         // Temporary CID format (var length from 34 to 42 bytes):
         // 1 byte for version
         // 1 byte for content_type

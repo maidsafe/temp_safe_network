@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::xorurl::SafeContentType;
-use super::{Safe, XorUrl, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use chrono::{SecondsFormat, Utc};
 use log::{debug, info, warn};
 use relative_path::RelativePath;
@@ -62,7 +62,7 @@ impl Safe {
         location: &str,
         dest: Option<String>,
         recursive: bool,
-    ) -> Result<(XorUrl, ProcessedFiles, FilesMap), String> {
+    ) -> ResultReturn<(XorUrl, ProcessedFiles, FilesMap)> {
         // TODO: Enable source for funds / ownership
         // Warn about ownership?
 
@@ -73,8 +73,12 @@ impl Safe {
         // timestamp as the entry's key, and the serialised FilesMap as the entry's value
         // TODO: use RDF format
         let files_map = files_map_create(&processed_files, location, dest)?;
-        let serialised_files_map = serde_json::to_string(&files_map)
-            .map_err(|err| format!("Couldn't serialise the FilesMap generated: {:?}", err))?;
+        let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
+            Error::Unexpected(format!(
+                "Couldn't serialise the FilesMap generated: {:?}",
+                err
+            ))
+        })?;
         let now = gen_timestamp();
         let files_container_data = vec![(
             now.into_bytes().to_vec(),
@@ -115,13 +119,10 @@ impl Safe {
     pub fn files_container_get_latest(
         &self,
         xorurl: &str,
-    ) -> Result<(u64, FilesMap, String), String> {
+    ) -> ResultReturn<(u64, FilesMap, String)> {
+        debug!("Getting latest files container from: {:?}", xorurl);
+
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-
-        debug!("Getting latest files container for: {:?}", xorurl);
-        let seq_appendable_empty_err: String = "SeqAppendOnlyDataEmpty".to_string();
-        let seq_appendable_not_found_err: String = "SeqAppendOnlyDataNotFound".to_string();
-
         match self
             .safe_app
             .get_latest_seq_appendable_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
@@ -134,14 +135,14 @@ impl Safe {
                 // TODO: use RDF format and deserialise it
                 let files_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
                     .map_err(|err| {
-                    format!(
+                    Error::ContentError(format!(
                         "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
                         err
-                    )
+                    ))
                 })?;
                 Ok((version, files_map, FILES_CONTAINER_NATIVE_TYPE.to_string()))
             }
-            Err(seq_appendable_empty_err) => {
+            Err(Error::EmptyContent(_)) => {
                 warn!("Files container found at {:?} was empty", &xorurl);
                 Ok((
                     0,
@@ -149,10 +150,13 @@ impl Safe {
                     FILES_CONTAINER_NATIVE_TYPE.to_string(),
                 ))
             }
-            Err(seq_appendable_not_found_err) => {
-                Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string())
-            }
-            Err(err) => Err(format!("Failed to get current version: {}", err)),
+            Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
+                ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
+            )),
+            Err(err) => Err(Error::NetDataError(format!(
+                "Failed to get current version: {}",
+                err
+            ))),
         }
     }
 
@@ -175,7 +179,7 @@ impl Safe {
         xorurl: &str,
         recursive: bool,
         delete: bool,
-    ) -> Result<(u64, ProcessedFiles, FilesMap), String> {
+    ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
         let (mut version, current_files_map, _): (u64, FilesMap, String) =
             self.files_container_get_latest(xorurl)?;
 
@@ -197,15 +201,17 @@ impl Safe {
         if success_count > 0 {
             // The FilesContainer is updated adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
-            let serialised_files_map = serde_json::to_string(&new_files_map)
-                .map_err(|err| format!("Couldn't serialise the FilesMap generated: {:?}", err))?;
+            let serialised_files_map = serde_json::to_string(&new_files_map).map_err(|err| {
+                Error::Unexpected(format!(
+                    "Couldn't serialise the FilesMap generated: {:?}",
+                    err
+                ))
+            })?;
             let now = gen_timestamp();
             let files_container_data = vec![(
                 now.into_bytes().to_vec(),
                 serialised_files_map.as_bytes().to_vec(),
             )];
-
-            let seq_appendable_not_found_err: String = "SeqAppendOnlyDataNotFound".to_string();
 
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
@@ -215,10 +221,17 @@ impl Safe {
                 .get_current_seq_appendable_data_version(xorname, type_tag)
             {
                 Ok(version) => version,
-                Err(seq_appendable_not_found_err) => {
-                    return Err(ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string())
+                Err(Error::ContentNotFound(_)) => {
+                    return Err(Error::ContentNotFound(
+                        ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
+                    ))
                 }
-                Err(err) => return Err(format!("Failed to get current version: {}", err)),
+                Err(err) => {
+                    return Err(Error::NetDataError(format!(
+                        "Failed to get current version: {}",
+                        err
+                    )))
+                }
             };
 
             version = self.safe_app.append_seq_appendable_data(
@@ -244,7 +257,7 @@ impl Safe {
     /// # let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorUrl, String> {
+    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorUrl> {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_app.files_put_published_immutable(&data)?;
 
@@ -268,7 +281,7 @@ impl Safe {
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_get_published_immutable(&self, xorurl: &str) -> Result<Vec<u8>, String> {
+    pub fn files_get_published_immutable(&self, xorurl: &str) -> ResultReturn<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         self.safe_app
@@ -289,7 +302,7 @@ fn normalise_path_separator(from: &str) -> String {
 
 // From the location path and the destination path chosen by the user, calculate
 // the destination path considering ending '/' in both the  location and dest path
-fn get_base_paths(location: &str, dest_path: Option<String>) -> Result<(String, String), String> {
+fn get_base_paths(location: &str, dest_path: Option<String>) -> ResultReturn<(String, String)> {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
     let location_base_path = normalise_path_separator(location);
 
@@ -354,7 +367,7 @@ fn files_map_sync(
     new_content: ProcessedFiles,
     dest_path: Option<String>,
     delete: bool,
-) -> Result<(ProcessedFiles, FilesMap, u64), String> {
+) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     let mut updated_files_map = FilesMap::new();
     let mut processed_files = ProcessedFiles::new();
@@ -364,19 +377,8 @@ fn files_map_sync(
         .iter()
         .filter(|(_, (change, _))| change != FILE_ERROR_SIGN)
     {
-        let metadata = fs::metadata(&key).map_err(|err| {
-            format!(
-                "Couldn't obtain metadata information for local file ('{}'): {:?}",
-                key, err,
-            )
-        })?;
-
         let file_path = Path::new(&key);
-        let file_type = match &file_path.extension() {
-            Some(ext) => ext.to_str().ok_or("unknown")?,
-            None => "unknown",
-        };
-
+        let (metadata, file_type) = get_metadata(&file_path)?;
         let file_size = metadata.len().to_string();
 
         let file_name = RelativePath::new(
@@ -483,10 +485,33 @@ fn files_map_sync(
 }
 
 // Upload a files to the Network as a Published-ImmutableData
-fn upload_file(safe: &mut Safe, path: &Path) -> Result<XorUrl, String> {
-    let data = fs::read(path)
-        .map_err(|err| format!("Failed to read file from local location: {}", err))?;
+fn upload_file(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
+    let data = fs::read(path).map_err(|err| {
+        Error::InvalidInput(format!("Failed to read file from local location: {}", err))
+    })?;
     safe.files_put_published_immutable(&data)
+}
+
+// Get file metadata from local filesystem
+fn get_metadata(path: &Path) -> ResultReturn<(fs::Metadata, String)> {
+    let metadata = fs::metadata(path).map_err(|err| {
+        Error::FilesSystemError(format!(
+            "Couldn't read metadata from source path ('{}'): {}",
+            path.display(),
+            err
+        ))
+    })?;
+    debug!("Metadata for location: {:?}", metadata);
+
+    let extension = match path.extension() {
+        Some(ext) => ext
+            .to_str()
+            .ok_or("unknown")
+            .map_err(|err| Error::Unexpected(err.to_string()))?,
+        None => "unknown",
+    };
+
+    Ok((metadata, extension.to_string()))
 }
 
 // Walk the local filesystem starting from `location`, creating a list of files paths,
@@ -497,23 +522,16 @@ fn file_system_dir_walk(
     location: &str,
     recursive: bool,
     upload_files: bool,
-) -> Result<ProcessedFiles, String> {
-    let path = Path::new(location);
-    info!("Reading files from {}", &path.display());
-    let metadata = fs::metadata(&path).map_err(|err| {
-        format!(
-            "Couldn't read metadata from source path ('{}'): {}",
-            location, err
-        )
-    })?;
-    debug!("Metadata for location: {:?}", metadata);
-
+) -> ResultReturn<ProcessedFiles> {
+    let file_path = Path::new(location);
+    let (metadata, _) = get_metadata(&file_path)?;
+    info!("Reading files from {}", file_path.display());
     if metadata.is_dir() || !recursive {
         // TODO: option to enable following symlinks and hidden files?
         // We now compare both FilesMaps to upload the missing files
         let max_depth = if recursive { MAX_RECURSIVE_DEPTH } else { 1 };
         let mut processed_files = BTreeMap::new();
-        WalkDir::new(path)
+        WalkDir::new(file_path)
             .follow_links(true)
             .into_iter()
             .filter_entry(|e| not_hidden_and_valid_depth(e, max_depth))
@@ -521,7 +539,7 @@ fn file_system_dir_walk(
             .for_each(|child| {
                 let current_file_path = child.path();
                 let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
-                info!("{}", current_path_str);
+                info!("Processing {}...", current_path_str);
                 let normalised_path = normalise_path_separator(&current_path_str);
                 match fs::metadata(&current_file_path) {
                     Ok(metadata) => {
@@ -558,13 +576,14 @@ fn file_system_dir_walk(
         // Recursive only works on a dir path. Let's error as the user may be making a mistake
         // so it's better for the user to double check and either provide the correct path
         // or remove the `--recursive` from the args
-        Err(format!(
+        Err(Error::InvalidInput(format!(
             "'{}' is not a directory. The \"--recursive\" arg is only supported for folders.",
             location
-        ))
+        )))
     }
 }
 
+// Checks if a path is not a hidden file or if the depth in the dir hierarchy is under a threshold
 fn not_hidden_and_valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
     entry
         .file_name()
@@ -579,7 +598,7 @@ fn files_map_create(
     content: &ProcessedFiles,
     location: &str,
     dest_path: Option<String>,
-) -> Result<FilesMap, String> {
+) -> ResultReturn<FilesMap> {
     let mut files_map = FilesMap::default();
     let now = gen_timestamp();
 
@@ -590,22 +609,12 @@ fn files_map_create(
     {
         debug!("FileItem item name:{:?}", &file_name);
         let mut file_item = FileItem::new();
-        let metadata = fs::metadata(&file_name).map_err(|err| {
-            format!(
-                "Couldn't obtain metadata information for local file: {:?}",
-                err,
-            )
-        })?;
+        let file_path = Path::new(&file_name);
+        let (metadata, file_type) = get_metadata(&file_path)?;
 
         file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), link.to_string());
 
-        let file_path = Path::new(&file_name);
-        let file_type: &str = match &file_path.extension() {
-            Some(ext) => ext.to_str().ok_or("unknown")?,
-            None => "unknown",
-        };
-
-        file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type.to_string());
+        file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type);
 
         let file_size = &metadata.len().to_string();
         file_item.insert(FILES_MAP_PREDICATE_SIZE.to_string(), file_size.to_string());
@@ -664,7 +673,6 @@ fn test_files_map_create() {
     assert_eq!(file_item2[FILES_MAP_PREDICATE_LINK], "safe://second_xorurl");
     assert_eq!(file_item2[FILES_MAP_PREDICATE_TYPE], "md");
     assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "7");
-
 }
 
 #[test]

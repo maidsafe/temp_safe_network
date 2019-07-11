@@ -8,7 +8,7 @@
 
 use super::helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, KeyPair};
 use super::xorurl::SafeContentType;
-use super::{Safe, XorUrl, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 
@@ -25,14 +25,18 @@ pub struct BlsKeyPair {
     pub sk: String,
 }
 
-pub fn validate_key_pair(key_pair: &BlsKeyPair) -> Result<(), String> {
+pub fn validate_key_pair(key_pair: &BlsKeyPair) -> ResultReturn<()> {
     let validation = key_pair.validate();
 
     if ValidationErrors::has_error(&validation, "sk") {
-        return Err("The secret key must be 64 characters long".to_string());
+        return Err(Error::InvalidInput(
+            "The secret key must be 64 characters long".to_string(),
+        ));
     }
     if ValidationErrors::has_error(&validation, "pk") {
-        return Err("The secret key must be 96 characters long".to_string());
+        return Err(Error::InvalidInput(
+            "The secret key must be 96 characters long".to_string(),
+        ));
     }
 
     let secret_key = sk_from_hex(&key_pair.sk)?;
@@ -42,7 +46,9 @@ pub fn validate_key_pair(key_pair: &BlsKeyPair) -> Result<(), String> {
     let real_pk_hex = pk_to_hex(&real_pk);
 
     if real_pk_hex != key_pair.pk {
-        return Err("The secret key provided does not match the public key.".to_string());
+        return Err(Error::InvalidInput(
+            "The secret key provided does not match the public key.".to_string(),
+        ));
     }
 
     Ok(())
@@ -51,9 +57,9 @@ pub fn validate_key_pair(key_pair: &BlsKeyPair) -> Result<(), String> {
 #[allow(dead_code)]
 impl Safe {
     // Generate a key pair without creating and/or storing a Key on the network
-    pub fn keypair(&self) -> Result<BlsKeyPair, String> {
+    pub fn keypair(&self) -> ResultReturn<BlsKeyPair> {
         let key_pair = KeyPair::random();
-        let (pk, sk) = key_pair.to_hex_key_pair();
+        let (pk, sk) = key_pair.to_hex_key_pair()?;
         Ok(BlsKeyPair { pk, sk })
     }
 
@@ -63,7 +69,7 @@ impl Safe {
         from: BlsKeyPair,
         preload_amount: Option<String>,
         pk: Option<String>,
-    ) -> Result<(XorUrl, Option<BlsKeyPair>), String> {
+    ) -> ResultReturn<(XorUrl, Option<BlsKeyPair>)> {
         let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk)?;
         let _ = parse_coins_amount(&preload_amount.clone().unwrap_or_else(|| "0".to_string()))?;
 
@@ -73,17 +79,17 @@ impl Safe {
             &to_pk,
             amount,
         ) {
-            Err("InvalidAmount") => Err(format!(
+            Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
                 "The amount '{}' specified for the transfer is invalid",
                 amount
+            ))),
+            Err(Error::NotEnoughBalance(_)) => Err(Error::NotEnoughBalance(
+                "Not enough balance at 'source' for the operation".to_string(),
             )),
-            Err("NotEnoughBalance") => {
-                Err("Not enough balance at 'source' for the operation".to_string())
-            }
-            Err(other_error) => Err(format!(
+            Err(other_error) => Err(Error::Unexpected(format!(
                 "Unexpected error when attempting to create Key: {}",
                 other_error
-            )),
+            ))),
             Ok(xorname) => Ok(xorname),
         };
 
@@ -97,7 +103,7 @@ impl Safe {
             }
             None => {
                 let key_pair = KeyPair::random();
-                let (pk, sk) = key_pair.to_hex_key_pair();
+                let (pk, sk) = key_pair.to_hex_key_pair()?;
                 let xorname = create_coin_balance(key_pair.pk, &amount)?;
                 (xorname, Some(BlsKeyPair { pk, sk }))
             }
@@ -115,7 +121,7 @@ impl Safe {
         &mut self,
         preload_amount: String,
         pk: Option<String>,
-    ) -> Result<(XorUrl, Option<BlsKeyPair>), String> {
+    ) -> ResultReturn<(XorUrl, Option<BlsKeyPair>)> {
         let _ = parse_coins_amount(&preload_amount)?;
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
@@ -128,7 +134,7 @@ impl Safe {
                 let xorname = self
                     .safe_app
                     .allocate_test_coins(&key_pair.pk, &preload_amount);
-                let (pk, sk) = key_pair.to_hex_key_pair();
+                let (pk, sk) = key_pair.to_hex_key_pair()?;
                 (xorname, Some(BlsKeyPair { pk, sk }))
             }
         };
@@ -139,32 +145,39 @@ impl Safe {
     }
 
     // Check Key's balance from the network from a given PublicKey
-    pub fn keys_balance_from_pk(&self, key_pair: &BlsKeyPair) -> Result<String, String> {
+    pub fn keys_balance_from_pk(&self, key_pair: &BlsKeyPair) -> ResultReturn<String> {
         let pair = KeyPair::from_hex_keys(&key_pair.pk, &key_pair.sk)?;
         self.safe_app
             .get_balance_from_pk(&pair.pk, &pair.sk)
-            .map_err(|_| "No Key found at specified location".to_string())
+            .map_err(|_| Error::ContentNotFound("No Key found at specified location".to_string()))
     }
 
     // Check Key's balance from the network from a given XOR-URL
-    pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> Result<String, String> {
-        let secret_key: SecretKey =
-            sk_from_hex(sk).map_err(|_| "Invalid secret key provided".to_string())?;
+    pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> ResultReturn<String> {
+        let secret_key: SecretKey = sk_from_hex(sk)
+            .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
 
-        Ok(self
+        let balance = self
             .safe_app
             .get_balance_from_xorname(&xorurl_encoder.xorname(), &secret_key)
-            .map_err(|_| "No Key found at specified location".to_string())?)
+            .map_err(|_| {
+                Error::ContentNotFound("No Key found at specified location".to_string())
+            })?;
+
+        Ok(balance)
     }
 
     // Fetch Key's pk from the network from a given XOR-URL
-    pub fn fetch_pk_from_xorname(&self, xorurl: &str) -> Result<String, String> {
+    pub fn fetch_pk_from_xorname(&self, xorurl: &str) -> ResultReturn<String> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         let public_key = self
             .safe_app
             .fetch_pk_from_xorname(&xorurl_encoder.xorname())
-            .map_err(|_| "No Key found at specified location".to_string())?;
+            .map_err(|_| {
+                Error::ContentNotFound("No Key found at specified location".to_string())
+            })?;
+
         Ok(pk_to_hex(&public_key))
     }
 }
@@ -241,7 +254,9 @@ fn test_keys_create_preload_invalid_amounts() {
     match safe.keys_create_preload_test_coins(".45".to_string(), None) {
         Err(msg) => assert_eq!(
             msg,
-            "Invalid safecoins amount '.45', expected a numeric value"
+            Error::InvalidAmount(
+                "Invalid safecoins amount '.45', expected a numeric value".to_string()
+            )
         ),
         Ok(_) => panic!("Key with test-coins was created unexpectedly"),
     };
@@ -250,7 +265,9 @@ fn test_keys_create_preload_invalid_amounts() {
     match safe.keys_create(unwrap!(key_pair.clone()), Some(".003".to_string()), None) {
         Err(msg) => assert_eq!(
             msg,
-            "Invalid safecoins amount '.003', expected a numeric value"
+            Error::InvalidAmount(
+                "Invalid safecoins amount '.003', expected a numeric value".to_string()
+            )
         ),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
@@ -261,14 +278,19 @@ fn test_keys_create_preload_invalid_amounts() {
     match safe.keys_create(unwrapped_key_pair, Some(".003".to_string()), None) {
         Err(msg) => assert_eq!(
             msg,
-            "Invalid safecoins amount '.003', expected a numeric value"
+            Error::InvalidAmount(
+                "Invalid safecoins amount '.003', expected a numeric value".to_string()
+            )
         ),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
 
     // test fail to preload with more than available balance in source (which has only 12 coins)
     match safe.keys_create(unwrap!(key_pair), Some("12.00001".to_string()), None) {
-        Err(msg) => assert_eq!(msg, "Not enough balance at 'source' for the operation"),
+        Err(msg) => assert_eq!(
+            msg,
+            Error::NotEnoughBalance("Not enough balance at 'source' for the operation".to_string())
+        ),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
 }
@@ -317,7 +339,8 @@ fn test_keys_test_coins_balance_wrong_xorurl() {
     let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
     let current_balance = safe.keys_balance_from_xorurl(&invalid_xorurl, &unwrap!(key_pair).sk);
     match current_balance {
-        Err(msg) => assert!(msg.contains("Failed to decode XOR-URL")),
+        Err(Error::InvalidXorUrl(msg)) => assert!(msg.contains("Failed to decode XOR-URL")),
+        Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
     };
 }
@@ -338,7 +361,10 @@ fn test_keys_test_coins_balance_wrong_location() {
     xorurl.replace_range(11..16, "ccccc");
     let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
     match current_balance {
-        Err(msg) => assert!(msg.contains("No Key found at specified location")),
+        Err(Error::ContentNotFound(msg)) => {
+            assert!(msg.contains("No Key found at specified location"))
+        }
+        Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
     };
 }
@@ -352,7 +378,8 @@ fn test_keys_test_coins_balance_wrong_pk() {
     unwrapped_key_pair.pk.replace_range(..6, "ababab");
     let current_balance = safe.keys_balance_from_pk(&unwrapped_key_pair);
     match current_balance {
-        Err(msg) => assert!(msg.contains("Invalid public key string")),
+        Err(Error::InvalidInput(msg)) => assert!(msg.contains("Invalid public key bytes")),
+        Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
     };
 }

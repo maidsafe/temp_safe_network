@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{Error, ResultReturn};
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::str;
@@ -25,20 +26,20 @@ impl KeyPair {
         KeyPair { pk, sk }
     }
 
-    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> Result<Self, String> {
+    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> ResultReturn<Self> {
         let pk = pk_from_hex(pk_hex_str)?;
         let sk = sk_from_hex(sk_hex_str)?;
         Ok(KeyPair { pk, sk })
     }
 
-    pub fn to_hex_key_pair(&self) -> (String, String) {
+    pub fn to_hex_key_pair(&self) -> ResultReturn<(String, String)> {
         let pk: String = pk_to_hex(&self.pk);
 
         let sk_serialised = bincode::serialize(&SerdeSecret(&self.sk))
             .expect("Failed to serialise the generated secret key");
         let sk: String = vec_to_hex(sk_serialised);
 
-        (pk, sk)
+        Ok((pk, sk))
     }
 }
 
@@ -82,53 +83,51 @@ pub fn pk_to_hex(pk: &PublicKey) -> String {
     vec_to_hex(pk_as_bytes.to_vec())
 }
 
-pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey, String> {
+pub fn pk_from_hex(hex_str: &str) -> ResultReturn<PublicKey> {
     let pk_bytes = parse_hex(&hex_str);
     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
-    PublicKey::from_bytes(pk_bytes_array).map_err(|_| "Invalid public key string".to_string())
+    PublicKey::from_bytes(pk_bytes_array)
+        .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
 }
 
-pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey, String> {
+pub fn sk_from_hex(hex_str: &str) -> ResultReturn<SecretKey> {
     let sk_bytes = parse_hex(&hex_str);
     bincode::deserialize(&sk_bytes)
-        .map_err(|_| "Failed to deserialize provided secret key".to_string())
+        .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))
 }
 
-pub fn parse_coins_amount(amount_str: &str) -> Result<f64, String> {
+pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<f64> {
     // TODO: implement our Error struct which is used across the lib and its API
     let mut itr = amount_str.splitn(2, '.');
     let _ = itr
         .next()
         .and_then(|s| s.parse::<u64>().ok())
         .ok_or_else(|| {
-            format!(
+            Error::InvalidAmount(format!(
                 "Invalid safecoins amount '{}', expected a numeric value",
                 amount_str
-            )
+            ))
         })?;
 
     let amount: f64 = amount_str.parse::<f64>().map_err(|_| {
-        format!(
+        Error::InvalidAmount(format!(
             "Invalid safecoins amount '{}', expected a numeric value",
             amount_str
-        )
+        ))
     })?;
     Ok(amount)
 }
 
-pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted, String> {
-    let msg =
-        decode_msg(&ipc_msg).map_err(|e| format!("Failed to decode the credentials: {:?}", e))?;
+pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
+    let msg = decode_msg(&ipc_msg)
+        .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
         IpcMsg::Resp {
             resp: IpcResp::Auth(res),
             ..
-        } => match res {
-            Ok(auth_granted) => Ok(auth_granted),
-            Err(err) => Err(format!("{:?}", err)),
-        },
-        IpcMsg::Revoked { .. } => Err("Authorisation denied".to_string()),
-        other => Err(format!("{:?}", other)),
+        } => res.map_err(|err| Error::AuthError(format!("{:?}", err))),
+        IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
+        other => Err(Error::AuthError(format!("{:?}", other))),
     }
 }

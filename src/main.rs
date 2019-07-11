@@ -22,8 +22,6 @@ extern crate human_panic;
 
 #[macro_use]
 extern crate validator_derive;
-#[macro_use]
-extern crate validator;
 
 fn main() {
     setup_panic!();

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
+mod errors;
 mod fetch;
 mod files;
 mod helpers;
@@ -18,8 +19,9 @@ mod scl_mock;
 mod wallet;
 mod xorurl;
 
+pub use errors::{Error, ResultReturn};
 pub use fetch::SafeData;
-pub use keys::{validate_key_pair, BlsKeyPair};
+pub use keys::BlsKeyPair;
 pub use safe_nd::{XorName, XOR_NAME_LEN};
 pub use xorurl::{XorUrl, XorUrlEncoder};
 

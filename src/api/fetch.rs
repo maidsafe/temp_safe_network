@@ -8,8 +8,8 @@
 
 use super::files::FilesMap;
 use super::xorurl::SafeContentType;
-use super::{Safe, XorName, XorUrlEncoder};
-use log::{debug, info, warn};
+use super::{Error, ResultReturn, Safe, XorName, XorUrlEncoder};
+use log::debug;
 
 #[derive(Debug, PartialEq)]
 pub enum SafeData {
@@ -68,7 +68,7 @@ impl Safe {
     ///
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
-    pub fn fetch(&self, xorurl: &str) -> Result<SafeData, String> {
+    pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
         debug!("Fetching url: {:?}", xorurl);
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
@@ -100,16 +100,16 @@ impl Safe {
                     let file_item = match files_map.get(path) {
                         Some(item_data) => item_data,
                         None => {
-                            return Err(format!(
+                            return Err(Error::ContentError(format!(
                                 "No data found for path \"{}\" on the FilesContainer at \"{}\"",
                                 &path, &xorurl
-                            ))
+                            )))
                         }
                     };
 
                     let new_target_xorurl = match file_item.get("link") {
 						Some( path_data ) => path_data,
-						None => return Err(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", &path, &xorurl) ),
+						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", &path, &xorurl))),
 					};
 
                     let path_data = self.fetch(new_target_xorurl);
@@ -135,10 +135,10 @@ impl Safe {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: xorurl_encoder.type_tag(),
             }),
-            other => Err(format!(
+            other => Err(Error::ContentError(format!(
                 "Content type '{:?}' not supported yet by fetch",
                 other
-            )),
+            ))),
         }
     }
 }
@@ -270,7 +270,9 @@ fn test_fetch_unsupported() {
         Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
         Err(msg) => assert_eq!(
             msg,
-            "Content type 'UnpublishedImmutableData' not supported yet by fetch"
+            Error::ContentError(
+                "Content type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
+            )
         ),
     };
 }

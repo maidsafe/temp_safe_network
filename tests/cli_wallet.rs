@@ -214,7 +214,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
 
 #[test]
 fn calling_safe_wallet_create_w_bad_secret() {
-    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+    let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
@@ -255,8 +255,8 @@ fn calling_safe_wallet_create_w_bad_pk() {
 
 #[test]
 fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
-    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
-    let (pk_pay_xor2, pay_sk2) = create_preload_and_get_keys("300");
+    let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
+    let (_pk_pay_xor2, pay_sk2) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 

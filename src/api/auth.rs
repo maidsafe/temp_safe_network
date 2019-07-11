@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::decode_ipc_msg;
-use super::Safe;
+use super::{Error, ResultReturn, Safe};
 use log::{debug, info};
 use reqwest::get as httpget;
-use safe_app::AppError;
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
 use std::collections::HashMap;
@@ -28,10 +27,10 @@ impl Safe {
         app_id: &str,
         app_name: &str,
         app_vendor: &str,
-    ) -> Result<String, String> {
+    ) -> ResultReturn<String> {
         info!("Sending authorisation request to SAFE Authenticator...");
 
-        let ipc_req = IpcReq::Auth(AuthReq {
+        let req = IpcReq::Auth(AuthReq {
             app: AppExchangeInfo {
                 id: app_id.to_string(),
                 scope: None,
@@ -46,55 +45,51 @@ impl Safe {
             containers: HashMap::new(),
         });
 
-        match encode_ipc_msg(ipc_req) {
-            Ok(auth_req_str) => {
-                debug!(
-                    "Authorisation request generated successfully: {}",
-                    auth_req_str
-                );
-
-                let authenticator_webservice_url =
-                    SAFE_AUTH_WEBSERVICE_BASE_URL.to_string() + &auth_req_str;
-                let mut res = httpget(&authenticator_webservice_url)
-                    .map_err(|err| format!("Failed to send request to Authenticator: {}", err))?;
-                let mut auth_res = String::new();
-                res.read_to_string(&mut auth_res).map_err(|err| {
-                    format!(
-                        "Failed read authorisation response received from Authenticator: {}",
-                        err
-                    )
-                })?;
-                info!("SAFE authorisation response received!");
-
-                // Check if the app has been authorised
-                match decode_ipc_msg(&auth_res) {
-                    Ok(_) => {
-                        info!("Application was authorisaed");
-                        Ok(auth_res)
-                    }
-                    Err(e) => {
-                        info!("Application was not authorised");
-                        Err(e)
-                    }
-                }
-            }
-            Err(e) => Err(format!(
+        let req_id: u32 = gen_req_id();
+        let auth_req_str = encode_msg(&IpcMsg::Req { req_id, req }).map_err(|err| {
+            Error::AuthError(format!(
                 "Failed encoding the authorisation request: {:?}",
-                e
-            )),
+                err
+            ))
+        })?;
+
+        debug!(
+            "Authorisation request generated successfully: {}",
+            auth_req_str
+        );
+
+        let authenticator_webservice_url =
+            SAFE_AUTH_WEBSERVICE_BASE_URL.to_string() + &auth_req_str;
+        let mut res = httpget(&authenticator_webservice_url).map_err(|err| {
+            Error::AuthError(format!("Failed to send request to Authenticator: {}", err))
+        })?;
+        let mut auth_res = String::new();
+        res.read_to_string(&mut auth_res).map_err(|err| {
+            Error::AuthError(format!(
+                "Failed read authorisation response received from Authenticator: {}",
+                err
+            ))
+        })?;
+        info!("SAFE authorisation response received!");
+
+        // Check if the app has been authorised
+        match decode_ipc_msg(&auth_res) {
+            Ok(_) => {
+                info!("Application was authorisaed");
+                Ok(auth_res)
+            }
+            Err(e) => {
+                info!("Application was not authorised");
+                Err(Error::AuthError(format!(
+                    "Application was not authorised: {:?}",
+                    e
+                )))
+            }
         }
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
-    pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> Result<(), String> {
+    pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> ResultReturn<()> {
         self.safe_app.connect(app_id, auth_credentials)
     }
-}
-
-// Helper functions
-
-fn encode_ipc_msg(req: IpcReq) -> Result<String, AppError> {
-    let req_id: u32 = gen_req_id();
-    let encoded = encode_msg(&IpcMsg::Req { req_id, req })?;
-    Ok(encoded)
 }
