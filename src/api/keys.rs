@@ -25,7 +25,7 @@ pub struct BlsKeyPair {
     pub sk: String,
 }
 
-pub fn validate_key_pair(key_pair: BlsKeyPair) -> Result<(), String> {
+pub fn validate_key_pair(key_pair: &BlsKeyPair) -> Result<(), String> {
     let validation = key_pair.validate();
 
     if ValidationErrors::has_error(&validation, "sk") {
