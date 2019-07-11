@@ -25,8 +25,9 @@ use pickledb::PickleDb;
 use safe_nd::{
     AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
     ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, IData, IDataAddress, MData,
-    MDataAction, MDataAddress, MDataPermissionSet, MessageId, NodePublicId, PublicId, PublicKey,
-    Request, Response, Result as NdResult, SeqAppendOnly, UnseqAppendOnly, XorName,
+    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
+    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, UnseqAppendOnly, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -184,8 +185,12 @@ impl DestinationElder {
                 user,
                 version,
             } => unimplemented!(),
-            MutateSeqMDataEntries { address, actions } => unimplemented!(),
-            MutateUnseqMDataEntries { address, actions } => unimplemented!(),
+            MutateSeqMDataEntries { address, actions } => {
+                self.handle_mutate_seq_mdata_entries_req(requester, address, actions, message_id)
+            }
+            MutateUnseqMDataEntries { address, actions } => {
+                self.handle_mutate_unseq_mdata_entries_req(requester, address, actions, message_id)
+            }
             //
             // ===== Append Only Data =====
             //
@@ -388,6 +393,41 @@ impl DestinationElder {
             })
     }
 
+    /// Get MData from the chunk store, update it, and overwrite the stored chunk.
+    fn mutate_mdata_chunk<F>(
+        &mut self,
+        address: &MDataAddress,
+        requester: PublicId,
+        message_id: MessageId,
+        mutation_fn: F,
+    ) -> Option<Action>
+    where
+        F: FnOnce(MData) -> NdResult<MData>,
+    {
+        let result = self
+            .mutable_chunks
+            .get(address)
+            .map_err(|e| match e {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+                error => error.to_string().into(),
+            })
+            .and_then(mutation_fn)
+            .and_then(move |mdata| {
+                self.mutable_chunks
+                    .put(&mdata)
+                    .map_err(|error| error.to_string().into())
+            });
+
+        Some(Action::RespondToSrcElders {
+            sender: *address.name(),
+            message: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
+    }
+
     /// Put MData.
     fn handle_put_mdata_req(
         &mut self,
@@ -410,6 +450,44 @@ impl DestinationElder {
                 response: Response::Mutation(result),
                 message_id,
             },
+        })
+    }
+
+    /// Mutate Sequenced MData.
+    fn handle_mutate_seq_mdata_entries_req(
+        &mut self,
+        requester: PublicId,
+        address: MDataAddress,
+        actions: MDataSeqEntryActions,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let requester_pk = *utils::own_key(&requester)?;
+
+        self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
+            match data {
+                MData::Seq(ref mut mdata) => mdata.mutate_entries(actions, requester_pk)?,
+                MData::Unseq(..) => return Err(NdError::NoSuchData), // FIXME
+            }
+            Ok(data)
+        })
+    }
+
+    /// Mutate Unsequenced MData.
+    fn handle_mutate_unseq_mdata_entries_req(
+        &mut self,
+        requester: PublicId,
+        address: MDataAddress,
+        actions: MDataUnseqEntryActions,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let requester_pk = *utils::own_key(&requester)?;
+
+        self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
+            match data {
+                MData::Unseq(ref mut mdata) => mdata.mutate_entries(actions, requester_pk)?,
+                MData::Seq(..) => return Err(NdError::NoSuchData), // FIXME
+            }
+            Ok(data)
         })
     }
 

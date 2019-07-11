@@ -274,7 +274,9 @@ impl SourceElder {
             | PutMData(..)
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..) => {
+            | ListMDataValues(..) 
+            | MutateSeqMDataEntries { .. }
+            | MutateUnseqMDataEntries { .. } => {
                 // TODO: allow only registered clients to send this req
                 // once the coin balances are implemented.
 
@@ -302,14 +304,6 @@ impl SourceElder {
                 unimplemented!()
             }
             DelMDataUserPermissions { .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            MutateSeqMDataEntries { .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            MutateUnseqMDataEntries { .. } => {
                 has_signature()?;
                 unimplemented!()
             }

@@ -59,10 +59,11 @@ use rand::{distributions::Standard, Rng};
 use safe_nd::{
     AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
-    AppendOnlyData, Coins, Error as NdError, IData, IDataAddress, LoginPacket, MData, MDataAddress,
-    MDataValue, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request,
-    Response, Result as NdResult, SeqAppendOnly, SeqMutableData, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    AppendOnlyData, Coins, EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData,
+    MDataAddress, MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, PubImmutableData,
+    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, SeqMutableData, UnpubImmutableData, UnpubSeqAppendOnlyData,
+    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -2398,6 +2399,216 @@ fn read_seq_mutable_data() {
 
     match client.expect_response(message_id) {
         Response::GetSeqMDataValue(Ok(val)) => assert_eq!(val, entries[&key]),
+        x => unexpected!(x),
+    }
+}
+
+#[test]
+fn mutate_seq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    // Try to put sequenced Mutable Data.
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = SeqMutableData::new(name, tag, *client.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Seq(mdata.clone())),
+    );
+
+    // Get a non-existant value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)) => (),
+        x => unexpected!(x),
+    }
+
+    // Insert new values.
+    let actions = MDataSeqEntryActions::new()
+        .ins(vec![0], vec![1], 0)
+        .ins(vec![1], vec![1], 0);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateSeqMDataEntries {
+            address: MDataAddress::Seq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Ok(val)) => assert_eq!(
+            val,
+            MDataValue {
+                data: vec![1],
+                version: 0
+            }
+        ),
+        x => unexpected!(x),
+    }
+
+    // Update and delete entries.
+    let actions = MDataSeqEntryActions::new()
+        .update(vec![0], vec![2], 1)
+        .del(vec![1], 1);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateSeqMDataEntries {
+            address: MDataAddress::Seq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Ok(val)) => assert_eq!(
+            val,
+            MDataValue {
+                data: vec![2],
+                version: 1
+            }
+        ),
+        x => unexpected!(x),
+    }
+
+    // Deleted key should not exist now.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: vec![1],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)) => (),
+        x => unexpected!(x),
+    }
+
+    // Try an invalid update request.
+    let actions = MDataSeqEntryActions::new().update(vec![0], vec![3], 0);
+    let message_id = client.send_request(Request::MutateSeqMDataEntries {
+        address: MDataAddress::Seq { name, tag },
+        actions,
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::Mutation(Err(NdError::InvalidEntryActions(invalid_actions))) => {
+            let mut expected_invalid_actions = BTreeMap::new();
+            let _ = expected_invalid_actions.insert(vec![0], EntryError::InvalidSuccessor(1));
+
+            assert_eq!(invalid_actions, expected_invalid_actions);
+        }
+        x => unexpected!(x),
+    }
+}
+
+#[test]
+fn mutate_unseq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    // Try to put unsequenced Mutable Data.
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = UnseqMutableData::new(name, tag, *client.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Unseq(mdata.clone())),
+    );
+
+    // Get a non-existant value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Unseq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetUnseqMDataValue(Err(NdError::NoSuchEntry)) => (),
+        x => unexpected!(x),
+    }
+
+    // Insert new values.
+    let actions = MDataUnseqEntryActions::new()
+        .ins(vec![0], vec![1])
+        .ins(vec![1], vec![1]);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Unseq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetUnseqMDataValue(Ok(val)) => assert_eq!(val, vec![1],),
+        x => unexpected!(x),
+    }
+
+    // Update and delete entries.
+    let actions = MDataUnseqEntryActions::new()
+        .update(vec![0], vec![2])
+        .del(vec![1]);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Unseq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetUnseqMDataValue(Ok(val)) => assert_eq!(val, vec![2]),
+        x => unexpected!(x),
+    }
+
+    // Deleted key should not exist now.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Unseq { name, tag },
+        key: vec![1],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetUnseqMDataValue(Err(NdError::NoSuchEntry)) => (),
         x => unexpected!(x),
     }
 }
