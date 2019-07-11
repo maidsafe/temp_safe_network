@@ -23,9 +23,9 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AppPermissions, Challenge, Coins, Error as NdError, IData, IDataKind, Message, MessageId,
-    NodePublicId, PublicId, PublicKey, Request, Response, Signature, Transaction, TransactionId,
-    XorName,
+    AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress, IDataKind, Message,
+    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature, Transaction,
+    TransactionId, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -222,25 +222,7 @@ impl SourceElder {
             // ===== Immutable Data =====
             //
             PutIData(chunk) => self.handle_put_idata(client, chunk, message_id, signature),
-            GetIData(ref address) => {
-                if address.kind() != IDataKind::Pub {
-                    self.has_signature(&client.public_id, &request, &message_id, &signature)?;
-                }
-                if address.kind() == IDataKind::Pub || client.has_balance {
-                    Some(Action::ForwardClientRequest(Rpc::Request {
-                        requester: client.public_id.clone(),
-                        request,
-                        message_id,
-                    }))
-                } else {
-                    self.send_response_to_client(
-                        &client.public_id,
-                        message_id,
-                        Response::GetIData(Err(NdError::AccessDenied)),
-                    );
-                    None
-                }
-            }
+            GetIData(address) => self.handle_get_idata(client, address, message_id, signature),
             DeleteUnpubIData(ref address) => {
                 if address.kind() == IDataKind::Pub {
                     self.send_response_to_client(
@@ -465,6 +447,33 @@ impl SourceElder {
             request,
             message_id,
         }))
+    }
+
+    fn handle_get_idata(
+        &mut self,
+        client: &ClientInfo,
+        address: IDataAddress,
+        message_id: MessageId,
+        signature: Option<Signature>,
+    ) -> Option<Action> {
+        let request = Request::GetIData(address);
+        if address.kind() != IDataKind::Pub {
+            self.has_signature(&client.public_id, &request, &message_id, &signature)?;
+        }
+        if address.kind() == IDataKind::Pub || client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::GetIData(Err(NdError::AccessDenied)),
+            );
+            None
+        }
     }
 
     /// Handles a received challenge response.
