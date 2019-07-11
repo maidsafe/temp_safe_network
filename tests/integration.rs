@@ -482,41 +482,39 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
 
-    // Create balances.
+    // Create balance.
     let start_nano = 1_000_000_000_000;
-    let message_id = client.send_request(
-        conn_info.clone(),
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::CreateBalance {
-            new_balance_owner: *client.public_id().public_key(),
+            new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
             transaction_id: 0,
         },
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::Transaction(Ok(_)) => (),
-        x => unexpected!(x),
-    }
 
-    // Put some published immutable data
+    // Put and verify some published immutable data
     let raw_data = vec![1, 2, 3];
     let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
     let pub_idata_address: XorName = *pub_idata.address().name();
-    let message_id = client.send_request(conn_info.clone(), Request::PutIData(pub_idata));
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::Mutation(Ok(())) => (),
-        x => unexpected!(x),
-    }
-    let message_id = client.send_request(
-        conn_info.clone(),
-        Request::GetIData(IDataAddress::Pub(pub_idata_address)),
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        &mut vault,
+        Request::PutIData(pub_idata),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Ok(IData::Pub(idata))) => assert_eq!(idata.value(), &raw_data),
-        x => unexpected!(x),
-    }
+    assert_eq!(
+        common::get_idata(
+            &mut env,
+            &mut client,
+            &mut vault,
+            IDataAddress::Pub(pub_idata_address)
+        ),
+        raw_data
+    );
 
     // Get some unpublished immutable data from the same address
     let message_id = client.send_request(
@@ -541,40 +539,38 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
 
     // Create balances.
     let start_nano = 1_000_000_000_000;
-    let message_id = client.send_request(
-        conn_info.clone(),
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::CreateBalance {
-            new_balance_owner: *client.public_id().public_key(),
+            new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
             transaction_id: 0,
         },
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::Transaction(Ok(_)) => (),
-        x => unexpected!(x),
-    }
 
-    // Put some unpub immutable data
+    // Put and verify some unpub immutable data
     let raw_data = vec![1, 2, 3];
     let owner = client.public_id().public_key();
     let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data.clone(), *owner));
     let unpub_idata_address: XorName = *unpub_idata.address().name();
-    let message_id = client.send_request(conn_info.clone(), Request::PutIData(unpub_idata));
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::Mutation(Ok(())) => (),
-        x => unexpected!(x),
-    }
-    let message_id = client.send_request(
-        conn_info.clone(),
-        Request::GetIData(IDataAddress::Unpub(unpub_idata_address)),
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        &mut vault,
+        Request::PutIData(unpub_idata),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Ok(IData::Unpub(idata))) => assert_eq!(idata.value(), &raw_data),
-        x => unexpected!(x),
-    }
+    assert_eq!(
+        common::get_idata(
+            &mut env,
+            &mut client,
+            &mut vault,
+            IDataAddress::Unpub(unpub_idata_address)
+        ),
+        raw_data
+    );
 
     // Get some published immutable data from the same address
     let message_id = client.send_request(

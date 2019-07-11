@@ -15,7 +15,8 @@ pub use self::rng::TestRng;
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
-    Challenge, ClientFullId, ClientPublicId, Coins, Message, MessageId, PublicId, Request, Response,
+    Challenge, ClientFullId, ClientPublicId, Coins, IData, IDataAddress, Message, MessageId,
+    PublicId, Request, Response,
 };
 use safe_vault::{
     mock::Network,
@@ -267,6 +268,22 @@ pub fn establish_connection(env: &mut Environment, client: &mut TestClient, vaul
     env.poll(vault);
 }
 
+pub fn perform_transaction(
+    env: &mut Environment,
+    client: &mut TestClient,
+    vault: &mut TestVault,
+    request: Request,
+) {
+    let conn_info = vault.connection_info();
+    let message_id = client.send_request(conn_info, request);
+    env.poll(vault);
+
+    match client.expect_response(message_id) {
+        Response::Transaction(Ok(_)) => (),
+        x => unexpected!(x),
+    }
+}
+
 pub fn perform_mutation(
     env: &mut Environment,
     client: &mut TestClient,
@@ -279,6 +296,23 @@ pub fn perform_mutation(
 
     match client.expect_response(message_id) {
         Response::Mutation(Ok(())) => (),
+        x => unexpected!(x),
+    }
+}
+
+pub fn get_idata(
+    env: &mut Environment,
+    client: &mut TestClient,
+    vault: &mut TestVault,
+    address: IDataAddress,
+) -> Vec<u8> {
+    let conn_info = vault.connection_info();
+    let message_id = client.send_request(conn_info, Request::GetIData(address));
+    env.poll(vault);
+
+    match client.expect_response(message_id) {
+        Response::GetIData(Ok(IData::Unpub(data))) => data.value().clone(),
+        Response::GetIData(Ok(IData::Pub(data))) => data.value().clone(),
         x => unexpected!(x),
     }
 }
