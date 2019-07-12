@@ -699,7 +699,7 @@ fn delete_immutable_data_that_doesnt_exist() {
     );
     env.poll(&mut vault);
     match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::InvalidOperation)) => (),
+        Response::Mutation(Err(NdError::InvalidOperation)) => (),
         x => unexpected!(x),
     }
 
@@ -779,8 +779,7 @@ fn delete_immutable_data() {
     );
     env.poll(&mut vault);
     match client_a.expect_response(message_id) {
-        // FIXME: Should be Response::Mutation!
-        Response::GetIData(Err(NdError::InvalidOperation)) => (),
+        Response::Mutation(Err(NdError::InvalidOperation)) => (),
         x => unexpected!(x),
     }
 
