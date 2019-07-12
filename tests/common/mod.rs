@@ -328,3 +328,20 @@ pub fn get_balance(env: &mut Environment, client: &mut TestClient, vault: &mut T
         x => unexpected!(x),
     }
 }
+
+pub fn send_request_expect_err(
+    env: &mut Environment,
+    client: &mut TestClient,
+    vault: &mut TestVault,
+    request: Request,
+    response: Response,
+) {
+    let conn_info = vault.connection_info();
+    let message_id = client.send_request(conn_info, request);
+    env.poll(vault);
+
+    let resp = client.expect_response(message_id);
+    if response != resp {
+        unexpected!(resp);
+    }
+}
