@@ -465,7 +465,7 @@ impl SourceElder {
             self.send_response_to_client(
                 &client.public_id,
                 message_id,
-                Response::GetIData(Err(NdError::InvalidOperation)),
+                Response::Mutation(Err(NdError::InvalidOperation)),
             );
             return None;
         }
