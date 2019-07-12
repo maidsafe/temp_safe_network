@@ -25,7 +25,7 @@ rand = "0.6.5"
 rand_core = "0.4.0"
 prettytable-rs = "^0.8"
 unwrap = "~1.2.1"
-threshold_crypto = "0.3.1"
+threshold_crypto = { git = "https://github.com/poanetwork/threshold_crypto.git", branch = "master" }
 uuid = "0.7"
 safecoin = "0.5.0"
 serde = "1.0.91"

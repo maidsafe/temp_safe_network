@@ -126,14 +126,14 @@ impl Safe {
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
                 let pk = unwrap!(pk_from_hex(&pk_str));
-                let xorname = self.safe_app.allocate_test_coins(&pk, &preload_amount);
+                let xorname = self.safe_app.allocate_test_coins(&pk, &preload_amount)?;
                 (xorname, None)
             }
             None => {
                 let key_pair = KeyPair::random();
                 let xorname = self
                     .safe_app
-                    .allocate_test_coins(&key_pair.pk, &preload_amount);
+                    .allocate_test_coins(&key_pair.pk, &preload_amount)?;
                 let (pk, sk) = key_pair.to_hex_key_pair()?;
                 (xorname, Some(BlsKeyPair { pk, sk }))
             }
@@ -187,6 +187,7 @@ impl Safe {
 #[test]
 fn test_keys_create_preload_test_coins() {
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("12.23".to_string(), None));
     assert!(xorurl.starts_with("safe://"));
@@ -199,6 +200,7 @@ fn test_keys_create_preload_test_coins() {
 #[test]
 fn test_keys_create_preload_test_coins_pk() {
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("1.1".to_string(), Some(pk)));
@@ -212,6 +214,7 @@ fn test_keys_create_preload_test_coins_pk() {
 #[test]
 fn test_keys_create() {
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (_, from_key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("23.23".to_string(), None));
 
@@ -226,6 +229,7 @@ fn test_keys_create() {
 #[test]
 fn test_keys_create_preload() {
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (_, from_key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("543.2312".to_string(), None));
 
@@ -251,6 +255,7 @@ fn test_keys_create_preload() {
 #[test]
 fn test_keys_create_preload_invalid_amounts() {
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     match safe.keys_create_preload_test_coins(".45".to_string(), None) {
         Err(msg) => assert_eq!(
             msg,
@@ -298,6 +303,7 @@ fn test_keys_create_preload_invalid_amounts() {
 #[test]
 fn test_keys_create_pk() {
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1".to_string(), None));
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
     let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, Some(pk)));
@@ -312,6 +318,7 @@ fn test_keys_create_pk() {
 fn test_keys_test_coins_balance_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let preload_amount = "1.1542";
     let (_, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
@@ -323,6 +330,7 @@ fn test_keys_test_coins_balance_pk() {
 fn test_keys_test_coins_balance_xorurl() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let preload_amount = "0.243";
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
@@ -334,6 +342,7 @@ fn test_keys_test_coins_balance_xorurl() {
 fn test_keys_test_coins_balance_wrong_xorurl() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0".to_string(), None));
 
     let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
@@ -349,6 +358,7 @@ fn test_keys_test_coins_balance_wrong_xorurl() {
 fn test_keys_test_coins_balance_wrong_location() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let amount = "35312";
     let (mut xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(amount.to_string(), None));
@@ -373,6 +383,7 @@ fn test_keys_test_coins_balance_wrong_location() {
 fn test_keys_test_coins_balance_wrong_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0".to_string(), None));
     let mut unwrapped_key_pair = unwrap!(key_pair);
     unwrapped_key_pair.pk.replace_range(..6, "ababab");
@@ -388,6 +399,7 @@ fn test_keys_test_coins_balance_wrong_pk() {
 fn test_keys_balance_pk() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let preload_amount = "1743.234";
     let (_, from_key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
@@ -411,6 +423,7 @@ fn test_keys_balance_pk() {
 fn test_keys_balance_xorname() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let preload_amount = "435.34";
     let (from_xorname, from_key_pair) =
         unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
@@ -436,6 +449,7 @@ fn test_keys_balance_xorname() {
 fn test_fetch_pk_from_xorname_test_coins() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("23.22".to_string(), None));
     let key_pair_unwrapped = unwrap!(key_pair);
@@ -447,6 +461,7 @@ fn test_fetch_pk_from_xorname_test_coins() {
 fn test_fetch_pk_from_xorname() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", ""));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("0.56".to_string(), None));
 
     let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, None));

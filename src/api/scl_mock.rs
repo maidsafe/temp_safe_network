@@ -120,7 +120,11 @@ impl SafeApp {
         Ok(to_xorname)
     }
 
-    pub fn allocate_test_coins(&mut self, to_pk: &PublicKeyMock, amount: &str) -> XorName {
+    pub fn allocate_test_coins(
+        &mut self,
+        to_pk: &PublicKeyMock,
+        amount: &str,
+    ) -> ResultReturn<XorName> {
         let xorname = xorname_from_pk(to_pk);
         self.mock_data.coin_balances.insert(
             xorname_to_hex(&xorname),
@@ -130,14 +134,14 @@ impl SafeApp {
             },
         );
 
-        xorname
+        Ok(xorname)
     }
 
     pub fn get_balance_from_pk(
         &self,
         pk: &PublicKeyMock,
         sk: &SecretKeyMock,
-    ) -> Result<String, &str> {
+    ) -> ResultReturn<String> {
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname, &sk)
     }
@@ -146,9 +150,11 @@ impl SafeApp {
         &self,
         xorname: &XorName,
         _sk: &SecretKeyMock,
-    ) -> Result<String, &str> {
+    ) -> ResultReturn<String> {
         match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
-            None => Err("CoinBalance data not found"),
+            None => Err(Error::ContentNotFound(
+                "CoinBalance data not found".to_string(),
+            )),
             Some(coin_balance) => Ok(coin_balance
                 .value
                 .to_string()
@@ -157,9 +163,11 @@ impl SafeApp {
         }
     }
 
-    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKeyMock, &str> {
+    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKeyMock> {
         match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
-            None => Err("CoinBalance data not found"),
+            None => Err(Error::ContentNotFound(
+                "CoinBalance data not found".to_string(),
+            )),
             Some(coin_balance) => Ok(coin_balance.owner),
         }
     }
@@ -486,7 +494,7 @@ fn test_allocate_test_coins() {
     let pk_to = sk_to.public_key();
 
     let balance = "2.345678912";
-    mock.allocate_test_coins(&pk_to, balance);
+    unwrap!(mock.allocate_test_coins(&pk_to, balance));
     let current_balance = unwrap!(mock.get_balance_from_pk(&pk_to, &sk_to));
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
@@ -503,7 +511,7 @@ fn test_create_balance() {
     let pk = sk.public_key();
 
     let balance = "2.345678912";
-    mock.allocate_test_coins(&pk, balance);
+    unwrap!(mock.allocate_test_coins(&pk, balance));
 
     let sk_to = SecretKeyMock::random();
     let pk_to = sk_to.public_key();
@@ -524,7 +532,7 @@ fn test_check_balance() {
     let pk = sk.public_key();
 
     let balance = "2.3";
-    mock.allocate_test_coins(&pk, balance);
+    unwrap!(mock.allocate_test_coins(&pk, balance));
     let current_balance = unwrap!(mock.get_balance_from_pk(&pk, &sk));
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
