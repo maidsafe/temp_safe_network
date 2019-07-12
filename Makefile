@@ -22,12 +22,11 @@ ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-cli-build:${SAFE_CLI_VERSION} \
-		/bin/bash -c "cargo test --release --features=scl-mock -- --test-threads=1"
+		./resources/test-scripts/all-tests
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
-	cargo check --release
-	cargo test --release --features=scl-mock -- --test-threads=1
+	./resources/test-scripts/all-tests
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 

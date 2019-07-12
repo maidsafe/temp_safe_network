@@ -34,10 +34,18 @@ pub fn auth_commander(cmd: Option<AuthSubCommands>, _safe: &mut Safe) -> Result<
 
 pub fn auth_connect(safe: &mut Safe) -> Result<(), String> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file");
-    safe.connect(APP_ID, "fake-app-id").map_err(|err| {
+    safe.connect(APP_ID, Some("fake-app-id")).map_err(|err| {
         format!(
             "You need to authorise the safe CLI first with 'auth' command: {}",
             err
         )
     })
+}
+
+#[allow(dead_code)]
+pub fn connect_without_auth(safe: &mut Safe) -> Result<(), String> {
+    debug!("Fake-auth is enabled so we don't try to read the credentials file");
+    safe.connect(APP_ID, None)?;
+
+    Ok(())
 }

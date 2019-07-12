@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e -x
+
+# setup auth cli
+git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe-auth
+cd ~/safe-auth
+ls
+SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features mock-network -- -i nonsense
+SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features mock-network -- --daemon 41805 --allow-all-auth &
+sleep 15
+cd -
+
+cargo run --features mock-network -- auth
+cargo test --release --features=scl-mock -- --test-threads=1
+# only run these two tests for now, as mock-vault is _sloooow_
+cargo test --release --features="mock-network fake-auth" -- test_put_get_update_seq_appendable_data
+cargo test --release --features="mock-network fake-auth" -- test_put_and_get_immutable_data
+# only run integration tests
+cargo test --features="mock-network" calling_safe_cat -- --test-threads=1
+cargo test --features="mock-network" calling_safe_files -- --test-threads=1

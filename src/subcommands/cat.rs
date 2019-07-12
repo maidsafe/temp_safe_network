@@ -8,6 +8,8 @@
 
 use super::helpers::{get_target_location, xorname_to_hex};
 use super::OutputFmt;
+use crate::subcommands::auth::auth_connect;
+use log::debug;
 use prettytable::Table;
 use safe_cli::{Safe, SafeData};
 use structopt::StructOpt;
@@ -31,6 +33,12 @@ pub fn cat_commander(
 ) -> Result<(), String> {
     // TODO: Get specific versions.
     let xorurl = get_target_location(cmd.location)?;
+    debug!("Running cat for: {:?}", &xorurl);
+
+    // TODO: pending: https://github.com/maidsafe/safe_client_libs/issues/899
+    // switch to connect_without_auth
+    auth_connect(safe)?;
+    // connect_without_auth(safe)?;
     let content = safe.fetch(&xorurl)?;
     match content {
         SafeData::FilesContainer {

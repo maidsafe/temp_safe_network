@@ -69,12 +69,22 @@ pub fn auth_connect(safe: &mut Safe) -> Result<(), String> {
     file.read_to_string(&mut auth_credentials)
         .map_err(|_| format!("Unable to read credentials from {}", file_path))?;
 
-    safe.connect(APP_ID, &auth_credentials).map_err(|err| {
-        format!(
-            "You need to authorise the safe CLI first with 'auth' command: {}",
-            err
-        )
-    })
+    safe.connect(APP_ID, Some(&auth_credentials))
+        .map_err(|err| {
+            format!(
+                "You need to authorise the safe CLI first with 'auth' command: {}",
+                err
+            )
+        })
+}
+
+#[allow(dead_code)]
+pub fn connect_without_auth(safe: &mut Safe) -> Result<(), String> {
+    debug!("Connecting...");
+
+    safe.connect(APP_ID, None)?;
+
+    Ok(())
 }
 
 fn credentials_file_path() -> Result<String, String> {

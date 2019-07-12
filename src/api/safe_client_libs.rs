@@ -51,8 +51,9 @@ impl SafeApp {
         Self { safe_conn: None }
     }
 
+    #[allow(dead_code)]
     #[cfg(feature = "fake-auth")]
-    pub fn connect(&mut self, _app_id: &str, _auth_credentials: &str) -> ResultReturn<()> {
+    pub fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
         warn!("Using fake authorisation for testing...");
         self.safe_conn = Some(create_app());
         Ok(())
@@ -60,18 +61,27 @@ impl SafeApp {
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     #[cfg(not(feature = "fake-auth"))]
-    pub fn connect(&mut self, app_id: &str, auth_credentials: &str) -> ResultReturn<()> {
+    pub fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()> {
         debug!("Connecting to SAFE Network...");
 
         let disconnect_cb = || {
             warn!("Connection with the SAFE Network was lost");
         };
 
-        let auth_granted = decode_ipc_msg(auth_credentials)?;
-        let app =
-            App::registered(app_id.to_string(), auth_granted, disconnect_cb).map_err(|err| {
+        let app = match auth_credentials {
+            Some(auth_credentials) => {
+                let auth_granted = decode_ipc_msg(auth_credentials)?;
+                App::registered(app_id.to_string(), auth_granted, disconnect_cb).map_err(|err| {
+                    Error::ConnectionError(format!(
+                        "Failed to connect to the SAFE Network: {:?}",
+                        err
+                    ))
+                })?
+            }
+            None => App::unregistered(disconnect_cb, None).map_err(|err| {
                 Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-            })?;
+            })?,
+        };
 
         self.safe_conn = Some(app);
         debug!("Successfully connected to the Network!!!");
@@ -608,7 +618,7 @@ impl SafeApp {
 fn test_put_and_get_immutable_data() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", "").unwrap();
+    safe.connect("", Some("")).unwrap();
 
     let id1 = b"HELLLOOOOOOO".to_vec();
 
@@ -625,7 +635,7 @@ fn test_put_and_get_immutable_data() {
 fn test_put_get_update_seq_appendable_data() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", "").unwrap();
+    safe.connect("", Some("")).unwrap();
 
     let key1 = b"KEY1".to_vec();
     let val1 = b"VALUE1".to_vec();
@@ -722,7 +732,7 @@ fn test_put_get_update_seq_appendable_data() {
 fn test_update_seq_appendable_data_error() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", "").unwrap();
+    safe.connect("", Some("")).unwrap();
 
     let key1 = b"KEY1".to_vec();
     let val1 = b"VALUE1".to_vec();

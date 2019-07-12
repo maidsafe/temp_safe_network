@@ -185,7 +185,7 @@ fn test_fetch_wallet() {
 fn test_fetch_files_container() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", "").unwrap();
+    safe.connect("", Some("")).unwrap();
 
     let (xorurl, _, files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true));

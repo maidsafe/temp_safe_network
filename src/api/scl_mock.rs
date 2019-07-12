@@ -77,7 +77,7 @@ impl SafeApp {
         Self { mock_data }
     }
 
-    pub fn connect(&mut self, _app_id: &str, _auth_credentials: &str) -> ResultReturn<()> {
+    pub fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
         debug!("Using mock so there is no connection to network");
         Ok(())
     }
