@@ -15,13 +15,6 @@ pub(crate) trait Chunk: Serialize + DeserializeOwned {
     fn id(&self) -> &Self::Id;
 }
 
-pub(crate) trait ChunkId: ToDbKey + PartialEq + Eq {
-    /// The XorName represented by this identifier.
-    fn raw_name(&self) -> &XorName;
-}
+pub(crate) trait ChunkId: ToDbKey + PartialEq + Eq {}
 
-impl ChunkId for XorName {
-    fn raw_name(&self) -> &XorName {
-        self
-    }
-}
+impl ChunkId for XorName {}

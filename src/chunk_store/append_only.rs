@@ -20,8 +20,4 @@ impl Chunk for AData {
     }
 }
 
-impl ChunkId for ADataAddress {
-    fn raw_name(&self) -> &XorName {
-        self.name()
-    }
-}
+impl ChunkId for ADataAddress {}

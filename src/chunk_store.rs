@@ -195,7 +195,7 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     fn file_path(&self, id: &T::Id) -> Result<PathBuf> {
-        Ok(self.dir.join(&hex::encode(utils::serialise(id.raw_name()))))
+        Ok(self.dir.join(&hex::encode(utils::serialise(id))))
     }
 }
 
