@@ -63,35 +63,37 @@ impl Safe {
         Ok(BlsKeyPair { pk, sk })
     }
 
-    // Create a Key on the network and return its XOR-URL
+    // Create a Key on the network and return its XOR-URL.
     pub fn keys_create(
         &mut self,
-        from: BlsKeyPair,
+        from: Option<String>,
         preload_amount: Option<String>,
         pk: Option<String>,
     ) -> ResultReturn<(XorUrl, Option<BlsKeyPair>)> {
-        let from_key_pair = KeyPair::from_hex_keys(&from.pk, &from.sk)?;
+        let from_sk = match from {
+            Some(sk) => match sk_from_hex(&sk) {
+                Ok(sk) => Some(sk),
+                Err(_) => return Err(Error::InvalidInput("Secret key invalid".to_string())),
+            },
+            None => None,
+        };
         let _ = parse_coins_amount(&preload_amount.clone().unwrap_or_else(|| "0".to_string()))?;
 
-        let mut create_coin_balance = |to_pk, amount: &str| match self.safe_app.create_balance(
-            &from_key_pair.pk,
-            &from_key_pair.sk,
-            &to_pk,
-            amount,
-        ) {
-            Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
-                "The amount '{}' specified for the transfer is invalid",
-                amount
-            ))),
-            Err(Error::NotEnoughBalance(_)) => Err(Error::NotEnoughBalance(
-                "Not enough balance at 'source' for the operation".to_string(),
-            )),
-            Err(other_error) => Err(Error::Unexpected(format!(
-                "Unexpected error when attempting to create Key: {}",
-                other_error
-            ))),
-            Ok(xorname) => Ok(xorname),
-        };
+        let create_coin_balance =
+            |to_pk, amount: &str| match self.safe_app.create_balance(from_sk, to_pk, amount) {
+                Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
+                    "The amount '{}' specified for the transfer is invalid",
+                    amount
+                ))),
+                Err(Error::NotEnoughBalance(_)) => Err(Error::NotEnoughBalance(
+                    "Not enough balance at 'source' for the operation".to_string(),
+                )),
+                Err(other_error) => Err(Error::Unexpected(format!(
+                    "Unexpected error when attempting to create Key: {}",
+                    other_error
+                ))),
+                Ok(xorname) => Ok(xorname),
+            };
 
         let amount = preload_amount.unwrap_or_else(|| "0.0".to_string());
 
@@ -218,7 +220,7 @@ fn test_keys_create() {
     let (_, from_key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("23.23".to_string(), None));
 
-    let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, None));
+    let (xorurl, key_pair) = unwrap!(safe.keys_create(Some(unwrap!(from_key_pair).sk), None, None));
     assert!(xorurl.starts_with("safe://"));
     match key_pair {
         None => panic!("Key pair was not generated as it was expected"),
@@ -235,7 +237,7 @@ fn test_keys_create_preload() {
 
     let preload_amount = "1.8";
     let (xorurl, key_pair) = unwrap!(safe.keys_create(
-        unwrap!(from_key_pair),
+        Some(unwrap!(from_key_pair).sk),
         Some(preload_amount.to_string()),
         None,
     ));
@@ -267,7 +269,11 @@ fn test_keys_create_preload_invalid_amounts() {
     };
 
     let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12".to_string(), None));
-    match safe.keys_create(unwrap!(key_pair.clone()), Some(".003".to_string()), None) {
+    match safe.keys_create(
+        Some(unwrap!(key_pair.clone()).sk),
+        Some(".003".to_string()),
+        None,
+    ) {
         Err(msg) => assert_eq!(
             msg,
             Error::InvalidAmount(
@@ -280,7 +286,7 @@ fn test_keys_create_preload_invalid_amounts() {
     // test fail with corrupted secret key
     let mut unwrapped_key_pair = unwrap!(key_pair.clone());
     unwrapped_key_pair.sk.replace_range(..6, "ababab");
-    match safe.keys_create(unwrapped_key_pair, Some(".003".to_string()), None) {
+    match safe.keys_create(Some(unwrapped_key_pair.sk), Some(".003".to_string()), None) {
         Err(msg) => assert_eq!(
             msg,
             Error::InvalidAmount(
@@ -291,7 +297,11 @@ fn test_keys_create_preload_invalid_amounts() {
     };
 
     // test fail to preload with more than available balance in source (which has only 12 coins)
-    match safe.keys_create(unwrap!(key_pair), Some("12.00001".to_string()), None) {
+    match safe.keys_create(
+        Some(unwrap!(key_pair).sk),
+        Some("12.00001".to_string()),
+        None,
+    ) {
         Err(msg) => assert_eq!(
             msg,
             Error::NotEnoughBalance("Not enough balance at 'source' for the operation".to_string())
@@ -306,7 +316,8 @@ fn test_keys_create_pk() {
     unwrap!(safe.connect("", ""));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1".to_string(), None));
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
-    let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, Some(pk)));
+    let (xorurl, key_pair) =
+        unwrap!(safe.keys_create(Some(unwrap!(from_key_pair).sk), None, Some(pk)));
     assert!(xorurl.starts_with("safe://"));
     match key_pair {
         None => assert!(true),
@@ -407,7 +418,7 @@ fn test_keys_balance_pk() {
 
     let amount = "1740";
     let (_, to_key_pair) = unwrap!(safe.keys_create(
-        from_key_pair_unwrapped.clone(),
+        Some(from_key_pair_unwrapped.clone().sk),
         Some(amount.to_string()),
         None,
     ));
@@ -431,7 +442,7 @@ fn test_keys_balance_xorname() {
 
     let amount = "35.3";
     let (to_xorname, to_key_pair) = unwrap!(safe.keys_create(
-        from_key_pair_unwrapped.clone(),
+        Some(from_key_pair_unwrapped.clone().sk),
         Some(amount.to_string()),
         None,
     ));
@@ -464,7 +475,7 @@ fn test_fetch_pk_from_xorname() {
     unwrap!(safe.connect("", ""));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("0.56".to_string(), None));
 
-    let (xorurl, key_pair) = unwrap!(safe.keys_create(unwrap!(from_key_pair), None, None));
+    let (xorurl, key_pair) = unwrap!(safe.keys_create(Some(unwrap!(from_key_pair).sk), None, None));
     let key_pair_unwrapped = unwrap!(key_pair);
     let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
     assert_eq!(pk, key_pair_unwrapped.pk);

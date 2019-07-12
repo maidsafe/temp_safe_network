@@ -19,14 +19,14 @@ use std::convert::TryFrom;
 use std::io::Write;
 use std::str::FromStr;
 use std::{fs, str};
-pub use threshold_crypto::{PublicKey as PublicKeyMock, SecretKey as SecretKeyMock};
+use threshold_crypto::{PublicKey, SecretKey};
 use unwrap::unwrap;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct CoinBalance {
-    owner: PublicKeyMock,
+    owner: PublicKey,
     value: String,
 }
 
@@ -84,35 +84,41 @@ impl SafeApp {
 
     pub fn create_balance(
         &mut self,
-        from_pk: &PublicKeyMock,
-        from_sk: &SecretKeyMock,
-        new_balance_owner: &PublicKeyMock,
+        from_sk: Option<SecretKey>,
+        new_balance_owner: PublicKey,
         amount: &str,
     ) -> ResultReturn<XorName> {
-        let from_xorname = xorname_from_pk(from_pk);
-        let from_balance = unwrap!(Coins::from_str(&unwrap!(
-            self.get_balance_from_xorname(&from_xorname, from_sk)
-        )));
-        let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
-        let amount_coin = unwrap!(Coins::from_str(amount));
-        let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
-        if from_nano_balance.num() < amount_nano.num() {
-            return Err(Error::NotEnoughBalance(from_nano_balance.num().to_string()));
-        }
-        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
-        self.mock_data.coin_balances.insert(
-            xorname_to_hex(&from_xorname),
-            CoinBalance {
-                owner: (*from_pk),
-                value: Coins::from(from_new_amount).to_string(),
-            },
-        );
+        match from_sk {
+            Some(sk) => {
+                let from_pk = sk.public_key();
+                let from_xorname = xorname_from_pk(&from_pk);
+                let from_balance = unwrap!(Coins::from_str(&unwrap!(
+                    self.get_balance_from_xorname(&from_xorname, &sk)
+                )));
+                let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
+                let amount_coin = unwrap!(Coins::from_str(amount));
+                let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
+                if from_nano_balance.num() < amount_nano.num() {
+                    return Err(Error::NotEnoughBalance(from_nano_balance.num().to_string()));
+                }
+                let from_new_amount =
+                    unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
+                self.mock_data.coin_balances.insert(
+                    xorname_to_hex(&from_xorname),
+                    CoinBalance {
+                        owner: from_pk,
+                        value: Coins::from(from_new_amount).to_string(),
+                    },
+                );
+            }
+            None => { /* TODO: we should have a default wallet and substract from there */ }
+        };
 
-        let to_xorname = xorname_from_pk(new_balance_owner);
+        let to_xorname = xorname_from_pk(&new_balance_owner);
         self.mock_data.coin_balances.insert(
             xorname_to_hex(&to_xorname),
             CoinBalance {
-                owner: (*new_balance_owner),
+                owner: new_balance_owner,
                 value: amount.to_string(),
             },
         );
@@ -122,7 +128,7 @@ impl SafeApp {
 
     pub fn allocate_test_coins(
         &mut self,
-        to_pk: &PublicKeyMock,
+        to_pk: &PublicKey,
         amount: &str,
     ) -> ResultReturn<XorName> {
         let xorname = xorname_from_pk(to_pk);
@@ -137,11 +143,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn get_balance_from_pk(
-        &self,
-        pk: &PublicKeyMock,
-        sk: &SecretKeyMock,
-    ) -> ResultReturn<String> {
+    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> ResultReturn<String> {
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname, &sk)
     }
@@ -149,7 +151,7 @@ impl SafeApp {
     pub fn get_balance_from_xorname(
         &self,
         xorname: &XorName,
-        _sk: &SecretKeyMock,
+        _sk: &SecretKey,
     ) -> ResultReturn<String> {
         match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
             None => Err(Error::ContentNotFound(
@@ -163,7 +165,7 @@ impl SafeApp {
         }
     }
 
-    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKeyMock> {
+    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
         match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
             None => Err(Error::ContentNotFound(
                 "CoinBalance data not found".to_string(),
@@ -174,9 +176,9 @@ impl SafeApp {
 
     pub fn safecoin_transfer(
         &mut self,
-        from_pk: &PublicKeyMock,
-        from_sk: &SecretKeyMock,
-        to_pk: &PublicKeyMock,
+        from_pk: &PublicKey,
+        from_sk: &SecretKey,
+        to_pk: &PublicKey,
         tx_id: &Uuid,
         amount: &str,
     ) -> ResultReturn<Uuid> {
@@ -240,8 +242,8 @@ impl SafeApp {
     pub fn get_transaction(
         &self,
         tx_id: &Uuid,
-        pk: &PublicKeyMock,
-        _sk: &SecretKeyMock,
+        pk: &PublicKey,
+        _sk: &SecretKey,
     ) -> ResultReturn<String> {
         let xorname = xorname_from_pk(pk);
         let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
@@ -486,11 +488,11 @@ impl SafeApp {
 #[test]
 fn test_allocate_test_coins() {
     use self::SafeApp;
-    use threshold_crypto::SecretKey as SecretKeyMock;
+    use threshold_crypto::SecretKey;
 
     let mut mock = SafeApp::new();
 
-    let sk_to = SecretKeyMock::random();
+    let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
 
     let balance = "2.345678912";
@@ -503,32 +505,32 @@ fn test_allocate_test_coins() {
 #[test]
 fn test_create_balance() {
     use self::SafeApp;
-    use threshold_crypto::SecretKey as SecretKeyMock;
+    use threshold_crypto::SecretKey;
 
     let mut mock = SafeApp::new();
 
-    let sk = SecretKeyMock::random();
+    let sk = SecretKey::random();
     let pk = sk.public_key();
 
     let balance = "2.345678912";
     unwrap!(mock.allocate_test_coins(&pk, balance));
 
-    let sk_to = SecretKeyMock::random();
+    let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
     println!(
         "New CoinBalance at: {:?}",
-        mock.create_balance(&pk, &sk, &pk_to, "1.234567891")
+        mock.create_balance(Some(sk), pk_to, "1.234567891")
     );
 }
 
 #[test]
 fn test_check_balance() {
     use self::SafeApp;
-    use threshold_crypto::SecretKey as SecretKeyMock;
+    use threshold_crypto::SecretKey;
 
     let mut mock = SafeApp::new();
 
-    let sk = SecretKeyMock::random();
+    let sk = SecretKey::random();
     let pk = sk.public_key();
 
     let balance = "2.3";
@@ -537,12 +539,12 @@ fn test_check_balance() {
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
 
-    let sk_to = SecretKeyMock::random();
+    let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
     let preload = "1.234567891";
     println!(
         "New CoinBalance at: {:?}",
-        mock.create_balance(&pk, &sk, &pk_to, preload)
+        mock.create_balance(Some(sk.clone()), pk_to, preload)
     );
     let current_balance = unwrap!(mock.get_balance_from_pk(&pk_to, &sk_to));
     println!("Current balance: {}", current_balance);
@@ -559,14 +561,14 @@ fn test_check_balance() {
 #[test]
 fn test_safecoin_transfer() {
     use self::SafeApp;
-    use threshold_crypto::SecretKey as SecretKeyMock;
+    use threshold_crypto::SecretKey;
 
     let mut mock = SafeApp::new();
 
-    let sk1 = SecretKeyMock::random();
+    let sk1 = SecretKey::random();
     let pk1 = sk1.public_key();
 
-    let sk2 = SecretKeyMock::random();
+    let sk2 = SecretKey::random();
     let pk2 = sk2.public_key();
 
     let balance1 = "2.5";

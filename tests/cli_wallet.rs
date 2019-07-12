@@ -19,7 +19,6 @@ use predicates::prelude::*;
 use std::process::Command;
 
 const PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-const NO_SOURCE: &str = "Missing the 'source' argument";
 const UNMATCHED_PK_SK: &str = "The secret key provided does not match the public key";
 
 #[test]
@@ -151,10 +150,7 @@ fn calling_safe_wallet_insert() {
 fn calling_safe_wallet_create_no_source() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    cmd.args(&vec!["wallet", "create"])
-        .assert()
-        .stderr(predicate::str::contains(NO_SOURCE))
-        .failure();
+    cmd.args(&vec!["wallet", "create"]).assert().success();
 }
 
 #[test]

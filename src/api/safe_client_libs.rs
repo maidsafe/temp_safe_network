@@ -89,9 +89,8 @@ impl SafeApp {
 
     pub fn create_balance(
         &mut self,
-        _from_pk: &PublicKey,
-        _from_sk: &SecretKey,
-        new_balance_owner: &PublicKey,
+        from_sk: Option<SecretKey>,
+        new_balance_owner: PublicKey,
         amount: &str,
     ) -> ResultReturn<XorName> {
         let safe_app: &App = match &self.safe_conn {
@@ -99,19 +98,28 @@ impl SafeApp {
             None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
-        let bls_sk = threshold_crypto::SecretKey::random(); // FIXME: use provided from_sk instead of creating a random one
-        let pk = bls_sk.public_key(); // FIXME: use provided new_balance_owner instead of creating a random one
         let coins_amount =
             Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
 
         run(safe_app, move |client, _app_context| {
+            let from_sk = from_sk.unwrap_or(unwrap!(client.clone().secret_bls_key()));
+            /*.unwrap_or_else(
+                return CoreError(SafeCoreError::Unexpected(
+                    "Couldn't get account's secret BLS key".to_string(),
+                )),
+            );*/
             client
-                .create_balance(Some(&bls_sk), SafeNdPublicKey::Bls(pk), coins_amount, None)
+                .create_balance(
+                    Some(&from_sk),
+                    SafeNdPublicKey::Bls(new_balance_owner),
+                    coins_amount,
+                    None,
+                )
                 .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
         })
         .map_err(|e| Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", e)))?;
 
-        let xorname = xorname_from_pk(new_balance_owner);
+        let xorname = xorname_from_pk(&new_balance_owner);
         Ok(xorname)
     }
 
@@ -131,11 +139,7 @@ impl SafeApp {
         run(safe_app, move |client, _app_context| {
             client
                 .allocate_test_coins(&xorname, coins_amount)
-                .map_err(|_| {
-                    CoreError(SafeCoreError::Unexpected(
-                        "Couldn't get account's owner pk".to_string(),
-                    ))
-                })
+                .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
         })
         .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 

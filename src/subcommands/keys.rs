@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_target_location, prompt_user};
+use super::helpers::get_target_location;
 use super::OutputFmt;
-use log::warn;
+use log::{debug, warn};
 use safe_cli::{BlsKeyPair, Safe};
 use structopt::StructOpt;
 
@@ -95,24 +95,13 @@ pub fn create_new_key(
         safe.keys_create_preload_test_coins(amount, pk)?
     // }
     } else {
-        // '--source' is either a Wallet XOR-URL, a Key XOR-URL, or a pk
-        // TODO: support Key XOR-URL and pk, we now support only Key XOR-URL
-        // Prompt the user for the secret key since 'source' is a Key and not a Wallet
-        let source_xorurl = source.ok_or_else(|| "Missing the 'source' argument".to_string())?;
-        let sk = prompt_user(
-            &format!(
-                "Enter secret key corresponding to public key at XOR-URL \"{}\": ",
-                source_xorurl
-            ),
-            "Invalid input, expected secret key string",
-        )?;
-
-        let pk_source_xor = safe.fetch_pk_from_xorname(&source_xorurl)?;
-        let source_key_pair = BlsKeyPair {
-            pk: pk_source_xor,
-            sk,
-        };
-        safe.keys_create(source_key_pair, preload, pk)?
+        // 'source' is either a Wallet XOR-URL, or a secret key
+        // TODO: support Wallet XOR-URL, we now support only secret key
+        // If the source is not provided the API will use the account's default wallet/sk
+        if source == None {
+            debug!("Missing the 'source' argument, using account's default wallet for funds");
+        }
+        safe.keys_create(source, preload, pk)?
     };
 
     if OutputFmt::Pretty == output_fmt {
