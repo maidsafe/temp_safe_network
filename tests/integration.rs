@@ -440,33 +440,28 @@ fn put_immutable_data() {
 fn get_immutable_data_that_doesnt_exist() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
 
     // Try to get non-existing published immutable data
     let address: XorName = env.rng().gen();
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Pub(address)),
+        Response::GetIData(Err(NdError::NoSuchData)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
 
     // Try to get non-existing unpublished immutable data while having no balance
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
+        Response::GetIData(Err(NdError::AccessDenied)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::AccessDenied)) => (),
-        x => unexpected!(x),
-    }
 
     // Try to get non-existing unpublished immutable data while having balance
     let start_nano = 1_000_000_000_000;
@@ -481,22 +476,19 @@ fn get_immutable_data_that_doesnt_exist() {
             transaction_id: 0,
         },
     );
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
+        Response::GetIData(Err(NdError::NoSuchData)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
 }
 
 #[test]
 fn get_immutable_data_from_other_owner() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
     let mut client_a = TestClient::new(env.rng());
     let mut client_b = TestClient::new(env.rng());
@@ -563,19 +555,19 @@ fn get_immutable_data_from_other_owner() {
         common::get_idata(&mut env, &mut client_a, &mut vault, unpub_idata_address,),
         raw_data
     );
-    let message_id = client_b.send_request(conn_info, Request::GetIData(unpub_idata_address));
-    env.poll(&mut vault);
-    match client_b.expect_response(message_id) {
-        Response::GetIData(Err(NdError::AccessDenied)) => (),
-        x => unexpected!(x),
-    }
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        &mut vault,
+        Request::GetIData(unpub_idata_address),
+        Response::GetIData(Err(NdError::AccessDenied)),
+    );
 }
 
 #[test]
 fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
@@ -615,22 +607,19 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     );
 
     // Get some unpublished immutable data from the same address
-    let message_id = client.send_request(
-        conn_info,
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Unpub(pub_idata_address)),
+        Response::GetIData(Err(NdError::NoSuchData)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
 }
 
 #[test]
 fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
@@ -671,48 +660,41 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     );
 
     // Get some published immutable data from the same address
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Pub(unpub_idata_address)),
+        Response::GetIData(Err(NdError::NoSuchData)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
 }
 
 #[test]
 fn delete_immutable_data_that_doesnt_exist() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
 
     // Try to delete non-existing published idata while not having a balance
     let address: XorName = env.rng().gen();
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Pub(address)),
+        Response::Mutation(Err(NdError::InvalidOperation)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::Mutation(Err(NdError::InvalidOperation)) => (),
-        x => unexpected!(x),
-    }
 
     // Try to delete non-existing unpublished data while not having a balance
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
+        Response::GetIData(Err(NdError::AccessDenied)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::AccessDenied)) => (),
-        x => unexpected!(x),
-    }
 
     // Try to delete non-existing unpublished data
     let start_nano = 1_000_000_000_000;
@@ -727,22 +709,19 @@ fn delete_immutable_data_that_doesnt_exist() {
             transaction_id: 0,
         },
     );
-    let message_id = client.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
+        Response::GetIData(Err(NdError::NoSuchData)),
     );
-    env.poll(&mut vault);
-    match client.expect_response(message_id) {
-        Response::GetIData(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
 }
 
 #[test]
 fn delete_immutable_data() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
     let mut client_a = TestClient::new(env.rng());
     let mut client_b = TestClient::new(env.rng());
@@ -773,26 +752,22 @@ fn delete_immutable_data() {
     );
 
     // Try to delete published data by constructing inconsistent Request
-    let message_id = client_a.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Pub(pub_idata_address)),
+        Response::Mutation(Err(NdError::InvalidOperation)),
     );
-    env.poll(&mut vault);
-    match client_a.expect_response(message_id) {
-        Response::Mutation(Err(NdError::InvalidOperation)) => (),
-        x => unexpected!(x),
-    }
 
     // Try to delete published data by raw XorName
-    let message_id = client_a.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(pub_idata_address)),
+        Response::Mutation(Err(NdError::NoSuchData)),
     );
-    env.poll(&mut vault);
-    match client_a.expect_response(message_id) {
-        Response::Mutation(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
 
     let raw_data = vec![42];
     let owner = client_a.public_id().public_key();
@@ -806,15 +781,13 @@ fn delete_immutable_data() {
     );
 
     // Delete unpublished data without being the owner
-    let message_id = client_b.send_request(
-        conn_info.clone(),
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
+        Response::Mutation(Err(NdError::AccessDenied)),
     );
-    env.poll(&mut vault);
-    match client_b.expect_response(message_id) {
-        Response::Mutation(Err(NdError::AccessDenied)) => (),
-        x => unexpected!(x),
-    }
 
     // Delete unpublished data without having the balance
     common::perform_mutation(
@@ -825,13 +798,11 @@ fn delete_immutable_data() {
     );
 
     // Delete unpublished data again
-    let message_id = client_a.send_request(
-        conn_info,
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
-    );
-    env.poll(&mut vault);
-    match client_a.expect_response(message_id) {
-        Response::Mutation(Err(NdError::NoSuchData)) => (),
-        x => unexpected!(x),
-    }
+        Response::Mutation(Err(NdError::NoSuchData)),
+    )
 }
