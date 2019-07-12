@@ -437,7 +437,7 @@ fn put_immutable_data() {
 }
 
 #[test]
-fn get_immutable_data() {
+fn get_immutable_data_that_doesnt_exist() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
     let conn_info = vault.connection_info();
@@ -445,32 +445,130 @@ fn get_immutable_data() {
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
 
-    // Get idata that doesn't exist
+    // Try to get non-existing published immutable data
     let address: XorName = env.rng().gen();
     let message_id = client.send_request(
         conn_info.clone(),
         Request::GetIData(IDataAddress::Pub(address)),
     );
     env.poll(&mut vault);
-
     match client.expect_response(message_id) {
         Response::GetIData(Err(NdError::NoSuchData)) => (),
         x => unexpected!(x),
     }
 
-    // Try to get non-existing unpublished immutable data while being an unregistered client
+    // Try to get non-existing unpublished immutable data while having no balance
     let message_id = client.send_request(
         conn_info.clone(),
         Request::GetIData(IDataAddress::Unpub(address)),
     );
     env.poll(&mut vault);
-
     match client.expect_response(message_id) {
         Response::GetIData(Err(NdError::AccessDenied)) => (),
         x => unexpected!(x),
     }
 
-    // TODO - Get immutable data that exist once we have PutIData working
+    // Try to get non-existing unpublished immutable data while having balance
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        &mut vault,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetIData(IDataAddress::Unpub(address)),
+    );
+    env.poll(&mut vault);
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::NoSuchData)) => (),
+        x => unexpected!(x),
+    }
+}
+
+#[test]
+fn get_immutable_data_from_other_owner() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
+
+    let mut client_a = TestClient::new(env.rng());
+    let mut client_b = TestClient::new(env.rng());
+    common::establish_connection(&mut env, &mut client_a, &mut vault);
+    common::establish_connection(&mut env, &mut client_b, &mut vault);
+
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client_a.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        &mut vault,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client_b.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client_b,
+        &mut vault,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    // Client A uploads published data that Client B can fetch
+    let raw_data = vec![1, 2, 3];
+    let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
+    let pub_idata_address = *pub_idata.address();
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        &mut vault,
+        Request::PutIData(pub_idata),
+    );
+    assert_eq!(
+        common::get_idata(&mut env, &mut client_a, &mut vault, pub_idata_address,),
+        raw_data
+    );
+    assert_eq!(
+        common::get_idata(&mut env, &mut client_b, &mut vault, pub_idata_address,),
+        raw_data
+    );
+
+    // Client A uploads unpublished data that Client B can't fetch
+    let raw_data = vec![42];
+    let owner = client_a.public_id().public_key();
+    let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data.clone(), *owner));
+    let unpub_idata_address = *unpub_idata.address();
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        &mut vault,
+        Request::PutIData(unpub_idata),
+    );
+    assert_eq!(
+        common::get_idata(&mut env, &mut client_a, &mut vault, unpub_idata_address,),
+        raw_data
+    );
+    let message_id = client_b.send_request(conn_info, Request::GetIData(unpub_idata_address));
+    env.poll(&mut vault);
+    match client_b.expect_response(message_id) {
+        Response::GetIData(Err(NdError::AccessDenied)) => (),
+        x => unexpected!(x),
+    }
 }
 
 #[test]
