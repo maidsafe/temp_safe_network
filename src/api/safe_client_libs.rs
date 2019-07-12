@@ -284,8 +284,10 @@ impl SafeApp {
                 values: the_data,
             };
 
+            let target_index = new_version - 1;
+
             client
-                .append_seq_adata(append, new_version)
+                .append_seq_adata(append, target_index)
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -640,6 +642,8 @@ fn test_put_get_update_seq_appendable_data() {
         .get_latest_seq_appendable_data(xorname, type_tag)
         .unwrap();
 
+    assert_eq!(_this_version, 1);
+
     //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
     assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
     assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
@@ -647,16 +651,18 @@ fn test_put_get_update_seq_appendable_data() {
     let key2 = b"KEY2".to_vec();
     let val2 = b"VALUE2".to_vec();
     let data2 = [(key2, val2)].to_vec();
-    let new_version = 1;
+    let new_version = 2;
 
-    let _updated_version = safe
+    let updated_version = safe
         .safe_app
         .append_seq_appendable_data(data2, new_version, xorname, type_tag)
         .unwrap();
-    let (_v_updated, data_updated) = safe
+    let (the_latest_version, data_updated) = safe
         .safe_app
         .get_latest_seq_appendable_data(xorname, type_tag)
         .unwrap();
+
+    assert_eq!(updated_version, the_latest_version);
 
     assert_eq!(
         std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
@@ -707,5 +713,48 @@ fn test_put_get_update_seq_appendable_data() {
         Ok(_data) => panic!("No error thrown for a version that does not exist"),
 
         Err(_err) => assert!(true),
+    }
+}
+
+// TODO: Enable once merged: https://github.com/maidsafe/safe_client_libs/issues/898
+#[test]
+#[ignore]
+fn test_update_seq_appendable_data_error() {
+    use super::Safe;
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", "").unwrap();
+
+    let key1 = b"KEY1".to_vec();
+    let val1 = b"VALUE1".to_vec();
+    let data1 = [(key1, val1)].to_vec();
+
+    let type_tag = 12322;
+    let xorname = safe
+        .safe_app
+        .put_seq_appendable_data(data1, None, type_tag, None)
+        .unwrap();
+
+    let (_this_version, data) = safe
+        .safe_app
+        .get_latest_seq_appendable_data(xorname, type_tag)
+        .unwrap();
+
+    assert_eq!(_this_version, 1);
+
+    //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
+    assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
+    assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
+
+    let key2 = b"KEY2".to_vec();
+    let val2 = b"VALUE2".to_vec();
+    let data2 = [(key2, val2)].to_vec();
+    let wrong_new_version = 1;
+
+    match safe
+        .safe_app
+        .append_seq_appendable_data(data2, wrong_new_version, xorname, type_tag)
+    {
+        Ok(_) => panic!("No error thrown when passing an outdated new version"),
+        Err(error) => assert!(format!("{}", error).contains("Something about the version")),
     }
 }
