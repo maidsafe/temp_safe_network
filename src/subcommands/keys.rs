@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_target_location;
+use super::helpers::get_secret_key;
 use super::OutputFmt;
 use log::{debug, warn};
 use safe_cli::{BlsKeyPair, Safe};
@@ -32,8 +32,11 @@ pub enum KeysSubCommands {
     #[structopt(name = "balance")]
     /// Query a Key's current balance
     Balance {
-        /// The target wallet to check the total balance.
+        /// The target Key to check the current balance
         target: Option<String>,
+        /// The secret key which corresponds to the target Key
+        #[structopt(long = "sk")]
+        secret: Option<String>,
     },
 }
 
@@ -53,12 +56,14 @@ pub fn key_commander(
             create_new_key(safe, preload_test_coins, source, preload, pk, output_fmt)?;
             Ok(())
         }
-        Some(KeysSubCommands::Balance { target }) => {
-            // FIXME: get sk from args or from the account
-            let sk =
-                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
-            let target = get_target_location(target)?;
-            let current_balance = safe.keys_balance_from_xorurl(&target, &sk)?;
+        Some(KeysSubCommands::Balance { target, secret }) => {
+            let target = target.unwrap_or_else(|| "".to_string());
+            let sk = get_secret_key(&target, secret)?;
+            let current_balance = if target.is_empty() {
+                safe.keys_balance_from_sk(&sk)?
+            } else {
+                safe.keys_balance_from_xorurl(&target, &sk)?
+            };
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Key's current balance: {}", current_balance);

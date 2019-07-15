@@ -13,9 +13,8 @@ use futures::future::Future;
 use log::{debug, info, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
-use safe_app::AppError::CoreError;
-use safe_app::{run, App};
-use safe_core::CoreError as SafeCoreError;
+use safe_app::{run, App, AppError::CoreError};
+use safe_core::{client::wallet_transfer_coins, CoreError as SafeCoreError};
 use std::str::FromStr;
 
 #[cfg(not(feature = "fake-auth"))]
@@ -33,8 +32,7 @@ use safe_nd::{
 pub use threshold_crypto::{PublicKey, SecretKey};
 
 use std::collections::BTreeMap;
-use unwrap::unwrap;
-use uuid::Uuid;
+use unwrap::unwrap; // TODO: remove all unwraps from this file
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
@@ -70,21 +68,25 @@ impl SafeApp {
         let app = match auth_credentials {
             Some(auth_credentials) => {
                 let auth_granted = decode_ipc_msg(auth_credentials)?;
-                App::registered(app_id.to_string(), auth_granted, disconnect_cb).map_err(|err| {
-                    Error::ConnectionError(format!(
-                        "Failed to connect to the SAFE Network: {:?}",
-                        err
-                    ))
-                })?
+                App::registered(app_id.to_string(), auth_granted, disconnect_cb)
             }
-            None => App::unregistered(disconnect_cb, None).map_err(|err| {
-                Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-            })?,
-        };
+            None => App::unregistered(disconnect_cb, None),
+        }
+        .map_err(|err| {
+            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+        })?;
 
         self.safe_conn = Some(app);
         debug!("Successfully connected to the Network!!!");
         Ok(())
+    }
+
+    // Private helper to obtain the App instance
+    fn get_safe_app(&self) -> ResultReturn<&App> {
+        match &self.safe_conn {
+            Some(app) => Ok(app),
+            None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
+        }
     }
 
     pub fn create_balance(
@@ -93,16 +95,12 @@ impl SafeApp {
         new_balance_owner: PublicKey,
         amount: &str,
     ) -> ResultReturn<XorName> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
+        let safe_app: &App = self.get_safe_app()?;
         let coins_amount =
             Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
 
         run(safe_app, move |client, _app_context| {
-            let from_sk = from_sk.unwrap_or(unwrap!(client.clone().secret_bls_key()));
+            let from_sk = from_sk.unwrap_or_else(|| unwrap!(client.clone().secret_bls_key()));
             /*.unwrap_or_else(
                 return CoreError(SafeCoreError::Unexpected(
                     "Couldn't get account's secret BLS key".to_string(),
@@ -123,48 +121,27 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn allocate_test_coins(
-        &mut self,
-        to_pk: &PublicKey,
-        amount: &str,
-    ) -> ResultReturn<XorName> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-        let xorname = xorname_from_pk(to_pk);
+    pub fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
+        info!("Creating test CoinBalance with {} test coins", amount);
+        let safe_app: &App = self.get_safe_app()?;
+        let xorname = xorname_from_pk(&to_pk);
         let coins_amount =
             Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
 
         run(safe_app, move |client, _app_context| {
-            client
-                .allocate_test_coins(&xorname, coins_amount)
-                .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
+            client.test_create_balance(&xorname, coins_amount, SafeNdPublicKey::Bls(to_pk));
+            Ok(())
         })
         .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 
         Ok(xorname)
     }
 
-    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> ResultReturn<String> {
-        let xorname = xorname_from_pk(pk);
-        self.get_balance_from_xorname(&xorname, sk)
-    }
-
-    pub fn get_balance_from_xorname(
-        &self,
-        _xorname: &XorName,
-        _sk: &SecretKey,
-    ) -> ResultReturn<String> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-        // FIXME: use provided sk instead of creating a random one
-        let bls_sk = threshold_crypto::SecretKey::random();
+    pub fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
+        let safe_app: &App = self.get_safe_app()?;
         let coins_amount = run(safe_app, move |client, _app_context| {
             client
-                .get_balance(Some(&bls_sk))
+                .get_balance(Some(&sk))
                 .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
         })
         .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
@@ -177,23 +154,50 @@ impl SafeApp {
         Ok(KeyPair::random().pk)
     }
 
-    // TODO: replace with actual code for calling SCL
-    pub fn safecoin_transfer(
+    pub fn safecoin_transfer_to_xorname(
         &mut self,
-        _from_pk: &PublicKey,
-        _from_sk: &SecretKey,
-        _to_pk: &PublicKey,
-        _tx_id: &Uuid,
-        _amount: &str,
-    ) -> ResultReturn<Uuid> {
-        Ok(Uuid::new_v4())
+        from_sk: SecretKey,
+        to_xorname: XorName,
+        tx_id: u64,
+        amount: &str,
+    ) -> ResultReturn<u64> {
+        let coins_amount =
+            Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
+
+        wallet_transfer_coins(&from_sk, to_xorname, coins_amount, Some(tx_id))
+            .map_err(|e| Error::NetDataError(format!("Failed to transfer coins: {:?}", e)))?;
+
+        Ok(tx_id)
+    }
+
+    #[allow(dead_code)]
+    pub fn safecoin_transfer_to_pk(
+        &mut self,
+        from_sk: SecretKey,
+        to_pk: PublicKey,
+        tx_id: u64,
+        amount: &str,
+    ) -> ResultReturn<u64> {
+        let safe_app: &App = self.get_safe_app()?;
+        let to_xorname = xorname_from_pk(&to_pk);
+        let coins_amount =
+            Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
+
+        run(safe_app, move |client, _app_context| {
+            client
+                .transfer_coins(Some(&from_sk), to_xorname, coins_amount, Some(tx_id))
+                .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
+        })
+        .map_err(|e| Error::NetDataError(format!("Failed to transfer coins: {:?}", e)))?;
+
+        Ok(tx_id)
     }
 
     // TODO: Replace with SCL calling code
     #[allow(dead_code)]
     pub fn get_transaction(
         &self,
-        _tx_id: &Uuid,
+        _tx_id: u64,
         _pk: &PublicKey,
         _sk: &SecretKey,
     ) -> ResultReturn<String> {
@@ -201,10 +205,7 @@ impl SafeApp {
     }
 
     pub fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
+        let safe_app: &App = self.get_safe_app()?;
 
         let the_idata = PubImmutableData::new(data.to_vec());
         let return_idata = the_idata.clone();
@@ -221,10 +222,7 @@ impl SafeApp {
     pub fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
+        let safe_app: &App = self.get_safe_app()?;
 
         let data = run(safe_app, move |client, _app_context| {
             client.get_idata(xorname).map_err(CoreError)
@@ -249,16 +247,12 @@ impl SafeApp {
             &tag, &name
         );
 
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
+        let safe_app: &App = self.get_safe_app()?;
         let xorname = name.unwrap_or_else(create_random_xorname);
         info!("Xorname for storage: {:?}", &xorname);
 
         run(safe_app, move |client, _app_context| {
-            let appendable_data_address = ADataAddress::PubSeq { name: xorname, tag };
+            let append_only_data_address = ADataAddress::PubSeq { name: xorname, tag };
             let append_client = client.clone();
 
             let mut data = PubSeqAppendOnlyData::new(xorname, tag);
@@ -266,7 +260,8 @@ impl SafeApp {
             // TODO: setup permissions from props
             let mut perms = BTreeMap::<ADataUser, ADataPubPermissionSet>::new();
             let set = ADataPubPermissionSet::new(true, true);
-            let usr = ADataUser::Key(SafeNdPublicKey::Bls(unwrap!(client.public_bls_key())));
+            let owner_pk = SafeNdPublicKey::Bls(unwrap!(client.public_bls_key()));
+            let usr = ADataUser::Key(owner_pk);
             let _ = perms.insert(usr, set);
             unwrap!(data.append_permissions(
                 ADataPubPermissions {
@@ -283,7 +278,7 @@ impl SafeApp {
             };
 
             let owner = ADataOwner {
-                public_key: SafeNdPublicKey::Bls(unwrap!(client.public_bls_key())),
+                public_key: owner_pk,
                 data_index: 0,
                 permissions_index: 1,
             };
@@ -307,16 +302,12 @@ impl SafeApp {
         xorname: XorName,
         tag: u64,
     ) -> ResultReturn<u64> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
+        let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
-            let appendable_data_address = PubSeqAppendOnlyData::new(xorname, tag);
+            let append_only_data_address = PubSeqAppendOnlyData::new(xorname, tag);
 
             let append = ADataAppend {
-                address: *appendable_data_address.address(),
+                address: *append_only_data_address.address(),
                 values: the_data,
             };
 
@@ -343,16 +334,12 @@ impl SafeApp {
     ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
         debug!("Getting latest seq_append_only_data for: {:?}", &xorname);
 
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
-        let appendable_data_address = PubSeqAppendOnlyData::new(xorname, tag);
+        let safe_app: &App = self.get_safe_app()?;
+        let append_only_data_address = PubSeqAppendOnlyData::new(xorname, tag);
 
         debug!(
             "Address for a_data : {:?}",
-            *appendable_data_address.address()
+            *append_only_data_address.address()
         );
 
         let data_length = self
@@ -361,7 +348,7 @@ impl SafeApp {
 
         let data = run(safe_app, move |client, _app_context| {
             client
-                .get_adata_last_entry(*appendable_data_address.address())
+                .get_adata_last_entry(*append_only_data_address.address())
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -378,16 +365,12 @@ impl SafeApp {
     ) -> ResultReturn<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
-        let appendable_data_address = PubSeqAppendOnlyData::new(name, tag);
+        let safe_app: &App = self.get_safe_app()?;
+        let append_only_data_address = PubSeqAppendOnlyData::new(name, tag);
 
         run(safe_app, move |client, _app_context| {
             client
-                .get_adata_indices(*appendable_data_address.address())
+                .get_adata_indices(*append_only_data_address.address())
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -411,11 +394,8 @@ impl SafeApp {
             version, name
         );
 
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-        let appendable_data_address = PubSeqAppendOnlyData::new(name, tag);
+        let safe_app: &App = self.get_safe_app()?;
+        let append_only_data_address = PubSeqAppendOnlyData::new(name, tag);
 
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
@@ -438,7 +418,7 @@ impl SafeApp {
 
         let data = run(safe_app, move |client, _app_context| {
             client
-                .get_adata_range(*appendable_data_address.address(), (start, end))
+                .get_adata_range(*append_only_data_address.address(), (start, end))
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -456,10 +436,7 @@ impl SafeApp {
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> ResultReturn<XorName> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
+        let safe_app: &App = self.get_safe_app()?;
 
         let owner_key_option = run(safe_app, move |client, _app_context| {
             let key = client.owner_key();
@@ -516,11 +493,7 @@ impl SafeApp {
     // TODO: we shouldn't need to expose this function, function like list_seq_mdata_entries should be exposed
     #[allow(dead_code)]
     fn get_seq_mdata(&self, xorurl: &str, tag: u64) -> ResultReturn<SeqMutableData> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
+        let safe_app: &App = self.get_safe_app()?;
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         run(safe_app, move |client, _app_context| {
             client.get_seq_mdata(xorname, tag).map_err(CoreError)
@@ -557,11 +530,7 @@ impl SafeApp {
         tag: u64,
         key: Vec<u8>,
     ) -> ResultReturn<MDataValue> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
+        let safe_app: &App = self.get_safe_app()?;
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
 
         run(safe_app, move |client, _app_context| {
@@ -577,11 +546,7 @@ impl SafeApp {
         xorurl: &str,
         tag: u64,
     ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
-
+        let safe_app: &App = self.get_safe_app()?;
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
 
         run(safe_app, move |client, _app_context| {
@@ -614,10 +579,7 @@ impl SafeApp {
         entry_actions: MDataSeqEntryActions,
         error_msg: &str,
     ) -> ResultReturn<()> {
-        let safe_app: &App = match &self.safe_conn {
-            Some(app) => &app,
-            None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        };
+        let safe_app: &App = self.get_safe_app()?;
         let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let message = error_msg.to_string();
 
@@ -639,7 +601,7 @@ impl SafeApp {
 fn test_put_and_get_immutable_data() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", Some("")).unwrap();
+    safe.connect("", Some("fake-credentials")).unwrap();
 
     let id1 = b"HELLLOOOOOOO".to_vec();
 
@@ -656,7 +618,7 @@ fn test_put_and_get_immutable_data() {
 fn test_put_get_update_seq_append_only_data() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", Some("")).unwrap();
+    safe.connect("", Some("fake-credentials")).unwrap();
 
     let key1 = b"KEY1".to_vec();
     let val1 = b"VALUE1".to_vec();
@@ -742,18 +704,15 @@ fn test_put_get_update_seq_append_only_data() {
         .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
     {
         Ok(_data) => panic!("No error thrown for a version that does not exist"),
-
         Err(_err) => assert!(true),
     }
 }
 
-// TODO: Enable once merged: https://github.com/maidsafe/safe_client_libs/issues/898
 #[test]
-#[ignore]
 fn test_update_seq_append_only_data_error() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", Some("")).unwrap();
+    safe.connect("", Some("fake-credentials")).unwrap();
 
     let key1 = b"KEY1".to_vec();
     let val1 = b"VALUE1".to_vec();

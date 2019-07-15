@@ -68,13 +68,13 @@ fn calling_safe_keypair_pretty() {
 
 #[test]
 fn calling_safe_keys_balance() {
-    let (pk_xor, _sk) = create_preload_and_get_keys("123");
+    let (pk_xor, sk) = create_preload_and_get_keys("123");
 
     assert!(pk_xor.contains("safe://"));
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["keys", "balance", &pk_xor, "--output", "json"])
+    cmd.args(&vec!["keys", "balance", &pk_xor, "--sk", &sk, "--json"])
         .assert()
-        .stdout("123\n")
+        .stdout("123.000000000\n")
         .success();
 }

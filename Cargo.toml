@@ -26,7 +26,6 @@ rand_core = "0.4.0"
 prettytable-rs = "^0.8"
 unwrap = "~1.2.1"
 threshold_crypto = { git = "https://github.com/poanetwork/threshold_crypto.git", branch = "master" }
-uuid = "0.7"
 safecoin = "0.5.0"
 serde = "1.0.91"
 serde_json = "1.0.39"
@@ -46,7 +45,6 @@ validator = "0.8.0"
 validator_derive = "0.8.0"
 
 [features]
-default = ["uuid/v4"]
 mock-network = ["safe_app/mock-network"]
 fake-auth = ["safe_app/testing"]
 scl-mock = ["fake-auth"]

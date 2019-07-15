@@ -26,12 +26,13 @@ impl KeyPair {
         KeyPair { pk, sk }
     }
 
+    /*
     pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> ResultReturn<Self> {
         let pk = pk_from_hex(pk_hex_str)?;
         let sk = sk_from_hex(sk_hex_str)?;
         Ok(KeyPair { pk, sk })
     }
-
+    */
     pub fn to_hex_key_pair(&self) -> ResultReturn<(String, String)> {
         let pk: String = pk_to_hex(&self.pk);
 

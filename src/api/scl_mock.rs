@@ -21,7 +21,6 @@ use std::str::FromStr;
 use std::{fs, str};
 use threshold_crypto::{PublicKey, SecretKey};
 use unwrap::unwrap;
-use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -92,9 +91,7 @@ impl SafeApp {
             Some(sk) => {
                 let from_pk = sk.public_key();
                 let from_xorname = xorname_from_pk(&from_pk);
-                let from_balance = unwrap!(Coins::from_str(&unwrap!(
-                    self.get_balance_from_xorname(&from_xorname, &sk)
-                )));
+                let from_balance = unwrap!(Coins::from_str(&unwrap!(self.get_balance_from_sk(sk))));
                 let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
                 let amount_coin = unwrap!(Coins::from_str(amount));
                 let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
@@ -126,16 +123,12 @@ impl SafeApp {
         Ok(to_xorname)
     }
 
-    pub fn allocate_test_coins(
-        &mut self,
-        to_pk: &PublicKey,
-        amount: &str,
-    ) -> ResultReturn<XorName> {
-        let xorname = xorname_from_pk(to_pk);
+    pub fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
+        let xorname = xorname_from_pk(&to_pk);
         self.mock_data.coin_balances.insert(
             xorname_to_hex(&xorname),
             CoinBalance {
-                owner: (*to_pk),
+                owner: (to_pk),
                 value: amount.to_string(),
             },
         );
@@ -143,26 +136,30 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn get_balance_from_pk(&self, pk: &PublicKey, sk: &SecretKey) -> ResultReturn<String> {
-        let xorname = xorname_from_pk(pk);
-        self.get_balance_from_xorname(&xorname, &sk)
-    }
-
-    pub fn get_balance_from_xorname(
-        &self,
-        xorname: &XorName,
-        _sk: &SecretKey,
-    ) -> ResultReturn<String> {
-        match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+    // private helper
+    fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<String> {
+        match self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
             None => Err(Error::ContentNotFound(
                 "CoinBalance data not found".to_string(),
             )),
-            Some(coin_balance) => Ok(coin_balance
-                .value
-                .to_string()
-                .replace("Coins(", "")
-                .replace(")", "")),
+            Some(coin_balance) => {
+                let balance_str = coin_balance
+                    .value
+                    .to_string()
+                    .replace("Coins(", "")
+                    .replace(")", "");
+                let balance = balance_str.parse::<f64>().map_err(|e| {
+                    Error::Unexpected(format!("Failed to format balance output: {}", e))
+                })?;
+                Ok(format!("{:.*}", 9, balance))
+            }
         }
+    }
+
+    pub fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
+        let pk = sk.public_key();
+        let xorname = xorname_from_pk(&pk);
+        self.get_balance_from_xorname(&xorname)
     }
 
     pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
@@ -174,19 +171,17 @@ impl SafeApp {
         }
     }
 
-    pub fn safecoin_transfer(
+    pub fn safecoin_transfer_to_xorname(
         &mut self,
-        from_pk: &PublicKey,
-        from_sk: &SecretKey,
-        to_pk: &PublicKey,
-        tx_id: &Uuid,
+        from_sk: SecretKey,
+        to_xorname: XorName,
+        tx_id: u64,
         amount: &str,
-    ) -> ResultReturn<Uuid> {
-        let to_xorname = xorname_from_pk(to_pk);
+    ) -> ResultReturn<u64> {
         let to_xorname_hex = xorname_to_hex(&to_xorname);
-        let from_xorname = xorname_from_pk(from_pk);
+        let from_pk = from_sk.public_key();
+        let from_xorname = xorname_from_pk(&from_pk);
 
-        let the_tx_id = *tx_id;
         // generate TX in destination section (to_pk)
         let mut txs_for_xorname = match self.mock_data.txs.get(&to_xorname_hex) {
             Some(txs) => txs.clone(),
@@ -205,7 +200,7 @@ impl SafeApp {
 
         // reduce balance from safecoin_transferer
         let from_balance = unwrap!(Coins::from_str(&unwrap!(
-            self.get_balance_from_pk(from_pk, from_sk)
+            self.get_balance_from_sk(from_sk.clone())
         )));
         let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
         let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
@@ -216,36 +211,37 @@ impl SafeApp {
         self.mock_data.coin_balances.insert(
             xorname_to_hex(&from_xorname),
             CoinBalance {
-                owner: (*from_pk),
+                owner: from_pk,
                 value: Coins::from(from_new_amount).to_string(),
             },
         );
 
         // credit destination
         let to_balance = unwrap!(Coins::from_str(&unwrap!(
-            self.get_balance_from_pk(to_pk, from_sk /*incorrect but doesn't matter for now*/)
-        ),));
+            self.get_balance_from_xorname(&to_xorname)
+        )));
+        let to_pk = self.fetch_pk_from_xorname(&to_xorname)?;
         let to_nano_balance = unwrap!(NanoCoins::try_from(to_balance));
         let to_new_amount = unwrap!(NanoCoins::new(to_nano_balance.num() + amount_nano.num()));
         self.mock_data.coin_balances.insert(
             to_xorname_hex,
             CoinBalance {
-                owner: (*to_pk),
+                owner: to_pk,
                 value: Coins::from(to_new_amount).to_string(),
             },
         );
 
-        Ok(the_tx_id)
+        Ok(tx_id)
     }
 
     #[allow(dead_code)]
     pub fn get_transaction(
         &self,
-        tx_id: &Uuid,
-        pk: &PublicKey,
-        _sk: &SecretKey,
+        tx_id: u64,
+        pk: PublicKey,
+        _sk: SecretKey,
     ) -> ResultReturn<String> {
-        let xorname = xorname_from_pk(pk);
+        let xorname = xorname_from_pk(&pk);
         let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
         let tx_state = unwrap!(txs_for_xorname.get(&tx_id.to_string()));
         Ok(tx_state.to_string())
@@ -496,8 +492,8 @@ fn test_allocate_test_coins() {
     let pk_to = sk_to.public_key();
 
     let balance = "2.345678912";
-    unwrap!(mock.allocate_test_coins(&pk_to, balance));
-    let current_balance = unwrap!(mock.get_balance_from_pk(&pk_to, &sk_to));
+    unwrap!(mock.allocate_test_coins(pk_to, balance));
+    let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
 }
@@ -513,7 +509,7 @@ fn test_create_balance() {
     let pk = sk.public_key();
 
     let balance = "2.345678912";
-    unwrap!(mock.allocate_test_coins(&pk, balance));
+    unwrap!(mock.allocate_test_coins(pk, balance));
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
@@ -533,9 +529,9 @@ fn test_check_balance() {
     let sk = SecretKey::random();
     let pk = sk.public_key();
 
-    let balance = "2.3";
-    unwrap!(mock.allocate_test_coins(&pk, balance));
-    let current_balance = unwrap!(mock.get_balance_from_pk(&pk, &sk));
+    let balance = "2.300000000";
+    unwrap!(mock.allocate_test_coins(pk, balance));
+    let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
     println!("Current balance: {}", current_balance);
     assert_eq!(balance, &current_balance);
 
@@ -546,11 +542,11 @@ fn test_check_balance() {
         "New CoinBalance at: {:?}",
         mock.create_balance(Some(sk.clone()), pk_to, preload)
     );
-    let current_balance = unwrap!(mock.get_balance_from_pk(&pk_to, &sk_to));
+    let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
     println!("Current balance: {}", current_balance);
     assert_eq!(preload, &current_balance);
 
-    let current_balance = unwrap!(mock.get_balance_from_pk(&pk, &sk));
+    let current_balance = unwrap!(mock.get_balance_from_sk(sk));
     println!("Current balance: {}", current_balance);
     assert_eq!(
         "1.065432109", /* == 2.3 - 1.234567891*/
@@ -561,6 +557,7 @@ fn test_check_balance() {
 #[test]
 fn test_safecoin_transfer() {
     use self::SafeApp;
+    use rand_core::RngCore;
     use threshold_crypto::SecretKey;
 
     let mut mock = SafeApp::new();
@@ -571,20 +568,20 @@ fn test_safecoin_transfer() {
     let sk2 = SecretKey::random();
     let pk2 = sk2.public_key();
 
-    let balance1 = "2.5";
-    let balance2 = "5.7";
+    let balance1 = "2.500000000";
+    let balance2 = "5.700000000";
     println!(
         "Allocate testcoins in new CoinBalance 1 at: {:?}",
-        mock.allocate_test_coins(&pk1, balance1)
+        mock.allocate_test_coins(pk1, balance1)
     );
 
     println!(
         "Allocate testcoins in new CoinBalance 2 at: {:?}",
-        mock.allocate_test_coins(&pk2, balance2)
+        mock.allocate_test_coins(pk2, balance2)
     );
 
-    let curr_balance1 = unwrap!(mock.get_balance_from_pk(&pk1, &sk1));
-    let curr_balance2 = unwrap!(mock.get_balance_from_pk(&pk2, &sk2));
+    let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()));
+    let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()));
     println!(
         "Current balances before TX: {} and {}",
         curr_balance1, curr_balance2
@@ -593,22 +590,28 @@ fn test_safecoin_transfer() {
     assert_eq!(balance1, curr_balance1);
     assert_eq!(balance2, curr_balance2);
 
-    let tx_id = Uuid::new_v4();
+    let mut rng = rand::thread_rng();
+    let tx_id = rng.next_u64();
     println!("UUID {}", tx_id);
 
-    let _ = unwrap!(mock.safecoin_transfer(&pk1, &sk1, &pk2, &tx_id, "1.4"));
+    let _ = unwrap!(mock.safecoin_transfer_to_xorname(
+        sk1.clone(),
+        xorname_from_pk(&pk2),
+        tx_id,
+        "1.4"
+    ));
     println!(
         "Current TX state: {}",
-        unwrap!(mock.get_transaction(&tx_id, &pk2, &sk2))
+        unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()))
     );
 
-    let curr_balance1 = unwrap!(mock.get_balance_from_pk(&pk1, &sk1));
-    let curr_balance2 = unwrap!(mock.get_balance_from_pk(&pk2, &sk2));
+    let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1));
+    let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2));
     println!(
         "Current balances after TX: {} and {}",
         curr_balance1, curr_balance2
     );
 
-    assert_eq!(curr_balance1, "1.1");
-    assert_eq!(curr_balance2, "7.1");
+    assert_eq!(curr_balance1, "1.100000000");
+    assert_eq!(curr_balance2, "7.100000000");
 }

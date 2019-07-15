@@ -8,7 +8,7 @@
 
 use structopt::StructOpt;
 
-use super::helpers::{get_target_location, prompt_user};
+use super::helpers::{get_secret_key, get_target_location, prompt_user};
 use super::keys::create_new_key;
 use super::OutputFmt;
 use log::debug;
@@ -33,7 +33,7 @@ pub enum WalletSubCommands {
         #[structopt(long = "default")]
         default: bool,
         /// Optionally pass the secret key to make the balance spendable
-        #[structopt(short = "sk", long = "secret-key")]
+        #[structopt(short = "s", long = "secret-key")]
         secret: Option<String>,
     },
     #[structopt(name = "balance")]
@@ -59,7 +59,7 @@ pub enum WalletSubCommands {
         #[structopt(long = "name")]
         name: Option<String>,
         /// Optionally pass the secret key to make the balance spendable
-        #[structopt(short = "sk", long = "secret-key")]
+        #[structopt(short = "s", long = "secret-key")]
         secret: Option<String>,
         /// Create a Key, allocate test-coins onto it, and add it to the Wallet
         #[structopt(long = "test-coins")]
@@ -112,19 +112,7 @@ pub fn wallet_commander(
                 // get or create keypair
                 let (xorname, key_pair) = match key {
                     Some(linked_key) => {
-                        let mut sk = secret.unwrap_or_else(|| String::from(""));
-
-                        if sk.is_empty() {
-                            // Get pk source Key, and prompt user for the corresponding sk
-                            sk = prompt_user(
-                                &format!(
-                                    "Enter secret key corresponding to public key at \"{}\": ",
-                                    linked_key
-                                ),
-                                "Invalid input",
-                            )?;
-                        }
-
+                        let sk = get_secret_key(&linked_key, secret)?;
                         let pk = safe.fetch_pk_from_xorname(&linked_key)?;
 
                         (linked_key, Some(BlsKeyPair { pk, sk }))

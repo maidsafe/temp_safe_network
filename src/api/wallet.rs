@@ -12,9 +12,9 @@ use super::xorurl::SafeContentType;
 use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
 use super::{Error, ResultReturn};
 use log::debug;
+use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
-use unwrap::unwrap;
-use uuid::Uuid;
+use unwrap::unwrap; // TODO: remove all unwraps from this file
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 10_000;
@@ -200,7 +200,7 @@ impl Safe {
     ///     &wallet_xorurl,
     ///     "frombalance",
     ///     true,
-    ///     &key_pair1.unwrap(),
+    ///     &key_pair1.clone().unwrap(),
     ///     &key1_xorurl,
     /// ));
     /// let current_balance = unwrap!(safe.wallet_balance( &wallet_xorurl, &sk ));
@@ -210,23 +210,23 @@ impl Safe {
     ///     &wallet_xorurl2,
     ///     "tobalance",
     ///     true,
-    ///     &key_pair2.unwrap(),
+    ///     &key_pair2.clone().unwrap(),
     ///     &key2_xorurl
     /// ));
     ///
     ///
     /// unwrap!(safe.wallet_transfer( "10", Some(wallet_xorurl), &wallet_xorurl2 ));
-    /// let from_balance = unwrap!(safe.keys_balance_from_xorurl( &key1_xorurl, &sk ));
-    /// assert_eq!("4.", from_balance);
-    /// let to_balance = unwrap!(safe.keys_balance_from_xorurl( &key2_xorurl, &sk ));
-    /// assert_eq!("11.", to_balance);
+    /// let from_balance = unwrap!(safe.keys_balance_from_xorurl( &key1_xorurl, &key_pair1.unwrap().sk ));
+    /// assert_eq!("4.000000000", from_balance);
+    /// let to_balance = unwrap!(safe.keys_balance_from_xorurl( &key2_xorurl, &key_pair2.unwrap().sk ));
+    /// assert_eq!("11.000000000", to_balance);
     /// ```
     pub fn wallet_transfer(
         &mut self,
         amount: &str,
         from: Option<XorUrl>,
         to: &str,
-    ) -> ResultReturn<Uuid> {
+    ) -> ResultReturn<u64> {
         // from is not optional until we know default account container / Wallet location ("root")
         // if no FROM for now, ERR
         // FROM needs to be from default
@@ -246,20 +246,23 @@ impl Safe {
         let from_wallet_balance = self.wallet_get_default_balance(&from_wallet_xorurl)?;
         let to_wallet_balance = self.wallet_get_default_balance(&to)?;
 
+        /*
         let from_pk = unwrap!(self.safe_app.fetch_pk_from_xorname(
             &XorUrlEncoder::from_url(&from_wallet_balance.xorurl)?.xorname()
-        ));
+        ));*/
 
-        let to_pk = unwrap!(self
-            .safe_app
-            .fetch_pk_from_xorname(&XorUrlEncoder::from_url(&to_wallet_balance.xorurl)?.xorname()));
+        let to_xorname = XorUrlEncoder::from_url(&to_wallet_balance.xorurl)?.xorname();
+        /*let to_pk = unwrap!(self
+        .safe_app
+        .fetch_pk_from_xorname(&to_xorname));*/
 
         let from_sk = unwrap!(sk_from_hex(&from_wallet_balance.sk));
-        let tx_id = Uuid::new_v4();
+        let mut rng = rand::thread_rng();
+        let tx_id = rng.next_u64();
 
         match self
             .safe_app
-            .safecoin_transfer(&from_pk, &from_sk, &to_pk, &tx_id, amount)
+            .safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
         {
             Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
                 "The amount '{}' specified for the transfer is invalid",
@@ -273,7 +276,7 @@ impl Safe {
                 "Unexpected error when attempting to transfer: {}",
                 other_error
             ))),
-            Ok(uuid) => Ok(uuid),
+            Ok(tx_id) => Ok(tx_id),
         }
     }
 }
@@ -325,7 +328,6 @@ fn test_wallet_insert_and_balance() {
 }
 
 #[test]
-#[cfg(not(feature = "mock-network"))] // TODO: this is temporary until issue #82 is fixed
 fn test_wallet_transfer_no_default() {
     let mut safe = Safe::new("base32z".to_string());
     let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance
