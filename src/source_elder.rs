@@ -332,58 +332,25 @@ impl SourceElder {
                 has_signature()?;
                 self.handle_put_adata(client, chunk, message_id)
             }
-            GetAData(ref address) => {
+            GetAData(ref address)
+            | GetADataShell { ref address, .. }
+            | GetADataRange { ref address, .. }
+            | GetADataIndices(ref address)
+            | GetADataLastEntry(ref address)
+            | GetADataOwners { ref address, .. }
+            | GetPubADataUserPermissions { ref address, .. }
+            | GetUnpubADataUserPermissions { ref address, .. }
+            | GetADataValue { ref address, .. } => {
                 if !utils::is_published(address) {
                     has_signature()?;
                 }
-                unimplemented!()
-            }
-            GetADataValue { ref address, .. } => {
-                if !utils::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
-            }
-            GetADataShell { ref address, .. } => {
-                if !utils::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
+                self.handle_get_adata(client, request, message_id)
             }
             DeleteAData(address) => {
                 has_signature()?;
                 self.handle_delete_adata(client, address, message_id)
             }
-            GetADataRange { ref address, .. } => {
-                if !utils::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
-            }
-            GetADataIndices(ref address) => {
-                if !utils::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
-            }
-            GetADataLastEntry(ref address) => {
-                if !utils::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
-            }
             GetADataPermissions { ref address, .. } => {
-                if !utils::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
-            }
-            GetPubADataUserPermissions { ref address, .. } => unimplemented!(),
-            GetUnpubADataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            GetADataOwners { ref address, .. } => {
                 if !utils::is_published(address) {
                     has_signature()?;
                 }
@@ -632,6 +599,39 @@ impl SourceElder {
         }
     }
 
+    fn handle_get_adata(
+        &mut self,
+        client: &ClientInfo,
+        request: Request,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let address = match utils::adata_address(&request) {
+            Some(address) => *address,
+            None => {
+                error!(
+                    "{}: Logic error - not an append-only data request: {:?}",
+                    self, request
+                );
+                return None;
+            }
+        };
+
+        if utils::is_published(&address) || client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                utils::to_error_response(&request, NdError::AccessDenied),
+            );
+            None
+        }
+    }
+
     fn handle_put_adata(
         &mut self,
         client: &ClientInfo,
@@ -863,43 +863,44 @@ impl SourceElder {
             requester,
             dst_elders
         );
-        // TODO - remove this
-        #[allow(unused)]
+
         match response {
             // Transfer the response from destination elders to clients
-            Mutation(_) | GetIData(_) | Transaction(_) => {
+            GetIData(..)
+            | GetAData(..)
+            | GetADataShell(..)
+            | GetADataRange(..)
+            | GetADataIndices(..)
+            | GetADataLastEntry(..)
+            | GetADataOwners(..)
+            | GetPubADataUserPermissions(..)
+            | GetUnpubADataUserPermissions(..)
+            | GetADataValue(..)
+            | Mutation(..)
+            | Transaction(..) => {
                 self.send_response_to_client(&requester, message_id, response);
                 None
             }
             //
             // ===== Mutable Data =====
             //
-            GetMData(result) => unimplemented!(),
-            GetMDataShell(result) => unimplemented!(),
-            GetMDataVersion(result) => unimplemented!(),
-            ListUnseqMDataEntries(result) => unimplemented!(),
-            ListSeqMDataEntries(result) => unimplemented!(),
-            ListMDataKeys(result) => unimplemented!(),
-            ListSeqMDataValues(result) => unimplemented!(),
-            ListUnseqMDataValues(result) => unimplemented!(),
-            ListMDataUserPermissions(result) => unimplemented!(),
-            ListMDataPermissions(result) => unimplemented!(),
-            GetSeqMDataValue(result) => unimplemented!(),
-            GetUnseqMDataValue(result) => unimplemented!(),
+            GetMData(_) => unimplemented!(),
+            GetMDataShell(_) => unimplemented!(),
+            GetMDataVersion(_) => unimplemented!(),
+            ListUnseqMDataEntries(_) => unimplemented!(),
+            ListSeqMDataEntries(_) => unimplemented!(),
+            ListMDataKeys(_) => unimplemented!(),
+            ListSeqMDataValues(_) => unimplemented!(),
+            ListUnseqMDataValues(_) => unimplemented!(),
+            ListMDataUserPermissions(_) => unimplemented!(),
+            ListMDataPermissions(_) => unimplemented!(),
+            GetSeqMDataValue(_) => unimplemented!(),
+            GetUnseqMDataValue(_) => unimplemented!(),
             //
             // ===== Append Only Data =====
             //
-            GetAData(result) => unimplemented!(),
-            GetADataValue(result) => unimplemented!(),
-            GetADataShell(result) => unimplemented!(),
-            GetADataOwners(result) => unimplemented!(),
-            GetADataRange(result) => unimplemented!(),
-            GetADataIndices(result) => unimplemented!(),
-            GetADataLastEntry(result) => unimplemented!(),
-            GetUnpubADataPermissionAtIndex(result) => unimplemented!(),
-            GetPubADataPermissionAtIndex(result) => unimplemented!(),
-            GetPubADataUserPermissions(result) => unimplemented!(),
-            GetUnpubADataUserPermissions(result) => unimplemented!(),
+            GetUnpubADataPermissionAtIndex(_) => unimplemented!(),
+            GetPubADataPermissionAtIndex(_) => unimplemented!(),
             //
             // ===== Invalid =====
             //
