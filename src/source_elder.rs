@@ -28,7 +28,7 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
     AData, ADataAddress, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress,
-    IDataKind, LoginPacket, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
+    IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
     Response, Result as NdResult, Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
@@ -265,50 +265,29 @@ impl SourceElder {
             //
             // ===== Mutable Data =====
             //
-            GetMData(..)
-            | PutMData(..)
+            PutMData(chunk) => {
+                has_signature()?;
+                self.handle_put_mdata(client, chunk, message_id)
+            }
+            MutateSeqMDataEntries { .. }
+            | MutateUnseqMDataEntries { .. }
             | DeleteMData(..)
+            | SetMDataUserPermissions { .. }
+            | DelMDataUserPermissions { .. } => {
+                has_signature()?;
+                self.handle_mdata_mutation(request, client, message_id)
+            }
+            GetMData(..)
+            | GetMDataVersion(..)
             | GetMDataShell(..)
             | GetMDataValue { .. }
-            | GetMDataVersion(..)
             | ListMDataPermissions(..)
             | ListMDataUserPermissions { .. }
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..)
-            | MutateSeqMDataEntries { .. }
-            | MutateUnseqMDataEntries { .. } 
-            | SetMDataUserPermissions { .. }
-            | DelMDataUserPermissions { .. } => {
-                // TODO: allow only registered clients to send this req
-                // once the coin balances are implemented.
-
-                // if registered_client == ClientState::Registered {
-                Some(Action::ForwardClientRequest(Rpc::Request {
-                    requester: client.public_id.clone(),
-                    request,
-                    message_id,
-                }))
-                // } else {
-                //     self.send_response_to_client(
-                //         client_id,
-                //         message_id,
-                //         Response::GetAccount(Err(NdError::AccessDenied)),
-                //     );
-                //     None
-                // }
-            }
-            DeleteMData(..) => {
+            | ListMDataValues(..) => {
                 has_signature()?;
-                unimplemented!()
-            }
-            SetMDataUserPermissions { .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            DelMDataUserPermissions { .. } => {
-                has_signature()?;
-                unimplemented!()
+                self.handle_get_mdata(request, client, message_id)
             }
             //
             // ===== Append Only Data =====
@@ -491,6 +470,84 @@ impl SourceElder {
                 false
             }
         }
+    }
+
+    fn handle_get_mdata(
+        &mut self,
+        request: Request,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
+    fn handle_mdata_mutation(
+        &mut self,
+        request: Request,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!(
+                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                self,
+                *COST_OF_PUT,
+                error
+            );
+        }
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
+    fn handle_put_mdata(
+        &mut self,
+        client: &ClientInfo,
+        chunk: MData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+
+        // Assert that the owner's public key has been added to the chunk, to avoid Apps
+        // putting chunks which can't be retrieved by their Client owners.
+        if chunk.owner() != *owner.public_key() {
+            trace!(
+                "{}: {} attempted PutMData with invalid owners field.",
+                self,
+                client.public_id
+            );
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::InvalidOwners)),
+            );
+            return None;
+        }
+
+        let request = Request::PutMData(chunk);
+        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!(
+                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                self,
+                *COST_OF_PUT,
+                error
+            );
+        }
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     fn handle_put_idata(
