@@ -26,9 +26,9 @@ use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
-    AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress, IDataKind, Message,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature, Transaction,
-    TransactionId, XorName,
+    AData, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress, IDataKind,
+    Message, MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature,
+    Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -311,9 +311,9 @@ impl SourceElder {
             //
             // ===== Append Only Data =====
             //
-            PutAData(_) => {
+            PutAData(chunk) => {
                 has_signature()?;
-                unimplemented!()
+                self.handle_put_adata(client, chunk, message_id)
             }
             GetAData(ref address) => {
                 if !utils::is_published(address) {
@@ -606,6 +606,32 @@ impl SourceElder {
             );
             None
         }
+    }
+
+    fn handle_put_adata(
+        &mut self,
+        client: &ClientInfo,
+        chunk: AData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+        // TODO - If unpublished, check that the owner's public key has been added to the chunk?
+        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!(
+                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                self,
+                *COST_OF_PUT,
+                error
+            );
+        }
+
+        let request = Request::PutAData(chunk);
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     /// Handles a received challenge response.

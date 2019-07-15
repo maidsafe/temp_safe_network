@@ -23,8 +23,8 @@ use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, LoginPacket, MessageId, NodePublicId, PublicId, Request,
-    Response, Result as NdResult, XorName,
+    AData, Error as NdError, IData, IDataAddress, LoginPacket, MessageId, NodePublicId, PublicId,
+    Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -179,7 +179,7 @@ impl DestinationElder {
             //
             // ===== Append Only Data =====
             //
-            PutAData(data) => unimplemented!(),
+            PutAData(data) => self.handle_put_adata_req(requester, data, message_id),
             GetAData(address) => unimplemented!(),
             GetADataValue { address, key } => unimplemented!(),
             GetADataShell {
@@ -895,6 +895,29 @@ impl DestinationElder {
             return self.idata_ops.remove(message_id);
         }
         None
+    }
+
+    fn handle_put_adata_req(
+        &mut self,
+        requester: PublicId,
+        data: AData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if self.append_only_chunks.has(data.address()) {
+            Err(NdError::DataExists)
+        } else {
+            self.append_only_chunks
+                .put(&data)
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToSrcElders {
+            sender: *data.name(),
+            message: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
     }
 }
 
