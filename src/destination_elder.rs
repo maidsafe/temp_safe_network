@@ -23,8 +23,8 @@ use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AData, Error as NdError, IData, IDataAddress, LoginPacket, MessageId, NodePublicId, PublicId,
-    Request, Response, Result as NdResult, XorName,
+    AData, ADataAddress, Error as NdError, IData, IDataAddress, LoginPacket, MessageId,
+    NodePublicId, PublicId, Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -186,7 +186,9 @@ impl DestinationElder {
                 address,
                 data_index,
             } => unimplemented!(),
-            DeleteAData(address) => unimplemented!(),
+            DeleteAData(address) => {
+                self.handle_delete_adata_req(src, requester, address, message_id)
+            }
             GetADataRange { address, range } => unimplemented!(),
             GetADataIndices(address) => unimplemented!(),
             GetADataLastEntry(address) => unimplemented!(),
@@ -912,6 +914,39 @@ impl DestinationElder {
         };
         Some(Action::RespondToSrcElders {
             sender: *data.name(),
+            message: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
+    }
+
+    fn handle_delete_adata_req(
+        &mut self,
+        _src: XorName,
+        requester: PublicId,
+        address: ADataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let _requester_pk = *utils::own_key(&requester)?;
+        let _request = Request::DeleteAData(address);
+        let result = self
+            .append_only_chunks
+            .get(&address)
+            .map_err(|error| match error {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+                error => error.to_string().into(),
+            })
+            .and_then(|_adata| {
+                // TODO - MDataAction missing the Delete case in safe-nd ?
+                //_adata.check_permission(MDataAction::Delete, requester.public_key())?;
+                self.append_only_chunks
+                    .delete(&address)
+                    .map_err(|error| error.to_string().into())
+            });
+        Some(Action::RespondToSrcElders {
+            sender: *address.name(),
             message: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
