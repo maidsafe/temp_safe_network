@@ -13,6 +13,17 @@ use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
 
+pub const CONTENT_ADDED_SIGN: &str = "+";
+pub const CONTENT_UPDATED_SIGN: &str = "*";
+pub const CONTENT_DELETED_SIGN: &str = "-";
+pub const CONTENT_ERROR_SIGN: &str = "E";
+
+pub const FAKE_RDF_PREDICATE_LINK: &str = "link";
+pub const FAKE_RDF_PREDICATE_TYPE: &str = "type";
+pub const FAKE_RDF_PREDICATE_SIZE: &str = "size";
+pub const FAKE_RDF_PREDICATE_MODIFIED: &str = "modified";
+pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
+
 // Out internal key pair structure to manage BLS keys
 pub struct KeyPair {
     pub pk: PublicKey,

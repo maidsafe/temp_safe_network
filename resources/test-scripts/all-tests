@@ -47,3 +47,4 @@ cargo test --release --features=mock-network --test cli_cat -- --test-threads=1
 cargo test --release --features=mock-network --test cli_files -- --test-threads=1
 cargo test --release --features=mock-network --test cli_keys -- --test-threads=1
 cargo test --release --features=mock-network --test cli_wallet -- --test-threads=1
+cargo test --release --features=mock-network --test cli_nrs -- --test-threads=1

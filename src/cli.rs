@@ -13,6 +13,7 @@ use crate::subcommands::auth::{auth_commander, auth_connect};
 use crate::subcommands::cat::cat_commander;
 use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
+use crate::subcommands::nrs::nrs_commander;
 use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::{OutputFmt, SubCommands};
 use safe_cli::Safe;
@@ -90,7 +91,8 @@ pub fn run() -> Result<(), String> {
             match args.cmd {
                 SubCommands::Keys { cmd } => key_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
-                SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),
+				SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),
+                SubCommands::Nrs { cmd } => nrs_commander(cmd, output_fmt, &mut safe),
                 _ => Err("Command not supported yet".to_string()),
             }
         }

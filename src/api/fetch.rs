@@ -7,9 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
+use super::nrs::xorname_from_nrs_string;
 use super::xorurl::SafeContentType;
-use super::{Error, ResultReturn, Safe, XorName, XorUrlEncoder};
-use log::debug;
+
+use url::Url;
+
+use super::{Error, ResultReturn, Safe, XorName, XorUrl, XorUrlEncoder};
+use log::{debug, info};
 
 #[derive(Debug, PartialEq)]
 pub enum SafeData {
@@ -28,6 +32,14 @@ pub enum SafeData {
         files_map: FilesMap,
         native_type: String,
     },
+    // TODO: Enable preventing resolution
+    // ResolvableMapContainer {
+    //     xorname: XorName,
+    //     type_tag: u64,
+    //     version: u64,
+    //     resolvable_map: ResolvableMap,
+    //     native_type: String,
+    // },
     ImmutableData {
         xorname: XorName,
         data: Vec<u8>,
@@ -70,26 +82,74 @@ impl Safe {
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
-        debug!("Fetching url: {:?}", xorurl);
+        debug!("Attempting to fetch url: {:?}", xorurl);
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        let path = xorurl_encoder.path();
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl);
 
-        debug!(
-            "Fetching content of type: {:?}",
-            xorurl_encoder.content_type()
-        );
-        match xorurl_encoder.content_type() {
+        let the_xorurl: &XorUrl;
+
+        let the_xor = match xorurl_encoder {
+            Ok(encoder) => Ok(encoder),
+            Err(err) => {
+                let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
+                    Error::InvalidXorUrl(format!(
+                        "Problem parsing the SAFE:// URL {:?} : {:?}",
+                        err, parse_err
+                    ))
+                })?;
+
+                let host_str = parsing_url
+                    .host_str()
+                    .unwrap_or_else(|| "Failed parsing the URL");
+
+                // TODO: DRY this out with XorUrlEncoder path finder
+                let mut path = str::replace(parsing_url.path(), "\\", "/");
+                if path == "/" {
+                    path = "".to_string();
+                }
+
+                info!(
+                    "Falling back to NRS. XorUrl decoding failed with: {:?}",
+                    err
+                );
+
+                const RESOLVABLE_MAP_TYPE_TAG: u64 = 1500;
+                let hashed_host = xorname_from_nrs_string(&host_str)?;
+
+                let encoder = XorUrlEncoder::new(
+                    hashed_host,
+                    RESOLVABLE_MAP_TYPE_TAG,
+                    SafeContentType::ResolvableMapContainer,
+                );
+
+                let base_xor_url = encoder.to_string("base32z")?;
+
+                let full_new_url = format!("{}{}", base_xor_url, path);
+                debug!("Checking NRS system for url: {:?}", &full_new_url);
+                Ok(XorUrlEncoder::from_url(&full_new_url)?)
+            }
+        }?;
+
+        let xorurl_string = the_xor.to_string("base32z")?;
+        the_xorurl = &xorurl_string;
+        debug!("URL parsed successfully, fetching: {:?}", the_xorurl);
+        let path = the_xor.path();
+
+        debug!("Fetching content of type: {:?}", the_xor.content_type());
+
+        // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
+        match the_xor.content_type() {
             SafeContentType::CoinBalance => Ok(SafeData::Key {
-                xorname: xorurl_encoder.xorname(),
+                xorname: the_xor.xorname(),
             }),
             SafeContentType::Wallet => Ok(SafeData::Wallet {
-                xorname: xorurl_encoder.xorname(),
-                type_tag: xorurl_encoder.type_tag(),
+                xorname: the_xor.xorname(),
+                type_tag: the_xor.type_tag(),
                 native_type: "MutableData".to_string(), // TODO: to be retrieved from wallet API
             }),
             SafeContentType::FilesContainer => {
-                let (version, files_map, native_type) = self.files_container_get_latest(&xorurl)?;
+                let (version, files_map, native_type) =
+                    self.files_container_get_latest(&the_xorurl)?;
 
                 debug!(
                     "Files container found w/ v:{:?}, of type: {:?}, containing: {:?}",
@@ -103,14 +163,14 @@ impl Safe {
                         None => {
                             return Err(Error::ContentError(format!(
                                 "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-                                &path, &xorurl
+                                &path, &the_xorurl
                             )))
                         }
                     };
 
                     let new_target_xorurl = match file_item.get("link") {
 						Some( path_data ) => path_data,
-						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", &path, &xorurl))),
+						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", &path, &the_xorurl))),
 					};
 
                     let path_data = self.fetch(new_target_xorurl);
@@ -118,23 +178,50 @@ impl Safe {
                 }
 
                 Ok(SafeData::FilesContainer {
-                    xorname: xorurl_encoder.xorname(),
-                    type_tag: xorurl_encoder.type_tag(),
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
                     version,
                     files_map,
                     native_type,
                 })
             }
+            SafeContentType::ResolvableMapContainer => {
+                let (version, resolvable_map, native_type) =
+                    self.resolvable_map_container_get_latest(&the_xorurl)?;
+                debug!(
+                    "Resolvable map container found w/ v:{:?}, of type: {:?}, containing: {:?}",
+                    &version, &native_type, &resolvable_map
+                );
+
+                let new_target_xorurl = &resolvable_map.get_default_link()?;
+
+                let url_with_path = format!("{}{}", new_target_xorurl, path);
+
+                debug!("Resolving target from resolvable map: {:?}", url_with_path);
+
+                // TODO: Properly prevent resolution
+                // if prevent_resolution {
+                // 	return Ok(SafeData::ResolvableMapContainer {
+                // 		xorname: the_xor.xorname(),
+                // 		type_tag: the_xor.type_tag(),
+                // 		version,
+                // 		resolvable_map,
+                // 		native_type,
+                // 	})
+                // }
+
+                self.fetch(&url_with_path)
+            }
             SafeContentType::ImmutableData => {
                 let data = self.files_get_published_immutable(&xorurl)?;
                 Ok(SafeData::ImmutableData {
-                    xorname: xorurl_encoder.xorname(),
+                    xorname: the_xor.xorname(),
                     data,
                 })
             }
             SafeContentType::Unknown => Ok(SafeData::Unknown {
-                xorname: xorurl_encoder.xorname(),
-                type_tag: xorurl_encoder.type_tag(),
+                xorname: the_xor.xorname(),
+                type_tag: the_xor.type_tag(),
             }),
             other => Err(Error::ContentError(format!(
                 "Content type '{:?}' not supported yet by fetch",
@@ -220,6 +307,43 @@ fn test_fetch_files_container() {
         xorurl_encoder_with_path.content_type(),
         xorurl_encoder.content_type()
     );
+}
+
+#[test]
+fn test_fetch_resolvable_container() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("")).unwrap();
+
+    let prevent_resolution = true;
+
+    let (xorurl, _, files_map) =
+        unwrap!(safe.files_container_create("tests/testfolder", None, true));
+
+    let (reslovable_map_xorurl, _, resolvable_map) =
+        unwrap!(safe.resolvable_map_container_create("somesite", &xorurl, true));
+
+    let content = unwrap!(safe.fetch("safe://somesite"));
+
+    // this should actually resolve to a FilesContainer until we enable the option to prevent resolution beyond the mao itself.
+    match content {
+        SafeData::FilesContainer {
+        	..
+		    // xorname,
+            // type_tag,
+            // version,
+            // resolvable_map,
+            // native_type,
+        } => {
+            // assert_eq!(xorname, reslovable_map_xorurl);
+            // assert_eq!(xorname, xorurl_encoder.xorname());
+            // assert_eq!(type_tag, 1500);
+            // assert_eq!(version, 1);
+            // assert_eq!(native_type, "AppendOnlyData".to_string());
+			assert!(true);
+        }
+        _ => panic!("Resolvable map container was not returned."),
+    }
 }
 
 #[test]

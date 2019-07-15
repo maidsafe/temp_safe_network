@@ -6,6 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::helpers::{
+    CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,
+    FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
+    FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
+};
 use super::xorurl::SafeContentType;
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use chrono::{SecondsFormat, Utc};
@@ -15,7 +20,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use walkdir::{DirEntry, WalkDir};
-
 // Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL
 pub type FileItem = BTreeMap<String, String>;
 
@@ -30,18 +34,7 @@ const FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
 // Informative string of the SAFE native data type behind a FilesContainer
 const FILES_CONTAINER_NATIVE_TYPE: &str = "AppendOnlyData";
 
-const FILE_ADDED_SIGN: &str = "+";
-const FILE_UPDATED_SIGN: &str = "*";
-const FILE_DELETED_SIGN: &str = "-";
-const FILE_ERROR_SIGN: &str = "E";
-
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
-
-const FILES_MAP_PREDICATE_LINK: &str = "link";
-const FILES_MAP_PREDICATE_TYPE: &str = "type";
-const FILES_MAP_PREDICATE_SIZE: &str = "size";
-const FILES_MAP_PREDICATE_MODIFIED: &str = "modified";
-const FILES_MAP_PREDICATE_CREATED: &str = "created";
 
 const MAX_RECURSIVE_DEPTH: usize = 10000;
 
@@ -137,10 +130,7 @@ impl Safe {
             .get_latest_seq_append_only_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
         {
             Ok((version, (_key, value))) => {
-                debug!(
-                    "Files map retrieved.... v{:?}, value {:?} ",
-                    &version, &value
-                );
+                debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
                 let files_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
                     .map_err(|err| {
@@ -361,12 +351,12 @@ fn gen_new_file_item(
     } else {
         "".to_string()
     };
-    file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), xorurl.to_string());
-    file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type.to_string());
-    file_item.insert(FILES_MAP_PREDICATE_SIZE.to_string(), file_size.to_string());
-    file_item.insert(FILES_MAP_PREDICATE_MODIFIED.to_string(), now.clone());
+    file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl.to_string());
+    file_item.insert(FAKE_RDF_PREDICATE_TYPE.to_string(), file_type.to_string());
+    file_item.insert(FAKE_RDF_PREDICATE_SIZE.to_string(), file_size.to_string());
+    file_item.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
     let created = file_created.unwrap_or_else(|| &now);
-    file_item.insert(FILES_MAP_PREDICATE_CREATED.to_string(), created.to_string());
+    file_item.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), created.to_string());
 
     Ok(file_item)
 }
@@ -390,7 +380,7 @@ fn files_map_sync(
 
     for (key, _value) in new_content
         .iter()
-        .filter(|(_, (change, _))| change != FILE_ERROR_SIGN)
+        .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
     {
         let file_path = Path::new(&key);
         let (metadata, file_type) = get_metadata(&file_path)?;
@@ -423,8 +413,8 @@ fn files_map_sync(
                         processed_files.insert(
                             key.to_string(),
                             (
-                                FILE_ADDED_SIGN.to_string(),
-                                new_file_item[FILES_MAP_PREDICATE_LINK].clone(),
+                                CONTENT_ADDED_SIGN.to_string(),
+                                new_file_item[FAKE_RDF_PREDICATE_LINK].clone(),
                             ),
                         );
                         success_count += 1;
@@ -432,7 +422,7 @@ fn files_map_sync(
                     Err(err) => {
                         processed_files.insert(
                             key.to_string(),
-                            (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                            (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
                         );
                         info!(
                         "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
@@ -443,8 +433,8 @@ fn files_map_sync(
             Some(file_item) => {
                 // TODO: we don't record the original creation/modified timestamp from the,
                 // filesystem thus we cannot compare to see if they changed
-                if file_item[FILES_MAP_PREDICATE_SIZE] != file_size
-                    || file_item[FILES_MAP_PREDICATE_TYPE] != file_type
+                if file_item[FAKE_RDF_PREDICATE_SIZE] != file_size
+                    || file_item[FAKE_RDF_PREDICATE_TYPE] != file_type
                 {
                     // We need to update the current FileItem, let's upload it first
                     match gen_new_file_item(
@@ -452,7 +442,7 @@ fn files_map_sync(
                         &file_path,
                         &file_type,
                         &file_size,
-                        Some(&file_item[FILES_MAP_PREDICATE_CREATED]),
+                        Some(&file_item[FAKE_RDF_PREDICATE_CREATED]),
                         upload_files,
                     ) {
                         Ok(new_file_item) => {
@@ -463,8 +453,8 @@ fn files_map_sync(
                             processed_files.insert(
                                 key.to_string(),
                                 (
-                                    FILE_UPDATED_SIGN.to_string(),
-                                    new_file_item[FILES_MAP_PREDICATE_LINK].clone(),
+                                    CONTENT_UPDATED_SIGN.to_string(),
+                                    new_file_item[FAKE_RDF_PREDICATE_LINK].clone(),
                                 ),
                             );
                             success_count += 1;
@@ -472,7 +462,7 @@ fn files_map_sync(
                         Err(err) => {
                             processed_files.insert(
                                 key.to_string(),
-                                (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
                             );
                             info!("Skipping file \"{}\": {}", &normalised_file_name, err);
                         }
@@ -497,8 +487,8 @@ fn files_map_sync(
             processed_files.insert(
                 file_name.to_string(),
                 (
-                    FILE_DELETED_SIGN.to_string(),
-                    file_item[FILES_MAP_PREDICATE_LINK].clone(),
+                    CONTENT_DELETED_SIGN.to_string(),
+                    file_item[FAKE_RDF_PREDICATE_LINK].clone(),
                 ),
             );
         }
@@ -572,10 +562,10 @@ fn file_system_dir_walk(
                         } else if upload_files {
                             match upload_file_to_net(safe, &current_file_path) {
                                 Ok(xorurl) => {
-                                    processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
+                                    processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
                                 }
                                 Err(err) => {
-                                    processed_files.insert(normalised_path.clone(), (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)));
+                                    processed_files.insert(normalised_path.clone(), (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)));
                                     info!(
                                     "Skipping file \"{}\". {}",
                                     normalised_path, err);
@@ -586,7 +576,7 @@ fn file_system_dir_walk(
                         }
                     },
                     Err(err) => {
-                        processed_files.insert(normalised_path.clone(), (FILE_ERROR_SIGN.to_string(), format!("<{}>", err)));
+                        processed_files.insert(normalised_path.clone(), (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)));
                         info!(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
                         normalised_path, err);
@@ -628,23 +618,23 @@ fn files_map_create(
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     for (file_name, (_change, link)) in content
         .iter()
-        .filter(|(_, (change, _))| change != FILE_ERROR_SIGN)
+        .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
     {
         debug!("FileItem item name:{:?}", &file_name);
         let mut file_item = FileItem::new();
         let file_path = Path::new(&file_name);
         let (metadata, file_type) = get_metadata(&file_path)?;
 
-        file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), link.to_string());
+        file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
 
-        file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type);
+        file_item.insert(FAKE_RDF_PREDICATE_TYPE.to_string(), file_type);
 
         let file_size = &metadata.len().to_string();
-        file_item.insert(FILES_MAP_PREDICATE_SIZE.to_string(), file_size.to_string());
+        file_item.insert(FAKE_RDF_PREDICATE_SIZE.to_string(), file_size.to_string());
 
         // file_item.insert("permissions", metadata.permissions().to_string());
-        file_item.insert(FILES_MAP_PREDICATE_MODIFIED.to_string(), now.clone());
-        file_item.insert(FILES_MAP_PREDICATE_CREATED.to_string(), now.clone());
+        file_item.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
+        file_item.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now.clone());
 
         debug!("FileItem item: {:?}", file_item);
         let new_file_name = RelativePath::new(
@@ -672,12 +662,15 @@ fn test_files_map_create() {
     let mut processed_files = ProcessedFiles::new();
     processed_files.insert(
         "./tests/testfolder/test.md".to_string(),
-        (FILE_ADDED_SIGN.to_string(), "safe://top_xorurl".to_string()),
+        (
+            CONTENT_ADDED_SIGN.to_string(),
+            "safe://top_xorurl".to_string(),
+        ),
     );
     processed_files.insert(
         "./tests/testfolder/subfolder/subexists.md".to_string(),
         (
-            FILE_ADDED_SIGN.to_string(),
+            CONTENT_ADDED_SIGN.to_string(),
             "safe://second_xorurl".to_string(),
         ),
     );
@@ -688,14 +681,14 @@ fn test_files_map_create() {
     ));
     assert_eq!(files_map.len(), 2);
     let file_item1 = &files_map["/testfolder/test.md"];
-    assert_eq!(file_item1[FILES_MAP_PREDICATE_LINK], "safe://top_xorurl");
-    assert_eq!(file_item1[FILES_MAP_PREDICATE_TYPE], "md");
-    assert_eq!(file_item1[FILES_MAP_PREDICATE_SIZE], "12");
+    assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
+    assert_eq!(file_item1[FAKE_RDF_PREDICATE_TYPE], "md");
+    assert_eq!(file_item1[FAKE_RDF_PREDICATE_SIZE], "12");
 
     let file_item2 = &files_map["/testfolder/subfolder/subexists.md"];
-    assert_eq!(file_item2[FILES_MAP_PREDICATE_LINK], "safe://second_xorurl");
-    assert_eq!(file_item2[FILES_MAP_PREDICATE_TYPE], "md");
-    assert_eq!(file_item2[FILES_MAP_PREDICATE_SIZE], "7");
+    assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
+    assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "md");
+    assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "7");
 }
 
 #[test]
@@ -711,10 +704,10 @@ fn test_files_container_create_file() {
     assert_eq!(processed_files.len(), 1);
     assert_eq!(files_map.len(), 1);
     let file_path = "/test.md";
-    assert_eq!(processed_files[filename].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename].1,
-        files_map[file_path][FILES_MAP_PREDICATE_LINK]
+        files_map[file_path][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -736,7 +729,7 @@ fn test_files_container_create_dry_run() {
     assert!(processed_files[filename1].1.is_empty());
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
@@ -744,7 +737,7 @@ fn test_files_container_create_dry_run() {
     assert!(processed_files[filename2].1.is_empty());
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
@@ -752,7 +745,7 @@ fn test_files_container_create_dry_run() {
     assert!(processed_files[filename3].1.is_empty());
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
@@ -760,7 +753,7 @@ fn test_files_container_create_dry_run() {
     assert!(processed_files[filename4].1.is_empty());
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+        files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -777,31 +770,31 @@ fn test_files_container_create_folder_without_trailing_slash() {
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/testfolder/test.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/testfolder/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/testfolder/another.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/testfolder/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/testfolder/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/testfolder/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/testfolder/noextension"][FILES_MAP_PREDICATE_LINK]
+        files_map["/testfolder/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -818,31 +811,31 @@ fn test_files_container_create_folder_with_trailing_slash() {
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+        files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -863,31 +856,31 @@ fn test_files_container_create_dest_path_without_trailing_slash() {
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/myroot/test.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/myroot/another.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/myroot/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/myroot/noextension"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -908,31 +901,31 @@ fn test_files_container_create_dest_path_with_trailing_slash() {
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        files_map["/myroot/testfolder/test.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/testfolder/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        files_map["/myroot/testfolder/another.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/testfolder/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        files_map["/myroot/testfolder/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/testfolder/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        files_map["/myroot/testfolder/noextension"][FILES_MAP_PREDICATE_LINK]
+        files_map["/myroot/testfolder/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -963,42 +956,42 @@ fn test_files_container_sync() {
     assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        new_files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
     assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        new_files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
     assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
     assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
     assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename6 = "./tests/testfolder/subfolder/sub2.md";
     assert_eq!(new_processed_files[filename6].0, FILE_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename6].1,
-        new_files_map["/sub2.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -1026,39 +1019,39 @@ fn test_files_container_sync_dry_run() {
     assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        new_files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        new_files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
     assert!(new_processed_files[filename5].1.is_empty());
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename6 = "./tests/testfolder/subfolder/sub2.md";
@@ -1066,7 +1059,7 @@ fn test_files_container_sync_dry_run() {
     assert!(new_processed_files[filename6].1.is_empty());
     assert_eq!(
         new_processed_files[filename6].1,
-        new_files_map["/sub2.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -1095,39 +1088,39 @@ fn test_files_container_sync_with_delete() {
 
     // first check all previous files were removed
     let file_path1 = "/test.md";
-    assert_eq!(new_processed_files[file_path1].0, FILE_DELETED_SIGN);
+    assert_eq!(new_processed_files[file_path1].0, CONTENT_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path1].1,
-        files_map[file_path1][FILES_MAP_PREDICATE_LINK]
+        files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
     );
 
     let file_path2 = "/another.md";
-    assert_eq!(new_processed_files[file_path2].0, FILE_DELETED_SIGN);
+    assert_eq!(new_processed_files[file_path2].0, CONTENT_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path2].1,
-        files_map[file_path2][FILES_MAP_PREDICATE_LINK]
+        files_map[file_path2][FAKE_RDF_PREDICATE_LINK]
     );
 
     let file_path3 = "/subfolder/subexists.md";
-    assert_eq!(new_processed_files[file_path3].0, FILE_DELETED_SIGN);
+    assert_eq!(new_processed_files[file_path3].0, CONTENT_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path3].1,
-        files_map[file_path3][FILES_MAP_PREDICATE_LINK]
+        files_map[file_path3][FAKE_RDF_PREDICATE_LINK]
     );
 
     let file_path4 = "/noextension";
-    assert_eq!(new_processed_files[file_path4].0, FILE_DELETED_SIGN);
+    assert_eq!(new_processed_files[file_path4].0, CONTENT_DELETED_SIGN);
     assert_eq!(
         new_processed_files[file_path4].1,
-        files_map[file_path4][FILES_MAP_PREDICATE_LINK]
+        files_map[file_path4][FAKE_RDF_PREDICATE_LINK]
     );
 
     // and finally check the synced file was added
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -1175,39 +1168,39 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
     assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        new_files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        new_files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 
     // and finally check the synced file is there
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/path/when/sync/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 
@@ -1235,39 +1228,39 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
     assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
-        new_files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
-        new_files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
-        new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 
     // and finally check the synced file is there
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
-        new_files_map["/path/when/sync/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+        new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 }
 

@@ -12,6 +12,7 @@ mod fetch;
 mod files;
 mod helpers;
 mod keys;
+mod nrs;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 #[cfg(feature = "scl-mock")]

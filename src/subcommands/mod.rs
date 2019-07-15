@@ -15,7 +15,7 @@ pub mod fake_auth;
 pub mod files;
 mod helpers;
 pub mod keys;
-pub mod pns;
+pub mod nrs;
 pub mod safe_id;
 pub mod wallet;
 
@@ -64,12 +64,12 @@ pub enum SubCommands {
     #[structopt(name = "keypair")]
     /// Generate a key pair without creating and/or storing a Key on the network
     Keypair {},
-    #[structopt(name = "pns")]
+    #[structopt(name = "nrs")]
     /// Manage public names on the network
-    Pns {
+    Nrs {
         /// subcommands
         #[structopt(subcommand)]
-        cmd: Option<pns::PnsSubCommands>,
+        cmd: Option<nrs::NrsSubCommands>,
     },
     #[structopt(name = "keys")]
     /// Manage keys on the network
