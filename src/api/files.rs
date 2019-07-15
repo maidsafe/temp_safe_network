@@ -86,7 +86,7 @@ impl Safe {
         )];
 
         // Store the FilesContainer in a Published AppendOnlyData
-        let xorname = self.safe_app.put_seq_appendable_data(
+        let xorname = self.safe_app.put_seq_append_only_data(
             files_container_data,
             None,
             FILES_CONTAINER_TYPE_TAG,
@@ -125,7 +125,7 @@ impl Safe {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         match self
             .safe_app
-            .get_latest_seq_appendable_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
+            .get_latest_seq_append_only_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
         {
             Ok((version, (_key, value))) => {
                 debug!(
@@ -218,7 +218,7 @@ impl Safe {
 
             let current_version = match self
                 .safe_app
-                .get_current_seq_appendable_data_version(xorname, type_tag)
+                .get_current_seq_append_only_data_version(xorname, type_tag)
             {
                 Ok(version) => version,
                 Err(Error::ContentNotFound(_)) => {
@@ -234,7 +234,7 @@ impl Safe {
                 }
             };
 
-            version = self.safe_app.append_seq_appendable_data(
+            version = self.safe_app.append_seq_append_only_data(
                 files_container_data,
                 current_version + 1,
                 xorname,

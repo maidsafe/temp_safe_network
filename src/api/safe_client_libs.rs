@@ -214,7 +214,7 @@ impl SafeApp {
         Ok(data.value().to_vec())
     }
 
-    pub fn put_seq_appendable_data(
+    pub fn put_seq_append_only_data(
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -235,7 +235,7 @@ impl SafeApp {
         info!("Xorname for storage: {:?}", &xorname);
 
         run(safe_app, move |client, _app_context| {
-            let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
+            let append_only_data_address = ADataAddress::new_pub_seq(xorname, tag);
             let append_client = client.clone();
 
             let mut data = PubSeqAppendOnlyData::new(xorname, tag);
@@ -252,7 +252,7 @@ impl SafeApp {
             }));
 
             let append = ADataAppend {
-                address: appendable_data_address,
+                address: append_only_data_address,
                 values: the_data,
             };
 
@@ -270,11 +270,11 @@ impl SafeApp {
                 .map(move |_| xorname)
         })
         .map_err(|e| {
-            Error::NetDataError(format!("Failed to PUT Sequenced Appendable Data: {:?}", e))
+            Error::NetDataError(format!("Failed to PUT Sequenced Append Only Data: {:?}", e))
         })
     }
 
-    pub fn append_seq_appendable_data(
+    pub fn append_seq_append_only_data(
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         new_version: u64,
@@ -287,10 +287,10 @@ impl SafeApp {
         };
 
         run(safe_app, move |client, _app_context| {
-            let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
+            let append_only_data_address = ADataAddress::new_pub_seq(xorname, tag);
 
             let append = ADataAppend {
-                address: appendable_data_address,
+                address: append_only_data_address,
                 values: the_data,
             };
 
@@ -302,7 +302,7 @@ impl SafeApp {
         })
         .map_err(|e| {
             Error::NetDataError(format!(
-                "Failed to UPDATE Sequenced Appendable Data: {:?}",
+                "Failed to UPDATE Sequenced Append Only Data: {:?}",
                 e
             ))
         })?;
@@ -310,39 +310,39 @@ impl SafeApp {
         Ok(new_version)
     }
 
-    pub fn get_latest_seq_appendable_data(
+    pub fn get_latest_seq_append_only_data(
         &self,
         xorname: XorName,
         tag: u64,
     ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
-        debug!("Getting latest seq_appendable_data for: {:?}", &xorname);
+        debug!("Getting latest seq_append_only_data for: {:?}", &xorname);
 
         let safe_app: &App = match &self.safe_conn {
             Some(app) => &app,
             None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
-        let appendable_data_address = ADataAddress::new_pub_seq(xorname, tag);
+        let append_only_data_address = ADataAddress::new_pub_seq(xorname, tag);
 
-        debug!("Address for a_data : {:?}", appendable_data_address);
+        debug!("Address for a_data : {:?}", append_only_data_address);
 
         let data_length = self
-            .get_current_seq_appendable_data_version(xorname, tag)
+            .get_current_seq_append_only_data_version(xorname, tag)
             .unwrap();
 
         let data = run(safe_app, move |client, _app_context| {
             client
-                .get_adata_last_entry(appendable_data_address)
+                .get_adata_last_entry(append_only_data_address)
                 .map_err(CoreError)
         })
         .map_err(|e| {
-            Error::NetDataError(format!("Failed to get Sequenced Appendable Data: {:?}", e))
+            Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
         })?;
 
         Ok((data_length, data))
     }
 
-    pub fn get_current_seq_appendable_data_version(
+    pub fn get_current_seq_append_only_data_version(
         &self,
         name: XorName,
         tag: u64,
@@ -354,16 +354,16 @@ impl SafeApp {
             None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
 
-        let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
+        let append_only_data_address = ADataAddress::new_pub_seq(name, tag);
 
         run(safe_app, move |client, _app_context| {
             client
-                .get_adata_indices(appendable_data_address)
+                .get_adata_indices(append_only_data_address)
                 .map_err(CoreError)
         })
         .map_err(|e| {
             Error::NetDataError(format!(
-                "Failed to get Sequenced Appendable Data indices: {:?}",
+                "Failed to get Sequenced Append Only Data indices: {:?}",
                 e
             ))
         })
@@ -371,7 +371,7 @@ impl SafeApp {
     }
 
     #[allow(dead_code)]
-    pub fn get_seq_appendable_data(
+    pub fn get_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
@@ -386,10 +386,10 @@ impl SafeApp {
             Some(app) => &app,
             None => return Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         };
-        let appendable_data_address = ADataAddress::new_pub_seq(name, tag);
+        let append_only_data_address = ADataAddress::new_pub_seq(name, tag);
 
         let data_length = self
-            .get_current_seq_appendable_data_version(name, tag)
+            .get_current_seq_append_only_data_version(name, tag)
             .unwrap();
 
         let start = ADataIndex::FromStart(version);
@@ -403,17 +403,17 @@ impl SafeApp {
         }
 
         if version == data_length {
-            let (_version, data) = self.get_latest_seq_appendable_data(name, tag).unwrap();
+            let (_version, data) = self.get_latest_seq_append_only_data(name, tag).unwrap();
             return Ok(data);
         }
 
         let data = run(safe_app, move |client, _app_context| {
             client
-                .get_adata_range(appendable_data_address, (start, end))
+                .get_adata_range(append_only_data_address, (start, end))
                 .map_err(CoreError)
         })
         .map_err(|e| {
-            Error::NetDataError(format!("Failed to get Sequenced Appendable Data: {:?}", e))
+            Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
         })?;
 
         let this_version = data[0].clone();
@@ -632,7 +632,7 @@ fn test_put_and_get_immutable_data() {
 }
 
 #[test]
-fn test_put_get_update_seq_appendable_data() {
+fn test_put_get_update_seq_append_only_data() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", Some("")).unwrap();
@@ -644,12 +644,12 @@ fn test_put_get_update_seq_appendable_data() {
     let type_tag = 12322;
     let xorname = safe
         .safe_app
-        .put_seq_appendable_data(data1, None, type_tag, None)
+        .put_seq_append_only_data(data1, None, type_tag, None)
         .unwrap();
 
     let (_this_version, data) = safe
         .safe_app
-        .get_latest_seq_appendable_data(xorname, type_tag)
+        .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
     assert_eq!(_this_version, 1);
@@ -665,11 +665,11 @@ fn test_put_get_update_seq_appendable_data() {
 
     let updated_version = safe
         .safe_app
-        .append_seq_appendable_data(data2, new_version, xorname, type_tag)
+        .append_seq_append_only_data(data2, new_version, xorname, type_tag)
         .unwrap();
     let (the_latest_version, data_updated) = safe
         .safe_app
-        .get_latest_seq_appendable_data(xorname, type_tag)
+        .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
     assert_eq!(updated_version, the_latest_version);
@@ -687,7 +687,7 @@ fn test_put_get_update_seq_appendable_data() {
 
     let first_data = safe
         .safe_app
-        .get_seq_appendable_data(xorname, type_tag, first_version)
+        .get_seq_append_only_data(xorname, type_tag, first_version)
         .unwrap();
 
     assert_eq!(
@@ -702,7 +702,7 @@ fn test_put_get_update_seq_appendable_data() {
     let second_version = 1;
     let second_data = safe
         .safe_app
-        .get_seq_appendable_data(xorname, type_tag, second_version)
+        .get_seq_append_only_data(xorname, type_tag, second_version)
         .unwrap();
 
     assert_eq!(
@@ -718,7 +718,7 @@ fn test_put_get_update_seq_appendable_data() {
     // test cehcking for versions that dont exist
     match safe
         .safe_app
-        .get_seq_appendable_data(xorname, type_tag, nonexistant_version)
+        .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
     {
         Ok(_data) => panic!("No error thrown for a version that does not exist"),
 
@@ -729,7 +729,7 @@ fn test_put_get_update_seq_appendable_data() {
 // TODO: Enable once merged: https://github.com/maidsafe/safe_client_libs/issues/898
 #[test]
 #[ignore]
-fn test_update_seq_appendable_data_error() {
+fn test_update_seq_append_only_data_error() {
     use super::Safe;
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", Some("")).unwrap();
@@ -741,12 +741,12 @@ fn test_update_seq_appendable_data_error() {
     let type_tag = 12322;
     let xorname = safe
         .safe_app
-        .put_seq_appendable_data(data1, None, type_tag, None)
+        .put_seq_append_only_data(data1, None, type_tag, None)
         .unwrap();
 
     let (_this_version, data) = safe
         .safe_app
-        .get_latest_seq_appendable_data(xorname, type_tag)
+        .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
     assert_eq!(_this_version, 1);
@@ -762,7 +762,7 @@ fn test_update_seq_appendable_data_error() {
 
     match safe
         .safe_app
-        .append_seq_appendable_data(data2, wrong_new_version, xorname, type_tag)
+        .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),
         Err(error) => assert!(format!("{}", error).contains("Something about the version")),

@@ -268,7 +268,7 @@ impl SafeApp {
         Ok(data)
     }
 
-    pub fn put_seq_appendable_data(
+    pub fn put_seq_append_only_data(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -284,7 +284,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn append_seq_appendable_data(
+    pub fn append_seq_append_only_data(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         _new_version: u64,
@@ -310,7 +310,7 @@ impl SafeApp {
         Ok(seq_append_only.len() as u64)
     }
 
-    pub fn get_latest_seq_appendable_data(
+    pub fn get_latest_seq_append_only_data(
         &self,
         name: XorName,
         _tag: u64,
@@ -336,7 +336,7 @@ impl SafeApp {
         }
     }
 
-    pub fn get_current_seq_appendable_data_version(
+    pub fn get_current_seq_append_only_data_version(
         &self,
         name: XorName,
         _tag: u64,
