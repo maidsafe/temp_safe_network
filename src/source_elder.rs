@@ -868,20 +868,7 @@ impl SourceElder {
         match response {
             // Transfer the response from destination elders to clients
             Mutation(_) | GetIData(_) | Transaction(_) => {
-                if let Some(peer_addr) = self.lookup_client_peer_addr(&requester) {
-                    let peer = Peer::Client {
-                        peer_addr: *peer_addr,
-                    };
-                    self.send(
-                        peer,
-                        &Message::Response {
-                            response,
-                            message_id,
-                        },
-                    );
-                } else {
-                    info!("{}: client {} not found", self, requester);
-                }
+                self.send_response_to_client(&requester, message_id, response);
                 None
             }
             //
@@ -1034,11 +1021,7 @@ impl SourceElder {
         message_id: MessageId,
         response: Response,
     ) {
-        let peer_addr = if let Some((peer_addr, _)) = self
-            .clients
-            .iter()
-            .find(|(_, client)| client.public_id == *client_id)
-        {
+        let peer_addr = if let Some(peer_addr) = self.lookup_client_peer_addr(client_id) {
             *peer_addr
         } else {
             info!("{}: client {} not found", self, client_id);
