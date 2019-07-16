@@ -15,8 +15,8 @@ pub use self::rng::TestRng;
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
-    Challenge, ClientFullId, ClientPublicId, Coins, IData, IDataAddress, Message, MessageId,
-    PublicId, Request, Response,
+    AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, IData, IDataAddress,
+    Message, MessageId, PublicId, Request, Response, Signature,
 };
 use safe_vault::{
     mock::Network,
@@ -41,6 +41,7 @@ macro_rules! unexpected {
 pub struct Environment {
     rng: TestRng,
     network: Network,
+    vault: TestVault,
 }
 
 impl Environment {
@@ -53,6 +54,7 @@ impl Environment {
         Self {
             rng,
             network: Network::new(network_rng),
+            vault: TestVault::new(),
         }
     }
 
@@ -60,34 +62,49 @@ impl Environment {
         &mut self.rng
     }
 
-    // Poll the mock network and the given vaults.
-    // For convenience, this function can be called with `&mut Vault` or `&mut [Vault]`.
-    pub fn poll<T: AsMutSlice<TestVault>>(&self, vaults: &mut T) {
+    // Poll the mock network and the environment's vault.
+    pub fn poll(&mut self) {
         let mut progress = true;
         while progress {
             self.network.poll();
-
-            progress = false;
-            for vault in vaults.as_mut_slice().iter_mut() {
-                if vault.inner.poll() {
-                    progress = true;
-                }
-            }
+            progress = self.vault.inner.poll();
         }
+    }
+
+    pub fn new_connected_client(&mut self) -> TestClient {
+        let mut client = TestClient::new_disconnected(&mut self.rng);
+        self.establish_connection(&mut client);
+        client
+    }
+
+    pub fn new_connected_app(&mut self, owner: ClientPublicId) -> TestApp {
+        let mut app = TestApp::new_disconnected(&mut self.rng, owner);
+        self.establish_connection(&mut app);
+        app
+    }
+
+    fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
+        let conn_info = self.vault.connection_info();
+        client.quic_p2p().connect_to(conn_info.clone());
+        self.poll();
+
+        client.expect_connected_to(&conn_info);
+        client.handle_challenge_from(&conn_info);
+        self.poll();
     }
 }
 
-pub trait AsMutSlice<T> {
+trait AsMutSlice<T> {
     fn as_mut_slice(&mut self) -> &mut [T];
 }
 
-pub struct TestVault {
+struct TestVault {
     inner: Vault,
     _root_dir: TempDir,
 }
 
 impl TestVault {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
 
         let mut config = Config::default();
@@ -101,7 +118,7 @@ impl TestVault {
         }
     }
 
-    pub fn connection_info(&mut self) -> NodeInfo {
+    fn connection_info(&mut self) -> NodeInfo {
         unwrap!(self.inner.our_connection_info())
     }
 }
@@ -132,37 +149,40 @@ impl AsMutSlice<TestVault> for [TestVault] {
     }
 }
 
-pub struct TestClient {
-    quic_p2p: QuicP2p,
-    rx: Receiver<Event>,
-    full_id: ClientFullId,
+pub enum FullId {
+    Client(ClientFullId),
+    App(AppFullId),
 }
 
-impl TestClient {
-    pub fn new(rng: &mut TestRng) -> Self {
-        let (tx, rx) = crossbeam_channel::unbounded();
-        let config = quic_p2p::Config {
-            our_type: OurType::Client,
-            ..Default::default()
-        };
-
-        Self {
-            quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
-            rx,
-            full_id: ClientFullId::new_ed25519(rng),
+impl FullId {
+    fn sign<T: AsRef<[u8]>>(&self, data: T) -> Signature {
+        match self {
+            FullId::Client(full_id) => full_id.sign(data),
+            FullId::App(full_id) => full_id.sign(data),
         }
     }
 
-    pub fn public_id(&self) -> &ClientPublicId {
-        self.full_id.public_id()
+    fn public_id(&self) -> PublicId {
+        match self {
+            FullId::Client(full_id) => PublicId::Client(full_id.public_id().clone()),
+            FullId::App(full_id) => PublicId::App(full_id.public_id().clone()),
+        }
+    }
+}
+
+pub trait TestClientTrait {
+    fn quic_p2p(&mut self) -> &mut QuicP2p;
+    fn rx(&self) -> &Receiver<Event>;
+    fn full_id(&self) -> &FullId;
+    fn set_connected_vault(&mut self, connected_vault: NodeInfo);
+    fn connected_vault(&self) -> NodeInfo;
+
+    fn sign<T: AsRef<[u8]>>(&self, data: T) -> Signature {
+        self.full_id().sign(data)
     }
 
-    pub fn full_id(&self) -> &ClientFullId {
-        &self.full_id
-    }
-
-    pub fn expect_connected_to(&self, conn_info: &NodeInfo) {
-        match self.rx.try_recv() {
+    fn expect_connected_to(&self, conn_info: &NodeInfo) {
+        match self.rx().try_recv() {
             Ok(Event::ConnectedTo {
                 peer: Peer::Node { ref node_info },
             }) if node_info == conn_info => (),
@@ -170,14 +190,7 @@ impl TestClient {
         }
     }
 
-    pub fn expect_new_message(&self) -> (SocketAddr, Bytes) {
-        match self.rx.try_recv() {
-            Ok(Event::NewMessage { peer_addr, msg }) => (peer_addr, msg),
-            x => unexpected!(x),
-        }
-    }
-
-    pub fn handle_challenge_from(&mut self, conn_info: &NodeInfo) {
+    fn handle_challenge_from(&mut self, conn_info: &NodeInfo) {
         let (sender, bytes) = self.expect_new_message();
         assert_eq!(sender, conn_info.peer_addr);
 
@@ -187,31 +200,39 @@ impl TestClient {
             Challenge::Response(..) => panic!("Unexpected Challenge::Response"),
         };
 
-        let signature = self.full_id.sign(payload);
-        let response = Challenge::Response(
-            PublicId::Client(self.full_id.public_id().clone()),
-            signature,
-        );
-
-        self.send(conn_info.clone(), &response);
+        let signature = self.full_id().sign(payload);
+        let response = Challenge::Response(self.full_id().public_id().clone(), signature);
+        self.set_connected_vault(conn_info.clone());
+        self.send(&response);
     }
 
-    pub fn send<T: Serialize>(&mut self, recipient: NodeInfo, msg: &T) {
+    fn expect_new_message(&self) -> (SocketAddr, Bytes) {
+        match self.rx().try_recv() {
+            Ok(Event::NewMessage { peer_addr, msg }) => (peer_addr, msg),
+            x => unexpected!(x),
+        }
+    }
+
+    fn expect_no_new_message(&self) {
+        match self.rx().try_recv() {
+            Err(error) => assert!(error.is_empty()),
+            x => unexpected!(x),
+        }
+    }
+
+    fn send<T: Serialize>(&mut self, msg: &T) {
         let msg = unwrap!(bincode::serialize(msg));
-        self.quic_p2p.send(
-            Peer::Node {
-                node_info: recipient,
-            },
-            Bytes::from(msg),
-        )
+        let node_info = self.connected_vault();
+        self.quic_p2p()
+            .send(Peer::Node { node_info }, Bytes::from(msg))
     }
 
-    pub fn send_request(&mut self, recipient: NodeInfo, request: Request) -> MessageId {
+    fn send_request(&mut self, request: Request) -> MessageId {
         let message_id = MessageId::new();
 
         let to_sign = (&request, &message_id);
         let to_sign = unwrap!(bincode::serialize(&to_sign));
-        let signature = self.full_id.sign(&to_sign);
+        let signature = self.full_id().sign(&to_sign);
 
         let msg = Message::Request {
             request,
@@ -219,12 +240,12 @@ impl TestClient {
             signature: Some(signature),
         };
 
-        self.send(recipient, &msg);
+        self.send(&msg);
 
         message_id
     }
 
-    pub fn expect_response(&mut self, expected_message_id: MessageId) -> Response {
+    fn expect_response(&mut self, expected_message_id: MessageId) -> Response {
         let bytes = self.expect_new_message().1;
         let message: Message = unwrap!(bincode::deserialize(&bytes));
 
@@ -244,6 +265,60 @@ impl TestClient {
     }
 }
 
+pub struct TestClient {
+    quic_p2p: QuicP2p,
+    rx: Receiver<Event>,
+    full_id: FullId,
+    public_id: ClientPublicId,
+    connected_vault: Option<NodeInfo>,
+}
+
+impl TestClient {
+    fn new_disconnected(rng: &mut TestRng) -> Self {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let config = quic_p2p::Config {
+            our_type: OurType::Client,
+            ..Default::default()
+        };
+        let client_full_id = ClientFullId::new_ed25519(rng);
+        let public_id = client_full_id.public_id().clone();
+
+        Self {
+            quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
+            rx,
+            full_id: FullId::Client(client_full_id),
+            public_id,
+            connected_vault: None,
+        }
+    }
+
+    pub fn public_id(&self) -> &ClientPublicId {
+        &self.public_id
+    }
+}
+
+impl TestClientTrait for TestClient {
+    fn quic_p2p(&mut self) -> &mut QuicP2p {
+        &mut self.quic_p2p
+    }
+
+    fn rx(&self) -> &Receiver<Event> {
+        &self.rx
+    }
+
+    fn full_id(&self) -> &FullId {
+        &self.full_id
+    }
+
+    fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
+        self.connected_vault = Some(connected_vault);
+    }
+
+    fn connected_vault(&self) -> NodeInfo {
+        unwrap!(self.connected_vault.clone())
+    }
+}
+
 impl Deref for TestClient {
     type Target = QuicP2p;
 
@@ -258,58 +333,107 @@ impl DerefMut for TestClient {
     }
 }
 
-pub fn establish_connection(env: &mut Environment, client: &mut TestClient, vault: &mut TestVault) {
-    let conn_info = vault.connection_info();
-    client.connect_to(conn_info.clone());
-    env.poll(vault);
-
-    client.expect_connected_to(&conn_info);
-    client.handle_challenge_from(&conn_info);
-    env.poll(vault);
+pub struct TestApp {
+    quic_p2p: QuicP2p,
+    rx: Receiver<Event>,
+    full_id: FullId,
+    public_id: AppPublicId,
+    connected_vault: Option<NodeInfo>,
 }
 
-pub fn perform_transaction(
+impl TestApp {
+    fn new_disconnected(rng: &mut TestRng, owner: ClientPublicId) -> Self {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let config = quic_p2p::Config {
+            our_type: OurType::Client,
+            ..Default::default()
+        };
+        let app_full_id = AppFullId::new_ed25519(rng, owner);
+        let public_id = app_full_id.public_id().clone();
+
+        Self {
+            quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
+            rx,
+            full_id: FullId::App(app_full_id),
+            public_id,
+            connected_vault: None,
+        }
+    }
+
+    pub fn public_id(&self) -> &AppPublicId {
+        &self.public_id
+    }
+}
+
+impl TestClientTrait for TestApp {
+    fn quic_p2p(&mut self) -> &mut QuicP2p {
+        &mut self.quic_p2p
+    }
+
+    fn rx(&self) -> &Receiver<Event> {
+        &self.rx
+    }
+
+    fn full_id(&self) -> &FullId {
+        &self.full_id
+    }
+
+    fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
+        self.connected_vault = Some(connected_vault);
+    }
+
+    fn connected_vault(&self) -> NodeInfo {
+        unwrap!(self.connected_vault.clone())
+    }
+}
+
+impl Deref for TestApp {
+    type Target = QuicP2p;
+
+    fn deref(&self) -> &Self::Target {
+        &self.quic_p2p
+    }
+}
+
+impl DerefMut for TestApp {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.quic_p2p
+    }
+}
+
+pub fn perform_transaction<T: TestClientTrait>(
     env: &mut Environment,
-    client: &mut TestClient,
-    vault: &mut TestVault,
+    client: &mut T,
     request: Request,
 ) {
-    let conn_info = vault.connection_info();
-    let message_id = client.send_request(conn_info, request);
-    env.poll(vault);
-
+    let message_id = client.send_request(request);
+    env.poll();
     match client.expect_response(message_id) {
         Response::Transaction(Ok(_)) => (),
         x => unexpected!(x),
     }
 }
 
-pub fn perform_mutation(
+pub fn perform_mutation<T: TestClientTrait>(
     env: &mut Environment,
-    client: &mut TestClient,
-    vault: &mut TestVault,
+    client: &mut T,
     request: Request,
 ) {
-    let conn_info = vault.connection_info();
-    let message_id = client.send_request(conn_info, request);
-    env.poll(vault);
-
+    let message_id = client.send_request(request);
+    env.poll();
     match client.expect_response(message_id) {
         Response::Mutation(Ok(())) => (),
         x => unexpected!(x),
     }
 }
 
-pub fn get_idata(
+pub fn get_idata<T: TestClientTrait>(
     env: &mut Environment,
-    client: &mut TestClient,
-    vault: &mut TestVault,
+    client: &mut T,
     address: IDataAddress,
 ) -> Vec<u8> {
-    let conn_info = vault.connection_info();
-    let message_id = client.send_request(conn_info, Request::GetIData(address));
-    env.poll(vault);
-
+    let message_id = client.send_request(Request::GetIData(address));
+    env.poll();
     match client.expect_response(message_id) {
         Response::GetIData(Ok(IData::Unpub(data))) => data.value().clone(),
         Response::GetIData(Ok(IData::Pub(data))) => data.value().clone(),
@@ -317,29 +441,23 @@ pub fn get_idata(
     }
 }
 
-pub fn get_balance(env: &mut Environment, client: &mut TestClient, vault: &mut TestVault) -> Coins {
-    let conn_info = vault.connection_info();
-    let message_id = client.send_request(conn_info, Request::GetBalance);
-
-    env.poll(vault);
-
+pub fn get_balance<T: TestClientTrait>(env: &mut Environment, client: &mut T) -> Coins {
+    let message_id = client.send_request(Request::GetBalance);
+    env.poll();
     match client.expect_response(message_id) {
         Response::GetBalance(Ok(coins)) => coins,
         x => unexpected!(x),
     }
 }
 
-pub fn send_request_expect_err(
+pub fn send_request_expect_err<T: TestClientTrait>(
     env: &mut Environment,
-    client: &mut TestClient,
-    vault: &mut TestVault,
+    client: &mut T,
     request: Request,
     response: Response,
 ) {
-    let conn_info = vault.connection_info();
-    let message_id = client.send_request(conn_info, request);
-    env.poll(vault);
-
+    let message_id = client.send_request(request);
+    env.poll();
     let resp = client.expect_response(message_id);
     if response != resp {
         unexpected!(resp);

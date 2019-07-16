@@ -19,12 +19,12 @@ pub(super) struct Balance {
     pub coins: Coins,
 }
 
-pub(super) struct BalanceDb {
+pub(super) struct BalancesDb {
     db: PickleDb,
     index: HashMap<XorName, PublicKey>,
 }
 
-impl BalanceDb {
+impl BalancesDb {
     pub fn new<R: AsRef<Path>>(root_dir: R, init_mode: Init) -> Result<Self> {
         let db = utils::new_db(root_dir, BALANCES_DB_NAME, init_mode)?;
         let index = db

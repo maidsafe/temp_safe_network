@@ -6,28 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod account;
 mod balance;
 
-use self::balance::{Balance, BalanceDb};
+use self::{
+    account::AccountsDb,
+    balance::{Balance, BalancesDb},
+};
 use crate::{
     action::Action,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     rpc::Rpc,
     utils,
     vault::Init,
-    Error, Result, ToDbKey,
+    Error, Result,
 };
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
-use pickledb::PickleDb;
 use safe_nd::{
     AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress, IDataKind, Message,
     MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature, Transaction,
     TransactionId, XorName,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
@@ -36,16 +39,9 @@ use std::{
 };
 use unwrap::unwrap;
 
-const ACCOUNTS_DB_NAME: &str = "accounts.db";
-
 lazy_static! {
     /// The cost to Put a chunk to the network.
     pub static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Account {
-    apps: HashMap<PublicKey, AppPermissions>,
 }
 
 #[derive(Clone, Debug)]
@@ -56,8 +52,8 @@ struct ClientInfo {
 
 pub(crate) struct SourceElder {
     id: NodePublicId,
-    accounts: PickleDb,
-    balances: BalanceDb,
+    accounts: AccountsDb,
+    balances: BalancesDb,
     clients: HashMap<SocketAddr, ClientInfo>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
@@ -71,8 +67,8 @@ impl SourceElder {
         config: &QuicP2pConfig,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let accounts = utils::new_db(&root_dir, ACCOUNTS_DB_NAME, init_mode)?;
-        let balances = BalanceDb::new(&root_dir, init_mode)?;
+        let accounts = AccountsDb::new(&root_dir, init_mode)?;
+        let balances = BalancesDb::new(&root_dir, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
         let src_elder = Self {
             id,
@@ -195,6 +191,7 @@ impl SourceElder {
         None
     }
 
+    #[allow(clippy::cognitive_complexity)]
     fn handle_client_request(
         &mut self,
         client: &ClientInfo,
@@ -215,54 +212,190 @@ impl SourceElder {
                 return None;
             }
         }
+
+        let dbg_msg = format!(
+            "{}: ({:?}/{:?}) from {} is unsigned",
+            self, request, message_id, client.public_id
+        );
+        let has_signature = || {
+            if (&signature).is_none() {
+                warn!("{}", dbg_msg);
+                return None;
+            }
+            Some(())
+        };
+
         // TODO - remove this
         #[allow(unused)]
         match request {
             //
             // ===== Immutable Data =====
             //
-            PutIData(chunk) => self.handle_put_idata(client, chunk, message_id, signature),
-            GetIData(address) => self.handle_get_idata(client, address, message_id, signature),
+            PutIData(chunk) => {
+                has_signature()?;
+                self.handle_put_idata(client, chunk, message_id)
+            }
+            GetIData(address) => {
+                if address.kind() != IDataKind::Pub {
+                    has_signature()?;
+                }
+                self.handle_get_idata(client, address, message_id)
+            }
             DeleteUnpubIData(address) => {
-                self.handle_delete_unpub_idata(client, address, message_id, signature)
+                has_signature()?;
+                self.handle_delete_unpub_idata(client, address, message_id)
             }
             //
             // ===== Mutable Data =====
             //
-            PutMData(_) => unimplemented!(),
-            GetMData(ref address) => unimplemented!(),
-            GetMDataValue { ref address, .. } => unimplemented!(),
-            DeleteMData(ref address) => unimplemented!(),
-            GetMDataShell(ref address) => unimplemented!(),
-            GetMDataVersion(ref address) => unimplemented!(),
-            ListMDataEntries(ref address) => unimplemented!(),
-            ListMDataKeys(ref address) => unimplemented!(),
-            ListMDataValues(ref address) => unimplemented!(),
-            SetMDataUserPermissions { ref address, .. } => unimplemented!(),
-            DelMDataUserPermissions { ref address, .. } => unimplemented!(),
-            ListMDataPermissions(ref address) => unimplemented!(),
-            ListMDataUserPermissions { ref address, .. } => unimplemented!(),
-            MutateSeqMDataEntries { ref address, .. } => unimplemented!(),
-            MutateUnseqMDataEntries { ref address, .. } => unimplemented!(),
+            PutMData(_) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetMData(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetMDataValue { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            DeleteMData(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetMDataShell(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetMDataVersion(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            ListMDataEntries(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            ListMDataKeys(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            ListMDataValues(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            SetMDataUserPermissions { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            DelMDataUserPermissions { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            ListMDataPermissions(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            ListMDataUserPermissions { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            MutateSeqMDataEntries { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            MutateUnseqMDataEntries { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
             //
             // ===== Append Only Data =====
             //
-            PutAData(_) => unimplemented!(),
-            GetAData(ref address) => unimplemented!(),
-            GetADataShell { ref address, .. } => unimplemented!(),
-            DeleteAData(ref address) => unimplemented!(),
-            GetADataRange { ref address, .. } => unimplemented!(),
-            GetADataIndices(ref address) => unimplemented!(),
-            GetADataLastEntry(ref address) => unimplemented!(),
-            GetADataPermissions { ref address, .. } => unimplemented!(),
+            PutAData(_) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetAData(ref address) => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            GetADataValue { ref address, .. } => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            GetADataShell { ref address, .. } => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            DeleteAData(ref address) => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetADataRange { ref address, .. } => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            GetADataIndices(ref address) => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            GetADataLastEntry(ref address) => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            GetADataPermissions { ref address, .. } => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
             GetPubADataUserPermissions { ref address, .. } => unimplemented!(),
-            GetUnpubADataUserPermissions { ref address, .. } => unimplemented!(),
-            GetADataOwners { ref address, .. } => unimplemented!(),
-            AddPubADataPermissions { ref address, .. } => unimplemented!(),
-            AddUnpubADataPermissions { ref address, .. } => unimplemented!(),
-            SetADataOwner { ref address, .. } => unimplemented!(),
-            AppendSeq { ref append, .. } => unimplemented!(),
-            AppendUnseq(ref append) => unimplemented!(),
+            GetUnpubADataUserPermissions { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            GetADataOwners { ref address, .. } => {
+                if !utils::is_published(address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            AddPubADataPermissions { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            AddUnpubADataPermissions { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            SetADataOwner { ref address, .. } => {
+                has_signature()?;
+                unimplemented!()
+            }
+            AppendSeq { ref append, .. } => {
+                if !utils::is_published(&append.address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
+            AppendUnseq(ref append) => {
+                if !utils::is_published(&append.address) {
+                    has_signature()?;
+                }
+                unimplemented!()
+            }
             //
             // ===== Coins =====
             //
@@ -270,14 +403,18 @@ impl SourceElder {
                 destination,
                 amount,
                 transaction_id,
-            } => self.handle_transfer_coins(
-                &client.public_id,
-                message_id,
-                destination,
-                amount,
-                transaction_id,
-            ),
+            } => {
+                has_signature()?;
+                self.handle_transfer_coins(
+                    &client.public_id,
+                    message_id,
+                    destination,
+                    amount,
+                    transaction_id,
+                )
+            }
             GetBalance => {
+                has_signature()?;
                 let balance = self
                     .balance(client.public_id.name())
                     .or_else(|| Coins::from_nano(0).ok())?;
@@ -289,13 +426,16 @@ impl SourceElder {
                 new_balance_owner,
                 amount,
                 transaction_id,
-            } => self.handle_create_balance(
-                &client.public_id,
-                message_id,
-                new_balance_owner,
-                amount,
-                transaction_id,
-            ),
+            } => {
+                has_signature()?;
+                self.handle_create_balance(
+                    &client.public_id,
+                    message_id,
+                    new_balance_owner,
+                    amount,
+                    transaction_id,
+                )
+            }
             //
             // ===== Login packets =====
             //
@@ -305,6 +445,7 @@ impl SourceElder {
                 message_id,
             })),
             CreateLoginPacketFor { .. } | UpdateLoginPacket { .. } | GetLoginPacket(..) => {
+                has_signature()?;
                 // TODO: allow only registered clients to send this req
                 // once the coin balances are implemented.
 
@@ -326,13 +467,22 @@ impl SourceElder {
             //
             // ===== Client (Owner) to SrcElders =====
             //
-            ListAuthKeysAndVersion => unimplemented!(),
+            ListAuthKeysAndVersion => {
+                has_signature()?;
+                self.handle_list_auth_keys_and_version(client, message_id)
+            }
             InsAuthKey {
-                ref key,
+                key,
                 version,
-                ref permissions,
-            } => unimplemented!(),
-            DelAuthKey { ref key, version } => unimplemented!(),
+                permissions,
+            } => {
+                has_signature()?;
+                self.handle_ins_auth_key(client, key, version, permissions, message_id)
+            }
+            DelAuthKey { key, version } => {
+                has_signature()?;
+                self.handle_del_auth_key(client, key, version, message_id)
+            }
         }
     }
 
@@ -362,30 +512,11 @@ impl SourceElder {
         }
     }
 
-    /// This method only exists to avoid duplicating the log line in many places.
-    fn has_signature(
-        &self,
-        client_id: &PublicId,
-        request: &Request,
-        message_id: &MessageId,
-        signature: &Option<Signature>,
-    ) -> Option<()> {
-        if signature.is_none() {
-            warn!(
-                "{}: ({:?}/{:?}) from {} is unsigned",
-                self, request, message_id, client_id
-            );
-            return None;
-        }
-        Some(())
-    }
-
     fn handle_put_idata(
         &mut self,
         client: &ClientInfo,
         chunk: IData,
         message_id: MessageId,
-        signature: Option<Signature>,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
 
@@ -408,8 +539,6 @@ impl SourceElder {
             }
         }
 
-        let request = Request::PutIData(chunk);
-        self.has_signature(&client.public_id, &request, &message_id, &signature)?;
         if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
             // Note: in phase 1, we proceed even if there are insufficient funds.
             trace!(
@@ -422,7 +551,7 @@ impl SourceElder {
 
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request,
+            request: Request::PutIData(chunk),
             message_id,
         }))
     }
@@ -432,16 +561,11 @@ impl SourceElder {
         client: &ClientInfo,
         address: IDataAddress,
         message_id: MessageId,
-        signature: Option<Signature>,
     ) -> Option<Action> {
-        let request = Request::GetIData(address);
-        if address.kind() != IDataKind::Pub {
-            self.has_signature(&client.public_id, &request, &message_id, &signature)?;
-        }
         if address.kind() == IDataKind::Pub || client.has_balance {
             Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client.public_id.clone(),
-                request,
+                request: Request::GetIData(address),
                 message_id,
             }))
         } else {
@@ -459,7 +583,6 @@ impl SourceElder {
         client: &ClientInfo,
         address: IDataAddress,
         message_id: MessageId,
-        signature: Option<Signature>,
     ) -> Option<Action> {
         if address.kind() == IDataKind::Pub {
             self.send_response_to_client(
@@ -469,12 +592,10 @@ impl SourceElder {
             );
             return None;
         }
-        let request = Request::DeleteUnpubIData(address);
-        self.has_signature(&client.public_id, &request, &message_id, &signature)?;
         if client.has_balance {
             Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client.public_id.clone(),
-                request,
+                request: Request::DeleteUnpubIData(address),
                 message_id,
             }))
         } else {
@@ -544,14 +665,8 @@ impl SourceElder {
         match public_id {
             PublicId::Client(pub_id) => self.balances.exists(pub_id.name()),
             PublicId::App(app_pub_id) => {
-                let owner = app_pub_id.owner();
-                let app_pub_key = app_pub_id.public_key();
-                self.balances.exists(owner.name())
-                    && self
-                        .accounts
-                        .get(&owner.to_db_key())
-                        .map(|account: Account| account.apps.get(app_pub_key).is_some())
-                        .unwrap_or(false)
+                self.balances.exists(app_pub_id.owner().name())
+                    && self.accounts.app_permissions(app_pub_id).is_some()
             }
             PublicId::Node(_) => {
                 error!("{}: Logic error. This should be unreachable.", self);
@@ -628,6 +743,7 @@ impl SourceElder {
             // ===== Append Only Data =====
             //
             GetAData(result) => unimplemented!(),
+            GetADataValue(result) => unimplemented!(),
             GetADataShell(result) => unimplemented!(),
             GetADataOwners(result) => unimplemented!(),
             GetADataRange(result) => unimplemented!(),
@@ -823,6 +939,66 @@ impl SourceElder {
 
             NdError::from("Failed to update balance")
         })
+    }
+
+    fn handle_list_auth_keys_and_version(
+        &mut self,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if client.has_balance {
+            Ok(self
+                .accounts
+                .list_auth_keys_and_version(utils::client(&client.public_id)?))
+        } else {
+            Err(NdError::NoSuchBalance)
+        };
+
+        self.send_response_to_client(
+            &client.public_id,
+            message_id,
+            Response::ListAuthKeysAndVersion(result),
+        );
+        None
+    }
+
+    fn handle_ins_auth_key(
+        &mut self,
+        client: &ClientInfo,
+        key: PublicKey,
+        new_version: u64,
+        permissions: AppPermissions,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if client.has_balance {
+            self.accounts.ins_auth_key(
+                utils::client(&client.public_id)?,
+                key,
+                new_version,
+                permissions,
+            )
+        } else {
+            Err(NdError::NoSuchBalance)
+        };
+        self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
+        None
+    }
+
+    fn handle_del_auth_key(
+        &mut self,
+        client: &ClientInfo,
+        key: PublicKey,
+        new_version: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if client.has_balance {
+            self.accounts
+                .del_auth_key(utils::client(&client.public_id)?, key, new_version)
+        } else {
+            Err(NdError::NoSuchBalance)
+        };
+        self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
+        None
     }
 }
 

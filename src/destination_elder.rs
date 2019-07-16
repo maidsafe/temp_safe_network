@@ -38,9 +38,6 @@ use std::{
 use unwrap::unwrap;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
-const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
-const APPEND_ONLY_META_DB_NAME: &str = "append_only_data.db";
-const LOGIN_PACKET_META_DB_NAME: &str = "login_packet.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 // The number of separate copies of an ImmutableData chunk which should be maintained.
 const IMMUTABLE_DATA_COPY_COUNT: usize = 3;
@@ -56,14 +53,11 @@ pub(crate) struct DestinationElder {
     id: NodePublicId,
     idata_ops: BTreeMap<MessageId, IDataOp>,
     immutable_metadata: PickleDb,
-    mutable_metadata: PickleDb,
-    append_only_metadata: PickleDb,
-    login_packet_metadata: PickleDb,
     full_adults: PickleDb,
     immutable_chunks: ImmutableChunkStore,
     mutable_chunks: MutableChunkStore,
     append_only_chunks: AppendOnlyChunkStore,
-    login_packet_chunks: LoginPacketChunkStore,
+    login_packets: LoginPacketChunkStore,
 }
 
 impl DestinationElder {
@@ -74,10 +68,7 @@ impl DestinationElder {
         init_mode: Init,
     ) -> Result<Self> {
         let immutable_metadata = utils::new_db(root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
-        let mutable_metadata = utils::new_db(root_dir, MUTABLE_META_DB_NAME, init_mode)?;
-        let append_only_metadata = utils::new_db(root_dir, APPEND_ONLY_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
-        let login_packet_metadata = utils::new_db(root_dir, LOGIN_PACKET_META_DB_NAME, init_mode)?;
 
         let total_used_space = Rc::new(RefCell::new(0));
         let immutable_chunks = ImmutableChunkStore::new(
@@ -98,7 +89,7 @@ impl DestinationElder {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
-        let login_packet_chunks = LoginPacketChunkStore::new(
+        let login_packets = LoginPacketChunkStore::new(
             root_dir,
             max_capacity,
             Rc::clone(&total_used_space),
@@ -108,14 +99,11 @@ impl DestinationElder {
             id,
             idata_ops: Default::default(),
             immutable_metadata,
-            mutable_metadata,
-            append_only_metadata,
-            login_packet_metadata,
             full_adults,
             immutable_chunks,
             mutable_chunks,
             append_only_chunks,
-            login_packet_chunks,
+            login_packets,
         })
     }
 
@@ -193,6 +181,7 @@ impl DestinationElder {
             //
             PutAData(data) => unimplemented!(),
             GetAData(address) => unimplemented!(),
+            GetADataValue { address, key } => unimplemented!(),
             GetADataShell {
                 address,
                 data_index,
@@ -222,12 +211,18 @@ impl DestinationElder {
             AddPubADataPermissions {
                 address,
                 permissions,
+                permissions_idx,
             } => unimplemented!(),
             AddUnpubADataPermissions {
                 address,
                 permissions,
+                permissions_idx,
             } => unimplemented!(),
-            SetADataOwner { address, owner } => unimplemented!(),
+            SetADataOwner {
+                address,
+                owner,
+                owners_idx,
+            } => unimplemented!(),
             AppendSeq { append, index } => unimplemented!(),
             AppendUnseq(operation) => unimplemented!(),
             //
@@ -286,42 +281,37 @@ impl DestinationElder {
         #[allow(unused)]
         match response {
             Mutation(result) => self.handle_mutation_resp(src, result, message_id),
-            //
-            // ===== Immutable Data =====
-            //
             GetIData(result) => self.handle_get_idata_resp(src, result, message_id),
-            //
-            // ===== Mutable Data =====
-            //
-            GetMData(result) => unimplemented!(),
-            GetMDataShell(result) => unimplemented!(),
-            GetMDataVersion(result) => unimplemented!(),
-            ListUnseqMDataEntries(result) => unimplemented!(),
-            ListSeqMDataEntries(result) => unimplemented!(),
-            ListMDataKeys(result) => unimplemented!(),
-            ListSeqMDataValues(result) => unimplemented!(),
-            ListUnseqMDataValues(result) => unimplemented!(),
-            ListMDataUserPermissions(result) => unimplemented!(),
-            ListMDataPermissions(result) => unimplemented!(),
-            GetSeqMDataValue(result) => unimplemented!(),
-            GetUnseqMDataValue(result) => unimplemented!(),
-            //
-            // ===== Append Only Data =====
-            //
-            GetAData(result) => unimplemented!(),
-            GetADataShell(result) => unimplemented!(),
-            GetADataOwners(result) => unimplemented!(),
-            GetADataRange(result) => unimplemented!(),
-            GetADataIndices(result) => unimplemented!(),
-            GetADataLastEntry(result) => unimplemented!(),
-            GetUnpubADataPermissionAtIndex(result) => unimplemented!(),
-            GetPubADataPermissionAtIndex(result) => unimplemented!(),
-            GetPubADataUserPermissions(result) => unimplemented!(),
-            GetUnpubADataUserPermissions(result) => unimplemented!(),
             //
             // ===== Invalid =====
             //
-            GetBalance(_) | Transaction(_) | ListAuthKeysAndVersion(_) | GetLoginPacket(_) => {
+            GetMData(_)
+            | GetMDataShell(_)
+            | GetMDataVersion(_)
+            | ListUnseqMDataEntries(_)
+            | ListSeqMDataEntries(_)
+            | ListMDataKeys(_)
+            | ListSeqMDataValues(_)
+            | ListUnseqMDataValues(_)
+            | ListMDataUserPermissions(_)
+            | ListMDataPermissions(_)
+            | GetSeqMDataValue(_)
+            | GetUnseqMDataValue(_)
+            | GetAData(_)
+            | GetADataValue(_)
+            | GetADataShell(_)
+            | GetADataOwners(_)
+            | GetADataRange(_)
+            | GetADataIndices(_)
+            | GetADataLastEntry(_)
+            | GetUnpubADataPermissionAtIndex(_)
+            | GetPubADataPermissionAtIndex(_)
+            | GetPubADataUserPermissions(_)
+            | GetUnpubADataUserPermissions(_)
+            | Transaction(_)
+            | GetBalance(_)
+            | ListAuthKeysAndVersion(_)
+            | GetLoginPacket(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response
@@ -339,7 +329,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let requester_pk = utils::own_key(&requester)?;
         let result = self
-            .login_packet_chunks
+            .login_packets
             .get(updated_login_packet.destination())
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
@@ -353,7 +343,7 @@ impl DestinationElder {
                     // Request does not come from the owner
                     Err(NdError::AccessDenied)
                 } else {
-                    self.login_packet_chunks
+                    self.login_packets
                         .put(updated_login_packet)
                         .map_err(|err| err.to_string().into())
                 }
@@ -375,12 +365,12 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         // TODO: verify owner is the same as src?
-        let result = if self.login_packet_chunks.has(new_login_packet.destination()) {
+        let result = if self.login_packets.has(new_login_packet.destination()) {
             Err(NdError::LoginPacketExists)
         } else if !new_login_packet.size_is_valid() {
             Err(NdError::ExceededSize)
         } else {
-            self.login_packet_chunks
+            self.login_packets
                 .put(new_login_packet)
                 .map_err(|error| error.to_string().into())
         };
@@ -402,7 +392,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let requester_pk = utils::own_key(&requester)?;
         let result = self
-            .login_packet_chunks
+            .login_packets
             .get(address)
             .map_err(|error| match error {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,

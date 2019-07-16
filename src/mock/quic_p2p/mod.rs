@@ -72,7 +72,8 @@ impl QuicP2p {
     /// connect to all peers which are specified in the config (`hard_coded_contacts`) or were
     /// previously cached. If one bootstrap connection succeeds, all other connections will be dropped.
     ///
-    /// In case of success `Event::BootstrapedTo` will be fired. On error quic-p2p will fire `Event::BootstrapFailure`.
+    /// In case of success `Event::BootstrappedTo` will be fired. On error quic-p2p will fire
+    /// `Event::BootstrapFailure`.
     pub fn bootstrap(&mut self) {
         self.inner.borrow_mut().bootstrap()
     }
@@ -247,7 +248,7 @@ pub enum Event {
         /// Message content.
         msg: Bytes,
     },
-    /// Connection successfuly established.
+    /// Connection successfully established.
     ConnectedTo {
         /// Info about the connected peer.
         peer: Peer,

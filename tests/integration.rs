@@ -53,42 +53,34 @@
 #[macro_use]
 mod common;
 
-use self::common::{Environment, TestClient, TestVault};
+use self::common::{Environment, TestClientTrait};
 use rand::Rng;
 use safe_nd::{
-    Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData, Request, Response,
-    UnpubImmutableData, XorName,
+    AppPermissions, Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
+    PublicKey, Request, Response, Result as NdResult, UnpubImmutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
+use std::collections::BTreeMap;
 use unwrap::unwrap;
 
 #[test]
 fn client_connects() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let client = env.new_connected_client();
+    let _app = env.new_connected_app(client.public_id().clone());
 }
 
 #[test]
 fn login_packets() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
-
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let mut client = env.new_connected_client();
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
 
     // Try to get a login packet that does not exist yet.
-    let message_id = client.send_request(
-        conn_info.clone(),
-        Request::GetLoginPacket(login_packet_locator),
-    );
-    env.poll(&mut vault);
-
+    let message_id = client.send_request(Request::GetLoginPacket(login_packet_locator));
+    env.poll();
     match client.expect_response(message_id) {
         Response::GetLoginPacket(Err(NdError::NoSuchLoginPacket)) => (),
         x => unexpected!(x),
@@ -99,23 +91,18 @@ fn login_packets() {
         login_packet_locator,
         *client.public_id().public_key(),
         login_packet_data.clone(),
-        client.full_id().sign(&login_packet_data),
+        client.sign(&login_packet_data),
     ));
 
     common::perform_mutation(
         &mut env,
         &mut client,
-        &mut vault,
         Request::CreateLoginPacket(login_packet.clone()),
     );
 
     // Try to get the login packet data and signature.
-    let message_id = client.send_request(
-        conn_info.clone(),
-        Request::GetLoginPacket(login_packet_locator),
-    );
-    env.poll(&mut vault);
-
+    let message_id = client.send_request(Request::GetLoginPacket(login_packet_locator));
+    env.poll();
     match client.expect_response(message_id) {
         Response::GetLoginPacket(Ok((data, sig))) => {
             assert_eq!(data, login_packet_data);
@@ -129,10 +116,8 @@ fn login_packets() {
     }
 
     // Putting login packet to the same address should fail.
-    let message_id =
-        client.send_request(conn_info.clone(), Request::CreateLoginPacket(login_packet));
-    env.poll(&mut vault);
-
+    let message_id = client.send_request(Request::CreateLoginPacket(login_packet));
+    env.poll();
     match client.expect_response(message_id) {
         Response::Mutation(Err(NdError::LoginPacketExists)) => (),
         x => unexpected!(x),
@@ -140,15 +125,9 @@ fn login_packets() {
 
     // Getting login packet from non-owning client should fail.
     {
-        let mut client = TestClient::new(env.rng());
-        common::establish_connection(&mut env, &mut client, &mut vault);
-
-        let message_id = client.send_request(
-            conn_info.clone(),
-            Request::GetLoginPacket(login_packet_locator),
-        );
-        env.poll(&mut vault);
-
+        let mut client = env.new_connected_client();
+        let message_id = client.send_request(Request::GetLoginPacket(login_packet_locator));
+        env.poll();
         match client.expect_response(message_id) {
             Response::GetLoginPacket(Err(NdError::AccessDenied)) => (),
             x => unexpected!(x),
@@ -159,11 +138,7 @@ fn login_packets() {
 #[test]
 fn update_login_packet() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
-
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let mut client = env.new_connected_client();
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -173,24 +148,22 @@ fn update_login_packet() {
         login_packet_locator,
         *client.public_id().public_key(),
         login_packet_data.clone(),
-        client.full_id().sign(&login_packet_data),
+        client.sign(&login_packet_data),
     ));
 
     common::perform_mutation(
         &mut env,
         &mut client,
-        &mut vault,
         Request::CreateLoginPacket(login_packet.clone()),
     );
 
     // Update the login packet data.
     let new_login_packet_data = vec![1; 32];
     let client_public_key = *client.public_id().public_key();
-    let signature = client.full_id().sign(&new_login_packet_data);
+    let signature = client.sign(&new_login_packet_data);
     common::perform_mutation(
         &mut env,
         &mut client,
-        &mut vault,
         Request::UpdateLoginPacket(unwrap!(LoginPacket::new(
             login_packet_locator,
             client_public_key,
@@ -200,11 +173,8 @@ fn update_login_packet() {
     );
 
     // Try to get the login packet data and signature.
-    let message_id = client.send_request(
-        conn_info.clone(),
-        Request::GetLoginPacket(login_packet_locator),
-    );
-    env.poll(&mut vault);
+    let message_id = client.send_request(Request::GetLoginPacket(login_packet_locator));
+    env.poll();
 
     match client.expect_response(message_id) {
         Response::GetLoginPacket(Ok((data, sig))) => {
@@ -216,14 +186,10 @@ fn update_login_packet() {
 
     // Updating login packet from non-owning client should fail.
     {
-        let mut client = TestClient::new(env.rng());
-        common::establish_connection(&mut env, &mut client, &mut vault);
+        let mut client = env.new_connected_client();
 
-        let message_id = client.send_request(
-            conn_info.clone(),
-            Request::UpdateLoginPacket(login_packet.clone()),
-        );
-        env.poll(&mut vault);
+        let message_id = client.send_request(Request::UpdateLoginPacket(login_packet.clone()));
+        env.poll();
 
         match client.expect_response(message_id) {
             Response::Mutation(Err(NdError::AccessDenied)) => (),
@@ -235,29 +201,21 @@ fn update_login_packet() {
 #[test]
 fn coin_operations() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
-    let mut client_a = TestClient::new(env.rng());
-    let mut client_b = TestClient::new(env.rng());
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
 
-    common::establish_connection(&mut env, &mut client_a, &mut vault);
-    common::establish_connection(&mut env, &mut client_b, &mut vault);
-
-    let balance = common::get_balance(&mut env, &mut client_a, &mut vault);
+    let balance = common::get_balance(&mut env, &mut client_a);
     assert_eq!(balance, unwrap!(Coins::from_nano(0)));
 
     // Create A's balance
     let public_key = *client_a.public_id().public_key();
-    let message_id = client_a.send_request(
-        conn_info.clone(),
-        Request::CreateBalance {
-            new_balance_owner: public_key,
-            amount: unwrap!(Coins::from_nano(10)),
-            transaction_id: 0,
-        },
-    );
-    env.poll(&mut vault);
+    let message_id = client_a.send_request(Request::CreateBalance {
+        new_balance_owner: public_key,
+        amount: unwrap!(Coins::from_nano(10)),
+        transaction_id: 0,
+    });
+    env.poll();
 
     match client_a.expect_response(message_id) {
         Response::Transaction(Ok(transaction)) => {
@@ -267,19 +225,16 @@ fn coin_operations() {
         x => unexpected!(x),
     }
 
-    let balance = common::get_balance(&mut env, &mut client_a, &mut vault);
+    let balance = common::get_balance(&mut env, &mut client_a);
     assert_eq!(balance, unwrap!(Coins::from_nano(10)));
 
     // Create B's balance
-    let message_id = client_a.send_request(
-        conn_info.clone(),
-        Request::CreateBalance {
-            new_balance_owner: *client_b.public_id().public_key(),
-            amount: unwrap!(Coins::from_nano(1)),
-            transaction_id: 0,
-        },
-    );
-    env.poll(&mut vault);
+    let message_id = client_a.send_request(Request::CreateBalance {
+        new_balance_owner: *client_b.public_id().public_key(),
+        amount: unwrap!(Coins::from_nano(1)),
+        transaction_id: 0,
+    });
+    env.poll();
 
     match client_a.expect_response(message_id) {
         Response::Transaction(Ok(transaction)) => {
@@ -289,21 +244,18 @@ fn coin_operations() {
         x => unexpected!(x),
     }
 
-    let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
-    let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
+    let balance_a = common::get_balance(&mut env, &mut client_a);
+    let balance_b = common::get_balance(&mut env, &mut client_b);
     assert_eq!(balance_a, unwrap!(Coins::from_nano(9)));
     assert_eq!(balance_b, unwrap!(Coins::from_nano(1)));
 
     // Transfer coins from A to B
-    let message_id = client_a.send_request(
-        conn_info,
-        Request::TransferCoins {
-            destination: *client_b.public_id().name(),
-            amount: unwrap!(Coins::from_nano(2)),
-            transaction_id: 1,
-        },
-    );
-    env.poll(&mut vault);
+    let message_id = client_a.send_request(Request::TransferCoins {
+        destination: *client_b.public_id().name(),
+        amount: unwrap!(Coins::from_nano(2)),
+        transaction_id: 1,
+    });
+    env.poll();
 
     match client_a.expect_response(message_id) {
         Response::Transaction(Ok(transaction)) => {
@@ -313,8 +265,8 @@ fn coin_operations() {
         x => unexpected!(x),
     }
 
-    let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
-    let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
+    let balance_a = common::get_balance(&mut env, &mut client_a);
+    let balance_b = common::get_balance(&mut env, &mut client_b);
     assert_eq!(balance_a, unwrap!(Coins::from_nano(7)));
     assert_eq!(balance_b, unwrap!(Coins::from_nano(3)));
 }
@@ -322,13 +274,9 @@ fn coin_operations() {
 #[test]
 fn put_immutable_data() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-    let conn_info = vault.connection_info();
 
-    let mut client_a = TestClient::new(env.rng());
-    let mut client_b = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client_a, &mut vault);
-    common::establish_connection(&mut env, &mut client_b, &mut vault);
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
 
     let mut raw_data = vec![0u8; 1024];
     env.rng().fill(raw_data.as_mut_slice());
@@ -341,11 +289,9 @@ fn put_immutable_data() {
     // TODO - enable this once we're passed phase 1.
     if false {
         // Put should fail when the client has no associated balance.
-        let message_id_1 =
-            client_a.send_request(conn_info.clone(), Request::PutIData(pub_idata.clone()));
-        let message_id_2 =
-            client_b.send_request(conn_info.clone(), Request::PutIData(unpub_idata.clone()));
-        env.poll(&mut vault);
+        let message_id_1 = client_a.send_request(Request::PutIData(pub_idata.clone()));
+        let message_id_2 = client_b.send_request(Request::PutIData(unpub_idata.clone()));
+        env.poll();
 
         match client_a.expect_response(message_id_1) {
             Response::Mutation(Err(NdError::InsufficientBalance)) => (),
@@ -360,23 +306,17 @@ fn put_immutable_data() {
     // Create balances.  Client A starts with 2000 safecoins and spends 1000 to initialise
     // Client B's balance.
     let start_nano = 1_000_000_000_000;
-    let message_id_1 = client_a.send_request(
-        conn_info.clone(),
-        Request::CreateBalance {
-            new_balance_owner: *client_a.public_id().public_key(),
-            amount: unwrap!(Coins::from_nano(2 * start_nano)),
-            transaction_id: 0,
-        },
-    );
-    let message_id_2 = client_a.send_request(
-        conn_info.clone(),
-        Request::CreateBalance {
-            new_balance_owner: *client_b.public_id().public_key(),
-            amount: unwrap!(Coins::from_nano(start_nano)),
-            transaction_id: 0,
-        },
-    );
-    env.poll(&mut vault);
+    let message_id_1 = client_a.send_request(Request::CreateBalance {
+        new_balance_owner: *client_a.public_id().public_key(),
+        amount: unwrap!(Coins::from_nano(2 * start_nano)),
+        transaction_id: 0,
+    });
+    let message_id_2 = client_a.send_request(Request::CreateBalance {
+        new_balance_owner: *client_b.public_id().public_key(),
+        amount: unwrap!(Coins::from_nano(start_nano)),
+        transaction_id: 0,
+    });
+    env.poll();
 
     for message_id in &[message_id_1, message_id_2] {
         match client_a.expect_response(*message_id) {
@@ -387,22 +327,22 @@ fn put_immutable_data() {
 
     // Check client A can't Put an UnpubIData where B is the owner.
     let unpub_req = Request::PutIData(unpub_idata.clone());
-    let mut message_id_1 = client_a.send_request(conn_info.clone(), unpub_req.clone());
-    env.poll(&mut vault);
+    let mut message_id_1 = client_a.send_request(unpub_req.clone());
+    env.poll();
     match client_a.expect_response(message_id_1) {
         Response::Mutation(Err(NdError::InvalidOwners)) => (),
         x => unexpected!(x),
     }
-    let mut balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
+    let mut balance_a = common::get_balance(&mut env, &mut client_a);
     let mut expected_balance = unwrap!(Coins::from_nano(start_nano));
     assert_eq!(expected_balance, balance_a);
 
     for _ in &[0, 1] {
         // Check they can both Put valid data.
         let pub_req = Request::PutIData(pub_idata.clone());
-        message_id_1 = client_a.send_request(conn_info.clone(), pub_req);
-        let mut message_id_2 = client_b.send_request(conn_info.clone(), unpub_req.clone());
-        env.poll(&mut vault);
+        message_id_1 = client_a.send_request(pub_req);
+        let mut message_id_2 = client_b.send_request(unpub_req.clone());
+        env.poll();
 
         match client_a.expect_response(message_id_1) {
             Response::Mutation(Ok(())) => (),
@@ -412,18 +352,16 @@ fn put_immutable_data() {
             Response::Mutation(Ok(())) => (),
             x => unexpected!(x),
         }
-        balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
-        let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
+        balance_a = common::get_balance(&mut env, &mut client_a);
+        let balance_b = common::get_balance(&mut env, &mut client_b);
         expected_balance = unwrap!(expected_balance.checked_sub(*COST_OF_PUT));
         assert_eq!(expected_balance, balance_a);
         assert_eq!(expected_balance, balance_b);
 
         // Check the data is retrievable.
-        message_id_1 =
-            client_a.send_request(conn_info.clone(), Request::GetIData(*pub_idata.address()));
-        message_id_2 =
-            client_b.send_request(conn_info.clone(), Request::GetIData(*unpub_idata.address()));
-        env.poll(&mut vault);
+        message_id_1 = client_a.send_request(Request::GetIData(*pub_idata.address()));
+        message_id_2 = client_b.send_request(Request::GetIData(*unpub_idata.address()));
+        env.poll();
 
         match client_a.expect_response(message_id_1) {
             Response::GetIData(Ok(received)) => assert_eq!(pub_idata, received),
@@ -439,17 +377,13 @@ fn put_immutable_data() {
 #[test]
 fn get_immutable_data_that_doesnt_exist() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let mut client = env.new_connected_client();
 
     // Try to get non-existing published immutable data
     let address: XorName = env.rng().gen();
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Pub(address)),
         Response::GetIData(Err(NdError::NoSuchData)),
     );
@@ -458,7 +392,6 @@ fn get_immutable_data_that_doesnt_exist() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
         Response::GetIData(Err(NdError::AccessDenied)),
     );
@@ -469,7 +402,6 @@ fn get_immutable_data_that_doesnt_exist() {
     common::perform_transaction(
         &mut env,
         &mut client,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -479,7 +411,6 @@ fn get_immutable_data_that_doesnt_exist() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
         Response::GetIData(Err(NdError::NoSuchData)),
     );
@@ -488,19 +419,15 @@ fn get_immutable_data_that_doesnt_exist() {
 #[test]
 fn get_immutable_data_from_other_owner() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
 
-    let mut client_a = TestClient::new(env.rng());
-    let mut client_b = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client_a, &mut vault);
-    common::establish_connection(&mut env, &mut client_b, &mut vault);
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
 
     let start_nano = 1_000_000_000_000;
     let new_balance_owner = *client_a.public_id().public_key();
     common::perform_transaction(
         &mut env,
         &mut client_a,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -513,7 +440,6 @@ fn get_immutable_data_from_other_owner() {
     common::perform_transaction(
         &mut env,
         &mut client_b,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -525,18 +451,13 @@ fn get_immutable_data_from_other_owner() {
     let raw_data = vec![1, 2, 3];
     let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
     let pub_idata_address = *pub_idata.address();
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        &mut vault,
-        Request::PutIData(pub_idata),
-    );
+    common::perform_mutation(&mut env, &mut client_a, Request::PutIData(pub_idata));
     assert_eq!(
-        common::get_idata(&mut env, &mut client_a, &mut vault, pub_idata_address,),
+        common::get_idata(&mut env, &mut client_a, pub_idata_address,),
         raw_data
     );
     assert_eq!(
-        common::get_idata(&mut env, &mut client_b, &mut vault, pub_idata_address,),
+        common::get_idata(&mut env, &mut client_b, pub_idata_address,),
         raw_data
     );
 
@@ -545,20 +466,14 @@ fn get_immutable_data_from_other_owner() {
     let owner = client_a.public_id().public_key();
     let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data.clone(), *owner));
     let unpub_idata_address = *unpub_idata.address();
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        &mut vault,
-        Request::PutIData(unpub_idata),
-    );
+    common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
     assert_eq!(
-        common::get_idata(&mut env, &mut client_a, &mut vault, unpub_idata_address,),
+        common::get_idata(&mut env, &mut client_a, unpub_idata_address,),
         raw_data
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        &mut vault,
         Request::GetIData(unpub_idata_address),
         Response::GetIData(Err(NdError::AccessDenied)),
     );
@@ -567,10 +482,7 @@ fn get_immutable_data_from_other_owner() {
 #[test]
 fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let mut client = env.new_connected_client();
 
     // Create balance.
     let start_nano = 1_000_000_000_000;
@@ -578,7 +490,6 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     common::perform_transaction(
         &mut env,
         &mut client,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -590,19 +501,9 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     let raw_data = vec![1, 2, 3];
     let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
     let pub_idata_address: XorName = *pub_idata.address().name();
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        &mut vault,
-        Request::PutIData(pub_idata),
-    );
+    common::perform_mutation(&mut env, &mut client, Request::PutIData(pub_idata));
     assert_eq!(
-        common::get_idata(
-            &mut env,
-            &mut client,
-            &mut vault,
-            IDataAddress::Pub(pub_idata_address)
-        ),
+        common::get_idata(&mut env, &mut client, IDataAddress::Pub(pub_idata_address)),
         raw_data
     );
 
@@ -610,7 +511,6 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Unpub(pub_idata_address)),
         Response::GetIData(Err(NdError::NoSuchData)),
     );
@@ -619,10 +519,7 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
 #[test]
 fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let mut client = env.new_connected_client();
 
     // Create balances.
     let start_nano = 1_000_000_000_000;
@@ -630,7 +527,6 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     common::perform_transaction(
         &mut env,
         &mut client,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -643,17 +539,11 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     let owner = client.public_id().public_key();
     let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data.clone(), *owner));
     let unpub_idata_address: XorName = *unpub_idata.address().name();
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        &mut vault,
-        Request::PutIData(unpub_idata),
-    );
+    common::perform_mutation(&mut env, &mut client, Request::PutIData(unpub_idata));
     assert_eq!(
         common::get_idata(
             &mut env,
             &mut client,
-            &mut vault,
             IDataAddress::Unpub(unpub_idata_address)
         ),
         raw_data
@@ -663,7 +553,6 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Pub(unpub_idata_address)),
         Response::GetIData(Err(NdError::NoSuchData)),
     );
@@ -672,17 +561,13 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
 #[test]
 fn delete_immutable_data_that_doesnt_exist() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-
-    let mut client = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client, &mut vault);
+    let mut client = env.new_connected_client();
 
     // Try to delete non-existing published idata while not having a balance
     let address: XorName = env.rng().gen();
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Pub(address)),
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
@@ -691,7 +576,6 @@ fn delete_immutable_data_that_doesnt_exist() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
         Response::GetIData(Err(NdError::AccessDenied)),
     );
@@ -702,7 +586,6 @@ fn delete_immutable_data_that_doesnt_exist() {
     common::perform_transaction(
         &mut env,
         &mut client,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -712,7 +595,6 @@ fn delete_immutable_data_that_doesnt_exist() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        &mut vault,
         Request::GetIData(IDataAddress::Unpub(address)),
         Response::GetIData(Err(NdError::NoSuchData)),
     );
@@ -721,19 +603,14 @@ fn delete_immutable_data_that_doesnt_exist() {
 #[test]
 fn delete_immutable_data() {
     let mut env = Environment::new();
-    let mut vault = TestVault::new();
-
-    let mut client_a = TestClient::new(env.rng());
-    let mut client_b = TestClient::new(env.rng());
-    common::establish_connection(&mut env, &mut client_a, &mut vault);
-    common::establish_connection(&mut env, &mut client_b, &mut vault);
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
 
     let start_nano = 1_000_000_000_000;
     let new_balance_owner = *client_a.public_id().public_key();
     common::perform_transaction(
         &mut env,
         &mut client_a,
-        &mut vault,
         Request::CreateBalance {
             new_balance_owner,
             amount: unwrap!(Coins::from_nano(start_nano)),
@@ -744,18 +621,12 @@ fn delete_immutable_data() {
     let raw_data = vec![1, 2, 3];
     let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
     let pub_idata_address: XorName = *pub_idata.address().name();
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        &mut vault,
-        Request::PutIData(pub_idata),
-    );
+    common::perform_mutation(&mut env, &mut client_a, Request::PutIData(pub_idata));
 
     // Try to delete published data by constructing inconsistent Request
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Pub(pub_idata_address)),
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
@@ -764,7 +635,6 @@ fn delete_immutable_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(pub_idata_address)),
         Response::Mutation(Err(NdError::NoSuchData)),
     );
@@ -773,18 +643,12 @@ fn delete_immutable_data() {
     let owner = client_a.public_id().public_key();
     let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data.clone(), *owner));
     let unpub_idata_address: XorName = *unpub_idata.address().name();
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        &mut vault,
-        Request::PutIData(unpub_idata),
-    );
+    common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
     // Delete unpublished data without being the owner
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
         Response::Mutation(Err(NdError::AccessDenied)),
     );
@@ -793,7 +657,6 @@ fn delete_immutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
     );
 
@@ -801,8 +664,90 @@ fn delete_immutable_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        &mut vault,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
         Response::Mutation(Err(NdError::NoSuchData)),
     )
+}
+
+#[test]
+fn auth_keys() {
+    type KeysResult = NdResult<(BTreeMap<PublicKey, AppPermissions>, u64)>;
+    fn list_keys<T: TestClientTrait>(env: &mut Environment, client: &mut T, expected: KeysResult) {
+        let message_id = client.send_request(Request::ListAuthKeysAndVersion);
+        env.poll();
+        match client.expect_response(message_id) {
+            Response::ListAuthKeysAndVersion(result) => assert_eq!(expected, result),
+            x => unexpected!(x),
+        }
+    }
+
+    let mut env = Environment::new();
+    let mut owner = env.new_connected_client();
+    let mut app = env.new_connected_app(owner.public_id().clone());
+
+    // Try to insert and then list authorised keys using a client with no balance.  Each should
+    // return `NoSuchBalance`.
+    let permissions = AppPermissions {
+        transfer_coins: true,
+    };
+    let app_public_key = *app.public_id().public_key();
+    let make_ins_request = |version| Request::InsAuthKey {
+        key: app_public_key,
+        version,
+        permissions,
+    };
+
+    let no_such_balance = Response::Mutation(Err(NdError::NoSuchBalance));
+    common::send_request_expect_err(&mut env, &mut owner, make_ins_request(1), no_such_balance);
+    list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
+
+    // Create a balance for the owner and check that listing authorised keys returns an empty
+    // collection.
+    let new_balance_owner = *owner.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut owner,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(1_000_000_000_000)),
+            transaction_id: 0,
+        },
+    );
+    let mut expected_map = BTreeMap::new();
+    list_keys(&mut env, &mut owner, Ok((expected_map.clone(), 0)));
+
+    // Insert then list the app.
+    let _ = expected_map.insert(*app.public_id().public_key(), permissions);
+    common::perform_mutation(&mut env, &mut owner, make_ins_request(1));
+    list_keys(&mut env, &mut owner, Ok((expected_map.clone(), 1)));
+
+    // Check the app isn't allowed to get a listing of authorised keys, nor insert, nor delete any.
+    // No response should be returned to any of these requests.
+    let _ = app.send_request(Request::ListAuthKeysAndVersion);
+    let _ = app.send_request(make_ins_request(2));
+    let del_auth_key_request = Request::DelAuthKey {
+        key: *app.public_id().public_key(),
+        version: 2,
+    };
+    let _ = app.send_request(del_auth_key_request.clone());
+    env.poll();
+    app.expect_no_new_message();
+
+    // Remove the app, then list the keys.
+    common::perform_mutation(&mut env, &mut owner, del_auth_key_request);
+    list_keys(&mut env, &mut owner, Ok((BTreeMap::new(), 2)));
+
+    // Try to insert using an invalid version number.
+    let invalid_successor = Response::Mutation(Err(NdError::InvalidSuccessor(2)));
+    common::send_request_expect_err(
+        &mut env,
+        &mut owner,
+        make_ins_request(100),
+        invalid_successor,
+    );
+    list_keys(&mut env, &mut owner, Ok((BTreeMap::new(), 2)));
+
+    // Insert again and list again.
+    common::perform_mutation(&mut env, &mut owner, make_ins_request(3));
+    list_keys(&mut env, &mut owner, Ok((expected_map, 3)));
 }

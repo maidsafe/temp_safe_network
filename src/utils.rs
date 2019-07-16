@@ -11,7 +11,7 @@ use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
-use safe_nd::{ClientPublicId, PublicId, PublicKey, Request, XorName};
+use safe_nd::{ADataAddress, ClientPublicId, PublicId, PublicKey, Request, XorName};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -47,11 +47,22 @@ pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
     unwrap!(bincode::serialize(data))
 }
 
+/// Returns the client's public ID, the owner's public ID, or None depending on whether `public_id`
+/// represents a Client, App or Node respectively.
 pub(crate) fn owner(public_id: &PublicId) -> Option<&ClientPublicId> {
     match public_id {
         PublicId::Node(_) => None,
         PublicId::Client(pub_id) => Some(pub_id),
         PublicId::App(pub_id) => Some(pub_id.owner()),
+    }
+}
+
+/// Returns the client's ID if `public_id` represents a Client, or None if it represents an App or
+/// Node.
+pub(crate) fn client(public_id: &PublicId) -> Option<&ClientPublicId> {
+    match public_id {
+        PublicId::Node(_) | PublicId::App(_) => None,
+        PublicId::Client(pub_id) => Some(pub_id),
     }
 }
 
@@ -95,6 +106,7 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         | MutateUnseqMDataEntries { ref address, .. } => Some(address.name()),
         PutAData(ref data) => Some(data.name()),
         GetAData(ref address)
+        | GetADataValue { ref address, .. }
         | GetADataShell { ref address, .. }
         | DeleteAData(ref address)
         | GetADataRange { ref address, .. }
@@ -126,5 +138,13 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         | ListAuthKeysAndVersion
         | InsAuthKey { .. }
         | DelAuthKey { .. } => None,
+    }
+}
+
+pub(crate) fn is_published(address: &ADataAddress) -> bool {
+    use ADataAddress::*;
+    match address {
+        PubSeq { .. } | PubUnseq { .. } => true,
+        UnpubSeq { .. } | UnpubUnseq { .. } => false,
     }
 }

@@ -14,7 +14,7 @@ use unwrap::unwrap;
 pub type TestRng = ChaChaRng;
 
 // Create new random number generator suitable for tests. To provide repeatable results, the seed
-// can be overriden using the "SEED" env variable. If this variable is not provided, a random one
+// can be overridden using the "SEED" env variable. If this variable is not provided, a random one
 // is used (to support soak testing). The current seed is printed to stdout.
 pub fn new() -> TestRng {
     let seed = if let Ok(seed) = env::var("SEED") {
