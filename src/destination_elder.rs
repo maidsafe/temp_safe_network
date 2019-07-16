@@ -23,8 +23,8 @@ use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, LoginPacket, MessageId, NodePublicId, PublicId, Request,
-    Response, Result as NdResult, XorName,
+    AData, ADataAddress, Error as NdError, IData, IDataAddress, LoginPacket, MessageId,
+    NodePublicId, PublicId, Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -179,14 +179,14 @@ impl DestinationElder {
             //
             // ===== Append Only Data =====
             //
-            PutAData(data) => unimplemented!(),
+            PutAData(data) => self.handle_put_adata_req(requester, data, message_id),
             GetAData(address) => unimplemented!(),
             GetADataValue { address, key } => unimplemented!(),
             GetADataShell {
                 address,
                 data_index,
             } => unimplemented!(),
-            DeleteAData(address) => unimplemented!(),
+            DeleteAData(address) => self.handle_delete_adata_req(requester, address, message_id),
             GetADataRange { address, range } => unimplemented!(),
             GetADataIndices(address) => unimplemented!(),
             GetADataLastEntry(address) => unimplemented!(),
@@ -895,6 +895,66 @@ impl DestinationElder {
             return self.idata_ops.remove(message_id);
         }
         None
+    }
+
+    fn handle_put_adata_req(
+        &mut self,
+        requester: PublicId,
+        data: AData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if self.append_only_chunks.has(data.address()) {
+            Err(NdError::DataExists)
+        } else {
+            self.append_only_chunks
+                .put(&data)
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToSrcElders {
+            sender: *data.name(),
+            message: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
+    }
+
+    fn handle_delete_adata_req(
+        &mut self,
+        requester: PublicId,
+        address: ADataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let requester_pk = *utils::own_key(&requester)?;
+        let result = self
+            .append_only_chunks
+            .get(&address)
+            .map_err(|error| match error {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+                error => error.to_string().into(),
+            })
+            .and_then(|adata| {
+                // TODO - This is a workaround until we have AData::check_is_owner in safe-nd
+                match adata {
+                    AData::UnpubSeq(unpub_adata) => utils::is_owner(unpub_adata, requester_pk),
+                    AData::UnpubUnseq(unpub_adata) => utils::is_owner(unpub_adata, requester_pk),
+                    AData::PubSeq(_) | AData::PubUnseq(_) => Err(NdError::InvalidOperation),
+                }
+            })
+            .and_then(|_| {
+                self.append_only_chunks
+                    .delete(&address)
+                    .map_err(|error| error.to_string().into())
+            });
+        Some(Action::RespondToSrcElders {
+            sender: *address.name(),
+            message: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
     }
 }
 

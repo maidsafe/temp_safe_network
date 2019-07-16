@@ -26,9 +26,9 @@ use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
-    AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress, IDataKind, Message,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature, Transaction,
-    TransactionId, XorName,
+    AData, ADataAddress, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress,
+    IDataKind, Message, MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature,
+    Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -311,9 +311,9 @@ impl SourceElder {
             //
             // ===== Append Only Data =====
             //
-            PutAData(_) => {
+            PutAData(chunk) => {
                 has_signature()?;
-                unimplemented!()
+                self.handle_put_adata(client, chunk, message_id)
             }
             GetAData(ref address) => {
                 if !utils::is_published(address) {
@@ -333,9 +333,9 @@ impl SourceElder {
                 }
                 unimplemented!()
             }
-            DeleteAData(ref address) => {
+            DeleteAData(address) => {
                 has_signature()?;
-                unimplemented!()
+                self.handle_delete_adata(client, address, message_id)
             }
             GetADataRange { ref address, .. } => {
                 if !utils::is_published(address) {
@@ -596,6 +596,63 @@ impl SourceElder {
             Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client.public_id.clone(),
                 request: Request::DeleteUnpubIData(address),
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::AccessDenied)),
+            );
+            None
+        }
+    }
+
+    fn handle_put_adata(
+        &mut self,
+        client: &ClientInfo,
+        chunk: AData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+        // TODO - If unpublished, check that the owner's public key has been added to the chunk?
+        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!(
+                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                self,
+                *COST_OF_PUT,
+                error
+            );
+        }
+
+        let request = Request::PutAData(chunk);
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
+    fn handle_delete_adata(
+        &mut self,
+        client: &ClientInfo,
+        address: ADataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if utils::is_published(&address) {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::InvalidOperation)),
+            );
+            return None;
+        }
+        let request = Request::DeleteAData(address);
+        if client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
                 message_id,
             }))
         } else {

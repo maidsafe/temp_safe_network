@@ -56,8 +56,10 @@ mod common;
 use self::common::{Environment, TestClientTrait};
 use rand::Rng;
 use safe_nd::{
-    AppPermissions, Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
-    PublicKey, Request, Response, Result as NdResult, UnpubImmutableData, XorName,
+    AData, ADataOwner, AppPermissions, AppendOnlyData, Coins, Error as NdError, IData,
+    IDataAddress, LoginPacket, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData,
+    PublicKey, Request, Response, Result as NdResult, SeqAppendOnly, UnpubImmutableData,
+    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -269,6 +271,110 @@ fn coin_operations() {
     let balance_b = common::get_balance(&mut env, &mut client_b);
     assert_eq!(balance_a, unwrap!(Coins::from_nano(7)));
     assert_eq!(balance_b, unwrap!(Coins::from_nano(3)));
+}
+
+#[test]
+fn put_append_only_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let owner = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        data_index: 0,
+        permissions_index: 0,
+    };
+
+    // Seq
+    let adata_name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut adata = PubSeqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
+    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())], 0));
+    let adata = AData::PubSeq(adata);
+    let pub_seq_adata_address = *adata.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
+
+    // Unseq
+    let adata_name: XorName = env.rng().gen();
+    let tag = 101;
+    let mut adata = PubUnseqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
+    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())]));
+    let adata = AData::PubUnseq(adata);
+    let pub_unseq_adata_address = *adata.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
+
+    // Unpub Seq
+    let adata_name: XorName = env.rng().gen();
+    let tag = 102;
+    let mut adata = UnpubSeqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
+    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())], 0));
+    let adata = AData::UnpubSeq(adata);
+    let unpub_seq_adata_address = *adata.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
+
+    // Unpub Unseq
+    let adata_name: XorName = env.rng().gen();
+    let tag = 103;
+    let mut adata = UnpubUnseqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
+    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())]));
+    let adata = AData::UnpubUnseq(adata);
+    let unpub_unseq_adata_address = *adata.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
+
+    // TODO - get the data to verify
+
+    // Delete the data
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(pub_seq_adata_address),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(pub_unseq_adata_address),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(unpub_seq_adata_address),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(unpub_unseq_adata_address),
+    );
+
+    // Delete again to test if it's gone
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(unpub_seq_adata_address),
+        Response::Mutation(Err(NdError::NoSuchData)),
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(unpub_unseq_adata_address),
+        Response::Mutation(Err(NdError::NoSuchData)),
+    );
 }
 
 #[test]

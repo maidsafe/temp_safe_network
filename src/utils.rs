@@ -11,7 +11,10 @@ use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
-use safe_nd::{ADataAddress, ClientPublicId, PublicId, PublicKey, Request, XorName};
+use safe_nd::{
+    ADataAddress, ADataUnpubPermissions, AppendOnlyData, ClientPublicId, Error as NdError,
+    PublicId, PublicKey, Request, Result as NdResult, XorName,
+};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -147,4 +150,20 @@ pub(crate) fn is_published(address: &ADataAddress) -> bool {
         PubSeq { .. } | PubUnseq { .. } => true,
         UnpubSeq { .. } | UnpubUnseq { .. } => false,
     }
+}
+
+pub(crate) fn is_owner<T: AppendOnlyData<ADataUnpubPermissions>>(
+    adata: T,
+    requester: PublicKey,
+) -> NdResult<()> {
+    adata
+        .fetch_owner_at_index(adata.owners_index() - 1)
+        .ok_or_else(|| NdError::NoSuchData)
+        .and_then(|owner| {
+            if owner.public_key == requester {
+                Ok(())
+            } else {
+                Err(NdError::AccessDenied)
+            }
+        })
 }
