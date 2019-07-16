@@ -3,6 +3,7 @@
 set -e -x
 
 # setup auth cli
+rm -rf ~/safe-auth
 git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe-auth
 cd ~/safe-auth
 ls
@@ -12,11 +13,15 @@ sleep 15
 cd -
 
 cargo run --release --features mock-network -- auth
+
+# run tests with CLI's own mock
 cargo test --release --features=scl-mock -- --test-threads=1
-# only run these tests for now, as mock-vault is _sloooow_
-cargo test --release --features="mock-network fake-auth" -- test_put_get_update_seq_append_only_data
-cargo test --release --features="mock-network fake-auth" -- test_put_and_get_immutable_data
-cargo test --release --features="mock-network fake-auth" -- test_keys_
-# only run integration tests
-cargo test --release --features="mock-network" calling_safe_cat
-cargo test --release --features="mock-network" calling_safe_files
+
+# run the unit tests now with SCL's mock-network, for now with fake-auth
+cargo test --lib --release --features="mock-network fake-auth"
+
+# run the doc tests now with SCL's mock-network, for now with fake-auth
+cargo test --doc --release --features="mock-network fake-auth"
+
+# run the integration tests now with SCL's mock-network, for now with fake-auth
+cargo test --release --features="mock-network fake-auth" calling_

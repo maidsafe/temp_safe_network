@@ -158,31 +158,24 @@ impl Safe {
 
     // Check Key's balance from the network from a given XOR-URL and secret key string.
     // The difference between this and 'keys_balance_from_sk' function is that this will additionally
-    // check that the secret key corresponds to the public key derived form the XOR-URL
+    // check that the XOR-URL corresponds to the public key derived from the provided secret key
     pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> ResultReturn<String> {
+        self.validate_sk_for_xorurl(sk, xorurl)?;
+        self.keys_balance_from_sk(sk)
+    }
+
+    // Check that the XOR-URL corresponds to the public key derived from the provided secret key
+    pub fn validate_sk_for_xorurl(&self, sk: &str, xorurl: &str) -> ResultReturn<String> {
         let secret_key: SecretKey = sk_from_hex(sk)
             .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         let public_key = secret_key.public_key();
         let derived_xorname = xorname_from_pk(&public_key);
         if xorurl_encoder.xorname() != derived_xorname {
-            Err(Error::InvalidInput("Secret key provided doesn't correspond to public key derived from XOR-URL provided".to_string()))
+            Err(Error::InvalidInput("The XOR-URL doesn't correspond to the public key derived from the provided secret key".to_string()))
         } else {
-            self.keys_balance_from_sk(sk)
+            Ok(pk_to_hex(&public_key))
         }
-    }
-
-    // Fetch Key's pk from the network from a given XOR-URL
-    pub fn fetch_pk_from_xorname(&self, xorurl: &str) -> ResultReturn<String> {
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let public_key = self
-            .safe_app
-            .fetch_pk_from_xorname(&xorurl_encoder.xorname())
-            .map_err(|_| {
-                Error::ContentNotFound("No Key found at specified location".to_string())
-            })?;
-
-        Ok(pk_to_hex(&public_key))
     }
 }
 
@@ -258,8 +251,8 @@ fn test_keys_create_preload_invalid_amounts() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     match safe.keys_create_preload_test_coins(".45".to_string(), None) {
-        Err(msg) => assert_eq!(
-            msg,
+        Err(err) => assert_eq!(
+            err,
             Error::InvalidAmount(
                 "Invalid safecoins amount '.45', expected a numeric value".to_string()
             )
@@ -273,8 +266,8 @@ fn test_keys_create_preload_invalid_amounts() {
         Some(".003".to_string()),
         None,
     ) {
-        Err(msg) => assert_eq!(
-            msg,
+        Err(err) => assert_eq!(
+            err,
             Error::InvalidAmount(
                 "Invalid safecoins amount '.003', expected a numeric value".to_string()
             )
@@ -286,8 +279,8 @@ fn test_keys_create_preload_invalid_amounts() {
     let mut unwrapped_key_pair = unwrap!(key_pair.clone());
     unwrapped_key_pair.sk.replace_range(..6, "ababab");
     match safe.keys_create(Some(unwrapped_key_pair.sk), Some(".003".to_string()), None) {
-        Err(msg) => assert_eq!(
-            msg,
+        Err(err) => assert_eq!(
+            err,
             Error::InvalidAmount(
                 "Invalid safecoins amount '.003', expected a numeric value".to_string()
             )
@@ -298,17 +291,13 @@ fn test_keys_create_preload_invalid_amounts() {
     // test fail to preload with more than available balance in source (which has only 12 coins)
     match safe.keys_create(
         Some(unwrap!(key_pair).sk),
-        Some("12.00001".to_string()),
+        Some("12.000000001".to_string()),
         None,
     ) {
-        Err(_msg) => {
-            assert!(true);
-            // TODO: fix error messages transaltion from SCL to upper layers
-            /*assert_eq!(
-                msg,
-                Error::NotEnoughBalance("Not enough balance at 'source' for the operation".to_string())
-            )*/
-        }
+        Err(err) => assert_eq!(
+            err,
+            Error::NotEnoughBalance("Not enough balance at 'source' for the operation".to_string())
+        ),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
 }
@@ -386,7 +375,7 @@ fn test_keys_test_coins_balance_wrong_location() {
     let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
     match current_balance {
         Err(Error::InvalidInput(msg)) => assert!(msg.contains(
-            "Secret key provided doesn't correspond to public key derived from XOR-URL provided"
+            "The XOR-URL doesn't correspond to the public key derived from the provided secret key"
         )),
         Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
@@ -468,26 +457,13 @@ fn test_keys_balance_xorname() {
 }
 
 #[test]
-fn test_fetch_pk_from_xorname_test_coins() {
+fn test_validate_sk_for_xorurl() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("23.22".to_string(), None));
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
-    assert_eq!(pk, key_pair_unwrapped.pk);
-}
-
-#[test]
-fn test_fetch_pk_from_xorname() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("0.56".to_string(), None));
-
-    let (xorurl, key_pair) = unwrap!(safe.keys_create(Some(unwrap!(from_key_pair).sk), None, None));
-    let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = unwrap!(safe.fetch_pk_from_xorname(&xorurl));
+    let pk = unwrap!(safe.validate_sk_for_xorurl(&key_pair_unwrapped.sk, &xorurl));
     assert_eq!(pk, key_pair_unwrapped.pk);
 }

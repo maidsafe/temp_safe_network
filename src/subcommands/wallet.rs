@@ -8,7 +8,7 @@
 
 use structopt::StructOpt;
 
-use super::helpers::{get_secret_key, get_target_location, prompt_user};
+use super::helpers::{get_secret_key, get_target_location};
 use super::keys::create_new_key;
 use super::OutputFmt;
 use log::debug;
@@ -20,7 +20,7 @@ pub enum WalletSubCommands {
     #[structopt(name = "insert")]
     /// Insert a spendable balance into a Wallet
     Insert {
-        /// An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
+        /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'.
         key: String,
         /// The source Wallet for funds
         source: Option<String>,
@@ -29,11 +29,11 @@ pub enum WalletSubCommands {
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
-        /// Set the sub name as default for this public name
+        /// Set the inserted Key as the default one in the target Wallet
         #[structopt(long = "default")]
         default: bool,
-        /// Optionally pass the secret key to make the balance spendable
-        #[structopt(short = "s", long = "secret-key")]
+        /// Pass the secret key to make the balance spendable, it will be prompted if not provided
+        #[structopt(long = "sk")]
         secret: Option<String>,
     },
     #[structopt(name = "balance")]
@@ -48,7 +48,7 @@ pub enum WalletSubCommands {
     #[structopt(name = "create")]
     /// Create a new Wallet
     Create {
-        /// An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
+        /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'.
         key: Option<String>,
         /// The source Wallet for funds
         source: Option<String>,
@@ -58,10 +58,10 @@ pub enum WalletSubCommands {
         /// The name to give the spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
-        /// Optionally pass the secret key to make the balance spendable
-        #[structopt(short = "s", long = "secret-key")]
+        /// Pass the secret key to make the balance spendable, it will be prompted if not provided
+        #[structopt(long = "sk")]
         secret: Option<String>,
-        /// Create a Key, allocate test-coins onto it, and add it to the Wallet
+        /// Create a Key, allocate test-coins onto it, and add the Key to the Wallet
         #[structopt(long = "test-coins")]
         test_coins: bool,
         /// Preload the key with a balance
@@ -113,7 +113,7 @@ pub fn wallet_commander(
                 let (xorname, key_pair) = match key {
                     Some(linked_key) => {
                         let sk = get_secret_key(&linked_key, secret)?;
-                        let pk = safe.fetch_pk_from_xorname(&linked_key)?;
+                        let pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
 
                         (linked_key, Some(BlsKeyPair { pk, sk }))
                     }
@@ -143,13 +143,10 @@ pub fn wallet_commander(
             Ok(())
         }
         Some(WalletSubCommands::Balance { target }) => {
-            // FIXME: get sk from args or from the account
-            let sk =
-                String::from("391987fd429b4718a59b165b5799eaae2e56c697eb94670de8886f8fb7387058");
             let target = get_target_location(target)?;
 
             debug!("Got target location {:?}", target);
-            let balance = safe.wallet_balance(&target, &sk)?;
+            let balance = safe.wallet_balance(&target)?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!(
@@ -173,20 +170,8 @@ pub fn wallet_commander(
             let target = get_target_location(target)?;
 
             let (xorname, key_pair) = {
-                let mut sk = secret.unwrap_or_else(|| String::from(""));
-
-                if sk.is_empty() {
-                    // Get pk source Key, and prompt user for the corresponding sk
-                    sk = prompt_user(
-                        &format!(
-                            "Enter secret key corresponding to public key at \"{}\": ",
-                            &key
-                        ),
-                        "Invalid input",
-                    )?;
-                }
-
-                let pk = safe.fetch_pk_from_xorname(&key)?;
+                let sk = get_secret_key(&key, secret)?;
+                let pk = safe.validate_sk_for_xorurl(&sk, &key)?;
 
                 (key, Some(BlsKeyPair { pk, sk }))
             };

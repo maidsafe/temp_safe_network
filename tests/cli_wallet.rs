@@ -19,7 +19,8 @@ use predicates::prelude::*;
 use std::process::Command;
 
 const PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
-const UNMATCHED_PK_SK: &str = "The secret key provided does not match the public key";
+const UNMATCHED_SK_XORURL: &str =
+    "The XOR-URL doesn't correspond to the public key derived from the provided secret key";
 
 #[test]
 fn calling_safe_wallet_transfer() {
@@ -121,7 +122,6 @@ fn calling_safe_wallet_balance() {
 #[test]
 fn calling_safe_wallet_insert() {
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("50");
-
     let (pk_xor, sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -133,7 +133,7 @@ fn calling_safe_wallet_insert() {
         &pk_xor,
         &wallet_xor,
         &wallet_xor,
-        "--secret-key",
+        "--sk",
         &sk,
         "--json"
     )
@@ -189,7 +189,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
         "create",
         &pk_pay_xor,
         &pk_pay_xor,
-        "--secret-key",
+        "--sk",
         pay_sk,
         "--json"
     )
@@ -219,13 +219,12 @@ fn calling_safe_wallet_create_w_bad_secret() {
         "create",
         &pk_pay_xor,
         &pk_pay_xor,
-        "--secret-key",
+        "--sk",
         "badbadbad",
         "--json",
     ])
     .assert()
-    .stderr(predicate::str::contains("64"))
-    .stderr(predicate::str::contains("secret key"))
+    .stderr(predicate::str::contains("Invalid secret key provided"))
     .failure();
 }
 
@@ -240,7 +239,7 @@ fn calling_safe_wallet_create_w_bad_pk() {
         "create",
         "safe://nononooOOooo",
         &pk_pay_xor,
-        "--secret-key",
+        "--sk",
         &pay_sk,
         "--json",
     ])
@@ -261,11 +260,11 @@ fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
         "create",
         &pk_pay_xor,
         &pk_pay_xor,
-        "--secret-key",
+        "--sk",
         &pay_sk2,
         "--json",
     ])
     .assert()
-    .stderr(predicate::str::contains(UNMATCHED_PK_SK))
+    .stderr(predicate::str::contains(UNMATCHED_SK_XORURL))
     .failure();
 }

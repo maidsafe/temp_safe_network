@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{xorname_from_pk, KeyPair};
+use super::helpers::xorname_from_pk;
 use super::xorurl::{create_random_xorname, XorUrlEncoder};
 use super::{Error, ResultReturn};
 use futures::future::Future;
@@ -15,6 +15,7 @@ use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App, AppError::CoreError};
 use safe_core::{client::wallet_transfer_coins, CoreError as SafeCoreError};
+use safe_nd::Error as SafeNdError;
 use std::str::FromStr;
 
 #[cfg(not(feature = "fake-auth"))]
@@ -101,11 +102,6 @@ impl SafeApp {
 
         run(safe_app, move |client, _app_context| {
             let from_sk = from_sk.unwrap_or_else(|| unwrap!(client.clone().secret_bls_key()));
-            /*.unwrap_or_else(
-                return CoreError(SafeCoreError::Unexpected(
-                    "Couldn't get account's secret BLS key".to_string(),
-                )),
-            );*/
             client
                 .create_balance(
                     Some(&from_sk),
@@ -113,9 +109,24 @@ impl SafeApp {
                     coins_amount,
                     None,
                 )
-                .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
+                .map_err(|err| match err {
+                    SafeCoreError::NewRoutingClientError(e) => {
+                        CoreError(SafeCoreError::Unexpected(format!("{:?}", e)))
+                    }
+                    other => CoreError(SafeCoreError::Unexpected(format!("{:?}", other))),
+                })
         })
-        .map_err(|e| Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", e)))?;
+        .map_err(|err| {
+            if let CoreError(SafeCoreError::Unexpected(e)) = err {
+                if e == "InsufficientBalance" {
+                    Error::NotEnoughBalance(amount.to_string())
+                } else {
+                    Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", e))
+                }
+            } else {
+                Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", err))
+            }
+        })?;
 
         let xorname = xorname_from_pk(&new_balance_owner);
         Ok(xorname)
@@ -149,11 +160,6 @@ impl SafeApp {
         Ok(coins_amount.to_string())
     }
 
-    // TODO: replace with actual code for calling SCL
-    pub fn fetch_pk_from_xorname(&self, _xorname: &XorName) -> ResultReturn<PublicKey> {
-        Ok(KeyPair::random().pk)
-    }
-
     pub fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: SecretKey,
@@ -164,8 +170,12 @@ impl SafeApp {
         let coins_amount =
             Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
 
-        wallet_transfer_coins(&from_sk, to_xorname, coins_amount, Some(tx_id))
-            .map_err(|e| Error::NetDataError(format!("Failed to transfer coins: {:?}", e)))?;
+        wallet_transfer_coins(&from_sk, to_xorname, coins_amount, Some(tx_id)).map_err(|err| {
+            match err {
+                SafeNdError::ExcessiveValue => Error::NotEnoughBalance(amount.to_string()),
+                other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
+            }
+        })?;
 
         Ok(tx_id)
     }
@@ -178,19 +188,8 @@ impl SafeApp {
         tx_id: u64,
         amount: &str,
     ) -> ResultReturn<u64> {
-        let safe_app: &App = self.get_safe_app()?;
         let to_xorname = xorname_from_pk(&to_pk);
-        let coins_amount =
-            Coins::from_str(amount).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
-
-        run(safe_app, move |client, _app_context| {
-            client
-                .transfer_coins(Some(&from_sk), to_xorname, coins_amount, Some(tx_id))
-                .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to transfer coins: {:?}", e)))?;
-
-        Ok(tx_id)
+        self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
 
     // TODO: Replace with SCL calling code
@@ -278,7 +277,7 @@ impl SafeApp {
             };
 
             let owner = ADataOwner {
-                public_key: owner_pk,
+                public_key: unwrap!(client.owner_key()),
                 data_index: 0,
                 permissions_index: 1,
             };
@@ -745,6 +744,7 @@ fn test_update_seq_append_only_data_error() {
         .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),
-        Err(error) => assert!(format!("{}", error).contains("Something about the version")),
+        Err(Error::NetDataError(msg)) => assert!(msg.contains("Invalid data successor")),
+        Err(_) => panic!("Error returned is not the expected one"),
     }
 }

@@ -208,7 +208,7 @@ USAGE:
 OPTIONS:
         --name <name>             The name to give the spendable balance
         --preload <preload>       Preload the key with a balance
-    -s, --secret-key <secret>     Optionally pass the secret key to make the balance spendable
+    -s, --sk <secret>     Optionally pass the secret key to make the balance spendable
 
 ARGS:
     <key>       An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
@@ -256,7 +256,7 @@ USAGE:
 
 OPTIONS:
     --name <name>              The name to give this spendable balance
-    -s, --secret-key <secret>  Optionally pass the secret key to make the balance spendable
+    -s, --sk <secret>  Optionally pass the secret key to make the balance spendable
 
 ARGS:
     <key>        An existing `Key`'s safe://xor-url.
@@ -272,7 +272,7 @@ ARGS:
 
 With the above options, the user will be prompted to input the secret key associated with the public key. This is stored in the `Wallet`.
 
-Otherwise, there's also the `--secret-key` argument, which when combined with `--key` can pass the `Key` XorUrl as part of the command line instruction itself, e.g.:
+Otherwise, there's also the `--sk` argument, which when combined with `--key` can pass the `Key` XorUrl as part of the command line instruction itself, e.g.:
 
 ```shell
 $ safe wallet insert <source wallet> --target safe://wallet-xorurl --key safe://key-xor-url --name my_default_balance --default

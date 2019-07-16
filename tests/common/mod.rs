@@ -58,7 +58,7 @@ pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
         "create",
         &pk,
         &pk,
-        "--secret-key",
+        "--sk",
         &sk,
         "--json",
     )

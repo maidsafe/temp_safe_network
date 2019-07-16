@@ -162,7 +162,7 @@ impl SafeApp {
         self.get_balance_from_xorname(&xorname)
     }
 
-    pub fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
+    fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
         match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
             None => Err(Error::ContentNotFound(
                 "CoinBalance data not found".to_string(),
