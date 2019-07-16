@@ -69,6 +69,8 @@ pub(crate) fn client(public_id: &PublicId) -> Option<&ClientPublicId> {
     }
 }
 
+/// Returns the client's or app's public key if `public_id` represents a Client or App respectively,
+/// or None if it represents a Node.
 pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
     match public_id {
         PublicId::Node(_) => None,
@@ -130,12 +132,12 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
             // ref new_balance_owner,
             ..
         } => None, // Some(XorName::from(new_balance_owner)),
-        CreateLoginPacket(account_data) => Some(account_data.destination()),
+        CreateLoginPacket(login_packet) => Some(login_packet.destination()),
         CreateLoginPacketFor {
             new_login_packet,
             ..
         } => Some(new_login_packet.destination()),
-        UpdateLoginPacket(account_data) => Some(account_data.destination()),
+        UpdateLoginPacket(login_packet) => Some(login_packet.destination()),
         GetLoginPacket(ref name) => Some(name),
         GetBalance
         | ListAuthKeysAndVersion

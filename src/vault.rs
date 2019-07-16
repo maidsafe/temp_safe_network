@@ -19,11 +19,13 @@ use crate::{
 use bincode;
 use crossbeam_channel::Receiver;
 use log::{error, info};
-use safe_nd::{NodeFullId, XorName};
+use safe_nd::{NodeFullId, Request, XorName};
 use std::{
+    cell::RefCell,
     fmt::{self, Display, Formatter},
     fs,
     path::PathBuf,
+    rc::Rc,
 };
 
 const STATE_FILENAME: &str = "state";
@@ -68,22 +70,22 @@ impl Vault {
             (true, id)
         });
 
-        let root_dir = config.root_dir();
-
         let (state, event_receiver) = if is_elder {
+            let total_used_space = Rc::new(RefCell::new(0));
             let (src, event_receiver) = SourceElder::new(
                 id.public_id().clone(),
-                &root_dir,
-                config.quic_p2p_config(),
+                &config,
+                &total_used_space,
                 init_mode,
             )?;
             let dst = DestinationElder::new(
                 id.public_id().clone(),
-                &root_dir,
-                config.max_capacity(),
+                &config,
+                &total_used_space,
                 init_mode,
             )?;
-            let coins_handler = CoinsHandler::new(id.public_id().clone(), &root_dir, init_mode)?;
+            let coins_handler =
+                CoinsHandler::new(id.public_id().clone(), config.root_dir(), init_mode)?;
             (
                 State::Elder {
                     src,
@@ -95,7 +97,7 @@ impl Vault {
         } else {
             let _adult = Adult::new(
                 id.public_id().clone(),
-                &root_dir,
+                config.root_dir(),
                 config.max_capacity(),
                 init_mode,
             )?;
@@ -104,7 +106,7 @@ impl Vault {
 
         let vault = Self {
             id,
-            root_dir: root_dir.to_path_buf(),
+            root_dir: config.root_dir().to_path_buf(),
             state,
             event_receiver,
         };
@@ -178,7 +180,7 @@ impl Vault {
                         }
                     }
                 } else {
-                    error!("{}: Logic error - unexpcted RPC.", self);
+                    error!("{}: Logic error - unexpected RPC.", self);
                     return None;
                 };
 
@@ -187,9 +189,19 @@ impl Vault {
                 //        same handler which Routing will call after receiving a message.
 
                 if self.self_is_elder_for(&dst_elders_address) {
-                    return self
-                        .destination_elder_mut()?
-                        .handle_vault_message(requester_name, message);
+                    // TODO - We need a better way for determining which handler should be given the
+                    //        message.
+                    return if let Rpc::Request {
+                        request: Request::CreateLoginPacket(_),
+                        ..
+                    } = message
+                    {
+                        self.source_elder_mut()?
+                            .handle_vault_message(requester_name, message)
+                    } else {
+                        self.destination_elder_mut()?
+                            .handle_vault_message(requester_name, message)
+                    };
                 }
                 None
             }

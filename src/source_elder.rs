@@ -15,11 +15,12 @@ use self::{
 };
 use crate::{
     action::Action,
+    chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     rpc::Rpc,
     utils,
     vault::Init,
-    Error, Result,
+    Config, Error, Result,
 };
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
@@ -27,15 +28,16 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
     AData, ADataAddress, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress,
-    IDataKind, Message, MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature,
-    Transaction, TransactionId, XorName,
+    IDataKind, LoginPacket, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
+    Response, Result as NdResult, Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    path::Path,
+    rc::Rc,
 };
 use unwrap::unwrap;
 
@@ -58,18 +60,25 @@ pub(crate) struct SourceElder {
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
     quic_p2p: QuicP2p,
+    login_packets: LoginPacketChunkStore,
 }
 
 impl SourceElder {
-    pub fn new<P: AsRef<Path>>(
+    pub fn new(
         id: NodePublicId,
-        root_dir: P,
-        config: &QuicP2pConfig,
+        config: &Config,
+        total_used_space: &Rc<RefCell<u64>>,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let accounts = AccountsDb::new(&root_dir, init_mode)?;
-        let balances = BalancesDb::new(&root_dir, init_mode)?;
-        let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
+        let accounts = AccountsDb::new(config.root_dir(), init_mode)?;
+        let balances = BalancesDb::new(config.root_dir(), init_mode)?;
+        let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config.quic_p2p_config())?;
+        let login_packets = LoginPacketChunkStore::new(
+            config.root_dir(),
+            config.max_capacity(),
+            Rc::clone(&total_used_space),
+            init_mode,
+        )?;
         let src_elder = Self {
             id,
             accounts,
@@ -77,6 +86,7 @@ impl SourceElder {
             clients: Default::default(),
             client_candidates: Default::default(),
             quic_p2p,
+            login_packets,
         };
 
         Ok((src_elder, event_receiver))
@@ -236,6 +246,13 @@ impl SourceElder {
                 self.handle_put_idata(client, chunk, message_id)
             }
             GetIData(address) => {
+                // TODO: We don't check for the existence of a valid signature for published data,
+                // since it's free for anyone to get.  However, as a means of spam prevention, we
+                // could change this so that signatures are required, and the signatures would need
+                // to match a pattern which becomes increasingly difficult as the client's
+                // behaviour is deemed to become more "spammy". (e.g. the get requests include a
+                // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
+                // by brute-force attempts with varying seeds)
                 if address.kind() != IDataKind::Pub {
                     has_signature()?;
                 }
@@ -439,30 +456,37 @@ impl SourceElder {
             //
             // ===== Login packets =====
             //
-            CreateLoginPacket(..) => Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request,
-                message_id,
-            })),
-            CreateLoginPacketFor { .. } | UpdateLoginPacket { .. } | GetLoginPacket(..) => {
+            CreateLoginPacket(login_packet) => {
                 has_signature()?;
-                // TODO: allow only registered clients to send this req
-                // once the coin balances are implemented.
-
-                // if registered_client == ClientState::Registered {
-                Some(Action::ForwardClientRequest(Rpc::Request {
-                    requester: client.public_id.clone(),
-                    request,
+                self.handle_create_login_packet_client_req(
+                    &client.public_id,
+                    login_packet,
                     message_id,
-                }))
-                // } else {
-                //     self.send_response_to_client(
-                //         client_id,
-                //         message_id,
-                //         Response::GetAccount(Err(NdError::AccessDenied)),
-                //     );
-                //     None
-                // }
+                )
+            }
+            CreateLoginPacketFor {
+                new_owner,
+                amount,
+                transaction_id,
+                new_login_packet,
+            } => {
+                has_signature()?;
+                unimplemented!();
+                // self.handle_create_balance()
+                // THEN
+                // self.handle_create_login_packet_req()
+            }
+            UpdateLoginPacket(ref updated_login_packet) => {
+                has_signature()?;
+                self.handle_update_login_packet_req(
+                    &client.public_id,
+                    updated_login_packet,
+                    message_id,
+                )
+            }
+            GetLoginPacket(ref address) => {
+                has_signature()?;
+                self.handle_get_login_packet_req(&client.public_id, address, message_id)
             }
             //
             // ===== Client (Owner) to SrcElders =====
@@ -734,12 +758,91 @@ impl SourceElder {
 
     pub fn handle_vault_message(&mut self, src: XorName, message: Rpc) -> Option<Action> {
         match message {
-            Rpc::Request { .. } => None, // None for now - might be required when we handle coin refunds
+            Rpc::Request {
+                request,
+                requester,
+                message_id,
+            } => self.handle_vault_request(src, requester, request, message_id),
             Rpc::Response {
                 response,
                 requester,
                 message_id,
             } => self.handle_response(src, requester, response, message_id),
+        }
+    }
+
+    fn handle_vault_request(
+        &mut self,
+        src: XorName,
+        requester: PublicId,
+        request: Request,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use Request::*;
+        trace!(
+            "{}: Received ({:?} {:?}) from src {} (client {:?})",
+            self,
+            request,
+            message_id,
+            src,
+            requester
+        );
+        // TODO - remove this
+        #[allow(unused)]
+        match request {
+            CreateLoginPacket(ref login_packet) => {
+                self.handle_create_login_packet_vault_req(requester, login_packet, message_id)
+            }
+            PutIData(_)
+            | GetIData(_)
+            | DeleteUnpubIData(_)
+            | PutMData(_)
+            | GetMData(_)
+            | GetMDataValue { .. }
+            | DeleteMData(_)
+            | GetMDataShell(_)
+            | GetMDataVersion(_)
+            | ListMDataEntries(_)
+            | ListMDataKeys(_)
+            | ListMDataValues(_)
+            | SetMDataUserPermissions { .. }
+            | DelMDataUserPermissions { .. }
+            | ListMDataPermissions(_)
+            | ListMDataUserPermissions { .. }
+            | MutateSeqMDataEntries { .. }
+            | MutateUnseqMDataEntries { .. }
+            | PutAData(_)
+            | GetAData(_)
+            | GetADataShell { .. }
+            | GetADataValue { .. }
+            | DeleteAData(_)
+            | GetADataRange { .. }
+            | GetADataIndices(_)
+            | GetADataLastEntry(_)
+            | GetADataPermissions { .. }
+            | GetPubADataUserPermissions { .. }
+            | GetUnpubADataUserPermissions { .. }
+            | GetADataOwners { .. }
+            | AddPubADataPermissions { .. }
+            | AddUnpubADataPermissions { .. }
+            | SetADataOwner { .. }
+            | AppendSeq { .. }
+            | AppendUnseq(_)
+            | TransferCoins { .. }
+            | GetBalance
+            | ListAuthKeysAndVersion
+            | InsAuthKey { .. }
+            | DelAuthKey { .. }
+            | CreateBalance { .. }
+            | CreateLoginPacketFor { .. }
+            | UpdateLoginPacket { .. }
+            | GetLoginPacket(..) => {
+                error!(
+                    "{}: Should not receive {:?} as a source elder.",
+                    self, request
+                );
+                None
+            }
         }
     }
 
@@ -764,7 +867,7 @@ impl SourceElder {
         #[allow(unused)]
         match response {
             // Transfer the response from destination elders to clients
-            GetLoginPacket(..) | Mutation(..) | GetIData(..) | Transaction(..) => {
+            Mutation(_) | GetIData(_) | Transaction(_) => {
                 if let Some(peer_addr) = self.lookup_client_peer_addr(&requester) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
@@ -813,7 +916,7 @@ impl SourceElder {
             //
             // ===== Invalid =====
             //
-            GetBalance(_) | ListAuthKeysAndVersion(_) => {
+            GetLoginPacket(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
                 error!(
                     "{}: Should not receive {:?} as a source elder.",
                     self, response
@@ -996,6 +1099,123 @@ impl SourceElder {
 
             NdError::from("Failed to update balance")
         })
+    }
+
+    fn handle_create_login_packet_client_req(
+        &mut self,
+        client_id: &PublicId,
+        login_packet: LoginPacket,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if !login_packet.size_is_valid() {
+            self.send_response_to_client(
+                client_id,
+                message_id,
+                Response::Mutation(Err(NdError::ExceededSize)),
+            );
+            return None;
+        }
+
+        if let Err(error) = self.withdraw(utils::client(client_id)?.public_key(), *COST_OF_PUT) {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!(
+                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                self,
+                *COST_OF_PUT,
+                error
+            );
+        }
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client_id.clone(),
+            request: Request::CreateLoginPacket(login_packet),
+            message_id,
+        }))
+    }
+
+    fn handle_create_login_packet_vault_req(
+        &mut self,
+        requester: PublicId,
+        login_packet: &LoginPacket,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = if self.login_packets.has(login_packet.destination()) {
+            Err(NdError::LoginPacketExists)
+        } else {
+            self.login_packets
+                .put(login_packet)
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToSrcElders {
+            sender: *login_packet.destination(),
+            message: Rpc::Response {
+                response: Response::Mutation(result),
+                requester,
+                message_id,
+            },
+        })
+    }
+
+    fn handle_update_login_packet_req(
+        &mut self,
+        client_id: &PublicId,
+        updated_login_packet: &LoginPacket,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = self
+            .login_packet(
+                utils::own_key(client_id)?,
+                updated_login_packet.destination(),
+            )
+            .and_then(|_existing_login_packet| {
+                if !updated_login_packet.size_is_valid() {
+                    return Err(NdError::ExceededSize);
+                }
+                self.login_packets
+                    .put(updated_login_packet)
+                    .map_err(|err| err.to_string().into())
+            });
+        self.send_response_to_client(client_id, message_id, Response::Mutation(result));
+        None
+    }
+
+    fn handle_get_login_packet_req(
+        &mut self,
+        client_id: &PublicId,
+        address: &XorName,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = self
+            .login_packet(utils::own_key(client_id)?, address)
+            .map(|login_packet| {
+                // TODO - Fix before committing.  Use new function from safe-nd rather than cloning
+                (
+                    login_packet.data().to_vec(),
+                    login_packet.signature().clone(),
+                )
+            });
+        self.send_response_to_client(client_id, message_id, Response::GetLoginPacket(result));
+        None
+    }
+
+    fn login_packet(
+        &self,
+        requester_pub_key: &PublicKey,
+        packet_name: &XorName,
+    ) -> NdResult<LoginPacket> {
+        self.login_packets
+            .get(packet_name)
+            .map_err(|e| match e {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
+                error => error.to_string().into(),
+            })
+            .and_then(|login_packet| {
+                if login_packet.authorised_getter() == requester_pub_key {
+                    Ok(login_packet)
+                } else {
+                    Err(NdError::AccessDenied)
+                }
+            })
     }
 
     fn handle_list_auth_keys_and_version(
