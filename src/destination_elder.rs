@@ -186,9 +186,7 @@ impl DestinationElder {
                 address,
                 data_index,
             } => unimplemented!(),
-            DeleteAData(address) => {
-                self.handle_delete_adata_req(src, requester, address, message_id)
-            }
+            DeleteAData(address) => self.handle_delete_adata_req(requester, address, message_id),
             GetADataRange { address, range } => unimplemented!(),
             GetADataIndices(address) => unimplemented!(),
             GetADataLastEntry(address) => unimplemented!(),
@@ -924,13 +922,11 @@ impl DestinationElder {
 
     fn handle_delete_adata_req(
         &mut self,
-        _src: XorName,
         requester: PublicId,
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let _requester_pk = *utils::own_key(&requester)?;
-        let _request = Request::DeleteAData(address);
+        let requester_pk = *utils::own_key(&requester)?;
         let result = self
             .append_only_chunks
             .get(&address)
@@ -938,9 +934,15 @@ impl DestinationElder {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                 error => error.to_string().into(),
             })
-            .and_then(|_adata| {
-                // TODO - MDataAction missing the Delete case in safe-nd ?
-                //_adata.check_permission(MDataAction::Delete, requester.public_key())?;
+            .and_then(|adata| {
+                // TODO - This is a workaround until we have AData::check_is_owner in safe-nd
+                match adata {
+                    AData::UnpubSeq(unpub_adata) => utils::is_owner(unpub_adata, requester_pk),
+                    AData::UnpubUnseq(unpub_adata) => utils::is_owner(unpub_adata, requester_pk),
+                    AData::PubSeq(_) | AData::PubUnseq(_) => Err(NdError::InvalidOperation),
+                }
+            })
+            .and_then(|_| {
                 self.append_only_chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())

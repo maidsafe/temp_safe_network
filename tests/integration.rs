@@ -56,10 +56,10 @@ mod common;
 use self::common::{Environment, TestClientTrait};
 use rand::Rng;
 use safe_nd::{
-    AData, AppPermissions, Coins, Error as NdError, IData, IDataAddress, LoginPacket,
-    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response,
-    Result as NdResult, SeqAppendOnly, UnpubImmutableData, UnpubSeqAppendOnlyData,
-    UnpubUnseqAppendOnlyData, UnseqAppendOnly, XorName,
+    AData, ADataOwner, AppPermissions, AppendOnlyData, Coins, Error as NdError, IData,
+    IDataAddress, LoginPacket, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData,
+    PublicKey, Request, Response, Result as NdResult, SeqAppendOnly, UnpubImmutableData,
+    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -290,10 +290,17 @@ fn put_append_only_data() {
         },
     );
 
+    let owner = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        data_index: 0,
+        permissions_index: 0,
+    };
+
     // Seq
     let adata_name: XorName = env.rng().gen();
     let tag = 100;
     let mut adata = PubSeqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
     unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())], 0));
     let adata = AData::PubSeq(adata);
     let pub_seq_adata_address = *adata.address();
@@ -303,6 +310,7 @@ fn put_append_only_data() {
     let adata_name: XorName = env.rng().gen();
     let tag = 101;
     let mut adata = PubUnseqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
     unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())]));
     let adata = AData::PubUnseq(adata);
     let pub_unseq_adata_address = *adata.address();
@@ -312,6 +320,7 @@ fn put_append_only_data() {
     let adata_name: XorName = env.rng().gen();
     let tag = 102;
     let mut adata = UnpubSeqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
     unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())], 0));
     let adata = AData::UnpubSeq(adata);
     let unpub_seq_adata_address = *adata.address();
@@ -321,6 +330,7 @@ fn put_append_only_data() {
     let adata_name: XorName = env.rng().gen();
     let tag = 103;
     let mut adata = UnpubUnseqAppendOnlyData::new(adata_name, tag);
+    unwrap!(adata.append_owner(owner.clone(), 0));
     unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())]));
     let adata = AData::UnpubUnseq(adata);
     let unpub_unseq_adata_address = *adata.address();
