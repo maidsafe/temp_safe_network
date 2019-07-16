@@ -341,7 +341,7 @@ impl SourceElder {
             | GetPubADataUserPermissions { ref address, .. }
             | GetUnpubADataUserPermissions { ref address, .. }
             | GetADataValue { ref address, .. } => {
-                if !utils::is_published(address) {
+                if !utils::adata::is_published(address) {
                     has_signature()?;
                 }
                 self.handle_get_adata(client, request, message_id)
@@ -351,7 +351,7 @@ impl SourceElder {
                 self.handle_delete_adata(client, address, message_id)
             }
             GetADataPermissions { ref address, .. } => {
-                if !utils::is_published(address) {
+                if !utils::adata::is_published(address) {
                     has_signature()?;
                 }
                 unimplemented!()
@@ -369,13 +369,13 @@ impl SourceElder {
                 unimplemented!()
             }
             AppendSeq { ref append, .. } => {
-                if !utils::is_published(&append.address) {
+                if !utils::adata::is_published(&append.address) {
                     has_signature()?;
                 }
                 unimplemented!()
             }
             AppendUnseq(ref append) => {
-                if !utils::is_published(&append.address) {
+                if !utils::adata::is_published(&append.address) {
                     has_signature()?;
                 }
                 unimplemented!()
@@ -605,7 +605,7 @@ impl SourceElder {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        let address = match utils::adata_address(&request) {
+        let address = match utils::adata::address(&request) {
             Some(address) => *address,
             None => {
                 error!(
@@ -616,7 +616,7 @@ impl SourceElder {
             }
         };
 
-        if utils::is_published(&address) || client.has_balance {
+        if utils::adata::is_published(&address) || client.has_balance {
             Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client.public_id.clone(),
                 request,
@@ -664,7 +664,7 @@ impl SourceElder {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        if utils::is_published(&address) {
+        if utils::adata::is_published(&address) {
             self.send_response_to_client(
                 &client.public_id,
                 message_id,

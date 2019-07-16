@@ -146,54 +146,6 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
     }
 }
 
-pub(crate) fn is_published(address: &ADataAddress) -> bool {
-    use ADataAddress::*;
-    match address {
-        PubSeq { .. } | PubUnseq { .. } => true,
-        UnpubSeq { .. } | UnpubUnseq { .. } => false,
-    }
-}
-
-pub(crate) fn is_owner<T: AppendOnlyData<ADataUnpubPermissions>>(
-    adata: T,
-    requester: PublicKey,
-) -> NdResult<()> {
-    adata
-        .fetch_owner_at_index(adata.owners_index() - 1)
-        .ok_or_else(|| NdError::NoSuchData)
-        .and_then(|owner| {
-            if owner.public_key == requester {
-                Ok(())
-            } else {
-                Err(NdError::AccessDenied)
-            }
-        })
-}
-
-pub(crate) fn adata_address(request: &Request) -> Option<&ADataAddress> {
-    // TODO: handle the remaining AData requests too
-    use Request::*;
-    match request {
-        GetAData(address)
-        | GetADataShell { address, .. }
-        | GetADataRange { address, .. }
-        | GetADataIndices(address)
-        | GetADataLastEntry(address)
-        | GetADataPermissions { address, .. }
-        | GetPubADataUserPermissions { address, .. }
-        | GetUnpubADataUserPermissions { address, .. }
-        | GetADataOwners { address, .. } => Some(address),
-        _ => None,
-    }
-}
-
-pub(crate) fn adata_absolute_index(index: ADataIndex, last: u64) -> u64 {
-    match index {
-        ADataIndex::FromStart(index) => index,
-        ADataIndex::FromEnd(index) => last + 1 - index,
-    }
-}
-
 // Create an error response for the given request.
 pub(crate) fn to_error_response(request: &Request, error: NdError) -> Response {
     match request {
@@ -211,5 +163,57 @@ pub(crate) fn to_error_response(request: &Request, error: NdError) -> Response {
         }
         // TODO: implement the rest
         _ => unimplemented!(),
+    }
+}
+
+pub(crate) mod adata {
+    use super::*;
+
+    pub fn is_published(address: &ADataAddress) -> bool {
+        use ADataAddress::*;
+        match address {
+            PubSeq { .. } | PubUnseq { .. } => true,
+            UnpubSeq { .. } | UnpubUnseq { .. } => false,
+        }
+    }
+
+    pub fn is_owner<T: AppendOnlyData<ADataUnpubPermissions>>(
+        adata: T,
+        requester: PublicKey,
+    ) -> NdResult<()> {
+        adata
+            .fetch_owner_at_index(adata.owners_index() - 1)
+            .ok_or_else(|| NdError::NoSuchData)
+            .and_then(|owner| {
+                if owner.public_key == requester {
+                    Ok(())
+                } else {
+                    Err(NdError::AccessDenied)
+                }
+            })
+    }
+
+    pub fn address(request: &Request) -> Option<&ADataAddress> {
+        // TODO: handle the remaining AData requests too
+        use Request::*;
+        match request {
+            GetAData(address)
+            | GetADataShell { address, .. }
+            | GetADataRange { address, .. }
+            | GetADataIndices(address)
+            | GetADataLastEntry(address)
+            | GetADataPermissions { address, .. }
+            | GetPubADataUserPermissions { address, .. }
+            | GetUnpubADataUserPermissions { address, .. }
+            | GetADataOwners { address, .. } => Some(address),
+            _ => None,
+        }
+    }
+
+    pub fn absolute_index(index: ADataIndex, last: u64) -> u64 {
+        match index {
+            ADataIndex::FromStart(index) => index,
+            ADataIndex::FromEnd(index) => last + 1 - index,
+        }
     }
 }

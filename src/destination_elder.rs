@@ -842,8 +842,12 @@ impl DestinationElder {
             .and_then(|adata| {
                 // TODO - This is a workaround until we have AData::check_is_owner in safe-nd
                 match adata {
-                    AData::UnpubSeq(unpub_adata) => utils::is_owner(unpub_adata, requester_pk),
-                    AData::UnpubUnseq(unpub_adata) => utils::is_owner(unpub_adata, requester_pk),
+                    AData::UnpubSeq(unpub_adata) => {
+                        utils::adata::is_owner(unpub_adata, requester_pk)
+                    }
+                    AData::UnpubUnseq(unpub_adata) => {
+                        utils::adata::is_owner(unpub_adata, requester_pk)
+                    }
                     AData::PubSeq(_) | AData::PubUnseq(_) => Err(NdError::InvalidOperation),
                 }
             })
@@ -896,7 +900,7 @@ impl DestinationElder {
                 },
             )
             .and_then(|adata| {
-                let index = utils::adata_absolute_index(data_index, adata.indices()?.data_index());
+                let index = utils::adata::absolute_index(data_index, adata.indices()?.data_index());
                 adata.shell(index)
             });
 
@@ -987,7 +991,7 @@ impl DestinationElder {
                 },
             )
             .and_then(|adata| {
-                let index = utils::adata_absolute_index(owners_index, adata.owners_index());
+                let index = utils::adata::absolute_index(owners_index, adata.owners_index());
                 adata
                     .get_owners(index)
                     .cloned()
@@ -1023,7 +1027,7 @@ impl DestinationElder {
             )
             .and_then(|adata| {
                 let index =
-                    utils::adata_absolute_index(permissions_index, adata.permissions_index());
+                    utils::adata::absolute_index(permissions_index, adata.permissions_index());
                 adata.pub_user_permissions(user, index)
             });
 
@@ -1056,7 +1060,7 @@ impl DestinationElder {
             )
             .and_then(|adata| {
                 let index =
-                    utils::adata_absolute_index(permissions_index, adata.permissions_index());
+                    utils::adata::absolute_index(permissions_index, adata.permissions_index());
                 adata.unpub_user_permissions(public_key, index)
             });
 
@@ -1099,7 +1103,7 @@ impl DestinationElder {
 
     fn get_adata(&self, requester: &PublicId, request: &Request) -> Result<AData, NdError> {
         let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
-        let address = utils::adata_address(request).ok_or(NdError::InvalidOperation)?;
+        let address = utils::adata::address(request).ok_or(NdError::InvalidOperation)?;
         let data = self
             .append_only_chunks
             .get(&address)
