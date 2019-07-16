@@ -908,7 +908,7 @@ impl DestinationElder {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
-                response: Response::GetAData(result),
+                response: Response::GetADataShell(result),
                 message_id,
             },
         })

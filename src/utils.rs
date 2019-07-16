@@ -205,6 +205,7 @@ pub(crate) mod adata {
             | GetADataPermissions { address, .. }
             | GetPubADataUserPermissions { address, .. }
             | GetUnpubADataUserPermissions { address, .. }
+            | GetADataValue { address, .. }
             | GetADataOwners { address, .. } => Some(address),
             _ => None,
         }

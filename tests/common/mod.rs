@@ -454,12 +454,16 @@ pub fn send_request_expect_err<T: TestClientTrait>(
     env: &mut Environment,
     client: &mut T,
     request: Request,
-    response: Response,
+    expected_response: Response,
 ) {
     let message_id = client.send_request(request);
     env.poll();
-    let resp = client.expect_response(message_id);
-    if response != resp {
-        unexpected!(resp);
+    let actual_response = client.expect_response(message_id);
+
+    if actual_response != expected_response {
+        panic!(
+            "Expected: {:?}, got: {:?}.",
+            expected_response, actual_response
+        )
     }
 }

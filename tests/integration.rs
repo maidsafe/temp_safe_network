@@ -56,10 +56,11 @@ mod common;
 use self::common::{Environment, TestClientTrait};
 use rand::Rng;
 use safe_nd::{
-    AData, ADataOwner, AppPermissions, AppendOnlyData, Coins, Error as NdError, IData,
-    IDataAddress, LoginPacket, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData,
-    PublicKey, Request, Response, Result as NdResult, SeqAppendOnly, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, XorName,
+    AData, ADataAddress, ADataIndex, ADataIndices, ADataOwner, AppPermissions, AppendOnlyData,
+    Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
+    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
+    UnseqAppendOnly, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -375,6 +376,153 @@ fn put_append_only_data() {
         Request::DeleteAData(unpub_unseq_adata_address),
         Response::Mutation(Err(NdError::NoSuchData)),
     );
+}
+
+#[test]
+fn append_only_data_get_operations() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    // Create an append-only data
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        data_index: 0,
+        permissions_index: 0,
+    };
+
+    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.append(
+        vec![
+            (b"one".to_vec(), b"foo".to_vec()),
+            (b"two".to_vec(), b"bar".to_vec()),
+        ],
+        0,
+    ));
+
+    let data = AData::PubSeq(data);
+
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+
+    // GetAData (failure - non-existing data)
+    let invalid_name: XorName = env.rng().gen();
+    let invalid_address = ADataAddress::PubSeq {
+        name: invalid_name,
+        tag,
+    };
+
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::GetAData(invalid_address),
+        Response::GetAData(Err(NdError::NoSuchData)),
+    );
+
+    // GetAData (success)
+    let message_id = client.send_request(Request::GetAData(*data.address()));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetAData(Ok(got)) => assert_eq!(got, data),
+        x => unexpected!(x),
+    }
+
+    // GetADataShell
+    let index = 0;
+    let message_id = client.send_request(Request::GetADataShell {
+        address: *data.address(),
+        data_index: ADataIndex::FromStart(index),
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetADataShell(Ok(got)) => assert_eq!(got, unwrap!(data.shell(index))),
+        x => unexpected!(x),
+    }
+
+    // GetADataRange
+    let mut test_range = |start, end, expected_result| {
+        let message_id = client.send_request(Request::GetADataRange {
+            address: *data.address(),
+            range: (start, end),
+        });
+        env.poll();
+
+        match client.expect_response(message_id) {
+            Response::GetADataRange(got) => assert_eq!(got, expected_result),
+            x => unexpected!(x),
+        }
+    };
+
+    test_range(
+        ADataIndex::FromStart(0),
+        ADataIndex::FromStart(0),
+        Ok(vec![]),
+    );
+    test_range(
+        ADataIndex::FromStart(0),
+        ADataIndex::FromStart(1),
+        Ok(vec![(b"one".to_vec(), b"foo".to_vec())]),
+    );
+    test_range(
+        ADataIndex::FromStart(1),
+        ADataIndex::FromStart(2),
+        Ok(vec![(b"two".to_vec(), b"bar".to_vec())]),
+    );
+    test_range(
+        ADataIndex::FromEnd(1),
+        ADataIndex::FromEnd(0),
+        Ok(vec![(b"two".to_vec(), b"bar".to_vec())]),
+    );
+    test_range(
+        ADataIndex::FromStart(0),
+        ADataIndex::FromEnd(0),
+        Ok(vec![
+            (b"one".to_vec(), b"foo".to_vec()),
+            (b"two".to_vec(), b"bar".to_vec()),
+        ]),
+    );
+    // FIXME: uncomment once safe-nd stops panicking on this.
+    // test_range(
+    //     ADataIndex::FromStart(0),
+    //     ADataIndex::FromStart(3),
+    //     Err(NdError::NoSuchEntry),
+    // );
+
+    // GetADataIndices
+    let expected = ADataIndices::new(2, 1, 0);
+    let message_id = client.send_request(Request::GetADataIndices(*data.address()));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetADataIndices(Ok(got)) => assert_eq!(got, expected),
+        x => unexpected!(x),
+    }
+
+    // GetADataLastEntry
+    let expected = (b"two".to_vec(), b"bar".to_vec());
+    let message_id = client.send_request(Request::GetADataLastEntry(*data.address()));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetADataLastEntry(Ok(got)) => assert_eq!(got, expected),
+        x => unexpected!(x),
+    }
+
+    // GetADataValue
+    let message_id = client.send_request(Request::GetADataValue {
+        address: *data.address(),
+        key: b"one".to_vec(),
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetADataValue(Ok(got)) => assert_eq!(got, b"foo"),
+        x => unexpected!(x),
+    }
 }
 
 #[test]
