@@ -80,7 +80,8 @@ impl Safe {
                 err
             ))
         })?;
-        let now = gen_timestamp();
+
+        let now = gen_timestamp_nanos();
         let files_container_data = vec![(
             now.into_bytes().to_vec(),
             serialised_files_map.as_bytes().to_vec(),
@@ -210,7 +211,8 @@ impl Safe {
                     err
                 ))
             })?;
-            let now = gen_timestamp();
+
+            let now = gen_timestamp_nanos();
             let files_container_data = vec![(
                 now.into_bytes().to_vec(),
                 serialised_files_map.as_bytes().to_vec(),
@@ -296,8 +298,12 @@ impl Safe {
 
 // Helper functions
 
-fn gen_timestamp() -> String {
+fn gen_timestamp_secs() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+fn gen_timestamp_nanos() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
 }
 
 // Simply change Windows style path separator into `/`
@@ -349,7 +355,7 @@ fn gen_new_file_item(
     file_size: &str,
     file_created: Option<&str>,
 ) -> Result<FileItem, String> {
-    let now = gen_timestamp();
+    let now = gen_timestamp_secs();
     let mut file_item = FileItem::new();
     let xorurl = upload_file(safe, file_path)?;
     file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), xorurl.to_string());
@@ -605,7 +611,7 @@ fn files_map_create(
     dest_path: Option<String>,
 ) -> ResultReturn<FilesMap> {
     let mut files_map = FilesMap::default();
-    let now = gen_timestamp();
+    let now = gen_timestamp_secs();
 
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     for (file_name, (_change, link)) in content

@@ -298,15 +298,14 @@ impl SafeApp {
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         new_version: u64,
-        xorname: XorName,
+        name: XorName,
         tag: u64,
     ) -> ResultReturn<u64> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
-            let append_only_data_address = PubSeqAppendOnlyData::new(xorname, tag);
-
+            let append_only_data_address = ADataAddress::PubSeq { name, tag };
             let append = ADataAppend {
-                address: *append_only_data_address.address(),
+                address: append_only_data_address,
                 values: the_data,
             };
 
@@ -328,28 +327,25 @@ impl SafeApp {
 
     pub fn get_latest_seq_append_only_data(
         &self,
-        xorname: XorName,
+        name: XorName,
         tag: u64,
     ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
-        debug!("Getting latest seq_append_only_data for: {:?}", &xorname);
+        debug!("Getting latest seq_append_only_data for: {:?}", &name);
 
         let safe_app: &App = self.get_safe_app()?;
-        let append_only_data_address = PubSeqAppendOnlyData::new(xorname, tag);
+        let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
-        debug!(
-            "Address for a_data : {:?}",
-            *append_only_data_address.address()
-        );
+        debug!("Address for a_data : {:?}", append_only_data_address);
 
         let data_length = self
-            .get_current_seq_append_only_data_version(xorname, tag)
+            .get_current_seq_append_only_data_version(name, tag)
             .map_err(|e| {
                 Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
             })?;
 
         let data = run(safe_app, move |client, _app_context| {
             client
-                .get_adata_last_entry(*append_only_data_address.address())
+                .get_adata_last_entry(append_only_data_address)
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -367,11 +363,11 @@ impl SafeApp {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
         let safe_app: &App = self.get_safe_app()?;
-        let append_only_data_address = PubSeqAppendOnlyData::new(name, tag);
+        let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         run(safe_app, move |client, _app_context| {
             client
-                .get_adata_indices(*append_only_data_address.address())
+                .get_adata_indices(append_only_data_address)
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -396,8 +392,7 @@ impl SafeApp {
         );
 
         let safe_app: &App = self.get_safe_app()?;
-        let append_only_data_address = PubSeqAppendOnlyData::new(name, tag);
-
+        let append_only_data_address = ADataAddress::PubSeq { name, tag };
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
             .unwrap();
@@ -419,7 +414,7 @@ impl SafeApp {
 
         let data = run(safe_app, move |client, _app_context| {
             client
-                .get_adata_range(*append_only_data_address.address(), (start, end))
+                .get_adata_range(append_only_data_address, (start, end))
                 .map_err(CoreError)
         })
         .map_err(|e| {
