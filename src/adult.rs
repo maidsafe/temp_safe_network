@@ -27,13 +27,8 @@ impl Adult {
         max_capacity: u64,
         init_mode: Init,
     ) -> Result<Self> {
-        let total_used_space = Rc::new(RefCell::new(0));
-        let _immutable_chunks = ImmutableChunkStore::new(
-            root_dir,
-            max_capacity,
-            Rc::clone(&total_used_space),
-            init_mode,
-        )?;
+        let _immutable_chunks =
+            ImmutableChunkStore::new(root_dir, max_capacity, Rc::new(RefCell::new(0)), init_mode)?;
         Ok(Self {
             _id: id,
             _immutable_chunks,

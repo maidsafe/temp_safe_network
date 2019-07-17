@@ -12,19 +12,19 @@ use crate::{
     action::Action,
     chunk_store::{
         error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
-        LoginPacketChunkStore, MutableChunkStore,
+        MutableChunkStore,
     },
     rpc::Rpc,
     utils,
     vault::Init,
-    Result, ToDbKey,
+    Config, Result, ToDbKey,
 };
 use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AData, ADataAddress, Error as NdError, IData, IDataAddress, LoginPacket, MessageId,
-    NodePublicId, PublicId, Request, Response, Result as NdResult, XorName,
+    AData, ADataAddress, Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId,
+    Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -32,7 +32,6 @@ use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     iter,
-    path::Path,
     rc::Rc,
 };
 use unwrap::unwrap;
@@ -57,42 +56,36 @@ pub(crate) struct DestinationElder {
     immutable_chunks: ImmutableChunkStore,
     mutable_chunks: MutableChunkStore,
     append_only_chunks: AppendOnlyChunkStore,
-    login_packets: LoginPacketChunkStore,
 }
 
 impl DestinationElder {
-    pub fn new<P: AsRef<Path> + Copy>(
+    pub fn new(
         id: NodePublicId,
-        root_dir: P,
-        max_capacity: u64,
+        config: &Config,
+        total_used_space: &Rc<RefCell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
-        let immutable_metadata = utils::new_db(root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
-        let full_adults = utils::new_db(root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
+        let root_dir = config.root_dir();
+        let immutable_metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
+        let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
-        let total_used_space = Rc::new(RefCell::new(0));
+        let max_capacity = config.max_capacity();
         let immutable_chunks = ImmutableChunkStore::new(
-            root_dir,
+            &root_dir,
             max_capacity,
-            Rc::clone(&total_used_space),
+            Rc::clone(total_used_space),
             init_mode,
         )?;
         let mutable_chunks = MutableChunkStore::new(
-            root_dir,
+            &root_dir,
             max_capacity,
-            Rc::clone(&total_used_space),
+            Rc::clone(total_used_space),
             init_mode,
         )?;
         let append_only_chunks = AppendOnlyChunkStore::new(
-            root_dir,
+            &root_dir,
             max_capacity,
-            Rc::clone(&total_used_space),
-            init_mode,
-        )?;
-        let login_packets = LoginPacketChunkStore::new(
-            root_dir,
-            max_capacity,
-            Rc::clone(&total_used_space),
+            Rc::clone(total_used_space),
             init_mode,
         )?;
         Ok(Self {
@@ -103,7 +96,6 @@ impl DestinationElder {
             immutable_chunks,
             mutable_chunks,
             append_only_chunks,
-            login_packets,
         })
     }
 
@@ -236,24 +228,18 @@ impl DestinationElder {
             //
             // ===== Login packets =====
             //
-            CreateLoginPacket(ref new_login_packet) => {
-                self.handle_create_login_packet_req(requester, new_login_packet, message_id)
-            }
-            UpdateLoginPacket(ref updated_login_packet) => {
-                self.handle_update_login_packet_req(requester, updated_login_packet, message_id)
-            }
-            CreateLoginPacketFor { .. } => unimplemented!(),
-            GetLoginPacket(ref address) => {
-                self.handle_get_login_packet_req(requester, address, message_id)
-            }
             //
             // ===== Invalid =====
             //
             GetBalance
+            | CreateBalance { .. }
+            | CreateLoginPacket(_)
+            | CreateLoginPacketFor { .. }
+            | UpdateLoginPacket(_)
+            | GetLoginPacket(_)
             | ListAuthKeysAndVersion
             | InsAuthKey { .. }
-            | DelAuthKey { .. }
-            | CreateBalance { .. } => {
+            | DelAuthKey { .. } => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, request
@@ -319,104 +305,6 @@ impl DestinationElder {
                 None
             }
         }
-    }
-
-    fn handle_update_login_packet_req(
-        &mut self,
-        requester: PublicId,
-        updated_login_packet: &LoginPacket,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let requester_pk = utils::own_key(&requester)?;
-        let result = self
-            .login_packets
-            .get(updated_login_packet.destination())
-            .map_err(|e| match e {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
-                error => error.to_string().into(),
-            })
-            .and_then(|existing_login_packet| {
-                if !updated_login_packet.size_is_valid() {
-                    return Err(NdError::ExceededSize);
-                }
-                if existing_login_packet.authorised_getter() != requester_pk {
-                    // Request does not come from the owner
-                    Err(NdError::AccessDenied)
-                } else {
-                    self.login_packets
-                        .put(updated_login_packet)
-                        .map_err(|err| err.to_string().into())
-                }
-            });
-        Some(Action::RespondToSrcElders {
-            sender: *updated_login_packet.destination(),
-            message: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_create_login_packet_req(
-        &mut self,
-        requester: PublicId,
-        new_login_packet: &LoginPacket,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        // TODO: verify owner is the same as src?
-        let result = if self.login_packets.has(new_login_packet.destination()) {
-            Err(NdError::LoginPacketExists)
-        } else if !new_login_packet.size_is_valid() {
-            Err(NdError::ExceededSize)
-        } else {
-            self.login_packets
-                .put(new_login_packet)
-                .map_err(|error| error.to_string().into())
-        };
-        Some(Action::RespondToSrcElders {
-            sender: *new_login_packet.destination(),
-            message: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_login_packet_req(
-        &mut self,
-        requester: PublicId,
-        address: &XorName,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let requester_pk = utils::own_key(&requester)?;
-        let result = self
-            .login_packets
-            .get(address)
-            .map_err(|error| match error {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
-                error => error.to_string().into(),
-            })
-            .and_then(|login_packet| {
-                if login_packet.authorised_getter() != requester_pk {
-                    // Request does not come from the owner
-                    Err(NdError::AccessDenied)
-                } else {
-                    Ok((
-                        login_packet.data().to_vec(),
-                        login_packet.signature().clone(),
-                    ))
-                }
-            });
-        Some(Action::RespondToSrcElders {
-            sender: *address,
-            message: Rpc::Response {
-                requester,
-                response: Response::GetLoginPacket(result),
-                message_id,
-            },
-        })
     }
 
     fn handle_put_idata_req(
