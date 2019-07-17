@@ -211,10 +211,10 @@ pub(crate) mod adata {
         }
     }
 
-    pub fn absolute_index(index: ADataIndex, last: u64) -> u64 {
+    pub fn absolute_index(index: ADataIndex, count: u64) -> u64 {
         match index {
             ADataIndex::FromStart(index) => index,
-            ADataIndex::FromEnd(index) => last + 1 - index,
+            ADataIndex::FromEnd(index) => count.checked_sub(index).unwrap_or(count),
         }
     }
 }

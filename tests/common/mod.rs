@@ -15,8 +15,9 @@ pub use self::rng::TestRng;
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
-    AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, IData, IDataAddress,
-    Message, MessageId, PublicId, Request, Response, Signature,
+    ADataOwner, AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins,
+    Error as NdError, IData, IDataAddress, Message, MessageId, PublicId, PublicKey, Request,
+    Response, Signature,
 };
 use safe_vault::{
     mock::Network,
@@ -25,6 +26,7 @@ use safe_vault::{
 };
 use serde::Serialize;
 use std::{
+    fmt::{self, Debug, Formatter},
     net::SocketAddr,
     ops::{Deref, DerefMut},
     slice,
@@ -465,5 +467,33 @@ pub fn send_request_expect_err<T: TestClientTrait>(
             "Expected: {:?}, got: {:?}.",
             expected_response, actual_response
         )
+    }
+}
+
+pub fn gen_public_key(rng: &mut TestRng) -> PublicKey {
+    *ClientFullId::new_ed25519(rng).public_id().public_key()
+}
+
+// Temporary workarounds for missing impl Debug for ADataOwner
+pub struct ADataOwnerDebug<'a>(&'a ADataOwner);
+
+impl<'a> Debug for ADataOwnerDebug<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Owner")
+            .field("public_key", &self.0.public_key)
+            .field("data_index", &self.0.data_index)
+            .field("permissions_index", &self.0.permissions_index)
+            .finish()
+    }
+}
+
+pub struct ResultADataOwnerDebug<'a>(pub &'a Result<ADataOwner, NdError>);
+
+impl<'a> Debug for ResultADataOwnerDebug<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.0 {
+            Ok(owner) => write!(f, "Ok({:?})", ADataOwnerDebug(owner)),
+            Err(error) => write!(f, "Err({:?})", error),
+        }
     }
 }

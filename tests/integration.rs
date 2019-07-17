@@ -56,11 +56,10 @@ mod common;
 use self::common::{Environment, TestClientTrait};
 use rand::Rng;
 use safe_nd::{
-    AData, ADataAddress, ADataIndex, ADataIndices, ADataOwner, AppPermissions, AppendOnlyData,
-    Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
-    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
-    UnseqAppendOnly, XorName,
+    AData, ADataAddress, ADataIndex, ADataOwner, AppPermissions, AppendOnlyData, Coins,
+    Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData, PubSeqAppendOnlyData,
+    PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult, SeqAppendOnly,
+    UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -379,7 +378,7 @@ fn put_append_only_data() {
 }
 
 #[test]
-fn append_only_data_get_operations() {
+fn append_only_data_get_data_operations() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
@@ -430,21 +429,8 @@ fn append_only_data_get_operations() {
         x => unexpected!(x),
     }
 
-    // GetADataShell
-    let index = 0;
-    let message_id = client.send_request(Request::GetADataShell {
-        address: *data.address(),
-        data_index: ADataIndex::FromStart(index),
-    });
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetADataShell(Ok(got)) => assert_eq!(got, unwrap!(data.shell(index))),
-        x => unexpected!(x),
-    }
-
     // GetADataRange
-    let mut test_range = |start, end, expected_result| {
+    let mut range_scenario = |start, end, expected_result| {
         let message_id = client.send_request(Request::GetADataRange {
             address: *data.address(),
             range: (start, end),
@@ -457,27 +443,27 @@ fn append_only_data_get_operations() {
         }
     };
 
-    test_range(
+    range_scenario(
         ADataIndex::FromStart(0),
         ADataIndex::FromStart(0),
         Ok(vec![]),
     );
-    test_range(
+    range_scenario(
         ADataIndex::FromStart(0),
         ADataIndex::FromStart(1),
         Ok(vec![(b"one".to_vec(), b"foo".to_vec())]),
     );
-    test_range(
+    range_scenario(
         ADataIndex::FromStart(1),
         ADataIndex::FromStart(2),
         Ok(vec![(b"two".to_vec(), b"bar".to_vec())]),
     );
-    test_range(
+    range_scenario(
         ADataIndex::FromEnd(1),
         ADataIndex::FromEnd(0),
         Ok(vec![(b"two".to_vec(), b"bar".to_vec())]),
     );
-    test_range(
+    range_scenario(
         ADataIndex::FromStart(0),
         ADataIndex::FromEnd(0),
         Ok(vec![
@@ -486,21 +472,11 @@ fn append_only_data_get_operations() {
         ]),
     );
     // FIXME: uncomment once safe-nd stops panicking on this.
-    // test_range(
+    // range_scenario(
     //     ADataIndex::FromStart(0),
     //     ADataIndex::FromStart(3),
     //     Err(NdError::NoSuchEntry),
     // );
-
-    // GetADataIndices
-    let expected = ADataIndices::new(2, 1, 0);
-    let message_id = client.send_request(Request::GetADataIndices(*data.address()));
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetADataIndices(Ok(got)) => assert_eq!(got, expected),
-        x => unexpected!(x),
-    }
 
     // GetADataLastEntry
     let expected = (b"two".to_vec(), b"bar".to_vec());
@@ -523,6 +499,72 @@ fn append_only_data_get_operations() {
         Response::GetADataValue(Ok(got)) => assert_eq!(got, b"foo"),
         x => unexpected!(x),
     }
+}
+
+#[test]
+fn append_only_data_get_owners() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key: common::gen_public_key(env.rng()),
+        data_index: 0,
+        permissions_index: 0,
+    };
+    let owner_1 = ADataOwner {
+        public_key: common::gen_public_key(env.rng()),
+        data_index: 0,
+        permissions_index: 0,
+    };
+    let owner_2 = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        data_index: 1,
+        permissions_index: 0,
+    };
+
+    unwrap!(data.append_owner(owner_0.clone(), 0));
+    unwrap!(data.append_owner(owner_1.clone(), 1));
+
+    unwrap!(data.append(vec![(b"one".to_vec(), b"foo".to_vec())], 0));
+    unwrap!(data.append_owner(owner_2.clone(), 2));
+
+    let data = AData::PubSeq(data);
+    let address = *data.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(data));
+
+    let mut scenario = |owners_index, expected_result| {
+        let message_id = client.send_request(Request::GetADataOwners {
+            address,
+            owners_index,
+        });
+        env.poll();
+
+        match client.expect_response(message_id) {
+            // TODO: use assert_eq! once safe-nd implements Debug for ADataOwner.
+            Response::GetADataOwners(got) => assert!(
+                got == expected_result,
+                "{:?} != {:?}",
+                common::ResultADataOwnerDebug(&got),
+                common::ResultADataOwnerDebug(&expected_result)
+            ),
+            x => unexpected!(x),
+        }
+    };
+
+    scenario(ADataIndex::FromStart(0), Ok(owner_0.clone()));
+    scenario(ADataIndex::FromStart(1), Ok(owner_1.clone()));
+    scenario(ADataIndex::FromStart(2), Ok(owner_2.clone()));
+    scenario(ADataIndex::FromStart(3), Err(NdError::InvalidOwners));
+
+    scenario(ADataIndex::FromEnd(0), Err(NdError::InvalidOwners));
+    scenario(ADataIndex::FromEnd(1), Ok(owner_2));
+    scenario(ADataIndex::FromEnd(2), Ok(owner_1));
+    scenario(ADataIndex::FromEnd(3), Ok(owner_0));
+    scenario(ADataIndex::FromEnd(4), Err(NdError::InvalidOwners));
 }
 
 #[test]
