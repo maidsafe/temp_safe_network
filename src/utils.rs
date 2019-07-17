@@ -12,8 +12,8 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
 use safe_nd::{
-    ADataAddress, ADataIndex, ADataUnpubPermissions, AppendOnlyData, ClientPublicId,
-    Error as NdError, PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
+    ADataAddress, ADataUnpubPermissions, AppendOnlyData, ClientPublicId, Error as NdError,
+    PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
 };
 use serde::Serialize;
 use std::{fs, path::Path};
@@ -182,7 +182,7 @@ pub(crate) mod adata {
         requester: PublicKey,
     ) -> NdResult<()> {
         adata
-            .fetch_owner_at_index(adata.owners_index() - 1)
+            .owner(adata.owners_index() - 1)
             .ok_or_else(|| NdError::NoSuchData)
             .and_then(|owner| {
                 if owner.public_key == requester {
@@ -208,13 +208,6 @@ pub(crate) mod adata {
             | GetADataValue { address, .. }
             | GetADataOwners { address, .. } => Some(address),
             _ => None,
-        }
-    }
-
-    pub fn absolute_index(index: ADataIndex, count: u64) -> u64 {
-        match index {
-            ADataIndex::FromStart(index) => index,
-            ADataIndex::FromEnd(index) => count.checked_sub(index).unwrap_or(count),
         }
     }
 }

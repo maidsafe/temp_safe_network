@@ -23,8 +23,8 @@ use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AData, ADataAddress, ADataIndex, ADataUser, Error as NdError, IData, IDataAddress, MessageId,
-    NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
+    AData, ADataAction, ADataAddress, ADataIndex, ADataUser, Error as NdError, IData, IDataAddress,
+    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -872,7 +872,7 @@ impl DestinationElder {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.get_adata(&requester, &Request::GetAData(address));
+        let result = self.get_adata(&requester, address, ADataAction::Read);
 
         Some(Action::RespondToSrcElders {
             sender: *address.name(),
@@ -892,17 +892,8 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(
-                &requester,
-                &Request::GetADataShell {
-                    address,
-                    data_index,
-                },
-            )
-            .and_then(|adata| {
-                let index = utils::adata::absolute_index(data_index, adata.indices()?.data_index());
-                adata.shell(index)
-            });
+            .get_adata(&requester, address, ADataAction::Read)
+            .and_then(|adata| adata.shell(data_index));
 
         Some(Action::RespondToSrcElders {
             sender: *address.name(),
@@ -922,7 +913,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(&requester, &Request::GetADataRange { address, range })
+            .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToSrcElders {
@@ -942,7 +933,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(&requester, &Request::GetADataIndices(address))
+            .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.indices());
 
         Some(Action::RespondToSrcElders {
@@ -962,7 +953,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(&requester, &Request::GetADataIndices(address))
+            .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.last_entry().ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToSrcElders {
@@ -983,17 +974,10 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(
-                &requester,
-                &Request::GetADataOwners {
-                    address,
-                    owners_index,
-                },
-            )
+            .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| {
-                let index = utils::adata::absolute_index(owners_index, adata.owners_index());
                 adata
-                    .get_owners(index)
+                    .owner(owners_index)
                     .cloned()
                     .ok_or(NdError::InvalidOwners)
             });
@@ -1017,19 +1001,8 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(
-                &requester,
-                &Request::GetPubADataUserPermissions {
-                    address,
-                    permissions_index,
-                    user: user.clone(),
-                },
-            )
-            .and_then(|adata| {
-                let index =
-                    utils::adata::absolute_index(permissions_index, adata.permissions_index());
-                adata.pub_user_permissions(user, index)
-            });
+            .get_adata(&requester, address, ADataAction::Read)
+            .and_then(|adata| adata.pub_user_permissions(user, permissions_index));
 
         Some(Action::RespondToSrcElders {
             sender: *address.name(),
@@ -1050,19 +1023,8 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(
-                &requester,
-                &Request::GetUnpubADataUserPermissions {
-                    address,
-                    permissions_index,
-                    public_key,
-                },
-            )
-            .and_then(|adata| {
-                let index =
-                    utils::adata::absolute_index(permissions_index, adata.permissions_index());
-                adata.unpub_user_permissions(public_key, index)
-            });
+            .get_adata(&requester, address, ADataAction::Read)
+            .and_then(|adata| adata.unpub_user_permissions(public_key, permissions_index));
 
         Some(Action::RespondToSrcElders {
             sender: *address.name(),
@@ -1082,13 +1044,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_adata(
-                &requester,
-                &Request::GetADataValue {
-                    address,
-                    key: key.clone(),
-                },
-            )
+            .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.get(&key).cloned().ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToSrcElders {
@@ -1101,9 +1057,13 @@ impl DestinationElder {
         })
     }
 
-    fn get_adata(&self, requester: &PublicId, request: &Request) -> Result<AData, NdError> {
+    fn get_adata(
+        &self,
+        requester: &PublicId,
+        address: ADataAddress,
+        action: ADataAction,
+    ) -> Result<AData, NdError> {
         let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
-        let address = utils::adata::address(request).ok_or(NdError::InvalidOperation)?;
         let data = self
             .append_only_chunks
             .get(&address)
@@ -1112,7 +1072,7 @@ impl DestinationElder {
                 _ => error.to_string().into(),
             })?;
 
-        data.check_permission(request, *requester_key)?;
+        data.check_permission(action, *requester_key)?;
         Ok(data)
     }
 }
