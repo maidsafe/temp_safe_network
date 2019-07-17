@@ -75,7 +75,7 @@ impl Safe {
         // Check if the app has been authorised
         match decode_ipc_msg(&auth_res) {
             Ok(_) => {
-                info!("Application was authorisaed");
+                info!("Application was authorised");
                 Ok(auth_res)
             }
             Err(e) => {
