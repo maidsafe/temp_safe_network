@@ -351,29 +351,17 @@ impl SourceElder {
                 has_signature()?;
                 self.handle_delete_adata(client, address, message_id)
             }
-            AddPubADataPermissions { ref address, .. } => {
+            AddPubADataPermissions { ref address, .. }
+            | AddUnpubADataPermissions { ref address, .. }
+            | SetADataOwner { ref address, .. } => {
                 has_signature()?;
-                unimplemented!()
+                self.handle_mutate_adata(client, request, message_id)
             }
-            AddUnpubADataPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            SetADataOwner { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            AppendSeq { ref append, .. } => {
+            AppendSeq { ref append, .. } | AppendUnseq(ref append) => {
                 if !utils::adata::is_published(&append.address) {
                     has_signature()?;
                 }
-                unimplemented!()
-            }
-            AppendUnseq(ref append) => {
-                if !utils::adata::is_published(&append.address) {
-                    has_signature()?;
-                }
-                unimplemented!()
+                self.handle_mutate_adata(client, request, message_id)
             }
             //
             // ===== Coins =====
@@ -668,6 +656,28 @@ impl SourceElder {
             return None;
         }
         let request = Request::DeleteAData(address);
+        if client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::AccessDenied)),
+            );
+            None
+        }
+    }
+
+    fn handle_mutate_adata(
+        &mut self,
+        client: &ClientInfo,
+        request: Request,
+        message_id: MessageId,
+    ) -> Option<Action> {
         if client.has_balance {
             Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client.public_id.clone(),
