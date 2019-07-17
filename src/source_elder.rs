@@ -338,6 +338,7 @@ impl SourceElder {
             | GetADataIndices(ref address)
             | GetADataLastEntry(ref address)
             | GetADataOwners { ref address, .. }
+            | GetADataPermissions { ref address, .. }
             | GetPubADataUserPermissions { ref address, .. }
             | GetUnpubADataUserPermissions { ref address, .. }
             | GetADataValue { ref address, .. } => {
@@ -349,12 +350,6 @@ impl SourceElder {
             DeleteAData(address) => {
                 has_signature()?;
                 self.handle_delete_adata(client, address, message_id)
-            }
-            GetADataPermissions { ref address, .. } => {
-                if !utils::adata::is_published(address) {
-                    has_signature()?;
-                }
-                unimplemented!()
             }
             AddPubADataPermissions { ref address, .. } => {
                 has_signature()?;
@@ -875,6 +870,8 @@ impl SourceElder {
             | GetADataOwners(..)
             | GetPubADataUserPermissions(..)
             | GetUnpubADataUserPermissions(..)
+            | GetUnpubADataPermissionAtIndex(..)
+            | GetPubADataPermissionAtIndex(..)
             | GetADataValue(..)
             | Mutation(..)
             | Transaction(..) => {
@@ -896,11 +893,6 @@ impl SourceElder {
             ListMDataPermissions(_) => unimplemented!(),
             GetSeqMDataValue(_) => unimplemented!(),
             GetUnseqMDataValue(_) => unimplemented!(),
-            //
-            // ===== Append Only Data =====
-            //
-            GetUnpubADataPermissionAtIndex(_) => unimplemented!(),
-            GetPubADataPermissionAtIndex(_) => unimplemented!(),
             //
             // ===== Invalid =====
             //

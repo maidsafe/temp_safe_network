@@ -215,7 +215,15 @@ impl DestinationElder {
                 public_key,
                 message_id,
             ),
-            GetADataPermissions { .. } => unimplemented!(),
+            GetADataPermissions {
+                address,
+                permissions_index,
+            } => self.handle_get_adata_permissions_req(
+                requester,
+                address,
+                permissions_index,
+                message_id,
+            ),
             DeleteAData(address) => self.handle_delete_adata_req(requester, address, message_id),
             AddPubADataPermissions {
                 address,
@@ -1031,6 +1039,35 @@ impl DestinationElder {
             message: Rpc::Response {
                 requester,
                 response: Response::GetUnpubADataUserPermissions(result),
+                message_id,
+            },
+        })
+    }
+
+    fn handle_get_adata_permissions_req(
+        &self,
+        requester: PublicId,
+        address: ADataAddress,
+        permissions_index: ADataIndex,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let response = if utils::adata::is_published(&address) {
+            let result = self
+                .get_adata(&requester, address, ADataAction::Read)
+                .and_then(|adata| adata.pub_permissions(permissions_index).map(Clone::clone));
+            Response::GetPubADataPermissionAtIndex(result)
+        } else {
+            let result = self
+                .get_adata(&requester, address, ADataAction::Read)
+                .and_then(|adata| adata.unpub_permissions(permissions_index).map(Clone::clone));
+            Response::GetUnpubADataPermissionAtIndex(result)
+        };
+
+        Some(Action::RespondToSrcElders {
+            sender: *address.name(),
+            message: Rpc::Response {
+                requester,
+                response,
                 message_id,
             },
         })

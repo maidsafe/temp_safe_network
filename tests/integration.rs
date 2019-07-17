@@ -693,8 +693,6 @@ fn pub_append_only_data_get_permissions() {
     );
 
     // GetADataPermissions
-    // TODO: uncomment when the functionality is implemented
-    /*
     let mut scenario = |permissions_index, expected_result| {
         let response = common::send_request_expect_response(
             &mut env,
@@ -713,7 +711,6 @@ fn pub_append_only_data_get_permissions() {
     scenario(ADataIndex::FromStart(0), Ok(perms_0));
     scenario(ADataIndex::FromStart(1), Ok(perms_1));
     scenario(ADataIndex::FromStart(2), Err(NdError::NoSuchEntry));
-    */
 }
 
 ////////////////////////////////////////////////////////////////////////////////
