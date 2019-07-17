@@ -35,6 +35,7 @@ tiny-keccak = "~1.4.4"
 unwrap = "~1.2.1"
 
 [dev_dependencies]
+maplit = "~1.0.1"
 rand_chacha = "~0.1.1"
 tempdir = "~0.3.7"
 
