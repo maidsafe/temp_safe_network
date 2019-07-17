@@ -243,7 +243,7 @@ impl SafeApp {
     ) -> ResultReturn<XorName> {
         debug!(
             "Putting appendable data w/ type: {:?}, xorname: {:?}",
-            &tag, &name
+            tag, name
         );
 
         let safe_app: &App = self.get_safe_app()?;
@@ -259,9 +259,8 @@ impl SafeApp {
             // TODO: setup permissions from props
             let mut perms = BTreeMap::<ADataUser, ADataPubPermissionSet>::new();
             let set = ADataPubPermissionSet::new(true, true);
-            let owner_pk = SafeNdPublicKey::Bls(unwrap!(client.public_bls_key()));
-            let usr = ADataUser::Key(owner_pk);
-            let _ = perms.insert(usr, set);
+            let usr_app = ADataUser::Key(SafeNdPublicKey::Bls(unwrap!(client.public_bls_key())));
+            let _ = perms.insert(usr_app, set);
             unwrap!(data.append_permissions(
                 ADataPubPermissions {
                     permissions: perms,
@@ -271,17 +270,18 @@ impl SafeApp {
                 0
             ));
 
-            let append = ADataAppend {
-                address: append_only_data_address,
-                values: the_data,
-            };
-
+            let usr_acc_owner = unwrap!(client.owner_key());
             let owner = ADataOwner {
-                public_key: unwrap!(client.owner_key()),
+                public_key: usr_acc_owner,
                 data_index: 0,
                 permissions_index: 1,
             };
             unwrap!(data.append_owner(owner, 0));
+
+            let append = ADataAppend {
+                address: append_only_data_address,
+                values: the_data,
+            };
 
             client
                 .put_adata(AData::PubSeq(data.clone()))

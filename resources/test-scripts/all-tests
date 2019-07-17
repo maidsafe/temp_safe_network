@@ -2,20 +2,30 @@
 
 set -e -x
 
-# setup auth cli
-#rm -rf ~/safe-auth
-#git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe-auth
-#cd ~/safe-auth
-#ls
-#SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features mock-network -- -i nonsense
-#SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features mock-network -- --daemon 41805 --allow-all-auth &
-#sleep 15
-#cd -
-
-#cargo run --release --features mock-network -- auth
+# setup auth CLI
+rm -rf ~/safe-auth
+git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe-auth
+cd ~/safe-auth
+ls
+SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense --daemon 41805 --allow-all-auth &
+sleep 15
+cd -
 
 # run tests with CLI's own mock
 cargo test --release --features=scl-mock -- --test-threads=1
 
-# run the unit tests now with SCL's mock-network, for now with fake-auth
-cargo test --release --features="mock-network fake-auth" -- --test-threads=1
+# run the unit tests with SCL's mock-network, with fake-auth
+cargo test --lib --release --features=mock-network,fake-auth -- --test-threads=1
+
+# run the doc tests now with SCL's mock-network, with fake-auth
+cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
+
+# now let's run the integration tests but without fake-auth, using the safe_auth CLI to get credentials
+# get auth credentials which will be then used by the integration tests to connect to mock-network
+cargo run --release --features=mock-network -- auth
+
+# we can now run each of the integration tests suite
+cargo test --release --features=mock-network --test cli_cat
+cargo test --release --features=mock-network --test cli_files --test-threads=1
+cargo test --release --features=mock-network --test cli_keys
+cargo test --release --features=mock-network --test cli_wallet

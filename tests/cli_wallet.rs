@@ -147,6 +147,7 @@ fn calling_safe_wallet_insert() {
 }
 
 #[test]
+#[cfg(not(feature = "mock-network"))]
 fn calling_safe_wallet_create_no_source() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
