@@ -14,11 +14,11 @@ cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
 # now let's run the integration tests but without fake-auth, using the safe_auth CLI to get credentials
 
 # first setup auth CLI
-rm -rf ~/safe-auth
-git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe-auth
+rm -rf ~/safe_auth
+git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe_auth
 cd ~/safe-auth
 ls
-SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense
+SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense || true
 SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- --daemon 41805 --allow-all-auth &
 sleep 15
 cd -
