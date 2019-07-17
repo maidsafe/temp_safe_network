@@ -108,7 +108,12 @@ impl SafeApp {
                     },
                 );
             }
-            None => { /* TODO: we should have a default wallet and substract from there */ }
+            None => {
+                /* TODO: we should have a default wallet and substract from there */
+                return Err(Error::NetDataError(
+                    "Failed to create a CoinBalance: \"NoSuchBalance\"".to_string(),
+                ));
+            }
         };
 
         let to_xorname = xorname_from_pk(&new_balance_owner);

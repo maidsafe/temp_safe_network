@@ -20,8 +20,6 @@ pub enum WalletSubCommands {
     #[structopt(name = "insert")]
     /// Insert a spendable balance into a Wallet
     Insert {
-        /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'.
-        key: String,
         /// The source Wallet for funds
         source: Option<String>,
         /// The target Wallet to insert the spendable balance
@@ -29,6 +27,9 @@ pub enum WalletSubCommands {
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
+        /// The Key's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'.
+        #[structopt(long = "keyurl")]
+        keyurl: Option<String>,
         /// Set the inserted Key as the default one in the target Wallet
         #[structopt(long = "default")]
         default: bool,
@@ -48,8 +49,6 @@ pub enum WalletSubCommands {
     #[structopt(name = "create")]
     /// Create a new Wallet
     Create {
-        /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'.
-        key: Option<String>,
         /// The source Wallet for funds
         source: Option<String>,
         /// If true, do not create a spendable balance
@@ -58,6 +57,9 @@ pub enum WalletSubCommands {
         /// The name to give the spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
+        /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'.
+        #[structopt(long = "keyurl")]
+        keyurl: Option<String>,
         /// Pass the secret key to make the balance spendable, it will be prompted if not provided
         #[structopt(long = "sk")]
         secret: Option<String>,
@@ -100,7 +102,7 @@ pub fn wallet_commander(
             preload,
             test_coins,
             no_balance,
-            key,
+            keyurl,
             name,
             source,
             secret,
@@ -110,7 +112,7 @@ pub fn wallet_commander(
 
             if !no_balance {
                 // get or create keypair
-                let (xorname, key_pair) = match key {
+                let (xorurl, key_pair) = match keyurl {
                     Some(linked_key) => {
                         let sk = get_secret_key(&linked_key, secret)?;
                         let pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
@@ -122,7 +124,7 @@ pub fn wallet_commander(
 
                 let the_name = match name {
                     Some(name_str) => name_str.to_string(),
-                    None => xorname.clone(),
+                    None => xorurl.clone(),
                 };
 
                 // insert and set as default
@@ -131,7 +133,7 @@ pub fn wallet_commander(
                     &the_name,
                     true,
                     &unwrap!(key_pair),
-                    &xorname,
+                    &xorurl,
                 )?;
             }
 
@@ -161,7 +163,7 @@ pub fn wallet_commander(
         }
         Some(WalletSubCommands::Insert {
             target,
-            key,
+            keyurl,
             name,
             default,
             secret,
@@ -169,19 +171,20 @@ pub fn wallet_commander(
         }) => {
             let target = get_target_location(target)?;
 
-            let (xorname, key_pair) = {
-                let sk = get_secret_key(&key, secret)?;
-                let pk = safe.validate_sk_for_xorurl(&sk, &key)?;
+            let (xorurl, key_pair) = {
+                let url = keyurl.unwrap_or_else(|| "".to_string());
+                let sk = get_secret_key(&url, secret)?;
+                let pk = safe.validate_sk_for_xorurl(&sk, &url)?;
 
-                (key, Some(BlsKeyPair { pk, sk }))
+                (url, Some(BlsKeyPair { pk, sk }))
             };
 
             let the_name = match name {
                 Some(name_str) => name_str,
-                None => xorname.clone(),
+                None => xorurl.clone(),
             };
 
-            safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorname)?;
+            safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorurl)?;
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",

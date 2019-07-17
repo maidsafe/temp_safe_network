@@ -17,7 +17,7 @@ const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
     #[structopt(name = "create")]
-    /// Create a new KeyPair
+    /// Create a new Key
     Create {
         /// The source wallet for funds
         source: Option<String>,
@@ -34,8 +34,9 @@ pub enum KeysSubCommands {
     #[structopt(name = "balance")]
     /// Query a Key's current balance
     Balance {
-        /// The target Key to check the current balance
-        target: Option<String>,
+        /// The target Key's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'.
+        #[structopt(long = "keyurl")]
+        keyurl: Option<String>,
         /// The secret key which corresponds to the target Key
         #[structopt(long = "sk")]
         secret: Option<String>,
@@ -58,8 +59,8 @@ pub fn key_commander(
             create_new_key(safe, preload_test_coins, source, preload, pk, output_fmt)?;
             Ok(())
         }
-        Some(KeysSubCommands::Balance { target, secret }) => {
-            let target = target.unwrap_or_else(|| "".to_string());
+        Some(KeysSubCommands::Balance { keyurl, secret }) => {
+            let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret)?;
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(&sk)?

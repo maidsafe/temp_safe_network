@@ -7,7 +7,8 @@ rm -rf ~/safe-auth
 git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe-auth
 cd ~/safe-auth
 ls
-SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense --daemon 41805 --allow-all-auth &
+SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense
+SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- --daemon 41805 --allow-all-auth &
 sleep 15
 cd -
 

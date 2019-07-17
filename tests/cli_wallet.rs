@@ -122,7 +122,7 @@ fn calling_safe_wallet_balance() {
 #[test]
 fn calling_safe_wallet_insert() {
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("50");
-    let (pk_xor, sk) = create_preload_and_get_keys("300");
+    let (key_pk_xor, sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
@@ -130,9 +130,10 @@ fn calling_safe_wallet_insert() {
         get_bin_location(),
         "wallet",
         "insert",
-        &pk_xor,
+        &key_pk_xor,
         &wallet_xor,
-        &wallet_xor,
+        "--keyurl",
+        &key_pk_xor,
         "--sk",
         &sk,
         "--json"
@@ -147,11 +148,15 @@ fn calling_safe_wallet_insert() {
 }
 
 #[test]
-#[cfg(not(feature = "mock-network"))]
 fn calling_safe_wallet_create_no_source() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    cmd.args(&vec!["wallet", "create"]).assert().success();
+    cmd.args(&vec!["wallet", "create"])
+        .assert()
+        .stderr(predicate::str::contains(
+            "Failed to create a CoinBalance: \"NoSuchBalance\"",
+        ))
+        .failure();
 }
 
 #[test]
@@ -189,6 +194,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
         "wallet",
         "create",
         &pk_pay_xor,
+        "--keyurl",
         &pk_pay_xor,
         "--sk",
         pay_sk,
@@ -219,6 +225,7 @@ fn calling_safe_wallet_create_w_bad_secret() {
         "wallet",
         "create",
         &pk_pay_xor,
+        "--keyurl",
         &pk_pay_xor,
         "--sk",
         "badbadbad",
@@ -238,14 +245,17 @@ fn calling_safe_wallet_create_w_bad_pk() {
     cmd.args(&vec![
         "wallet",
         "create",
-        "safe://nononooOOooo",
         &pk_pay_xor,
+        "--keyurl",
+        "safe://nononooOOooo",
         "--sk",
         &pay_sk,
         "--json",
     ])
     .assert()
-    .stderr(predicate::str::contains("UnkownBase"))
+    .stderr(predicate::str::contains(
+        "Failed to decode XOR-URL: UnkownBase",
+    ))
     .failure();
 }
 
@@ -260,6 +270,7 @@ fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
         "wallet",
         "create",
         &pk_pay_xor,
+        "--keyurl",
         &pk_pay_xor,
         "--sk",
         &pay_sk2,

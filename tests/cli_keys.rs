@@ -73,8 +73,10 @@ fn calling_safe_keys_balance() {
     assert!(pk_xor.contains("safe://"));
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["keys", "balance", &pk_xor, "--sk", &sk, "--json"])
-        .assert()
-        .stdout("123.000000000\n")
-        .success();
+    cmd.args(&vec![
+        "keys", "balance", "--keyurl", &pk_xor, "--sk", &sk, "--json",
+    ])
+    .assert()
+    .stdout("123.000000000\n")
+    .success();
 }
