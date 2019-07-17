@@ -343,7 +343,9 @@ impl SafeApp {
 
         let data_length = self
             .get_current_seq_append_only_data_version(xorname, tag)
-            .unwrap();
+            .map_err(|e| {
+                Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
+            })?;
 
         let data = run(safe_app, move |client, _app_context| {
             client

@@ -12,6 +12,8 @@ use log::{debug, warn};
 use safe_cli::{BlsKeyPair, Safe};
 use structopt::StructOpt;
 
+const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
+
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
     #[structopt(name = "create")]
@@ -91,9 +93,9 @@ pub fn create_new_key(
             safe.keys_create(source, preload, pk)
         } else {*/
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
-        let amount = preload.unwrap_or_else(|| "1000.111".to_string());
+        let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
-        if amount == "1000.111" {
+        if amount == PRELOAD_TESTCOINS_DEFAULT_AMOUNT {
             warn!("You must pass a preload amount with test-coins, 1000.111 will be added by default.");
         }
 
