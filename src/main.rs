@@ -21,6 +21,9 @@ extern crate prettytable;
 extern crate human_panic;
 
 #[macro_use]
+extern crate self_update;
+
+#[macro_use]
 extern crate validator_derive;
 
 fn main() {
@@ -28,8 +31,25 @@ fn main() {
     env_logger::init();
     debug!("Starting SAFE CLI...");
 
+    if let Err(e) = update() {
+        error!("safe_cli error: {}", e);
+        process::exit(1);
+    }
     if let Err(e) = run() {
         error!("safe_cli error: {}", e);
         process::exit(1);
     }
+}
+
+fn update() -> Result<(), Box<::std::error::Error>> {
+    let target = self_update::get_target()?;
+    let releases = self_update::backends::github::ReleaseList::configure()
+        .repo_owner("maidsafe")
+        .repo_name("safe-cli")
+        .with_target(&target)
+        .build()?
+        .fetch()?;
+    println!("found releases:");
+    println!("{:#?}\n", releases);
+    Ok(())
 }

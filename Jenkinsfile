@@ -29,6 +29,12 @@ stage('build & test') {
             packageBuildArtifacts('macos')
             uploadBuildArtifacts()
         }
+    },
+    clippy: {
+        node('safe_cli') {
+            checkout(scm)
+            sh("make clippy")
+        }
     }
 }
 
@@ -109,28 +115,20 @@ def createGithubRelease(version) {
 }
 
 def retrieveBuildArtifacts() {
-    command = ""
-    if (env.CHANGE_ID?.trim()) {
-        command += "SAFE_CLI_BRANCH=${env.CHANGE_ID} "
-    } else {
-        command += "SAFE_CLI_BRANCH=${env.BRANCH_NAME} "
+    branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
+    withEnv(["SAFE_CLI_BRANCH=${branch}",
+             "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+        sh("make retrieve-all-build-artifacts")
     }
-    command += "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER} "
-    command += "make retrieve-all-build-artifacts"
-    sh(command)
 }
 
 def packageBuildArtifacts(os) {
-    command = ""
-    if (env.CHANGE_ID?.trim()) {
-        command += "SAFE_CLI_BRANCH=${env.CHANGE_ID} "
-    } else {
-        command += "SAFE_CLI_BRANCH=${env.BRANCH_NAME} "
+    branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
+    withEnv(["SAFE_CLI_BRANCH=${branch}",
+             "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}",
+             "SAFE_CLI_BUILD_OS=${os}"]) {
+        sh("make package-build-artifacts")
     }
-    command += "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER} "
-    command += "SAFE_CLI_BUILD_OS=${os} "
-    command += "make package-build-artifacts"
-    sh(command)
 }
 
 def uploadBuildArtifacts() {
