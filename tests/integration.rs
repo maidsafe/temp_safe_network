@@ -90,6 +90,8 @@ fn login_packets() {
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
 
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
     // Try to get a login packet that does not exist yet.
     let message_id = client.send_request(Request::GetLoginPacket(login_packet_locator));
     env.poll();
@@ -151,6 +153,8 @@ fn login_packets() {
 fn update_login_packet() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -631,6 +635,7 @@ fn append_only_data_delete_data_doesnt_exist() {
 fn get_pub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -754,6 +759,8 @@ fn append_only_data_get_entries() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
     let owner = ADataOwner {
@@ -871,6 +878,7 @@ fn append_only_data_get_entries() {
 fn append_only_data_get_owners() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -935,6 +943,7 @@ fn append_only_data_get_owners() {
 fn pub_append_only_data_get_permissions() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -2276,6 +2285,8 @@ fn put_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
     // Try to put sequenced Mutable Data
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -2301,6 +2312,8 @@ fn put_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
     // Try to put unsequenced Mutable Data
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -2325,6 +2338,8 @@ fn put_unseq_mutable_data() {
 fn read_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     // Try to put sequenced Mutable Data with several entries.
     let entries: BTreeMap<_, _> = (1..4)
@@ -2408,6 +2423,8 @@ fn mutate_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
     // Try to put sequenced Mutable Data.
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -2419,16 +2436,15 @@ fn mutate_seq_mutable_data() {
     );
 
     // Get a non-existant value by key.
-    let message_id = client.send_request(Request::GetMDataValue {
-        address: MDataAddress::Seq { name, tag },
-        key: vec![0],
-    });
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)) => (),
-        x => unexpected!(x),
-    }
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetMDataValue {
+            address: MDataAddress::Seq { name, tag },
+            key: vec![0],
+        },
+        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)),
+    );
 
     // Insert new values.
     let actions = MDataSeqEntryActions::new()
@@ -2493,40 +2509,36 @@ fn mutate_seq_mutable_data() {
     }
 
     // Deleted key should not exist now.
-    let message_id = client.send_request(Request::GetMDataValue {
-        address: MDataAddress::Seq { name, tag },
-        key: vec![1],
-    });
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)) => (),
-        x => unexpected!(x),
-    }
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetMDataValue {
+            address: MDataAddress::Seq { name, tag },
+            key: vec![1],
+        },
+        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)),
+    );
 
     // Try an invalid update request.
+    let expected_invalid_actions = btreemap![vec![0] => EntryError::InvalidSuccessor(1)];
     let actions = MDataSeqEntryActions::new().update(vec![0], vec![3], 0);
-    let message_id = client.send_request(Request::MutateSeqMDataEntries {
-        address: MDataAddress::Seq { name, tag },
-        actions,
-    });
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::Mutation(Err(NdError::InvalidEntryActions(invalid_actions))) => {
-            let mut expected_invalid_actions = BTreeMap::new();
-            let _ = expected_invalid_actions.insert(vec![0], EntryError::InvalidSuccessor(1));
-
-            assert_eq!(invalid_actions, expected_invalid_actions);
-        }
-        x => unexpected!(x),
-    }
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::MutateSeqMDataEntries {
+            address: MDataAddress::Seq { name, tag },
+            actions,
+        },
+        Response::Mutation(Err(NdError::InvalidEntryActions(expected_invalid_actions))),
+    );
 }
 
 #[test]
 fn mutate_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     // Try to put unsequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2617,6 +2629,9 @@ fn mutable_data_permissions() {
 
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client_a, unwrap!(Coins::from_nano(0)));
+    common::create_balance(&mut env, &mut client_b, unwrap!(Coins::from_nano(0)));
 
     // Try to put new unsequenced Mutable Data.
     let name: XorName = env.rng().gen();

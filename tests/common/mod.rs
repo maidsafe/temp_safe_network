@@ -441,6 +441,19 @@ pub fn get_idata<T: TestClientTrait>(
     }
 }
 
+pub fn create_balance(env: &mut Environment, client: &mut TestClient, amount: Coins) {
+    let public_key = *client.public_id().public_key();
+    perform_transaction(
+        env,
+        client,
+        Request::CreateBalance {
+            new_balance_owner: public_key,
+            amount,
+            transaction_id: 0,
+        },
+    )
+}
+
 pub fn get_balance<T: TestClientTrait>(env: &mut Environment, client: &mut T) -> Coins {
     let message_id = client.send_request(Request::GetBalance);
     env.poll();

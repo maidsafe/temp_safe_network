@@ -478,11 +478,20 @@ impl SourceElder {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
+        if client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                utils::to_error_response(&request, NdError::AccessDenied),
+            );
+            None
+        }
     }
 
     fn handle_mdata_mutation(
@@ -492,15 +501,14 @@ impl SourceElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
-        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
             request,
@@ -533,15 +541,13 @@ impl SourceElder {
         }
 
         let request = Request::PutMData(chunk);
-        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
 
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
@@ -577,19 +583,18 @@ impl SourceElder {
             }
         }
 
-        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
+        let request = Request::PutIData(chunk);
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
 
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request: Request::PutIData(chunk),
+            request,
             message_id,
         }))
     }
@@ -701,17 +706,16 @@ impl SourceElder {
             );
             return None;
         }
-        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
 
         let request = Request::PutAData(chunk);
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
             request,
@@ -1130,7 +1134,7 @@ impl SourceElder {
         let (public_key, mut balance) = self
             .balances
             .get_key_value(key)
-            .ok_or(NdError::InsufficientBalance)?;
+            .ok_or(NdError::NoSuchBalance)?;
         balance.coins = balance
             .coins
             .checked_sub(amount)
@@ -1162,6 +1166,37 @@ impl SourceElder {
         })
     }
 
+    // Pays cost of a request.
+    fn pay(
+        &mut self,
+        requester_id: &PublicId,
+        requester_key: &PublicKey,
+        request: &Request,
+        message_id: MessageId,
+        cost: Coins,
+    ) -> Option<()> {
+        match self.withdraw(requester_key, cost) {
+            Ok(()) => Some(()),
+            Err(NdError::InsufficientBalance) => {
+                // Note: in phase 1, we proceed even if there are insufficient funds.
+                trace!(
+                    "{}: Insufficient balance to withdraw {} coins (but allowing the request anyway)",
+                    self,
+                    cost,
+                );
+                Some(())
+            }
+            Err(error) => {
+                self.send_response_to_client(
+                    requester_id,
+                    message_id,
+                    utils::to_error_response(&request, error),
+                );
+                None
+            }
+        }
+    }
+
     fn handle_create_login_packet_client_req(
         &mut self,
         client_id: &PublicId,
@@ -1177,19 +1212,18 @@ impl SourceElder {
             return None;
         }
 
-        if let Err(error) = self.withdraw(utils::client(client_id)?.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
+        let request = Request::CreateLoginPacket(login_packet);
+        self.pay(
+            client_id,
+            utils::client(client_id)?.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
 
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client_id.clone(),
-            request: Request::CreateLoginPacket(login_packet),
+            request,
             message_id,
         }))
     }
