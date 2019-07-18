@@ -463,6 +463,32 @@ fn put_append_only_data() {
         x => unexpected!(x),
     }
 
+    // Verify that B cannot delete A's data
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*pub_seq_adata.address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*pub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*unpub_seq_adata.address()),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*unpub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+
     // Delete the data
     common::send_request_expect_response(
         &mut env,
@@ -498,6 +524,81 @@ fn put_append_only_data() {
         &mut env,
         &mut client_a,
         Request::DeleteAData(*unpub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::NoSuchData)),
+    );
+}
+
+#[test]
+fn append_only_data_delete_data_doesnt_exist() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::PubSeq(PubSeqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::PubUnseq(PubUnseqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::UnpubSeq(UnpubSeqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(
+            *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
+        ),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::PubSeq(PubSeqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::PubUnseq(PubUnseqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::UnpubSeq(UnpubSeqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::NoSuchData)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(
+            *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
+        ),
         Response::Mutation(Err(NdError::NoSuchData)),
     );
 }
