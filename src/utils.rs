@@ -259,7 +259,6 @@ pub(crate) mod adata {
     }
 
     pub fn address(request: &Request) -> Option<&ADataAddress> {
-        // TODO: handle the remaining AData requests too
         use Request::*;
         match request {
             GetAData(address)
@@ -271,7 +270,10 @@ pub(crate) mod adata {
             | GetPubADataUserPermissions { address, .. }
             | GetUnpubADataUserPermissions { address, .. }
             | GetADataValue { address, .. }
-            | GetADataOwners { address, .. } => Some(address),
+            | GetADataOwners { address, .. }
+            | DeleteAData(address)
+            | AddPubADataPermissions { address, .. } => Some(address),
+            AppendSeq { append, .. } | AppendUnseq(append) => Some(&append.address),
             _ => None,
         }
     }
