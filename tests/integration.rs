@@ -1289,8 +1289,125 @@ fn pub_append_only_data_put_permissions() {
     );
 }
 
+#[test]
+fn unpub_append_only_data_put_permissions() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let public_key_a = *client_a.public_id().public_key();
+    let public_key_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: public_key_a,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    common::perform_transaction(
+        &mut env,
+        &mut client_b,
+        Request::CreateBalance {
+            new_balance_owner: public_key_b,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = UnpubSeqAppendOnlyData::new(name, tag);
+
+    let owner = ADataOwner {
+        public_key: *client_a.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+
+    unwrap!(data.append_owner(owner, 0));
+
+    // Client A can manage permissions, but not B
+    let perms_0 = ADataUnpubPermissions {
+        permissions: btreemap![public_key_a => ADataUnpubPermissionSet::new(true, true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(AData::UnpubSeq(data.clone())),
+    );
+
+    // Before
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(0),
+        },
+        Response::GetUnpubADataPermissionAtIndex(Ok(perms_0)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(1),
+        },
+        Response::GetUnpubADataPermissionAtIndex(Err(NdError::NoSuchEntry)),
+    );
+
+    let perms_1 = ADataUnpubPermissions {
+        permissions: btreemap![
+            public_key_b => ADataUnpubPermissionSet::new(true, true, true)
+        ],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    // Only client A has permissions to add permissions
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::AddUnpubADataPermissions {
+            address: *data.address(),
+            permissions: perms_1.clone(),
+            permissions_idx: 1,
+        },
+        // TODO: this should probably be AccessDenied?
+        Response::Mutation(Err(NdError::NoSuchEntry)),
+    );
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::AddUnpubADataPermissions {
+            address: *data.address(),
+            permissions: perms_1.clone(),
+            permissions_idx: 1,
+        },
+    );
+
+    // Check that the permissions have been updated
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(1),
+        },
+        Response::GetUnpubADataPermissionAtIndex(Ok(perms_1)),
+    );
+}
+
 // TODO:
-// Request::AddUnpubADataPermissions
 // Request::SetADataOwner
 // Request::AppendSeq
 // Request::AppendUnseq
