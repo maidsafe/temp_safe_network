@@ -450,7 +450,7 @@ pub fn get_balance<T: TestClientTrait>(env: &mut Environment, client: &mut T) ->
     }
 }
 
-pub fn send_request_expect_response<T: TestClientTrait>(
+pub fn send_request_get_response<T: TestClientTrait>(
     env: &mut Environment,
     client: &mut T,
     request: Request,
@@ -460,13 +460,13 @@ pub fn send_request_expect_response<T: TestClientTrait>(
     client.expect_response(message_id)
 }
 
-pub fn send_request_expect_err<T: TestClientTrait>(
+pub fn send_request_expect_response<T: TestClientTrait>(
     env: &mut Environment,
     client: &mut T,
     request: Request,
     expected_response: Response,
 ) {
-    let actual_response = send_request_expect_response(env, client, request);
+    let actual_response = send_request_get_response(env, client, request);
     if actual_response != expected_response {
         panic!(
             "Expected: {:?}, got: {:?}.",

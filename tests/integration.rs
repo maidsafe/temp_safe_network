@@ -359,13 +359,13 @@ fn put_append_only_data() {
     // TODO - get the data to verify
 
     // Delete the data
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::DeleteAData(pub_seq_adata_address),
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::DeleteAData(pub_unseq_adata_address),
@@ -383,13 +383,13 @@ fn put_append_only_data() {
     );
 
     // Delete again to test if it's gone
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::DeleteAData(unpub_seq_adata_address),
         Response::Mutation(Err(NdError::NoSuchData)),
     );
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::DeleteAData(unpub_unseq_adata_address),
@@ -423,6 +423,7 @@ fn append_only_data_get_data_operations() {
     ));
 
     let data = AData::PubSeq(data);
+    let address = *data.address();
     common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
 
     // GetAData (failure - non-existing data)
@@ -432,7 +433,7 @@ fn append_only_data_get_data_operations() {
         tag,
     };
 
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetAData(invalid_address),
@@ -440,26 +441,24 @@ fn append_only_data_get_data_operations() {
     );
 
     // GetAData (success)
-    let message_id = client.send_request(Request::GetAData(*data.address()));
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetAData(Ok(got)) => assert_eq!(got, data),
-        x => unexpected!(x),
-    }
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetAData(address),
+        Response::GetAData(Ok(data)),
+    );
 
     // GetADataRange
     let mut range_scenario = |start, end, expected_result| {
-        let message_id = client.send_request(Request::GetADataRange {
-            address: *data.address(),
-            range: (start, end),
-        });
-        env.poll();
-
-        match client.expect_response(message_id) {
-            Response::GetADataRange(got) => assert_eq!(got, expected_result),
-            x => unexpected!(x),
-        }
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetADataRange {
+                address,
+                range: (start, end),
+            },
+            Response::GetADataRange(expected_result),
+        )
     };
 
     range_scenario(
@@ -498,25 +497,23 @@ fn append_only_data_get_data_operations() {
 
     // GetADataLastEntry
     let expected = (b"two".to_vec(), b"bar".to_vec());
-    let message_id = client.send_request(Request::GetADataLastEntry(*data.address()));
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetADataLastEntry(Ok(got)) => assert_eq!(got, expected),
-        x => unexpected!(x),
-    }
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(address),
+        Response::GetADataLastEntry(Ok(expected)),
+    );
 
     // GetADataValue
-    let message_id = client.send_request(Request::GetADataValue {
-        address: *data.address(),
-        key: b"one".to_vec(),
-    });
-    env.poll();
-
-    match client.expect_response(message_id) {
-        Response::GetADataValue(Ok(got)) => assert_eq!(got, b"foo"),
-        x => unexpected!(x),
-    }
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataValue {
+            address,
+            key: b"one".to_vec(),
+        },
+        Response::GetADataValue(Ok(b"foo".to_vec())),
+    );
 }
 
 #[test]
@@ -554,18 +551,15 @@ fn append_only_data_get_owners() {
     common::perform_mutation(&mut env, &mut client, Request::PutAData(data.into()));
 
     let mut scenario = |owners_index, expected_result| {
-        let response = common::send_request_expect_response(
+        common::send_request_expect_response(
             &mut env,
             &mut client,
             Request::GetADataOwners {
                 address,
                 owners_index,
             },
+            Response::GetADataOwners(expected_result),
         );
-        match response {
-            Response::GetADataOwners(got) => assert_eq!(got, expected_result),
-            x => unexpected!(x),
-        }
     };
 
     scenario(ADataIndex::FromStart(0), Ok(owner_0));
@@ -620,7 +614,7 @@ fn pub_append_only_data_get_permissions() {
 
     // GetPubADataUserPermissions
     let mut scenario = |permissions_index, user, expected_response| {
-        let response = common::send_request_expect_response(
+        common::send_request_expect_response(
             &mut env,
             &mut client,
             Request::GetPubADataUserPermissions {
@@ -628,11 +622,8 @@ fn pub_append_only_data_get_permissions() {
                 permissions_index,
                 user,
             },
+            Response::GetPubADataUserPermissions(expected_response),
         );
-        match response {
-            Response::GetPubADataUserPermissions(got) => assert_eq!(got, expected_response),
-            x => unexpected!(x),
-        }
     };
 
     scenario(
@@ -678,7 +669,7 @@ fn pub_append_only_data_get_permissions() {
     );
 
     // GetUnpubADataUserPermissions (failure - incorrect data type)
-    let response = common::send_request_expect_response(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetUnpubADataUserPermissions {
@@ -686,26 +677,20 @@ fn pub_append_only_data_get_permissions() {
             permissions_index: ADataIndex::FromStart(1),
             public_key,
         },
-    );
-    assert_eq!(
-        response,
-        Response::GetUnpubADataUserPermissions(Err(NdError::NoSuchData))
+        Response::GetUnpubADataUserPermissions(Err(NdError::NoSuchData)),
     );
 
     // GetADataPermissions
     let mut scenario = |permissions_index, expected_result| {
-        let response = common::send_request_expect_response(
+        common::send_request_expect_response(
             &mut env,
             &mut client,
             Request::GetADataPermissions {
                 address,
                 permissions_index,
             },
+            Response::GetPubADataPermissionAtIndex(expected_result),
         );
-        match response {
-            Response::GetPubADataPermissionAtIndex(got) => assert_eq!(got, expected_result),
-            x => unexpected!(x),
-        }
     };
 
     scenario(ADataIndex::FromStart(0), Ok(perms_0));
@@ -829,7 +814,7 @@ fn get_immutable_data_that_doesnt_exist() {
 
     // Try to get non-existing published immutable data
     let address: XorName = env.rng().gen();
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Pub(address)),
@@ -837,7 +822,7 @@ fn get_immutable_data_that_doesnt_exist() {
     );
 
     // Try to get non-existing unpublished immutable data while having no balance
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Unpub(address)),
@@ -856,7 +841,7 @@ fn get_immutable_data_that_doesnt_exist() {
             transaction_id: 0,
         },
     );
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Unpub(address)),
@@ -919,7 +904,7 @@ fn get_immutable_data_from_other_owner() {
         common::get_idata(&mut env, &mut client_a, unpub_idata_address,),
         raw_data
     );
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client_b,
         Request::GetIData(unpub_idata_address),
@@ -956,7 +941,7 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
     );
 
     // Get some unpublished immutable data from the same address
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Unpub(pub_idata_address)),
@@ -998,7 +983,7 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
     );
 
     // Get some published immutable data from the same address
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Pub(unpub_idata_address)),
@@ -1013,7 +998,7 @@ fn delete_immutable_data_that_doesnt_exist() {
 
     // Try to delete non-existing published idata while not having a balance
     let address: XorName = env.rng().gen();
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::DeleteUnpubIData(IDataAddress::Pub(address)),
@@ -1021,7 +1006,7 @@ fn delete_immutable_data_that_doesnt_exist() {
     );
 
     // Try to delete non-existing unpublished data while not having a balance
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Unpub(address)),
@@ -1040,7 +1025,7 @@ fn delete_immutable_data_that_doesnt_exist() {
             transaction_id: 0,
         },
     );
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client,
         Request::GetIData(IDataAddress::Unpub(address)),
@@ -1072,7 +1057,7 @@ fn delete_immutable_data() {
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(pub_idata));
 
     // Try to delete published data by constructing inconsistent Request
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client_a,
         Request::DeleteUnpubIData(IDataAddress::Pub(pub_idata_address)),
@@ -1080,7 +1065,7 @@ fn delete_immutable_data() {
     );
 
     // Try to delete published data by raw XorName
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client_a,
         Request::DeleteUnpubIData(IDataAddress::Unpub(pub_idata_address)),
@@ -1094,7 +1079,7 @@ fn delete_immutable_data() {
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
     // Delete unpublished data without being the owner
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client_b,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
@@ -1109,7 +1094,7 @@ fn delete_immutable_data() {
     );
 
     // Delete unpublished data again
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut client_a,
         Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
@@ -1152,7 +1137,12 @@ fn auth_keys() {
     };
 
     let no_such_balance = Response::Mutation(Err(NdError::NoSuchBalance));
-    common::send_request_expect_err(&mut env, &mut owner, make_ins_request(1), no_such_balance);
+    common::send_request_expect_response(
+        &mut env,
+        &mut owner,
+        make_ins_request(1),
+        no_such_balance,
+    );
     list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
 
     // Create a balance for the owner and check that listing authorised keys returns an empty
@@ -1193,7 +1183,7 @@ fn auth_keys() {
 
     // Try to insert using an invalid version number.
     let invalid_successor = Response::Mutation(Err(NdError::InvalidSuccessor(2)));
-    common::send_request_expect_err(
+    common::send_request_expect_response(
         &mut env,
         &mut owner,
         make_ins_request(100),
