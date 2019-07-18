@@ -47,6 +47,7 @@ pub enum NrsSubCommands {
 pub fn nrs_commander(
     cmd: Option<NrsSubCommands>,
     output_fmt: OutputFmt,
+	dry_run : bool,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -60,7 +61,7 @@ pub fn nrs_commander(
             let target = get_target_location(destination)?;
 
             let (resolvable_map_container_xorurl, processed_entries, _resolvable_map) =
-                safe.resolvable_map_container_create(&name, &target, set_as_defualt)?;
+                safe.resolvable_map_container_create(&name, &target, set_as_defualt, dry_run)?;
 
             // Now let's just print out the content of the ResolvableMap
             if OutputFmt::Pretty == output_fmt {

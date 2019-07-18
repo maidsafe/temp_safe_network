@@ -572,7 +572,7 @@ fn file_system_dir_walk(
                                 },
                             };
                         } else {
-                            processed_files.insert(normalised_path.clone(), (FILE_ADDED_SIGN.to_string(), "".to_string()));
+                            processed_files.insert(normalised_path.clone(), (CONTENT_ADDED_SIGN.to_string(), "".to_string()));
                         }
                     },
                     Err(err) => {
@@ -725,7 +725,7 @@ fn test_files_container_create_dry_run() {
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert!(processed_files[filename1].1.is_empty());
     assert_eq!(
         processed_files[filename1].1,
@@ -733,7 +733,7 @@ fn test_files_container_create_dry_run() {
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert!(processed_files[filename2].1.is_empty());
     assert_eq!(
         processed_files[filename2].1,
@@ -741,7 +741,7 @@ fn test_files_container_create_dry_run() {
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert!(processed_files[filename3].1.is_empty());
     assert_eq!(
         processed_files[filename3].1,
@@ -749,7 +749,7 @@ fn test_files_container_create_dry_run() {
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert!(processed_files[filename4].1.is_empty());
     assert_eq!(
         processed_files[filename4].1,
@@ -953,42 +953,42 @@ fn test_files_container_sync() {
     assert_eq!(new_files_map.len(), 7);
 
     let filename1 = "./tests/testfolder/test.md";
-    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename1].1,
         new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename2 = "./tests/testfolder/another.md";
-    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename2].1,
         new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename3 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename3].1,
         new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename4 = "./tests/testfolder/noextension";
-    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         processed_files[filename4].1,
         new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
         new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
     );
 
     let filename6 = "./tests/testfolder/subfolder/sub2.md";
-    assert_eq!(new_processed_files[filename6].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename6].1,
         new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
@@ -1055,7 +1055,7 @@ fn test_files_container_sync_dry_run() {
     );
 
     let filename6 = "./tests/testfolder/subfolder/sub2.md";
-    assert_eq!(new_processed_files[filename6].0, FILE_ADDED_SIGN);
+    assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
     assert!(new_processed_files[filename6].1.is_empty());
     assert_eq!(
         new_processed_files[filename6].1,

@@ -318,10 +318,10 @@ fn test_fetch_resolvable_container() {
     let prevent_resolution = true;
 
     let (xorurl, _, files_map) =
-        unwrap!(safe.files_container_create("tests/testfolder", None, true));
+        unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
     let (reslovable_map_xorurl, _, resolvable_map) =
-        unwrap!(safe.resolvable_map_container_create("somesite", &xorurl, true));
+        unwrap!(safe.resolvable_map_container_create("somesite", &xorurl, true, false));
 
     let content = unwrap!(safe.fetch("safe://somesite"));
 

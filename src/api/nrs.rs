@@ -86,9 +86,14 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
+	/// # use rand::distributions::Alphanumeric;
+	/// # use rand::{thread_rng, Rng};
+	/// # use unwrap::unwrap;
     /// # use safe_cli::Safe;
     /// # let mut safe = Safe::new("base32z".to_string());
-    /// let (xorurl, _processed_entries, resolvable_map_container) = safe.resolvable_map_container_create("something", "safe://somewhere", true).unwrap();
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+	/// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+    /// let (xorurl, _processed_entries, resolvable_map_container) = safe.resolvable_map_container_create(&rand_string, "safe://somewhere", true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn resolvable_map_container_create(
@@ -96,6 +101,7 @@ impl Safe {
         name: &str,
         destination: &str,
         default: bool,
+		_dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, ResolvableMap)> {
         let sanitized_name = str::replace(&name, "safe://", "").to_string();
 
@@ -152,14 +158,18 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
+	/// # use rand::distributions::Alphanumeric;
+	/// # use rand::{thread_rng, Rng};
     /// # let mut safe = Safe::new("base32z".to_string());
+	/// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # const FAKE_RDF_PREDICATE_LINK: &str = "link";
-    /// let (xorurl, _processed_entries, _resolvable_map) = safe.resolvable_map_container_create("test", "somewhere", true).unwrap();
+	/// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+    /// let (xorurl, _processed_entries, _resolvable_map) = safe.resolvable_map_container_create(&rand_string, "somewhere", true, false).unwrap();
     /// let (version, resolvable_map_container, native_type) = safe.resolvable_map_container_get_latest(&xorurl).unwrap();
-    /// assert_eq!(version, 1);
-    /// assert_eq!(resolvable_map_container.entries["test"][FAKE_RDF_PREDICATE_LINK], "somewhere");
+	/// assert_eq!(version, 1);
+    /// assert_eq!(resolvable_map_container.entries[&rand_string][FAKE_RDF_PREDICATE_LINK], "somewhere");
     /// assert_eq!(resolvable_map_container.get_default_link().unwrap(), "somewhere");
-    /// assert_eq!(resolvable_map_container.get_default().unwrap(), "test");
+    /// assert_eq!(resolvable_map_container.get_default().unwrap(), &rand_string);
     /// ```
     pub fn resolvable_map_container_get_latest(
         &self,
@@ -261,11 +271,12 @@ fn test_resolvable_map_container_create() {
     use unwrap::unwrap;
 
     let mut safe = Safe::new("base32z".to_string());
+	safe.connect("", Some("fake-credentials")).unwrap();
 
     let nrs_xorname = xorname_from_nrs_string("some_site").unwrap();
     let SITE_NAME = "some_site";
     let (xor_url, _entries, resolvable_map) =
-        unwrap!(safe.resolvable_map_container_create(SITE_NAME, "safe://top_xorurl", true));
+        unwrap!(safe.resolvable_map_container_create(SITE_NAME, "safe://top_xorurl", true, false));
     assert_eq!(resolvable_map.entries.len(), 1);
     let resolvable_item = &resolvable_map.entries[SITE_NAME];
     assert_eq!(
