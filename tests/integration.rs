@@ -1407,8 +1407,144 @@ fn unpub_append_only_data_put_permissions() {
     );
 }
 
+#[test]
+fn append_only_data_put_owners() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let public_key_a = *client_a.public_id().public_key();
+    let public_key_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: public_key_a,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    common::perform_transaction(
+        &mut env,
+        &mut client_b,
+        Request::CreateBalance {
+            new_balance_owner: public_key_b,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key: public_key_a,
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner_0, 0));
+
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append(vec![(b"one".to_vec(), b"foo".to_vec())], 0));
+    unwrap!(data.append(vec![(b"two".to_vec(), b"foo".to_vec())], 1));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(data.clone().into()),
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(0),
+        },
+        Response::GetADataOwners(Ok(owner_0)),
+    );
+    // Neither A or B can get the owners with index 1 (it doesn't exist)
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        Response::GetADataOwners(Err(NdError::InvalidOwners)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        // TODO - Return type doesn't look right
+        Response::GetADataOwners(Err(NdError::NoSuchEntry)),
+    );
+
+    // Set the new owner, change from A -> B
+    let owner_1 = ADataOwner {
+        public_key: public_key_b,
+        entries_index: 2,
+        permissions_index: 1,
+    };
+
+    // B can't set the new owner, but A can
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::SetADataOwner {
+            address: *data.address(),
+            owner: owner_1,
+            owners_idx: 1,
+        },
+        // TODO - Return type doesn't look right
+        Response::Mutation(Err(NdError::NoSuchEntry)),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SetADataOwner {
+            address: *data.address(),
+            owner: owner_1,
+            owners_idx: 1,
+        },
+    );
+
+    // Check the new owner
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        // TODO - Return type doesn't look right
+        Response::GetADataOwners(Err(NdError::NoSuchEntry)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        Response::GetADataOwners(Ok(owner_1)),
+    );
+}
+
 // TODO:
-// Request::SetADataOwner
 // Request::AppendSeq
 // Request::AppendUnseq
 
