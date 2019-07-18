@@ -237,6 +237,14 @@ pub(crate) mod adata {
         }
     }
 
+    pub fn is_sequential(address: &ADataAddress) -> bool {
+        use ADataAddress::*;
+        match address {
+            PubSeq { .. } | UnpubSeq { .. } => true,
+            PubUnseq { .. } | UnpubUnseq { .. } => false,
+        }
+    }
+
     pub fn is_owner(adata: &AData, requester: PublicKey) -> NdResult<()> {
         adata
             .owner(adata.owners_index() - 1)

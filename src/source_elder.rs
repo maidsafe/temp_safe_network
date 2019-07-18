@@ -357,9 +357,31 @@ impl SourceElder {
                 has_signature()?;
                 self.handle_mutate_adata(client, request, message_id)
             }
-            AppendSeq { ref append, .. } | AppendUnseq(ref append) => {
+            AppendSeq { ref append, .. } => {
                 if !utils::adata::is_published(&append.address) {
                     has_signature()?;
+                }
+                if !utils::adata::is_sequential(&append.address) {
+                    self.send_response_to_client(
+                        &client.public_id,
+                        message_id,
+                        Response::Mutation(Err(NdError::InvalidOperation)),
+                    );
+                    return None;
+                }
+                self.handle_mutate_adata(client, request, message_id)
+            }
+            AppendUnseq(ref append) => {
+                if !utils::adata::is_published(&append.address) {
+                    has_signature()?;
+                }
+                if utils::adata::is_sequential(&append.address) {
+                    self.send_response_to_client(
+                        &client.public_id,
+                        message_id,
+                        Response::Mutation(Err(NdError::InvalidOperation)),
+                    );
+                    return None;
                 }
                 self.handle_mutate_adata(client, request, message_id)
             }

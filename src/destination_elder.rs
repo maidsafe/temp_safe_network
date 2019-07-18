@@ -1237,7 +1237,7 @@ impl DestinationElder {
                     AData::PubSeq(ref mut adata) => adata.append(append.values, index)?,
                     AData::UnpubSeq(ref mut adata) => adata.append(append.values, index)?,
                     AData::PubUnseq(_) | AData::UnpubUnseq(_) => {
-                        error!("{}: Unexpected chunk encountered", own_id);
+                        error!("{}: Unexpected unseqential chunk encountered", own_id);
                         return Err(NdError::InvalidOperation);
                     }
                 }
@@ -1264,7 +1264,7 @@ impl DestinationElder {
                     AData::PubUnseq(ref mut adata) => adata.append(operation.values)?,
                     AData::UnpubUnseq(ref mut adata) => adata.append(operation.values)?,
                     AData::PubSeq(_) | AData::UnpubSeq(_) => {
-                        error!("{}: Unexpected chunk encountered", own_id);
+                        error!("{}: Unexpected sequential chunk encountered", own_id);
                         return Err(NdError::InvalidOperation);
                     }
                 }
