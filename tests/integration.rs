@@ -58,10 +58,11 @@ use maplit::btreemap;
 use rand::Rng;
 use safe_nd::{
     AData, ADataAddress, ADataIndex, ADataOwner, ADataPubPermissionSet, ADataPubPermissions,
-    ADataUser, AppPermissions, AppendOnlyData, Coins, Error as NdError, IData, IDataAddress,
-    LoginPacket, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey,
-    Request, Response, Result as NdResult, SeqAppendOnly, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, XorName,
+    ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions, AppendOnlyData,
+    Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
+    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
+    UnseqAppendOnly, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -668,7 +669,7 @@ fn pub_append_only_data_get_permissions() {
         Err(NdError::NoSuchEntry),
     );
 
-    // GetUnpubADataUserPermissions (failure - incorrect data type)
+    // GetUnpubADataUserPermissions (failure - incorrect data kind)
     common::send_request_expect_response(
         &mut env,
         &mut client,
@@ -690,6 +691,146 @@ fn pub_append_only_data_get_permissions() {
                 permissions_index,
             },
             Response::GetPubADataPermissionAtIndex(expected_result),
+        );
+    };
+
+    scenario(ADataIndex::FromStart(0), Ok(perms_0));
+    scenario(ADataIndex::FromStart(1), Ok(perms_1));
+    scenario(ADataIndex::FromStart(2), Err(NdError::NoSuchEntry));
+}
+
+#[test]
+fn unpub_append_only_data_get_permissions() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = UnpubSeqAppendOnlyData::new(name, tag);
+
+    let owner = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+
+    unwrap!(data.append_owner(owner, 0));
+
+    let public_key_0 = common::gen_public_key(env.rng());
+    let public_key_1 = common::gen_public_key(env.rng());
+
+    let perms_0 = ADataUnpubPermissions {
+        permissions: btreemap![
+            public_key_0 => ADataUnpubPermissionSet::new(true, true, false)
+        ],
+        entries_index: 0,
+        owners_index: 1,
+    };
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+
+    let perms_1 = ADataUnpubPermissions {
+        permissions: btreemap![
+            public_key_0 => ADataUnpubPermissionSet::new(true, false, false),
+            public_key_1 => ADataUnpubPermissionSet::new(true, true, true)
+        ],
+        entries_index: 0,
+        owners_index: 1,
+    };
+    unwrap!(data.append_permissions(perms_1.clone(), 1));
+
+    let address = *data.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.into()));
+
+    // GetUnpubADataUserPermissions
+    let mut scenario = |permissions_index, public_key, expected_response| {
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetUnpubADataUserPermissions {
+                address,
+                permissions_index,
+                public_key,
+            },
+            Response::GetUnpubADataUserPermissions(expected_response),
+        );
+    };
+
+    scenario(
+        ADataIndex::FromStart(0),
+        public_key_0,
+        Ok(ADataUnpubPermissionSet::new(true, true, false)),
+    );
+    scenario(
+        ADataIndex::FromStart(0),
+        public_key_1,
+        Err(NdError::NoSuchEntry),
+    );
+    scenario(
+        ADataIndex::FromStart(1),
+        public_key_0,
+        Ok(ADataUnpubPermissionSet::new(true, false, false)),
+    );
+    scenario(
+        ADataIndex::FromStart(1),
+        public_key_1,
+        Ok(ADataUnpubPermissionSet::new(true, true, true)),
+    );
+    scenario(
+        ADataIndex::FromStart(2),
+        public_key_0,
+        Err(NdError::NoSuchEntry),
+    );
+
+    scenario(
+        ADataIndex::FromEnd(1),
+        public_key_0,
+        Ok(ADataUnpubPermissionSet::new(true, false, false)),
+    );
+    scenario(
+        ADataIndex::FromEnd(2),
+        public_key_0,
+        Ok(ADataUnpubPermissionSet::new(true, true, false)),
+    );
+    scenario(
+        ADataIndex::FromEnd(3),
+        public_key_0,
+        Err(NdError::NoSuchEntry),
+    );
+
+    // GetPubADataUserPermissions (failure - incorrect data kind)
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetPubADataUserPermissions {
+            address,
+            permissions_index: ADataIndex::FromStart(1),
+            user: ADataUser::Key(public_key_0),
+        },
+        Response::GetPubADataUserPermissions(Err(NdError::NoSuchData)),
+    );
+
+    // GetADataPermissions
+    let mut scenario = |permissions_index, expected_result| {
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetADataPermissions {
+                address,
+                permissions_index,
+            },
+            Response::GetUnpubADataPermissionAtIndex(expected_result),
         );
     };
 
