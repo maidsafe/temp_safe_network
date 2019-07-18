@@ -3,7 +3,7 @@
 set -e -x
 
 # first setup auth CLI
-rm -f %TEMP%/SCL-Mock
+rm -f $TMP/SCL-Mock
 rm -f $TMPDIR/SCL-Mock
 rm -rf ~/safe_auth
 git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe_auth
