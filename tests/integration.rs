@@ -57,7 +57,7 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::Rng;
 use safe_nd::{
-    AData, ADataAddress, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
+    AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
     AppendOnlyData, Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
     PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
@@ -311,24 +311,33 @@ fn put_append_only_data() {
     let mut pub_seq_adata = PubSeqAppendOnlyData::new(pub_seq_adata_name, 100);
     unwrap!(pub_seq_adata.append_owner(owner_a, 0));
     unwrap!(pub_seq_adata.append(
-            vec![ADataEntry {
-                key: b"one".to_vec(),
-                value: b"pub sec".to_vec()
-            }],
-            0
-        ));
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"pub sec".to_vec()
+        }],
+        0
+    ));
     unwrap!(pub_seq_adata.append(
-            vec![ADataEntry { key:b"two".to_vec(), value: b"pub sec".to_vec()}], 1));
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"pub sec".to_vec()
+        }],
+        1
+    ));
     let pub_seq_adata = AData::PubSeq(pub_seq_adata);
 
     // Published unsequential data
     let pub_unseq_adata_name: XorName = env.rng().gen();
     let mut pub_unseq_adata = PubUnseqAppendOnlyData::new(pub_unseq_adata_name, 100);
     unwrap!(pub_unseq_adata.append_owner(owner_a, 0));
-    unwrap!(pub_unseq_adata.append(
-            vec![ADataEntry { key: b"one".to_vec(), value: b"pub unsec".to_vec() }]));
-    unwrap!(pub_unseq_adata.append(
-            vec![ADataEntry { key: b"two".to_vec(), value: b"pub unsec".to_vec() } ]));
+    unwrap!(pub_unseq_adata.append(vec![ADataEntry {
+        key: b"one".to_vec(),
+        value: b"pub unsec".to_vec()
+    }]));
+    unwrap!(pub_unseq_adata.append(vec![ADataEntry {
+        key: b"two".to_vec(),
+        value: b"pub unsec".to_vec()
+    }]));
     let pub_unseq_adata = AData::PubUnseq(pub_unseq_adata);
 
     // Unpublished sequential
@@ -336,19 +345,33 @@ fn put_append_only_data() {
     let mut unpub_seq_adata = UnpubSeqAppendOnlyData::new(unpub_seq_adata_name, 100);
     unwrap!(unpub_seq_adata.append_owner(owner_a, 0));
     unwrap!(unpub_seq_adata.append(
-            vec![ADataEntry { key: b"one".to_vec(), value: b"unpub sec".to_vec() } ], 0));
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"unpub sec".to_vec()
+        }],
+        0
+    ));
     unwrap!(unpub_seq_adata.append(
-            vec![ADataEntry { key: b"two".to_vec(), value: b"unpub sec".to_vec() } ], 1));
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"unpub sec".to_vec()
+        }],
+        1
+    ));
     let unpub_seq_adata = AData::UnpubSeq(unpub_seq_adata);
 
     // Unpublished unsequential data
     let unpub_unseq_adata_name: XorName = env.rng().gen();
     let mut unpub_unseq_adata = UnpubUnseqAppendOnlyData::new(unpub_unseq_adata_name, 100);
     unwrap!(unpub_unseq_adata.append_owner(owner_a, 0));
-    unwrap!(unpub_unseq_adata.append(
-            vec![ADataEntry { key: b"one".to_vec(), value: b"unpub unsec".to_vec() } ]));
-    unwrap!(unpub_unseq_adata.append(
-            vec![ADataEntry { key: b"two".to_vec(), value: b"unpub unsec".to_vec() } ]));
+    unwrap!(unpub_unseq_adata.append(vec![ADataEntry {
+        key: b"one".to_vec(),
+        value: b"unpub unsec".to_vec()
+    }]));
+    unwrap!(unpub_unseq_adata.append(vec![ADataEntry {
+        key: b"two".to_vec(),
+        value: b"unpub unsec".to_vec()
+    }]));
     let unpub_unseq_adata = AData::UnpubUnseq(unpub_unseq_adata);
 
     // TODO - Enable this once we're passed phase 1
@@ -1454,8 +1477,20 @@ fn append_only_data_put_owners() {
     };
 
     unwrap!(data.append_permissions(perms_0.clone(), 0));
-    unwrap!(data.append(vec![(b"one".to_vec(), b"foo".to_vec())], 0));
-    unwrap!(data.append(vec![(b"two".to_vec(), b"foo".to_vec())], 1));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        0
+    ));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        1
+    ));
 
     common::perform_mutation(
         &mut env,
@@ -1544,9 +1579,191 @@ fn append_only_data_put_owners() {
     );
 }
 
-// TODO:
-// Request::AppendSeq
-// Request::AppendUnseq
+#[test]
+fn append_only_data_append_seq() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+    let public_key = *client.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key,
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner_0, 0));
+
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        0
+    ));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        1
+    ));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutAData(data.clone().into()),
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec(),
+        })),
+    );
+
+    let appended_values = ADataEntry {
+        key: b"three".to_vec(),
+        value: b"bar".to_vec(),
+    };
+    let append = ADataAppend {
+        address: *data.address(),
+        values: vec![appended_values.clone()],
+    };
+    // First try an invalid append
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::AppendUnseq(append.clone()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::AppendSeq { append, index: 2 },
+    );
+
+    // Check the result
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(appended_values)),
+    );
+}
+
+#[test]
+fn append_only_data_append_unseq() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+    let public_key = *client.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubUnseqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key,
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner_0, 0));
+
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append(vec![ADataEntry {
+        key: b"one".to_vec(),
+        value: b"foo".to_vec()
+    }]));
+    unwrap!(data.append(vec![ADataEntry {
+        key: b"two".to_vec(),
+        value: b"foo".to_vec()
+    }]));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutAData(data.clone().into()),
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec(),
+        })),
+    );
+
+    let appended_values = ADataEntry {
+        key: b"three".to_vec(),
+        value: b"bar".to_vec(),
+    };
+    let append = ADataAppend {
+        address: *data.address(),
+        values: vec![appended_values.clone()],
+    };
+
+    // First try an invalid append
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::AppendSeq {
+            append: append.clone(),
+            index: 2,
+        },
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::perform_mutation(&mut env, &mut client, Request::AppendUnseq(append));
+
+    // Check the result
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(appended_values)),
+    );
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
