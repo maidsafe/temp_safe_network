@@ -866,15 +866,11 @@ impl DestinationElder {
                 error => error.to_string().into(),
             })
             .and_then(|adata| {
-                // TODO - This is a workaround until we have AData::check_is_owner in safe-nd
-                match adata {
-                    AData::UnpubSeq(unpub_adata) => {
-                        utils::adata::is_owner(unpub_adata, requester_pk)
-                    }
-                    AData::UnpubUnseq(unpub_adata) => {
-                        utils::adata::is_owner(unpub_adata, requester_pk)
-                    }
-                    AData::PubSeq(_) | AData::PubUnseq(_) => Err(NdError::InvalidOperation),
+                // TODO - AData::check_permission() doesn't support Delete yet in safe-nd
+                if utils::adata::is_published(adata.address()) {
+                    Err(NdError::InvalidOperation)
+                } else {
+                    utils::adata::is_owner(&adata, requester_pk)
                 }
             })
             .and_then(|_| {

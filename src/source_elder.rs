@@ -622,7 +622,21 @@ impl SourceElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
-        // TODO - If unpublished, check that the owner's public key has been added to the chunk?
+        // TODO - Should we replace this with a adata.check_permission call in destination_elder.
+        // That would be more consistent, but on the other hand a check here stops spam earlier.
+        if utils::adata::is_owner(&chunk, *owner.public_key()).is_err() {
+            trace!(
+                "{}: {} attempted Put AppendOnlyData with invalid owners.",
+                self,
+                client.public_id
+            );
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::InvalidOwners)),
+            );
+            return None;
+        }
         if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
             // Note: in phase 1, we proceed even if there are insufficient funds.
             trace!(
