@@ -1286,8 +1286,9 @@ fn pub_append_only_data_put_permissions() {
             permissions: perms_1.clone(),
             permissions_idx: 1,
         },
-        // TODO: this should probably be AccessDenied?
-        Response::Mutation(Err(NdError::NoSuchEntry)),
+        // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
+        // changing this behaviour to AccessDenied.
+        Response::Mutation(Err(NdError::InvalidPermissions)),
     );
 
     common::perform_mutation(
@@ -1404,8 +1405,9 @@ fn unpub_append_only_data_put_permissions() {
             permissions: perms_1.clone(),
             permissions_idx: 1,
         },
-        // TODO: this should probably be AccessDenied?
-        Response::Mutation(Err(NdError::NoSuchEntry)),
+        // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
+        // changing this behaviour to AccessDenied.
+        Response::Mutation(Err(NdError::InvalidPermissions)),
     );
 
     common::perform_mutation(
@@ -1471,7 +1473,7 @@ fn append_only_data_put_owners() {
     unwrap!(data.append_owner(owner_0, 0));
 
     let perms_0 = ADataPubPermissions {
-        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+        permissions: btreemap![ADataUser::Key(public_key_a) => ADataPubPermissionSet::new(true, true)],
         entries_index: 0,
         owners_index: 1,
     };
@@ -1524,8 +1526,7 @@ fn append_only_data_put_owners() {
             address: *data.address(),
             owners_index: ADataIndex::FromStart(1),
         },
-        // TODO - Return type doesn't look right
-        Response::GetADataOwners(Err(NdError::NoSuchEntry)),
+        Response::GetADataOwners(Err(NdError::InvalidOwners)),
     );
 
     // Set the new owner, change from A -> B
@@ -1544,8 +1545,9 @@ fn append_only_data_put_owners() {
             owner: owner_1,
             owners_idx: 1,
         },
-        // TODO - Return type doesn't look right
-        Response::Mutation(Err(NdError::NoSuchEntry)),
+        // TODO - InvalidPermissions because client B doesn't have their key registered. Maybe we
+        //        should consider changing this.
+        Response::Mutation(Err(NdError::InvalidPermissions)),
     );
     common::perform_mutation(
         &mut env,
@@ -1565,8 +1567,7 @@ fn append_only_data_put_owners() {
             address: *data.address(),
             owners_index: ADataIndex::FromStart(1),
         },
-        // TODO - Return type doesn't look right
-        Response::GetADataOwners(Err(NdError::NoSuchEntry)),
+        Response::GetADataOwners(Ok(owner_1)),
     );
     common::send_request_expect_response(
         &mut env,
