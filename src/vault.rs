@@ -9,11 +9,11 @@
 use crate::{
     action::Action,
     adult::Adult,
+    client_handler::ClientHandler,
     coins_handler::CoinsHandler,
     destination_elder::DestinationElder,
     quic_p2p::{Event, NodeInfo},
     rpc::Rpc,
-    source_elder::SourceElder,
     utils, Config, Error, Result,
 };
 use bincode;
@@ -33,7 +33,7 @@ const STATE_FILENAME: &str = "state";
 #[allow(clippy::large_enum_variant)]
 enum State {
     Elder {
-        src: SourceElder,
+        src: ClientHandler,
         dst: DestinationElder,
         coins_handler: CoinsHandler,
     },
@@ -72,7 +72,7 @@ impl Vault {
 
         let (state, event_receiver) = if is_elder {
             let total_used_space = Rc::new(RefCell::new(0));
-            let (src, event_receiver) = SourceElder::new(
+            let (src, event_receiver) = ClientHandler::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
@@ -150,14 +150,14 @@ impl Vault {
     }
 
     fn handle_quic_p2p_event(&mut self, event: Event) -> Option<Action> {
-        let source_elder = self.source_elder_mut()?;
+        let client_handler = self.client_handler_mut()?;
         match event {
-            Event::ConnectedTo { peer } => source_elder.handle_new_connection(peer),
+            Event::ConnectedTo { peer } => client_handler.handle_new_connection(peer),
             Event::ConnectionFailure { peer_addr, err } => {
-                source_elder.handle_connection_failure(peer_addr, Error::from(err));
+                client_handler.handle_connection_failure(peer_addr, Error::from(err));
             }
             Event::NewMessage { peer_addr, msg } => {
-                return source_elder.handle_client_message(peer_addr, msg);
+                return client_handler.handle_client_message(peer_addr, msg);
             }
             event => {
                 info!("{}: Unexpected event: {}", self, event);
@@ -196,7 +196,7 @@ impl Vault {
                         ..
                     } = message
                     {
-                        self.source_elder_mut()?
+                        self.client_handler_mut()?
                             .handle_vault_message(requester_name, message)
                     } else {
                         self.destination_elder_mut()?
@@ -213,16 +213,16 @@ impl Vault {
                 self.destination_elder_mut()?
                     .handle_vault_message(sender, message)
             }
-            RespondToSrcElders { sender, message } => {
+            RespondToClientHandlers { sender, message } => {
                 let client_name = utils::rpc_elder_address(&message)?;
 
                 // TODO - once Routing is integrated, we'll construct the full message to send
-                //        onwards, and then if we're also part of the src elders, we'll call that
+                //        onwards, and then if we're also part of the client handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
                 if self.self_is_elder_for(&client_name) {
                     return self
-                        .source_elder_mut()?
+                        .client_handler_mut()?
                         .handle_vault_message(sender, message);
                 }
                 None
@@ -255,14 +255,14 @@ impl Vault {
         true
     }
 
-    fn source_elder(&self) -> Option<&SourceElder> {
+    fn client_handler(&self) -> Option<&ClientHandler> {
         match &self.state {
             State::Elder { ref src, .. } => Some(src),
             State::Adult(_) => None,
         }
     }
 
-    fn source_elder_mut(&mut self) -> Option<&mut SourceElder> {
+    fn client_handler_mut(&mut self) -> Option<&mut ClientHandler> {
         match &mut self.state {
             State::Elder { ref mut src, .. } => Some(src),
             State::Adult(_) => None,

@@ -60,12 +60,12 @@
 mod action;
 mod adult;
 mod chunk_store;
+mod client_handler;
 mod coins_handler;
 mod config_handler;
 mod destination_elder;
 mod error;
 mod rpc;
-mod source_elder;
 mod to_db_key;
 mod utils;
 mod vault;
@@ -84,9 +84,9 @@ pub use quic_p2p;
 
 pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
+    client_handler::COST_OF_PUT,
     config_handler::Config,
     error::{Error, Result},
-    source_elder::COST_OF_PUT,
     utils::to_error_response,
     vault::Vault,
 };

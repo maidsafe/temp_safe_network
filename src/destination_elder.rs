@@ -435,7 +435,7 @@ impl DestinationElder {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -459,7 +459,7 @@ impl DestinationElder {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             message: Rpc::Response {
                 requester,
@@ -492,7 +492,7 @@ impl DestinationElder {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -596,7 +596,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let result = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -617,7 +617,7 @@ impl DestinationElder {
             .get_mdata_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.shell());
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -638,7 +638,7 @@ impl DestinationElder {
             .get_mdata_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.version());
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -680,7 +680,7 @@ impl DestinationElder {
             }))
         };
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -701,7 +701,7 @@ impl DestinationElder {
             .get_mdata_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.keys());
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -742,7 +742,7 @@ impl DestinationElder {
             }))
         };
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -783,7 +783,7 @@ impl DestinationElder {
             }))
         };
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -804,7 +804,7 @@ impl DestinationElder {
             .get_mdata_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.permissions());
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -826,7 +826,7 @@ impl DestinationElder {
             .get_mdata_chunk(&address, &requester, MDataAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -848,12 +848,12 @@ impl DestinationElder {
             // single dst elder, implying that we're a dst elder chosen to store the chunk.
             self.store_idata(kind, requester, message_id)
         } else {
-            // We're acting as dst elder, received request from src elders
+            // We're acting as dst elder, received request from client handlers
             let data_name = *kind.name();
 
             let client_id = requester.clone();
             let respond = |result: NdResult<()>| {
-                Some(Action::RespondToSrcElders {
+                Some(Action::RespondToClientHandlers {
                     sender: data_name,
                     message: Rpc::Response {
                         requester: client_id,
@@ -917,10 +917,10 @@ impl DestinationElder {
             // single dst elder, implying that we're a dst elder where the chunk is stored.
             self.delete_unpub_idata(address, message_id)
         } else {
-            // We're acting as dst elder, received request from src elders
+            // We're acting as dst elder, received request from client handlers
             let client_id = requester.clone();
             let respond = |result: NdResult<()>| {
-                Some(Action::RespondToSrcElders {
+                Some(Action::RespondToClientHandlers {
                     sender: *address.name(),
                     message: Rpc::Response {
                         requester: client_id,
@@ -988,7 +988,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         // TODO -
-        // - if Ok, and this is the final of the three responses send success back to src elders and
+        // - if Ok, and this is the final of the three responses send success back to client handlers and
         //   then on to the client.  Note: there's no functionality in place yet to know whether
         //   this is the last response or not.
         // - if Ok, and this is not the last response, just return `None` here.
@@ -1014,12 +1014,12 @@ impl DestinationElder {
         }
         if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-            // TODO - send failure back to src elders (hopefully won't accumulate), or
+            // TODO - send failure back to client handlers (hopefully won't accumulate), or
             //        maybe self-terminate if we can't fix this error?
         }
 
         self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| Action::RespondToSrcElders {
+            .map(|idata_op| Action::RespondToClientHandlers {
                 sender: *idata_address.name(),
                 message: Rpc::Response {
                     requester: idata_op.client().clone(),
@@ -1061,15 +1061,15 @@ impl DestinationElder {
             if metadata.holders.is_empty() {
                 if let Err(error) = self.immutable_metadata.rem(&db_key) {
                     warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
-                    // TODO - Send failure back to src elders?
+                    // TODO - Send failure back to client handlers?
                 }
             } else if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
                 warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-                // TODO - Send failure back to src elders?
+                // TODO - Send failure back to client handlers?
             }
         };
         self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| Action::RespondToSrcElders {
+            .map(|idata_op| Action::RespondToClientHandlers {
                 sender: *idata_address.name(),
                 message: Rpc::Response {
                     requester: idata_op.client().clone(),
@@ -1093,7 +1093,7 @@ impl DestinationElder {
         } else {
             let client_id = requester.clone();
             let respond = |result: NdResult<IData>| {
-                Some(Action::RespondToSrcElders {
+                Some(Action::RespondToClientHandlers {
                     sender: *address.name(),
                     message: Rpc::Response {
                         requester: client_id,
@@ -1103,7 +1103,7 @@ impl DestinationElder {
                 })
             };
 
-            // We're acting as dst elder, received request from src elders
+            // We're acting as dst elder, received request from client handlers
             let metadata = match self.get_metadata_for(address) {
                 Ok(metadata) => metadata,
                 Err(error) => return respond(Err(error)),
@@ -1328,7 +1328,7 @@ impl DestinationElder {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             message: Rpc::Response {
                 requester,
@@ -1365,7 +1365,7 @@ impl DestinationElder {
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1383,7 +1383,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let result = self.get_adata(&requester, address, ADataAction::Read);
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1404,7 +1404,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.shell(data_index));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1425,7 +1425,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1445,7 +1445,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.indices());
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1465,7 +1465,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.last_entry().cloned().ok_or(NdError::NoSuchEntry));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1491,7 +1491,7 @@ impl DestinationElder {
                     .ok_or(NdError::InvalidOwners)
             });
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1513,7 +1513,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.pub_user_permissions(user, permissions_index));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1535,7 +1535,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.unpub_user_permissions(public_key, permissions_index));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1564,7 +1564,7 @@ impl DestinationElder {
             Response::GetUnpubADataPermissionAtIndex(result)
         };
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1585,7 +1585,7 @@ impl DestinationElder {
             .get_adata(&requester, address, ADataAction::Read)
             .and_then(|adata| adata.get(&key).cloned().ok_or(NdError::NoSuchEntry));
 
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester,
@@ -1779,7 +1779,7 @@ impl DestinationElder {
                     .put(&adata)
                     .map_err(|error| error.to_string().into())
             });
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             message: Rpc::Response {
                 requester: requester.clone(),

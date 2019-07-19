@@ -141,7 +141,7 @@ impl IDataOp {
         if is_already_actioned {
             None
         } else {
-            Some(Action::RespondToSrcElders {
+            Some(Action::RespondToClientHandlers {
                 sender: *address.name(),
                 message: Rpc::Response {
                     requester: self.client().clone(),
