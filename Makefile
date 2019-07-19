@@ -15,7 +15,7 @@ build-container:
 push-container:
 	docker push maidsafe/safe-cli-build:${SAFE_CLI_VERSION}
 
-test: clean
+test:
 	rm -rf artifacts
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
@@ -81,9 +81,10 @@ clean:
 # The behaviour of both is to error if there are no processes that match the name,
 # so we can just pipe it through || true to ignore that error and continue.
 ifeq ($(OS),Windows_NT)
-    cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
+	cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
 else ifeq ($(UNAME_S),Darwin)
-    lsof -t -i tcp:${RANDOM_PORT_NUMBER} | xargs -n 1 -x kill
+	lsof -t -i tcp:${RANDOM_PORT_NUMBER} | xargs -n 1 -x kill
+	rm -rf ~/safe_auth-${RANDOM_PORT_NUMBER}
 endif
 
 package-commit_hash-artifacts-for-deploy:
