@@ -646,7 +646,7 @@ impl SourceElder {
         let owner = utils::owner(&client.public_id)?;
         // TODO - Should we replace this with a adata.check_permission call in destination_elder.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
-        if utils::adata::is_owner(&chunk, *owner.public_key()).is_err() {
+        if chunk.check_is_last_owner(*owner.public_key()).is_err() {
             trace!(
                 "{}: {} attempted Put AppendOnlyData with invalid owners.",
                 self,

@@ -870,7 +870,7 @@ impl DestinationElder {
                 if utils::adata::is_published(adata.address()) {
                     Err(NdError::InvalidOperation)
                 } else {
-                    utils::adata::is_owner(&adata, requester_pk)
+                    adata.check_is_last_owner(requester_pk)
                 }
             })
             .and_then(|_| {

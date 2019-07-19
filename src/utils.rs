@@ -12,8 +12,7 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
 use safe_nd::{
-    AData, ADataAddress, ClientPublicId, Error as NdError, PublicId, PublicKey, Request, Response,
-    Result as NdResult, XorName,
+    ADataAddress, ClientPublicId, Error as NdError, PublicId, PublicKey, Request, Response, XorName,
 };
 use serde::Serialize;
 use std::{fs, path::Path};
@@ -243,19 +242,6 @@ pub(crate) mod adata {
             PubSeq { .. } | UnpubSeq { .. } => true,
             PubUnseq { .. } | UnpubUnseq { .. } => false,
         }
-    }
-
-    pub fn is_owner(adata: &AData, requester: PublicKey) -> NdResult<()> {
-        adata
-            .owner(adata.owners_index() - 1)
-            .ok_or_else(|| NdError::NoSuchData)
-            .and_then(|owner| {
-                if owner.public_key == requester {
-                    Ok(())
-                } else {
-                    Err(NdError::AccessDenied)
-                }
-            })
     }
 
     pub fn address(request: &Request) -> Option<&ADataAddress> {
