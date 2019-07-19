@@ -336,8 +336,6 @@ impl DestinationElder {
             message_id,
             src
         );
-        // TODO - remove this
-        #[allow(unused)]
         match response {
             Mutation(result) => self.handle_mutation_resp(src, result, message_id),
             GetIData(result) => self.handle_get_idata_resp(src, result, message_id),
@@ -1242,6 +1240,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let client = self.client_id(&message_id)?.clone();
         let client_pk = utils::own_key(&client)?;
+
         // First we need to read the chunk to verify the permissions
         let result = self
             .immutable_chunks

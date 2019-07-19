@@ -1899,13 +1899,16 @@ fn get_immutable_data_that_doesnt_exist() {
         Response::GetIData(Err(NdError::NoSuchData)),
     );
 
-    // Try to get non-existing unpublished immutable data while having no balance
-    common::send_request_expect_response(
-        &mut env,
-        &mut client,
-        Request::GetIData(IDataAddress::Unpub(address)),
-        Response::GetIData(Err(NdError::AccessDenied)),
-    );
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Try to get non-existing unpublished immutable data while having no balance
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetIData(IDataAddress::Unpub(address)),
+            Response::GetIData(Err(NdError::AccessDenied)),
+        );
+    }
 
     // Try to get non-existing unpublished immutable data while having balance
     let start_nano = 1_000_000_000_000;
@@ -2083,13 +2086,16 @@ fn delete_immutable_data_that_doesnt_exist() {
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
 
-    // Try to delete non-existing unpublished data while not having a balance
-    common::send_request_expect_response(
-        &mut env,
-        &mut client,
-        Request::GetIData(IDataAddress::Unpub(address)),
-        Response::GetIData(Err(NdError::AccessDenied)),
-    );
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Try to delete non-existing unpublished data while not having a balance
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetIData(IDataAddress::Unpub(address)),
+            Response::GetIData(Err(NdError::AccessDenied)),
+        );
+    }
 
     // Try to delete non-existing unpublished data
     let start_nano = 1_000_000_000_000;
@@ -2156,13 +2162,16 @@ fn delete_immutable_data() {
     let unpub_idata_address: XorName = *unpub_idata.address().name();
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
-    // Delete unpublished data without being the owner
-    common::send_request_expect_response(
-        &mut env,
-        &mut client_b,
-        Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
-        Response::Mutation(Err(NdError::AccessDenied)),
-    );
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Delete unpublished data without being the owner
+        common::send_request_expect_response(
+            &mut env,
+            &mut client_b,
+            Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
+            Response::Mutation(Err(NdError::AccessDenied)),
+        );
+    }
 
     // Delete unpublished data without having the balance
     common::perform_mutation(
@@ -2202,8 +2211,6 @@ fn auth_keys() {
     let mut owner = env.new_connected_client();
     let mut app = env.new_connected_app(owner.public_id().clone());
 
-    // Try to insert and then list authorised keys using a client with no balance.  Each should
-    // return `NoSuchBalance`.
     let permissions = AppPermissions {
         transfer_coins: true,
     };
@@ -2214,14 +2221,19 @@ fn auth_keys() {
         permissions,
     };
 
-    let no_such_balance = Response::Mutation(Err(NdError::NoSuchBalance));
-    common::send_request_expect_response(
-        &mut env,
-        &mut owner,
-        make_ins_request(1),
-        no_such_balance,
-    );
-    list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Try to insert and then list authorised keys using a client with no balance.  Each should
+        // return `NoSuchBalance`.
+        let no_such_balance = Response::Mutation(Err(NdError::NoSuchBalance));
+        common::send_request_expect_response(
+            &mut env,
+            &mut owner,
+            make_ins_request(1),
+            no_such_balance,
+        );
+        list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
+    }
 
     // Create a balance for the owner and check that listing authorised keys returns an empty
     // collection.
