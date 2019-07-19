@@ -55,14 +55,15 @@ mod common;
 
 use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
-use rand::Rng;
+use rand::{distributions::Standard, Rng};
 use safe_nd::{
     AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
-    AppendOnlyData, Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
-    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
-    UnseqAppendOnly, XorName,
+    AppendOnlyData, Coins, EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData,
+    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
+    MDataValue, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request,
+    Response, Result as NdResult, SeqAppendOnly, SeqMutableData, UnpubImmutableData,
+    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::BTreeMap;
@@ -88,6 +89,8 @@ fn login_packets() {
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     // Try to get a login packet that does not exist yet.
     let message_id = client.send_request(Request::GetLoginPacket(login_packet_locator));
@@ -150,6 +153,8 @@ fn login_packets() {
 fn update_login_packet() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -630,6 +635,7 @@ fn append_only_data_delete_data_doesnt_exist() {
 fn get_pub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -753,6 +759,8 @@ fn append_only_data_get_entries() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
     let owner = ADataOwner {
@@ -870,6 +878,7 @@ fn append_only_data_get_entries() {
 fn append_only_data_get_owners() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -934,6 +943,7 @@ fn append_only_data_get_owners() {
 fn pub_append_only_data_get_permissions() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1889,13 +1899,16 @@ fn get_immutable_data_that_doesnt_exist() {
         Response::GetIData(Err(NdError::NoSuchData)),
     );
 
-    // Try to get non-existing unpublished immutable data while having no balance
-    common::send_request_expect_response(
-        &mut env,
-        &mut client,
-        Request::GetIData(IDataAddress::Unpub(address)),
-        Response::GetIData(Err(NdError::AccessDenied)),
-    );
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Try to get non-existing unpublished immutable data while having no balance
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetIData(IDataAddress::Unpub(address)),
+            Response::GetIData(Err(NdError::AccessDenied)),
+        );
+    }
 
     // Try to get non-existing unpublished immutable data while having balance
     let start_nano = 1_000_000_000_000;
@@ -2073,13 +2086,16 @@ fn delete_immutable_data_that_doesnt_exist() {
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
 
-    // Try to delete non-existing unpublished data while not having a balance
-    common::send_request_expect_response(
-        &mut env,
-        &mut client,
-        Request::GetIData(IDataAddress::Unpub(address)),
-        Response::GetIData(Err(NdError::AccessDenied)),
-    );
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Try to delete non-existing unpublished data while not having a balance
+        common::send_request_expect_response(
+            &mut env,
+            &mut client,
+            Request::GetIData(IDataAddress::Unpub(address)),
+            Response::GetIData(Err(NdError::AccessDenied)),
+        );
+    }
 
     // Try to delete non-existing unpublished data
     let start_nano = 1_000_000_000_000;
@@ -2146,13 +2162,16 @@ fn delete_immutable_data() {
     let unpub_idata_address: XorName = *unpub_idata.address().name();
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
-    // Delete unpublished data without being the owner
-    common::send_request_expect_response(
-        &mut env,
-        &mut client_b,
-        Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
-        Response::Mutation(Err(NdError::AccessDenied)),
-    );
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Delete unpublished data without being the owner
+        common::send_request_expect_response(
+            &mut env,
+            &mut client_b,
+            Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
+            Response::Mutation(Err(NdError::AccessDenied)),
+        );
+    }
 
     // Delete unpublished data without having the balance
     common::perform_mutation(
@@ -2192,8 +2211,6 @@ fn auth_keys() {
     let mut owner = env.new_connected_client();
     let mut app = env.new_connected_app(owner.public_id().clone());
 
-    // Try to insert and then list authorised keys using a client with no balance.  Each should
-    // return `NoSuchBalance`.
     let permissions = AppPermissions {
         transfer_coins: true,
     };
@@ -2204,14 +2221,19 @@ fn auth_keys() {
         permissions,
     };
 
-    let no_such_balance = Response::Mutation(Err(NdError::NoSuchBalance));
-    common::send_request_expect_response(
-        &mut env,
-        &mut owner,
-        make_ins_request(1),
-        no_such_balance,
-    );
-    list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Try to insert and then list authorised keys using a client with no balance.  Each should
+        // return `NoSuchBalance`.
+        let no_such_balance = Response::Mutation(Err(NdError::NoSuchBalance));
+        common::send_request_expect_response(
+            &mut env,
+            &mut owner,
+            make_ins_request(1),
+            no_such_balance,
+        );
+        list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
+    }
 
     // Create a balance for the owner and check that listing authorised keys returns an empty
     // collection.
@@ -2262,4 +2284,432 @@ fn auth_keys() {
     // Insert again and list again.
     common::perform_mutation(&mut env, &mut owner, make_ins_request(3));
     list_keys(&mut env, &mut owner, Ok((expected_map, 3)));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Mutable data
+//
+////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn put_seq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
+    // Try to put sequenced Mutable Data
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = SeqMutableData::new(name, tag, *client.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Seq(mdata.clone())),
+    );
+
+    // Get Mutable Data and verify it's been stored correctly.
+    let message_id = client.send_request(Request::GetMData(MDataAddress::Seq { name, tag }));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetMData(Ok(MData::Seq(data))) => assert_eq!(data, mdata),
+        x => unexpected!(x),
+    }
+}
+
+#[test]
+fn put_unseq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
+    // Try to put unsequenced Mutable Data
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = UnseqMutableData::new(name, tag, *client.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Unseq(mdata.clone())),
+    );
+
+    // Get Mutable Data and verify it's been stored correctly.
+    let message_id = client.send_request(Request::GetMData(MDataAddress::Unseq { name, tag }));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetMData(Ok(MData::Unseq(data))) => assert_eq!(data, mdata),
+        x => unexpected!(x),
+    }
+}
+
+#[test]
+fn read_seq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
+    // Try to put sequenced Mutable Data with several entries.
+    let entries: BTreeMap<_, _> = (1..4)
+        .map(|_| {
+            let key = env.rng().sample_iter(&Standard).take(8).collect();
+            let data = env.rng().sample_iter(&Standard).take(8).collect();
+            (key, MDataValue { data, version: 0 })
+        })
+        .collect();
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = SeqMutableData::new_with_data(
+        name,
+        tag,
+        entries.clone(),
+        Default::default(),
+        *client.public_id().public_key(),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Seq(mdata.clone())),
+    );
+
+    // Get version.
+    let message_id = client.send_request(Request::GetMDataVersion(MDataAddress::Seq { name, tag }));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetMDataVersion(Ok(version)) => assert_eq!(version, 0),
+        x => unexpected!(x),
+    }
+
+    // Get keys.
+    let message_id = client.send_request(Request::ListMDataKeys(MDataAddress::Seq { name, tag }));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::ListMDataKeys(Ok(keys)) => assert_eq!(keys, entries.keys().cloned().collect()),
+        x => unexpected!(x),
+    }
+
+    // Get values.
+    let message_id = client.send_request(Request::ListMDataValues(MDataAddress::Seq { name, tag }));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::ListSeqMDataValues(Ok(values)) => {
+            assert_eq!(values, entries.values().cloned().collect::<Vec<_>>())
+        }
+        x => unexpected!(x),
+    }
+
+    // Get entries.
+    let message_id =
+        client.send_request(Request::ListMDataEntries(MDataAddress::Seq { name, tag }));
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::ListSeqMDataEntries(Ok(fetched_entries)) => assert_eq!(fetched_entries, entries),
+        x => unexpected!(x),
+    }
+
+    // Get a value by key.
+    let key = unwrap!(entries.keys().cloned().nth(0));
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: key.clone(),
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Ok(val)) => assert_eq!(val, entries[&key]),
+        x => unexpected!(x),
+    }
+}
+
+#[test]
+fn mutate_seq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
+    // Try to put sequenced Mutable Data.
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = SeqMutableData::new(name, tag, *client.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Seq(mdata.clone())),
+    );
+
+    // Get a non-existant value by key.
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetMDataValue {
+            address: MDataAddress::Seq { name, tag },
+            key: vec![0],
+        },
+        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)),
+    );
+
+    // Insert new values.
+    let actions = MDataSeqEntryActions::new()
+        .ins(vec![0], vec![1], 0)
+        .ins(vec![1], vec![1], 0);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateSeqMDataEntries {
+            address: MDataAddress::Seq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Ok(val)) => assert_eq!(
+            val,
+            MDataValue {
+                data: vec![1],
+                version: 0
+            }
+        ),
+        x => unexpected!(x),
+    }
+
+    // Update and delete entries.
+    let actions = MDataSeqEntryActions::new()
+        .update(vec![0], vec![2], 1)
+        .del(vec![1], 1);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateSeqMDataEntries {
+            address: MDataAddress::Seq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Seq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetSeqMDataValue(Ok(val)) => assert_eq!(
+            val,
+            MDataValue {
+                data: vec![2],
+                version: 1
+            }
+        ),
+        x => unexpected!(x),
+    }
+
+    // Deleted key should not exist now.
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetMDataValue {
+            address: MDataAddress::Seq { name, tag },
+            key: vec![1],
+        },
+        Response::GetSeqMDataValue(Err(NdError::NoSuchEntry)),
+    );
+
+    // Try an invalid update request.
+    let expected_invalid_actions = btreemap![vec![0] => EntryError::InvalidSuccessor(1)];
+    let actions = MDataSeqEntryActions::new().update(vec![0], vec![3], 0);
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::MutateSeqMDataEntries {
+            address: MDataAddress::Seq { name, tag },
+            actions,
+        },
+        Response::Mutation(Err(NdError::InvalidEntryActions(expected_invalid_actions))),
+    );
+}
+
+#[test]
+fn mutate_unseq_mutable_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, unwrap!(Coins::from_nano(0)));
+
+    // Try to put unsequenced Mutable Data.
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = UnseqMutableData::new(name, tag, *client.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutMData(MData::Unseq(mdata.clone())),
+    );
+
+    // Get a non-existant value by key.
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetMDataValue {
+            address: MDataAddress::Unseq { name, tag },
+            key: vec![0],
+        },
+        Response::GetUnseqMDataValue(Err(NdError::NoSuchEntry)),
+    );
+
+    // Insert new values.
+    let actions = MDataUnseqEntryActions::new()
+        .ins(vec![0], vec![1])
+        .ins(vec![1], vec![1]);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Unseq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetUnseqMDataValue(Ok(val)) => assert_eq!(val, vec![1],),
+        x => unexpected!(x),
+    }
+
+    // Update and delete entries.
+    let actions = MDataUnseqEntryActions::new()
+        .update(vec![0], vec![2])
+        .del(vec![1]);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+    );
+
+    // Get an existing value by key.
+    let message_id = client.send_request(Request::GetMDataValue {
+        address: MDataAddress::Unseq { name, tag },
+        key: vec![0],
+    });
+    env.poll();
+
+    match client.expect_response(message_id) {
+        Response::GetUnseqMDataValue(Ok(val)) => assert_eq!(val, vec![2]),
+        x => unexpected!(x),
+    }
+
+    // Deleted key should not exist now.
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetMDataValue {
+            address: MDataAddress::Unseq { name, tag },
+            key: vec![1],
+        },
+        Response::GetUnseqMDataValue(Err(NdError::NoSuchEntry)),
+    );
+}
+
+#[test]
+fn mutable_data_permissions() {
+    let mut env = Environment::new();
+
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client_a, unwrap!(Coins::from_nano(0)));
+    common::create_balance(&mut env, &mut client_b, unwrap!(Coins::from_nano(0)));
+
+    // Try to put new unsequenced Mutable Data.
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mdata = UnseqMutableData::new(name, tag, *client_a.public_id().public_key());
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutMData(MData::Unseq(mdata.clone())),
+    );
+
+    // Make sure client B can't insert anything.
+    let actions = MDataUnseqEntryActions::new().ins(vec![0], vec![1]);
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+
+    // Insert permissions for client B.
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SetMDataUserPermissions {
+            address: MDataAddress::Unseq { name, tag },
+            user: *client_b.public_id().public_key(),
+            permissions: MDataPermissionSet::new().allow(MDataAction::Insert),
+            version: 1,
+        },
+    );
+
+    // Client B now can insert new values.
+    let actions = MDataUnseqEntryActions::new().ins(vec![0], vec![1]);
+    common::perform_mutation(
+        &mut env,
+        &mut client_b,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+    );
+
+    // Delete client B permissions.
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::DelMDataUserPermissions {
+            address: MDataAddress::Unseq { name, tag },
+            user: *client_b.public_id().public_key(),
+            version: 2,
+        },
+    );
+
+    // Client B can't insert anything again.
+    let actions = MDataUnseqEntryActions::new().ins(vec![0], vec![1]);
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::MutateUnseqMDataEntries {
+            address: MDataAddress::Unseq { name, tag },
+            actions,
+        },
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
 }

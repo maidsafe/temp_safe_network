@@ -28,7 +28,7 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
     AData, ADataAddress, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress,
-    IDataKind, LoginPacket, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
+    IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
     Response, Result as NdResult, Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
@@ -265,65 +265,29 @@ impl SourceElder {
             //
             // ===== Mutable Data =====
             //
-            PutMData(_) => {
+            PutMData(chunk) => {
                 has_signature()?;
-                unimplemented!()
+                self.handle_put_mdata(client, chunk, message_id)
             }
-            GetMData(ref address) => {
+            MutateSeqMDataEntries { .. }
+            | MutateUnseqMDataEntries { .. }
+            | DeleteMData(..)
+            | SetMDataUserPermissions { .. }
+            | DelMDataUserPermissions { .. } => {
                 has_signature()?;
-                unimplemented!()
+                self.handle_mdata_mutation(request, client, message_id)
             }
-            GetMDataValue { ref address, .. } => {
+            GetMData(..)
+            | GetMDataVersion(..)
+            | GetMDataShell(..)
+            | GetMDataValue { .. }
+            | ListMDataPermissions(..)
+            | ListMDataUserPermissions { .. }
+            | ListMDataEntries(..)
+            | ListMDataKeys(..)
+            | ListMDataValues(..) => {
                 has_signature()?;
-                unimplemented!()
-            }
-            DeleteMData(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            GetMDataShell(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            GetMDataVersion(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataEntries(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataKeys(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataValues(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            SetMDataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            DelMDataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataPermissions(ref address) => {
-                has_signature()?;
-                unimplemented!()
-            }
-            ListMDataUserPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            MutateSeqMDataEntries { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            MutateUnseqMDataEntries { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
+                self.handle_get_mdata(request, client, message_id)
             }
             //
             // ===== Append Only Data =====
@@ -508,6 +472,81 @@ impl SourceElder {
         }
     }
 
+    fn handle_get_mdata(
+        &mut self,
+        request: Request,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
+    fn handle_mdata_mutation(
+        &mut self,
+        request: Request,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
+    fn handle_put_mdata(
+        &mut self,
+        client: &ClientInfo,
+        chunk: MData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+
+        // Assert that the owner's public key has been added to the chunk, to avoid Apps
+        // putting chunks which can't be retrieved by their Client owners.
+        if chunk.owner() != *owner.public_key() {
+            trace!(
+                "{}: {} attempted PutMData with invalid owners field.",
+                self,
+                client.public_id
+            );
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::InvalidOwners)),
+            );
+            return None;
+        }
+
+        let request = Request::PutMData(chunk);
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
     fn handle_put_idata(
         &mut self,
         client: &ClientInfo,
@@ -535,19 +574,18 @@ impl SourceElder {
             }
         }
 
-        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
+        let request = Request::PutIData(chunk);
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
 
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request: Request::PutIData(chunk),
+            request,
             message_id,
         }))
     }
@@ -558,20 +596,11 @@ impl SourceElder {
         address: IDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        if address.kind() == IDataKind::Pub || client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request: Request::GetIData(address),
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                Response::GetIData(Err(NdError::AccessDenied)),
-            );
-            None
-        }
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request: Request::GetIData(address),
+            message_id,
+        }))
     }
 
     fn handle_delete_unpub_idata(
@@ -588,20 +617,11 @@ impl SourceElder {
             );
             return None;
         }
-        if client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request: Request::DeleteUnpubIData(address),
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                Response::Mutation(Err(NdError::AccessDenied)),
-            );
-            None
-        }
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request: Request::DeleteUnpubIData(address),
+            message_id,
+        }))
     }
 
     fn handle_get_adata(
@@ -610,31 +630,11 @@ impl SourceElder {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        let address = match utils::adata::address(&request) {
-            Some(address) => *address,
-            None => {
-                error!(
-                    "{}: Logic error - not an append-only data request: {:?}",
-                    self, request
-                );
-                return None;
-            }
-        };
-
-        if utils::adata::is_published(&address) || client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request,
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                utils::to_error_response(&request, NdError::AccessDenied),
-            );
-            None
-        }
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     fn handle_put_adata(
@@ -659,17 +659,16 @@ impl SourceElder {
             );
             return None;
         }
-        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
 
         let request = Request::PutAData(chunk);
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
             request,
@@ -919,26 +918,23 @@ impl SourceElder {
             | GetUnpubADataPermissionAtIndex(..)
             | GetPubADataPermissionAtIndex(..)
             | GetADataValue(..)
+            | GetMData(..)
+            | GetMDataShell(..)
+            | GetMDataVersion(..)
+            | ListUnseqMDataEntries(..)
+            | ListSeqMDataEntries(..)
+            | ListMDataKeys(..)
+            | ListSeqMDataValues(..)
+            | ListUnseqMDataValues(..)
+            | ListMDataUserPermissions(..)
+            | ListMDataPermissions(..)
+            | GetSeqMDataValue(..)
+            | GetUnseqMDataValue(..)
             | Mutation(..)
             | Transaction(..) => {
                 self.send_response_to_client(&requester, message_id, response);
                 None
             }
-            //
-            // ===== Mutable Data =====
-            //
-            GetMData(_) => unimplemented!(),
-            GetMDataShell(_) => unimplemented!(),
-            GetMDataVersion(_) => unimplemented!(),
-            ListUnseqMDataEntries(_) => unimplemented!(),
-            ListSeqMDataEntries(_) => unimplemented!(),
-            ListMDataKeys(_) => unimplemented!(),
-            ListSeqMDataValues(_) => unimplemented!(),
-            ListUnseqMDataValues(_) => unimplemented!(),
-            ListMDataUserPermissions(_) => unimplemented!(),
-            ListMDataPermissions(_) => unimplemented!(),
-            GetSeqMDataValue(_) => unimplemented!(),
-            GetUnseqMDataValue(_) => unimplemented!(),
             //
             // ===== Invalid =====
             //
@@ -1091,7 +1087,7 @@ impl SourceElder {
         let (public_key, mut balance) = self
             .balances
             .get_key_value(key)
-            .ok_or(NdError::InsufficientBalance)?;
+            .ok_or(NdError::NoSuchBalance)?;
         balance.coins = balance
             .coins
             .checked_sub(amount)
@@ -1123,6 +1119,37 @@ impl SourceElder {
         })
     }
 
+    // Pays cost of a request.
+    fn pay(
+        &mut self,
+        requester_id: &PublicId,
+        requester_key: &PublicKey,
+        request: &Request,
+        message_id: MessageId,
+        cost: Coins,
+    ) -> Option<()> {
+        match self.withdraw(requester_key, cost) {
+            Ok(()) => Some(()),
+            Err(NdError::InsufficientBalance) | Err(NdError::NoSuchBalance) => {
+                // Note: in phase 1, we proceed even if there are insufficient funds.
+                trace!(
+                    "{}: Insufficient balance to withdraw {} coins (but allowing the request anyway)",
+                    self,
+                    cost,
+                );
+                Some(())
+            }
+            Err(error) => {
+                self.send_response_to_client(
+                    requester_id,
+                    message_id,
+                    utils::to_error_response(&request, error),
+                );
+                None
+            }
+        }
+    }
+
     fn handle_create_login_packet_client_req(
         &mut self,
         client_id: &PublicId,
@@ -1138,19 +1165,18 @@ impl SourceElder {
             return None;
         }
 
-        if let Err(error) = self.withdraw(utils::client(client_id)?.public_key(), *COST_OF_PUT) {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!(
-                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                self,
-                *COST_OF_PUT,
-                error
-            );
-        }
+        let request = Request::CreateLoginPacket(login_packet);
+        self.pay(
+            client_id,
+            utils::client(client_id)?.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
 
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client_id.clone(),
-            request: Request::CreateLoginPacket(login_packet),
+            request,
             message_id,
         }))
     }
@@ -1245,13 +1271,9 @@ impl SourceElder {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if client.has_balance {
-            Ok(self
-                .accounts
-                .list_auth_keys_and_version(utils::client(&client.public_id)?))
-        } else {
-            Err(NdError::NoSuchBalance)
-        };
+        let result = Ok(self
+            .accounts
+            .list_auth_keys_and_version(utils::client(&client.public_id)?));
 
         self.send_response_to_client(
             &client.public_id,
@@ -1269,16 +1291,12 @@ impl SourceElder {
         permissions: AppPermissions,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if client.has_balance {
-            self.accounts.ins_auth_key(
-                utils::client(&client.public_id)?,
-                key,
-                new_version,
-                permissions,
-            )
-        } else {
-            Err(NdError::NoSuchBalance)
-        };
+        let result = self.accounts.ins_auth_key(
+            utils::client(&client.public_id)?,
+            key,
+            new_version,
+            permissions,
+        );
         self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
         None
     }
@@ -1290,12 +1308,9 @@ impl SourceElder {
         new_version: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if client.has_balance {
+        let result =
             self.accounts
-                .del_auth_key(utils::client(&client.public_id)?, key, new_version)
-        } else {
-            Err(NdError::NoSuchBalance)
-        };
+                .del_auth_key(utils::client(&client.public_id)?, key, new_version);
         self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
         None
     }

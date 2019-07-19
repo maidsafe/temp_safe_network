@@ -243,24 +243,4 @@ pub(crate) mod adata {
             PubUnseq { .. } | UnpubUnseq { .. } => false,
         }
     }
-
-    pub fn address(request: &Request) -> Option<&ADataAddress> {
-        use Request::*;
-        match request {
-            GetAData(address)
-            | GetADataShell { address, .. }
-            | GetADataRange { address, .. }
-            | GetADataIndices(address)
-            | GetADataLastEntry(address)
-            | GetADataPermissions { address, .. }
-            | GetPubADataUserPermissions { address, .. }
-            | GetUnpubADataUserPermissions { address, .. }
-            | GetADataValue { address, .. }
-            | GetADataOwners { address, .. }
-            | DeleteAData(address)
-            | AddPubADataPermissions { address, .. } => Some(address),
-            AppendSeq { append, .. } | AppendUnseq(append) => Some(&append.address),
-            _ => None,
-        }
-    }
 }
