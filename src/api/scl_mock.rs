@@ -33,6 +33,7 @@ type AppendOnlyDataMock = Vec<(Vec<u8>, Vec<u8>)>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
 type SeqMutableDataMock = BTreeMap<String, MDataValue>;
+type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
 
 const MOCK_FILE: &str = "./mock_data.txt";
 
@@ -286,7 +287,7 @@ impl SafeApp {
         _tag: u64,
         _permissions: Option<String>,
     ) -> ResultReturn<XorName> {
-        let xorname = name.unwrap_or_else(|| create_random_xorname());
+        let xorname = name.unwrap_or_else(create_random_xorname);
 
         self.mock_data
             .published_seq_append_only
@@ -325,19 +326,19 @@ impl SafeApp {
         &self,
         name: XorName,
         _tag: u64,
-    ) -> ResultReturn<(u64, (Vec<u8>, Vec<u8>))> {
+    ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate scl mock mdata: {}", xorname_hex);
 
         match self.mock_data.published_seq_append_only.get(&xorname_hex) {
             Some(seq_append_only) => {
                 let latest_index = seq_append_only.len() - 1;
-                let last_entry = seq_append_only
-                    .get(latest_index)
-                    .ok_or(Error::EmptyContent(format!(
+                let last_entry = seq_append_only.get(latest_index).ok_or_else(|| {
+                    Error::EmptyContent(format!(
                         "Empty Sequential AppendOnlyData found at Xor name {}",
                         xorname_hex
-                    )))?;
+                    ))
+                })?;
                 Ok((seq_append_only.len() as u64, last_entry.clone()))
             }
             None => Err(Error::ContentNotFound(format!(
@@ -377,7 +378,7 @@ impl SafeApp {
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> ResultReturn<XorName> {
-        let xorname = name.unwrap_or_else(|| create_random_xorname());
+        let xorname = name.unwrap_or_else(create_random_xorname);
         let seq_md = match self.mock_data.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(uao) => uao.clone(),
             None => BTreeMap::new(),

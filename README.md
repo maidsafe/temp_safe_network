@@ -361,7 +361,7 @@ FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiu
 
 The `*`, `+` and `-` signs mean that the files were updated, added, and removed respectively.
 
-Also, please note we provided the optional `--delete` flag to the command above, this forces the deletion of those files which are found at the targeted `FilesContainer` that are not found in the source location, like the case of `./to-upload/test.md` file in our example above. If we didn't provide such flag, only the modification and creation of files would have been updated on the `FilesContainer`, like the case of `./to-upload/another.md` and `./to-upload/new` files in our example above.
+Also, please note we provided the optional `--delete` flag to the command above, this forces the deletion of those files which are found at the targeted `FilesContainer` that are not found in the source location, like the case of `./to-upload/test.md` file in our example above. If we didn't provide such flag, only the modification and creation of files would have been updated on the `FilesContainer`, like the case of `./to-upload/another.md` and `./to-upload/new` files in our example above. Note that `--delete` is only allowed if the `--recursive` flag is also provided.
 
 The `files sync` command also supports to be passed a destination path as the `files put` command, but in this case the destination path needs to be provided as part of the target XOR-URL. E.g., we can sync a `FilesContainer` using the local path and provide a specific destination path `new-files` in the target XOR-URL:
 ```shell

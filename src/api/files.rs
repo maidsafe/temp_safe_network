@@ -184,6 +184,11 @@ impl Safe {
         recursive: bool,
         delete: bool,
     ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
+        if delete && !recursive {
+            return Err(Error::InvalidInput(
+                "--delete is not allowed if --recursive is not set".to_string(),
+            ));
+        }
         let (mut version, current_files_map, _): (u64, FilesMap, String) =
             self.files_container_get_latest(xorurl)?;
 
@@ -989,6 +994,25 @@ fn test_files_container_sync_with_delete() {
         new_processed_files[filename5].1,
         new_files_map["/subexists.md"][FILES_MAP_PREDICATE_LINK]
     );
+}
+
+#[test]
+fn test_files_container_sync_delete_without_recursive() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    match safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        "some-url",
+        false, // this sets the recursive flag to off
+        true,  // this sets the delete flag
+    ) {
+        Ok(_) => panic!("Sync was unexpectdly successful"),
+        Err(err) => assert_eq!(
+            err,
+            Error::InvalidInput("--delete is not allowed if --recursive is not set".to_string())
+        ),
+    };
 }
 
 #[test]

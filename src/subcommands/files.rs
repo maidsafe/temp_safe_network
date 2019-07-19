@@ -48,7 +48,7 @@ pub enum FilesSubCommands {
         /// Recursively sync folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
-        /// Delete files found at the target FilesContainer that are not in the source location
+        /// Delete files found at the target FilesContainer that are not in the source location. This is only allowed when --recursive is passed as well.
         #[structopt(short = "d", long = "delete")]
         delete: bool,
     },
