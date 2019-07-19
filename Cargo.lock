@@ -749,8 +749,8 @@ dependencies = [
 
 [[package]]
 name = "quic-p2p"
-version = "0.1.1"
-source = "git+https://github.com/maidsafe/quic-p2p?rev=d43460ae#d43460aedae3be78254b3a74c965af6c4d97c580"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1093,7 +1093,7 @@ dependencies = [
  "log 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "maplit 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pickledb 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "quic-p2p 0.1.1 (git+https://github.com/maidsafe/quic-p2p?rev=d43460ae)",
+ "quic-p2p 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_chacha 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1747,7 +1747,7 @@ dependencies = [
 "checksum pem 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fd2ae096568d61688cd1d419ca9815c94475d7b4622b1834d6e068e5bb2eb3d2"
 "checksum pickledb 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f84c239b2c2dc17025deda2d513de8218f1afd9ec7c34de45797ab35cf97d8a0"
 "checksum proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)" = "cf3d2011ab5c909338f7887f4fc896d35932e29146c12c8d01da6b22a80ba759"
-"checksum quic-p2p 0.1.1 (git+https://github.com/maidsafe/quic-p2p?rev=d43460ae)" = "<none>"
+"checksum quic-p2p 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a5c9ceea6ff2622f92de8f2506a17d0e8995bda3621ce9c7ff557d982a3eae59"
 "checksum quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9274b940887ce9addde99c4eee6b5c44cc494b182b97e73dc8ffdcb3397fd3f0"
 "checksum quinn 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f79b799f97a3f97a69ab888bc92124fcdac3c6654ee5d46952f94fadd6a06d9"
 "checksum quinn-proto 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a5aeb6dc5d670066a6c90a666139f92d95f73b4ca8883d80e33b0693ef103f65"

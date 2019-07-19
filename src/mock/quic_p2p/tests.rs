@@ -425,7 +425,7 @@ impl Agent {
     }
 
     fn send(&mut self, dst_addr: SocketAddr, msg: Bytes) {
-        self.inner.send(Peer::node(dst_addr), msg)
+        self.inner.send(Peer::node(dst_addr), msg, 0)
     }
 
     fn addr(&self) -> SocketAddr {

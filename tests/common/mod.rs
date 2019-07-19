@@ -15,16 +15,18 @@ pub use self::rng::TestRng;
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
-    AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, IData, IDataAddress,
-    Message, MessageId, PublicId, PublicKey, Request, Response, Signature,
+    AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, Error, Message,
+    MessageId, PublicId, PublicKey, Request, Response, Signature, Transaction,
 };
 use safe_vault::{
     mock::Network,
     quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
-    Config, Vault,
+    to_error_response, Config, Vault,
 };
 use serde::Serialize;
 use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
     net::SocketAddr,
     ops::{Deref, DerefMut},
     slice,
@@ -224,7 +226,7 @@ pub trait TestClientTrait {
         let msg = unwrap!(bincode::serialize(msg));
         let node_info = self.connected_vault();
         self.quic_p2p()
-            .send(Peer::Node { node_info }, Bytes::from(msg))
+            .send(Peer::Node { node_info }, Bytes::from(msg), 0)
     }
 
     fn send_request(&mut self, request: Request) -> MessageId {
@@ -401,17 +403,16 @@ impl DerefMut for TestApp {
     }
 }
 
-pub fn perform_transaction<T: TestClientTrait>(
-    env: &mut Environment,
-    client: &mut T,
-    request: Request,
-) {
+pub fn get_from_response<T, D>(env: &mut Environment, client: &mut T, request: Request) -> D
+where
+    T: TestClientTrait,
+    D: TryFrom<Response>,
+    <D as TryFrom<Response>>::Error: Debug,
+{
     let message_id = client.send_request(request);
     env.poll();
-    match client.expect_response(message_id) {
-        Response::Transaction(Ok(_)) => (),
-        x => unexpected!(x),
-    }
+    let response = client.expect_response(message_id);
+    unwrap!(response.try_into())
 }
 
 pub fn perform_mutation<T: TestClientTrait>(
@@ -419,73 +420,60 @@ pub fn perform_mutation<T: TestClientTrait>(
     client: &mut T,
     request: Request,
 ) {
-    let message_id = client.send_request(request);
-    env.poll();
-    match client.expect_response(message_id) {
-        Response::Mutation(Ok(())) => (),
-        x => unexpected!(x),
-    }
+    get_from_response::<_, ()>(env, client, request);
 }
 
-pub fn get_idata<T: TestClientTrait>(
+pub fn send_request_expect_ok<T, D>(
     env: &mut Environment,
     client: &mut T,
-    address: IDataAddress,
-) -> Vec<u8> {
-    let message_id = client.send_request(Request::GetIData(address));
-    env.poll();
-    match client.expect_response(message_id) {
-        Response::GetIData(Ok(IData::Unpub(data))) => data.value().clone(),
-        Response::GetIData(Ok(IData::Pub(data))) => data.value().clone(),
-        x => unexpected!(x),
-    }
+    request: Request,
+    expected_success: D,
+) where
+    T: TestClientTrait,
+    D: TryFrom<Response> + Eq + Debug,
+    <D as TryFrom<Response>>::Error: Debug,
+{
+    assert_eq!(expected_success, get_from_response(env, client, request));
 }
 
-pub fn create_balance(env: &mut Environment, client: &mut TestClient, amount: Coins) {
-    let public_key = *client.public_id().public_key();
-    perform_transaction(
+pub fn send_request_expect_err<T: TestClientTrait>(
+    env: &mut Environment,
+    client: &mut T,
+    request: Request,
+    expected_error: Error,
+) {
+    let expected_response = to_error_response(&request, expected_error);
+    let message_id = client.send_request(request);
+    env.poll();
+    assert_eq!(expected_response, client.expect_response(message_id));
+}
+
+pub fn send_request_expect_no_response<T: TestClientTrait>(
+    env: &mut Environment,
+    client: &mut T,
+    request: Request,
+) {
+    let _message_id = client.send_request(request);
+    env.poll();
+    client.expect_no_new_message();
+}
+
+pub fn create_balance_from_nano(
+    env: &mut Environment,
+    client: &mut TestClient,
+    amount: u64,
+    new_owner: Option<PublicKey>,
+) {
+    let public_key = new_owner.unwrap_or_else(|| *client.public_id().public_key());
+    let _: Transaction = get_from_response(
         env,
         client,
         Request::CreateBalance {
             new_balance_owner: public_key,
-            amount,
+            amount: unwrap!(Coins::from_nano(amount)),
             transaction_id: 0,
         },
-    )
-}
-
-pub fn get_balance<T: TestClientTrait>(env: &mut Environment, client: &mut T) -> Coins {
-    let message_id = client.send_request(Request::GetBalance);
-    env.poll();
-    match client.expect_response(message_id) {
-        Response::GetBalance(Ok(coins)) => coins,
-        x => unexpected!(x),
-    }
-}
-
-pub fn send_request_get_response<T: TestClientTrait>(
-    env: &mut Environment,
-    client: &mut T,
-    request: Request,
-) -> Response {
-    let message_id = client.send_request(request);
-    env.poll();
-    client.expect_response(message_id)
-}
-
-pub fn send_request_expect_response<T: TestClientTrait>(
-    env: &mut Environment,
-    client: &mut T,
-    request: Request,
-    expected_response: Response,
-) {
-    let actual_response = send_request_get_response(env, client, request);
-    if actual_response != expected_response {
-        panic!(
-            "Expected: {:?}, got: {:?}.",
-            expected_response, actual_response
-        )
-    }
+    );
 }
 
 pub fn gen_public_key(rng: &mut TestRng) -> PublicKey {
