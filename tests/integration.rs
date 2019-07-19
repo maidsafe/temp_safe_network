@@ -57,7 +57,7 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::Rng;
 use safe_nd::{
-    AData, ADataAddress, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
+    AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
     AppendOnlyData, Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
     PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
@@ -297,7 +297,294 @@ fn coin_operations() {
 #[test]
 fn put_append_only_data() {
     let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let owner_a = ADataOwner {
+        public_key: *client_a.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+
+    // Published sequential data
+    let pub_seq_adata_name: XorName = env.rng().gen();
+    let mut pub_seq_adata = PubSeqAppendOnlyData::new(pub_seq_adata_name, 100);
+    unwrap!(pub_seq_adata.append_owner(owner_a, 0));
+    unwrap!(pub_seq_adata.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"pub sec".to_vec()
+        }],
+        0
+    ));
+    unwrap!(pub_seq_adata.append(
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"pub sec".to_vec()
+        }],
+        1
+    ));
+    let pub_seq_adata = AData::PubSeq(pub_seq_adata);
+
+    // Published unsequential data
+    let pub_unseq_adata_name: XorName = env.rng().gen();
+    let mut pub_unseq_adata = PubUnseqAppendOnlyData::new(pub_unseq_adata_name, 100);
+    unwrap!(pub_unseq_adata.append_owner(owner_a, 0));
+    unwrap!(pub_unseq_adata.append(vec![ADataEntry {
+        key: b"one".to_vec(),
+        value: b"pub unsec".to_vec()
+    }]));
+    unwrap!(pub_unseq_adata.append(vec![ADataEntry {
+        key: b"two".to_vec(),
+        value: b"pub unsec".to_vec()
+    }]));
+    let pub_unseq_adata = AData::PubUnseq(pub_unseq_adata);
+
+    // Unpublished sequential
+    let unpub_seq_adata_name: XorName = env.rng().gen();
+    let mut unpub_seq_adata = UnpubSeqAppendOnlyData::new(unpub_seq_adata_name, 100);
+    unwrap!(unpub_seq_adata.append_owner(owner_a, 0));
+    unwrap!(unpub_seq_adata.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"unpub sec".to_vec()
+        }],
+        0
+    ));
+    unwrap!(unpub_seq_adata.append(
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"unpub sec".to_vec()
+        }],
+        1
+    ));
+    let unpub_seq_adata = AData::UnpubSeq(unpub_seq_adata);
+
+    // Unpublished unsequential data
+    let unpub_unseq_adata_name: XorName = env.rng().gen();
+    let mut unpub_unseq_adata = UnpubUnseqAppendOnlyData::new(unpub_unseq_adata_name, 100);
+    unwrap!(unpub_unseq_adata.append_owner(owner_a, 0));
+    unwrap!(unpub_unseq_adata.append(vec![ADataEntry {
+        key: b"one".to_vec(),
+        value: b"unpub unsec".to_vec()
+    }]));
+    unwrap!(unpub_unseq_adata.append(vec![ADataEntry {
+        key: b"two".to_vec(),
+        value: b"unpub unsec".to_vec()
+    }]));
+    let unpub_unseq_adata = AData::UnpubUnseq(unpub_unseq_adata);
+
+    // TODO - Enable this once we're passed phase 1
+    // First try to put some data without any associated balance.
+    if false {
+        common::send_request_expect_response(
+            &mut env,
+            &mut client_a,
+            Request::PutAData(pub_seq_adata.clone()),
+            Response::Mutation(Err(NdError::AccessDenied)),
+        );
+        common::send_request_expect_response(
+            &mut env,
+            &mut client_a,
+            Request::PutAData(pub_unseq_adata.clone()),
+            Response::Mutation(Err(NdError::AccessDenied)),
+        );
+        common::send_request_expect_response(
+            &mut env,
+            &mut client_a,
+            Request::PutAData(unpub_seq_adata.clone()),
+            Response::Mutation(Err(NdError::AccessDenied)),
+        );
+        common::send_request_expect_response(
+            &mut env,
+            &mut client_a,
+            Request::PutAData(unpub_unseq_adata.clone()),
+            Response::Mutation(Err(NdError::AccessDenied)),
+        );
+    }
+
+    let start_nano = 1_000_000_000_000;
+    let new_balance_owner = *client_a.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    // Check that client B cannot put A's data
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::PutAData(pub_seq_adata.clone()),
+        Response::Mutation(Err(NdError::InvalidOwners)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::PutAData(pub_unseq_adata.clone()),
+        Response::Mutation(Err(NdError::InvalidOwners)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::PutAData(unpub_seq_adata.clone()),
+        Response::Mutation(Err(NdError::InvalidOwners)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::PutAData(unpub_unseq_adata.clone()),
+        Response::Mutation(Err(NdError::InvalidOwners)),
+    );
+
+    // Put, this time with a balance and the correct owner
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(pub_seq_adata.clone()),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(pub_unseq_adata.clone()),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(unpub_seq_adata.clone()),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(unpub_unseq_adata.clone()),
+    );
+
+    // Get the data to verify
+    let message_id_1 = client_a.send_request(Request::GetAData(*pub_seq_adata.address()));
+    let message_id_2 = client_a.send_request(Request::GetAData(*pub_unseq_adata.address()));
+    let message_id_3 = client_a.send_request(Request::GetAData(*unpub_seq_adata.address()));
+    let message_id_4 = client_a.send_request(Request::GetAData(*unpub_unseq_adata.address()));
+    env.poll();
+    match client_a.expect_response(message_id_1) {
+        Response::GetAData(Ok(got)) => assert_eq!(got, pub_seq_adata),
+        x => unexpected!(x),
+    }
+    match client_a.expect_response(message_id_2) {
+        Response::GetAData(Ok(got)) => assert_eq!(got, pub_unseq_adata),
+        x => unexpected!(x),
+    }
+    match client_a.expect_response(message_id_3) {
+        Response::GetAData(Ok(got)) => assert_eq!(got, unpub_seq_adata),
+        x => unexpected!(x),
+    }
+    match client_a.expect_response(message_id_4) {
+        Response::GetAData(Ok(got)) => assert_eq!(got, unpub_unseq_adata),
+        x => unexpected!(x),
+    }
+
+    // Verify that B cannot delete A's data
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*pub_seq_adata.address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*pub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*unpub_seq_adata.address()),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::DeleteAData(*unpub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+
+    // Delete the data
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::DeleteAData(*pub_seq_adata.address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::DeleteAData(*pub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::DeleteAData(*unpub_seq_adata.address()),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::DeleteAData(*unpub_unseq_adata.address()),
+    );
+
+    // Delete again to test if it's gone
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::DeleteAData(*unpub_seq_adata.address()),
+        Response::Mutation(Err(NdError::NoSuchData)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::DeleteAData(*unpub_unseq_adata.address()),
+        Response::Mutation(Err(NdError::NoSuchData)),
+    );
+}
+
+#[test]
+fn append_only_data_delete_data_doesnt_exist() {
+    let mut env = Environment::new();
     let mut client = env.new_connected_client();
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::PubSeq(PubSeqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::PubUnseq(PubUnseqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(*AData::UnpubSeq(UnpubSeqAppendOnlyData::new(name, tag)).address()),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::DeleteAData(
+            *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
+        ),
+        Response::Mutation(Err(NdError::AccessDenied)),
+    );
 
     let start_nano = 1_000_000_000_000;
     let new_balance_owner = *client.public_id().public_key();
@@ -311,107 +598,30 @@ fn put_append_only_data() {
         },
     );
 
-    let owner = ADataOwner {
-        public_key: *client.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
-    };
-
-    // Seq
-    let adata_name: XorName = env.rng().gen();
-    let tag = 100;
-    let mut adata = PubSeqAppendOnlyData::new(adata_name, tag);
-    unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(
-        vec![ADataEntry {
-            key: b"more".to_vec(),
-            value: b"data".to_vec()
-        }],
-        0
-    ));
-    let adata = AData::PubSeq(adata);
-    let pub_seq_adata_address = *adata.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
-
-    // Unseq
-    let adata_name: XorName = env.rng().gen();
-    let tag = 101;
-    let mut adata = PubUnseqAppendOnlyData::new(adata_name, tag);
-    unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(vec![ADataEntry {
-        key: b"more".to_vec(),
-        value: b"data".to_vec()
-    }]));
-    let adata = AData::PubUnseq(adata);
-    let pub_unseq_adata_address = *adata.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
-
-    // Unpub Seq
-    let adata_name: XorName = env.rng().gen();
-    let tag = 102;
-    let mut adata = UnpubSeqAppendOnlyData::new(adata_name, tag);
-    unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(
-        vec![ADataEntry {
-            key: b"more".to_vec(),
-            value: b"data".to_vec()
-        }],
-        0
-    ));
-    let adata = AData::UnpubSeq(adata);
-    let unpub_seq_adata_address = *adata.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
-
-    // Unpub Unseq
-    let adata_name: XorName = env.rng().gen();
-    let tag = 103;
-    let mut adata = UnpubUnseqAppendOnlyData::new(adata_name, tag);
-    unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(vec![ADataEntry {
-        key: b"more".to_vec(),
-        value: b"data".to_vec()
-    }]));
-    let adata = AData::UnpubUnseq(adata);
-    let unpub_unseq_adata_address = *adata.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
-
-    // TODO - get the data to verify
-
-    // Delete the data
     common::send_request_expect_response(
         &mut env,
         &mut client,
-        Request::DeleteAData(pub_seq_adata_address),
+        Request::DeleteAData(*AData::PubSeq(PubSeqAppendOnlyData::new(name, tag)).address()),
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
     common::send_request_expect_response(
         &mut env,
         &mut client,
-        Request::DeleteAData(pub_unseq_adata_address),
+        Request::DeleteAData(*AData::PubUnseq(PubUnseqAppendOnlyData::new(name, tag)).address()),
         Response::Mutation(Err(NdError::InvalidOperation)),
     );
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(unpub_seq_adata_address),
-    );
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(unpub_unseq_adata_address),
-    );
-
-    // Delete again to test if it's gone
     common::send_request_expect_response(
         &mut env,
         &mut client,
-        Request::DeleteAData(unpub_seq_adata_address),
+        Request::DeleteAData(*AData::UnpubSeq(UnpubSeqAppendOnlyData::new(name, tag)).address()),
         Response::Mutation(Err(NdError::NoSuchData)),
     );
     common::send_request_expect_response(
         &mut env,
         &mut client,
-        Request::DeleteAData(unpub_unseq_adata_address),
+        Request::DeleteAData(
+            *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
+        ),
         Response::Mutation(Err(NdError::NoSuchData)),
     );
 }
@@ -982,6 +1192,578 @@ fn unpub_append_only_data_get_permissions() {
     scenario(ADataIndex::FromStart(0), Ok(perms_0));
     scenario(ADataIndex::FromStart(1), Ok(perms_1));
     scenario(ADataIndex::FromStart(2), Err(NdError::NoSuchEntry));
+}
+
+#[test]
+fn pub_append_only_data_put_permissions() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let public_key_a = *client_a.public_id().public_key();
+    let public_key_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: public_key_a,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    common::perform_transaction(
+        &mut env,
+        &mut client_b,
+        Request::CreateBalance {
+            new_balance_owner: public_key_b,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner = ADataOwner {
+        public_key: *client_a.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+
+    unwrap!(data.append_owner(owner, 0));
+
+    // Client A can manage permissions, but not B
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Key(public_key_a) => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(AData::PubSeq(data.clone())),
+    );
+
+    // Before
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(0),
+        },
+        Response::GetPubADataPermissionAtIndex(Ok(perms_0)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(1),
+        },
+        Response::GetPubADataPermissionAtIndex(Err(NdError::NoSuchEntry)),
+    );
+
+    let perms_1 = ADataPubPermissions {
+        permissions: btreemap![
+            ADataUser::Key(public_key_b) => ADataPubPermissionSet::new(true, true)
+        ],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    // Only client A has permissions to add permissions
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::AddPubADataPermissions {
+            address: *data.address(),
+            permissions: perms_1.clone(),
+            permissions_idx: 1,
+        },
+        // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
+        // changing this behaviour to AccessDenied.
+        Response::Mutation(Err(NdError::InvalidPermissions)),
+    );
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::AddPubADataPermissions {
+            address: *data.address(),
+            permissions: perms_1.clone(),
+            permissions_idx: 1,
+        },
+    );
+
+    // Check that the permissions have been updated
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(1),
+        },
+        Response::GetPubADataPermissionAtIndex(Ok(perms_1)),
+    );
+}
+
+#[test]
+fn unpub_append_only_data_put_permissions() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let public_key_a = *client_a.public_id().public_key();
+    let public_key_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: public_key_a,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    common::perform_transaction(
+        &mut env,
+        &mut client_b,
+        Request::CreateBalance {
+            new_balance_owner: public_key_b,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = UnpubSeqAppendOnlyData::new(name, tag);
+
+    let owner = ADataOwner {
+        public_key: *client_a.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+
+    unwrap!(data.append_owner(owner, 0));
+
+    // Client A can manage permissions, but not B
+    let perms_0 = ADataUnpubPermissions {
+        permissions: btreemap![public_key_a => ADataUnpubPermissionSet::new(true, true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(AData::UnpubSeq(data.clone())),
+    );
+
+    // Before
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(0),
+        },
+        Response::GetUnpubADataPermissionAtIndex(Ok(perms_0)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(1),
+        },
+        Response::GetUnpubADataPermissionAtIndex(Err(NdError::NoSuchEntry)),
+    );
+
+    let perms_1 = ADataUnpubPermissions {
+        permissions: btreemap![
+            public_key_b => ADataUnpubPermissionSet::new(true, true, true)
+        ],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    // Only client A has permissions to add permissions
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::AddUnpubADataPermissions {
+            address: *data.address(),
+            permissions: perms_1.clone(),
+            permissions_idx: 1,
+        },
+        // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
+        // changing this behaviour to AccessDenied.
+        Response::Mutation(Err(NdError::InvalidPermissions)),
+    );
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::AddUnpubADataPermissions {
+            address: *data.address(),
+            permissions: perms_1.clone(),
+            permissions_idx: 1,
+        },
+    );
+
+    // Check that the permissions have been updated
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataPermissions {
+            address: *data.address(),
+            permissions_index: ADataIndex::FromStart(1),
+        },
+        Response::GetUnpubADataPermissionAtIndex(Ok(perms_1)),
+    );
+}
+
+#[test]
+fn append_only_data_put_owners() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let public_key_a = *client_a.public_id().public_key();
+    let public_key_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: public_key_a,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    common::perform_transaction(
+        &mut env,
+        &mut client_b,
+        Request::CreateBalance {
+            new_balance_owner: public_key_b,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key: public_key_a,
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner_0, 0));
+
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Key(public_key_a) => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        0
+    ));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        1
+    ));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(data.clone().into()),
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(0),
+        },
+        Response::GetADataOwners(Ok(owner_0)),
+    );
+    // Neither A or B can get the owners with index 1 (it doesn't exist)
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        Response::GetADataOwners(Err(NdError::InvalidOwners)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        Response::GetADataOwners(Err(NdError::InvalidOwners)),
+    );
+
+    // Set the new owner, change from A -> B
+    let owner_1 = ADataOwner {
+        public_key: public_key_b,
+        entries_index: 2,
+        permissions_index: 1,
+    };
+
+    // B can't set the new owner, but A can
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::SetADataOwner {
+            address: *data.address(),
+            owner: owner_1,
+            owners_idx: 1,
+        },
+        // TODO - InvalidPermissions because client B doesn't have their key registered. Maybe we
+        //        should consider changing this.
+        Response::Mutation(Err(NdError::InvalidPermissions)),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SetADataOwner {
+            address: *data.address(),
+            owner: owner_1,
+            owners_idx: 1,
+        },
+    );
+
+    // Check the new owner
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_a,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        Response::GetADataOwners(Ok(owner_1)),
+    );
+    common::send_request_expect_response(
+        &mut env,
+        &mut client_b,
+        Request::GetADataOwners {
+            address: *data.address(),
+            owners_index: ADataIndex::FromStart(1),
+        },
+        Response::GetADataOwners(Ok(owner_1)),
+    );
+}
+
+#[test]
+fn append_only_data_append_seq() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+    let public_key = *client.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubSeqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key,
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner_0, 0));
+
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        0
+    ));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        1
+    ));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutAData(data.clone().into()),
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec(),
+        })),
+    );
+
+    let appended_values = ADataEntry {
+        key: b"three".to_vec(),
+        value: b"bar".to_vec(),
+    };
+    let append = ADataAppend {
+        address: *data.address(),
+        values: vec![appended_values.clone()],
+    };
+    // First try an invalid append
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::AppendUnseq(append.clone()),
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::AppendSeq { append, index: 2 },
+    );
+
+    // Check the result
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(appended_values)),
+    );
+}
+
+#[test]
+fn append_only_data_append_unseq() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+    let public_key = *client.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut data = PubUnseqAppendOnlyData::new(name, tag);
+
+    let owner_0 = ADataOwner {
+        public_key,
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner_0, 0));
+
+    let perms_0 = ADataPubPermissions {
+        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+        entries_index: 0,
+        owners_index: 1,
+    };
+
+    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append(vec![ADataEntry {
+        key: b"one".to_vec(),
+        value: b"foo".to_vec()
+    }]));
+    unwrap!(data.append(vec![ADataEntry {
+        key: b"two".to_vec(),
+        value: b"foo".to_vec()
+    }]));
+
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::PutAData(data.clone().into()),
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(ADataEntry {
+            key: b"two".to_vec(),
+            value: b"foo".to_vec(),
+        })),
+    );
+
+    let appended_values = ADataEntry {
+        key: b"three".to_vec(),
+        value: b"bar".to_vec(),
+    };
+    let append = ADataAppend {
+        address: *data.address(),
+        values: vec![appended_values.clone()],
+    };
+
+    // First try an invalid append
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::AppendSeq {
+            append: append.clone(),
+            index: 2,
+        },
+        Response::Mutation(Err(NdError::InvalidOperation)),
+    );
+    common::perform_mutation(&mut env, &mut client, Request::AppendUnseq(append));
+
+    // Check the result
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetADataLastEntry(*data.address()),
+        Response::GetADataLastEntry(Ok(appended_values)),
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////

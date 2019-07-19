@@ -12,8 +12,7 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
 use safe_nd::{
-    ADataAddress, ADataUnpubPermissions, AppendOnlyData, ClientPublicId, Error as NdError,
-    PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
+    ADataAddress, ClientPublicId, Error as NdError, PublicId, PublicKey, Request, Response, XorName,
 };
 use serde::Serialize;
 use std::{fs, path::Path};
@@ -237,24 +236,15 @@ pub(crate) mod adata {
         }
     }
 
-    pub fn is_owner<T: AppendOnlyData<ADataUnpubPermissions>>(
-        adata: T,
-        requester: PublicKey,
-    ) -> NdResult<()> {
-        adata
-            .owner(adata.owners_index() - 1)
-            .ok_or_else(|| NdError::NoSuchData)
-            .and_then(|owner| {
-                if owner.public_key == requester {
-                    Ok(())
-                } else {
-                    Err(NdError::AccessDenied)
-                }
-            })
+    pub fn is_sequential(address: &ADataAddress) -> bool {
+        use ADataAddress::*;
+        match address {
+            PubSeq { .. } | UnpubSeq { .. } => true,
+            PubUnseq { .. } | UnpubUnseq { .. } => false,
+        }
     }
 
     pub fn address(request: &Request) -> Option<&ADataAddress> {
-        // TODO: handle the remaining AData requests too
         use Request::*;
         match request {
             GetAData(address)
@@ -266,7 +256,10 @@ pub(crate) mod adata {
             | GetPubADataUserPermissions { address, .. }
             | GetUnpubADataUserPermissions { address, .. }
             | GetADataValue { address, .. }
-            | GetADataOwners { address, .. } => Some(address),
+            | GetADataOwners { address, .. }
+            | DeleteAData(address)
+            | AddPubADataPermissions { address, .. } => Some(address),
+            AppendSeq { append, .. } | AppendUnseq(append) => Some(&append.address),
             _ => None,
         }
     }

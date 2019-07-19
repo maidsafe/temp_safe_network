@@ -351,29 +351,39 @@ impl SourceElder {
                 has_signature()?;
                 self.handle_delete_adata(client, address, message_id)
             }
-            AddPubADataPermissions { ref address, .. } => {
+            AddPubADataPermissions { ref address, .. }
+            | AddUnpubADataPermissions { ref address, .. }
+            | SetADataOwner { ref address, .. } => {
                 has_signature()?;
-                unimplemented!()
-            }
-            AddUnpubADataPermissions { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
-            }
-            SetADataOwner { ref address, .. } => {
-                has_signature()?;
-                unimplemented!()
+                self.handle_mutate_adata(client, request, message_id)
             }
             AppendSeq { ref append, .. } => {
                 if !utils::adata::is_published(&append.address) {
                     has_signature()?;
                 }
-                unimplemented!()
+                if !utils::adata::is_sequential(&append.address) {
+                    self.send_response_to_client(
+                        &client.public_id,
+                        message_id,
+                        Response::Mutation(Err(NdError::InvalidOperation)),
+                    );
+                    return None;
+                }
+                self.handle_mutate_adata(client, request, message_id)
             }
             AppendUnseq(ref append) => {
                 if !utils::adata::is_published(&append.address) {
                     has_signature()?;
                 }
-                unimplemented!()
+                if utils::adata::is_sequential(&append.address) {
+                    self.send_response_to_client(
+                        &client.public_id,
+                        message_id,
+                        Response::Mutation(Err(NdError::InvalidOperation)),
+                    );
+                    return None;
+                }
+                self.handle_mutate_adata(client, request, message_id)
             }
             //
             // ===== Coins =====
@@ -634,7 +644,21 @@ impl SourceElder {
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
-        // TODO - If unpublished, check that the owner's public key has been added to the chunk?
+        // TODO - Should we replace this with a adata.check_permission call in destination_elder.
+        // That would be more consistent, but on the other hand a check here stops spam earlier.
+        if chunk.check_is_last_owner(*owner.public_key()).is_err() {
+            trace!(
+                "{}: {} attempted Put AppendOnlyData with invalid owners.",
+                self,
+                client.public_id
+            );
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::InvalidOwners)),
+            );
+            return None;
+        }
         if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
             // Note: in phase 1, we proceed even if there are insufficient funds.
             trace!(
@@ -668,6 +692,28 @@ impl SourceElder {
             return None;
         }
         let request = Request::DeleteAData(address);
+        if client.has_balance {
+            Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
+                request,
+                message_id,
+            }))
+        } else {
+            self.send_response_to_client(
+                &client.public_id,
+                message_id,
+                Response::Mutation(Err(NdError::AccessDenied)),
+            );
+            None
+        }
+    }
+
+    fn handle_mutate_adata(
+        &mut self,
+        client: &ClientInfo,
+        request: Request,
+        message_id: MessageId,
+    ) -> Option<Action> {
         if client.has_balance {
             Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client.public_id.clone(),

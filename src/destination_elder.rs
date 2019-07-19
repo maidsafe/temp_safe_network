@@ -23,8 +23,10 @@ use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataIndex, ADataUser, Error as NdError, IData, IDataAddress,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
+    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
+    ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, IData, IDataAddress,
+    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, UnseqAppendOnly, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -229,19 +231,35 @@ impl DestinationElder {
                 address,
                 permissions,
                 permissions_idx,
-            } => unimplemented!(),
+            } => self.handle_add_pub_adata_permissions_req(
+                requester,
+                address,
+                permissions,
+                permissions_idx,
+                message_id,
+            ),
             AddUnpubADataPermissions {
                 address,
                 permissions,
                 permissions_idx,
-            } => unimplemented!(),
+            } => self.handle_add_unpub_adata_permissions_req(
+                requester,
+                address,
+                permissions,
+                permissions_idx,
+                message_id,
+            ),
             SetADataOwner {
                 address,
                 owner,
                 owners_idx,
-            } => unimplemented!(),
-            AppendSeq { append, index } => unimplemented!(),
-            AppendUnseq(operation) => unimplemented!(),
+            } => self.handle_set_adata_owner_req(requester, address, owner, owners_idx, message_id),
+            AppendSeq { append, index } => {
+                self.handle_append_seq_req(requester, append, index, message_id)
+            }
+            AppendUnseq(operation) => {
+                self.handle_append_unseq_req(requester, operation, message_id)
+            }
             //
             // ===== Coins =====
             //
@@ -848,15 +866,11 @@ impl DestinationElder {
                 error => error.to_string().into(),
             })
             .and_then(|adata| {
-                // TODO - This is a workaround until we have AData::check_is_owner in safe-nd
-                match adata {
-                    AData::UnpubSeq(unpub_adata) => {
-                        utils::adata::is_owner(unpub_adata, requester_pk)
-                    }
-                    AData::UnpubUnseq(unpub_adata) => {
-                        utils::adata::is_owner(unpub_adata, requester_pk)
-                    }
-                    AData::PubSeq(_) | AData::PubUnseq(_) => Err(NdError::InvalidOperation),
+                // TODO - AData::check_permission() doesn't support Delete yet in safe-nd
+                if utils::adata::is_published(adata.address()) {
+                    Err(NdError::InvalidOperation)
+                } else {
+                    adata.check_is_last_owner(requester_pk)
                 }
             })
             .and_then(|_| {
@@ -1111,6 +1125,181 @@ impl DestinationElder {
 
         data.check_permission(action, *requester_key)?;
         Ok(data)
+    }
+
+    fn handle_add_pub_adata_permissions_req(
+        &mut self,
+        requester: PublicId,
+        address: ADataAddress,
+        permissions: ADataPubPermissions,
+        permissions_idx: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        self.mutate_adata_chunk(
+            &requester,
+            address,
+            ADataAction::ManagePermissions,
+            message_id,
+            move |mut adata| {
+                match adata {
+                    AData::PubSeq(ref mut pub_seq_data) => {
+                        pub_seq_data.append_permissions(permissions, permissions_idx)?;
+                    }
+                    AData::PubUnseq(ref mut pub_unseq_data) => {
+                        pub_unseq_data.append_permissions(permissions, permissions_idx)?;
+                    }
+                    _ => {
+                        return {
+                            error!("{}: Unexpected chunk encountered", own_id);
+                            Err(NdError::InvalidOperation)
+                        }
+                    }
+                }
+                Ok(adata)
+            },
+        )
+    }
+
+    fn handle_add_unpub_adata_permissions_req(
+        &mut self,
+        requester: PublicId,
+        address: ADataAddress,
+        permissions: ADataUnpubPermissions,
+        permissions_idx: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        self.mutate_adata_chunk(
+            &requester,
+            address,
+            ADataAction::ManagePermissions,
+            message_id,
+            move |mut adata| {
+                match adata {
+                    AData::UnpubSeq(ref mut unpub_seq_data) => {
+                        unpub_seq_data.append_permissions(permissions, permissions_idx)?;
+                    }
+                    AData::UnpubUnseq(ref mut unpub_unseq_data) => {
+                        unpub_unseq_data.append_permissions(permissions, permissions_idx)?;
+                    }
+                    _ => {
+                        error!("{}: Unexpected chunk encountered", own_id);
+                        return Err(NdError::InvalidOperation);
+                    }
+                }
+                Ok(adata)
+            },
+        )
+    }
+
+    fn handle_set_adata_owner_req(
+        &mut self,
+        requester: PublicId,
+        address: ADataAddress,
+        owner: ADataOwner,
+        owners_idx: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        self.mutate_adata_chunk(
+            &requester,
+            address,
+            ADataAction::ManagePermissions,
+            message_id,
+            move |mut adata| {
+                match adata {
+                    AData::PubSeq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
+                    AData::PubUnseq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
+                    AData::UnpubSeq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
+                    AData::UnpubUnseq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
+                }
+                Ok(adata)
+            },
+        )
+    }
+
+    fn handle_append_seq_req(
+        &mut self,
+        requester: PublicId,
+        append: ADataAppend,
+        index: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        let address = append.address;
+        self.mutate_adata_chunk(
+            &requester,
+            address,
+            ADataAction::Append,
+            message_id,
+            move |mut adata| {
+                match adata {
+                    AData::PubSeq(ref mut adata) => adata.append(append.values, index)?,
+                    AData::UnpubSeq(ref mut adata) => adata.append(append.values, index)?,
+                    AData::PubUnseq(_) | AData::UnpubUnseq(_) => {
+                        error!("{}: Unexpected unseqential chunk encountered", own_id);
+                        return Err(NdError::InvalidOperation);
+                    }
+                }
+                Ok(adata)
+            },
+        )
+    }
+
+    fn handle_append_unseq_req(
+        &mut self,
+        requester: PublicId,
+        operation: ADataAppend,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        let address = operation.address;
+        self.mutate_adata_chunk(
+            &requester,
+            address,
+            ADataAction::Append,
+            message_id,
+            move |mut adata| {
+                match adata {
+                    AData::PubUnseq(ref mut adata) => adata.append(operation.values)?,
+                    AData::UnpubUnseq(ref mut adata) => adata.append(operation.values)?,
+                    AData::PubSeq(_) | AData::UnpubSeq(_) => {
+                        error!("{}: Unexpected sequential chunk encountered", own_id);
+                        return Err(NdError::InvalidOperation);
+                    }
+                }
+                Ok(adata)
+            },
+        )
+    }
+
+    fn mutate_adata_chunk<F>(
+        &mut self,
+        requester: &PublicId,
+        address: ADataAddress,
+        action: ADataAction,
+        message_id: MessageId,
+        mutation_fn: F,
+    ) -> Option<Action>
+    where
+        F: FnOnce(AData) -> NdResult<AData>,
+    {
+        let result = self
+            .get_adata(requester, address, action)
+            .and_then(mutation_fn)
+            .and_then(move |adata| {
+                self.append_only_chunks
+                    .put(&adata)
+                    .map_err(|error| error.to_string().into())
+            });
+        Some(Action::RespondToSrcElders {
+            sender: *address.name(),
+            message: Rpc::Response {
+                requester: requester.clone(),
+                response: Response::Mutation(result),
+                message_id,
+            },
+        })
     }
 }
 
