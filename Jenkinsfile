@@ -9,7 +9,7 @@ stage('build & test') {
     parallel linux: {
         node('docker') {
             checkout(scm)
-            sh("make test")
+            runTests()
             packageBuildArtifacts('linux')
             uploadBuildArtifacts()
         }
@@ -17,7 +17,7 @@ stage('build & test') {
     windows: {
         node('windows') {
             checkout(scm)
-            sh("make test")
+            runTests()
             packageBuildArtifacts('windows')
             uploadBuildArtifacts()
         }
@@ -25,7 +25,7 @@ stage('build & test') {
     macos: {
         node('osx') {
             checkout(scm)
-            sh("make test")
+            runTests()
             packageBuildArtifacts('macos')
             uploadBuildArtifacts()
         }
@@ -52,6 +52,17 @@ stage('deploy') {
         } else {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
         }
+    }
+}
+
+def runTests() {
+    command = "RANDOM_PORT_NUMBER=\$(( \$RANDOM % 100 + 41800 )) "
+    try {
+        test_command = command + "make test"
+        sh(test_command)
+    } finally {
+        clean_command = command + "make clean"
+        sh(clean_command)
     }
 }
 

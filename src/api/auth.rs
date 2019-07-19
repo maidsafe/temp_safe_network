@@ -15,8 +15,12 @@ use safe_nd::AppPermissions;
 use std::collections::HashMap;
 use std::io::Read;
 
-// Default URL where to send a GET request to the authenticator webservice for authorising a SAFE app
-const SAFE_AUTH_WEBSERVICE_BASE_URL: &str = "http://localhost:41805/authorise/";
+// Default host where to send a GET request to the authenticator webservice for authorising a SAFE app
+const SAFE_AUTH_ENDPOINT_HOST: &str = "http://localhost";
+// Default port number where to send a GET request for authorising the CLI app
+const SAFE_AUTH_ENDPOINT_PORT: u16 = 41805;
+// Path where the authenticator webservice endpoint
+const SAFE_AUTH_ENDPOINT_PATH: &str = "authorise/";
 
 #[allow(dead_code)]
 impl Safe {
@@ -27,6 +31,7 @@ impl Safe {
         app_id: &str,
         app_name: &str,
         app_vendor: &str,
+        port: Option<u16>,
     ) -> ResultReturn<String> {
         info!("Sending authorisation request to SAFE Authenticator...");
 
@@ -58,8 +63,11 @@ impl Safe {
             auth_req_str
         );
 
-        let authenticator_webservice_url =
-            SAFE_AUTH_WEBSERVICE_BASE_URL.to_string() + &auth_req_str;
+        let port_number = port.unwrap_or(SAFE_AUTH_ENDPOINT_PORT);
+        let authenticator_webservice_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTH_ENDPOINT_HOST, port_number, SAFE_AUTH_ENDPOINT_PATH, auth_req_str
+        );
         let mut res = httpget(&authenticator_webservice_url).map_err(|err| {
             Error::AuthError(format!("Failed to send request to Authenticator: {}", err))
         })?;

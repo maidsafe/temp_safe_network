@@ -15,7 +15,7 @@ build-container:
 push-container:
 	docker push maidsafe/safe-cli-build:${SAFE_CLI_VERSION}
 
-test:
+test: clean
 	rm -rf artifacts
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
@@ -75,6 +75,16 @@ endif
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64.tar.gz
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64.tar.gz
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64.tar.gz
+
+clean:
+# Both taskkill and killall could be called when safe_auth isn't running.
+# The behaviour of both is to error if there are no processes that match the name,
+# so we can just pipe it through || true to ignore that error and continue.
+ifeq ($(OS),Windows_NT)
+    cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
+else ifeq ($(UNAME_S),Darwin)
+    lsof -t -i tcp:${RANDOM_PORT_NUMBER} | xargs -n 1 -x kill
+endif
 
 package-commit_hash-artifacts-for-deploy:
 	rm -f *.tar

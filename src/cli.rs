@@ -72,7 +72,7 @@ pub fn run() -> Result<(), String> {
     debug!("Processing command: {:?}", args);
 
     match args.cmd {
-        SubCommands::Auth { cmd } => auth_commander(cmd, &mut safe),
+        SubCommands::Auth { cmd, port } => auth_commander(cmd, port, &mut safe),
         SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe),
         SubCommands::Keypair {} => {
             let key_pair = safe.keypair()?;

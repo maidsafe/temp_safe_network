@@ -19,7 +19,11 @@ pub enum AuthSubCommands {
     Clear {},
 }
 
-pub fn auth_commander(cmd: Option<AuthSubCommands>, _safe: &mut Safe) -> Result<(), String> {
+pub fn auth_commander(
+    cmd: Option<AuthSubCommands>,
+    _port: Option<u16>,
+    _safe: &mut Safe,
+) -> Result<(), String> {
     match cmd {
         Some(AuthSubCommands::Clear {}) => {
             debug!("Fake-auth is enabled so we don't try to clear the credentials file");

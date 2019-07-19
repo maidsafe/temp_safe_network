@@ -27,7 +27,11 @@ pub enum AuthSubCommands {
     Clear {},
 }
 
-pub fn auth_commander(cmd: Option<AuthSubCommands>, safe: &mut Safe) -> Result<(), String> {
+pub fn auth_commander(
+    cmd: Option<AuthSubCommands>,
+    port: Option<u16>,
+    safe: &mut Safe,
+) -> Result<(), String> {
     let file_path = credentials_file_path()?;
     let mut file = File::create(&file_path)
         .map_err(|_| format!("Unable to create credentials file at {}", file_path))?;
@@ -45,7 +49,7 @@ pub fn auth_commander(cmd: Option<AuthSubCommands>, safe: &mut Safe) -> Result<(
             println!("Authorising CLI application...");
 
             let auth_credentials = safe
-                .auth_app(APP_ID, APP_NAME, APP_VENDOR)
+                .auth_app(APP_ID, APP_NAME, APP_VENDOR, port)
                 .map_err(|err| format!("Application authorisation failed: {}", err))?;
 
             file.write_all(auth_credentials.as_bytes())

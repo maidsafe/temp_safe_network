@@ -1,18 +1,24 @@
 #!/bin/bash
 
+export SAFE_MOCK_VAULT_PATH=~/safe_auth
+
+function setup_safe_auth() {
+    rm -rf $SAFE_MOCK_VAULT_PATH
+    git clone https://github.com/maidsafe/safe-authenticator-cli.git $SAFE_MOCK_VAULT_PATH
+    (
+        cd $SAFE_MOCK_VAULT_PATH
+        SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense || true
+        echo "Launching safe_auth daemon on port:" $RANDOM_PORT_NUMBER
+        SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- --daemon $RANDOM_PORT_NUMBER --allow-all-auth &
+        sleep 15
+        cd -
+    )
+}
+
 set -e -x
 
 # first setup auth CLI
-rm -f $TMP/SCL-Mock
-rm -f $TMPDIR/SCL-Mock
-rm -rf ~/safe_auth
-git clone https://github.com/maidsafe/safe-authenticator-cli.git ~/safe_auth
-cd ~/safe_auth
-ls
-SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- -i nonsense || true
-SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b cargo run --features=mock-network -- --daemon 41805 --allow-all-auth &
-sleep 15
-cd -
+setup_safe_auth
 
 # run tests with CLI's own mock
 cargo test --release --features=scl-mock -- --test-threads=1
@@ -25,7 +31,8 @@ cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
 
 # now let's run the integration tests but without fake-auth, using the safe_auth CLI to get credentials
 # get auth credentials which will be then used by the integration tests to connect to mock-network
-cargo run --release --features=mock-network -- auth
+echo "Sending auth request to port:" $RANDOM_PORT_NUMBER
+cargo run --release --features=mock-network -- auth --port $RANDOM_PORT_NUMBER
 
 # we can now run each of the integration tests suite
 cargo test --release --features=mock-network --test cli_cat -- --test-threads=1
