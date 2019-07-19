@@ -23,7 +23,7 @@ pub enum ContainerSubCommands {
         #[structopt(short = "p", long = "publish")]
         publish: bool,
         /// Do not require new versions for container edits
-        #[structopt(short = "n", long = "non_versioned")]
+        #[structopt(short = "e", long = "non_versioned")]
         non_versioned: bool,
     },
     #[structopt(name = "add")]

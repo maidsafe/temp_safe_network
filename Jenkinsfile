@@ -56,12 +56,12 @@ stage('deploy') {
 }
 
 def runTests() {
-    command = "RANDOM_PORT_NUMBER=\$(( \$RANDOM % 100 + 41800 )) "
+    command_prefix = "RANDOM_PORT_NUMBER=\$(( \$RANDOM % 100 + 41800 )) "
     try {
-        test_command = command + "make test"
+        test_command = command_prefix + "make test"
         sh(test_command)
     } finally {
-        clean_command = command + "make clean"
+        clean_command = command_prefix + "make clean"
         sh(clean_command)
     }
 }

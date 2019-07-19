@@ -40,7 +40,7 @@ struct CmdArgs {
     // #[structopt(short = "q", long = "query", raw(global = "true"))]
     query: Option<String>,
     /// Dry run of command. No data will be written. No coins spent.
-    // #[structopt(long = "dry-run", raw(global = "true"))]
+    #[structopt(short = "n", long = "dry-run", raw(global = "true"))]
     dry: bool,
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
     #[structopt(long = "xorurl", raw(global = "true"))]
@@ -90,7 +90,7 @@ pub fn run() -> Result<(), String> {
             match args.cmd {
                 SubCommands::Keys { cmd } => key_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
-                SubCommands::Files { cmd } => files_commander(cmd, output_fmt, &mut safe),
+                SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),
                 _ => Err("Command not supported yet".to_string()),
             }
         }

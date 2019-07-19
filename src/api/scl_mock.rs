@@ -46,6 +46,7 @@ struct MockData {
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
 
+#[derive(Default)]
 pub struct SafeApp {
     mock_data: MockData,
 }
@@ -348,6 +349,7 @@ impl SafeApp {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_current_seq_append_only_data_version(
         &self,
         name: XorName,

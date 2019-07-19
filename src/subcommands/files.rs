@@ -57,6 +57,7 @@ pub enum FilesSubCommands {
 pub fn files_commander(
     cmd: Option<FilesSubCommands>,
     output_fmt: OutputFmt,
+    dry_run: bool,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -67,7 +68,7 @@ pub fn files_commander(
         }) => {
             // create FilesContainer from a given path to local files/folders
             let (files_container_xorurl, processed_files, _files_map) =
-                safe.files_container_create(&location, dest, recursive)?;
+                safe.files_container_create(&location, dest, recursive, dry_run)?;
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {
@@ -102,7 +103,7 @@ pub fn files_commander(
 
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) =
-                safe.files_container_sync(&location, &target, recursive, delete)?;
+                safe.files_container_sync(&location, &target, recursive, delete, dry_run)?;
 
             // Now let's just print out the content of the FilesMap
             if OutputFmt::Pretty == output_fmt {

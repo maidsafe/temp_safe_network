@@ -51,7 +51,7 @@ impl Safe {
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
-    /// let (xorurl, _, _) = unwrap!(safe.files_container_create("tests/testfolder/", None, true));
+    /// let (xorurl, _, _) = unwrap!(safe.files_container_create("tests/testfolder/", None, true, false));
     ///
     /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl ) ) );
     /// let data_string = match safe_data {
@@ -192,7 +192,7 @@ fn test_fetch_files_container() {
     safe.connect("", Some("")).unwrap();
 
     let (xorurl, _, files_map) =
-        unwrap!(safe.files_container_create("tests/testfolder", None, true));
+        unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
     let content = unwrap!(safe.fetch(&xorurl));

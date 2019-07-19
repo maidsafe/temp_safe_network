@@ -55,7 +55,7 @@ impl Safe {
     /// # use safe_cli::Safe;
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true).unwrap();
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn files_container_create(
@@ -63,46 +63,52 @@ impl Safe {
         location: &str,
         dest: Option<String>,
         recursive: bool,
+        dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedFiles, FilesMap)> {
         // TODO: Enable source for funds / ownership
         // Warn about ownership?
 
         // Let's upload the files and generate the list of local files paths
-        let processed_files = file_system_dir_walk(self, location, recursive, true)?;
+        let processed_files = file_system_dir_walk(self, location, recursive, !dry_run)?;
 
         // The FilesContainer is created as a AppendOnlyData with a single entry containing the
         // timestamp as the entry's key, and the serialised FilesMap as the entry's value
         // TODO: use RDF format
         let files_map = files_map_create(&processed_files, location, dest)?;
-        let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
-            Error::Unexpected(format!(
-                "Couldn't serialise the FilesMap generated: {:?}",
-                err
-            ))
-        })?;
 
-        let now = gen_timestamp_nanos();
-        let files_container_data = vec![(
-            now.into_bytes().to_vec(),
-            serialised_files_map.as_bytes().to_vec(),
-        )];
+        if dry_run {
+            Ok(("".to_string(), processed_files, files_map))
+        } else {
+            let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
+                Error::Unexpected(format!(
+                    "Couldn't serialise the FilesMap generated: {:?}",
+                    err
+                ))
+            })?;
 
-        // Store the FilesContainer in a Published AppendOnlyData
-        let xorname = self.safe_app.put_seq_append_only_data(
-            files_container_data,
-            None,
-            FILES_CONTAINER_TYPE_TAG,
-            None,
-        )?;
+            let now = gen_timestamp_nanos();
+            let files_container_data = vec![(
+                now.into_bytes().to_vec(),
+                serialised_files_map.as_bytes().to_vec(),
+            )];
 
-        let xorurl = XorUrlEncoder::encode(
-            xorname,
-            FILES_CONTAINER_TYPE_TAG,
-            SafeContentType::FilesContainer,
-            &self.xorurl_base,
-        )?;
+            // Store the FilesContainer in a Published AppendOnlyData
+            let xorname = self.safe_app.put_seq_append_only_data(
+                files_container_data,
+                None,
+                FILES_CONTAINER_TYPE_TAG,
+                None,
+            )?;
 
-        Ok((xorurl, processed_files, files_map))
+            let xorurl = XorUrlEncoder::encode(
+                xorname,
+                FILES_CONTAINER_TYPE_TAG,
+                SafeContentType::FilesContainer,
+                &self.xorurl_base,
+            )?;
+
+            Ok((xorurl, processed_files, files_map))
+        }
     }
 
     /// # Fetch an existing FilesContaier.
@@ -113,7 +119,7 @@ impl Safe {
     /// # use safe_cli::Safe;
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true).unwrap();
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// let (version, files_map, native_type) = safe.files_container_get_latest(&xorurl).unwrap();
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("FilesContainer is stored on a {} data type", native_type);
@@ -171,8 +177,8 @@ impl Safe {
     /// # use safe_cli::Safe;
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true).unwrap();
-    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, false).unwrap();
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, false, false).unwrap();
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("The local files that were synced up are: {:?}", new_processed_files);
     /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
@@ -183,13 +189,14 @@ impl Safe {
         xorurl: &str,
         recursive: bool,
         delete: bool,
+        dry_run: bool,
     ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
                 "--delete is not allowed if --recursive is not set".to_string(),
             ));
         }
-        let (mut version, current_files_map, _): (u64, FilesMap, String) =
+        let (current_version, current_files_map, _): (u64, FilesMap, String) =
             self.files_container_get_latest(xorurl)?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
@@ -205,9 +212,14 @@ impl Safe {
                 processed_files,
                 dest_path,
                 delete,
+                !dry_run,
             )?;
 
-        if success_count > 0 {
+        let version = if success_count == 0 {
+            current_version
+        } else if dry_run {
+            current_version + 1
+        } else {
             // The FilesContainer is updated adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
             let serialised_files_map = serde_json::to_string(&new_files_map).map_err(|err| {
@@ -225,32 +237,13 @@ impl Safe {
 
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
-
-            let current_version = match self
-                .safe_app
-                .get_current_seq_append_only_data_version(xorname, type_tag)
-            {
-                Ok(version) => version,
-                Err(Error::ContentNotFound(_)) => {
-                    return Err(Error::ContentNotFound(
-                        ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
-                    ))
-                }
-                Err(err) => {
-                    return Err(Error::NetDataError(format!(
-                        "Failed to get current version: {}",
-                        err
-                    )))
-                }
-            };
-
-            version = self.safe_app.append_seq_append_only_data(
+            self.safe_app.append_seq_append_only_data(
                 files_container_data,
                 current_version + 1,
                 xorname,
                 type_tag,
-            )?;
-        }
+            )?
+        };
 
         Ok((version, processed_files, new_files_map))
     }
@@ -359,10 +352,15 @@ fn gen_new_file_item(
     file_type: &str,
     file_size: &str,
     file_created: Option<&str>,
+    upload_file: bool,
 ) -> Result<FileItem, String> {
     let now = gen_timestamp_secs();
     let mut file_item = FileItem::new();
-    let xorurl = upload_file(safe, file_path)?;
+    let xorurl = if upload_file {
+        upload_file_to_net(safe, file_path)?
+    } else {
+        "".to_string()
+    };
     file_item.insert(FILES_MAP_PREDICATE_LINK.to_string(), xorurl.to_string());
     file_item.insert(FILES_MAP_PREDICATE_TYPE.to_string(), file_type.to_string());
     file_item.insert(FILES_MAP_PREDICATE_SIZE.to_string(), file_size.to_string());
@@ -383,6 +381,7 @@ fn files_map_sync(
     new_content: ProcessedFiles,
     dest_path: Option<String>,
     delete: bool,
+    upload_files: bool,
 ) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     let mut updated_files_map = FilesMap::new();
@@ -409,7 +408,14 @@ fn files_map_sync(
         match current_files_map.get(&normalised_file_name) {
             None => {
                 // We need to add a new FileItem, let's upload it first
-                match gen_new_file_item(safe, &file_path, &file_type, &file_size, None) {
+                match gen_new_file_item(
+                    safe,
+                    &file_path,
+                    &file_type,
+                    &file_size,
+                    None,
+                    upload_files,
+                ) {
                     Ok(new_file_item) => {
                         debug!("New FileItem item: {:?}", new_file_item);
                         debug!("New FileItem item inserted as {:?}", &file_name);
@@ -447,6 +453,7 @@ fn files_map_sync(
                         &file_type,
                         &file_size,
                         Some(&file_item[FILES_MAP_PREDICATE_CREATED]),
+                        upload_files,
                     ) {
                         Ok(new_file_item) => {
                             debug!("Updated FileItem item: {:?}", new_file_item);
@@ -501,7 +508,7 @@ fn files_map_sync(
 }
 
 // Upload a files to the Network as a Published-ImmutableData
-fn upload_file(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
+fn upload_file_to_net(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
@@ -563,7 +570,7 @@ fn file_system_dir_walk(
                             // Everything is in the iter. We dont need to recurse.
                             // so what do we do with dirs? decide if we want to support empty dirs also
                         } else if upload_files {
-                            match upload_file(safe, &current_file_path) {
+                            match upload_file_to_net(safe, &current_file_path) {
                                 Ok(xorurl) => {
                                     processed_files.insert(normalised_path, (FILE_ADDED_SIGN.to_string(), xorurl));
                                 }
@@ -575,7 +582,7 @@ fn file_system_dir_walk(
                                 },
                             };
                         } else {
-                            processed_files.insert(normalised_path.clone(), ("".to_string(), "".to_string()));
+                            processed_files.insert(normalised_path.clone(), (FILE_ADDED_SIGN.to_string(), "".to_string()));
                         }
                     },
                     Err(err) => {
@@ -698,7 +705,7 @@ fn test_files_container_create_file() {
     unwrap!(safe.connect("", Some("fake-credentials")));
     let filename = "tests/testfolder/test.md";
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create(filename, None, false));
+        unwrap!(safe.files_container_create(filename, None, false, false));
 
     assert!(xorurl.starts_with("safe://"));
     assert_eq!(processed_files.len(), 1);
@@ -712,12 +719,58 @@ fn test_files_container_create_file() {
 }
 
 #[test]
+fn test_files_container_create_dry_run() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let filename = "./tests/testfolder/";
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create(filename, None, true, true));
+
+    assert!(xorurl.is_empty());
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
+
+    let filename1 = "./tests/testfolder/test.md";
+    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert!(processed_files[filename1].1.is_empty());
+    assert_eq!(
+        processed_files[filename1].1,
+        files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename2 = "./tests/testfolder/another.md";
+    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert!(processed_files[filename2].1.is_empty());
+    assert_eq!(
+        processed_files[filename2].1,
+        files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename3 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert!(processed_files[filename3].1.is_empty());
+    assert_eq!(
+        processed_files[filename3].1,
+        files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename4 = "./tests/testfolder/noextension";
+    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert!(processed_files[filename4].1.is_empty());
+    assert_eq!(
+        processed_files[filename4].1,
+        files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+    );
+}
+
+#[test]
 fn test_files_container_create_folder_without_trailing_slash() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("tests/testfolder", None, true));
+        unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
     assert!(xorurl.starts_with("safe://"));
     assert_eq!(processed_files.len(), 5);
@@ -758,7 +811,7 @@ fn test_files_container_create_folder_with_trailing_slash() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     assert!(xorurl.starts_with("safe://"));
     assert_eq!(processed_files.len(), 5);
@@ -801,7 +854,8 @@ fn test_files_container_create_dest_path_without_trailing_slash() {
     let (xorurl, processed_files, files_map) = unwrap!(safe.files_container_create(
         "./tests/testfolder",
         Some("/myroot".to_string()),
-        true
+        true,
+        false
     ));
 
     assert!(xorurl.starts_with("safe://"));
@@ -845,7 +899,8 @@ fn test_files_container_create_dest_path_with_trailing_slash() {
     let (xorurl, processed_files, files_map) = unwrap!(safe.files_container_create(
         "./tests/testfolder",
         Some("/myroot/".to_string()),
-        true
+        true,
+        false
     ));
 
     assert!(xorurl.starts_with("safe://"));
@@ -887,13 +942,18 @@ fn test_files_container_sync() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     assert_eq!(processed_files.len(), 5);
     assert_eq!(files_map.len(), 5);
 
-    let (version, new_processed_files, new_files_map) =
-        unwrap!(safe.files_container_sync("./tests/testfolder/subfolder/", &xorurl, true, false));
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &xorurl,
+        true,
+        false,
+        false
+    ));
 
     assert_eq!(version, 2);
     assert_eq!(new_processed_files.len(), 2);
@@ -927,12 +987,86 @@ fn test_files_container_sync() {
         new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
     );
 
-    // and finally check the synced file is there
     let filename5 = "./tests/testfolder/subfolder/subexists.md";
     assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
     assert_eq!(
         new_processed_files[filename5].1,
         new_files_map["/subexists.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename6 = "./tests/testfolder/subfolder/sub2.md";
+    assert_eq!(new_processed_files[filename6].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        new_processed_files[filename6].1,
+        new_files_map["/sub2.md"][FILES_MAP_PREDICATE_LINK]
+    );
+}
+
+#[test]
+fn test_files_container_sync_dry_run() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+
+    assert_eq!(processed_files.len(), 5);
+    assert_eq!(files_map.len(), 5);
+
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &xorurl,
+        true,
+        false,
+        true // set dry_run flag on
+    ));
+
+    assert_eq!(version, 2);
+    assert_eq!(new_processed_files.len(), 2);
+    assert_eq!(new_files_map.len(), 7);
+
+    let filename1 = "./tests/testfolder/test.md";
+    assert_eq!(processed_files[filename1].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename1].1,
+        new_files_map["/test.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename2 = "./tests/testfolder/another.md";
+    assert_eq!(processed_files[filename2].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename2].1,
+        new_files_map["/another.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename3 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(processed_files[filename3].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename3].1,
+        new_files_map["/subfolder/subexists.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename4 = "./tests/testfolder/noextension";
+    assert_eq!(processed_files[filename4].0, FILE_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename4].1,
+        new_files_map["/noextension"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename5 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(new_processed_files[filename5].0, FILE_ADDED_SIGN);
+    assert!(new_processed_files[filename5].1.is_empty());
+    assert_eq!(
+        new_processed_files[filename5].1,
+        new_files_map["/subexists.md"][FILES_MAP_PREDICATE_LINK]
+    );
+
+    let filename6 = "./tests/testfolder/subfolder/sub2.md";
+    assert_eq!(new_processed_files[filename6].0, FILE_ADDED_SIGN);
+    assert!(new_processed_files[filename6].1.is_empty());
+    assert_eq!(
+        new_processed_files[filename6].1,
+        new_files_map["/sub2.md"][FILES_MAP_PREDICATE_LINK]
     );
 }
 
@@ -942,7 +1076,7 @@ fn test_files_container_sync_with_delete() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     assert_eq!(processed_files.len(), 5);
     assert_eq!(files_map.len(), 5);
@@ -951,7 +1085,8 @@ fn test_files_container_sync_with_delete() {
         "./tests/testfolder/subfolder/",
         &xorurl,
         true,
-        true // this sets the delete flag
+        true, // this sets the delete flag
+        false
     ));
 
     assert_eq!(version, 2);
@@ -1006,6 +1141,7 @@ fn test_files_container_sync_delete_without_recursive() {
         "some-url",
         false, // this sets the recursive flag to off
         true,  // this sets the delete flag
+        false,
     ) {
         Ok(_) => panic!("Sync was unexpectdly successful"),
         Err(err) => assert_eq!(
@@ -1021,7 +1157,7 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     assert_eq!(processed_files.len(), 5);
     assert_eq!(files_map.len(), 5);
@@ -1030,6 +1166,7 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
         "./tests/testfolder/subfolder",
         &xorurl_with_path,
         true,
+        false,
         false
     ));
 
@@ -1080,7 +1217,7 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     assert_eq!(processed_files.len(), 5);
     assert_eq!(files_map.len(), 5);
@@ -1089,7 +1226,8 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
         "./tests/testfolder/subfolder",
         &xorurl_with_path,
         true,
-        false
+        false,
+        false,
     ));
 
     assert_eq!(version, 2);
@@ -1139,7 +1277,7 @@ fn test_files_container_get_latest() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _processed_files, files_map) =
-        unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     let (version, fetched_files_map, native_type) =
         unwrap!(safe.files_container_get_latest(&xorurl));
@@ -1162,7 +1300,8 @@ fn test_files_container_version() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _, _) = unwrap!(safe.files_container_create("./tests/testfolder/", None, true));
+    let (xorurl, _, _) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     let (version, _, _) = unwrap!(safe.files_container_get_latest(&xorurl));
     assert_eq!(version, 1);
@@ -1171,7 +1310,8 @@ fn test_files_container_version() {
         "./tests/testfolder/subfolder/",
         &xorurl,
         true,
-        true // this sets the delete flag
+        true, // this sets the delete flag,
+        false,
     ));
     assert_eq!(version, 2);
 
