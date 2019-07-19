@@ -1047,7 +1047,7 @@ impl SourceElder {
     fn send<T: Serialize>(&mut self, recipient: Peer, msg: &T) {
         let msg = utils::serialise(msg);
         let msg = Bytes::from(msg);
-        self.quic_p2p.send(recipient, msg)
+        self.quic_p2p.send(recipient, msg, 0)
     }
 
     fn send_response_to_client(

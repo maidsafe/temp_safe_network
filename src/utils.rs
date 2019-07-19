@@ -145,8 +145,8 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
     }
 }
 
-// Create an error response for the given request.
-pub(crate) fn to_error_response(request: &Request, error: NdError) -> Response {
+/// Create an error response for the given request.
+pub fn to_error_response(request: &Request, error: NdError) -> Response {
     match request {
         Request::PutIData(_)
         | Request::DeleteUnpubIData(_)
