@@ -16,7 +16,7 @@ use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
     AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, IData, IDataAddress,
-    Message, MessageId, PublicId, Request, Response, Signature,
+    Message, MessageId, PublicId, PublicKey, Request, Response, Signature,
 };
 use safe_vault::{
     mock::Network,
@@ -450,16 +450,31 @@ pub fn get_balance<T: TestClientTrait>(env: &mut Environment, client: &mut T) ->
     }
 }
 
-pub fn send_request_expect_err<T: TestClientTrait>(
+pub fn send_request_get_response<T: TestClientTrait>(
     env: &mut Environment,
     client: &mut T,
     request: Request,
-    response: Response,
-) {
+) -> Response {
     let message_id = client.send_request(request);
     env.poll();
-    let resp = client.expect_response(message_id);
-    if response != resp {
-        unexpected!(resp);
+    client.expect_response(message_id)
+}
+
+pub fn send_request_expect_response<T: TestClientTrait>(
+    env: &mut Environment,
+    client: &mut T,
+    request: Request,
+    expected_response: Response,
+) {
+    let actual_response = send_request_get_response(env, client, request);
+    if actual_response != expected_response {
+        panic!(
+            "Expected: {:?}, got: {:?}.",
+            expected_response, actual_response
+        )
     }
+}
+
+pub fn gen_public_key(rng: &mut TestRng) -> PublicKey {
+    *ClientFullId::new_ed25519(rng).public_id().public_key()
 }

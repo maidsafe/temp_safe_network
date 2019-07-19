@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{MDataAddress, MutableData, SeqMutableData, UnseqMutableData, XorName};
+use safe_nd::{MData, MDataAddress, SeqMutableData, UnseqMutableData, XorName};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Hash, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
