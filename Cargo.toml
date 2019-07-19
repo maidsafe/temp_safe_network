@@ -31,7 +31,7 @@ safe-nd = { version = "~0.1.0", git = "https://github.com/maidsafe/safe-nd" }
 serde = { version = "~1.0.93", features = ["derive"] }
 serde_json = "~1.0.39"
 structopt = "~0.2.16"
-tiny-keccak = "~1.4.4"
+tiny-keccak = "~1.5.0"
 unwrap = "~1.2.1"
 
 [dev_dependencies]

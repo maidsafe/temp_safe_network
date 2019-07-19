@@ -962,7 +962,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let result = self
             .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.last_entry().ok_or(NdError::NoSuchEntry));
+            .and_then(|adata| adata.last_entry().cloned().ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToSrcElders {
             sender: *address.name(),

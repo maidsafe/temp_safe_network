@@ -149,20 +149,80 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
 // Create an error response for the given request.
 pub(crate) fn to_error_response(request: &Request, error: NdError) -> Response {
     match request {
+        Request::PutIData(_)
+        | Request::DeleteUnpubIData(_)
+        | Request::PutMData(_)
+        | Request::DeleteMData(_)
+        | Request::SetMDataUserPermissions { .. }
+        | Request::DelMDataUserPermissions { .. }
+        | Request::MutateSeqMDataEntries { .. }
+        | Request::MutateUnseqMDataEntries { .. }
+        | Request::PutAData(_)
+        | Request::DeleteAData(_)
+        | Request::AddPubADataPermissions { .. }
+        | Request::AddUnpubADataPermissions { .. }
+        | Request::SetADataOwner { .. }
+        | Request::AppendSeq { .. }
+        | Request::AppendUnseq { .. }
+        | Request::CreateLoginPacket(_)
+        | Request::CreateLoginPacketFor { .. }
+        | Request::UpdateLoginPacket { .. }
+        | Request::InsAuthKey { .. }
+        | Request::DelAuthKey { .. } => Response::Mutation(Err(error)),
+        Request::GetIData(_) => Response::GetIData(Err(error)),
+        Request::GetMData(_) => Response::GetMData(Err(error)),
+        Request::GetMDataValue { address, .. } => {
+            if address.is_seq() {
+                Response::GetSeqMDataValue(Err(error))
+            } else {
+                Response::GetUnseqMDataValue(Err(error))
+            }
+        }
+        Request::GetMDataShell(_) => Response::GetMDataShell(Err(error)),
+        Request::GetMDataVersion(_) => Response::GetMDataVersion(Err(error)),
+        Request::ListMDataKeys(_) => Response::ListMDataKeys(Err(error)),
+        Request::ListMDataValues(address) => {
+            if address.is_seq() {
+                Response::ListSeqMDataValues(Err(error))
+            } else {
+                Response::ListUnseqMDataValues(Err(error))
+            }
+        }
+        Request::ListMDataEntries(address) => {
+            if address.is_seq() {
+                Response::ListSeqMDataEntries(Err(error))
+            } else {
+                Response::ListUnseqMDataEntries(Err(error))
+            }
+        }
+        Request::ListMDataPermissions(_) => Response::ListMDataPermissions(Err(error)),
+        Request::ListMDataUserPermissions { .. } => Response::ListMDataUserPermissions(Err(error)),
         Request::GetAData(_) => Response::GetAData(Err(error)),
+        Request::GetADataValue { .. } => Response::GetADataValue(Err(error)),
         Request::GetADataShell { .. } => Response::GetADataShell(Err(error)),
         Request::GetADataRange { .. } => Response::GetADataRange(Err(error)),
         Request::GetADataIndices { .. } => Response::GetADataIndices(Err(error)),
         Request::GetADataLastEntry { .. } => Response::GetADataLastEntry(Err(error)),
         Request::GetADataOwners { .. } => Response::GetADataOwners(Err(error)),
+        Request::GetADataPermissions { address, .. } => {
+            if adata::is_published(address) {
+                Response::GetPubADataPermissionAtIndex(Err(error))
+            } else {
+                Response::GetUnpubADataPermissionAtIndex(Err(error))
+            }
+        }
         Request::GetPubADataUserPermissions { .. } => {
             Response::GetPubADataUserPermissions(Err(error))
         }
         Request::GetUnpubADataUserPermissions { .. } => {
             Response::GetUnpubADataUserPermissions(Err(error))
         }
-        // TODO: implement the rest
-        _ => unimplemented!(),
+        Request::GetBalance => Response::GetBalance(Err(error)),
+        Request::TransferCoins { .. } | Request::CreateBalance { .. } => {
+            Response::Transaction(Err(error))
+        }
+        Request::GetLoginPacket(_) => Response::GetLoginPacket(Err(error)),
+        Request::ListAuthKeysAndVersion => Response::ListAuthKeysAndVersion(Err(error)),
     }
 }
 

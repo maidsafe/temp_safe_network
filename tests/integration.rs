@@ -57,9 +57,9 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::Rng;
 use safe_nd::{
-    AData, ADataAddress, ADataIndex, ADataOwner, ADataPubPermissionSet, ADataPubPermissions,
-    ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions, AppendOnlyData,
-    Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
+    AData, ADataAddress, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
+    ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
+    AppendOnlyData, Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData,
     PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
     SeqAppendOnly, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
     UnseqAppendOnly, XorName,
@@ -322,7 +322,13 @@ fn put_append_only_data() {
     let tag = 100;
     let mut adata = PubSeqAppendOnlyData::new(adata_name, tag);
     unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())], 0));
+    unwrap!(adata.append(
+        vec![ADataEntry {
+            key: b"more".to_vec(),
+            value: b"data".to_vec()
+        }],
+        0
+    ));
     let adata = AData::PubSeq(adata);
     let pub_seq_adata_address = *adata.address();
     common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
@@ -332,7 +338,10 @@ fn put_append_only_data() {
     let tag = 101;
     let mut adata = PubUnseqAppendOnlyData::new(adata_name, tag);
     unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())]));
+    unwrap!(adata.append(vec![ADataEntry {
+        key: b"more".to_vec(),
+        value: b"data".to_vec()
+    }]));
     let adata = AData::PubUnseq(adata);
     let pub_unseq_adata_address = *adata.address();
     common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
@@ -342,7 +351,13 @@ fn put_append_only_data() {
     let tag = 102;
     let mut adata = UnpubSeqAppendOnlyData::new(adata_name, tag);
     unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())], 0));
+    unwrap!(adata.append(
+        vec![ADataEntry {
+            key: b"more".to_vec(),
+            value: b"data".to_vec()
+        }],
+        0
+    ));
     let adata = AData::UnpubSeq(adata);
     let unpub_seq_adata_address = *adata.address();
     common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
@@ -352,7 +367,10 @@ fn put_append_only_data() {
     let tag = 103;
     let mut adata = UnpubUnseqAppendOnlyData::new(adata_name, tag);
     unwrap!(adata.append_owner(owner, 0));
-    unwrap!(adata.append(vec![(b"more".to_vec(), b"data".to_vec())]));
+    unwrap!(adata.append(vec![ADataEntry {
+        key: b"more".to_vec(),
+        value: b"data".to_vec()
+    }]));
     let adata = AData::UnpubUnseq(adata);
     let unpub_unseq_adata_address = *adata.address();
     common::perform_mutation(&mut env, &mut client, Request::PutAData(adata));
@@ -399,14 +417,133 @@ fn put_append_only_data() {
 }
 
 #[test]
-fn append_only_data_get_data_operations() {
+fn get_pub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    // Create an append-only data
-    let name: XorName = env.rng().gen();
-    let tag = 100;
-    let mut data = PubSeqAppendOnlyData::new(name, tag);
+    let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
+
+    let owner = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner, 0));
+
+    let data = AData::PubSeq(data);
+    let address = *data.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+
+    // Success
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetAData(address),
+        Response::GetAData(Ok(data.clone())),
+    );
+
+    // Failure - non-existing data
+    let invalid_name: XorName = env.rng().gen();
+    let invalid_address = ADataAddress::PubSeq {
+        name: invalid_name,
+        tag: 100,
+    };
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetAData(invalid_address),
+        Response::GetAData(Err(NdError::NoSuchData)),
+    );
+
+    // Published data is gettable by non-owners too
+    let mut other_client = env.new_connected_client();
+    common::send_request_expect_response(
+        &mut env,
+        &mut other_client,
+        Request::GetAData(address),
+        Response::GetAData(Ok(data)),
+    );
+}
+
+#[test]
+fn get_unpub_append_only_data() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let new_balance_owner = *client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut client,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(0)),
+            transaction_id: 0,
+        },
+    );
+
+    let mut data = UnpubSeqAppendOnlyData::new(env.rng().gen(), 100);
+
+    let owner = ADataOwner {
+        public_key: *client.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+    unwrap!(data.append_owner(owner, 0));
+
+    let data = AData::UnpubSeq(data);
+    let address = *data.address();
+    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+
+    // Success
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetAData(address),
+        Response::GetAData(Ok(data.clone())),
+    );
+
+    // Failure - non-existing data
+    let invalid_name: XorName = env.rng().gen();
+    let invalid_address = ADataAddress::UnpubSeq {
+        name: invalid_name,
+        tag: 100,
+    };
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut client,
+        Request::GetAData(invalid_address),
+        Response::GetAData(Err(NdError::NoSuchData)),
+    );
+
+    // Failure - get by non-owner not allowed
+    let mut other_client = env.new_connected_client();
+    let new_balance_owner = *other_client.public_id().public_key();
+    common::perform_transaction(
+        &mut env,
+        &mut other_client,
+        Request::CreateBalance {
+            new_balance_owner,
+            amount: unwrap!(Coins::from_nano(0)),
+            transaction_id: 0,
+        },
+    );
+
+    common::send_request_expect_response(
+        &mut env,
+        &mut other_client,
+        Request::GetAData(address),
+        Response::GetAData(Err(NdError::InvalidPermissions)),
+    );
+}
+
+#[test]
+fn append_only_data_get_entries() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
     let owner = ADataOwner {
         public_key: *client.public_id().public_key(),
@@ -417,8 +554,14 @@ fn append_only_data_get_data_operations() {
     unwrap!(data.append_owner(owner, 0));
     unwrap!(data.append(
         vec![
-            (b"one".to_vec(), b"foo".to_vec()),
-            (b"two".to_vec(), b"bar".to_vec()),
+            ADataEntry {
+                key: b"one".to_vec(),
+                value: b"foo".to_vec()
+            },
+            ADataEntry {
+                key: b"two".to_vec(),
+                value: b"bar".to_vec()
+            },
         ],
         0,
     ));
@@ -426,28 +569,6 @@ fn append_only_data_get_data_operations() {
     let data = AData::PubSeq(data);
     let address = *data.address();
     common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
-
-    // GetAData (failure - non-existing data)
-    let invalid_name: XorName = env.rng().gen();
-    let invalid_address = ADataAddress::PubSeq {
-        name: invalid_name,
-        tag,
-    };
-
-    common::send_request_expect_response(
-        &mut env,
-        &mut client,
-        Request::GetAData(invalid_address),
-        Response::GetAData(Err(NdError::NoSuchData)),
-    );
-
-    // GetAData (success)
-    common::send_request_expect_response(
-        &mut env,
-        &mut client,
-        Request::GetAData(address),
-        Response::GetAData(Ok(data)),
-    );
 
     // GetADataRange
     let mut range_scenario = |start, end, expected_result| {
@@ -470,24 +591,39 @@ fn append_only_data_get_data_operations() {
     range_scenario(
         ADataIndex::FromStart(0),
         ADataIndex::FromStart(1),
-        Ok(vec![(b"one".to_vec(), b"foo".to_vec())]),
+        Ok(vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"foo".to_vec(),
+        }]),
     );
     range_scenario(
         ADataIndex::FromStart(1),
         ADataIndex::FromStart(2),
-        Ok(vec![(b"two".to_vec(), b"bar".to_vec())]),
+        Ok(vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"bar".to_vec(),
+        }]),
     );
     range_scenario(
         ADataIndex::FromEnd(1),
         ADataIndex::FromEnd(0),
-        Ok(vec![(b"two".to_vec(), b"bar".to_vec())]),
+        Ok(vec![ADataEntry {
+            key: b"two".to_vec(),
+            value: b"bar".to_vec(),
+        }]),
     );
     range_scenario(
         ADataIndex::FromStart(0),
         ADataIndex::FromEnd(0),
         Ok(vec![
-            (b"one".to_vec(), b"foo".to_vec()),
-            (b"two".to_vec(), b"bar".to_vec()),
+            ADataEntry {
+                key: b"one".to_vec(),
+                value: b"foo".to_vec(),
+            },
+            ADataEntry {
+                key: b"two".to_vec(),
+                value: b"bar".to_vec(),
+            },
         ]),
     );
     range_scenario(
@@ -497,7 +633,10 @@ fn append_only_data_get_data_operations() {
     );
 
     // GetADataLastEntry
-    let expected = (b"two".to_vec(), b"bar".to_vec());
+    let expected = ADataEntry {
+        key: b"two".to_vec(),
+        value: b"bar".to_vec(),
+    };
     common::send_request_expect_response(
         &mut env,
         &mut client,
@@ -545,7 +684,13 @@ fn append_only_data_get_owners() {
     unwrap!(data.append_owner(owner_0, 0));
     unwrap!(data.append_owner(owner_1, 1));
 
-    unwrap!(data.append(vec![(b"one".to_vec(), b"foo".to_vec())], 0));
+    unwrap!(data.append(
+        vec![ADataEntry {
+            key: b"one".to_vec(),
+            value: b"foo".to_vec()
+        }],
+        0
+    ));
     unwrap!(data.append_owner(owner_2, 2));
 
     let address = *data.address();
