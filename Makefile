@@ -6,6 +6,7 @@ UNAME_S := $(shell uname -s)
 PWD := $(shell echo $$PWD)
 UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
+SAFE_MOCK_VAULT_PATH := ~/safe_auth$(shell echo $$RANDOM_PORT_NUMBER)
 
 build-container:
 	rm -rf target/
@@ -17,6 +18,12 @@ push-container:
 
 test:
 	rm -rf artifacts
+ifeq ($(OS),Windows_NT)
+		cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
+else
+	killall "safe_auth" || true
+endif
+	rm -rf ~/safe_auth*
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
@@ -26,7 +33,7 @@ ifeq ($(UNAME_S),Linux)
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
-	./resources/test-scripts/all-tests
+	RANDOM_PORT_NUMBER=${RANDOM_PORT_NUMBER} SAFE_MOCK_VAULT_PATH=${SAFE_MOCK_VAULT_PATH} ./resources/test-scripts/all-tests
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
@@ -84,7 +91,7 @@ ifeq ($(OS),Windows_NT)
 	cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
 else ifeq ($(UNAME_S),Darwin)
 	lsof -t -i tcp:${RANDOM_PORT_NUMBER} | xargs -n 1 -x kill
-	rm -rf ~/safe_auth-${RANDOM_PORT_NUMBER}
+	rm -rf ${SAFE_MOCK_VAULT_PATH}
 endif
 
 package-commit_hash-artifacts-for-deploy:

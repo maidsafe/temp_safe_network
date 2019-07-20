@@ -9,7 +9,7 @@ stage('build & test') {
     parallel linux: {
         node('docker') {
             checkout(scm)
-            runTests()
+            runTests(false)
             packageBuildArtifacts('linux')
             uploadBuildArtifacts()
         }
@@ -17,7 +17,7 @@ stage('build & test') {
     windows: {
         node('windows') {
             checkout(scm)
-            runTests()
+            runTests(true)
             packageBuildArtifacts('windows')
             uploadBuildArtifacts()
         }
@@ -25,7 +25,7 @@ stage('build & test') {
     macos: {
         node('osx') {
             checkout(scm)
-            runTests()
+            runTests(true)
             packageBuildArtifacts('macos')
             uploadBuildArtifacts()
         }
@@ -55,14 +55,21 @@ stage('deploy') {
     }
 }
 
-def runTests() {
-    command_prefix = "RANDOM_PORT_NUMBER=\$(( \$RANDOM % 100 + 41800 )) "
+def runTests(setPortNumber) {
+    test_command = "make test"
+    clean_command = "make clean"
+    if (setPortNumber) {
+        randomNumber = sh(
+          returnStdout: true,
+          script: "echo \$(( \$RANDOM % 100 + 41800 ))"
+        )
+        test_command = "RANDOM_PORT_NUMBER=${randomNumber} make test"
+        clean_command = "RANDOM_PORT_NUMBER=${randomNumber} make clean"
+    }
     try {
-        test_command = command_prefix + "make test"
-        sh(test_command)
+      sh(test_command)
     } finally {
-        clean_command = command_prefix + "make clean"
-        sh(clean_command)
+      sh(clean_command)
     }
 }
 

@@ -1,6 +1,14 @@
 #!/bin/bash
 
-export SAFE_MOCK_VAULT_PATH=~/safe_auth-$RANDOM_PORT_NUMBER
+if [ -z $RANDOM_PORT_NUMBER ]
+then
+  export RANDOM_PORT_NUMBER=41805
+fi
+
+if [ -z $SAFE_MOCK_VAULT_PATH ]
+then
+  export SAFE_MOCK_VAULT_PATH=~/safe_auth
+fi
 
 function setup_safe_auth() {
     rm -rf $SAFE_MOCK_VAULT_PATH
