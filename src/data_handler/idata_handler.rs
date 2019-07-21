@@ -6,36 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    action::Action,
-    chunk_store::{
-        error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
-        MutableChunkStore,
-    },
-    rpc::Rpc,
-    utils,
-    vault::Init,
-    Config, Result, ToDbKey,
-};
-use log::{error, info, trace, warn};
+use super::{IDataOp, OpType};
+use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
+use log::{trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
-    ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, IData, IDataAddress, MData,
-    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, UnseqAppendOnly, XorName,
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
+    Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     iter,
-    rc::Rc,
 };
 use unwrap::unwrap;
-use super::{IDataOp, OpType};
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
@@ -51,21 +36,17 @@ pub(crate) struct IDataHandler {
     id: NodePublicId,
     idata_ops: BTreeMap<MessageId, IDataOp>,
     immutable_metadata: PickleDb,
+    #[allow(unused)]
     full_adults: PickleDb,
 }
 
 impl IDataHandler {
-    pub(crate) fn new(
-        id: NodePublicId,
-        config: &Config,
-        total_used_space: &Rc<RefCell<u64>>,
-        init_mode: Init,
-    ) -> Result<Self> {
+    pub(crate) fn new(id: NodePublicId, config: &Config, init_mode: Init) -> Result<Self> {
         let root_dir = config.root_dir();
         let immutable_metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
-        Ok(Self{
+        Ok(Self {
             id,
             idata_ops: Default::default(),
             immutable_metadata,
@@ -75,7 +56,6 @@ impl IDataHandler {
 
     pub(crate) fn handle_put_idata_req(
         &mut self,
-        src: XorName,
         requester: PublicId,
         kind: IData,
         message_id: MessageId,
@@ -138,7 +118,6 @@ impl IDataHandler {
 
     pub(crate) fn handle_delete_unpub_idata_req(
         &mut self,
-        src: XorName,
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
@@ -185,7 +164,6 @@ impl IDataHandler {
 
     pub(crate) fn handle_get_idata_req(
         &mut self,
-        src: XorName,
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
@@ -230,7 +208,6 @@ impl IDataHandler {
             }
         }
     }
-
 
     pub(crate) fn handle_mutation_resp(
         &mut self,

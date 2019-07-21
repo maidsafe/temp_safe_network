@@ -8,33 +8,25 @@
 
 use crate::{
     action::Action,
-    chunk_store::{
-        error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
-        MutableChunkStore,
-    },
+    chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
     rpc::Rpc,
     utils,
     vault::Init,
-    Config, Result, ToDbKey,
+    Config, Result,
 };
-use log::{error, info, trace, warn};
-use pickledb::PickleDb;
+use log::error;
+
 use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
-    ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, IData, IDataAddress, MData,
-    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, UnseqAppendOnly, XorName,
+    Error as NdError, MData, MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions,
+    MDataUnseqEntryActions, MessageId, NodePublicId, PublicId, PublicKey, Response,
+    Result as NdResult,
 };
-use serde::{Deserialize, Serialize};
+
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
-    iter,
     rc::Rc,
 };
-use unwrap::unwrap;
 
 pub(crate) struct MDataHandler {
     id: NodePublicId,

@@ -7,34 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::Action,
-    chunk_store::{
-        error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
-        MutableChunkStore,
-    },
-    rpc::Rpc,
-    utils,
-    vault::Init,
-    Config, Result, ToDbKey,
+    action::Action, chunk_store::ImmutableChunkStore, rpc::Rpc, utils, vault::Init, Config, Result,
 };
-use log::{error, info, trace, warn};
-use pickledb::PickleDb;
-use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
-    ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, IData, IDataAddress, MData,
-    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, UnseqAppendOnly, XorName,
-};
-use serde::{Deserialize, Serialize};
+use log::{error, info};
+
+use safe_nd::{Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response};
+
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
-    iter,
     rc::Rc,
 };
-use unwrap::unwrap;
 
 pub(crate) struct IDataHolder {
     id: NodePublicId,

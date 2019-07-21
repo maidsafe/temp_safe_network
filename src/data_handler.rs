@@ -12,40 +12,21 @@ mod idata_holder;
 mod idata_op;
 mod mdata_handler;
 
-use crate::{
-    action::Action,
-    chunk_store::{
-        error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
-        MutableChunkStore,
-    },
-    rpc::Rpc,
-    utils,
-    vault::Init,
-    Config, Result, ToDbKey,
-};
+use crate::{action::Action, rpc::Rpc, vault::Init, Config, Result};
 use adata_handler::ADataHandler;
+use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
-use log::{error, info, trace, warn};
+use log::{error, trace};
 use mdata_handler::MDataHandler;
-use idata_handler::IDataHandler;
-use pickledb::PickleDb;
-use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
-    ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, IData, IDataAddress, MData,
-    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, UnseqAppendOnly, XorName,
-};
-use serde::{Deserialize, Serialize};
+
+use safe_nd::{IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response, XorName};
+
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
-    iter,
     rc::Rc,
 };
-use unwrap::unwrap;
 
 // TODO - remove this
 #[allow(unused)]
@@ -64,7 +45,7 @@ impl DataHandler {
         total_used_space: &Rc<RefCell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
-        let idata_handler = IDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
+        let idata_handler = IDataHandler::new(id.clone(), config, init_mode)?;
         let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
         let mdata_handler = MDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
         let adata_handler = ADataHandler::new(id.clone(), config, total_used_space, init_mode)?;
@@ -337,8 +318,12 @@ impl DataHandler {
             src
         );
         match response {
-            Mutation(result) => self.idata_handler.handle_mutation_resp(src, result, message_id),
-            GetIData(result) => self.idata_handler.handle_get_idata_resp(src, result, message_id),
+            Mutation(result) => self
+                .idata_handler
+                .handle_mutation_resp(src, result, message_id),
+            GetIData(result) => self
+                .idata_handler
+                .handle_get_idata_resp(src, result, message_id),
             //
             // ===== Invalid =====
             //
@@ -390,7 +375,8 @@ impl DataHandler {
             // single data handler, implying that we're a data handler chosen to store the chunk.
             self.idata_holder.store_idata(kind, requester, message_id)
         } else {
-            self.idata_handler.handle_put_idata_req(src, requester, kind, message_id)
+            self.idata_handler
+                .handle_put_idata_req(requester, kind, message_id)
         }
     }
 
@@ -409,10 +395,10 @@ impl DataHandler {
                 .delete_unpub_idata(address, client, message_id)
         } else {
             // We're acting as data handler, received request from client handlers
-            self.idata_handler.handle_delete_unpub_idata_req(src,requester, address, message_id)
+            self.idata_handler
+                .handle_delete_unpub_idata_req(requester, address, message_id)
         }
     }
-
 
     fn handle_get_idata_req(
         &mut self,
@@ -427,7 +413,8 @@ impl DataHandler {
             let client = self.client_id(&message_id)?.clone();
             self.idata_holder.get_idata(address, client, message_id)
         } else {
-            self.idata_handler.handle_get_idata_req(src, requester, address, message_id)
+            self.idata_handler
+                .handle_get_idata_req(requester, address, message_id)
         }
     }
 
