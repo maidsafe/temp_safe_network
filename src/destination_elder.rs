@@ -6,24 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod adata_handler;
+mod idata_holder;
 mod idata_op;
+mod mdata_handler;
 
 use crate::{
     action::Action,
-    adata_handler::ADataHandler,
     chunk_store::{
         error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
         MutableChunkStore,
     },
-    idata_holder::IDataHolder,
-    mdata_handler::MDataHandler,
     rpc::Rpc,
     utils,
     vault::Init,
     Config, Result, ToDbKey,
 };
+use adata_handler::ADataHandler;
+use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
 use log::{error, info, trace, warn};
+use mdata_handler::MDataHandler;
 use pickledb::PickleDb;
 use safe_nd::{
     AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
