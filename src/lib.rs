@@ -66,6 +66,7 @@ mod coins_handler;
 mod config_handler;
 mod destination_elder;
 mod adata_handler;
+mod mdata_handler;
 mod error;
 mod rpc;
 mod to_db_key;
