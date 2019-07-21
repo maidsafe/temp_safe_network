@@ -49,7 +49,7 @@ use unwrap::unwrap;
 
 // TODO - remove this
 #[allow(unused)]
-pub(crate) struct DestinationElder {
+pub(crate) struct DataHandler {
     id: NodePublicId,
     idata_handler: IDataHandler,
     idata_holder: IDataHolder,
@@ -57,7 +57,7 @@ pub(crate) struct DestinationElder {
     adata_handler: ADataHandler,
 }
 
-impl DestinationElder {
+impl DataHandler {
     pub fn new(
         id: NodePublicId,
         config: &Config,
@@ -314,7 +314,7 @@ impl DestinationElder {
             | InsAuthKey { .. }
             | DelAuthKey { .. } => {
                 error!(
-                    "{}: Should not receive {:?} as a destination elder.",
+                    "{}: Should not receive {:?} as a data handler.",
                     self, request
                 );
                 None
@@ -370,7 +370,7 @@ impl DestinationElder {
             | ListAuthKeysAndVersion(_)
             | GetLoginPacket(_) => {
                 error!(
-                    "{}: Should not receive {:?} as a destination elder.",
+                    "{}: Should not receive {:?} as a data handler.",
                     self, response
                 );
                 None
@@ -386,8 +386,8 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == kind.name() {
-            // Since the src is the chunk's name, this message was sent by the dst elders to us as a
-            // single dst elder, implying that we're a dst elder chosen to store the chunk.
+            // Since the src is the chunk's name, this message was sent by the data handlers to us as a
+            // single data handler, implying that we're a data handler chosen to store the chunk.
             self.idata_holder.store_idata(kind, requester, message_id)
         } else {
             self.idata_handler.handle_put_idata_req(src, requester, kind, message_id)
@@ -402,13 +402,13 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == address.name() {
-            // Since the src is the chunk's name, this message was sent by the dst elders to us as a
-            // single dst elder, implying that we're a dst elder where the chunk is stored.
+            // Since the src is the chunk's name, this message was sent by the data handlers to us as a
+            // single data handler, implying that we're a data handler where the chunk is stored.
             let client = self.client_id(&message_id)?.clone();
             self.idata_holder
                 .delete_unpub_idata(address, client, message_id)
         } else {
-            // We're acting as dst elder, received request from client handlers
+            // We're acting as data handler, received request from client handlers
             self.idata_handler.handle_delete_unpub_idata_req(src,requester, address, message_id)
         }
     }
@@ -422,7 +422,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == address.name() {
-            // The message was sent by the dst elders to us as the one who is supposed to store the
+            // The message was sent by the data handlers to us as the one who is supposed to store the
             // chunk. See the sent Get request below.
             let client = self.client_id(&message_id)?.clone();
             self.idata_holder.get_idata(address, client, message_id)
@@ -436,7 +436,7 @@ impl DestinationElder {
     }
 }
 
-impl Display for DestinationElder {
+impl Display for DataHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

@@ -80,7 +80,7 @@ impl IDataHolder {
                 .put(&kind)
                 .map_err(|error| error.to_string().into())
         };
-        Some(Action::RespondToOurDstElders {
+        Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             message: Rpc::Response {
                 requester,
@@ -111,7 +111,7 @@ impl IDataHolder {
                 }
                 _ => Ok(kind),
             });
-        Some(Action::RespondToOurDstElders {
+        Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             message: Rpc::Response {
                 requester: client.clone(),
@@ -156,7 +156,7 @@ impl IDataHolder {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToOurDstElders {
+        Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             message: Rpc::Response {
                 requester: client.clone(),

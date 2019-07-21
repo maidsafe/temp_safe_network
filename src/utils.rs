@@ -87,7 +87,7 @@ pub(crate) fn rpc_elder_address(rpc: &Rpc) -> Option<XorName> {
     }
 }
 
-pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
+pub(crate) fn data_handlers_address(request: &Request) -> Option<&XorName> {
     use Request::*;
     match request {
         PutIData(ref data) => Some(data.name()),

@@ -80,7 +80,7 @@ impl IDataHandler {
         kind: IData,
         message_id: MessageId,
     ) -> Option<Action> {
-        // We're acting as dst elder, received request from client handlers
+        // We're acting as data handler, received request from client handlers
         let data_name = *kind.name();
 
         let client_id = requester.clone();
@@ -202,7 +202,7 @@ impl IDataHandler {
             })
         };
 
-        // We're acting as dst elder, received request from client handlers
+        // We're acting as data handler, received request from client handlers
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
             Err(error) => return respond(Err(error)),

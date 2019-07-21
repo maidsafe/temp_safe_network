@@ -644,7 +644,7 @@ impl ClientHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
-        // TODO - Should we replace this with a adata.check_permission call in destination_elder.
+        // TODO - Should we replace this with a adata.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*owner.public_key()).is_err() {
             trace!(
@@ -886,10 +886,10 @@ impl ClientHandler {
         }
     }
 
-    /// Handle response from the destination elders.
+    /// Handle response from the data handlers.
     fn handle_response(
         &mut self,
-        dst_elders: XorName,
+        data_handlers: XorName,
         requester: PublicId,
         response: Response,
         message_id: MessageId,
@@ -901,11 +901,11 @@ impl ClientHandler {
             response,
             message_id,
             requester,
-            dst_elders
+            data_handlers
         );
 
         match response {
-            // Transfer the response from destination elders to clients
+            // Transfer the response from data handlers to clients
             GetIData(..)
             | GetAData(..)
             | GetADataShell(..)
