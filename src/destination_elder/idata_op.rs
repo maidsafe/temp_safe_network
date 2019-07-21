@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub(super) enum RpcState {
+pub(crate) enum RpcState {
     // Request sent to chunk holder.
     Sent,
     // Response received from chunk holder.
@@ -27,14 +27,14 @@ pub(super) enum RpcState {
 }
 
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub(super) enum OpType {
+pub(crate) enum OpType {
     Put,
     Get,
     Delete,
 }
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub(super) struct IDataOp {
+pub(crate) struct IDataOp {
     client: PublicId,
     request: Request,
     pub rpc_states: BTreeMap<XorName, RpcState>,
