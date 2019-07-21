@@ -15,6 +15,7 @@ use crate::{
         error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
         MutableChunkStore,
     },
+    idata_holder::IDataHolder,
     mdata_handler::MDataHandler,
     rpc::Rpc,
     utils,
@@ -58,7 +59,7 @@ pub(crate) struct DestinationElder {
     idata_ops: BTreeMap<MessageId, IDataOp>,
     immutable_metadata: PickleDb,
     full_adults: PickleDb,
-    immutable_chunks: ImmutableChunkStore,
+    idata_holder: IDataHolder,
     mdata_handler: MDataHandler,
     adata_handler: ADataHandler,
 }
@@ -75,12 +76,7 @@ impl DestinationElder {
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
         let max_capacity = config.max_capacity();
-        let immutable_chunks = ImmutableChunkStore::new(
-            &root_dir,
-            max_capacity,
-            Rc::clone(total_used_space),
-            init_mode,
-        )?;
+        let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
         let mdata_handler = MDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
         let adata_handler = ADataHandler::new(id.clone(), config, total_used_space, init_mode)?;
         Ok(Self {
@@ -88,7 +84,7 @@ impl DestinationElder {
             idata_ops: Default::default(),
             immutable_metadata,
             full_adults,
-            immutable_chunks,
+            idata_holder,
             mdata_handler,
             adata_handler,
         })
@@ -405,7 +401,7 @@ impl DestinationElder {
         if &src == kind.name() {
             // Since the src is the chunk's name, this message was sent by the dst elders to us as a
             // single dst elder, implying that we're a dst elder chosen to store the chunk.
-            self.store_idata(kind, requester, message_id)
+            self.idata_holder.store_idata(kind, requester, message_id)
         } else {
             // We're acting as dst elder, received request from client handlers
             let data_name = *kind.name();
@@ -474,7 +470,9 @@ impl DestinationElder {
         if &src == address.name() {
             // Since the src is the chunk's name, this message was sent by the dst elders to us as a
             // single dst elder, implying that we're a dst elder where the chunk is stored.
-            self.delete_unpub_idata(address, message_id)
+            let client = self.client_id(&message_id)?.clone();
+            self.idata_holder
+                .delete_unpub_idata(address, client, message_id)
         } else {
             // We're acting as dst elder, received request from client handlers
             let client_id = requester.clone();
@@ -648,7 +646,8 @@ impl DestinationElder {
         if &src == address.name() {
             // The message was sent by the dst elders to us as the one who is supposed to store the
             // chunk. See the sent Get request below.
-            self.get_idata(address, message_id)
+            let client = self.client_id(&message_id)?.clone();
+            self.idata_holder.get_idata(address, client, message_id)
         } else {
             let client_id = requester.clone();
             let respond = |result: NdResult<IData>| {
@@ -706,34 +705,6 @@ impl DestinationElder {
         action
     }
 
-    fn store_idata(
-        &mut self,
-        kind: IData,
-        requester: PublicId,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = if self.immutable_chunks.has(kind.address()) {
-            info!(
-                "{}: Immutable chunk already exists, not storing: {:?}",
-                self,
-                kind.address()
-            );
-            Ok(())
-        } else {
-            self.immutable_chunks
-                .put(&kind)
-                .map_err(|error| error.to_string().into())
-        };
-        Some(Action::RespondToOurDstElders {
-            sender: *self.id.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
-    }
-
     // Returns an iterator over all of our section's non-full adults' names, sorted by closest to
     // `target`.
     fn non_full_adults_sorted(&self, _target: &XorName) -> impl Iterator<Item = &XorName> {
@@ -763,78 +734,6 @@ impl DestinationElder {
                 Err(NdError::NoSuchData)
             }
         }
-    }
-
-    fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {
-        let client = self.client_id(&message_id)?;
-        let client_pk = utils::own_key(&client)?;
-        let result = self
-            .immutable_chunks
-            .get(&address)
-            .map_err(|error| error.to_string().into())
-            .and_then(|kind| match kind {
-                IData::Unpub(ref data) => {
-                    if data.owner() != client_pk {
-                        Err(NdError::AccessDenied)
-                    } else {
-                        Ok(kind)
-                    }
-                }
-                _ => Ok(kind),
-            });
-        Some(Action::RespondToOurDstElders {
-            sender: *self.id.name(),
-            message: Rpc::Response {
-                requester: client.clone(),
-                response: Response::GetIData(result),
-                message_id,
-            },
-        })
-    }
-
-    fn delete_unpub_idata(
-        &mut self,
-        address: IDataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let client = self.client_id(&message_id)?.clone();
-        let client_pk = utils::own_key(&client)?;
-
-        // First we need to read the chunk to verify the permissions
-        let result = self
-            .immutable_chunks
-            .get(&address)
-            .map_err(|error| error.to_string().into())
-            .and_then(|kind| match kind {
-                IData::Unpub(ref data) => {
-                    if data.owner() != client_pk {
-                        Err(NdError::AccessDenied)
-                    } else {
-                        Ok(())
-                    }
-                }
-                _ => {
-                    error!(
-                        "{}: Invalid DeleteUnpub(IData::Pub) encountered: {:?}",
-                        self, message_id
-                    );
-                    Err(NdError::InvalidOperation)
-                }
-            })
-            .and_then(|_| {
-                self.immutable_chunks
-                    .delete(&address)
-                    .map_err(|error| error.to_string().into())
-            });
-
-        Some(Action::RespondToOurDstElders {
-            sender: *self.id.name(),
-            message: Rpc::Response {
-                requester: client.clone(),
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
     }
 
     fn client_id(&self, message_id: &MessageId) -> Option<&PublicId> {

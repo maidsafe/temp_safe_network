@@ -65,6 +65,7 @@ mod client_handler;
 mod coins_handler;
 mod config_handler;
 mod destination_elder;
+mod idata_holder;
 mod adata_handler;
 mod mdata_handler;
 mod error;
