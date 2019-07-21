@@ -18,7 +18,7 @@
     mutable_transmutes,
     no_mangle_const_items,
     unknown_crate_types,
-    warnings
+    //warnings
 )]
 #![deny(
     bad_style,
@@ -32,7 +32,7 @@
     unconditional_recursion,
     unknown_lints,
     unsafe_code,
-    unused,
+    //unused,
     unused_allocation,
     unused_attributes,
     unused_comparisons,
@@ -52,7 +52,8 @@
     box_pointers,
     missing_copy_implementations,
     missing_debug_implementations,
-    variant_size_differences
+    variant_size_differences,
+    unused_imports,
 )]
 // For quick_error
 #![recursion_limit = "128"]
@@ -64,6 +65,7 @@ mod client_handler;
 mod coins_handler;
 mod config_handler;
 mod destination_elder;
+mod adata_handler;
 mod error;
 mod rpc;
 mod to_db_key;

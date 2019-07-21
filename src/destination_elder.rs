@@ -10,6 +10,7 @@ mod idata_op;
 
 use crate::{
     action::Action,
+    adata_handler::ADataHandler,
     chunk_store::{
         error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
         MutableChunkStore,
@@ -58,7 +59,7 @@ pub(crate) struct DestinationElder {
     full_adults: PickleDb,
     immutable_chunks: ImmutableChunkStore,
     mutable_chunks: MutableChunkStore,
-    append_only_chunks: AppendOnlyChunkStore,
+    adata_handler: ADataHandler,
 }
 
 impl DestinationElder {
@@ -85,12 +86,7 @@ impl DestinationElder {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        let append_only_chunks = AppendOnlyChunkStore::new(
-            &root_dir,
-            max_capacity,
-            Rc::clone(total_used_space),
-            init_mode,
-        )?;
+        let adata_handler = ADataHandler::new(id.clone(), config, total_used_space, init_mode)?;
         Ok(Self {
             id,
             idata_ops: Default::default(),
@@ -98,7 +94,7 @@ impl DestinationElder {
             full_adults,
             immutable_chunks,
             mutable_chunks,
-            append_only_chunks,
+            adata_handler,
         })
     }
 
@@ -203,65 +199,82 @@ impl DestinationElder {
             //
             // ===== Append Only Data =====
             //
-            PutAData(data) => self.handle_put_adata_req(requester, data, message_id),
-            GetAData(address) => self.handle_get_adata_req(requester, address, message_id),
-            GetADataValue { address, key } => {
-                self.handle_get_adata_value_req(requester, address, key, message_id)
-            }
+            PutAData(data) => self
+                .adata_handler
+                .handle_put_adata_req(requester, data, message_id),
+            GetAData(address) => self
+                .adata_handler
+                .handle_get_adata_req(requester, address, message_id),
+            GetADataValue { address, key } => self
+                .adata_handler
+                .handle_get_adata_value_req(requester, address, key, message_id),
             GetADataShell {
                 address,
                 data_index,
-            } => self.handle_get_adata_shell_req(requester, address, data_index, message_id),
-            GetADataRange { address, range } => {
-                self.handle_get_adata_range_req(requester, address, range, message_id)
-            }
-            GetADataIndices(address) => {
-                self.handle_get_adata_indices_req(requester, address, message_id)
-            }
-            GetADataLastEntry(address) => {
-                self.handle_get_adata_last_entry_req(requester, address, message_id)
-            }
+            } => self
+                .adata_handler
+                .handle_get_adata_shell_req(requester, address, data_index, message_id),
+            GetADataRange { address, range } => self
+                .adata_handler
+                .handle_get_adata_range_req(requester, address, range, message_id),
+            GetADataIndices(address) => self
+                .adata_handler
+                .handle_get_adata_indices_req(requester, address, message_id),
+            GetADataLastEntry(address) => self
+                .adata_handler
+                .handle_get_adata_last_entry_req(requester, address, message_id),
             GetADataOwners {
                 address,
                 owners_index,
-            } => self.handle_get_adata_owners_req(requester, address, owners_index, message_id),
+            } => self.adata_handler.handle_get_adata_owners_req(
+                requester,
+                address,
+                owners_index,
+                message_id,
+            ),
             GetPubADataUserPermissions {
                 address,
                 permissions_index,
                 user,
-            } => self.handle_get_pub_adata_user_permissions_req(
-                requester,
-                address,
-                permissions_index,
-                user,
-                message_id,
-            ),
+            } => self
+                .adata_handler
+                .handle_get_pub_adata_user_permissions_req(
+                    requester,
+                    address,
+                    permissions_index,
+                    user,
+                    message_id,
+                ),
             GetUnpubADataUserPermissions {
                 address,
                 permissions_index,
                 public_key,
-            } => self.handle_get_unpub_adata_user_permissions_req(
-                requester,
-                address,
-                permissions_index,
-                public_key,
-                message_id,
-            ),
+            } => self
+                .adata_handler
+                .handle_get_unpub_adata_user_permissions_req(
+                    requester,
+                    address,
+                    permissions_index,
+                    public_key,
+                    message_id,
+                ),
             GetADataPermissions {
                 address,
                 permissions_index,
-            } => self.handle_get_adata_permissions_req(
+            } => self.adata_handler.handle_get_adata_permissions_req(
                 requester,
                 address,
                 permissions_index,
                 message_id,
             ),
-            DeleteAData(address) => self.handle_delete_adata_req(requester, address, message_id),
+            DeleteAData(address) => self
+                .adata_handler
+                .handle_delete_adata_req(requester, address, message_id),
             AddPubADataPermissions {
                 address,
                 permissions,
                 permissions_idx,
-            } => self.handle_add_pub_adata_permissions_req(
+            } => self.adata_handler.handle_add_pub_adata_permissions_req(
                 requester,
                 address,
                 permissions,
@@ -272,7 +285,7 @@ impl DestinationElder {
                 address,
                 permissions,
                 permissions_idx,
-            } => self.handle_add_unpub_adata_permissions_req(
+            } => self.adata_handler.handle_add_unpub_adata_permissions_req(
                 requester,
                 address,
                 permissions,
@@ -283,13 +296,15 @@ impl DestinationElder {
                 address,
                 owner,
                 owners_idx,
-            } => self.handle_set_adata_owner_req(requester, address, owner, owners_idx, message_id),
-            AppendSeq { append, index } => {
-                self.handle_append_seq_req(requester, append, index, message_id)
-            }
-            AppendUnseq(operation) => {
-                self.handle_append_unseq_req(requester, operation, message_id)
-            }
+            } => self
+                .adata_handler
+                .handle_set_adata_owner_req(requester, address, owner, owners_idx, message_id),
+            AppendSeq { append, index } => self
+                .adata_handler
+                .handle_append_seq_req(requester, append, index, message_id),
+            AppendUnseq(operation) => self
+                .adata_handler
+                .handle_append_unseq_req(requester, operation, message_id),
             //
             // ===== Coins =====
             //
@@ -1313,480 +1328,6 @@ impl DestinationElder {
             return self.idata_ops.remove(message_id);
         }
         None
-    }
-
-    fn handle_put_adata_req(
-        &mut self,
-        requester: PublicId,
-        data: AData,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = if self.append_only_chunks.has(data.address()) {
-            Err(NdError::DataExists)
-        } else {
-            self.append_only_chunks
-                .put(&data)
-                .map_err(|error| error.to_string().into())
-        };
-        Some(Action::RespondToClientHandlers {
-            sender: *data.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_delete_adata_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let requester_pk = *utils::own_key(&requester)?;
-        let result = self
-            .append_only_chunks
-            .get(&address)
-            .map_err(|error| match error {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
-                error => error.to_string().into(),
-            })
-            .and_then(|adata| {
-                // TODO - AData::check_permission() doesn't support Delete yet in safe-nd
-                if utils::adata::is_published(adata.address()) {
-                    Err(NdError::InvalidOperation)
-                } else {
-                    adata.check_is_last_owner(requester_pk)
-                }
-            })
-            .and_then(|_| {
-                self.append_only_chunks
-                    .delete(&address)
-                    .map_err(|error| error.to_string().into())
-            });
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self.get_adata(&requester, address, ADataAction::Read);
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetAData(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_shell_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        data_index: ADataIndex,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.shell(data_index));
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetADataShell(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_range_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        range: (ADataIndex, ADataIndex),
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetADataRange(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_indices_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.indices());
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetADataIndices(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_last_entry_req(
-        &self,
-        requester: PublicId,
-        address: ADataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.last_entry().cloned().ok_or(NdError::NoSuchEntry));
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetADataLastEntry(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_owners_req(
-        &self,
-        requester: PublicId,
-        address: ADataAddress,
-        owners_index: ADataIndex,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| {
-                adata
-                    .owner(owners_index)
-                    .cloned()
-                    .ok_or(NdError::InvalidOwners)
-            });
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetADataOwners(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_pub_adata_user_permissions_req(
-        &self,
-        requester: PublicId,
-        address: ADataAddress,
-        permissions_index: ADataIndex,
-        user: ADataUser,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.pub_user_permissions(user, permissions_index));
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetPubADataUserPermissions(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_unpub_adata_user_permissions_req(
-        &self,
-        requester: PublicId,
-        address: ADataAddress,
-        permissions_index: ADataIndex,
-        public_key: PublicKey,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.unpub_user_permissions(public_key, permissions_index));
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetUnpubADataUserPermissions(result),
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_permissions_req(
-        &self,
-        requester: PublicId,
-        address: ADataAddress,
-        permissions_index: ADataIndex,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let response = if utils::adata::is_published(&address) {
-            let result = self
-                .get_adata(&requester, address, ADataAction::Read)
-                .and_then(|adata| adata.pub_permissions(permissions_index).map(Clone::clone));
-            Response::GetPubADataPermissionAtIndex(result)
-        } else {
-            let result = self
-                .get_adata(&requester, address, ADataAction::Read)
-                .and_then(|adata| adata.unpub_permissions(permissions_index).map(Clone::clone));
-            Response::GetUnpubADataPermissionAtIndex(result)
-        };
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response,
-                message_id,
-            },
-        })
-    }
-
-    fn handle_get_adata_value_req(
-        &self,
-        requester: PublicId,
-        address: ADataAddress,
-        key: Vec<u8>,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.get(&key).cloned().ok_or(NdError::NoSuchEntry));
-
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester,
-                response: Response::GetADataValue(result),
-                message_id,
-            },
-        })
-    }
-
-    fn get_adata(
-        &self,
-        requester: &PublicId,
-        address: ADataAddress,
-        action: ADataAction,
-    ) -> Result<AData, NdError> {
-        let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
-        let data = self
-            .append_only_chunks
-            .get(&address)
-            .map_err(|error| match error {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
-                _ => error.to_string().into(),
-            })?;
-
-        data.check_permission(action, *requester_key)?;
-        Ok(data)
-    }
-
-    fn handle_add_pub_adata_permissions_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        permissions: ADataPubPermissions,
-        permissions_idx: u64,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        self.mutate_adata_chunk(
-            &requester,
-            address,
-            ADataAction::ManagePermissions,
-            message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubSeq(ref mut pub_seq_data) => {
-                        pub_seq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    AData::PubUnseq(ref mut pub_unseq_data) => {
-                        pub_unseq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    _ => {
-                        return {
-                            error!("{}: Unexpected chunk encountered", own_id);
-                            Err(NdError::InvalidOperation)
-                        }
-                    }
-                }
-                Ok(adata)
-            },
-        )
-    }
-
-    fn handle_add_unpub_adata_permissions_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        permissions: ADataUnpubPermissions,
-        permissions_idx: u64,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        self.mutate_adata_chunk(
-            &requester,
-            address,
-            ADataAction::ManagePermissions,
-            message_id,
-            move |mut adata| {
-                match adata {
-                    AData::UnpubSeq(ref mut unpub_seq_data) => {
-                        unpub_seq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    AData::UnpubUnseq(ref mut unpub_unseq_data) => {
-                        unpub_unseq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    _ => {
-                        error!("{}: Unexpected chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
-                Ok(adata)
-            },
-        )
-    }
-
-    fn handle_set_adata_owner_req(
-        &mut self,
-        requester: PublicId,
-        address: ADataAddress,
-        owner: ADataOwner,
-        owners_idx: u64,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        self.mutate_adata_chunk(
-            &requester,
-            address,
-            ADataAction::ManagePermissions,
-            message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubSeq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                    AData::PubUnseq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                    AData::UnpubSeq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                    AData::UnpubUnseq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                }
-                Ok(adata)
-            },
-        )
-    }
-
-    fn handle_append_seq_req(
-        &mut self,
-        requester: PublicId,
-        append: ADataAppend,
-        index: u64,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let address = append.address;
-        self.mutate_adata_chunk(
-            &requester,
-            address,
-            ADataAction::Append,
-            message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubSeq(ref mut adata) => adata.append(append.values, index)?,
-                    AData::UnpubSeq(ref mut adata) => adata.append(append.values, index)?,
-                    AData::PubUnseq(_) | AData::UnpubUnseq(_) => {
-                        error!("{}: Unexpected unseqential chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
-                Ok(adata)
-            },
-        )
-    }
-
-    fn handle_append_unseq_req(
-        &mut self,
-        requester: PublicId,
-        operation: ADataAppend,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let address = operation.address;
-        self.mutate_adata_chunk(
-            &requester,
-            address,
-            ADataAction::Append,
-            message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubUnseq(ref mut adata) => adata.append(operation.values)?,
-                    AData::UnpubUnseq(ref mut adata) => adata.append(operation.values)?,
-                    AData::PubSeq(_) | AData::UnpubSeq(_) => {
-                        error!("{}: Unexpected sequential chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
-                Ok(adata)
-            },
-        )
-    }
-
-    fn mutate_adata_chunk<F>(
-        &mut self,
-        requester: &PublicId,
-        address: ADataAddress,
-        action: ADataAction,
-        message_id: MessageId,
-        mutation_fn: F,
-    ) -> Option<Action>
-    where
-        F: FnOnce(AData) -> NdResult<AData>,
-    {
-        let result = self
-            .get_adata(requester, address, action)
-            .and_then(mutation_fn)
-            .and_then(move |adata| {
-                self.append_only_chunks
-                    .put(&adata)
-                    .map_err(|error| error.to_string().into())
-            });
-        Some(Action::RespondToClientHandlers {
-            sender: *address.name(),
-            message: Rpc::Response {
-                requester: requester.clone(),
-                response: Response::Mutation(result),
-                message_id,
-            },
-        })
     }
 }
 
