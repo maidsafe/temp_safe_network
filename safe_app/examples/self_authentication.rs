@@ -99,21 +99,19 @@ fn main() {
         let _ = std::io::stdin().read_line(&mut secret_1);
         secret_1 = secret_1.trim().to_string();
 
-        let invitation: String = if let Some(i) = matches.value_of("invite") {
+        let _invitation: String = if let Some(i) = matches.value_of("invite") {
             i.to_string()
         } else {
             unwrap!(utils::generate_random_string(10))
         };
 
+        // FIXME
+        let bls_sk = threshold_crypto::SecretKey::random();
+
         // Account Creation
         println!("\nTrying to create an account...");
 
-        match Authenticator::create_acc(
-            secret_0.as_str(),
-            secret_1.as_str(),
-            invitation.as_str(),
-            || (),
-        ) {
+        match Authenticator::create_acc(secret_0.as_str(), secret_1.as_str(), bls_sk, || ()) {
             Ok(_) => (),
             Err(AuthError::CoreError(CoreError::RoutingClientError(
                 ClientError::AccountExists,
