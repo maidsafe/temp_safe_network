@@ -13,14 +13,14 @@ use std::collections::BTreeSet;
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
-    // Send a validated client request from src elders to dst elders.
+    // Send a validated client request from client handlers to dst elders.
     ForwardClientRequest(Rpc),
     // Send a response as an adult or elder to own section's elders.
     RespondToOurDstElders {
         sender: XorName,
         message: Rpc,
     },
-    RespondToSrcElders {
+    RespondToClientHandlers {
         sender: XorName,
         message: Rpc,
     },

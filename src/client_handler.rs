@@ -52,7 +52,7 @@ struct ClientInfo {
     has_balance: bool,
 }
 
-pub(crate) struct SourceElder {
+pub(crate) struct ClientHandler {
     id: NodePublicId,
     accounts: AccountsDb,
     balances: BalancesDb,
@@ -63,7 +63,7 @@ pub(crate) struct SourceElder {
     login_packets: LoginPacketChunkStore,
 }
 
-impl SourceElder {
+impl ClientHandler {
     pub fn new(
         id: NodePublicId,
         config: &Config,
@@ -79,7 +79,7 @@ impl SourceElder {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
-        let src_elder = Self {
+        let client_handler = Self {
             id,
             accounts,
             balances,
@@ -89,7 +89,7 @@ impl SourceElder {
             login_packets,
         };
 
-        Ok((src_elder, event_receiver))
+        Ok((client_handler, event_receiver))
     }
 
     fn setup_quic_p2p(config: &QuicP2pConfig) -> Result<(QuicP2p, Receiver<Event>)> {
@@ -425,7 +425,7 @@ impl SourceElder {
                 self.handle_get_login_packet_req(&client.public_id, address, message_id)
             }
             //
-            // ===== Client (Owner) to SrcElders =====
+            // ===== Client (Owner) to ClientHandlers =====
             //
             ListAuthKeysAndVersion => {
                 has_signature()?;
@@ -878,7 +878,7 @@ impl SourceElder {
             | UpdateLoginPacket { .. }
             | GetLoginPacket(..) => {
                 error!(
-                    "{}: Should not receive {:?} as a source elder.",
+                    "{}: Should not receive {:?} as a client handler.",
                     self, request
                 );
                 None
@@ -940,7 +940,7 @@ impl SourceElder {
             //
             GetLoginPacket(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
                 error!(
-                    "{}: Should not receive {:?} as a source elder.",
+                    "{}: Should not receive {:?} as a client handler.",
                     self, response
                 );
                 None
@@ -1194,7 +1194,7 @@ impl SourceElder {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
-        Some(Action::RespondToSrcElders {
+        Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             message: Rpc::Response {
                 response: Response::Mutation(result),
@@ -1316,7 +1316,7 @@ impl SourceElder {
     }
 }
 
-impl Display for SourceElder {
+impl Display for ClientHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Node({})", self.id.name())
     }
