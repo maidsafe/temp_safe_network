@@ -60,10 +60,11 @@ use safe_nd::{
     AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
     AppendOnlyData, Coins, EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData,
-    MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions, MDataUnseqEntryActions,
-    MDataValue, PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request,
-    Result as NdResult, SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    MDataAction, MDataAddress, MDataKind, MDataPermissionSet, MDataSeqEntryActions,
+    MDataUnseqEntryActions, MDataValue, PubImmutableData, PubSeqAppendOnlyData,
+    PubUnseqAppendOnlyData, PublicKey, Request, Result as NdResult, SeqAppendOnly, SeqMutableData,
+    Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
+    UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -2399,5 +2400,52 @@ fn mutable_data_permissions() {
         &mut client_b,
         Request::MutateUnseqMDataEntries { address, actions },
         NdError::AccessDenied,
+    );
+}
+
+#[test]
+fn delete_mutable_data() {
+    let mut env = Environment::new();
+
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    common::create_balance_from_nano(&mut env, &mut client_a, 0, None);
+    common::create_balance_from_nano(&mut env, &mut client_b, 0, None);
+
+    let mdata = UnseqMutableData::new(env.rng().gen(), 100, *client_a.public_id().public_key());
+    let address = *mdata.address();
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutMData(MData::Unseq(mdata.clone())),
+    );
+
+    // Attempt to delete non-existent data.
+    let invalid_address = MDataAddress::from_kind(MDataKind::Unseq, env.rng().gen(), 101);
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::DeleteMData(invalid_address),
+        NdError::NoSuchData,
+    );
+
+    // Attempt to delete the data by non-owner.
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::DeleteMData(address),
+        NdError::AccessDenied,
+    );
+
+    // Successfuly delete.
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::DeleteMData(address), ());
+
+    // Verify the data doesn't exist anymore.
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::GetMData(address),
+        NdError::NoSuchData,
     );
 }
