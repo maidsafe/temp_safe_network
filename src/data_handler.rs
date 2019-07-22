@@ -272,17 +272,6 @@ impl DataHandler {
                 .adata_handler
                 .handle_append_unseq_req(requester, operation, message_id),
             //
-            // ===== Coins =====
-            //
-            TransferCoins {
-                destination,
-                amount,
-                transaction_id,
-            } => unimplemented!(),
-            //
-            // ===== Login packets =====
-            //
-            //
             // ===== Invalid =====
             //
             GetBalance
@@ -293,6 +282,7 @@ impl DataHandler {
             | GetLoginPacket(_)
             | ListAuthKeysAndVersion
             | InsAuthKey { .. }
+            | TransferCoins { .. }
             | DelAuthKey { .. } => {
                 error!(
                     "{}: Should not receive {:?} as a data handler.",
