@@ -61,7 +61,7 @@ pub fn nrs_commander(
             let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, &target, set_as_default, dry_run)?;
+                safe.nrs_map_container_create(&name, Some(&target), set_as_default, dry_run)?;
 
             // Now let's just print out the content of the NrsMap
             if OutputFmt::Pretty == output_fmt {

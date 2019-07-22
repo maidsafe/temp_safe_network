@@ -305,7 +305,7 @@ fn test_fetch_resolvable_container() {
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
 
     let (nrs_map_xorurl, _, nrs_map) =
-        unwrap!(safe.nrs_map_container_create("somesite", &xorurl, true, false));
+        unwrap!(safe.nrs_map_container_create("somesite", Some(&xorurl), true, false));
 
     let content = unwrap!(safe.fetch("safe://somesite"));
 

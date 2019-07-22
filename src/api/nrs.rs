@@ -93,13 +93,13 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, "safe://somewhere", true, false).unwrap();
+    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, Some("safe://somewhere"), true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn nrs_map_container_create(
         &mut self,
         name: &str,
-        destination: &str,
+        destination: Option<&str>,
         default: bool,
         _dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
@@ -109,17 +109,18 @@ impl Safe {
 
         debug!("XorName for \"{:?}\" is \"{:?}\"", &name, &nrs_xorname);
 
+		let final_destination = destination.unwrap_or_else(|| "");
         // TODO: Enable source for funds / ownership
 
         // The NrsMapContainer is created as a AppendOnlyData with a single entry containing the
         // timestamp as the entry's key, and the serialised NrsMap as the entry's value
         // TODO: use RDF format
-        let nrs_map = nrs_map_create(&name, &destination, default)?;
+        let nrs_map = nrs_map_create(&name, &final_destination, default)?;
 
         let mut processed_entries = BTreeMap::new();
         processed_entries.insert(
             name.to_string(),
-            (CONTENT_ADDED_SIGN.to_string(), destination.to_string()),
+            (CONTENT_ADDED_SIGN.to_string(), final_destination.to_string()),
         );
 
         let serialised_nrs_map = serde_json::to_string(&nrs_map).map_err(|err| {
@@ -165,7 +166,7 @@ impl Safe {
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # const FAKE_RDF_PREDICATE_LINK: &str = "link";
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, "somewhere", true, false).unwrap();
+    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, Some("somewhere"), true, false).unwrap();
     /// let (version, nrs_map_container, native_type) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
     /// assert_eq!(version, 1);
     /// assert_eq!(nrs_map_container.entries[&rand_string][FAKE_RDF_PREDICATE_LINK], "somewhere");
@@ -257,7 +258,7 @@ fn test_nrs_map_container_create() {
     let nrs_xorname = xorname_from_nrs_string("some_site").unwrap();
     let SITE_NAME = "some_site";
     let (xor_url, _entries, nrs_map) =
-        unwrap!(safe.nrs_map_container_create(SITE_NAME, "safe://top_xorurl", true, false));
+        unwrap!(safe.nrs_map_container_create(SITE_NAME, Some("safe://top_xorurl"), true, false));
     assert_eq!(nrs_map.entries.len(), 1);
     let public_name = &nrs_map.entries[SITE_NAME];
     assert_eq!(public_name[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
