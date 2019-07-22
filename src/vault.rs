@@ -11,7 +11,7 @@ use crate::{
     adult::Adult,
     client_handler::ClientHandler,
     coins_handler::CoinsHandler,
-    destination_elder::DestinationElder,
+    data_handler::DataHandler,
     quic_p2p::{Event, NodeInfo},
     rpc::Rpc,
     utils, Config, Error, Result,
@@ -33,8 +33,8 @@ const STATE_FILENAME: &str = "state";
 #[allow(clippy::large_enum_variant)]
 enum State {
     Elder {
-        src: ClientHandler,
-        dst: DestinationElder,
+        client_handler: ClientHandler,
+        data_handler: DataHandler,
         coins_handler: CoinsHandler,
     },
     // TODO - remove this
@@ -72,13 +72,13 @@ impl Vault {
 
         let (state, event_receiver) = if is_elder {
             let total_used_space = Rc::new(RefCell::new(0));
-            let (src, event_receiver) = ClientHandler::new(
+            let (client_handler, event_receiver) = ClientHandler::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
                 init_mode,
             )?;
-            let dst = DestinationElder::new(
+            let data_handler = DataHandler::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
@@ -88,8 +88,8 @@ impl Vault {
                 CoinsHandler::new(id.public_id().clone(), config.root_dir(), init_mode)?;
             (
                 State::Elder {
-                    src,
-                    dst,
+                    client_handler,
+                    data_handler,
                     coins_handler,
                 },
                 event_receiver,
@@ -117,7 +117,10 @@ impl Vault {
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<NodeInfo> {
         match self.state {
-            State::Elder { ref mut src, .. } => src.our_connection_info(),
+            State::Elder {
+                ref mut client_handler,
+                ..
+            } => client_handler.our_connection_info(),
             State::Adult { .. } => unimplemented!(),
         }
     }
@@ -171,11 +174,11 @@ impl Vault {
         match action {
             ForwardClientRequest(message) => {
                 let requester_name = utils::rpc_elder_address(&message)?;
-                let dst_elders_address = if let Rpc::Request { ref request, .. } = message {
-                    match utils::dst_elders_address(&request) {
+                let data_handlers_address = if let Rpc::Request { ref request, .. } = message {
+                    match utils::data_handlers_address(&request) {
                         Some(address) => address,
                         None => {
-                            error!("{}: Logic error - no dst address available.", self);
+                            error!("{}: Logic error - no data handler address available.", self);
                             return None;
                         }
                     }
@@ -185,10 +188,10 @@ impl Vault {
                 };
 
                 // TODO - once Routing is integrated, we'll construct the full message to send
-                //        onwards, and then if we're also part of the dst elders, we'll call that
+                //        onwards, and then if we're also part of the data handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                if self.self_is_elder_for(&dst_elders_address) {
+                if self.self_is_handler_for(&data_handlers_address) {
                     // TODO - We need a better way for determining which handler should be given the
                     //        message.
                     return if let Rpc::Request {
@@ -199,18 +202,18 @@ impl Vault {
                         self.client_handler_mut()?
                             .handle_vault_message(requester_name, message)
                     } else {
-                        self.destination_elder_mut()?
+                        self.data_handler_mut()?
                             .handle_vault_message(requester_name, message)
                     };
                 }
                 None
             }
-            RespondToOurDstElders { sender, message } => {
+            RespondToOurDataHandlers { sender, message } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
-                //        onwards, and then if we're also part of the dst elders, we'll call that
+                //        onwards, and then if we're also part of the data handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                self.destination_elder_mut()?
+                self.data_handler_mut()?
                     .handle_vault_message(sender, message)
             }
             RespondToClientHandlers { sender, message } => {
@@ -220,7 +223,7 @@ impl Vault {
                 //        onwards, and then if we're also part of the client handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                if self.self_is_elder_for(&client_name) {
+                if self.self_is_handler_for(&client_name) {
                     return self
                         .client_handler_mut()?
                         .handle_vault_message(sender, message);
@@ -236,7 +239,7 @@ impl Vault {
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         next_action = self
-                            .destination_elder_mut()?
+                            .data_handler_mut()?
                             .handle_vault_message(sender, message.clone());
                         // } else {
                         //     Send to target
@@ -251,34 +254,44 @@ impl Vault {
         }
     }
 
-    fn self_is_elder_for(&self, _address: &XorName) -> bool {
+    fn self_is_handler_for(&self, _address: &XorName) -> bool {
         true
     }
 
     fn client_handler(&self) -> Option<&ClientHandler> {
         match &self.state {
-            State::Elder { ref src, .. } => Some(src),
+            State::Elder {
+                ref client_handler, ..
+            } => Some(client_handler),
             State::Adult(_) => None,
         }
     }
 
     fn client_handler_mut(&mut self) -> Option<&mut ClientHandler> {
         match &mut self.state {
-            State::Elder { ref mut src, .. } => Some(src),
+            State::Elder {
+                ref mut client_handler,
+                ..
+            } => Some(client_handler),
             State::Adult(_) => None,
         }
     }
 
-    fn destination_elder(&self) -> Option<&DestinationElder> {
+    fn data_handler(&self) -> Option<&DataHandler> {
         match &self.state {
-            State::Elder { ref dst, .. } => Some(dst),
+            State::Elder {
+                ref data_handler, ..
+            } => Some(data_handler),
             State::Adult(_) => None,
         }
     }
 
-    fn destination_elder_mut(&mut self) -> Option<&mut DestinationElder> {
+    fn data_handler_mut(&mut self) -> Option<&mut DataHandler> {
         match &mut self.state {
-            State::Elder { ref mut dst, .. } => Some(dst),
+            State::Elder {
+                ref mut data_handler,
+                ..
+            } => Some(data_handler),
             State::Adult(_) => None,
         }
     }

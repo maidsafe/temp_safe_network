@@ -63,7 +63,7 @@ mod chunk_store;
 mod client_handler;
 mod coins_handler;
 mod config_handler;
-mod destination_elder;
+mod data_handler;
 mod error;
 mod rpc;
 mod to_db_key;

@@ -21,7 +21,7 @@ pub(crate) enum Rpc {
         requester: PublicId,
         message_id: MessageId,
     },
-    /// Wrapper for a response from Adults to DstElders, or from DstElders to ClientHandlers.
+    /// Wrapper for a response from Adults to DataHandlers, or from DataHandlers to ClientHandlers.
     Response {
         response: Response,
         requester: PublicId,
