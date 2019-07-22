@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::nrs::{NRS_MAP_TYPE_TAG, xorname_from_nrs_string};
-use super::xorurl::SafeContentType;
 use super::helpers::get_host_and_path;
+use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG};
+use super::xorurl::SafeContentType;
 
 use super::{Error, ResultReturn, Safe, XorName, XorUrl, XorUrlEncoder};
 use log::{debug, info};
@@ -87,11 +87,10 @@ impl Safe {
 
         let the_xorurl: &XorUrl;
 
-		let the_xor = match xorurl_encoder {
+        let the_xor = match xorurl_encoder {
             Ok(encoder) => Ok(encoder),
             Err(err) => {
-
-				let ( host_str, path ) = get_host_and_path(&xorurl)?;
+                let (host_str, path) = get_host_and_path(&xorurl)?;
 
                 info!(
                     "Falling back to NRS. XorUrl decoding failed with: {:?}",
@@ -104,7 +103,7 @@ impl Safe {
                     hashed_host,
                     NRS_MAP_TYPE_TAG,
                     SafeContentType::NrsMapContainer,
-					Some(&path)
+                    Some(&path),
                 );
 
                 let new_url = encoded_xor.to_string("base32z")?;
@@ -113,7 +112,7 @@ impl Safe {
                 debug!("Checking NRS system for url: {:?}", &new_url);
                 Ok(encoded_xor)
             }
-		}?;
+        }?;
 
         let xorurl_string = the_xor.to_string("base32z")?;
         the_xorurl = &xorurl_string;
@@ -303,7 +302,7 @@ fn test_fetch_resolvable_container() {
     let (xorurl, _, the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-	let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
 
     let (nrs_map_xorurl, _, nrs_map) =
         unwrap!(safe.nrs_map_container_create("somesite", &xorurl, true, false));
@@ -313,18 +312,18 @@ fn test_fetch_resolvable_container() {
     // this should resolve to a FilesContainer until we enable prevent resolution.
     match content {
         SafeData::FilesContainer {
-			xorname,
+            xorname,
             type_tag,
             version,
             files_map,
             native_type,
-			..
+            ..
         } => {
             assert_eq!(xorname, xorurl_encoder.xorname());
             assert_eq!(type_tag, 10_100);
             assert_eq!(version, 1);
             assert_eq!(native_type, "AppendOnlyData".to_string());
-			assert_eq!(files_map, the_files_map);
+            assert_eq!(files_map, the_files_map);
         }
         _ => panic!("Nrs map container was not returned."),
     }
@@ -361,7 +360,7 @@ fn test_fetch_unknown() {
         xorname,
         type_tag,
         SafeContentType::Unknown,
-		None,
+        None,
         "base32z"
     ));
     let content = unwrap!(safe.fetch(&xorurl));
@@ -380,7 +379,7 @@ fn test_fetch_unsupported() {
         xorname,
         type_tag,
         SafeContentType::UnpublishedImmutableData,
-		None,
+        None,
         "base32z"
     ));
     match safe.fetch(&xorurl) {

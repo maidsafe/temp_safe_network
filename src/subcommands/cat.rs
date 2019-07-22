@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_target_location, xorname_to_hex};
+use super::helpers::{get_from_arg_or_stdin, xorname_to_hex};
 use super::OutputFmt;
 use crate::subcommands::auth::auth_connect;
 use log::debug;
@@ -32,7 +32,7 @@ pub fn cat_commander(
     safe: &mut Safe,
 ) -> Result<(), String> {
     // TODO: Get specific versions.
-    let xorurl = get_target_location(cmd.location)?;
+    let xorurl = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &xorurl);
 
     // TODO: pending: https://github.com/maidsafe/safe_client_libs/issues/899

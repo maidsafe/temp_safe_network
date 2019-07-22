@@ -16,19 +16,19 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
 }
 
 // Read the target location from the STDIN if is not an arg provided
-pub fn get_target_location(target_arg: Option<String>) -> Result<String, String> {
+pub fn get_from_arg_or_stdin(
+    target_arg: Option<String>,
+    message: Option<&str>,
+) -> Result<String, String> {
+    let the_message = message.unwrap_or_else(|| "...awaiting data from STDIN stream...");
     match target_arg {
         Some(t) => Ok(t),
         None => {
-            // try reading target from stdin then
-            println!("...awaiting target XOR-URL from STDIN stream...");
+            println!("{}", &the_message);
             let mut input = String::new();
             match io::stdin().read_line(&mut input) {
                 Ok(n) => {
-                    debug!(
-                        "Read ({} bytes) from STDIN for target location: {}",
-                        n, input
-                    );
+                    debug!("Read ({} bytes) from STDIN: {}", n, input);
                     input.truncate(input.len() - 1);
                     Ok(input)
                 }

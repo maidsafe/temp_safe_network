@@ -37,7 +37,7 @@ fn calling_safe_nrs_create_pretty() {
     let test_name = get_random_nrs_string();
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["nrs", "create", &test_name, "-d", "fake_target"])
+    cmd.args(&vec!["nrs", "create", &test_name, "-l", "fake_target"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_NRS_CREATION_RESPONSE))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
@@ -56,7 +56,7 @@ fn calling_safe_nrs_twice_w_name_fails() {
         "nrs",
         "create",
         &test_name,
-        "-d",
+        "-l",
         "nowhere_good",
         "--json"
     )
@@ -64,7 +64,7 @@ fn calling_safe_nrs_twice_w_name_fails() {
     .unwrap();
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["nrs", "create", &test_name, "-d", "fake_target"])
+    cmd.args(&vec!["nrs", "create", &test_name, "-l", "fake_target"])
         .assert()
         .stderr(predicate::str::contains("Data exists"))
         .failure();
@@ -104,7 +104,7 @@ fn calling_safe_nrs_put_folder_and_fetch() {
         "nrs",
         "create",
         &test_name,
-        "-d",
+        "-l",
         &container_xorurl,
         "--json"
     )

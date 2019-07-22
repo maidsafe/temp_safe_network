@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_target_location;
+use super::helpers::get_from_arg_or_stdin;
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::Safe;
@@ -99,7 +99,7 @@ pub fn files_commander(
             recursive,
             delete,
         }) => {
-            let target = get_target_location(target)?;
+            let target = get_from_arg_or_stdin(target, None)?;
 
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) =

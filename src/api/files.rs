@@ -11,10 +11,9 @@ use super::constants::{
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
     FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
 };
-use super::helpers::{gen_timestamp_secs, gen_timestamp_nanos};
+use super::helpers::{gen_timestamp_nanos, gen_timestamp_secs};
 use super::xorurl::SafeContentType;
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
-use chrono::{SecondsFormat, Utc};
 use log::{debug, info, warn};
 use relative_path::RelativePath;
 use std::collections::BTreeMap;
@@ -98,7 +97,7 @@ impl Safe {
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
                 SafeContentType::FilesContainer,
-				None,
+                None,
                 &self.xorurl_base,
             )?;
 
@@ -261,7 +260,7 @@ impl Safe {
             xorname,
             0,
             SafeContentType::ImmutableData,
-			None,
+            None,
             &self.xorurl_base,
         )
     }

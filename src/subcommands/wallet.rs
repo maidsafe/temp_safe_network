@@ -8,7 +8,7 @@
 
 use structopt::StructOpt;
 
-use super::helpers::{get_secret_key, get_target_location};
+use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::keys::create_new_key;
 use super::OutputFmt;
 use log::debug;
@@ -145,7 +145,7 @@ pub fn wallet_commander(
             Ok(())
         }
         Some(WalletSubCommands::Balance { target }) => {
-            let target = get_target_location(target)?;
+            let target = get_from_arg_or_stdin(target, None)?;
 
             debug!("Got target location {:?}", target);
             let balance = safe.wallet_balance(&target)?;
@@ -169,7 +169,7 @@ pub fn wallet_commander(
             secret,
             ..
         }) => {
-            let target = get_target_location(target)?;
+            let target = get_from_arg_or_stdin(target, None)?;
 
             let (xorurl, key_pair) = {
                 let url = keyurl.unwrap_or_else(|| "".to_string());

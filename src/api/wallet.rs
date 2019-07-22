@@ -40,7 +40,7 @@ impl Safe {
             xorname,
             WALLET_TYPE_TAG,
             SafeContentType::Wallet,
-			None,
+            None,
             &self.xorurl_base,
         )
     }

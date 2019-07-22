@@ -1,4 +1,3 @@
-
 pub const CONTENT_ADDED_SIGN: &str = "+";
 pub const CONTENT_UPDATED_SIGN: &str = "*";
 pub const CONTENT_DELETED_SIGN: &str = "-";

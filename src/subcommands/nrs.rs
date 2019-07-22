@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_target_location;
+use super::helpers::get_from_arg_or_stdin;
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::Safe;
@@ -20,8 +20,8 @@ pub enum NrsSubCommands {
         /// The name to give this key
         name: String,
         /// The safe:// url to map this to. Usually a FilesContainer for a website, eg.
-        #[structopt(long = "destination")]
-        destination: Option<String>,
+        #[structopt(short = "-l", long = "link")]
+        link: Option<String>,
         /// Set the sub name as default for this public name.
         #[structopt(long = "default")]
         default: bool,
@@ -32,8 +32,8 @@ pub enum NrsSubCommands {
         /// The name to give site, eg 'safenetwork'
         name: String,
         /// The safe:// url to map this to. Usually a FilesContainer for a website, eg.
-        #[structopt(short = "-d", long = "destination")]
-        destination: Option<String>,
+        #[structopt(short = "-l", long = "link")]
+        link: Option<String>,
     },
     #[structopt(name = "remove")]
     /// Remove a subname from a public name
@@ -47,21 +47,21 @@ pub enum NrsSubCommands {
 pub fn nrs_commander(
     cmd: Option<NrsSubCommands>,
     output_fmt: OutputFmt,
-	dry_run : bool,
+    dry_run: bool,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(NrsSubCommands::Create { name, destination }) => {
+        Some(NrsSubCommands::Create { name, link }) => {
             // TODO: Where do we store/reference these?
             // Add a container for this...
             // check for subdomain?
             // sanitize name / spacing etc.
             // validate desination?
-            let set_as_defualt = true;
-            let target = get_target_location(destination)?;
+            let set_as_default = true;
+            let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, &target, set_as_defualt, dry_run)?;
+                safe.nrs_map_container_create(&name, &target, set_as_default, dry_run)?;
 
             // Now let's just print out the content of the NrsMap
             if OutputFmt::Pretty == output_fmt {
@@ -76,8 +76,8 @@ pub fn nrs_commander(
                     .build();
                 table.set_format(format);
 
-                for (public_name, (change, link)) in processed_entries.iter() {
-                    table.add_row(row![change, public_name, link]);
+                for (public_name, (change, name_link)) in processed_entries.iter() {
+                    table.add_row(row![change, public_name, name_link]);
                 }
                 table.printstd();
             } else {

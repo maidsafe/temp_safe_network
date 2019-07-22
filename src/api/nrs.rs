@@ -14,11 +14,9 @@ use super::constants::{
 use super::helpers::gen_timestamp_secs;
 use super::xorurl::SafeContentType;
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
+use log::{debug, warn};
 use safe_nd::XorName;
 use serde::{Deserialize, Serialize};
-
-use chrono::{SecondsFormat, Utc};
-use log::{debug, warn};
 use std::collections::BTreeMap;
 use tiny_keccak::sha3_256;
 
@@ -31,7 +29,6 @@ static ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 
 // Each PublicName contains metadata and the link to the target's XOR-URL
 pub type PublicName = BTreeMap<String, String>;
-
 
 // To use for mapping domain names (with path in a flattened hierarchy) to PublicNames
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -89,13 +86,13 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-	/// # use rand::distributions::Alphanumeric;
-	/// # use rand::{thread_rng, Rng};
-	/// # use unwrap::unwrap;
+    /// # use rand::distributions::Alphanumeric;
+    /// # use rand::{thread_rng, Rng};
+    /// # use unwrap::unwrap;
     /// # use safe_cli::Safe;
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-	/// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+    /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, "safe://somewhere", true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
@@ -104,7 +101,7 @@ impl Safe {
         name: &str,
         destination: &str,
         default: bool,
-		_dry_run: bool,
+        _dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
         let sanitized_name = str::replace(&name, "safe://", "").to_string();
 
@@ -149,7 +146,7 @@ impl Safe {
             xorname,
             NRS_MAP_TYPE_TAG,
             SafeContentType::NrsMapContainer,
-			None,
+            None,
             &self.xorurl_base,
         )?;
 
@@ -162,15 +159,15 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-	/// # use rand::distributions::Alphanumeric;
-	/// # use rand::{thread_rng, Rng};
+    /// # use rand::distributions::Alphanumeric;
+    /// # use rand::{thread_rng, Rng};
     /// # let mut safe = Safe::new("base32z".to_string());
-	/// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # const FAKE_RDF_PREDICATE_LINK: &str = "link";
-	/// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+    /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, "somewhere", true, false).unwrap();
     /// let (version, nrs_map_container, native_type) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
-	/// assert_eq!(version, 1);
+    /// assert_eq!(version, 1);
     /// assert_eq!(nrs_map_container.entries[&rand_string][FAKE_RDF_PREDICATE_LINK], "somewhere");
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");
     /// assert_eq!(nrs_map_container.get_default().unwrap(), &rand_string);
@@ -187,23 +184,16 @@ impl Safe {
             .get_latest_seq_append_only_data(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
         {
             Ok((version, (_key, value))) => {
-                debug!(
-                    "Nrs map retrieved.... v{:?}, value {:?} ",
-                    &version, &value
-                );
+                debug!("Nrs map retrieved.... v{:?}, value {:?} ", &version, &value);
                 // TODO: use RDF format and deserialise it
                 let nrs_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
                     .map_err(|err| {
-                    Error::ContentError(format!(
-                        "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
-                        err
-                    ))
-                })?;
-                Ok((
-                    version,
-                    nrs_map,
-                    NRS_MAP_TYPE_TAG_NATIVE_TYPE.to_string(),
-                ))
+                        Error::ContentError(format!(
+                            "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
+                            err
+                        ))
+                    })?;
+                Ok((version, nrs_map, NRS_MAP_TYPE_TAG_NATIVE_TYPE.to_string()))
             }
             Err(Error::EmptyContent(_)) => {
                 warn!("Nrs container found at {:?} was empty", &xorurl);
@@ -226,11 +216,7 @@ impl Safe {
 
 // From the provided list of resolovable public names
 // create a NrsMap with metadata and their corresponding links
-fn nrs_map_create(
-    name: &str,
-    destination: &str,
-    set_as_defualt: bool,
-) -> ResultReturn<NrsMap> {
+fn nrs_map_create(name: &str, destination: &str, set_as_defualt: bool) -> ResultReturn<NrsMap> {
     let mut nrs_map = NrsMap::default();
     let now = gen_timestamp_secs();
 
@@ -248,9 +234,7 @@ fn nrs_map_create(
     debug!("PublicName: {:?}", public_name);
 
     debug!("PublicName inserted with name {:?}", &name);
-    nrs_map
-        .entries
-        .insert(name.to_string(), public_name);
+    nrs_map.entries.insert(name.to_string(), public_name);
 
     if set_as_defualt {
         debug!("Setting {:?} as default for NrsMap", &name);
@@ -268,7 +252,7 @@ fn test_nrs_map_container_create() {
     use unwrap::unwrap;
 
     let mut safe = Safe::new("base32z".to_string());
-	safe.connect("", Some("fake-credentials")).unwrap();
+    safe.connect("", Some("fake-credentials")).unwrap();
 
     let nrs_xorname = xorname_from_nrs_string("some_site").unwrap();
     let SITE_NAME = "some_site";
@@ -276,10 +260,7 @@ fn test_nrs_map_container_create() {
         unwrap!(safe.nrs_map_container_create(SITE_NAME, "safe://top_xorurl", true, false));
     assert_eq!(nrs_map.entries.len(), 1);
     let public_name = &nrs_map.entries[SITE_NAME];
-    assert_eq!(
-        public_name[FAKE_RDF_PREDICATE_LINK],
-        "safe://top_xorurl"
-    );
+    assert_eq!(public_name[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
     assert_eq!(nrs_map.get_default().unwrap(), SITE_NAME);
 
     let decoder = XorUrlEncoder::from_url(&xor_url).unwrap();
@@ -293,13 +274,7 @@ fn test_nrs_map_create() {
     let nrs_map = unwrap!(nrs_map_create("site1", "safe://top_xorurl", true));
     assert_eq!(nrs_map.entries.len(), 1);
     let public_name = &nrs_map.entries["site1"];
-    assert_eq!(
-        public_name[FAKE_RDF_PREDICATE_LINK],
-        "safe://top_xorurl"
-    );
+    assert_eq!(public_name[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
     assert_eq!(nrs_map.get_default().unwrap(), "site1");
-    assert_eq!(
-        nrs_map.get_default_link().unwrap(),
-        "safe://top_xorurl"
-    );
+    assert_eq!(nrs_map.get_default_link().unwrap(), "safe://top_xorurl");
 }

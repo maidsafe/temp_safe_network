@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, ResultReturn};
+use chrono::{SecondsFormat, Utc};
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::str;
@@ -134,26 +135,22 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
     }
 }
 
-pub fn get_host_and_path( xorurl : &str ) -> ResultReturn<(String, String)>{
-	let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
-		Error::InvalidXorUrl(format!(
-			"Problem parsing the SAFE:// URL {:?}",
-			parse_err
-		))
-	})?;
+pub fn get_host_and_path(xorurl: &str) -> ResultReturn<(String, String)> {
+    let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
+        Error::InvalidXorUrl(format!("Problem parsing the SAFE:// URL {:?}", parse_err))
+    })?;
 
-	let host_str = parsing_url
-		.host_str()
-		.unwrap_or_else(|| "Failed parsing the URL");
+    let host_str = parsing_url
+        .host_str()
+        .unwrap_or_else(|| "Failed parsing the URL");
 
-	let mut path = str::replace(parsing_url.path(), "\\", "/");
-	if path == "/" {
-		path = "".to_string();
-	}
+    let mut path = str::replace(parsing_url.path(), "\\", "/");
+    if path == "/" {
+        path = "".to_string();
+    }
 
-	Ok((host_str.to_string(), path))
+    Ok((host_str.to_string(), path))
 }
-
 
 pub fn gen_timestamp_secs() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)

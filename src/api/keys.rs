@@ -113,8 +113,13 @@ impl Safe {
             }
         };
 
-        let xorurl =
-            XorUrlEncoder::encode(xorname, 0, SafeContentType::CoinBalance, None, &self.xorurl_base)?;
+        let xorurl = XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeContentType::CoinBalance,
+            None,
+            &self.xorurl_base,
+        )?;
         Ok((xorurl, key_pair))
     }
 
@@ -143,8 +148,13 @@ impl Safe {
             }
         };
 
-        let xorurl =
-            XorUrlEncoder::encode(xorname, 0, SafeContentType::CoinBalance, None, &self.xorurl_base)?;
+        let xorurl = XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeContentType::CoinBalance,
+            None,
+            &self.xorurl_base,
+        )?;
         Ok((xorurl, key_pair))
     }
 
