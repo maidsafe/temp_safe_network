@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
+mod constants;
 mod errors;
 mod fetch;
 mod files;

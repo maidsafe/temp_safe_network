@@ -12,17 +12,7 @@ use safe_nd::{XorName, XOR_NAME_LEN};
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
-
-pub const CONTENT_ADDED_SIGN: &str = "+";
-pub const CONTENT_UPDATED_SIGN: &str = "*";
-pub const CONTENT_DELETED_SIGN: &str = "-";
-pub const CONTENT_ERROR_SIGN: &str = "E";
-
-pub const FAKE_RDF_PREDICATE_LINK: &str = "link";
-pub const FAKE_RDF_PREDICATE_TYPE: &str = "type";
-pub const FAKE_RDF_PREDICATE_SIZE: &str = "size";
-pub const FAKE_RDF_PREDICATE_MODIFIED: &str = "modified";
-pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
+use url::Url;
 
 // Out internal key pair structure to manage BLS keys
 pub struct KeyPair {
@@ -142,4 +132,24 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
         IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
+}
+
+pub fn get_host_and_path( xorurl : &str ) -> ResultReturn<(String, String)>{
+	let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
+		Error::InvalidXorUrl(format!(
+			"Problem parsing the SAFE:// URL {:?}",
+			parse_err
+		))
+	})?;
+
+	let host_str = parsing_url
+		.host_str()
+		.unwrap_or_else(|| "Failed parsing the URL");
+
+	let mut path = str::replace(parsing_url.path(), "\\", "/");
+	if path == "/" {
+		path = "".to_string();
+	}
+
+	Ok((host_str.to_string(), path))
 }

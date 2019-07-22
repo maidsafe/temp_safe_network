@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{
+use super::constants::{
     CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
     FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
@@ -97,6 +97,7 @@ impl Safe {
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
                 SafeContentType::FilesContainer,
+				None,
                 &self.xorurl_base,
             )?;
 
@@ -259,6 +260,7 @@ impl Safe {
             xorname,
             0,
             SafeContentType::ImmutableData,
+			None,
             &self.xorurl_base,
         )
     }

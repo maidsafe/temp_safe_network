@@ -11,6 +11,7 @@ use multibase::{decode, encode, Base};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_nd::{XorName, XOR_NAME_LEN};
+use super::helpers::get_host_and_path;
 use url::Url;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
@@ -49,13 +50,13 @@ pub struct XorUrlEncoder {
 }
 
 impl XorUrlEncoder {
-    pub fn new(xorname: XorName, type_tag: u64, content_type: SafeContentType) -> Self {
+    pub fn new(xorname: XorName, type_tag: u64, content_type: SafeContentType,  path: Option<&str>) -> Self {
         Self {
             version: 1,
             xorname,
             type_tag,
             content_type,
-            path: "".to_string(),
+            path: path.unwrap_or_else(|| "").to_string(),
         }
     }
 
@@ -64,9 +65,10 @@ impl XorUrlEncoder {
         xorname: XorName,
         type_tag: u64,
         content_type: SafeContentType,
+		path : Option<&str>,
         base: &str,
     ) -> ResultReturn<String> {
-        let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, content_type);
+        let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, content_type, path );
         xorurl_encoder.to_string(base)
     }
 
@@ -75,17 +77,7 @@ impl XorUrlEncoder {
             Error::InvalidXorUrl(format!("Problem parsing the XOR-URL: {:?}", err))
         })?;
 
-        if parsing_url.scheme() != "safe" {
-            return Err(Error::InvalidXorUrl(
-                "Only \"safe://\" URLs may be used.".to_string(),
-            ));
-        }
-
-        // Get path and normalise it to use '/' (instead of '\' as on Windows)
-        let mut path = str::replace(parsing_url.path(), "\\", "/");
-        if path == "/" {
-            path = "".to_string();
-        }
+		let ( host_str, path ) = get_host_and_path(&xorurl)?;
 
         let cid_str = parsing_url
             .host_str()
@@ -213,6 +205,7 @@ fn test_xorurl_base32_encoding() {
         xorname,
         0xa6323c4d4a32,
         SafeContentType::ImmutableData,
+		None,
         &"base32".to_string()
     ));
     let base32_xorurl = "safe://bedtcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
@@ -227,6 +220,7 @@ fn test_xorurl_base32z_encoding() {
         xorname,
         0,
         SafeContentType::ImmutableData,
+		None,
         &"base32z".to_string()
     ));
     let base32z_xorurl = "safe://hoqcj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
@@ -241,6 +235,7 @@ fn test_xorurl_base64_encoding() {
         xorname,
         4584545,
         SafeContentType::FilesContainer,
+		None,
         &"base64".to_string()
     ));
     let base64_xorurl = "safe://mBBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
@@ -266,6 +261,7 @@ fn test_xorurl_default_base_encoding() {
         xorname,
         0,
         SafeContentType::ImmutableData,
+		None,
         &"".to_string() // forces it to use the default
     ));
     assert_eq!(xorurl, base32z_xorurl);
@@ -275,7 +271,7 @@ fn test_xorurl_default_base_encoding() {
 fn test_xorurl_decoding() {
     let xorname = XorName(*b"12345678901234567890123456789012");
     let type_tag: u64 = 0x0eef;
-    let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, SafeContentType::ImmutableData);
+    let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, SafeContentType::ImmutableData, None);
     assert_eq!("", xorurl_encoder.path());
     assert_eq!(1, xorurl_encoder.version());
     assert_eq!(xorname, xorurl_encoder.xorname());
@@ -295,6 +291,7 @@ fn test_xorurl_decoding_with_path() {
         xorname,
         type_tag,
         SafeContentType::ImmutableData,
+		None,
         "base32z"
     ));
 

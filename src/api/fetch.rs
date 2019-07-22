@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::nrs::xorname_from_nrs_string;
+use super::nrs::{RESOLVABLE_MAP_TYPE_TAG, xorname_from_nrs_string};
 use super::xorurl::SafeContentType;
-
-use url::Url;
+use super::helpers::get_host_and_path;
 
 use super::{Error, ResultReturn, Safe, XorName, XorUrl, XorUrlEncoder};
 use log::{debug, info};
@@ -88,47 +87,33 @@ impl Safe {
 
         let the_xorurl: &XorUrl;
 
-        let the_xor = match xorurl_encoder {
+		let the_xor = match xorurl_encoder {
             Ok(encoder) => Ok(encoder),
             Err(err) => {
-                let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
-                    Error::InvalidXorUrl(format!(
-                        "Problem parsing the SAFE:// URL {:?} : {:?}",
-                        err, parse_err
-                    ))
-                })?;
 
-                let host_str = parsing_url
-                    .host_str()
-                    .unwrap_or_else(|| "Failed parsing the URL");
-
-                // TODO: DRY this out with XorUrlEncoder path finder
-                let mut path = str::replace(parsing_url.path(), "\\", "/");
-                if path == "/" {
-                    path = "".to_string();
-                }
+				let ( host_str, path ) = get_host_and_path(&xorurl)?;
 
                 info!(
                     "Falling back to NRS. XorUrl decoding failed with: {:?}",
                     err
                 );
 
-                const RESOLVABLE_MAP_TYPE_TAG: u64 = 1500;
                 let hashed_host = xorname_from_nrs_string(&host_str)?;
 
-                let encoder = XorUrlEncoder::new(
+                let encoded_xor = XorUrlEncoder::new(
                     hashed_host,
                     RESOLVABLE_MAP_TYPE_TAG,
                     SafeContentType::ResolvableMapContainer,
+					Some(&path)
                 );
 
-                let base_xor_url = encoder.to_string("base32z")?;
+                let new_url = encoded_xor.to_string("base32z")?;
 
-                let full_new_url = format!("{}{}", base_xor_url, path);
-                debug!("Checking NRS system for url: {:?}", &full_new_url);
-                Ok(XorUrlEncoder::from_url(&full_new_url)?)
+                // let full_new_url = format!("{}", base_xor_url);
+                debug!("Checking NRS system for url: {:?}", &new_url);
+                Ok(encoded_xor)
             }
-        }?;
+		}?;
 
         let xorurl_string = the_xor.to_string("base32z")?;
         the_xorurl = &xorurl_string;
@@ -193,9 +178,9 @@ impl Safe {
                     &version, &native_type, &resolvable_map
                 );
 
-                let new_target_xorurl = &resolvable_map.get_default_link()?;
+                let new_target_xorurl = resolvable_map.get_default_link()?;
 
-                let url_with_path = format!("{}{}", new_target_xorurl, path);
+                let url_with_path = format!("{}{}", &new_target_xorurl, path);
 
                 debug!("Resolving target from resolvable map: {:?}", url_with_path);
 
@@ -315,32 +300,31 @@ fn test_fetch_resolvable_container() {
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", Some("")).unwrap();
 
-    let prevent_resolution = true;
-
-    let (xorurl, _, files_map) =
+    let (xorurl, _, the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-    let (reslovable_map_xorurl, _, resolvable_map) =
+	let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+
+    let (resolvable_map_xorurl, _, resolvable_map) =
         unwrap!(safe.resolvable_map_container_create("somesite", &xorurl, true, false));
 
     let content = unwrap!(safe.fetch("safe://somesite"));
 
-    // this should actually resolve to a FilesContainer until we enable the option to prevent resolution beyond the mao itself.
+    // this should resolve to a FilesContainer until we enable prevent resolution.
     match content {
         SafeData::FilesContainer {
-        	..
-		    // xorname,
-            // type_tag,
-            // version,
-            // resolvable_map,
-            // native_type,
+			xorname,
+            type_tag,
+            version,
+            files_map,
+            native_type,
+			..
         } => {
-            // assert_eq!(xorname, reslovable_map_xorurl);
-            // assert_eq!(xorname, xorurl_encoder.xorname());
-            // assert_eq!(type_tag, 1500);
-            // assert_eq!(version, 1);
-            // assert_eq!(native_type, "AppendOnlyData".to_string());
-			assert!(true);
+            assert_eq!(xorname, xorurl_encoder.xorname());
+            assert_eq!(type_tag, 10_100);
+            assert_eq!(version, 1);
+            assert_eq!(native_type, "AppendOnlyData".to_string());
+			assert_eq!(files_map, the_files_map);
         }
         _ => panic!("Resolvable map container was not returned."),
     }
@@ -377,6 +361,7 @@ fn test_fetch_unknown() {
         xorname,
         type_tag,
         SafeContentType::Unknown,
+		None,
         "base32z"
     ));
     let content = unwrap!(safe.fetch(&xorurl));
@@ -395,6 +380,7 @@ fn test_fetch_unsupported() {
         xorname,
         type_tag,
         SafeContentType::UnpublishedImmutableData,
+		None,
         "base32z"
     ));
     match safe.fetch(&xorurl) {

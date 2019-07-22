@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{
+use super::constants::{
     CONTENT_ADDED_SIGN, /*CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,*/
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
 };
@@ -20,8 +20,16 @@ use log::{debug, warn};
 use std::collections::BTreeMap;
 use tiny_keccak::sha3_256;
 
+// Type tag to use for the FilesContainer stored on AppendOnlyData
+pub static RESOLVABLE_MAP_TYPE_TAG: u64 = 1500;
+// Informative string of the SAFE native data type behind a FilesContainer
+pub static RESOLVABLE_MAP_TYPE_TAG_NATIVE_TYPE: &str = "AppendOnlyData";
+
+static ERROR_MSG_NO_RESOLVABLE_MAP_FOUND: &str = "No Resolvable Map found at this address";
+
 // Each ResolvableItem contains item metadata and the link to the item's XOR-URL
 pub type ResolvableItem = BTreeMap<String, String>;
+
 
 // To use for mapping domain names (with path in a flattened hierarchy) to ResolvableItems
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -62,13 +70,6 @@ impl ResolvableMap {
 
 // List of public names uploaded with details if they were added, updated or deleted from ResolvableMaps
 type ProcessedEntries = BTreeMap<String, (String, String)>;
-
-// Type tag to use for the FilesContainer stored on AppendOnlyData
-const RESOLVABLE_MAP_TYPE_TAG: u64 = 1500;
-// Informative string of the SAFE native data type behind a FilesContainer
-const RESOLVABLE_MAP_TYPE_TAG_NATIVE_TYPE: &str = "AppendOnlyData";
-
-const ERROR_MSG_NO_RESOLVABLE_MAP_FOUND: &str = "No Resolvable Map found at this address";
 
 pub fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
     let vec_hash = sha3_256(&name.to_string().into_bytes());
@@ -146,6 +147,7 @@ impl Safe {
             xorname,
             RESOLVABLE_MAP_TYPE_TAG,
             SafeContentType::ResolvableMapContainer,
+			None,
             &self.xorurl_base,
         )?;
 
