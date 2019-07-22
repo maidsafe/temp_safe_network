@@ -22,7 +22,7 @@ use std::fs::OpenOptions;
 use std::io::{prelude::*, Seek, SeekFrom};
 use std::process::Command;
 
-const PRETTY_NRS_CREATION_RESPONSE: &str = "New ResolvableMap";
+const PRETTY_NRS_CREATION_RESPONSE: &str = "New NrsMap";
 
 const TEST_FOLDER: &str = "./tests/testfolder/";
 
@@ -111,7 +111,7 @@ fn calling_safe_nrs_put_folder_and_fetch() {
     .read()
     .unwrap();
 
-    let (resolvable_map_xorurl, _change_map): (String, BTreeMap<String, (String, String)>) =
+    let (nrs_map_xorurl, _change_map): (String, BTreeMap<String, (String, String)>) =
         match serde_json::from_str(&nrs_creation) {
             Ok(s) => s,
             Err(err) => panic!(format!(
@@ -120,15 +120,15 @@ fn calling_safe_nrs_put_folder_and_fetch() {
             )),
         };
 
-    assert!(resolvable_map_xorurl.contains("safe://"));
-    let cat_of_resolvable_map_url = cmd!(get_bin_location(), "cat", &resolvable_map_xorurl)
+    assert!(nrs_map_xorurl.contains("safe://"));
+    let cat_of_nrs_map_url = cmd!(get_bin_location(), "cat", &nrs_map_xorurl)
         .read()
         .unwrap();
 
     // does our resolvable map exist?
-    assert!(cat_of_resolvable_map_url.contains("safe://"));
-    assert!(cat_of_resolvable_map_url.contains("another.md"));
-    assert!(cat_of_resolvable_map_url.contains("Files of FilesContainer (version 1)"));
+    assert!(cat_of_nrs_map_url.contains("safe://"));
+    assert!(cat_of_nrs_map_url.contains("another.md"));
+    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 1)"));
 
     assert!(nrs_creation.contains("safe://"));
     assert!(nrs_creation.contains("+"));

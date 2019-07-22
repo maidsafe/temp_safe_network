@@ -11,6 +11,7 @@ use super::constants::{
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
     FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
 };
+use super::helpers::{gen_timestamp_secs, gen_timestamp_nanos};
 use super::xorurl::SafeContentType;
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use chrono::{SecondsFormat, Utc};
@@ -287,14 +288,6 @@ impl Safe {
 }
 
 // Helper functions
-
-fn gen_timestamp_secs() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
-}
-
-fn gen_timestamp_nanos() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
-}
 
 // Simply change Windows style path separator into `/`
 fn normalise_path_separator(from: &str) -> String {

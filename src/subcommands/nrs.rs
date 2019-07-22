@@ -60,14 +60,14 @@ pub fn nrs_commander(
             let set_as_defualt = true;
             let target = get_target_location(destination)?;
 
-            let (resolvable_map_container_xorurl, processed_entries, _resolvable_map) =
-                safe.resolvable_map_container_create(&name, &target, set_as_defualt, dry_run)?;
+            let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
+                safe.nrs_map_container_create(&name, &target, set_as_defualt, dry_run)?;
 
-            // Now let's just print out the content of the ResolvableMap
+            // Now let's just print out the content of the NrsMap
             if OutputFmt::Pretty == output_fmt {
                 println!(
-                    "New ResolvableMap, \"{}\" created at: \"{}\"",
-                    &name, resolvable_map_container_xorurl
+                    "New NrsMap, \"{}\" created at: \"{}\"",
+                    &name, nrs_map_container_xorurl
                 );
                 let mut table = Table::new();
                 let format = FormatBuilder::new()
@@ -83,7 +83,7 @@ pub fn nrs_commander(
             } else {
                 println!(
                     "{}",
-                    serde_json::to_string(&(resolvable_map_container_xorurl, processed_entries))
+                    serde_json::to_string(&(nrs_map_container_xorurl, processed_entries))
                         .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
                 );
             }

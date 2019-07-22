@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::nrs::{RESOLVABLE_MAP_TYPE_TAG, xorname_from_nrs_string};
+use super::nrs::{NRS_MAP_TYPE_TAG, xorname_from_nrs_string};
 use super::xorurl::SafeContentType;
 use super::helpers::get_host_and_path;
 
@@ -32,11 +32,11 @@ pub enum SafeData {
         native_type: String,
     },
     // TODO: Enable preventing resolution
-    // ResolvableMapContainer {
+    // NrsMapContainer {
     //     xorname: XorName,
     //     type_tag: u64,
     //     version: u64,
-    //     resolvable_map: ResolvableMap,
+    //     nrs_map: NrsMap,
     //     native_type: String,
     // },
     ImmutableData {
@@ -102,8 +102,8 @@ impl Safe {
 
                 let encoded_xor = XorUrlEncoder::new(
                     hashed_host,
-                    RESOLVABLE_MAP_TYPE_TAG,
-                    SafeContentType::ResolvableMapContainer,
+                    NRS_MAP_TYPE_TAG,
+                    SafeContentType::NrsMapContainer,
 					Some(&path)
                 );
 
@@ -170,15 +170,15 @@ impl Safe {
                     native_type,
                 })
             }
-            SafeContentType::ResolvableMapContainer => {
-                let (version, resolvable_map, native_type) =
-                    self.resolvable_map_container_get_latest(&the_xorurl)?;
+            SafeContentType::NrsMapContainer => {
+                let (version, nrs_map, native_type) =
+                    self.nrs_map_container_get_latest(&the_xorurl)?;
                 debug!(
-                    "Resolvable map container found w/ v:{:?}, of type: {:?}, containing: {:?}",
-                    &version, &native_type, &resolvable_map
+                    "Nrs map container found w/ v:{:?}, of type: {:?}, containing: {:?}",
+                    &version, &native_type, &nrs_map
                 );
 
-                let new_target_xorurl = resolvable_map.get_default_link()?;
+                let new_target_xorurl = nrs_map.get_default_link()?;
 
                 let url_with_path = format!("{}{}", &new_target_xorurl, path);
 
@@ -186,11 +186,11 @@ impl Safe {
 
                 // TODO: Properly prevent resolution
                 // if prevent_resolution {
-                // 	return Ok(SafeData::ResolvableMapContainer {
+                // 	return Ok(SafeData::NrsMapContainer {
                 // 		xorname: the_xor.xorname(),
                 // 		type_tag: the_xor.type_tag(),
                 // 		version,
-                // 		resolvable_map,
+                // 		nrs_map,
                 // 		native_type,
                 // 	})
                 // }
@@ -305,8 +305,8 @@ fn test_fetch_resolvable_container() {
 
 	let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
 
-    let (resolvable_map_xorurl, _, resolvable_map) =
-        unwrap!(safe.resolvable_map_container_create("somesite", &xorurl, true, false));
+    let (nrs_map_xorurl, _, nrs_map) =
+        unwrap!(safe.nrs_map_container_create("somesite", &xorurl, true, false));
 
     let content = unwrap!(safe.fetch("safe://somesite"));
 
@@ -326,7 +326,7 @@ fn test_fetch_resolvable_container() {
             assert_eq!(native_type, "AppendOnlyData".to_string());
 			assert_eq!(files_map, the_files_map);
         }
-        _ => panic!("Resolvable map container was not returned."),
+        _ => panic!("Nrs map container was not returned."),
     }
 }
 

@@ -30,7 +30,7 @@ pub enum SafeContentType {
     UnpublishedFilesContainer = 0x06,
     ImmutableData = 0x07,
     UnpublishedImmutableData = 0x08,
-    ResolvableMapContainer = 0x09,
+    NrsMapContainer = 0x09,
 }
 
 pub fn create_random_xorname() -> XorName {
@@ -111,7 +111,7 @@ impl XorUrlEncoder {
             6 => SafeContentType::UnpublishedFilesContainer,
             7 => SafeContentType::ImmutableData,
             8 => SafeContentType::UnpublishedImmutableData,
-            9 => SafeContentType::ResolvableMapContainer,
+            9 => SafeContentType::NrsMapContainer,
             _other => SafeContentType::Unknown,
         };
         let xorname_offset = 2; // offset where to find the xorname bytes

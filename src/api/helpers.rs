@@ -153,3 +153,12 @@ pub fn get_host_and_path( xorurl : &str ) -> ResultReturn<(String, String)>{
 
 	Ok((host_str.to_string(), path))
 }
+
+
+pub fn gen_timestamp_secs() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+pub fn gen_timestamp_nanos() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
+}
