@@ -33,8 +33,8 @@ const STATE_FILENAME: &str = "state";
 #[allow(clippy::large_enum_variant)]
 enum State {
     Elder {
-        src: ClientHandler,
-        dst: DataHandler,
+        client_handler: ClientHandler,
+        data_handler: DataHandler,
         coins_handler: CoinsHandler,
     },
     // TODO - remove this
@@ -72,13 +72,13 @@ impl Vault {
 
         let (state, event_receiver) = if is_elder {
             let total_used_space = Rc::new(RefCell::new(0));
-            let (src, event_receiver) = ClientHandler::new(
+            let (client_handler, event_receiver) = ClientHandler::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
                 init_mode,
             )?;
-            let dst = DataHandler::new(
+            let data_handler = DataHandler::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
@@ -88,8 +88,8 @@ impl Vault {
                 CoinsHandler::new(id.public_id().clone(), config.root_dir(), init_mode)?;
             (
                 State::Elder {
-                    src,
-                    dst,
+                    client_handler,
+                    data_handler,
                     coins_handler,
                 },
                 event_receiver,
@@ -117,7 +117,10 @@ impl Vault {
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<NodeInfo> {
         match self.state {
-            State::Elder { ref mut src, .. } => src.our_connection_info(),
+            State::Elder {
+                ref mut client_handler,
+                ..
+            } => client_handler.our_connection_info(),
             State::Adult { .. } => unimplemented!(),
         }
     }
@@ -257,28 +260,38 @@ impl Vault {
 
     fn client_handler(&self) -> Option<&ClientHandler> {
         match &self.state {
-            State::Elder { ref src, .. } => Some(src),
+            State::Elder {
+                ref client_handler, ..
+            } => Some(client_handler),
             State::Adult(_) => None,
         }
     }
 
     fn client_handler_mut(&mut self) -> Option<&mut ClientHandler> {
         match &mut self.state {
-            State::Elder { ref mut src, .. } => Some(src),
+            State::Elder {
+                ref mut client_handler,
+                ..
+            } => Some(client_handler),
             State::Adult(_) => None,
         }
     }
 
     fn data_handler(&self) -> Option<&DataHandler> {
         match &self.state {
-            State::Elder { ref dst, .. } => Some(dst),
+            State::Elder {
+                ref data_handler, ..
+            } => Some(data_handler),
             State::Adult(_) => None,
         }
     }
 
     fn data_handler_mut(&mut self) -> Option<&mut DataHandler> {
         match &mut self.state {
-            State::Elder { ref mut dst, .. } => Some(dst),
+            State::Elder {
+                ref mut data_handler,
+                ..
+            } => Some(data_handler),
             State::Adult(_) => None,
         }
     }
