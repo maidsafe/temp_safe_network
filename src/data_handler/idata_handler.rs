@@ -35,7 +35,7 @@ struct ChunkMetadata {
 pub(crate) struct IDataHandler {
     id: NodePublicId,
     idata_ops: BTreeMap<MessageId, IDataOp>,
-    immutable_metadata: PickleDb,
+    metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
 }
@@ -43,13 +43,13 @@ pub(crate) struct IDataHandler {
 impl IDataHandler {
     pub(crate) fn new(id: NodePublicId, config: &Config, init_mode: Init) -> Result<Self> {
         let root_dir = config.root_dir();
-        let immutable_metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
+        let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
         Ok(Self {
             id,
             idata_ops: Default::default(),
-            immutable_metadata,
+            metadata,
             full_adults,
         })
     }
@@ -75,10 +75,7 @@ impl IDataHandler {
             })
         };
 
-        if self
-            .immutable_metadata
-            .exists(&(*kind.address()).to_db_key())
-        {
+        if self.metadata.exists(&(*kind.address()).to_db_key()) {
             trace!(
                 "{}: Replying success for Put {:?}, it already exists.",
                 self,
@@ -251,7 +248,7 @@ impl IDataHandler {
         // TODO - we'll assume `result` is success for phase 1.
         let db_key = idata_address.to_db_key();
         let mut metadata = self
-            .immutable_metadata
+            .metadata
             .get::<ChunkMetadata>(&db_key)
             .unwrap_or_default();
         if !metadata.holders.insert(sender) {
@@ -262,7 +259,7 @@ impl IDataHandler {
                 self.idata_op(&message_id)?
             );
         }
-        if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
+        if let Err(error) = self.metadata.set(&db_key, &metadata) {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
             // TODO - send failure back to client handlers (hopefully won't accumulate), or
             //        maybe self-terminate if we can't fix this error?
@@ -288,16 +285,13 @@ impl IDataHandler {
     ) -> Option<Action> {
         // TODO - Assume deletion on Adult nodes was success for phase 1.
         let db_key = idata_address.to_db_key();
-        let metadata = self
-            .immutable_metadata
-            .get::<ChunkMetadata>(&db_key)
-            .or_else(|| {
-                warn!(
-                    "{}: Failed to get metadata from DB: {:?}",
-                    self, idata_address
-                );
-                None
-            });
+        let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
+            warn!(
+                "{}: Failed to get metadata from DB: {:?}",
+                self, idata_address
+            );
+            None
+        });
 
         if let Some(mut metadata) = metadata {
             if !metadata.holders.remove(&sender) {
@@ -309,11 +303,11 @@ impl IDataHandler {
                 );
             }
             if metadata.holders.is_empty() {
-                if let Err(error) = self.immutable_metadata.rem(&db_key) {
+                if let Err(error) = self.metadata.rem(&db_key) {
                     warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
                     // TODO - Send failure back to client handlers?
                 }
-            } else if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
+            } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
                 warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                 // TODO - Send failure back to client handlers?
             }
@@ -344,10 +338,7 @@ impl IDataHandler {
     }
 
     fn get_metadata_for(&self, address: IDataAddress) -> NdResult<ChunkMetadata> {
-        match self
-            .immutable_metadata
-            .get::<ChunkMetadata>(&address.to_db_key())
-        {
+        match self.metadata.get::<ChunkMetadata>(&address.to_db_key()) {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
                     warn!("{}: Metadata holders is empty for: {:?}", self, address);
