@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod account;
+mod auth_keys;
 mod balance;
 
 use self::{
-    account::AccountsDb,
+    auth_keys::AuthKeysDb,
     balance::{Balance, BalancesDb},
 };
 use crate::{
@@ -54,7 +54,7 @@ struct ClientInfo {
 
 pub(crate) struct ClientHandler {
     id: NodePublicId,
-    accounts: AccountsDb,
+    auth_keys: AuthKeysDb,
     balances: BalancesDb,
     clients: HashMap<SocketAddr, ClientInfo>,
     // Map of new client connections to the challenge value we sent them.
@@ -70,7 +70,7 @@ impl ClientHandler {
         total_used_space: &Rc<RefCell<u64>>,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let accounts = AccountsDb::new(config.root_dir(), init_mode)?;
+        let auth_keys = AuthKeysDb::new(config.root_dir(), init_mode)?;
         let balances = BalancesDb::new(config.root_dir(), init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config.quic_p2p_config())?;
         let login_packets = LoginPacketChunkStore::new(
@@ -81,7 +81,7 @@ impl ClientHandler {
         )?;
         let client_handler = Self {
             id,
-            accounts,
+            auth_keys,
             balances,
             clients: Default::default(),
             client_candidates: Default::default(),
@@ -780,7 +780,7 @@ impl ClientHandler {
             PublicId::Client(pub_id) => self.balances.exists(pub_id.name()),
             PublicId::App(app_pub_id) => {
                 self.balances.exists(app_pub_id.owner().name())
-                    && self.accounts.app_permissions(app_pub_id).is_some()
+                    && self.auth_keys.app_permissions(app_pub_id).is_some()
             }
             PublicId::Node(_) => {
                 error!("{}: Logic error. This should be unreachable.", self);
@@ -1263,7 +1263,7 @@ impl ClientHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = Ok(self
-            .accounts
+            .auth_keys
             .list_auth_keys_and_version(utils::client(&client.public_id)?));
 
         self.send_response_to_client(
@@ -1282,7 +1282,7 @@ impl ClientHandler {
         permissions: AppPermissions,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.accounts.ins_auth_key(
+        let result = self.auth_keys.ins_auth_key(
             utils::client(&client.public_id)?,
             key,
             new_version,
@@ -1300,7 +1300,7 @@ impl ClientHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let result =
-            self.accounts
+            self.auth_keys
                 .del_auth_key(utils::client(&client.public_id)?, key, new_version);
         self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
         None
