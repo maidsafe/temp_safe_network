@@ -28,13 +28,13 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct MDataHandler {
+pub(super) struct MDataHandler {
     id: NodePublicId,
     chunks: MutableChunkStore,
 }
 
 impl MDataHandler {
-    pub(crate) fn new(
+    pub(super) fn new(
         id: NodePublicId,
         config: &Config,
         total_used_space: &Rc<RefCell<u64>>,
@@ -55,7 +55,7 @@ impl MDataHandler {
     /// Returns `Some(Result<..>)` if the flow should be continued, returns
     /// `None` if there was a logic error encountered and the flow should be
     /// terminated.
-    pub(crate) fn get_mdata_chunk(
+    fn get_mdata_chunk(
         &mut self,
         address: &MDataAddress,
         requester: &PublicId,
@@ -84,7 +84,7 @@ impl MDataHandler {
     }
 
     /// Get MData from the chunk store, update it, and overwrite the stored chunk.
-    pub(crate) fn mutate_mdata_chunk<F>(
+    fn mutate_mdata_chunk<F>(
         &mut self,
         address: &MDataAddress,
         requester: PublicId,
@@ -119,7 +119,7 @@ impl MDataHandler {
     }
 
     /// Put MData.
-    pub(crate) fn handle_put_mdata_req(
+    pub(super) fn handle_put_mdata_req(
         &mut self,
         requester: PublicId,
         data: MData,
@@ -142,7 +142,7 @@ impl MDataHandler {
         })
     }
 
-    pub(crate) fn handle_delete_mdata_req(
+    pub(super) fn handle_delete_mdata_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -176,7 +176,7 @@ impl MDataHandler {
     }
 
     /// Set MData user permissions.
-    pub(crate) fn handle_set_mdata_user_permissions_req(
+    pub(super) fn handle_set_mdata_user_permissions_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -195,7 +195,7 @@ impl MDataHandler {
     }
 
     /// Delete MData user permissions.
-    pub(crate) fn handle_del_mdata_user_permissions_req(
+    pub(super) fn handle_del_mdata_user_permissions_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -213,7 +213,7 @@ impl MDataHandler {
     }
 
     /// Mutate Sequenced MData.
-    pub(crate) fn handle_mutate_seq_mdata_entries_req(
+    pub(super) fn handle_mutate_seq_mdata_entries_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -237,7 +237,7 @@ impl MDataHandler {
     }
 
     /// Mutate Unsequenced MData.
-    pub(crate) fn handle_mutate_unseq_mdata_entries_req(
+    pub(super) fn handle_mutate_unseq_mdata_entries_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -261,7 +261,7 @@ impl MDataHandler {
     }
 
     /// Get entire MData.
-    pub(crate) fn handle_get_mdata_req(
+    pub(super) fn handle_get_mdata_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -280,7 +280,7 @@ impl MDataHandler {
     }
 
     /// Get MData shell.
-    pub(crate) fn handle_get_mdata_shell_req(
+    pub(super) fn handle_get_mdata_shell_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -301,7 +301,7 @@ impl MDataHandler {
     }
 
     /// Get MData version.
-    pub(crate) fn handle_get_mdata_version_req(
+    pub(super) fn handle_get_mdata_version_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -322,7 +322,7 @@ impl MDataHandler {
     }
 
     /// Get MData value.
-    pub(crate) fn handle_get_mdata_value_req(
+    pub(super) fn handle_get_mdata_value_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -364,7 +364,7 @@ impl MDataHandler {
     }
 
     /// Get MData keys.
-    pub(crate) fn handle_list_mdata_keys_req(
+    pub(super) fn handle_list_mdata_keys_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -385,7 +385,7 @@ impl MDataHandler {
     }
 
     /// Get MData values.
-    pub(crate) fn handle_list_mdata_values_req(
+    pub(super) fn handle_list_mdata_values_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -426,7 +426,7 @@ impl MDataHandler {
     }
 
     /// Get MData entries.
-    pub(crate) fn handle_list_mdata_entries_req(
+    pub(super) fn handle_list_mdata_entries_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -467,7 +467,7 @@ impl MDataHandler {
     }
 
     /// Get MData permissions.
-    pub(crate) fn handle_list_mdata_permissions_req(
+    pub(super) fn handle_list_mdata_permissions_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -488,7 +488,7 @@ impl MDataHandler {
     }
 
     /// Get MData user permissions.
-    pub(crate) fn handle_list_mdata_user_permissions_req(
+    pub(super) fn handle_list_mdata_user_permissions_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,

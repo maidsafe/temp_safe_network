@@ -32,7 +32,7 @@ struct ChunkMetadata {
     holders: BTreeSet<XorName>,
 }
 
-pub(crate) struct IDataHandler {
+pub(super) struct IDataHandler {
     id: NodePublicId,
     idata_ops: BTreeMap<MessageId, IDataOp>,
     metadata: PickleDb,
@@ -41,7 +41,7 @@ pub(crate) struct IDataHandler {
 }
 
 impl IDataHandler {
-    pub(crate) fn new(id: NodePublicId, config: &Config, init_mode: Init) -> Result<Self> {
+    pub(super) fn new(id: NodePublicId, config: &Config, init_mode: Init) -> Result<Self> {
         let root_dir = config.root_dir();
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
@@ -54,7 +54,7 @@ impl IDataHandler {
         })
     }
 
-    pub(crate) fn handle_put_idata_req(
+    pub(super) fn handle_put_idata_req(
         &mut self,
         requester: PublicId,
         kind: IData,
@@ -113,7 +113,7 @@ impl IDataHandler {
         }
     }
 
-    pub(crate) fn handle_delete_unpub_idata_req(
+    pub(super) fn handle_delete_unpub_idata_req(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
@@ -159,7 +159,7 @@ impl IDataHandler {
         }
     }
 
-    pub(crate) fn handle_get_idata_req(
+    pub(super) fn handle_get_idata_req(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
@@ -206,7 +206,7 @@ impl IDataHandler {
         }
     }
 
-    pub(crate) fn handle_mutation_resp(
+    pub(super) fn handle_mutation_resp(
         &mut self,
         sender: XorName,
         result: NdResult<()>,
@@ -227,7 +227,7 @@ impl IDataHandler {
         }
     }
 
-    pub(crate) fn handle_put_idata_resp(
+    pub(super) fn handle_put_idata_resp(
         &mut self,
         idata_address: IDataAddress,
         sender: XorName,
@@ -276,7 +276,7 @@ impl IDataHandler {
             })
     }
 
-    pub(crate) fn handle_delete_unpub_idata_resp(
+    pub(super) fn handle_delete_unpub_idata_resp(
         &mut self,
         idata_address: IDataAddress,
         sender: XorName,
@@ -323,7 +323,7 @@ impl IDataHandler {
             })
     }
 
-    pub(crate) fn handle_get_idata_resp(
+    pub(super) fn handle_get_idata_resp(
         &mut self,
         sender: XorName,
         result: NdResult<IData>,
@@ -354,7 +354,7 @@ impl IDataHandler {
         }
     }
 
-    pub(crate) fn idata_op(&self, message_id: &MessageId) -> Option<&IDataOp> {
+    pub(super) fn idata_op(&self, message_id: &MessageId) -> Option<&IDataOp> {
         self.idata_ops.get(message_id).or_else(|| {
             warn!(
                 "{}: No current ImmutableData operation for {:?}",
@@ -364,7 +364,7 @@ impl IDataHandler {
         })
     }
 
-    pub(crate) fn idata_op_mut(&mut self, message_id: &MessageId) -> Option<&mut IDataOp> {
+    pub(super) fn idata_op_mut(&mut self, message_id: &MessageId) -> Option<&mut IDataOp> {
         let own_id = format!("{}", self);
         self.idata_ops.get_mut(message_id).or_else(|| {
             warn!(

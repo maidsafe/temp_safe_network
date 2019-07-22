@@ -19,13 +19,13 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct IDataHolder {
+pub(super) struct IDataHolder {
     id: NodePublicId,
     chunks: ImmutableChunkStore,
 }
 
 impl IDataHolder {
-    pub(crate) fn new(
+    pub(super) fn new(
         id: NodePublicId,
         config: &Config,
         total_used_space: &Rc<RefCell<u64>>,
@@ -42,7 +42,7 @@ impl IDataHolder {
         Ok(Self { id, chunks })
     }
 
-    pub(crate) fn store_idata(
+    pub(super) fn store_idata(
         &mut self,
         kind: IData,
         requester: PublicId,
@@ -70,7 +70,7 @@ impl IDataHolder {
         })
     }
 
-    pub(crate) fn get_idata(
+    pub(super) fn get_idata(
         &self,
         address: IDataAddress,
         client: PublicId,
@@ -101,7 +101,7 @@ impl IDataHolder {
         })
     }
 
-    pub(crate) fn delete_unpub_idata(
+    pub(super) fn delete_unpub_idata(
         &mut self,
         address: IDataAddress,
         client: PublicId,
