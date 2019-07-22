@@ -2017,6 +2017,144 @@ fn auth_keys() {
     list_keys(&mut env, &mut owner, Ok((expected_map, 3)));
 }
 
+#[test]
+fn app_permissions() {
+    let mut env = Environment::new();
+
+    let mut owner = env.new_connected_client();
+    common::create_balance_from_nano(&mut env, &mut owner, 0, None);
+
+    // App 0 is authorized with permission to transfer coins.
+    let mut app_0 = env.new_disconnected_app(owner.public_id().clone());
+    common::perform_mutation(
+        &mut env,
+        &mut owner,
+        Request::InsAuthKey {
+            key: *app_0.public_id().public_key(),
+            version: 1,
+            permissions: AppPermissions {
+                transfer_coins: true,
+            },
+        },
+    );
+    env.establish_connection(&mut app_0);
+
+    // App 1 is authorized, but cannot transfer coins.
+    let mut app_1 = env.new_disconnected_app(owner.public_id().clone());
+    common::perform_mutation(
+        &mut env,
+        &mut owner,
+        Request::InsAuthKey {
+            key: *app_1.public_id().public_key(),
+            version: 2,
+            permissions: AppPermissions {
+                transfer_coins: false,
+            },
+        },
+    );
+    env.establish_connection(&mut app_1);
+
+    // App 2 is not authorized.
+    let mut app_2 = env.new_connected_app(owner.public_id().clone());
+
+    let adata_owner = ADataOwner {
+        public_key: *owner.public_id().public_key(),
+        entries_index: 0,
+        permissions_index: 0,
+    };
+
+    let mut pub_data = PubUnseqAppendOnlyData::new(env.rng().gen(), 100);
+    unwrap!(pub_data.append_owner(adata_owner, 0));
+    unwrap!(pub_data.append_permissions(
+        ADataPubPermissions {
+            permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
+            entries_index: 0,
+            owners_index: 1,
+        },
+        0
+    ));
+
+    let pub_data_address = *pub_data.address();
+    common::perform_mutation(
+        &mut env,
+        &mut owner,
+        Request::PutAData(AData::from(pub_data)),
+    );
+
+    let mut unpub_data = UnpubUnseqAppendOnlyData::new(env.rng().gen(), 101);
+    unwrap!(unpub_data.append_owner(adata_owner, 0));
+    unwrap!(unpub_data.append_permissions(
+        ADataUnpubPermissions {
+            permissions: btreemap![
+                *app_0.public_id().public_key() => ADataUnpubPermissionSet::new(true, true, true),
+                *app_1.public_id().public_key() => ADataUnpubPermissionSet::new(true, true, true),
+                *app_2.public_id().public_key() => ADataUnpubPermissionSet::new(true, true, true),
+            ],
+            entries_index: 0,
+            owners_index: 1,
+        },
+        0
+    ));
+
+    let unpub_data_address = *unpub_data.address();
+    common::perform_mutation(
+        &mut env,
+        &mut owner,
+        Request::PutAData(AData::from(unpub_data)),
+    );
+
+    // All three apps can perform get request against published data
+    let _: AData =
+        common::get_from_response(&mut env, &mut app_0, Request::GetAData(pub_data_address));
+    let _: AData =
+        common::get_from_response(&mut env, &mut app_1, Request::GetAData(pub_data_address));
+    let _: AData =
+        common::get_from_response(&mut env, &mut app_2, Request::GetAData(pub_data_address));
+
+    // Only the authorized apps can perform get request against unpublished data
+    let _: AData =
+        common::get_from_response(&mut env, &mut app_0, Request::GetAData(unpub_data_address));
+    let _: AData =
+        common::get_from_response(&mut env, &mut app_1, Request::GetAData(unpub_data_address));
+    common::send_request_expect_err(
+        &mut env,
+        &mut app_2,
+        Request::GetAData(unpub_data_address),
+        NdError::AccessDenied,
+    );
+
+    // Only the app with the transfer coins permission can perform mutable request.
+    for address in [pub_data_address, unpub_data_address].iter().cloned() {
+        let append = ADataAppend {
+            address,
+            values: vec![ADataEntry {
+                key: b"key".to_vec(),
+                value: b"value".to_vec(),
+            }],
+        };
+
+        common::send_request_expect_ok(
+            &mut env,
+            &mut app_0,
+            Request::AppendUnseq(append.clone()),
+            (),
+        );
+
+        common::send_request_expect_err(
+            &mut env,
+            &mut app_1,
+            Request::AppendUnseq(append.clone()),
+            NdError::AccessDenied,
+        );
+        common::send_request_expect_err(
+            &mut env,
+            &mut app_2,
+            Request::AppendUnseq(append),
+            NdError::AccessDenied,
+        );
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Mutable data

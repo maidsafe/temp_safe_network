@@ -27,9 +27,10 @@ use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
-    AData, ADataAddress, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress,
-    IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
-    Response, Result as NdResult, Signature, Transaction, TransactionId, XorName,
+    AData, ADataAddress, AppPermissions, AppPublicId, Challenge, Coins, Error as NdError, IData,
+    IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId,
+    PublicKey, Request, Response, Result as NdResult, Signature, Transaction, TransactionId,
+    XorName,
 };
 use serde::Serialize;
 use std::{
@@ -234,6 +235,8 @@ impl ClientHandler {
             }
             Some(())
         };
+
+        self.authorise_app(&client.public_id, &request, message_id)?;
 
         match request {
             //
@@ -1304,6 +1307,106 @@ impl ClientHandler {
                 .del_auth_key(utils::client(&client.public_id)?, key, new_version);
         self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
         None
+    }
+
+    // If the client is app, check if it is authorised to perform the given request.
+    fn authorise_app(
+        &mut self,
+        public_id: &PublicId,
+        request: &Request,
+        message_id: MessageId,
+    ) -> Option<()> {
+        use Request::*;
+
+        let app_id = match public_id {
+            PublicId::App(app_id) => app_id,
+            _ => return Some(()),
+        };
+
+        let result = match request {
+            PutIData(_)
+            | DeleteUnpubIData(_)
+            | PutMData(_)
+            | DeleteMData(_)
+            | SetMDataUserPermissions { .. }
+            | DelMDataUserPermissions { .. }
+            | MutateSeqMDataEntries { .. }
+            | MutateUnseqMDataEntries { .. }
+            | PutAData(_)
+            | DeleteAData(_)
+            | AddPubADataPermissions { .. }
+            | AddUnpubADataPermissions { .. }
+            | SetADataOwner { .. }
+            | AppendSeq { .. }
+            | AppendUnseq(_)
+            | TransferCoins { .. }
+            | CreateBalance { .. }
+            | CreateLoginPacket(_)
+            | CreateLoginPacketFor { .. }
+            | UpdateLoginPacket(_)
+            | InsAuthKey { .. }
+            | DelAuthKey { .. } => self.authorise_app_for_mutation(app_id),
+            GetIData(IDataAddress::Pub(_)) => Ok(()),
+            GetIData(IDataAddress::Unpub(_)) => self.authorise_app_for_unpublished_get(app_id),
+            GetMData(_)
+            | GetMDataValue { .. }
+            | GetMDataShell(_)
+            | GetMDataVersion(_)
+            | ListMDataEntries(_)
+            | ListMDataKeys(_)
+            | ListMDataValues(_)
+            | ListMDataPermissions(_)
+            | ListMDataUserPermissions { .. } => self.authorise_app_for_unpublished_get(app_id),
+            GetAData(address)
+            | GetADataValue { address, .. }
+            | GetADataShell { address, .. }
+            | GetADataRange { address, .. }
+            | GetADataIndices(address)
+            | GetADataLastEntry(address)
+            | GetADataPermissions { address, .. }
+            | GetPubADataUserPermissions { address, .. }
+            | GetUnpubADataUserPermissions { address, .. }
+            | GetADataOwners { address, .. } => {
+                if utils::adata::is_published(address) {
+                    Ok(())
+                } else {
+                    self.authorise_app_for_unpublished_get(app_id)
+                }
+            }
+            GetLoginPacket(_) => Ok(()),
+            GetBalance | ListAuthKeysAndVersion => self.authorise_app_for_unpublished_get(app_id),
+        };
+
+        if let Err(error) = result {
+            self.send_response_to_client(
+                public_id,
+                message_id,
+                utils::to_error_response(request, error),
+            );
+            None
+        } else {
+            Some(())
+        }
+    }
+
+    fn authorise_app_for_mutation(&self, app_id: &AppPublicId) -> Result<(), NdError> {
+        if self
+            .accounts
+            .app_permissions(app_id)
+            .map(|perms| perms.transfer_coins)
+            .unwrap_or(false)
+        {
+            Ok(())
+        } else {
+            Err(NdError::AccessDenied)
+        }
+    }
+
+    fn authorise_app_for_unpublished_get(&self, app_id: &AppPublicId) -> Result<(), NdError> {
+        self.accounts
+            .app_permissions(app_id)
+            .map(|_| ())
+            .ok_or(NdError::AccessDenied)
     }
 }
 
