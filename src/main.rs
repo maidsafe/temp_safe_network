@@ -44,7 +44,7 @@ fn main() {
 fn update() -> Result<(), Box<::std::error::Error>> {
     let target = self_update::get_target()?;
     let releases = self_update::backends::github::ReleaseList::configure()
-        .repo_owner("maidsafe")
+        .repo_owner("jacderida")
         .repo_name("safe-cli")
         .with_target(&target)
         .build()?

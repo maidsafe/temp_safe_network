@@ -7,6 +7,8 @@ PWD := $(shell echo $$PWD)
 UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
 SAFE_AUTH_DEFAULT_PORT := 41805
+GITHUB_REPO_OWNER := maidsafe
+GITHUB_REPO_NAME := safe-cli
 
 build-container:
 	rm -rf target/
@@ -98,23 +100,23 @@ package-commit_hash-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
 	mkdir deploy
-	tar -C artifacts/linux/release -cvf safe_cli-linux-$$(git rev-parse --short HEAD)-x86_64.tar safe
-	tar -C artifacts/win/release -cvf safe_cli-win-$$(git rev-parse --short HEAD)-x86_64.tar safe.exe
-	tar -C artifacts/macos/release -cvf safe_cli-macos-$$(git rev-parse --short HEAD)-x86_64.tar safe
-	mv safe_cli-linux-$$(git rev-parse --short HEAD)-x86_64.tar deploy
-	mv safe_cli-win-$$(git rev-parse --short HEAD)-x86_64.tar deploy
-	mv safe_cli-macos-$$(git rev-parse --short HEAD)-x86_64.tar deploy
+	tar -C artifacts/linux/release -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar safe
+	tar -C artifacts/win/release -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar safe.exe
+	tar -C artifacts/macos/release -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar safe
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar deploy
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar deploy
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar deploy
 
 package-version-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
 	mkdir deploy
-	tar -C artifacts/linux/release -cvf safe_cli-linux-${SAFE_CLI_VERSION}-x86_64.tar safe
-	tar -C artifacts/win/release -cvf safe_cli-win-${SAFE_CLI_VERSION}-x86_64.tar safe.exe
-	tar -C artifacts/macos/release -cvf safe_cli-macos-${SAFE_CLI_VERSION}-x86_64.tar safe
-	mv safe_cli-linux-${SAFE_CLI_VERSION}-x86_64.tar deploy
-	mv safe_cli-win-${SAFE_CLI_VERSION}-x86_64.tar deploy
-	mv safe_cli-macos-${SAFE_CLI_VERSION}-x86_64.tar deploy
+	tar -C artifacts/linux/release -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar safe
+	tar -C artifacts/win/release -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar safe.exe
+	tar -C artifacts/macos/release -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar safe
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar deploy
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar deploy
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar deploy
 
 deploy-github-release:
 ifndef GITHUB_TOKEN
@@ -122,26 +124,26 @@ ifndef GITHUB_TOKEN
 	@exit 1
 endif
 	github-release release \
-		--user maidsafe \
-		--repo safe-cli \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli" \
 		--description "Command line interface for the SAFE Network";
 	github-release upload \
-		--user maidsafe \
-		--repo safe-cli \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
-		--name "safe_cli-linux-${SAFE_CLI_VERSION}-x86_64.tar" \
-		--file deploy/safe_cli-linux-${SAFE_CLI_VERSION}-x86_64.tar;
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar" \
+		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar;
 	github-release upload \
-		--user maidsafe \
-		--repo safe-cli \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
-		--name "safe_cli-win-${SAFE_CLI_VERSION}-x86_64.tar" \
-		--file deploy/safe_cli-win-${SAFE_CLI_VERSION}-x86_64.tar;
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar" \
+		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar;
 	github-release upload \
-		--user maidsafe \
-		--repo safe-cli \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
-		--name "safe_cli-macos-${SAFE_CLI_VERSION}-x86_64.tar" \
-		--file deploy/safe_cli-macos-${SAFE_CLI_VERSION}-x86_64.tar;
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar" \
+		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar;
