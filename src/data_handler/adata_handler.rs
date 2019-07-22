@@ -28,13 +28,13 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct ADataHandler {
+pub(super) struct ADataHandler {
     id: NodePublicId,
     chunks: AppendOnlyChunkStore,
 }
 
 impl ADataHandler {
-    pub(crate) fn new(
+    pub(super) fn new(
         id: NodePublicId,
         config: &Config,
         total_used_space: &Rc<RefCell<u64>>,
@@ -51,7 +51,7 @@ impl ADataHandler {
         Ok(Self { id, chunks })
     }
 
-    pub(crate) fn handle_put_adata_req(
+    pub(super) fn handle_put_adata_req(
         &mut self,
         requester: PublicId,
         data: AData,
@@ -74,7 +74,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_delete_adata_req(
+    pub(super) fn handle_delete_adata_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -111,7 +111,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_req(
+    pub(super) fn handle_get_adata_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -129,7 +129,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_shell_req(
+    pub(super) fn handle_get_adata_shell_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -150,7 +150,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_range_req(
+    pub(super) fn handle_get_adata_range_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -171,7 +171,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_indices_req(
+    pub(super) fn handle_get_adata_indices_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -191,7 +191,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_last_entry_req(
+    pub(super) fn handle_get_adata_last_entry_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -211,7 +211,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_owners_req(
+    pub(super) fn handle_get_adata_owners_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -237,7 +237,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_pub_adata_user_permissions_req(
+    pub(super) fn handle_get_pub_adata_user_permissions_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -259,7 +259,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_unpub_adata_user_permissions_req(
+    pub(super) fn handle_get_unpub_adata_user_permissions_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -281,7 +281,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_permissions_req(
+    pub(super) fn handle_get_adata_permissions_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -310,7 +310,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn handle_get_adata_value_req(
+    pub(super) fn handle_get_adata_value_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -331,7 +331,7 @@ impl ADataHandler {
         })
     }
 
-    pub(crate) fn get_adata(
+    fn get_adata(
         &self,
         requester: &PublicId,
         address: ADataAddress,
@@ -347,7 +347,7 @@ impl ADataHandler {
         Ok(data)
     }
 
-    pub(crate) fn handle_add_pub_adata_permissions_req(
+    pub(super) fn handle_add_pub_adata_permissions_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -381,7 +381,7 @@ impl ADataHandler {
         )
     }
 
-    pub(crate) fn handle_add_unpub_adata_permissions_req(
+    pub(super) fn handle_add_unpub_adata_permissions_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -413,7 +413,7 @@ impl ADataHandler {
         )
     }
 
-    pub(crate) fn handle_set_adata_owner_req(
+    pub(super) fn handle_set_adata_owner_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -438,7 +438,7 @@ impl ADataHandler {
         )
     }
 
-    pub(crate) fn handle_append_seq_req(
+    pub(super) fn handle_append_seq_req(
         &mut self,
         requester: PublicId,
         append: ADataAppend,
@@ -466,7 +466,7 @@ impl ADataHandler {
         )
     }
 
-    pub(crate) fn handle_append_unseq_req(
+    pub(super) fn handle_append_unseq_req(
         &mut self,
         requester: PublicId,
         operation: ADataAppend,
@@ -493,7 +493,7 @@ impl ADataHandler {
         )
     }
 
-    pub(crate) fn mutate_adata_chunk<F>(
+    fn mutate_adata_chunk<F>(
         &mut self,
         requester: &PublicId,
         address: ADataAddress,

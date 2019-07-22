@@ -58,7 +58,6 @@ pub struct Vault {
 }
 
 // TODO - remove this
-#[allow(unused)]
 impl Vault {
     /// Construct a new vault instance.
     pub fn new(config: Config) -> Result<Self> {
@@ -247,10 +246,6 @@ impl Vault {
                 }
                 next_action
             }
-            action => {
-                error!("Invalid action: {:?}", action);
-                None
-            }
         }
     }
 
@@ -258,6 +253,8 @@ impl Vault {
         true
     }
 
+    // TODO - remove this
+    #[allow(unused)]
     fn client_handler(&self) -> Option<&ClientHandler> {
         match &self.state {
             State::Elder {
@@ -277,6 +274,8 @@ impl Vault {
         }
     }
 
+    // TODO - remove this
+    #[allow(unused)]
     fn data_handler(&self) -> Option<&DataHandler> {
         match &self.state {
             State::Elder {
@@ -296,6 +295,8 @@ impl Vault {
         }
     }
 
+    // TODO - remove this
+    #[allow(unused)]
     fn coins_handler(&self) -> Option<&CoinsHandler> {
         match &self.state {
             State::Elder {
@@ -305,6 +306,8 @@ impl Vault {
         }
     }
 
+    // TODO - remove this
+    #[allow(unused)]
     fn coins_handler_mut(&mut self) -> Option<&mut CoinsHandler> {
         match &mut self.state {
             State::Elder {
@@ -315,6 +318,8 @@ impl Vault {
         }
     }
 
+    // TODO - remove this
+    #[allow(unused)]
     fn adult(&self) -> Option<&Adult> {
         match &self.state {
             State::Elder { .. } => None,
@@ -322,6 +327,8 @@ impl Vault {
         }
     }
 
+    // TODO - remove this
+    #[allow(unused)]
     fn adult_mut(&mut self) -> Option<&mut Adult> {
         match &mut self.state {
             State::Elder { .. } => None,

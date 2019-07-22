@@ -28,8 +28,6 @@ use std::{
     rc::Rc,
 };
 
-// TODO - remove this
-#[allow(unused)]
 pub(crate) struct DataHandler {
     id: NodePublicId,
     idata_handler: IDataHandler,
@@ -89,8 +87,6 @@ impl DataHandler {
             src,
             requester
         );
-        // TODO - remove this
-        #[allow(unused)]
         match request {
             //
             // ===== Immutable Data =====

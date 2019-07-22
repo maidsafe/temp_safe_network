@@ -235,8 +235,6 @@ impl ClientHandler {
             Some(())
         };
 
-        // TODO - remove this
-        #[allow(unused)]
         match request {
             //
             // ===== Immutable Data =====
@@ -315,9 +313,9 @@ impl ClientHandler {
                 has_signature()?;
                 self.handle_delete_adata(client, address, message_id)
             }
-            AddPubADataPermissions { ref address, .. }
-            | AddUnpubADataPermissions { ref address, .. }
-            | SetADataOwner { ref address, .. } => {
+            AddPubADataPermissions { .. }
+            | AddUnpubADataPermissions { .. }
+            | SetADataOwner { .. } => {
                 has_signature()?;
                 self.handle_mutate_adata(client, request, message_id)
             }
@@ -400,12 +398,7 @@ impl ClientHandler {
                     message_id,
                 )
             }
-            CreateLoginPacketFor {
-                new_owner,
-                amount,
-                transaction_id,
-                new_login_packet,
-            } => {
+            CreateLoginPacketFor { .. } => {
                 has_signature()?;
                 unimplemented!();
                 // self.handle_create_balance()
@@ -827,8 +820,6 @@ impl ClientHandler {
             src,
             requester
         );
-        // TODO - remove this
-        #[allow(unused)]
         match request {
             CreateLoginPacket(ref login_packet) => {
                 self.handle_create_login_packet_vault_req(requester, login_packet, message_id)

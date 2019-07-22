@@ -8,7 +8,6 @@
 
 use super::chunk::Chunk;
 use safe_nd::{LoginPacket, XorName};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 impl Chunk for LoginPacket {
     type Id = XorName;
