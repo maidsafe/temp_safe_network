@@ -278,6 +278,6 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
 
     // and now the tests...
     assert_eq!(file_cat, "the sub with more text!");
-    assert!(files_sync_result.contains("*"));
-    assert!(!files_sync_result.contains("+"));
+    assert!(files_sync_result.contains('*'));
+    assert!(!files_sync_result.contains('+'));
 }

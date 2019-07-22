@@ -199,7 +199,7 @@ fn test_xorurl_base32_encoding() {
     let xorname = XorName(*b"12345678901234567890123456789012");
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
-        0xa6323c4d4a32,
+        0xa632_3c4d_4a32,
         SafeContentType::ImmutableData,
         None,
         &"base32".to_string()
@@ -229,7 +229,7 @@ fn test_xorurl_base64_encoding() {
     let xorname = XorName(*b"12345678901234567890123456789012");
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
-        4584545,
+        4_584_545,
         SafeContentType::FilesContainer,
         None,
         &"base64".to_string()
@@ -241,7 +241,7 @@ fn test_xorurl_base64_encoding() {
     assert_eq!("", xorurl_encoder.path());
     assert_eq!(1, xorurl_encoder.version());
     assert_eq!(xorname, xorurl_encoder.xorname());
-    assert_eq!(4584545, xorurl_encoder.type_tag());
+    assert_eq!(4_584_545, xorurl_encoder.type_tag());
     assert_eq!(
         SafeContentType::FilesContainer,
         xorurl_encoder.content_type()

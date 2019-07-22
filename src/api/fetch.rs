@@ -294,7 +294,7 @@ fn test_fetch_resolvable_container() {
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
 
-    let (nrs_map_xorurl, _, nrs_map) =
+    let (_nrs_map_xorurl, _, _nrs_map) =
         unwrap!(safe.nrs_map_container_create("somesite", Some(&xorurl), true, false));
 
     let content = unwrap!(safe.fetch("safe://somesite"));
@@ -345,7 +345,7 @@ fn test_fetch_unknown() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let xorname = create_random_xorname();
-    let type_tag = 575756443;
+    let type_tag = 575_756_443;
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         type_tag,
@@ -364,7 +364,7 @@ fn test_fetch_unsupported() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let xorname = create_random_xorname();
-    let type_tag = 575756443;
+    let type_tag = 575_756_443;
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         type_tag,
