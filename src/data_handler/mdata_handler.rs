@@ -30,7 +30,7 @@ use std::{
 
 pub(crate) struct MDataHandler {
     id: NodePublicId,
-    mutable_chunks: MutableChunkStore,
+    chunks: MutableChunkStore,
 }
 
 impl MDataHandler {
@@ -42,13 +42,13 @@ impl MDataHandler {
     ) -> Result<Self> {
         let root_dir = config.root_dir();
         let max_capacity = config.max_capacity();
-        let mutable_chunks = MutableChunkStore::new(
+        let chunks = MutableChunkStore::new(
             &root_dir,
             max_capacity,
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, mutable_chunks })
+        Ok(Self { id, chunks })
     }
 
     /// Get `MData` from the chunk store and check permissions.
@@ -69,7 +69,7 @@ impl MDataHandler {
         };
 
         Some(
-            self.mutable_chunks
+            self.chunks
                 .get(&address)
                 .map_err(|e| match e {
                     ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
@@ -95,7 +95,7 @@ impl MDataHandler {
         F: FnOnce(MData) -> NdResult<MData>,
     {
         let result = self
-            .mutable_chunks
+            .chunks
             .get(address)
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
@@ -103,7 +103,7 @@ impl MDataHandler {
             })
             .and_then(mutation_fn)
             .and_then(move |mdata| {
-                self.mutable_chunks
+                self.chunks
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
@@ -125,10 +125,10 @@ impl MDataHandler {
         data: MData,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if self.mutable_chunks.has(data.address()) {
+        let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
-            self.mutable_chunks
+            self.chunks
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
@@ -151,7 +151,7 @@ impl MDataHandler {
         let requester_pk = *utils::own_key(&requester)?;
 
         let result = self
-            .mutable_chunks
+            .chunks
             .get(&address)
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
@@ -160,7 +160,7 @@ impl MDataHandler {
             .and_then(move |mdata| {
                 mdata.check_is_owner(requester_pk)?;
 
-                self.mutable_chunks
+                self.chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });

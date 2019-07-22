@@ -30,7 +30,7 @@ use std::{
 
 pub(crate) struct ADataHandler {
     id: NodePublicId,
-    append_only_chunks: AppendOnlyChunkStore,
+    chunks: AppendOnlyChunkStore,
 }
 
 impl ADataHandler {
@@ -42,16 +42,13 @@ impl ADataHandler {
     ) -> Result<Self> {
         let root_dir = config.root_dir();
         let max_capacity = config.max_capacity();
-        let append_only_chunks = AppendOnlyChunkStore::new(
+        let chunks = AppendOnlyChunkStore::new(
             &root_dir,
             max_capacity,
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self {
-            id,
-            append_only_chunks,
-        })
+        Ok(Self { id, chunks })
     }
 
     pub(crate) fn handle_put_adata_req(
@@ -60,10 +57,10 @@ impl ADataHandler {
         data: AData,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if self.append_only_chunks.has(data.address()) {
+        let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
-            self.append_only_chunks
+            self.chunks
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
@@ -85,7 +82,7 @@ impl ADataHandler {
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
         let result = self
-            .append_only_chunks
+            .chunks
             .get(&address)
             .map_err(|error| match error {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
@@ -100,7 +97,7 @@ impl ADataHandler {
                 }
             })
             .and_then(|_| {
-                self.append_only_chunks
+                self.chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });
@@ -341,13 +338,10 @@ impl ADataHandler {
         action: ADataAction,
     ) -> Result<AData, NdError> {
         let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
-        let data = self
-            .append_only_chunks
-            .get(&address)
-            .map_err(|error| match error {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
-                _ => error.to_string().into(),
-            })?;
+        let data = self.chunks.get(&address).map_err(|error| match error {
+            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+            _ => error.to_string().into(),
+        })?;
 
         data.check_permission(action, *requester_key)?;
         Ok(data)
@@ -514,7 +508,7 @@ impl ADataHandler {
             .get_adata(requester, address, action)
             .and_then(mutation_fn)
             .and_then(move |adata| {
-                self.append_only_chunks
+                self.chunks
                     .put(&adata)
                     .map_err(|error| error.to_string().into())
             });

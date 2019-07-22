@@ -21,7 +21,7 @@ use std::{
 
 pub(crate) struct IDataHolder {
     id: NodePublicId,
-    immutable_chunks: ImmutableChunkStore,
+    chunks: ImmutableChunkStore,
 }
 
 impl IDataHolder {
@@ -33,16 +33,13 @@ impl IDataHolder {
     ) -> Result<Self> {
         let root_dir = config.root_dir();
         let max_capacity = config.max_capacity();
-        let immutable_chunks = ImmutableChunkStore::new(
+        let chunks = ImmutableChunkStore::new(
             &root_dir,
             max_capacity,
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self {
-            id,
-            immutable_chunks,
-        })
+        Ok(Self { id, chunks })
     }
 
     pub(crate) fn store_idata(
@@ -51,7 +48,7 @@ impl IDataHolder {
         requester: PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if self.immutable_chunks.has(kind.address()) {
+        let result = if self.chunks.has(kind.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -59,7 +56,7 @@ impl IDataHolder {
             );
             Ok(())
         } else {
-            self.immutable_chunks
+            self.chunks
                 .put(&kind)
                 .map_err(|error| error.to_string().into())
         };
@@ -81,7 +78,7 @@ impl IDataHolder {
     ) -> Option<Action> {
         let client_pk = utils::own_key(&client)?;
         let result = self
-            .immutable_chunks
+            .chunks
             .get(&address)
             .map_err(|error| error.to_string().into())
             .and_then(|kind| match kind {
@@ -114,7 +111,7 @@ impl IDataHolder {
 
         // First we need to read the chunk to verify the permissions
         let result = self
-            .immutable_chunks
+            .chunks
             .get(&address)
             .map_err(|error| error.to_string().into())
             .and_then(|kind| match kind {
@@ -134,7 +131,7 @@ impl IDataHolder {
                 }
             })
             .and_then(|_| {
-                self.immutable_chunks
+                self.chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });
