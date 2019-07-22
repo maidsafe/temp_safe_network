@@ -8,9 +8,6 @@
 
 //! A simple, persistent, disk-based key-value store.
 
-// FIXME - remove
-#![allow(unused)]
-
 // #[cfg(test)]
 // mod tests;
 mod append_only;
@@ -22,17 +19,15 @@ mod mutable;
 mod used_space;
 
 use crate::{utils, vault::Init};
-use chunk::{Chunk, ChunkId};
+use chunk::Chunk;
 use error::{Error, Result};
-use hex::{self, FromHex};
+use hex;
 use log::trace;
-use safe_nd::{AData, ADataAddress, IData, IDataAddress, LoginPacket, MData, MDataAddress};
-use serde::{Deserialize, Serialize};
+use safe_nd::{AData, IData, LoginPacket, MData};
 use std::{
     cell::RefCell,
-    cmp, env,
-    fs::{self, File, Metadata, OpenOptions},
-    io::{self, Read, Seek, SeekFrom, Write},
+    fs::{self, File, Metadata},
+    io::{Read, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
     rc::Rc,
@@ -167,6 +162,7 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     /// Lists all keys of currently stored data.
+    #[allow(unused)]
     pub fn keys(&self) -> Vec<T::Id> {
         unimplemented!();
         // fs::read_dir(&self.dir)

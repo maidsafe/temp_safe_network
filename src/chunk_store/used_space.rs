@@ -11,9 +11,9 @@ use crate::vault::Init;
 use bincode;
 use std::{
     cell::RefCell,
-    fs::{self, File, OpenOptions},
-    io::{self, Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf},
+    fs::{File, OpenOptions},
+    io::{Read, Seek, SeekFrom},
+    path::Path,
     rc::Rc,
 };
 
