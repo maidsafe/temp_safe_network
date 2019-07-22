@@ -57,7 +57,7 @@ The base command, if built is `$ safe`, or all commands can be run via `$ cargo 
 Various global flags are available (those commented out are not yet implemented):
 
 ```
-# --dry-run                Dry run of command. No data will be written. No coins spent.
+--dry-run                  Dry run of command. No data will be written. No coins spent.
 -h, --help                 Prints help information
 --json                     Sets JSON as output serialisation format (alias of '--output json')
 # --root                   The account's Root Container address
@@ -65,7 +65,8 @@ Various global flags are available (those commented out are not yet implemented)
 # -v, --verbose            Increase output verbosity. (More logs!)
 -o, --output <output_fmt>  Output data serlialisation. Currently only supported 'json'
 # -q, --query <query>      Enable to query the output via SPARQL eg.
---xorurl <xorurl_base>     Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default) and base32
+--xorurl <xorurl_base>     Base encoding to be used for XOR-URLs generated. Currently supported: base32z
+                           (default), base32 and base64
 ```
 
 #### `--help`
@@ -175,7 +176,7 @@ sk="62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a"
 We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `Key` to be owned by it and preload it with some test-coins:
 ```shell
 $ safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
-New Key created at: "safe://bbkulcbmrxdx2inbg4srljrd2fwvwxmqg7moev72r5ptxelr43e25cndjf"
+New Key created at: "safe://hodby8y3qgina9nqzxmsoi8ytjfh6gwnia7hdupo49ibt8yy3ytgdq"
 ```
 
 Finally, our friend gives us the XOR-URL of the `Key` they have created for us, and we can now use the `Key` for any other operation, we own the balance it contains since we have the secret key associated to it.
@@ -205,33 +206,37 @@ SUBCOMMANDS:
 USAGE:
     safe wallet create [FLAGS] [OPTIONS] [ARGS]
 
+FLAGS:
+        --no-balance    If true, do not create a spendable balance
+        --test-coins    Create a Key, allocate test-coins onto it, and add the Key to the Wallet
+
 OPTIONS:
+        --keyurl <keyurl>         An existing Key's safe://xor-url. If this is not supplied, a new Key will be
+                                  automatically generated and inserted. The corresponding secret key will be prompted if
+                                  not provided with '--sk'.
         --name <name>             The name to give the spendable balance
+    -o, --output <output_fmt>     Output data serlialisation. Currently only supported 'json'
         --preload <preload>       Preload the key with a balance
-    -s, --sk <secret>     Optionally pass the secret key to make the balance spendable
+        --sk <secret>             Pass the secret key to make the balance spendable, it will be prompted if not provided
+        --xorurl <xorurl_base>    Base encoding to be used for XOR-URLs generated. Currently supported: base32z
+                                  (default), base32 and base64
 
 ARGS:
-    <key>       An existing `Key`'s safe://xor-url. If this is not supplied, a new `Key` will be automatically generated and inserted
-    <source>    The source Wallet for funds.
-	<no_balance>    If true, do not create a spendable balance
+    <source>    The secret key of a Key for paying the storage costs.
 ```
 
-- The `<source>` is the `Wallet` paying for data creation/mutation.
-- `<no_balance>` will prevent the command from automatically creating a spendable balance if non is supplied.
-- The `<key>` allows passing an existing `Key` XorUrl, which we'll be used to generate the spendable balance.
+Right now, only a secret key (of a `Key` with coins) can be used as the `<source>` to pay for the costs, but in the future a `Wallet` will be also allowed as the `<source>`.
 
-For example, we can create a new `Wallet` with a new spendable balance by simply running:
+For example, if we use the secret key we obtained when creating a `Key` in our example in previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
 
 ```shell
-$ safe wallet create --source <source wallet to pay for storage costs>
-New Key created at: "safe://bbkulcbjyino6h67nnpw2abkm2z2m72rvl733ffuchrdn4hoorw3sf33ai"
+$ safe wallet create 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
+New Key created at: "safe://hodqmc6ht5ezpprkh1cbw54n3mjyckcpm95qmygon897ft5dq8oxpc"
 Key pair generated:
 pk=a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
 sk=65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
-Wallet created at: "safe://bbkulcamiji5j7jcewxwqzqfk5hybac4tvit3544xa7ka5yp5qhrwy2xnd"
+Wallet created at: "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao"
 ```
-
-Or if you already have a public key to preload into the wallet, you can do so with the `--key` argument.
 
 #### Wallet Balance
 
@@ -239,43 +244,48 @@ The balance of a given `Wallet` can be queried using its XorUrl. This returns th
 
 The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
 ```shell
-$ safe wallet balance safe://bbkulcbthsrih6ot7mfwus6oa4xeonv5y7wwm2ucjeypgtwrmdk5db7fqy
-Wallet at "safe://bbkulcakdcx2jxw2gfyvh7klkacht652c2pog3pohhpmiri73qjjpd2vks" has a total balance of 0 safecoins
+$ safe wallet balance safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao
+Wallet at "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao" has a total balance of 0 safecoins
 ```
 
 #### Wallet Insert
 
 As mentioned before, a `Key` doesn't hold the secret key on the network, therefore even if it has some non-zero coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `Key`'s, and making their balances spendable by storing the corresponding secret keys.
 
-
 Aside from at wallet creation, we can add _more_ keys to use as spendable balances by `insert`-ing into a `Wallet` a link to a `Key`, making it a spendable balance.
 
 ```shell
 USAGE:
-    safe wallet insert [FLAGS] [OPTIONS] <source> [ARGS]
+    safe wallet insert [FLAGS] [OPTIONS] [ARGS]
+
+FLAGS:
+        --default    Set the inserted Key as the default one in the target Wallet
 
 OPTIONS:
-    --name <name>              The name to give this spendable balance
-    -s, --sk <secret>  Optionally pass the secret key to make the balance spendable
+        --keyurl <keyurl>         The Key's safe://xor-url to verify it matches/corresponds to the secret key provided.
+                                  The corresponding secret key will be prompted if not provided with '--sk'.
+        --name <name>             The name to give this spendable balance
+    -o, --output <output_fmt>     Output data serlialisation. Currently only supported 'json'
+        --sk <secret>             Pass the secret key to make the balance spendable, it will be prompted if not provided
+        --xorurl <xorurl_base>    Base encoding to be used for XOR-URLs generated. Currently supported: base32z
+                                  (default), base32 and base64
 
 ARGS:
-    <key>        An existing `Key`'s safe://xor-url.
-    <source>     The source Wallet for funds
     <target>     The target Wallet to insert the spendable balance
+    <source>     The secret key of a Key for paying the storage costs
 ```
 
-- The `<source>` is the `Wallet` paying for data creation/mutation.
-- The `<target>` is the `Wallet` to insert the spendable balance to.
-- The `<key>` allows passing an existing `Key` XorUrl, which we'll be used to generate the spendable balance.
-- The `--name` is an optional nickname to give a spendable balance for easy reference,
-- The `--default` flag sets _this_ new spendable balance as the default for the containing `Wallet`. This can be used by wallet applications to apply some logic on how to spend and/or choose the balances for a transaction.
+- The `<target>` is the `Wallet` to insert the spendable balance to
+- The `<source>` is the secret key of a `Key` paying for the costs. Right now, only a secret key (of a `Key` with coins) can be used as the `<source>` to pay for the costs, but in the future a `Wallet` will be also allowed as the `<source>`
+- The `--name` is an optional nickname to give a spendable balance for easy reference
+- The `--default` flag sets _this_ new spendable balance as the default for the containing `Wallet`. This can be used by wallet applications to apply some logic on how to spend and/or choose the balances for a transaction
 
-With the above options, the user will be prompted to input the secret key associated with the public key. This is stored in the `Wallet`.
+With the above options, the user will be prompted to input the secret key associated with the public key, unless it was already provided with `--sk`. This is stored in the `Wallet`.
 
-Otherwise, there's also the `--sk` argument, which when combined with `--key` can pass the `Key` XorUrl as part of the command line instruction itself, e.g.:
+The `--sk` argument can also be combined with `--keyurl` to pass the `Key`'s XorUrl as part of the command line instruction itself, e.g.:
 
 ```shell
-$ safe wallet insert <source wallet> --target safe://wallet-xorurl --key safe://key-xor-url --name my_default_balance --default
+$ safe wallet insert safe://<wallet-xorurl> --keyurl safe://<key-xor-url> --name my_default_balance --default
 Enter secret key corresponding to public key at safe://key-xor-url:
 b493a84e3b35239cbffdf10b8ebfa49c0013a5d1b59e5ef3c000320e2d303311
 Spendable balance inserted with name 'my_default_balance' in Wallet located at "safe://wallet-xorurl"
@@ -292,8 +302,8 @@ $ safe wallet transfer <amount> <to> <from>
 ```
 E.g.:
 ```shell
-$ safe wallet transfer 323.23 safe://7e0ae5e6ed15a8065ea03218a0903b0be7c9d78384998817331b309e9d23566e safe://6221785c1a20163bbefaf523af15fa525d83b00be7502d28cae5b09ac54f4e75
-Success. TX_ID: 44dcd919-0703-4f23-a9a2-6b6be8da0bcc
+$ safe wallet transfer 323.23 safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao safe://hodn6ny9jwhrnokdrgrfmn1jyksh7exctuuzh9w35bpuw5wmpp7hhp
+Success. TX_ID: 6183829450183485238
 ```
 
 ### Files

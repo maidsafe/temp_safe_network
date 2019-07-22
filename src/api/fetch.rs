@@ -81,42 +81,32 @@ impl Safe {
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
-        debug!("Attempting to fetch url: {:?}", xorurl);
+        debug!("Attempting to fetch url: {}", xorurl);
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl);
+        let the_xor = XorUrlEncoder::from_url(&xorurl).or_else(|err| {
+            info!(
+                "Falling back to NRS. XorUrl decoding failed with: {:?}",
+                err
+            );
 
-        let the_xorurl: &XorUrl;
+            let (host_str, path) = get_host_and_path(&xorurl)?;
+            let hashed_host = xorname_from_nrs_string(&host_str)?;
 
-        let the_xor = match xorurl_encoder {
-            Ok(encoder) => Ok(encoder),
-            Err(err) => {
-                let (host_str, path) = get_host_and_path(&xorurl)?;
+            let encoded_xor = XorUrlEncoder::new(
+                hashed_host,
+                NRS_MAP_TYPE_TAG,
+                SafeContentType::NrsMapContainer,
+                Some(&path),
+            );
 
-                info!(
-                    "Falling back to NRS. XorUrl decoding failed with: {:?}",
-                    err
-                );
+            let new_url = encoded_xor.to_string("base32z")?;
 
-                let hashed_host = xorname_from_nrs_string(&host_str)?;
+            debug!("Checking NRS system for URL: {}", new_url);
+            Ok(encoded_xor)
+        })?;
 
-                let encoded_xor = XorUrlEncoder::new(
-                    hashed_host,
-                    NRS_MAP_TYPE_TAG,
-                    SafeContentType::NrsMapContainer,
-                    Some(&path),
-                );
-
-                let new_url = encoded_xor.to_string("base32z")?;
-
-                // let full_new_url = format!("{}", base_xor_url);
-                debug!("Checking NRS system for url: {:?}", &new_url);
-                Ok(encoded_xor)
-            }
-        }?;
-
-        let xorurl_string = the_xor.to_string("base32z")?;
-        the_xorurl = &xorurl_string;
-        debug!("URL parsed successfully, fetching: {:?}", the_xorurl);
+        let the_xorurl = the_xor.to_string("base32z")?;
+        debug!("URL parsed successfully, fetching: {}", the_xorurl);
         let path = the_xor.path();
 
         debug!("Fetching content of type: {:?}", the_xor.content_type());
@@ -136,8 +126,8 @@ impl Safe {
                     self.files_container_get_latest(&the_xorurl)?;
 
                 debug!(
-                    "Files container found w/ v:{:?}, of type: {:?}, containing: {:?}",
-                    &version, &native_type, &files_map
+                    "Files container found w/ v:{}, of type: {}, containing: {:?}",
+                    version, native_type, files_map
                 );
 
                 if path != "/" && !path.is_empty() {
@@ -147,14 +137,14 @@ impl Safe {
                         None => {
                             return Err(Error::ContentError(format!(
                                 "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-                                &path, &the_xorurl
+                                path, the_xorurl
                             )))
                         }
                     };
 
                     let new_target_xorurl = match file_item.get("link") {
 						Some( path_data ) => path_data,
-						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", &path, &the_xorurl))),
+						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, the_xorurl))),
 					};
 
                     let path_data = self.fetch(new_target_xorurl);
@@ -173,15 +163,15 @@ impl Safe {
                 let (version, nrs_map, native_type) =
                     self.nrs_map_container_get_latest(&the_xorurl)?;
                 debug!(
-                    "Nrs map container found w/ v:{:?}, of type: {:?}, containing: {:?}",
-                    &version, &native_type, &nrs_map
+                    "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
+                    version, native_type, nrs_map
                 );
 
                 let new_target_xorurl = nrs_map.get_default_link()?;
 
                 let url_with_path = format!("{}{}", &new_target_xorurl, path);
 
-                debug!("Resolving target from resolvable map: {:?}", url_with_path);
+                debug!("Resolving target from resolvable map: {}", url_with_path);
 
                 // TODO: Properly prevent resolution
                 // if prevent_resolution {

@@ -61,7 +61,7 @@ pub fn key_commander(
         }
         Some(KeysSubCommands::Balance { keyurl, secret }) => {
             let target = keyurl.unwrap_or_else(|| "".to_string());
-            let sk = get_secret_key(&target, secret)?;
+            let sk = get_secret_key(&target, secret, "the Key to query the balance from")?;
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(&sk)?
             } else {

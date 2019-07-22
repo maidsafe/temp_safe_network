@@ -109,7 +109,7 @@ impl Safe {
 
         debug!("XorName for \"{:?}\" is \"{:?}\"", &name, &nrs_xorname);
 
-		let final_destination = destination.unwrap_or_else(|| "");
+        let final_destination = destination.unwrap_or_else(|| "");
         // TODO: Enable source for funds / ownership
 
         // The NrsMapContainer is created as a AppendOnlyData with a single entry containing the
@@ -120,7 +120,10 @@ impl Safe {
         let mut processed_entries = BTreeMap::new();
         processed_entries.insert(
             name.to_string(),
-            (CONTENT_ADDED_SIGN.to_string(), final_destination.to_string()),
+            (
+                CONTENT_ADDED_SIGN.to_string(),
+                final_destination.to_string(),
+            ),
         );
 
         let serialised_nrs_map = serde_json::to_string(&nrs_map).map_err(|err| {

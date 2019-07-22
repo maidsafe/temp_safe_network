@@ -130,7 +130,6 @@ fn calling_safe_wallet_insert() {
         get_bin_location(),
         "wallet",
         "insert",
-        &key_pk_xor,
         &wallet_xor,
         "--keyurl",
         &key_pk_xor,

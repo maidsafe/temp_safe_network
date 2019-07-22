@@ -12,18 +12,20 @@ use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::keys::create_new_key;
 use super::OutputFmt;
 use log::debug;
-use safe_cli::{BlsKeyPair, Safe};
-use unwrap::unwrap;
+use safe_cli::Safe;
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
     #[structopt(name = "insert")]
     /// Insert a spendable balance into a Wallet
     Insert {
-        /// The source Wallet for funds
-        source: Option<String>,
         /// The target Wallet to insert the spendable balance
-        target: Option<String>,
+        target: String,
+        /// The secret key of a Key for paying the storage costs
+        source: Option<String>,
+        /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
+        #[structopt(long = "sk")]
+        secret: Option<String>,
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
@@ -33,9 +35,6 @@ pub enum WalletSubCommands {
         /// Set the inserted Key as the default one in the target Wallet
         #[structopt(long = "default")]
         default: bool,
-        /// Pass the secret key to make the balance spendable, it will be prompted if not provided
-        #[structopt(long = "sk")]
-        secret: Option<String>,
     },
     #[structopt(name = "balance")]
     /// Query a Wallet's total balance
@@ -49,7 +48,7 @@ pub enum WalletSubCommands {
     #[structopt(name = "create")]
     /// Create a new Wallet
     Create {
-        /// The source Wallet for funds
+        /// The secret key of a Key for paying the storage costs
         source: Option<String>,
         /// If true, do not create a spendable balance
         #[structopt(long = "no-balance")]
@@ -60,7 +59,7 @@ pub enum WalletSubCommands {
         /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'.
         #[structopt(long = "keyurl")]
         keyurl: Option<String>,
-        /// Pass the secret key to make the balance spendable, it will be prompted if not provided
+        /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
         #[structopt(long = "sk")]
         secret: Option<String>,
         /// Create a Key, allocate test-coins onto it, and add the Key to the Wallet
@@ -75,9 +74,9 @@ pub enum WalletSubCommands {
     Transfer {
         /// Number of safecoins to transfer
         amount: String,
-        /// target Wallet
+        /// The receiving Wallet/Key
         to: String,
-        /// source Wallet, or pulled from stdin if not present
+        /// Source Wallet, or pulled from stdin if not provided
         from: Option<String>,
     },
     #[structopt(name = "sweep")]
@@ -112,29 +111,23 @@ pub fn wallet_commander(
 
             if !no_balance {
                 // get or create keypair
-                let (xorurl, key_pair) = match keyurl {
+                let sk = match keyurl {
                     Some(linked_key) => {
-                        let sk = get_secret_key(&linked_key, secret)?;
-                        let pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
-
-                        (linked_key, Some(BlsKeyPair { pk, sk }))
+                        let sk = get_secret_key(&linked_key, secret, "the Key to insert")?;
+                        let _pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
+                        sk
                     }
-                    None => create_new_key(safe, test_coins, source, preload, None, output_fmt)?,
-                };
-
-                let the_name = match name {
-                    Some(name_str) => name_str.to_string(),
-                    None => xorurl.clone(),
+                    None => {
+                        let (_xorurl, key_pair) =
+                            create_new_key(safe, test_coins, source, preload, None, output_fmt)?;
+                        let unwrapped_key_pair =
+                            key_pair.ok_or("Failed to read the generated key pair")?;
+                        unwrapped_key_pair.sk
+                    }
                 };
 
                 // insert and set as default
-                safe.wallet_insert(
-                    &wallet_xorname,
-                    &the_name,
-                    true,
-                    &unwrap!(key_pair),
-                    &xorurl,
-                )?;
+                safe.wallet_insert(&wallet_xorname, name, true, &sk)?;
             }
 
             if OutputFmt::Pretty == output_fmt {
@@ -169,22 +162,16 @@ pub fn wallet_commander(
             secret,
             ..
         }) => {
-            let target = get_from_arg_or_stdin(target, None)?;
-
-            let (xorurl, key_pair) = {
-                let url = keyurl.unwrap_or_else(|| "".to_string());
-                let sk = get_secret_key(&url, secret)?;
-                let pk = safe.validate_sk_for_xorurl(&sk, &url)?;
-
-                (url, Some(BlsKeyPair { pk, sk }))
+            let sk = match keyurl {
+                Some(linked_key) => {
+                    let sk = get_secret_key(&linked_key, secret, "the Key to insert")?;
+                    let _pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
+                    sk
+                }
+                None => get_secret_key("", secret, "the Key to insert")?,
             };
 
-            let the_name = match name {
-                Some(name_str) => name_str,
-                None => xorurl.clone(),
-            };
-
-            safe.wallet_insert(&target, &the_name, default, &unwrap!(key_pair), &xorurl)?;
+            let the_name = safe.wallet_insert(&target, name, default, &sk)?;
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",
@@ -197,10 +184,15 @@ pub fn wallet_commander(
         }
         Some(WalletSubCommands::Transfer { amount, from, to }) => {
             //TODO: if from/to start without safe://, i.e. if they are PK hex strings.
-            let tx_id = safe.wallet_transfer(&amount, from, &to)?;
+            let source = get_from_arg_or_stdin(
+                from,
+                Some("...awaiting source Wallet/Key to be used for funds from STDIN stream..."),
+            )?;
+
+            let tx_id = safe.wallet_transfer(&amount, Some(source), &to)?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Success. TX_ID: {:?}", &tx_id);
+                println!("Success. TX_ID: {}", &tx_id);
             } else {
                 println!("{}", &tx_id)
             }

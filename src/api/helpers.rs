@@ -16,6 +16,7 @@ use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
 use url::Url;
 
 // Out internal key pair structure to manage BLS keys
+#[derive(Debug)]
 pub struct KeyPair {
     pub pk: PublicKey,
     pub sk: SecretKey,
@@ -28,13 +29,25 @@ impl KeyPair {
         KeyPair { pk, sk }
     }
 
-    /*
+    #[allow(dead_code)]
     pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> ResultReturn<Self> {
         let pk = pk_from_hex(pk_hex_str)?;
         let sk = sk_from_hex(sk_hex_str)?;
+        if pk != sk.public_key() {
+            Err(Error::InvalidInput(
+                "Secret key doesn't correspond to public key provided".to_string(),
+            ))
+        } else {
+            Ok(KeyPair { pk, sk })
+        }
+    }
+
+    pub fn from_hex_sk(sk_hex_str: &str) -> ResultReturn<Self> {
+        let sk = sk_from_hex(sk_hex_str)?;
+        let pk = sk.public_key();
         Ok(KeyPair { pk, sk })
     }
-    */
+
     pub fn to_hex_key_pair(&self) -> ResultReturn<(String, String)> {
         let pk: String = pk_to_hex(&self.pk);
 

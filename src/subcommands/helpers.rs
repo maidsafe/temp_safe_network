@@ -59,12 +59,12 @@ pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String, String> 
 }
 
 // Unwrap secret key string provided, otherwise prompt user to provide it
-pub fn get_secret_key(key_xorurl: &str, sk: Option<String>) -> Result<String, String> {
+pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result<String, String> {
     let mut sk = sk.unwrap_or_else(|| String::from(""));
 
     if sk.is_empty() {
         let msg = if key_xorurl.is_empty() {
-            "Enter secret key corresponding to the Key to query: ".to_string()
+            format!("Enter secret key corresponding to {}: ", msg)
         } else {
             format!(
                 "Enter secret key corresponding to public key at \"{}\": ",

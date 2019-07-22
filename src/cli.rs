@@ -25,21 +25,21 @@ struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
     cmd: SubCommands,
-    /// The account's Root Container address
+    // /// The account's Root Container address
     // #[structopt(long = "root", raw(global = "true"))]
-    root: bool,
+    // root: bool,
     /// Output data serlialisation. Currently only supported 'json'
     #[structopt(short = "o", long = "output", raw(global = "true"))]
     output_fmt: Option<String>,
     /// Sets JSON as output serialisation format (alias of '--output json')
     #[structopt(long = "json", raw(global = "true"))]
     output_json: bool,
-    /// Increase output verbosity. (More logs!)
+    // /// Increase output verbosity. (More logs!)
     // #[structopt(short = "v", long = "verbose", raw(global = "true"))]
-    verbose: bool,
-    /// Enable to query the output via SPARQL eg.
+    // verbose: bool,
+    // /// Enable to query the output via SPARQL eg.
     // #[structopt(short = "q", long = "query", raw(global = "true"))]
-    query: Option<String>,
+    // query: Option<String>,
     /// Dry run of command. No data will be written. No coins spent.
     #[structopt(short = "n", long = "dry-run", raw(global = "true"))]
     dry: bool,

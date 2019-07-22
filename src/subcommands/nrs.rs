@@ -19,7 +19,7 @@ pub enum NrsSubCommands {
     Add {
         /// The name to give this key
         name: String,
-        /// The safe:// url to map this to. Usually a FilesContainer for a website, eg.
+        /// The safe:// URL to map this to. Usually a FilesContainer for a website, eg.
         #[structopt(short = "-l", long = "link")]
         link: Option<String>,
         /// Set the sub name as default for this public name.
@@ -31,7 +31,7 @@ pub enum NrsSubCommands {
     Create {
         /// The name to give site, eg 'safenetwork'
         name: String,
-        /// The safe:// url to map this to. Usually a FilesContainer for a website, eg.
+        /// The safe:// URL to map this to. Usually a FilesContainer for a website, eg.
         #[structopt(short = "-l", long = "link")]
         link: Option<String>,
     },

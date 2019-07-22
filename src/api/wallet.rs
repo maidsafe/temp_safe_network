@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{parse_coins_amount, sk_from_hex};
-use super::keys::validate_key_pair;
+use super::helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, KeyPair};
 use super::xorurl::SafeContentType;
-use super::{BlsKeyPair, Safe, XorUrl, XorUrlEncoder};
 use super::{Error, ResultReturn};
+use super::{Safe, XorUrl, XorUrlEncoder};
 use log::debug;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
@@ -36,6 +35,7 @@ impl Safe {
         let xorname = self
             .safe_app
             .put_seq_mutable_data(None, WALLET_TYPE_TAG, None)?;
+
         XorUrlEncoder::encode(
             xorname,
             WALLET_TYPE_TAG,
@@ -45,37 +45,47 @@ impl Safe {
         )
     }
 
-    // Add a Key to a Wallet to make it spendable
+    // Add a Key to a Wallet to make it spendable, and returns the friendly name set for it
     pub fn wallet_insert(
         &mut self,
         wallet_xorurl: &str,
-        name: &str,
+        name: Option<String>,
         default: bool,
-        key_pair: &BlsKeyPair,
-        key_xorurl: &str,
-    ) -> ResultReturn<()> {
+        sk: &str,
+    ) -> ResultReturn<String> {
+        let key_pair = KeyPair::from_hex_sk(sk)?;
+        let xorname = xorname_from_pk(&key_pair.pk);
+        let xorurl = XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeContentType::CoinBalance,
+            None,
+            &self.xorurl_base,
+        )?;
         let value = WalletSpendableBalance {
-            xorurl: key_xorurl.to_string(),
-            sk: key_pair.sk.clone(),
+            xorurl: xorurl.clone(),
+            sk: sk.to_string(),
         };
 
-        validate_key_pair(&key_pair)?;
+        let serialised_value = serde_json::to_string(&value).map_err(|err| {
+            Error::Unexpected(format!(
+                "Failed to serialise data to insert in Wallet container: {:?}",
+                err
+            ))
+        })?;
 
-        let serialised_value = unwrap!(serde_json::to_string(&value));
-        // FIXME: it should return error if the name already exists
-        let md_key = name.to_string();
-
-        // TODO, check if key already exists and throw errors or update
+        // TODO, check if name/key already exists and throw proper error, or simply update
+        let md_key = name.unwrap_or_else(|| xorurl);
         self.safe_app.seq_mutable_data_insert(
             wallet_xorurl,
             WALLET_TYPE_TAG,
-            md_key.clone().into_bytes().to_vec(),
+            md_key.to_string().into_bytes().to_vec(),
             &serialised_value.into_bytes(),
         )?;
 
         debug!(
-            "{:?} had a spendable balance added with name: {:?}.",
-            &wallet_xorurl, &name
+            "Wallet at {} had a spendable balance added with name: {}.",
+            &wallet_xorurl, md_key
         );
 
         if default {
@@ -83,13 +93,13 @@ impl Safe {
                 wallet_xorurl,
                 WALLET_TYPE_TAG,
                 WALLET_DEFAULT_BYTES.to_vec(),
-                &md_key.into_bytes(),
+                &md_key.to_string().into_bytes(),
             )?;
 
             debug!("Default wallet set.");
         }
 
-        Ok(())
+        Ok(md_key.to_string())
     }
 
     // Check the total balance of a Wallet found at a given XOR-URL
@@ -199,20 +209,18 @@ impl Safe {
     /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1".to_string(), None));
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl,
-    ///     "frombalance",
+    ///     Some("frombalance".to_string()),
     ///     true,
-    ///     &key_pair1.clone().unwrap(),
-    ///     &key1_xorurl,
+    ///     &key_pair1.clone().unwrap().sk,
     /// ));
     /// let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl));
     /// assert_eq!("14", current_balance);
     ///
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl2,
-    ///     "tobalance",
+    ///     Some("tobalance".to_string()),
     ///     true,
-    ///     &key_pair2.clone().unwrap(),
-    ///     &key2_xorurl
+    ///     &key_pair2.clone().unwrap().sk,
     /// ));
     ///
     ///
@@ -291,17 +299,16 @@ fn test_wallet_insert_and_balance() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let wallet_xorurl = unwrap!(safe.wallet_create());
-    let (key1_xorurl, key_pair1) =
+    let (_key1_xorurl, key_pair1) =
         unwrap!(safe.keys_create_preload_test_coins("12.23".to_string(), None));
-    let (key2_xorurl, key_pair2) =
+    let (_key2_xorurl, key_pair2) =
         unwrap!(safe.keys_create_preload_test_coins("1.53".to_string(), None));
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        "myfirstbalance",
+        Some("myfirstbalance".to_string()),
         true,
-        &unwrap!(key_pair1),
-        &key1_xorurl,
+        &unwrap!(key_pair1).sk,
     ));
 
     let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl));
@@ -309,10 +316,9 @@ fn test_wallet_insert_and_balance() {
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        "mysecondbalance",
+        Some("mysecondbalance".to_string()),
         false,
-        &unwrap!(key_pair2),
-        &key2_xorurl,
+        &unwrap!(key_pair2).sk,
     ));
 
     let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl));
@@ -326,14 +332,13 @@ fn test_wallet_transfer_no_default() {
     let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance
 
     let to_wallet_xorurl = unwrap!(safe.wallet_create()); // we'll insert a default balance
-    let (key_xorurl, key_pair) =
+    let (_key_xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("43523".to_string(), None));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        "myfirstbalance",
+        Some("myfirstbalance".to_string()),
         true, // set --default
-        &unwrap!(key_pair),
-        &key_xorurl,
+        &unwrap!(key_pair).sk,
     ));
 
     // test no default balance at wallet in <from> argument
@@ -368,25 +373,23 @@ fn test_wallet_transfer_diff_amounts() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let from_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (key_xorurl1, key_pair1) =
+    let (_key_xorurl1, key_pair1) =
         unwrap!(safe.keys_create_preload_test_coins("100.5".to_string(), None));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        "myfirstbalance",
+        Some("myfirstbalance".to_string()),
         true, // set --default
-        &unwrap!(key_pair1.clone()),
-        &key_xorurl1,
+        &unwrap!(key_pair1.clone()).sk,
     ));
 
     let to_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (key_xorurl2, key_pair2) =
+    let (_key_xorurl2, key_pair2) =
         unwrap!(safe.keys_create_preload_test_coins("0.5".to_string(), None));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        "alsomyfirstbalance",
+        Some("alsomyfirstbalance".to_string()),
         true, // set --default
-        &unwrap!(key_pair2.clone()),
-        &key_xorurl2,
+        &unwrap!(key_pair2.clone()).sk,
     ));
 
     // test fail to transfer more than current balance at wallet in <from> argument
