@@ -9,7 +9,8 @@
 use super::files::FilesMap;
 use super::helpers::get_host_and_path;
 use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG};
-use super::xorurl::{SafeContentType, SafeDataType};
+use super::xorurl::SafeContentType;
+pub use super::xorurl::SafeDataType;
 
 use super::{Error, ResultReturn, Safe, XorName, XorUrlEncoder};
 use log::{debug, info};

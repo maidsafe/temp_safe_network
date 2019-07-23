@@ -126,8 +126,9 @@ impl XorUrlEncoder {
             )));
         }
 
-        // FIXME: we now ignore first byte of content_type, i.e. xorurl_bytes[1]
-        let content_type = match xorurl_bytes[2] {
+        let mut content_type_bytes = [0; 2];
+        content_type_bytes[0..].copy_from_slice(&xorurl_bytes[1..3]);
+        let content_type = match u16::from_be_bytes(content_type_bytes) {
             0 => SafeContentType::Raw,
             1 => SafeContentType::Wallet,
             2 => SafeContentType::FilesContainer,
@@ -213,13 +214,15 @@ impl XorUrlEncoder {
     // 32 bytes for XoR Name
     // and up to 8 bytes for type_tag
     pub fn to_string(&self, base: &str) -> ResultReturn<String> {
-        // let's set the first bytes
-        let mut cid_vec: Vec<u8> = vec![
-            XOR_URL_VERSION_1 as u8,         // XOR-URL format version
-            0x00, // TODO: properly decompose self.content_type into two bytes
-            self.content_type.clone() as u8, // content type
-            self.data_type.clone() as u8, // SAFE native data type
-        ];
+        // let's set the first byte with the XOR-URL format version
+        let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
+
+        // add the content type bytes
+        let content_type: u16 = self.content_type.clone() as u16;
+        cid_vec.extend_from_slice(&content_type.to_be_bytes());
+
+        // push the SAFE data type byte
+        cid_vec.push(self.data_type.clone() as u8);
 
         // add the xorname 32 bytes
         cid_vec.extend_from_slice(&self.xorname.0);

@@ -22,7 +22,7 @@ mod wallet;
 mod xorurl;
 
 pub use errors::{Error, ResultReturn};
-pub use fetch::SafeData;
+pub use fetch::{SafeData, SafeDataType};
 pub use keys::BlsKeyPair;
 pub use safe_nd::{XorName, XOR_NAME_LEN};
 pub use xorurl::{XorUrl, XorUrlEncoder};
