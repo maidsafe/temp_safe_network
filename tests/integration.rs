@@ -59,12 +59,12 @@ use rand::{distributions::Standard, Rng};
 use safe_nd::{
     AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
-    AppendOnlyData, Coins, EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData,
-    MDataAction, MDataAddress, MDataKind, MDataPermissionSet, MDataSeqEntryActions,
-    MDataUnseqEntryActions, MDataValue, PubImmutableData, PubSeqAppendOnlyData,
-    PubUnseqAppendOnlyData, PublicKey, Request, Result as NdResult, SeqAppendOnly, SeqMutableData,
-    Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData,
-    UnseqAppendOnly, UnseqMutableData, XorName,
+    AppendOnlyData, ClientFullId, Coins, EntryError, Error as NdError, IData, IDataAddress,
+    LoginPacket, MData, MDataAction, MDataAddress, MDataKind, MDataPermissionSet,
+    MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, Message, MessageId, PubImmutableData,
+    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
+    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -75,6 +75,45 @@ fn client_connects() {
     let mut env = Environment::new();
     let client = env.new_connected_client();
     let _app = env.new_connected_app(client.public_id().clone());
+}
+
+#[test]
+fn invalid_signature() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let name: XorName = env.rng().gen();
+    let request = Request::GetIData(IDataAddress::Unpub(name));
+    let message_id = MessageId::new();
+
+    // Missing signature
+    client.send(&Message::Request {
+        request: request.clone(),
+        message_id,
+        signature: None,
+    });
+    env.poll();
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::InvalidSignature)) => (),
+        x => unexpected!(x),
+    }
+
+    // Invalid signature
+    let other_full_id = ClientFullId::new_ed25519(env.rng());
+    let to_sign = (&request, &message_id);
+    let to_sign = unwrap!(bincode::serialize(&to_sign));
+    let signature = other_full_id.sign(&to_sign);
+
+    client.send(&Message::Request {
+        request,
+        message_id,
+        signature: Some(signature),
+    });
+    env.poll();
+    match client.expect_response(message_id) {
+        Response::GetIData(Err(NdError::InvalidSignature)) => (),
+        x => unexpected!(x),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

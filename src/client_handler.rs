@@ -1299,7 +1299,7 @@ impl ClientHandler {
 
     fn authorise_app_for_mutation(&self, app_id: &AppPublicId) -> Result<(), NdError> {
         if self
-            .accounts
+            .auth_keys
             .app_permissions(app_id)
             .map(|perms| perms.transfer_coins)
             .unwrap_or(false)
@@ -1311,7 +1311,7 @@ impl ClientHandler {
     }
 
     fn authorise_app_for_unpublished_get(&self, app_id: &AppPublicId) -> Result<(), NdError> {
-        self.accounts
+        self.auth_keys
             .app_permissions(app_id)
             .map(|_| ())
             .ok_or(NdError::AccessDenied)
