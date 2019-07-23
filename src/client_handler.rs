@@ -686,21 +686,12 @@ impl ClientHandler {
             );
             return None;
         }
-        let request = Request::DeleteAData(address);
-        if client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request,
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                Response::Mutation(Err(NdError::AccessDenied)),
-            );
-            None
-        }
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request: Request::DeleteAData(address),
+            message_id,
+        }))
     }
 
     fn handle_mutate_adata(
@@ -709,20 +700,20 @@ impl ClientHandler {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        if client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request,
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                Response::Mutation(Err(NdError::AccessDenied)),
-            );
-            None
-        }
+        let owner = utils::owner(&client.public_id)?;
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     /// Handles a received challenge response.

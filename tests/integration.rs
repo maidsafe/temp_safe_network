@@ -537,39 +537,12 @@ fn put_append_only_data() {
 }
 
 #[test]
-fn append_only_data_delete_data_doesnt_exist() {
+fn delete_append_only_data_that_doesnt_exist() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-
-    common::send_request_expect_err(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(*AData::PubSeq(PubSeqAppendOnlyData::new(name, tag)).address()),
-        NdError::InvalidOperation,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(*AData::PubUnseq(PubUnseqAppendOnlyData::new(name, tag)).address()),
-        NdError::InvalidOperation,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(*AData::UnpubSeq(UnpubSeqAppendOnlyData::new(name, tag)).address()),
-        NdError::AccessDenied,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(
-            *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
-        ),
-        NdError::AccessDenied,
-    );
 
     let start_nano = 1_000_000_000_000;
     common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
