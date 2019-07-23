@@ -14,6 +14,8 @@ pub use self::rng::TestRng;
 
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
+use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
+use log::Record;
 use safe_nd::{
     AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, Error, Message,
     MessageId, Notification, PublicId, PublicKey, Request, Response, Signature, Transaction,
@@ -27,6 +29,7 @@ use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
+    io::Write,
     net::SocketAddr,
     ops::{Deref, DerefMut},
     slice,
@@ -48,7 +51,23 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        let _ = env_logger::builder().is_test(true).try_init();
+        let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
+            let now = formatter.timestamp();
+            writeln!(
+                formatter,
+                "{} {} [{}:{}] {}",
+                formatter.default_styled_level(record.level()),
+                now,
+                record.file().unwrap_or_default(),
+                record.line().unwrap_or_default(),
+                record.args()
+            )
+        };
+
+        let _ = LoggerBuilder::from_default_env()
+            .format(do_format)
+            .is_test(true)
+            .try_init();
 
         let mut rng = rng::new();
         let network_rng = rng::from_rng(&mut rng);
