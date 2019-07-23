@@ -14,22 +14,44 @@ use rand_core::RngCore;
 use safe_nd::{XorName, XOR_NAME_LEN};
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
+const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
+const XOR_URL_STR_MAX_LENGTH: usize = 44;
+const XOR_NAME_BYTES_OFFSET: usize = 4; // offset where to find the XoR name bytes
 
 // The XOR-URL type
 pub type XorUrl = String;
 
+// We encode the content type that a XOR-URL is targetting, this allows the consumer/user to
+// treat the content in particular ways when the content requires it.
+// TODO: support MIME types
 #[derive(Debug, Clone, PartialEq)]
 pub enum SafeContentType {
-    Unknown = 0x00,
-    CoinBalance = 0x01,
-    Wallet = 0x02,
+    Raw = 0x0000,
+    Wallet = 0x0001,
+    FilesContainer = 0x0002,
+    NrsMapContainer = 0x0003,
+}
+
+// We also encode the native SAFE data type where the content is being stored on the SAFE Network,
+// this allows us to fetch the targetted data using the corresponding API, regardless of the
+// data that is being held which is identified by the SafeContentType instead.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SafeDataType {
+    CoinBalance = 0x00,
+    PublishedImmutableData = 0x01,
+    UnpublishedImmutableData = 0x02,
     SeqMutableData = 0x03,
     UnseqMutableData = 0x04,
-    FilesContainer = 0x05,
-    UnpublishedFilesContainer = 0x06,
-    ImmutableData = 0x07,
-    UnpublishedImmutableData = 0x08,
-    NrsMapContainer = 0x09,
+    PublishedSeqAppendOnlyData = 0x05,
+    PublishedUnseqAppendOnlyData = 0x06,
+    UnpublishedSeqAppendOnlyData = 0x07,
+    UnpublishedUnseqAppendOnlyData = 0x08,
+}
+
+impl std::fmt::Display for SafeDataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 pub fn create_random_xorname() -> XorName {
@@ -44,6 +66,7 @@ pub struct XorUrlEncoder {
     version: u64, // currently only v1 supported
     xorname: XorName,
     type_tag: u64,
+    data_type: SafeDataType,
     content_type: SafeContentType,
     path: String,
 }
@@ -52,83 +75,107 @@ impl XorUrlEncoder {
     pub fn new(
         xorname: XorName,
         type_tag: u64,
+        data_type: SafeDataType,
         content_type: SafeContentType,
         path: Option<&str>,
     ) -> Self {
         Self {
-            version: 1,
+            version: XOR_URL_VERSION_1,
             xorname,
             type_tag,
+            data_type,
             content_type,
             path: path.unwrap_or_else(|| "").to_string(),
         }
     }
 
-    // An static encoder function for convinience in some cases
+    // A non-member encoder function for convinience in some cases
     pub fn encode(
         xorname: XorName,
         type_tag: u64,
+        data_type: SafeDataType,
         content_type: SafeContentType,
         path: Option<&str>,
         base: &str,
     ) -> ResultReturn<String> {
-        let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, content_type, path);
+        let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, data_type, content_type, path);
         xorurl_encoder.to_string(base)
     }
 
     pub fn from_url(xorurl: &str) -> ResultReturn<Self> {
         let (cid_str, path) = get_host_and_path(&xorurl)?;
 
-        let decoded_xorurl = decode(&cid_str)
-            .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?
-            .1;
-        if decoded_xorurl.len() > 42 {
+        let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&cid_str)
+            .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
+
+        // let's do a sanity check before analysing byte by byte
+        if xorurl_bytes.len() > XOR_URL_STR_MAX_LENGTH {
             return Err(Error::InvalidXorUrl(format!(
                 "Invalid XOR-URL, encoded string too long: {} bytes",
-                decoded_xorurl.len()
+                xorurl_bytes.len()
             )));
         }
 
-        let u8_version: u8 = decoded_xorurl[0];
+        // let's make sure we support the XOR_URL version
+        let u8_version: u8 = xorurl_bytes[0];
         let version: u64 = u64::from(u8_version);
-        if version != 1 {
+        if version != XOR_URL_VERSION_1 {
             return Err(Error::InvalidXorUrl(format!(
-                "Invalid XOR-URL encoding version: {}",
+                "Invalid or unsupported XOR-URL encoding version: {}",
                 version
             )));
         }
-        let content_type = match decoded_xorurl[1] {
-            0 => SafeContentType::Unknown,
-            1 => SafeContentType::CoinBalance,
-            2 => SafeContentType::Wallet,
-            3 => SafeContentType::SeqMutableData,
-            4 => SafeContentType::UnseqMutableData,
-            5 => SafeContentType::FilesContainer,
-            6 => SafeContentType::UnpublishedFilesContainer,
-            7 => SafeContentType::ImmutableData,
-            8 => SafeContentType::UnpublishedImmutableData,
-            9 => SafeContentType::NrsMapContainer,
-            _other => SafeContentType::Unknown,
+
+        // FIXME: we now ignore first byte of content_type, i.e. xorurl_bytes[1]
+        let content_type = match xorurl_bytes[2] {
+            0 => SafeContentType::Raw,
+            1 => SafeContentType::Wallet,
+            2 => SafeContentType::FilesContainer,
+            3 => SafeContentType::NrsMapContainer,
+            other => {
+                return Err(Error::InvalidXorUrl(format!(
+                    "Invalid content type encoded in the XOR-URL string: {}",
+                    other
+                )))
+            }
         };
-        let xorname_offset = 2; // offset where to find the xorname bytes
-        let type_tag_offset = xorname_offset + XOR_NAME_LEN; // offset where to find the type tag bytes
+
+        let data_type = match xorurl_bytes[3] {
+            0 => SafeDataType::CoinBalance,
+            1 => SafeDataType::PublishedImmutableData,
+            2 => SafeDataType::UnpublishedImmutableData,
+            3 => SafeDataType::SeqMutableData,
+            4 => SafeDataType::UnseqMutableData,
+            5 => SafeDataType::PublishedSeqAppendOnlyData,
+            6 => SafeDataType::PublishedUnseqAppendOnlyData,
+            7 => SafeDataType::UnpublishedSeqAppendOnlyData,
+            8 => SafeDataType::UnpublishedUnseqAppendOnlyData,
+            other => {
+                return Err(Error::InvalidXorUrl(format!(
+                    "Invalid SAFE data type encoded in the XOR-URL string: {}",
+                    other
+                )))
+            }
+        };
+
+        let type_tag_offset = XOR_NAME_BYTES_OFFSET + XOR_NAME_LEN; // offset where to find the type tag bytes
 
         let mut xorname = XorName::default();
         xorname
             .0
-            .copy_from_slice(&decoded_xorurl[xorname_offset..type_tag_offset]);
+            .copy_from_slice(&xorurl_bytes[XOR_NAME_BYTES_OFFSET..type_tag_offset]);
 
-        let type_tag_bytes_len = decoded_xorurl.len() - type_tag_offset;
+        let type_tag_bytes_len = xorurl_bytes.len() - type_tag_offset;
 
-        let mut tag_type_bytes = [0; 8];
-        tag_type_bytes[8 - type_tag_bytes_len..]
-            .copy_from_slice(&decoded_xorurl[type_tag_offset..]);
-        let type_tag: u64 = u64::from_be_bytes(tag_type_bytes);
+        let mut type_tag_bytes = [0; 8];
+        type_tag_bytes[8 - type_tag_bytes_len..].copy_from_slice(&xorurl_bytes[type_tag_offset..]);
+        let type_tag: u64 = u64::from_be_bytes(type_tag_bytes);
 
         Ok(Self {
             version,
             xorname,
             type_tag,
+            data_type,
             content_type,
             path: path.to_string(),
         })
@@ -137,6 +184,10 @@ impl XorUrlEncoder {
     #[allow(dead_code)]
     pub fn version(&self) -> u64 {
         self.version
+    }
+
+    pub fn data_type(&self) -> SafeDataType {
+        self.data_type.clone()
     }
 
     pub fn content_type(&self) -> SafeContentType {
@@ -155,15 +206,19 @@ impl XorUrlEncoder {
         &self.path
     }
 
+    // XOR-URL encoding format (var length from 36 to 44 bytes):
+    // 1 byte for version
+    // 2 bytes for content type (enough to start including some MIME types also)
+    // 1 byte for SAFE native data type
+    // 32 bytes for XoR Name
+    // and up to 8 bytes for type_tag
     pub fn to_string(&self, base: &str) -> ResultReturn<String> {
-        // Temporary CID format (var length from 34 to 42 bytes):
-        // 1 byte for version
-        // 1 byte for content_type
-        // 32 bytes for xorname
-        // and up to 8 bytes for type_tag
+        // let's set the first bytes
         let mut cid_vec: Vec<u8> = vec![
-            0x1,                             // version = 1
+            XOR_URL_VERSION_1 as u8,         // XOR-URL format version
+            0x00, // TODO: properly decompose self.content_type into two bytes
             self.content_type.clone() as u8, // content type
+            self.data_type.clone() as u8, // SAFE native data type
         ];
 
         // add the xorname 32 bytes
@@ -200,11 +255,13 @@ fn test_xorurl_base32_encoding() {
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         0xa632_3c4d_4a32,
-        SafeContentType::ImmutableData,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::Raw,
         None,
-        &"base32".to_string()
+        "base32"
     ));
-    let base32_xorurl = "safe://bedtcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
+    let base32_xorurl =
+        "safe://biaaaatcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
     assert_eq!(xorurl, base32_xorurl);
 }
 
@@ -215,11 +272,12 @@ fn test_xorurl_base32z_encoding() {
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         0,
-        SafeContentType::ImmutableData,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::Raw,
         None,
-        &"base32z".to_string()
+        "base32z"
     ));
-    let base32z_xorurl = "safe://hoqcj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+    let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
     assert_eq!(xorurl, base32z_xorurl);
 }
 
@@ -230,18 +288,23 @@ fn test_xorurl_base64_encoding() {
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         4_584_545,
+        SafeDataType::PublishedSeqAppendOnlyData,
         SafeContentType::FilesContainer,
         None,
-        &"base64".to_string()
+        "base64"
     ));
-    let base64_xorurl = "safe://mBBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+    let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
     assert_eq!(xorurl, base64_xorurl);
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&base64_xorurl));
     assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_string("base64")));
     assert_eq!("", xorurl_encoder.path());
-    assert_eq!(1, xorurl_encoder.version());
+    assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.version());
     assert_eq!(xorname, xorurl_encoder.xorname());
     assert_eq!(4_584_545, xorurl_encoder.type_tag());
+    assert_eq!(
+        SafeDataType::PublishedSeqAppendOnlyData,
+        xorurl_encoder.data_type()
+    );
     assert_eq!(
         SafeContentType::FilesContainer,
         xorurl_encoder.content_type()
@@ -252,13 +315,14 @@ fn test_xorurl_base64_encoding() {
 fn test_xorurl_default_base_encoding() {
     use unwrap::unwrap;
     let xorname = XorName(*b"12345678901234567890123456789012");
-    let base32z_xorurl = "safe://hoqcj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+    let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         0,
-        SafeContentType::ImmutableData,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::Raw,
         None,
-        &"".to_string() // forces it to use the default
+        "" // forces it to use the default
     ));
     assert_eq!(xorurl, base32z_xorurl);
 }
@@ -267,16 +331,22 @@ fn test_xorurl_default_base_encoding() {
 fn test_xorurl_decoding() {
     let xorname = XorName(*b"12345678901234567890123456789012");
     let type_tag: u64 = 0x0eef;
-    let xorurl_encoder =
-        XorUrlEncoder::new(xorname, type_tag, SafeContentType::ImmutableData, None);
+    let xorurl_encoder = XorUrlEncoder::new(
+        xorname,
+        type_tag,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::Raw,
+        None,
+    );
     assert_eq!("", xorurl_encoder.path());
-    assert_eq!(1, xorurl_encoder.version());
+    assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.version());
     assert_eq!(xorname, xorurl_encoder.xorname());
     assert_eq!(type_tag, xorurl_encoder.type_tag());
     assert_eq!(
-        SafeContentType::ImmutableData,
-        xorurl_encoder.content_type()
+        SafeDataType::PublishedImmutableData,
+        xorurl_encoder.data_type()
     );
+    assert_eq!(SafeContentType::Raw, xorurl_encoder.content_type());
 }
 
 #[test]
@@ -287,7 +357,8 @@ fn test_xorurl_decoding_with_path() {
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         type_tag,
-        SafeContentType::ImmutableData,
+        SafeDataType::PublishedSeqAppendOnlyData,
+        SafeContentType::Wallet,
         None,
         "base32z"
     ));
@@ -299,11 +370,15 @@ fn test_xorurl_decoding_with_path() {
         unwrap!(xorurl_encoder_with_path.to_string("base32z"))
     );
     assert_eq!("/subfolder/file", xorurl_encoder_with_path.path());
-    assert_eq!(1, xorurl_encoder_with_path.version());
+    assert_eq!(XOR_URL_VERSION_1, xorurl_encoder_with_path.version());
     assert_eq!(xorname, xorurl_encoder_with_path.xorname());
     assert_eq!(type_tag, xorurl_encoder_with_path.type_tag());
     assert_eq!(
-        SafeContentType::ImmutableData,
+        SafeDataType::PublishedSeqAppendOnlyData,
+        xorurl_encoder_with_path.data_type()
+    );
+    assert_eq!(
+        SafeContentType::Wallet,
         xorurl_encoder_with_path.content_type()
     );
 }

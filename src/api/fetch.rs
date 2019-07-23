@@ -9,7 +9,7 @@
 use super::files::FilesMap;
 use super::helpers::get_host_and_path;
 use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG};
-use super::xorurl::SafeContentType;
+use super::xorurl::{SafeContentType, SafeDataType};
 
 use super::{Error, ResultReturn, Safe, XorName, XorUrlEncoder};
 use log::{debug, info};
@@ -22,14 +22,14 @@ pub enum SafeData {
     Wallet {
         xorname: XorName,
         type_tag: u64,
-        native_type: String,
+        data_type: SafeDataType,
     },
     FilesContainer {
         xorname: XorName,
         type_tag: u64,
         version: u64,
         files_map: FilesMap,
-        native_type: String,
+        data_type: SafeDataType,
     },
     // TODO: Enable preventing resolution
     // NrsMapContainer {
@@ -37,15 +37,11 @@ pub enum SafeData {
     //     type_tag: u64,
     //     version: u64,
     //     nrs_map: NrsMap,
-    //     native_type: String,
+    //     data_type: SafeDataType,
     // },
-    ImmutableData {
+    PublishedImmutableData {
         xorname: XorName,
         data: Vec<u8>,
-    },
-    Unknown {
-        xorname: XorName,
-        type_tag: u64,
     },
 }
 
@@ -66,7 +62,7 @@ impl Safe {
     ///
     /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl ) ) );
     /// let data_string = match safe_data {
-    /// 	SafeData::ImmutableData { data, .. } => {
+    /// 	SafeData::PublishedImmutableData { data, .. } => {
     /// 		match String::from_utf8(data) {
     /// 			Ok(string) => string,
     /// 			Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
@@ -95,6 +91,7 @@ impl Safe {
             let encoded_xor = XorUrlEncoder::new(
                 hashed_host,
                 NRS_MAP_TYPE_TAG,
+                SafeDataType::PublishedSeqAppendOnlyData,
                 SafeContentType::NrsMapContainer,
                 Some(&path),
             );
@@ -113,21 +110,36 @@ impl Safe {
 
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         match the_xor.content_type() {
-            SafeContentType::CoinBalance => Ok(SafeData::Key {
-                xorname: the_xor.xorname(),
-            }),
+            SafeContentType::Raw => match the_xor.data_type() {
+                SafeDataType::CoinBalance => Ok(SafeData::Key {
+                    xorname: the_xor.xorname(),
+                    // TODO: perhaps also return the balance if sk provided?
+                }),
+                SafeDataType::PublishedImmutableData => {
+                    let data = self.files_get_published_immutable(&xorurl)?;
+                    Ok(SafeData::PublishedImmutableData {
+                        xorname: the_xor.xorname(),
+                        data,
+                    })
+                }
+                other => Err(Error::ContentError(format!(
+                    "Data type '{:?}' not supported yet by fetch",
+                    other
+                ))),
+            },
             SafeContentType::Wallet => Ok(SafeData::Wallet {
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
-                native_type: "MutableData".to_string(), // TODO: to be retrieved from wallet API
+                data_type: the_xor.data_type(),
             }),
             SafeContentType::FilesContainer => {
-                let (version, files_map, native_type) =
-                    self.files_container_get_latest(&the_xorurl)?;
+                let (version, files_map) = self.files_container_get_latest(&the_xorurl)?;
 
                 debug!(
-                    "Files container found w/ v:{}, of type: {}, containing: {:?}",
-                    version, native_type, files_map
+                    "Files container found w/ v:{}, on data type: {}, containing: {:?}",
+                    version,
+                    the_xor.data_type(),
+                    files_map
                 );
 
                 if path != "/" && !path.is_empty() {
@@ -143,7 +155,7 @@ impl Safe {
                     };
 
                     let new_target_xorurl = match file_item.get("link") {
-						Some( path_data ) => path_data,
+						Some(path_data) => path_data,
 						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, the_xorurl))),
 					};
 
@@ -156,15 +168,16 @@ impl Safe {
                     type_tag: the_xor.type_tag(),
                     version,
                     files_map,
-                    native_type,
+                    data_type: the_xor.data_type(),
                 })
             }
             SafeContentType::NrsMapContainer => {
-                let (version, nrs_map, native_type) =
-                    self.nrs_map_container_get_latest(&the_xorurl)?;
+                let (version, nrs_map) = self.nrs_map_container_get_latest(&the_xorurl)?;
                 debug!(
                     "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
-                    version, native_type, nrs_map
+                    version,
+                    the_xor.data_type(),
+                    nrs_map
                 );
 
                 let new_target_xorurl = nrs_map.get_default_link()?;
@@ -180,27 +193,12 @@ impl Safe {
                 // 		type_tag: the_xor.type_tag(),
                 // 		version,
                 // 		nrs_map,
-                // 		native_type,
+                // 		data_type: the_xor.data_type(),
                 // 	})
                 // }
 
                 self.fetch(&url_with_path)
             }
-            SafeContentType::ImmutableData => {
-                let data = self.files_get_published_immutable(&xorurl)?;
-                Ok(SafeData::ImmutableData {
-                    xorname: the_xor.xorname(),
-                    data,
-                })
-            }
-            SafeContentType::Unknown => Ok(SafeData::Unknown {
-                xorname: the_xor.xorname(),
-                type_tag: the_xor.type_tag(),
-            }),
-            other => Err(Error::ContentError(format!(
-                "Content type '{:?}' not supported yet by fetch",
-                other
-            ))),
         }
     }
 }
@@ -208,7 +206,7 @@ impl Safe {
 // Unit Tests
 
 #[test]
-fn test_fetch_coin_balance() {
+fn test_fetch_key() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -240,7 +238,7 @@ fn test_fetch_wallet() {
             == SafeData::Wallet {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 10_000,
-                native_type: "MutableData".to_string(),
+                data_type: SafeDataType::SeqMutableData,
             }
     );
 }
@@ -265,7 +263,7 @@ fn test_fetch_files_container() {
                 type_tag: 10_100,
                 version: 1,
                 files_map,
-                native_type: "AppendOnlyData".to_string(),
+                data_type: SafeDataType::PublishedSeqAppendOnlyData,
             }
     );
 
@@ -306,13 +304,13 @@ fn test_fetch_resolvable_container() {
             type_tag,
             version,
             files_map,
-            native_type,
+            data_type,
             ..
         } => {
             assert_eq!(xorname, xorurl_encoder.xorname());
             assert_eq!(type_tag, 10_100);
             assert_eq!(version, 1);
-            assert_eq!(native_type, "AppendOnlyData".to_string());
+            assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
             assert_eq!(files_map, the_files_map);
         }
         _ => panic!("Nrs map container was not returned."),
@@ -320,7 +318,7 @@ fn test_fetch_resolvable_container() {
 }
 
 #[test]
-fn test_fetch_immutable_data() {
+fn test_fetch_published_immutable_data() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -331,30 +329,11 @@ fn test_fetch_immutable_data() {
     let content = unwrap!(safe.fetch(&xorurl));
     assert!(
         content
-            == SafeData::ImmutableData {
+            == SafeData::PublishedImmutableData {
                 xorname: xorurl_encoder.xorname(),
                 data: data.to_vec()
             }
     );
-}
-
-#[test]
-fn test_fetch_unknown() {
-    use super::xorurl::create_random_xorname;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let xorname = create_random_xorname();
-    let type_tag = 575_756_443;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeContentType::Unknown,
-        None,
-        "base32z"
-    ));
-    let content = unwrap!(safe.fetch(&xorurl));
-    assert!(content == SafeData::Unknown { xorname, type_tag });
 }
 
 #[test]
@@ -368,7 +347,8 @@ fn test_fetch_unsupported() {
     let xorurl = unwrap!(XorUrlEncoder::encode(
         xorname,
         type_tag,
-        SafeContentType::UnpublishedImmutableData,
+        SafeDataType::UnpublishedImmutableData,
+        SafeContentType::Raw,
         None,
         "base32z"
     ));
@@ -377,7 +357,7 @@ fn test_fetch_unsupported() {
         Err(msg) => assert_eq!(
             msg,
             Error::ContentError(
-                "Content type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
+                "Data type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
             )
         ),
     };

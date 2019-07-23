@@ -12,7 +12,7 @@ use super::constants::{
 };
 
 use super::helpers::gen_timestamp_secs;
-use super::xorurl::SafeContentType;
+use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use log::{debug, warn};
 use safe_nd::XorName;
@@ -21,11 +21,9 @@ use std::collections::BTreeMap;
 use tiny_keccak::sha3_256;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
-pub static NRS_MAP_TYPE_TAG: u64 = 1500;
-// Informative string of the SAFE native data type behind a FilesContainer
-pub static NRS_MAP_TYPE_TAG_NATIVE_TYPE: &str = "AppendOnlyData";
+pub const NRS_MAP_TYPE_TAG: u64 = 1500;
 
-static ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
+const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 
 // Each PublicName contains metadata and the link to the target's XOR-URL
 pub type PublicName = BTreeMap<String, String>;
@@ -149,6 +147,7 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             NRS_MAP_TYPE_TAG,
+            SafeDataType::PublishedSeqAppendOnlyData,
             SafeContentType::NrsMapContainer,
             None,
             &self.xorurl_base,
@@ -167,19 +166,15 @@ impl Safe {
     /// # use rand::{thread_rng, Rng};
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// # const FAKE_RDF_PREDICATE_LINK: &str = "link";
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, Some("somewhere"), true, false).unwrap();
-    /// let (version, nrs_map_container, native_type) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
+    /// let (version, nrs_map_container) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
     /// assert_eq!(version, 1);
-    /// assert_eq!(nrs_map_container.entries[&rand_string][FAKE_RDF_PREDICATE_LINK], "somewhere");
+    /// assert_eq!(nrs_map_container.entries[&rand_string]["link"], "somewhere");
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");
     /// assert_eq!(nrs_map_container.get_default().unwrap(), &rand_string);
     /// ```
-    pub fn nrs_map_container_get_latest(
-        &self,
-        xorurl: &str,
-    ) -> ResultReturn<(u64, NrsMap, String)> {
+    pub fn nrs_map_container_get_latest(&self, xorurl: &str) -> ResultReturn<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", xorurl);
 
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
@@ -197,15 +192,11 @@ impl Safe {
                             err
                         ))
                     })?;
-                Ok((version, nrs_map, NRS_MAP_TYPE_TAG_NATIVE_TYPE.to_string()))
+                Ok((version, nrs_map))
             }
             Err(Error::EmptyContent(_)) => {
                 warn!("Nrs container found at {:?} was empty", &xorurl);
-                Ok((
-                    0,
-                    NrsMap::default(),
-                    NRS_MAP_TYPE_TAG_NATIVE_TYPE.to_string(),
-                ))
+                Ok((0, NrsMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_NRS_MAP_FOUND.to_string(),

@@ -46,12 +46,12 @@ pub fn cat_commander(
             files_map,
             type_tag,
             xorname,
-            native_type,
+            data_type,
         } => {
             // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
                 if cmd.info {
-                    println!("Native data type: {}", native_type);
+                    println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag,);
                     println!("XOR name: 0x{}", xorname_to_hex(&xorname));
                     println!();
@@ -77,9 +77,9 @@ pub fn cat_commander(
                 table.printstd();
             } else if cmd.info {
                 println!(
-                        "[{}, {{ \"native_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
+                        "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
                         xorurl,
-                        native_type,
+                        data_type,
                         type_tag,
                         xorname_to_hex(&xorname),
                         files_map
@@ -88,7 +88,7 @@ pub fn cat_commander(
                 println!("[{}, {:?}]", xorurl, files_map);
             }
         }
-        SafeData::ImmutableData { data, xorname } => {
+        SafeData::PublishedImmutableData { data, xorname } => {
             if cmd.info {
                 println!("Native data type: ImmutableData (published)");
                 println!("XOR name: 0x{}", xorname_to_hex(&xorname));

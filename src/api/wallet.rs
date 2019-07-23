@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, KeyPair};
-use super::xorurl::SafeContentType;
+use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn};
 use super::{Safe, XorUrl, XorUrlEncoder};
 use log::debug;
@@ -39,6 +39,7 @@ impl Safe {
         XorUrlEncoder::encode(
             xorname,
             WALLET_TYPE_TAG,
+            SafeDataType::SeqMutableData,
             SafeContentType::Wallet,
             None,
             &self.xorurl_base,
@@ -58,7 +59,8 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
-            SafeContentType::CoinBalance,
+            SafeDataType::CoinBalance,
+            SafeContentType::Raw,
             None,
             &self.xorurl_base,
         )?;

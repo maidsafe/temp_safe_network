@@ -9,7 +9,7 @@
 use super::helpers::{
     parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, xorname_from_pk, KeyPair,
 };
-use super::xorurl::SafeContentType;
+use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
@@ -117,7 +117,8 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
-            SafeContentType::CoinBalance,
+            SafeDataType::CoinBalance,
+            SafeContentType::Raw,
             None,
             &self.xorurl_base,
         )?;
@@ -152,7 +153,8 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
-            SafeContentType::CoinBalance,
+            SafeDataType::CoinBalance,
+            SafeContentType::Raw,
             None,
             &self.xorurl_base,
         )?;
@@ -369,8 +371,8 @@ fn test_keys_test_coins_balance_wrong_location() {
         unwrap!(safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair.clone()).sk));
     assert_eq!(amount, current_balance);
 
-    // let's corrupt the XOR-URL
-    xorurl.replace_range(11..16, "ccccc");
+    // let's corrupt the XOR-URL right where the encoded xorname bytes are in the string
+    xorurl.replace_range(13..18, "ccccc");
     let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
     match current_balance {
         Err(Error::InvalidInput(msg)) => assert!(msg.contains(

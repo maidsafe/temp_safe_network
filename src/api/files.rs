@@ -12,7 +12,7 @@ use super::constants::{
     FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
 };
 use super::helpers::{gen_timestamp_nanos, gen_timestamp_secs};
-use super::xorurl::SafeContentType;
+use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
 use log::{debug, info, warn};
 use relative_path::RelativePath;
@@ -31,12 +31,10 @@ type ProcessedFiles = BTreeMap<String, (String, String)>;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
 const FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
-// Informative string of the SAFE native data type behind a FilesContainer
-const FILES_CONTAINER_NATIVE_TYPE: &str = "AppendOnlyData";
 
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 
-const MAX_RECURSIVE_DEPTH: usize = 10000;
+const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
 #[allow(dead_code)]
 impl Safe {
@@ -96,6 +94,7 @@ impl Safe {
             let xorurl = XorUrlEncoder::encode(
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
+                SafeDataType::PublishedSeqAppendOnlyData,
                 SafeContentType::FilesContainer,
                 None,
                 &self.xorurl_base,
@@ -114,15 +113,11 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
-    /// let (version, files_map, native_type) = safe.files_container_get_latest(&xorurl).unwrap();
+    /// let (version, files_map) = safe.files_container_get_latest(&xorurl).unwrap();
     /// println!("FilesContainer fetched is at version: {}", version);
-    /// println!("FilesContainer is stored on a {} data type", native_type);
     /// println!("FilesMap of latest fetched version is: {:?}", files_map);
     /// ```
-    pub fn files_container_get_latest(
-        &self,
-        xorurl: &str,
-    ) -> ResultReturn<(u64, FilesMap, String)> {
+    pub fn files_container_get_latest(&self, xorurl: &str) -> ResultReturn<(u64, FilesMap)> {
         debug!("Getting latest files container from: {:?}", xorurl);
 
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
@@ -140,15 +135,11 @@ impl Safe {
                         err
                     ))
                 })?;
-                Ok((version, files_map, FILES_CONTAINER_NATIVE_TYPE.to_string()))
+                Ok((version, files_map))
             }
             Err(Error::EmptyContent(_)) => {
                 warn!("Files container found at {:?} was empty", &xorurl);
-                Ok((
-                    0,
-                    FilesMap::default(),
-                    FILES_CONTAINER_NATIVE_TYPE.to_string(),
-                ))
+                Ok((0, FilesMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
@@ -187,7 +178,7 @@ impl Safe {
                 "--delete is not allowed if --recursive is not set".to_string(),
             ));
         }
-        let (current_version, current_files_map, _): (u64, FilesMap, String) =
+        let (current_version, current_files_map): (u64, FilesMap) =
             self.files_container_get_latest(xorurl)?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
@@ -259,7 +250,8 @@ impl Safe {
         XorUrlEncoder::encode(
             xorname,
             0,
-            SafeContentType::ImmutableData,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::Raw,
             None,
             &self.xorurl_base,
         )
@@ -1266,11 +1258,9 @@ fn test_files_container_get_latest() {
     let (xorurl, _processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
-    let (version, fetched_files_map, native_type) =
-        unwrap!(safe.files_container_get_latest(&xorurl));
+    let (version, fetched_files_map) = unwrap!(safe.files_container_get_latest(&xorurl));
 
     assert_eq!(version, 1);
-    assert_eq!(native_type, FILES_CONTAINER_NATIVE_TYPE);
     assert_eq!(fetched_files_map.len(), 5);
     assert_eq!(files_map.len(), fetched_files_map.len());
     assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
@@ -1290,7 +1280,7 @@ fn test_files_container_version() {
     let (xorurl, _, _) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
-    let (version, _, _) = unwrap!(safe.files_container_get_latest(&xorurl));
+    let (version, _) = unwrap!(safe.files_container_get_latest(&xorurl));
     assert_eq!(version, 1);
 
     let (version, _, _) = unwrap!(safe.files_container_sync(
@@ -1302,6 +1292,6 @@ fn test_files_container_version() {
     ));
     assert_eq!(version, 2);
 
-    let (version, _, _) = unwrap!(safe.files_container_get_latest(&xorurl));
+    let (version, _) = unwrap!(safe.files_container_get_latest(&xorurl));
     assert_eq!(version, 2);
 }
