@@ -83,7 +83,6 @@ impl CoreClient {
     pub fn new(
         acc_locator: &str,
         acc_password: &str,
-        // invitation: &str,
         el_handle: Handle,
         core_tx: CoreMsgTx<Self, ()>,
         net_tx: NetworkTx,
@@ -91,7 +90,6 @@ impl CoreClient {
         Self::new_impl(
             acc_locator.as_bytes(),
             acc_password.as_bytes(),
-            // invitation,
             el_handle,
             core_tx,
             net_tx,
@@ -103,7 +101,6 @@ impl CoreClient {
     fn new_impl<F>(
         acc_locator: &[u8],
         acc_password: &[u8],
-        // balance_sk: BlsSecretKey,
         el_handle: Handle,
         core_tx: CoreMsgTx<Self, ()>,
         net_tx: NetworkTx,
@@ -148,6 +145,7 @@ impl CoreClient {
                 None,
             )?;
 
+            // Create a balance that is debited to insert the login packet
             routing.create_balance(
                 *balance_client_id.public_id().public_key(),
                 unwrap!(Coins::from_str("10")),
