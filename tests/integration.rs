@@ -61,10 +61,10 @@ use safe_nd::{
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
     AppendOnlyData, ClientFullId, Coins, EntryError, Error as NdError, IData, IDataAddress,
     LoginPacket, MData, MDataAction, MDataAddress, MDataKind, MDataPermissionSet,
-    MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, Message, MessageId, PubImmutableData,
-    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
-    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, Message, MessageId, Notification,
+    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response,
+    Result as NdResult, SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData,
+    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -311,6 +311,7 @@ fn coin_operations() {
         },
         expected,
     );
+    assert_eq!(client_b.expect_notification(), Notification(expected));
 
     amount_a = unwrap!(Coins::from_nano(7));
     amount_b = unwrap!(Coins::from_nano(3));

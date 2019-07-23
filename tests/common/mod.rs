@@ -16,7 +16,7 @@ use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
     AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, Error, Message,
-    MessageId, PublicId, PublicKey, Request, Response, Signature, Transaction,
+    MessageId, Notification, PublicId, PublicKey, Request, Response, Signature, Transaction,
 };
 use safe_vault::{
     mock::Network,
@@ -267,6 +267,18 @@ pub trait TestClientTrait {
                 response
             }
             Message::Request { request, .. } => unexpected!(request),
+            Message::Notification { notification } => unexpected!(notification),
+        }
+    }
+
+    fn expect_notification(&mut self) -> Notification {
+        let bytes = self.expect_new_message().1;
+        let message: Message = unwrap!(bincode::deserialize(&bytes));
+
+        match message {
+            Message::Notification { notification } => notification,
+            Message::Request { request, .. } => unexpected!(request),
+            Message::Response { response, .. } => unexpected!(response),
         }
     }
 }

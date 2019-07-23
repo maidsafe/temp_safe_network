@@ -28,9 +28,9 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
     AData, ADataAddress, AppPermissions, AppPublicId, Challenge, Coins, Error as NdError, IData,
-    IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Result as NdResult, Signature, Transaction, TransactionId,
-    XorName,
+    IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, Notification,
+    PublicId, PublicKey, Request, Response, Result as NdResult, Signature, Transaction,
+    TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -170,6 +170,12 @@ impl ClientHandler {
                     info!(
                         "{}: {} invalidly sent {:?}",
                         self, client.public_id, response
+                    );
+                }
+                Ok(Message::Notification { notification, .. }) => {
+                    info!(
+                        "{}: {} invalidly sent {:?}",
+                        self, client.public_id, notification
                     );
                 }
                 Err(err) => {
@@ -905,10 +911,20 @@ impl ClientHandler {
             .map(|_| Transaction {
                 id: transaction_id,
                 amount,
+            })
+            .map(|transaction| {
+                self.notify_destination_owners(&destination, transaction);
+                transaction
             });
 
         self.send_response_to_client(public_id, message_id, Response::Transaction(result));
         None
+    }
+
+    fn notify_destination_owners(&mut self, destination: &XorName, transaction: Transaction) {
+        for client_id in self.lookup_client_and_its_apps(destination) {
+            self.send_notification_to_client(client_id, Notification(transaction));
+        }
     }
 
     fn withdraw_coins_for_transfer(
@@ -963,6 +979,23 @@ impl ClientHandler {
         self.quic_p2p.send(recipient, msg, 0)
     }
 
+    fn send_notification_to_client(&mut self, client_id: PublicId, notification: Notification) {
+        let peer_addr = if let Some(peer_addr) = self.lookup_client_peer_addr(&client_id) {
+            *peer_addr
+        } else {
+            info!(
+                "{}: can't notify {} as it's not connected.",
+                self, client_id
+            );
+            return;
+        };
+
+        self.send(
+            Peer::Client { peer_addr },
+            &Message::Notification { notification },
+        )
+    }
+
     fn send_response_to_client(
         &mut self,
         client_id: &PublicId,
@@ -990,6 +1023,19 @@ impl ClientHandler {
             .iter()
             .find(|(_, client)| &client.public_id == id)
             .map(|(peer_addr, _)| peer_addr)
+    }
+
+    fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
+        self.clients
+            .values()
+            .filter_map(|client| {
+                if client.public_id.name() == name {
+                    Some(client.public_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
     }
 
     fn balance<K: balance::Key>(&self, key: &K) -> Option<Coins> {

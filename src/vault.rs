@@ -57,7 +57,6 @@ pub struct Vault {
     event_receiver: Receiver<Event>,
 }
 
-// TODO - remove this
 impl Vault {
     /// Construct a new vault instance.
     pub fn new(config: Config) -> Result<Self> {
