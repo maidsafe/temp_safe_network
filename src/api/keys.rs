@@ -27,6 +27,7 @@ pub struct BlsKeyPair {
     pub sk: String,
 }
 
+#[allow(dead_code)]
 pub fn validate_key_pair(key_pair: &BlsKeyPair) -> ResultReturn<()> {
     let validation = key_pair.validate();
 

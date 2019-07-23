@@ -11,7 +11,7 @@ use super::helpers::get_host_and_path;
 use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG};
 use super::xorurl::SafeContentType;
 
-use super::{Error, ResultReturn, Safe, XorName, XorUrl, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, XorName, XorUrlEncoder};
 use log::{debug, info};
 
 #[derive(Debug, PartialEq)]
