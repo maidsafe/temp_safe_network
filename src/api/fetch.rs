@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::helpers::get_host_and_path;
+use super::helpers::get_subnames_host_and_path;
 use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG};
 use super::xorurl::SafeContentType;
 pub use super::xorurl::SafeDataType;
@@ -86,7 +86,7 @@ impl Safe {
                 err
             );
 
-            let (host_str, path) = get_host_and_path(&xorurl)?;
+            let (sub_names, host_str, path) = get_subnames_host_and_path(&xorurl)?;
             let hashed_host = xorname_from_nrs_string(&host_str)?;
 
             let encoded_xor = XorUrlEncoder::new(
@@ -95,6 +95,7 @@ impl Safe {
                 SafeDataType::PublishedSeqAppendOnlyData,
                 SafeContentType::NrsMapContainer,
                 Some(&path),
+                Some(sub_names),
             );
 
             let new_url = encoded_xor.to_string("base32z")?;
@@ -104,8 +105,9 @@ impl Safe {
         })?;
 
         let the_xorurl = the_xor.to_string("base32z")?;
-        debug!("URL parsed successfully, fetching: {}", the_xorurl);
+        info!("URL parsed successfully, fetching: {}", the_xorurl);
         let path = the_xor.path();
+        let sub_names = the_xor.sub_names();
 
         debug!("Fetching content of type: {:?}", the_xor.content_type());
 
@@ -181,11 +183,22 @@ impl Safe {
                     nrs_map
                 );
 
-                let new_target_xorurl = nrs_map.get_default_link()?;
+                let mut new_target_xorurl = nrs_map.get_default_link()?;
+
+                debug!(
+                    "Fetch found a default link for domain: \"{}\"",
+                    new_target_xorurl
+                );
+
+                if !sub_names.is_empty() {
+                    new_target_xorurl = nrs_map.resolve_for_subnames(sub_names)?;
+
+                    debug!("Resolved target from subnames: {}", new_target_xorurl);
+                }
 
                 let url_with_path = format!("{}{}", &new_target_xorurl, path);
 
-                debug!("Resolving target from resolvable map: {}", url_with_path);
+                info!("Resolving target from resolvable map: {}", url_with_path);
 
                 // TODO: Properly prevent resolution
                 // if prevent_resolution {
@@ -284,7 +297,12 @@ fn test_fetch_files_container() {
 
 #[test]
 fn test_fetch_resolvable_container() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", Some("")).unwrap();
 
@@ -294,9 +312,12 @@ fn test_fetch_resolvable_container() {
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
 
     let (_nrs_map_xorurl, _, _nrs_map) =
-        unwrap!(safe.nrs_map_container_create("somesite", Some(&xorurl), true, false));
+        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
 
-    let content = unwrap!(safe.fetch("safe://somesite"));
+    println!("NRS CREATED???? {:?}", _nrs_map);
+    println!("fetching CREATED site nammeee???? safe://{}", site_name);
+
+    let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
     // this should resolve to a FilesContainer until we enable prevent resolution.
     match content {
@@ -350,6 +371,7 @@ fn test_fetch_unsupported() {
         type_tag,
         SafeDataType::UnpublishedImmutableData,
         SafeContentType::Raw,
+        None,
         None,
         "base32z"
     ));

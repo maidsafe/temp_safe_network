@@ -8,8 +8,11 @@
 
 use super::{Error, ResultReturn};
 use chrono::{SecondsFormat, Utc};
+
+use log::debug;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
 use safe_nd::{XorName, XOR_NAME_LEN};
+use std::iter::FromIterator;
 use std::str;
 use threshold_crypto::serde_impl::SerdeSecret;
 use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
@@ -148,7 +151,7 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
     }
 }
 
-pub fn get_host_and_path(xorurl: &str) -> ResultReturn<(String, String)> {
+pub fn get_subnames_host_and_path(xorurl: &str) -> ResultReturn<(Vec<String>, String, String)> {
     let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
         Error::InvalidXorUrl(format!("Problem parsing the SAFE:// URL {:?}", parse_err))
     })?;
@@ -157,12 +160,23 @@ pub fn get_host_and_path(xorurl: &str) -> ResultReturn<(String, String)> {
         .host_str()
         .unwrap_or_else(|| "Failed parsing the URL");
 
+    let names_vec = Vec::from_iter(host_str.split('.').map(String::from));
+
+    let top_level_name = &names_vec[names_vec.len() - 1];
+    let sub_names = &names_vec[0..names_vec.len() - 1];
+
     let mut path = str::replace(parsing_url.path(), "\\", "/");
     if path == "/" {
         path = "".to_string();
     }
 
-    Ok((host_str.to_string(), path))
+    debug!(
+        "Data from url: sub names: {:?}, host: {}, path: {}",
+        sub_names.to_vec(),
+        top_level_name.to_string(),
+        path
+    );
+    Ok((sub_names.to_vec(), top_level_name.to_string(), path))
 }
 
 pub fn gen_timestamp_secs() -> String {

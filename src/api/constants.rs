@@ -8,3 +8,4 @@ pub const FAKE_RDF_PREDICATE_TYPE: &str = "type";
 pub const FAKE_RDF_PREDICATE_SIZE: &str = "size";
 pub const FAKE_RDF_PREDICATE_MODIFIED: &str = "modified";
 pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
+pub const FAKE_RDF_PREDICATE_DEFAULT: &str = "_default";

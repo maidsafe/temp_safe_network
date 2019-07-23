@@ -97,6 +97,7 @@ impl Safe {
                 SafeDataType::PublishedSeqAppendOnlyData,
                 SafeContentType::FilesContainer,
                 None,
+                None,
                 &self.xorurl_base,
             )?;
 
@@ -252,6 +253,7 @@ impl Safe {
             0,
             SafeDataType::PublishedImmutableData,
             SafeContentType::Raw,
+            None,
             None,
             &self.xorurl_base,
         )

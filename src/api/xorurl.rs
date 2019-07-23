@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_host_and_path;
+use super::helpers::get_subnames_host_and_path;
 use super::{Error, ResultReturn};
+use log::debug;
 use multibase::{decode, encode, Base};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
@@ -69,6 +70,7 @@ pub struct XorUrlEncoder {
     data_type: SafeDataType,
     content_type: SafeContentType,
     path: String,
+    sub_names: Vec<String>,
 }
 
 impl XorUrlEncoder {
@@ -78,6 +80,7 @@ impl XorUrlEncoder {
         data_type: SafeDataType,
         content_type: SafeContentType,
         path: Option<&str>,
+        sub_names: Option<Vec<String>>,
     ) -> Self {
         Self {
             version: XOR_URL_VERSION_1,
@@ -86,6 +89,7 @@ impl XorUrlEncoder {
             data_type,
             content_type,
             path: path.unwrap_or_else(|| "").to_string(),
+            sub_names: sub_names.unwrap_or_else(|| vec![]),
         }
     }
 
@@ -96,14 +100,16 @@ impl XorUrlEncoder {
         data_type: SafeDataType,
         content_type: SafeContentType,
         path: Option<&str>,
+        sub_names: Option<Vec<String>>,
         base: &str,
     ) -> ResultReturn<String> {
-        let xorurl_encoder = XorUrlEncoder::new(xorname, type_tag, data_type, content_type, path);
+        let xorurl_encoder =
+            XorUrlEncoder::new(xorname, type_tag, data_type, content_type, path, sub_names);
         xorurl_encoder.to_string(base)
     }
 
     pub fn from_url(xorurl: &str) -> ResultReturn<Self> {
-        let (cid_str, path) = get_host_and_path(&xorurl)?;
+        let (sub_names, cid_str, path) = get_subnames_host_and_path(&xorurl)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&cid_str)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -140,6 +146,11 @@ impl XorUrlEncoder {
                 )))
             }
         };
+
+        debug!(
+            "Attempting to match content type of URL: {}, {:?}",
+            &xorurl, content_type
+        );
 
         let data_type = match xorurl_bytes[3] {
             0 => SafeDataType::CoinBalance,
@@ -179,6 +190,7 @@ impl XorUrlEncoder {
             data_type,
             content_type,
             path: path.to_string(),
+            sub_names,
         })
     }
 
@@ -207,12 +219,17 @@ impl XorUrlEncoder {
         &self.path
     }
 
+    pub fn sub_names(&self) -> Vec<String> {
+        self.sub_names.to_vec()
+    }
+
     // XOR-URL encoding format (var length from 36 to 44 bytes):
     // 1 byte for version
     // 2 bytes for content type (enough to start including some MIME types also)
     // 1 byte for SAFE native data type
     // 32 bytes for XoR Name
     // and up to 8 bytes for type_tag
+
     pub fn to_string(&self, base: &str) -> ResultReturn<String> {
         // let's set the first byte with the XOR-URL format version
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
@@ -223,6 +240,12 @@ impl XorUrlEncoder {
 
         // push the SAFE data type byte
         cid_vec.push(self.data_type.clone() as u8);
+
+        let sub_names = if !self.sub_names.is_empty() {
+            format!("{}.", self.sub_names.join("."))
+        } else {
+            "".to_string()
+        };
 
         // add the xorname 32 bytes
         cid_vec.extend_from_slice(&self.xorname.0);
@@ -247,7 +270,10 @@ impl XorUrlEncoder {
             }
         };
         let cid_str = encode(base_encoding, cid_vec);
-        Ok(format!("{}{}{}", SAFE_URL_PROTOCOL, cid_str, self.path))
+        Ok(format!(
+            "{}{}{}{}",
+            SAFE_URL_PROTOCOL, sub_names, cid_str, self.path
+        ))
     }
 }
 
@@ -260,6 +286,7 @@ fn test_xorurl_base32_encoding() {
         0xa632_3c4d_4a32,
         SafeDataType::PublishedImmutableData,
         SafeContentType::Raw,
+        None,
         None,
         "base32"
     ));
@@ -278,6 +305,7 @@ fn test_xorurl_base32z_encoding() {
         SafeDataType::PublishedImmutableData,
         SafeContentType::Raw,
         None,
+        None,
         "base32z"
     ));
     let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
@@ -293,6 +321,7 @@ fn test_xorurl_base64_encoding() {
         4_584_545,
         SafeDataType::PublishedSeqAppendOnlyData,
         SafeContentType::FilesContainer,
+        None,
         None,
         "base64"
     ));
@@ -325,6 +354,7 @@ fn test_xorurl_default_base_encoding() {
         SafeDataType::PublishedImmutableData,
         SafeContentType::Raw,
         None,
+        None,
         "" // forces it to use the default
     ));
     assert_eq!(xorurl, base32z_xorurl);
@@ -339,6 +369,7 @@ fn test_xorurl_decoding() {
         type_tag,
         SafeDataType::PublishedImmutableData,
         SafeContentType::Raw,
+        None,
         None,
     );
     assert_eq!("", xorurl_encoder.path());
@@ -363,6 +394,7 @@ fn test_xorurl_decoding_with_path() {
         SafeDataType::PublishedSeqAppendOnlyData,
         SafeContentType::Wallet,
         None,
+        None,
         "base32z"
     ));
 
@@ -383,5 +415,38 @@ fn test_xorurl_decoding_with_path() {
     assert_eq!(
         SafeContentType::Wallet,
         xorurl_encoder_with_path.content_type()
+    );
+}
+
+#[test]
+fn test_xorurl_decoding_with_subname() {
+    use unwrap::unwrap;
+    let xorname = XorName(*b"12345678901234567890123456789012");
+    let type_tag: u64 = 0x0eef;
+    let xorurl = unwrap!(XorUrlEncoder::encode(
+        xorname,
+        type_tag,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::NrsMapContainer,
+        None,
+        Some(vec!("sub".to_string())),
+        "base32z"
+    ));
+
+    let xorurl_with_subname = xorurl.to_string();
+    assert!(xorurl_with_subname.contains("safe://sub."));
+    let xorurl_encoder_with_subname = unwrap!(XorUrlEncoder::from_url(&xorurl_with_subname));
+    assert_eq!(
+        xorurl_with_subname,
+        unwrap!(xorurl_encoder_with_subname.to_string("base32z"))
+    );
+    assert_eq!("", xorurl_encoder_with_subname.path());
+    assert_eq!(1, xorurl_encoder_with_subname.version());
+    assert_eq!(xorname, xorurl_encoder_with_subname.xorname());
+    assert_eq!(type_tag, xorurl_encoder_with_subname.type_tag());
+    assert_eq!(vec!("sub"), xorurl_encoder_with_subname.sub_names());
+    assert_eq!(
+        SafeContentType::NrsMapContainer,
+        xorurl_encoder_with_subname.content_type()
     );
 }
