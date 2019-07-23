@@ -7,7 +7,7 @@ properties([
 
 stage('build & test') {
     parallel linux: {
-        node('docker') {
+        node('safe_cli') {
             checkout(scm)
             runTests(false)
             packageBuildArtifacts('linux')
@@ -33,7 +33,7 @@ stage('build & test') {
 }
 
 stage('deploy') {
-    node('docker') {
+    node('safe_cli') {
         if (env.BRANCH_NAME == "master") {
             checkout(scm)
             sh("git fetch --tags --force")
