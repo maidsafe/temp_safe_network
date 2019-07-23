@@ -6,6 +6,7 @@ UNAME_S := $(shell uname -s)
 PWD := $(shell echo $$PWD)
 UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
+SAFE_AUTH_DEFAULT_PORT := 41805
 
 build-container:
 	rm -rf target/
@@ -17,7 +18,7 @@ push-container:
 
 test:
 ifndef SAFE_AUTH_PORT
-	$(eval SAFE_AUTH_PORT := 41805)
+	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
 endif
 	rm -rf artifacts
 	mkdir artifacts
@@ -83,8 +84,7 @@ endif
 
 clean:
 ifndef SAFE_AUTH_PORT
-	@echo "The port that safe authenticator is running on must be supplied."
-	@exit 1
+	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
 endif
 ifeq ($(OS),Windows_NT)
 	powershell.exe -File resources\test-scripts\cleanup.ps1 -port ${SAFE_AUTH_PORT}
