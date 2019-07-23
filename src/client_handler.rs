@@ -227,6 +227,7 @@ impl ClientHandler {
 
         self.verify_signature(&client.public_id, &request, message_id, signature)?;
         self.authorise_app(&client.public_id, &request, message_id)?;
+        self.verify_consistent_address(&client.public_id, &request, message_id)?;
 
         match request {
             //
@@ -283,29 +284,9 @@ impl ClientHandler {
             DeleteAData(address) => self.handle_delete_adata(client, address, message_id),
             AddPubADataPermissions { .. }
             | AddUnpubADataPermissions { .. }
-            | SetADataOwner { .. } => self.handle_mutate_adata(client, request, message_id),
-            AppendSeq { ref append, .. } => {
-                if !utils::adata::is_sequential(&append.address) {
-                    self.send_response_to_client(
-                        &client.public_id,
-                        message_id,
-                        Response::Mutation(Err(NdError::InvalidOperation)),
-                    );
-                    return None;
-                }
-                self.handle_mutate_adata(client, request, message_id)
-            }
-            AppendUnseq(ref append) => {
-                if utils::adata::is_sequential(&append.address) {
-                    self.send_response_to_client(
-                        &client.public_id,
-                        message_id,
-                        Response::Mutation(Err(NdError::InvalidOperation)),
-                    );
-                    return None;
-                }
-                self.handle_mutate_adata(client, request, message_id)
-            }
+            | SetADataOwner { .. }
+            | AppendSeq { .. }
+            | AppendUnseq(..) => self.handle_mutate_adata(client, request, message_id),
             //
             // ===== Coins =====
             //
@@ -1361,6 +1342,31 @@ impl ClientHandler {
             .app_permissions(app_id)
             .map(|_| ())
             .ok_or(NdError::AccessDenied)
+    }
+
+    fn verify_consistent_address(
+        &mut self,
+        public_id: &PublicId,
+        request: &Request,
+        message_id: MessageId,
+    ) -> Option<()> {
+        use Request::*;
+        let consistent = match request {
+            AppendSeq { ref append, .. } => utils::adata::is_sequential(&append.address),
+            AppendUnseq(ref append) => !utils::adata::is_sequential(&append.address),
+            // TODO: any other requests for which this can happen?
+            _ => true,
+        };
+        if !consistent {
+            self.send_response_to_client(
+                public_id,
+                message_id,
+                Response::Mutation(Err(NdError::InvalidOperation)),
+            );
+            None
+        } else {
+            Some(())
+        }
     }
 }
 
