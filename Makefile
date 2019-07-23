@@ -88,7 +88,7 @@ ifndef SAFE_AUTH_PORT
 	@exit 1
 endif
 ifeq ($(OS),Windows_NT)
-	cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
+	powershell.exe -File resources\test-scripts\cleanup.ps1 -port ${SAFE_AUTH_PORT}
 else ifeq ($(UNAME_S),Darwin)
 	lsof -t -i tcp:${SAFE_AUTH_PORT} | xargs -n 1 -x kill
 endif
