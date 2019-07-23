@@ -30,7 +30,7 @@ pub type FilesMap = BTreeMap<String, FileItem>;
 type ProcessedFiles = BTreeMap<String, (String, String)>;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
-const FILES_CONTAINER_TYPE_TAG: u64 = 10_100;
+const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
 
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 

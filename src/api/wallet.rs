@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use unwrap::unwrap; // TODO: remove all unwraps from this file
 
 // Type tag used for the Wallet container
-const WALLET_TYPE_TAG: u64 = 10_000;
+const WALLET_TYPE_TAG: u64 = 1_000;
 
 const WALLET_DEFAULT: &str = "_default";
 const WALLET_DEFAULT_BYTES: &[u8] = b"_default";

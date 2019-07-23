@@ -238,7 +238,7 @@ fn test_fetch_wallet() {
         content
             == SafeData::Wallet {
                 xorname: xorurl_encoder.xorname(),
-                type_tag: 10_000,
+                type_tag: 1_000,
                 data_type: SafeDataType::SeqMutableData,
             }
     );
@@ -261,7 +261,7 @@ fn test_fetch_files_container() {
         content
             == SafeData::FilesContainer {
                 xorname: xorurl_encoder.xorname(),
-                type_tag: 10_100,
+                type_tag: 1_100,
                 version: 1,
                 files_map,
                 data_type: SafeDataType::PublishedSeqAppendOnlyData,
@@ -309,7 +309,7 @@ fn test_fetch_resolvable_container() {
             ..
         } => {
             assert_eq!(xorname, xorurl_encoder.xorname());
-            assert_eq!(type_tag, 10_100);
+            assert_eq!(type_tag, 1_100);
             assert_eq!(version, 1);
             assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
             assert_eq!(files_map, the_files_map);
