@@ -6,7 +6,6 @@ UNAME_S := $(shell uname -s)
 PWD := $(shell echo $$PWD)
 UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
-SAFE_MOCK_VAULT_PATH := ~/safe_auth$(shell echo $$RANDOM_PORT_NUMBER)
 
 build-container:
 	rm -rf target/

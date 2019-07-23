@@ -9,7 +9,7 @@ stage('build & test') {
     parallel linux: {
         node('safe_cli') {
             checkout(scm)
-            runTests(false)
+            runTests()
             packageBuildArtifacts('linux')
             uploadBuildArtifacts()
         }
@@ -17,7 +17,7 @@ stage('build & test') {
     windows: {
         node('windows') {
             checkout(scm)
-            runTests(true)
+            runTests()
             packageBuildArtifacts('windows')
             uploadBuildArtifacts()
         }
@@ -25,7 +25,7 @@ stage('build & test') {
     macos: {
         node('osx') {
             checkout(scm)
-            runTests(true)
+            runTests()
             packageBuildArtifacts('macos')
             uploadBuildArtifacts()
         }
@@ -55,19 +55,15 @@ stage('deploy') {
     }
 }
 
-def runTests(setPortNumber) {
-    testCommand = "make test"
-    cleanCommand = "make clean"
-    if (setPortNumber) {
-        port = new Random().nextInt() % 100 + 41800
-        echo("Generated ${port} at random to be used as SAFE_AUTH_PORT")
-        testCommand = "SAFE_AUTH_PORT=${port} make test"
-        cleanCommand = "SAFE_AUTH_PORT=${port} make clean"
-    }
-    try {
-      sh(testCommand)
-    } finally {
-      sh(cleanCommand)
+def runTests() {
+    port = new Random().nextInt() % 100 + 41800
+    echo("Generated ${port} at random to be used as SAFE_AUTH_PORT")
+    withEnv(["SAFE_AUTH_PORT=${port}"]) {
+        try {
+            sh("make test")
+        } finally {
+            sh("make clean")
+        }
     }
 }
 
