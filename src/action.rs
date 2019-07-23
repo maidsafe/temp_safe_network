@@ -13,21 +13,25 @@ use std::collections::BTreeSet;
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
-    // Send a validated client request from client handlers to data handlers.
+    // Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
+    // Send a request from client handlers of Client A to Client B to then be handled as if Client B
+    // had made the request.  Only used by `CreateLoginPacketFor`, where Client A is creating the
+    // new balance for Client B, but also effectively bundles B's `CreateLoginPacket` with it.
+    ProxyClientRequest(Rpc),
     // Send a response as an adult or elder to own section's elders.
     RespondToOurDataHandlers {
         sender: XorName,
-        message: Rpc,
+        rpc: Rpc,
     },
     RespondToClientHandlers {
         sender: XorName,
-        message: Rpc,
+        rpc: Rpc,
     },
     // Send the same request to each individual peer (used to send IData requests to adults).
     SendToPeers {
         sender: XorName,
         targets: BTreeSet<XorName>,
-        message: Rpc,
+        rpc: Rpc,
     },
 }

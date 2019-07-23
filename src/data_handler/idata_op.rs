@@ -143,7 +143,7 @@ impl IDataOp {
         } else {
             Some(Action::RespondToClientHandlers {
                 sender: *address.name(),
-                message: Rpc::Response {
+                rpc: Rpc::Response {
                     requester: self.client().clone(),
                     response: Response::GetIData(result),
                     message_id,

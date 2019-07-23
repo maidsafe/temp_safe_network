@@ -66,7 +66,7 @@ impl ADataHandler {
         };
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
@@ -103,7 +103,7 @@ impl ADataHandler {
             });
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
@@ -121,7 +121,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetAData(result),
                 message_id,
@@ -142,7 +142,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetADataShell(result),
                 message_id,
@@ -163,7 +163,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetADataRange(result),
                 message_id,
@@ -183,7 +183,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetADataIndices(result),
                 message_id,
@@ -203,7 +203,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetADataLastEntry(result),
                 message_id,
@@ -229,7 +229,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetADataOwners(result),
                 message_id,
@@ -251,7 +251,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetPubADataUserPermissions(result),
                 message_id,
@@ -273,7 +273,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetUnpubADataUserPermissions(result),
                 message_id,
@@ -302,7 +302,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response,
                 message_id,
@@ -323,7 +323,7 @@ impl ADataHandler {
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::GetADataValue(result),
                 message_id,
@@ -514,7 +514,7 @@ impl ADataHandler {
             });
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester: requester.clone(),
                 response: Response::Mutation(result),
                 message_id,

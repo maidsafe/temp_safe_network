@@ -79,16 +79,17 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
     }
 }
 
-pub(crate) fn rpc_elder_address(rpc: &Rpc) -> Option<XorName> {
+/// Returns the requester's address.  An App's address is the name of its owner.
+pub(crate) fn requester_address(rpc: &Rpc) -> &XorName {
     match rpc {
         Rpc::Request { ref requester, .. } | Rpc::Response { ref requester, .. } => {
-            let client_pk = own_key(&requester)?;
-            Some(XorName::from(*client_pk))
+            requester.name()
         }
     }
 }
 
-pub(crate) fn data_handlers_address(request: &Request) -> Option<&XorName> {
+/// Returns the address of the destination for `request`.
+pub(crate) fn destination_address(request: &Request) -> Option<&XorName> {
     use Request::*;
     match request {
         PutIData(ref data) => Some(data.name()),

@@ -170,75 +170,38 @@ impl Vault {
     fn handle_action(&mut self, action: Action) -> Option<Action> {
         use Action::*;
         match action {
-            ForwardClientRequest(message) => {
-                let requester_name = utils::rpc_elder_address(&message)?;
-                let data_handlers_address = if let Rpc::Request { ref request, .. } = message {
-                    match utils::data_handlers_address(&request) {
-                        Some(address) => address,
-                        None => {
-                            error!("{}: Logic error - no data handler address available.", self);
-                            return None;
-                        }
-                    }
-                } else {
-                    error!("{}: Logic error - unexpected RPC.", self);
-                    return None;
-                };
-
+            ForwardClientRequest(rpc) => self.forward_client_request(rpc),
+            ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
+            RespondToOurDataHandlers { sender, rpc } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the data handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                if self.self_is_handler_for(&data_handlers_address) {
-                    // TODO - We need a better way for determining which handler should be given the
-                    //        message.
-                    return if let Rpc::Request {
-                        request: Request::CreateLoginPacket(_),
-                        ..
-                    } = message
-                    {
-                        self.client_handler_mut()?
-                            .handle_vault_message(requester_name, message)
-                    } else {
-                        self.data_handler_mut()?
-                            .handle_vault_message(requester_name, message)
-                    };
-                }
-                None
+                self.data_handler_mut()?.handle_vault_rpc(sender, rpc)
             }
-            RespondToOurDataHandlers { sender, message } => {
-                // TODO - once Routing is integrated, we'll construct the full message to send
-                //        onwards, and then if we're also part of the data handlers, we'll call that
-                //        same handler which Routing will call after receiving a message.
-
-                self.data_handler_mut()?
-                    .handle_vault_message(sender, message)
-            }
-            RespondToClientHandlers { sender, message } => {
-                let client_name = utils::rpc_elder_address(&message)?;
+            RespondToClientHandlers { sender, rpc } => {
+                let client_name = utils::requester_address(&rpc);
 
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the client handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                if self.self_is_handler_for(&client_name) {
-                    return self
-                        .client_handler_mut()?
-                        .handle_vault_message(sender, message);
+                if self.self_is_handler_for(client_name) {
+                    return self.client_handler_mut()?.handle_vault_rpc(sender, rpc);
                 }
                 None
             }
             SendToPeers {
                 sender,
                 targets,
-                message,
+                rpc,
             } => {
                 let mut next_action = None;
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         next_action = self
                             .data_handler_mut()?
-                            .handle_vault_message(sender, message.clone());
+                            .handle_vault_rpc(sender, rpc.clone());
                         // } else {
                         //     Send to target
                     }
@@ -246,6 +209,80 @@ impl Vault {
                 next_action
             }
         }
+    }
+
+    fn forward_client_request(&mut self, rpc: Rpc) -> Option<Action> {
+        let requester_name = if let Rpc::Request {
+            request: Request::CreateLoginPacketFor { ref new_owner, .. },
+            ..
+        } = rpc
+        {
+            XorName::from(*new_owner)
+        } else {
+            *utils::requester_address(&rpc)
+        };
+        let dst_address = if let Rpc::Request { ref request, .. } = rpc {
+            match utils::destination_address(&request) {
+                Some(address) => address,
+                None => {
+                    error!("{}: Logic error - no data handler address available.", self);
+                    return None;
+                }
+            }
+        } else {
+            error!("{}: Logic error - unexpected RPC.", self);
+            return None;
+        };
+
+        // TODO - once Routing is integrated, we'll construct the full message to send
+        //        onwards, and then if we're also part of the data handlers, we'll call that
+        //        same handler which Routing will call after receiving a message.
+
+        if self.self_is_handler_for(&dst_address) {
+            // TODO - We need a better way for determining which handler should be given the
+            //        message.
+            return match rpc {
+                Rpc::Request {
+                    request: Request::CreateLoginPacket(_),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::CreateLoginPacketFor { .. },
+                    ..
+                } => self
+                    .client_handler_mut()?
+                    .handle_vault_rpc(requester_name, rpc),
+                _ => self
+                    .data_handler_mut()?
+                    .handle_vault_rpc(requester_name, rpc),
+            };
+        }
+        None
+    }
+
+    fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {
+        let requester_name = *utils::requester_address(&rpc);
+        let dst_address = if let Rpc::Request {
+            request: Request::CreateLoginPacketFor { ref new_owner, .. },
+            ..
+        } = rpc
+        {
+            XorName::from(*new_owner)
+        } else {
+            error!("{}: Logic error - unexpected RPC.", self);
+            return None;
+        };
+
+        // TODO - once Routing is integrated, we'll construct the full message to send
+        //        onwards, and then if we're also part of the data handlers, we'll call that
+        //        same handler which Routing will call after receiving a message.
+
+        if self.self_is_handler_for(&dst_address) {
+            return self
+                .client_handler_mut()?
+                .handle_vault_rpc(requester_name, rpc);
+        }
+        None
     }
 
     fn self_is_handler_for(&self, _address: &XorName) -> bool {

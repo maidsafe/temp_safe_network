@@ -67,7 +67,7 @@ impl IDataHandler {
         let respond = |result: NdResult<()>| {
             Some(Action::RespondToClientHandlers {
                 sender: data_name,
-                message: Rpc::Response {
+                rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::Mutation(result),
                     message_id,
@@ -103,7 +103,7 @@ impl IDataHandler {
                 Some(Action::SendToPeers {
                     sender: data_name,
                     targets: target_holders,
-                    message: Rpc::Request {
+                    rpc: Rpc::Request {
                         request: idata_op.request().clone(),
                         requester,
                         message_id,
@@ -123,7 +123,7 @@ impl IDataHandler {
         let respond = |result: NdResult<()>| {
             Some(Action::RespondToClientHandlers {
                 sender: *address.name(),
-                message: Rpc::Response {
+                rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::Mutation(result),
                     message_id,
@@ -149,7 +149,7 @@ impl IDataHandler {
                 Some(Action::SendToPeers {
                     sender: *address.name(),
                     targets: metadata.holders,
-                    message: Rpc::Request {
+                    rpc: Rpc::Request {
                         request: idata_op.request().clone(),
                         requester,
                         message_id,
@@ -169,7 +169,7 @@ impl IDataHandler {
         let respond = |result: NdResult<IData>| {
             Some(Action::RespondToClientHandlers {
                 sender: *address.name(),
-                message: Rpc::Response {
+                rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::GetIData(result),
                     message_id,
@@ -196,7 +196,7 @@ impl IDataHandler {
                 Some(Action::SendToPeers {
                     sender: *address.name(),
                     targets: metadata.holders,
-                    message: Rpc::Request {
+                    rpc: Rpc::Request {
                         request: idata_op.request().clone(),
                         requester,
                         message_id,
@@ -268,7 +268,7 @@ impl IDataHandler {
         self.remove_idata_op_if_concluded(&message_id)
             .map(|idata_op| Action::RespondToClientHandlers {
                 sender: *idata_address.name(),
-                message: Rpc::Response {
+                rpc: Rpc::Response {
                     requester: idata_op.client().clone(),
                     response: Response::Mutation(Ok(())),
                     message_id,
@@ -315,7 +315,7 @@ impl IDataHandler {
         self.remove_idata_op_if_concluded(&message_id)
             .map(|idata_op| Action::RespondToClientHandlers {
                 sender: *idata_address.name(),
-                message: Rpc::Response {
+                rpc: Rpc::Response {
                     requester: idata_op.client().clone(),
                     response: Response::Mutation(Ok(())),
                     message_id,
