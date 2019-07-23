@@ -83,15 +83,17 @@ endif
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64.tar.gz
 
 clean:
-# Both taskkill and killall could be called when safe_auth isn't running.
-# The behaviour of both is to error if there are no processes that match the name,
-# so we can just pipe it through || true to ignore that error and continue.
+ifndef SAFE_AUTH_PORT
+	@echo "The port that safe authenticator is running on must be supplied."
+	@exit 1
+endif
 ifeq ($(OS),Windows_NT)
 	cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
 else ifeq ($(UNAME_S),Darwin)
-	lsof -t -i tcp:${RANDOM_PORT_NUMBER} | xargs -n 1 -x kill
-	rm -rf ${SAFE_MOCK_VAULT_PATH}
+	lsof -t -i tcp:${SAFE_AUTH_PORT} | xargs -n 1 -x kill
 endif
+	$(eval MOCK_VAULT_PATH := ~/safe_auth-${SAFE_AUTH_PORT})
+	rm -rf ${MOCK_VAULT_PATH}
 
 package-commit_hash-artifacts-for-deploy:
 	rm -f *.tar
