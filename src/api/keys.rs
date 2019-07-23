@@ -198,10 +198,7 @@ fn test_keys_create_preload_test_coins() {
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("12.23".to_string(), None));
     assert!(xorurl.starts_with("safe://"));
-    match key_pair {
-        None => panic!("Key pair was not generated as it was expected"),
-        Some(_) => assert!(true),
-    };
+    assert!(key_pair.is_some());
 }
 
 #[test]
@@ -212,10 +209,7 @@ fn test_keys_create_preload_test_coins_pk() {
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create_preload_test_coins("1.1".to_string(), Some(pk)));
     assert!(xorurl.starts_with("safe://"));
-    match key_pair {
-        None => assert!(true),
-        Some(kp) => panic!("Unexpected key pair generated: {:?} {:?}", kp.pk, kp.sk),
-    };
+    assert!(key_pair.is_none());
 }
 
 #[test]
@@ -227,10 +221,7 @@ fn test_keys_create() {
 
     let (xorurl, key_pair) = unwrap!(safe.keys_create(Some(unwrap!(from_key_pair).sk), None, None));
     assert!(xorurl.starts_with("safe://"));
-    match key_pair {
-        None => panic!("Key pair was not generated as it was expected"),
-        Some(_) => assert!(true),
-    };
+    assert!(key_pair.is_some());
 }
 
 #[test]
@@ -321,10 +312,7 @@ fn test_keys_create_pk() {
     let (xorurl, key_pair) =
         unwrap!(safe.keys_create(Some(unwrap!(from_key_pair).sk), None, Some(pk)));
     assert!(xorurl.starts_with("safe://"));
-    match key_pair {
-        None => assert!(true),
-        Some(kp) => panic!("Unexpected key pair generated: {:?} {:?}", kp.pk, kp.sk),
-    };
+    assert!(key_pair.is_none());
 }
 
 #[test]

@@ -128,7 +128,7 @@ fn calling_safe_nrs_put_folder_and_fetch() {
     assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 1)"));
 
     assert!(nrs_creation.contains("safe://"));
-    assert!(nrs_creation.contains("+"));
+    assert!(nrs_creation.contains('+'));
     assert!(nrs_creation.contains(&test_name));
 
     let another_file = format!("{}/another.md", &test_name);
