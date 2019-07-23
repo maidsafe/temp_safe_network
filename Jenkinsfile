@@ -56,20 +56,18 @@ stage('deploy') {
 }
 
 def runTests(setPortNumber) {
-    test_command = "make test"
-    clean_command = "make clean"
+    testCommand = "make test"
+    cleanCommand = "make clean"
     if (setPortNumber) {
-        randomNumber = sh(
-          returnStdout: true,
-          script: "echo \$(( \$RANDOM % 100 + 41800 ))"
-        )
-        test_command = "RANDOM_PORT_NUMBER=${randomNumber} make test"
-        clean_command = "RANDOM_PORT_NUMBER=${randomNumber} make clean"
+        port = new Random().nextInt() % 100 + 41800
+        echo("Generated ${port} at random to be used as SAFE_AUTH_PORT")
+        testCommand = "SAFE_AUTH_PORT=${port} make test"
+        cleanCommand = "SAFE_AUTH_PORT=${port} make clean"
     }
     try {
-      sh(test_command)
+      sh(testCommand)
     } finally {
-      sh(clean_command)
+      sh(cleanCommand)
     }
 }
 

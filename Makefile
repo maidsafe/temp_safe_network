@@ -17,13 +17,10 @@ push-container:
 	docker push maidsafe/safe-cli-build:${SAFE_CLI_VERSION}
 
 test:
-	rm -rf artifacts
-ifeq ($(OS),Windows_NT)
-		cmd.exe /c "taskkill /F /IM safe_auth.exe" || true
-else
-	killall "safe_auth" || true
+ifndef SAFE_AUTH_PORT
+	$(eval SAFE_AUTH_PORT := 41805)
 endif
-	rm -rf ~/safe_auth*
+	rm -rf artifacts
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
@@ -33,7 +30,9 @@ ifeq ($(UNAME_S),Linux)
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
-	RANDOM_PORT_NUMBER=${RANDOM_PORT_NUMBER} SAFE_MOCK_VAULT_PATH=${SAFE_MOCK_VAULT_PATH} ./resources/test-scripts/all-tests
+	$(eval MOCK_VAULT_PATH := ~/safe_auth-${SAFE_AUTH_PORT})
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
+		SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} ./resources/test-scripts/all-tests
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
