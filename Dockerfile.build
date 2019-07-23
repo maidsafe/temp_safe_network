@@ -36,3 +36,6 @@ ENV CARGO_TARGET_DIR=/target YARN_GPG=no RUST_BACKTRACE=1
 RUN cargo check --release && \
     cargo test --features="scl-mock" -- --test-threads=1
 ENTRYPOINT ["fixuid"]
+
+
+RUN rustup component add rustfmt clippy;
