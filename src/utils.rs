@@ -12,7 +12,8 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
 use safe_nd::{
-    ADataAddress, ClientPublicId, Error as NdError, PublicId, PublicKey, Request, Response, XorName,
+    ADataAddress, ClientPublicId, Error as NdError, IDataAddress, PublicId, PublicKey, Request,
+    Response, XorName,
 };
 use serde::Serialize;
 use std::{fs, path::Path};
@@ -222,6 +223,77 @@ pub fn to_error_response(request: &Request, error: NdError) -> Response {
         }
         Request::GetLoginPacket(_) => Response::GetLoginPacket(Err(error)),
         Request::ListAuthKeysAndVersion => Response::ListAuthKeysAndVersion(Err(error)),
+    }
+}
+
+// The kind of authorisation needed for a reequest.
+pub(crate) enum AuthorisationKind {
+    // Get request against published data.
+    GetPub,
+    // Get request against unpublished data.
+    GetUnpub,
+    // Mutation request.
+    Mut,
+}
+
+// Returns the type of authorisation needed for the given request.
+pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
+    use AuthorisationKind::*;
+    use Request::*;
+
+    match request {
+        PutIData(_)
+        | DeleteUnpubIData(_)
+        | PutMData(_)
+        | DeleteMData(_)
+        | SetMDataUserPermissions { .. }
+        | DelMDataUserPermissions { .. }
+        | MutateSeqMDataEntries { .. }
+        | MutateUnseqMDataEntries { .. }
+        | PutAData(_)
+        | DeleteAData(_)
+        | AddPubADataPermissions { .. }
+        | AddUnpubADataPermissions { .. }
+        | SetADataOwner { .. }
+        | AppendSeq { .. }
+        | AppendUnseq(_)
+        | TransferCoins { .. }
+        | CreateBalance { .. }
+        | CreateLoginPacket(_)
+        | CreateLoginPacketFor { .. }
+        | UpdateLoginPacket(_)
+        | InsAuthKey { .. }
+        | DelAuthKey { .. } => Mut,
+        GetIData(IDataAddress::Pub(_)) => GetPub,
+        GetIData(IDataAddress::Unpub(_))
+        | GetMData(_)
+        | GetMDataValue { .. }
+        | GetMDataShell(_)
+        | GetMDataVersion(_)
+        | ListMDataEntries(_)
+        | ListMDataKeys(_)
+        | ListMDataValues(_)
+        | ListMDataPermissions(_)
+        | ListMDataUserPermissions { .. }
+        | GetLoginPacket(_)
+        | GetBalance
+        | ListAuthKeysAndVersion => GetUnpub,
+        GetAData(address)
+        | GetADataValue { address, .. }
+        | GetADataShell { address, .. }
+        | GetADataRange { address, .. }
+        | GetADataIndices(address)
+        | GetADataLastEntry(address)
+        | GetADataPermissions { address, .. }
+        | GetPubADataUserPermissions { address, .. }
+        | GetUnpubADataUserPermissions { address, .. }
+        | GetADataOwners { address, .. } => {
+            if adata::is_published(address) {
+                GetPub
+            } else {
+                GetUnpub
+            }
+        }
     }
 }
 

@@ -85,7 +85,11 @@ impl Environment {
         app
     }
 
-    fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
+    pub fn new_disconnected_app(&mut self, owner: ClientPublicId) -> TestApp {
+        TestApp::new_disconnected(&mut self.rng, owner)
+    }
+
+    pub fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
         let conn_info = self.vault.connection_info();
         client.quic_p2p().connect_to(conn_info.clone());
         self.poll();

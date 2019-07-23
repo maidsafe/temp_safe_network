@@ -18,7 +18,7 @@ use crate::{
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     rpc::Rpc,
-    utils,
+    utils::{self, AuthorisationKind},
     vault::Init,
     Config, Error, Result,
 };
@@ -27,9 +27,10 @@ use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
-    AData, ADataAddress, AppPermissions, Challenge, Coins, Error as NdError, IData, IDataAddress,
-    IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId, PublicKey, Request,
-    Response, Result as NdResult, Signature, Transaction, TransactionId, XorName,
+    AData, ADataAddress, AppPermissions, AppPublicId, Challenge, Coins, Error as NdError, IData,
+    IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, PublicId,
+    PublicKey, Request, Response, Result as NdResult, Signature, Transaction, TransactionId,
+    XorName,
 };
 use serde::Serialize;
 use std::{
@@ -217,32 +218,15 @@ impl ClientHandler {
             message_id,
             client.public_id
         );
-        if let Some(sig) = signature.as_ref() {
-            if !self.is_valid_client_signature(&client.public_id, &request, &message_id, sig) {
-                return None;
-            }
-        }
 
-        let dbg_msg = format!(
-            "{}: ({:?}/{:?}) from {} is unsigned",
-            self, request, message_id, client.public_id
-        );
-        let has_signature = || {
-            if (&signature).is_none() {
-                warn!("{}", dbg_msg);
-                return None;
-            }
-            Some(())
-        };
+        self.verify_signature(&client.public_id, &request, message_id, signature)?;
+        self.authorise_app(&client.public_id, &request, message_id)?;
 
         match request {
             //
             // ===== Immutable Data =====
             //
-            PutIData(chunk) => {
-                has_signature()?;
-                self.handle_put_idata(client, chunk, message_id)
-            }
+            PutIData(chunk) => self.handle_put_idata(client, chunk, message_id),
             GetIData(address) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
                 // since it's free for anyone to get.  However, as a means of spam prevention, we
@@ -251,28 +235,20 @@ impl ClientHandler {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                if address.kind() != IDataKind::Pub {
-                    has_signature()?;
-                }
                 self.handle_get_idata(client, address, message_id)
             }
             DeleteUnpubIData(address) => {
-                has_signature()?;
                 self.handle_delete_unpub_idata(client, address, message_id)
             }
             //
             // ===== Mutable Data =====
             //
-            PutMData(chunk) => {
-                has_signature()?;
-                self.handle_put_mdata(client, chunk, message_id)
-            }
+            PutMData(chunk) => self.handle_put_mdata(client, chunk, message_id),
             MutateSeqMDataEntries { .. }
             | MutateUnseqMDataEntries { .. }
             | DeleteMData(..)
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => {
-                has_signature()?;
                 self.handle_mdata_mutation(request, client, message_id)
             }
             GetMData(..)
@@ -283,46 +259,26 @@ impl ClientHandler {
             | ListMDataUserPermissions { .. }
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..) => {
-                has_signature()?;
-                self.handle_get_mdata(request, client, message_id)
-            }
+            | ListMDataValues(..) => self.handle_get_mdata(request, client, message_id),
             //
             // ===== Append Only Data =====
             //
-            PutAData(chunk) => {
-                has_signature()?;
-                self.handle_put_adata(client, chunk, message_id)
-            }
-            GetAData(ref address)
-            | GetADataShell { ref address, .. }
-            | GetADataRange { ref address, .. }
-            | GetADataIndices(ref address)
-            | GetADataLastEntry(ref address)
-            | GetADataOwners { ref address, .. }
-            | GetADataPermissions { ref address, .. }
-            | GetPubADataUserPermissions { ref address, .. }
-            | GetUnpubADataUserPermissions { ref address, .. }
-            | GetADataValue { ref address, .. } => {
-                if !utils::adata::is_published(address) {
-                    has_signature()?;
-                }
-                self.handle_get_adata(client, request, message_id)
-            }
-            DeleteAData(address) => {
-                has_signature()?;
-                self.handle_delete_adata(client, address, message_id)
-            }
+            PutAData(chunk) => self.handle_put_adata(client, chunk, message_id),
+            GetAData(_)
+            | GetADataShell { .. }
+            | GetADataRange { .. }
+            | GetADataIndices(_)
+            | GetADataLastEntry(_)
+            | GetADataOwners { .. }
+            | GetADataPermissions { .. }
+            | GetPubADataUserPermissions { .. }
+            | GetUnpubADataUserPermissions { .. }
+            | GetADataValue { .. } => self.handle_get_adata(client, request, message_id),
+            DeleteAData(address) => self.handle_delete_adata(client, address, message_id),
             AddPubADataPermissions { .. }
             | AddUnpubADataPermissions { .. }
-            | SetADataOwner { .. } => {
-                has_signature()?;
-                self.handle_mutate_adata(client, request, message_id)
-            }
+            | SetADataOwner { .. } => self.handle_mutate_adata(client, request, message_id),
             AppendSeq { ref append, .. } => {
-                if !utils::adata::is_published(&append.address) {
-                    has_signature()?;
-                }
                 if !utils::adata::is_sequential(&append.address) {
                     self.send_response_to_client(
                         &client.public_id,
@@ -334,9 +290,6 @@ impl ClientHandler {
                 self.handle_mutate_adata(client, request, message_id)
             }
             AppendUnseq(ref append) => {
-                if !utils::adata::is_published(&append.address) {
-                    has_signature()?;
-                }
                 if utils::adata::is_sequential(&append.address) {
                     self.send_response_to_client(
                         &client.public_id,
@@ -354,18 +307,14 @@ impl ClientHandler {
                 destination,
                 amount,
                 transaction_id,
-            } => {
-                has_signature()?;
-                self.handle_transfer_coins(
-                    &client.public_id,
-                    message_id,
-                    destination,
-                    amount,
-                    transaction_id,
-                )
-            }
+            } => self.handle_transfer_coins(
+                &client.public_id,
+                message_id,
+                destination,
+                amount,
+                transaction_id,
+            ),
             GetBalance => {
-                has_signature()?;
                 let balance = self
                     .balance(client.public_id.name())
                     .or_else(|| Coins::from_nano(0).ok())?;
@@ -377,63 +326,45 @@ impl ClientHandler {
                 new_balance_owner,
                 amount,
                 transaction_id,
-            } => {
-                has_signature()?;
-                self.handle_create_balance(
-                    &client.public_id,
-                    message_id,
-                    new_balance_owner,
-                    amount,
-                    transaction_id,
-                )
-            }
+            } => self.handle_create_balance(
+                &client.public_id,
+                message_id,
+                new_balance_owner,
+                amount,
+                transaction_id,
+            ),
             //
             // ===== Login packets =====
             //
-            CreateLoginPacket(login_packet) => {
-                has_signature()?;
-                self.handle_create_login_packet_client_req(
-                    &client.public_id,
-                    login_packet,
-                    message_id,
-                )
-            }
+            CreateLoginPacket(login_packet) => self.handle_create_login_packet_client_req(
+                &client.public_id,
+                login_packet,
+                message_id,
+            ),
             CreateLoginPacketFor { .. } => {
-                has_signature()?;
                 unimplemented!();
                 // self.handle_create_balance()
                 // THEN
                 // self.handle_create_login_packet_req()
             }
-            UpdateLoginPacket(ref updated_login_packet) => {
-                has_signature()?;
-                self.handle_update_login_packet_req(
-                    &client.public_id,
-                    updated_login_packet,
-                    message_id,
-                )
-            }
+            UpdateLoginPacket(ref updated_login_packet) => self.handle_update_login_packet_req(
+                &client.public_id,
+                updated_login_packet,
+                message_id,
+            ),
             GetLoginPacket(ref address) => {
-                has_signature()?;
                 self.handle_get_login_packet_req(&client.public_id, address, message_id)
             }
             //
             // ===== Client (Owner) to ClientHandlers =====
             //
-            ListAuthKeysAndVersion => {
-                has_signature()?;
-                self.handle_list_auth_keys_and_version(client, message_id)
-            }
+            ListAuthKeysAndVersion => self.handle_list_auth_keys_and_version(client, message_id),
             InsAuthKey {
                 key,
                 version,
                 permissions,
-            } => {
-                has_signature()?;
-                self.handle_ins_auth_key(client, key, version, permissions, message_id)
-            }
+            } => self.handle_ins_auth_key(client, key, version, permissions, message_id),
             DelAuthKey { key, version } => {
-                has_signature()?;
                 self.handle_del_auth_key(client, key, version, message_id)
             }
         }
@@ -683,21 +614,12 @@ impl ClientHandler {
             );
             return None;
         }
-        let request = Request::DeleteAData(address);
-        if client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request,
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                Response::Mutation(Err(NdError::AccessDenied)),
-            );
-            None
-        }
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request: Request::DeleteAData(address),
+            message_id,
+        }))
     }
 
     fn handle_mutate_adata(
@@ -706,20 +628,20 @@ impl ClientHandler {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        if client.has_balance {
-            Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client.public_id.clone(),
-                request,
-                message_id,
-            }))
-        } else {
-            self.send_response_to_client(
-                &client.public_id,
-                message_id,
-                Response::Mutation(Err(NdError::AccessDenied)),
-            );
-            None
-        }
+        let owner = utils::owner(&client.public_id)?;
+        self.pay(
+            &client.public_id,
+            owner.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     /// Handles a received challenge response.
@@ -1304,6 +1226,95 @@ impl ClientHandler {
                 .del_auth_key(utils::client(&client.public_id)?, key, new_version);
         self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
         None
+    }
+
+    // Verify that valid signature is provided if the request requires it.
+    fn verify_signature(
+        &mut self,
+        public_id: &PublicId,
+        request: &Request,
+        message_id: MessageId,
+        signature: Option<Signature>,
+    ) -> Option<()> {
+        let signature_required = match utils::authorisation_kind(request) {
+            AuthorisationKind::GetUnpub | AuthorisationKind::Mut => true,
+            AuthorisationKind::GetPub => false,
+        };
+
+        if !signature_required {
+            return Some(());
+        }
+
+        let valid = if let Some(signature) = signature {
+            self.is_valid_client_signature(public_id, request, &message_id, &signature)
+        } else {
+            warn!(
+                "{}: ({:?}/{:?}) from {} is unsigned",
+                self, request, message_id, public_id
+            );
+            false
+        };
+
+        if valid {
+            Some(())
+        } else {
+            self.send_response_to_client(
+                public_id,
+                message_id,
+                utils::to_error_response(request, NdError::InvalidSignature),
+            );
+            None
+        }
+    }
+
+    // If the client is app, check if it is authorised to perform the given request.
+    fn authorise_app(
+        &mut self,
+        public_id: &PublicId,
+        request: &Request,
+        message_id: MessageId,
+    ) -> Option<()> {
+        let app_id = match public_id {
+            PublicId::App(app_id) => app_id,
+            _ => return Some(()),
+        };
+
+        let result = match utils::authorisation_kind(request) {
+            AuthorisationKind::GetPub => Ok(()),
+            AuthorisationKind::GetUnpub => self.authorise_app_for_unpublished_get(app_id),
+            AuthorisationKind::Mut => self.authorise_app_for_mutation(app_id),
+        };
+
+        if let Err(error) = result {
+            self.send_response_to_client(
+                public_id,
+                message_id,
+                utils::to_error_response(request, error),
+            );
+            None
+        } else {
+            Some(())
+        }
+    }
+
+    fn authorise_app_for_mutation(&self, app_id: &AppPublicId) -> Result<(), NdError> {
+        if self
+            .auth_keys
+            .app_permissions(app_id)
+            .map(|perms| perms.transfer_coins)
+            .unwrap_or(false)
+        {
+            Ok(())
+        } else {
+            Err(NdError::AccessDenied)
+        }
+    }
+
+    fn authorise_app_for_unpublished_get(&self, app_id: &AppPublicId) -> Result<(), NdError> {
+        self.auth_keys
+            .app_permissions(app_id)
+            .map(|_| ())
+            .ok_or(NdError::AccessDenied)
     }
 }
 
