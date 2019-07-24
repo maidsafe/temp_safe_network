@@ -40,3 +40,4 @@ cargo-all.sh
 bindings
 tmp
 fake_vault_data.json
+*.orig
