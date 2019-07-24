@@ -328,12 +328,19 @@ impl ClientHandler {
                 login_packet,
                 message_id,
             ),
-            CreateLoginPacketFor { .. } => {
-                unimplemented!();
-                // self.handle_create_balance()
-                // THEN
-                // self.handle_create_login_packet_req()
-            }
+            CreateLoginPacketFor {
+                new_owner,
+                amount,
+                transaction_id,
+                new_login_packet,
+            } => self.handle_chained_create_login_packet_client_req(
+                &client.public_id,
+                new_owner,
+                amount,
+                transaction_id,
+                new_login_packet,
+                message_id,
+            ),
             UpdateLoginPacket(ref updated_login_packet) => self.handle_update_login_packet_req(
                 &client.public_id,
                 updated_login_packet,
@@ -698,8 +705,8 @@ impl ClientHandler {
         }
     }
 
-    pub fn handle_vault_message(&mut self, src: XorName, message: Rpc) -> Option<Action> {
-        match message {
+    pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
+        match rpc {
             Rpc::Request {
                 request,
                 requester,
@@ -733,6 +740,20 @@ impl ClientHandler {
             CreateLoginPacket(ref login_packet) => {
                 self.handle_create_login_packet_vault_req(requester, login_packet, message_id)
             }
+            CreateLoginPacketFor {
+                new_owner,
+                amount,
+                transaction_id,
+                new_login_packet,
+            } => self.handle_chained_create_login_packet_vault_req(
+                src,
+                requester,
+                new_owner,
+                amount,
+                transaction_id,
+                new_login_packet,
+                message_id,
+            ),
             PutIData(_)
             | GetIData(_)
             | DeleteUnpubIData(_)
@@ -774,7 +795,6 @@ impl ClientHandler {
             | InsAuthKey { .. }
             | DelAuthKey { .. }
             | CreateBalance { .. }
-            | CreateLoginPacketFor { .. }
             | UpdateLoginPacket { .. }
             | GetLoginPacket(..) => {
                 error!(
@@ -1136,12 +1156,122 @@ impl ClientHandler {
         };
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
             },
         })
+    }
+
+    /// Step one of the process - the payer is effectively doing a `CreateBalance` request to
+    /// new_owner, and bundling the new_owner's `CreateLoginPacket` along with it.
+    fn handle_chained_create_login_packet_client_req(
+        &mut self,
+        payer: &PublicId,
+        new_owner: PublicKey,
+        amount: Coins,
+        transaction_id: TransactionId,
+        login_packet: LoginPacket,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if !login_packet.size_is_valid() {
+            self.send_response_to_client(
+                payer,
+                message_id,
+                Response::Mutation(Err(NdError::ExceededSize)),
+            );
+            return None;
+        }
+        // TODO - (after phase 1) - if `amount` < cost to store login packet return error msg here.
+        match self.withdraw_coins_for_transfer(payer.name(), amount) {
+            Ok(_) => {
+                let request = Request::CreateLoginPacketFor {
+                    new_owner,
+                    amount,
+                    transaction_id,
+                    new_login_packet: login_packet,
+                };
+                Some(Action::ProxyClientRequest(Rpc::Request {
+                    request,
+                    requester: payer.clone(),
+                    message_id,
+                }))
+            }
+            Err(error) => {
+                self.send_response_to_client(payer, message_id, Response::Mutation(Err(error)));
+                None
+            }
+        }
+    }
+
+    /// Step two or three of the process - the payer is effectively doing a `CreateBalance` request
+    /// to new_owner, and bundling the new_owner's `CreateLoginPacket` along with it.
+    #[allow(clippy::too_many_arguments)]
+    fn handle_chained_create_login_packet_vault_req(
+        &mut self,
+        src: XorName,
+        payer: PublicId,
+        new_owner: PublicKey,
+        amount: Coins,
+        transaction_id: TransactionId,
+        login_packet: LoginPacket,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if &src == payer.name() {
+            // Step two - create balance and forward login_packet.
+            //
+            // TODO: confirm this follows the same failure flow as CreateBalance request.
+
+            // Pre-deduct payment for creating the login packet.
+            let new_amount =
+                Coins::from_nano(amount.as_nano().checked_sub(COST_OF_PUT.as_nano())?).ok()?;
+            if let Err(error) = self.create_balance(new_owner, new_amount) {
+                Some(Action::RespondToClientHandlers {
+                    sender: XorName::from(new_owner),
+                    rpc: Rpc::Response {
+                        response: Response::Mutation(Err(error)),
+                        requester: payer,
+                        message_id,
+                    },
+                })
+            } else {
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    request: Request::CreateLoginPacketFor {
+                        new_owner,
+                        amount,
+                        transaction_id,
+                        new_login_packet: login_packet,
+                    },
+                    requester: payer.clone(),
+                    message_id,
+                }))
+            }
+        } else {
+            // Step three - store login_packet.
+
+            // TODO - (after phase one) On failure, respond to src to allow them to refund the
+            //        original payer
+            let result = if self.login_packets.has(login_packet.destination()) {
+                Err(NdError::LoginPacketExists)
+            } else {
+                self.login_packets
+                    .put(&login_packet)
+                    .map(|_| Transaction {
+                        id: transaction_id,
+                        amount,
+                    })
+                    .map_err(|error| error.to_string().into())
+            };
+            Some(Action::RespondToClientHandlers {
+                sender: *login_packet.destination(),
+                rpc: Rpc::Response {
+                    response: Response::Transaction(result),
+                    requester: payer,
+                    message_id,
+                },
+            })
+        }
     }
 
     fn handle_update_login_packet_req(
@@ -1175,13 +1305,7 @@ impl ClientHandler {
     ) -> Option<Action> {
         let result = self
             .login_packet(utils::own_key(client_id)?, address)
-            .map(|login_packet| {
-                // TODO - Fix before committing.  Use new function from safe-nd rather than cloning
-                (
-                    login_packet.data().to_vec(),
-                    login_packet.signature().clone(),
-                )
-            });
+            .map(LoginPacket::into_data_and_signature);
         self.send_response_to_client(client_id, message_id, Response::GetLoginPacket(result));
         None
     }
@@ -1372,6 +1496,6 @@ impl ClientHandler {
 
 impl Display for ClientHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "Node({})", self.id.name())
+        write!(formatter, "{}", self.id.name())
     }
 }

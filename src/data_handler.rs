@@ -56,8 +56,8 @@ impl DataHandler {
         })
     }
 
-    pub fn handle_vault_message(&mut self, src: XorName, message: Rpc) -> Option<Action> {
-        match message {
+    pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
+        match rpc {
             Rpc::Request {
                 request,
                 requester,

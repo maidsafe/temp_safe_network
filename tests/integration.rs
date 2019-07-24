@@ -184,6 +184,80 @@ fn login_packets() {
 }
 
 #[test]
+fn create_login_packet_for_other() {
+    let mut env = Environment::new();
+    let mut established_client = env.new_connected_client();
+    let mut new_client = env.new_connected_client();
+
+    let login_packet_data = vec![0; 32];
+    let login_packet_locator: XorName = env.rng().gen();
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance_from_nano(&mut env, &mut established_client, 1_000_000_000_000, None);
+
+    // `new_client` gets `established_client` to create its balance and store its new login packet.
+    let login_packet = unwrap!(LoginPacket::new(
+        login_packet_locator,
+        *new_client.public_id().public_key(),
+        login_packet_data.clone(),
+        new_client.sign(&login_packet_data),
+    ));
+
+    let nano_to_transfer = 2 * COST_OF_PUT.as_nano();
+    let amount = unwrap!(Coins::from_nano(nano_to_transfer));
+    common::send_request_expect_ok(
+        &mut env,
+        &mut established_client,
+        Request::CreateLoginPacketFor {
+            new_owner: *new_client.public_id().public_key(),
+            amount,
+            transaction_id: 1,
+            new_login_packet: login_packet.clone(),
+        },
+        Transaction { id: 1, amount },
+    );
+
+    // Try to get the login packet data and signature.
+    let (data, sig) = common::get_from_response(
+        &mut env,
+        &mut new_client,
+        Request::GetLoginPacket(login_packet_locator),
+    );
+    assert_eq!(data, login_packet_data);
+    unwrap!(new_client.public_id().public_key().verify(&sig, &data));
+
+    // Check the balances have been updated.
+    common::send_request_expect_ok(
+        &mut env,
+        &mut established_client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(start_nano - nano_to_transfer)),
+    );
+    common::send_request_expect_ok(&mut env, &mut new_client, Request::GetBalance, *COST_OF_PUT);
+
+    // Putting login packet to the same address should fail.
+    common::send_request_expect_err(
+        &mut env,
+        &mut established_client,
+        Request::CreateLoginPacketFor {
+            new_owner: *new_client.public_id().public_key(),
+            amount: unwrap!(Coins::from_nano(nano_to_transfer)),
+            transaction_id: 2,
+            new_login_packet: login_packet.clone(),
+        },
+        NdError::BalanceExists,
+    );
+
+    // Getting login packet from non-owning client should fail.
+    common::send_request_expect_err(
+        &mut env,
+        &mut established_client,
+        Request::GetLoginPacket(login_packet_locator),
+        NdError::AccessDenied,
+    );
+}
+
+#[test]
 fn update_login_packet() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
@@ -2589,10 +2663,10 @@ fn delete_mutable_data() {
         NdError::AccessDenied,
     );
 
-    // Successfuly delete.
+    // Successfully delete.
     common::send_request_expect_ok(&mut env, &mut client_a, Request::DeleteMData(address), ());
 
-    // Verify the data doesn't exist anymore.
+    // Verify the data doesn't exist any more.
     common::send_request_expect_err(
         &mut env,
         &mut client_a,

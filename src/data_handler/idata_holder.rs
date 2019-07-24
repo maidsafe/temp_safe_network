@@ -62,7 +62,7 @@ impl IDataHolder {
         };
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
@@ -93,7 +93,7 @@ impl IDataHolder {
             });
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester: client.clone(),
                 response: Response::GetIData(result),
                 message_id,
@@ -138,7 +138,7 @@ impl IDataHolder {
 
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
-            message: Rpc::Response {
+            rpc: Rpc::Response {
                 requester: client.clone(),
                 response: Response::Mutation(result),
                 message_id,
