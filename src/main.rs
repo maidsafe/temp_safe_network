@@ -14,6 +14,7 @@ use cli::run;
 use env_logger;
 use log::{debug, error};
 use std::process;
+
 #[macro_use]
 extern crate prettytable;
 
@@ -43,15 +44,23 @@ fn main() {
 
 fn update() -> Result<(), Box<::std::error::Error>> {
     let target = self_update::get_target()?;
-    let status = self_update::backends::github::Update::configure()?
+    let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
         .repo_name("safe-cli")
-        .target(&target)
-        .bin_name("safe")
-        .show_download_progress(true)
-        .current_version(cargo_crate_version!())
+        .with_target(&target)
         .build()?
-        .update()?;
-    println!("Update status: `{}`!", status.version());
+        .fetch()?;
+    if releases.len() > 0 {
+        let status = self_update::backends::github::Update::configure()?
+            .repo_owner("maidsafe")
+            .repo_name("safe-cli")
+            .target(&target)
+            .bin_name("safe")
+            .show_download_progress(true)
+            .current_version(cargo_crate_version!())
+            .build()?
+            .update()?;
+        println!("Update status: `{}`!", status.version());
+    }
     Ok(())
 }
