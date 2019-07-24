@@ -25,14 +25,11 @@ function setup_safe_auth() {
 
 set -e -x
 
-# let's first run lint...
-cargo clippy --all-targets --all-features -- -D warnings
-
-# ...and let's check formatting before doing anything else
-cargo fmt -- --check
-
-# setup auth CLI service
+# first setup auth CLI
 setup_safe_auth
+
+# check formatting
+cargo fmt -- --check
 
 # run tests with CLI's own mock
 cargo test --release --features=scl-mock -- --test-threads=1

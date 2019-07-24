@@ -18,6 +18,16 @@ build-container:
 push-container:
 	docker push maidsafe/safe-cli-build:${SAFE_CLI_VERSION}
 
+clippy:
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:${SAFE_CLI_VERSION} \
+		/bin/bash -c "cargo clippy --all-targets --all-features -- -D warnings"
+else
+	cargo clippy --all-targets --all-features -- -D warnings
+endif
+
 test:
 ifndef SAFE_AUTH_PORT
 	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
