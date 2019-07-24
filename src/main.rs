@@ -43,13 +43,15 @@ fn main() {
 
 fn update() -> Result<(), Box<::std::error::Error>> {
     let target = self_update::get_target()?;
-    let releases = self_update::backends::github::ReleaseList::configure()
+    let status = self_update::backends::github::Update::configure()?
         .repo_owner("jacderida")
         .repo_name("safe-cli")
-        .with_target(&target)
+        .target(&target)
+        .bin_name("safe")
+        .show_download_progress(true)
+        .current_version(cargo_crate_version!())
         .build()?
-        .fetch()?;
-    println!("found releases:");
-    println!("{:#?}\n", releases);
+        .update()?;
+    println!("Update status: `{}`!", status.version());
     Ok(())
 }
