@@ -19,7 +19,9 @@ pub enum NrsSubCommands {
     Add {
         /// The name to give this key
         name: String,
-        /// The safe:// URL to map this to. Usually a FilesContainer for a website, eg.
+        /// The target NRS container where to add the subname to
+        target: String,
+        /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "-l", long = "link")]
         link: Option<String>,
         /// Set the sub name as default for this public name.
@@ -31,7 +33,7 @@ pub enum NrsSubCommands {
     Create {
         /// The name to give site, eg 'safenetwork'
         name: String,
-        /// The safe:// URL to map this to. Usually a FilesContainer for a website, eg.
+        /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "-l", long = "link")]
         link: Option<String>,
     },
@@ -39,8 +41,9 @@ pub enum NrsSubCommands {
     /// Remove a subname from a public name
     Remove {
         /// The name to remove
-        #[structopt(long = "name")]
         name: String,
+        /// The target NRS container where to remove the subname from
+        target: String,
     },
 }
 
@@ -63,11 +66,12 @@ pub fn nrs_commander(
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
                 safe.nrs_map_container_create(&name, Some(&target), set_as_default, dry_run)?;
 
-            // Now let's just print out the content of the NrsMap
+            // Now let's just print out the content of the NRS Map
             if OutputFmt::Pretty == output_fmt {
                 println!(
-                    "New NrsMap, \"{}\" created at: \"{}\"",
-                    &name, nrs_map_container_xorurl
+                    "New NRS Map for \"safe://{}\" created at: \"{}\"",
+                    name.replace("safe://", ""),
+                    nrs_map_container_xorurl
                 );
                 let mut table = Table::new();
                 let format = FormatBuilder::new()

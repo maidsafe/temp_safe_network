@@ -264,7 +264,9 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
         .unwrap();
 
     replace_test_md.seek(SeekFrom::Start(0)).unwrap();
-    replace_test_md.write_all(b"hello from a subfolder!").unwrap();
+    replace_test_md
+        .write_all(b"hello from a subfolder!")
+        .unwrap();
 
     // readd the removed missing file
     let mut readd_missing_file = OpenOptions::new()

@@ -52,10 +52,10 @@ pub enum SubCommands {
         cmd: Option<container::ContainerSubCommands>,
     },
     #[structopt(name = "cat")]
-    /// Read data on the network.
+    /// Read data on the SAFE Network.
     Cat(cat::CatCommands),
     #[structopt(name = "files")]
-    /// Manage files on the network
+    /// Manage files on the SAFE Network
     Files {
         /// subcommands
         #[structopt(subcommand)]
@@ -65,28 +65,28 @@ pub enum SubCommands {
     /// Generate a key pair without creating and/or storing a Key on the network
     Keypair {},
     #[structopt(name = "nrs")]
-    /// Manage public names on the network
+    /// Manage public names on the SAFE Network
     Nrs {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<nrs::NrsSubCommands>,
     },
     #[structopt(name = "keys")]
-    /// Manage keys on the network
+    /// Manage keys on the SAFE Network
     Keys {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<keys::KeysSubCommands>,
     },
     #[structopt(name = "wallet")]
-    /// Manage wallets on the network
+    /// Manage wallets on the SAFE Network
     Wallet {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<wallet::WalletSubCommands>,
     },
     #[structopt(name = "safe-id")]
-    /// Manage identities on the network
+    /// Manage identities on the SAFE Network
     SafeId {
         /// subcommands
         #[structopt(subcommand)]

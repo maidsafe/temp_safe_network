@@ -33,6 +33,9 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
     - [Put](#files-put)
     - [Sync](#files-sync)
   - [Cat](#cat)
+  - [NRS](#nrs-name-resolution-system)
+    - [Create](#create)
+    - [Add](#add)
 3. [Further Help](#further-help)
 4. [License](#license)
 
@@ -385,7 +388,7 @@ FilesContainer synced up (version 3): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiu
 
 The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
 
-#### Cat
+### Cat
 
 The `cat` command is probably the most straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
 ```shell
@@ -460,6 +463,73 @@ XOR name: 0xc343e62e9127559583a336ffd2e5f9e658b11387646725eec3dbda3d3cf55da1
 Raw content of the file:
 hello from a subfolder!
 ```
+
+### NRS (Name Resolution System)
+
+As we've seen in all the above sections, every piece of data on the SAFE Network has a unique location. Such location is determined by the XoR name given to it in the Network's XoR address space, as well as some other information which depend on the native date type, like in the case of `MutableData` data types which also has a type tag associated to it apart from its XoR address.
+
+So far all commands were using the XOR-URLs to either inform of the new data created/stored on the Network, as well as for retrieving data form the Network.
+
+While XOR-URLs are simply a way to encode SAFE Network data unique location into a URL, there are some incentive for having more human friendly URLs that can be easily remembered and recognisable when trying to share them with other people, or use them with tools and applications like the SAFE CLI or the SAFE Browser.
+
+This is why the SAFE Network also supports having such human friendly URLs through what it's called a `Name Resolution System (NRS)`. The NRS allows users to create friendly names that are resolvable to a unique location on the Network. This friendly names can be used in the form of a URL (NRS-URL) to share with other people the location of websites, web applications, files and folders, safecoin wallets for receiving transfers, SAFE IDs, etc.
+
+In this section we will explore the CLI commands which allow users to generate, administer, and use the NRS and its NRS-URLs for publishing and retrieving data to/from the SAFE Network.
+
+#### Create
+
+Creating a friendly name on the Network can be achieved with the `nrs create` subcommand. This subcommand generates an NRS Container automatically linking it to any data we decide to link the friendly name to. An NRS Container is stored on the Network as a `Published AppendOnlyData` data, and it contains an NRS Map using RDF for its data representation (since this is still under development, pseudo-RDF data is now being used temporarily), this Map has a list of subnames and where each of them are being linked to, e.g. `mysubname` can be created as a subname of `mywebsite` NRS name by having `mysubname` linked to a particular `FilesContainer` XOR-URL so that if can be fetched with `safe://mysubname.mywebsite`.
+
+Let's imagine we have uploaded the files and folders of a website we want to publish on the SAFE Network with `files put` command:
+```shell
+$ safe files put ./website-to-publish/ --recursive`
+FilesContainer created at: "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc"
++  ./website-to-publish/index.html              safe://hbyyyydhp7y3mb6zcj4herpqm53ywnbycstamb54yhniud1cij7frjfe8c
++  ./website-to-publish/image.jpg               safe://hbyyyynkt8ak5mxmbqkdt81hqceota8fu83e49gi3weszddujfc8fxcugp
++  ./website-to-publish/contact/form.html       safe://hbyyyyd1sw4dd57k1xeeijukansatia6mthaz1h6htnb8pjoh9naskoaks
+```
+
+As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human friendly NRS-URL:
+```shell
+$ safe nrs create mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
+New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
++  mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
+```
+
+We can now share the NRS-URL `safe://mywebsite` to anyone who wants to visit our website. Using this NRS-URL we can now fetch the same content we would do when using the `FilesContainer` XOR-URL we linked to it, thus we can fetch it using the following command:
+```shell
+$ safe cat safe://mywebsite
+Files of FilesContainer (version 1) at "safe://mywebsite":
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| Name                    | Size | Created              | Modified             | Link                                                              |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /index.html             | 146  | 2019-07-24T14:31:42Z | 2019-07-24T14:31:42Z | safe://hbyyyydhp7y3mb6zcj4herpqm53ywnbycstamb54yhniud1cij7frjfe8c |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /image.jpg              | 391  | 2019-07-24T14:31:42Z | 2019-07-24T14:31:42Z | safe://hbyyyynkt8ak5mxmbqkdt81hqceota8fu83e49gi3weszddujfc8fxcugp |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /contact/form.html      | 23   | 2019-07-24T14:31:42Z | 2019-07-24T14:31:42Z | safe://hbyyyyd1sw4dd57k1xeeijukansatia6mthaz1h6htnb8pjoh9naskoaks |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+```
+
+In this example the `cat` simply prints out the content of the top level folder (`FilesContainer`) as we've learned from previous sections of this guide, but any other tool or application would be treating this in different ways, e.g. the SAFE Browser would be automatically fetching the `index.html` file from it and rendering the website to the user.
+
+We can obviously fetch the content of any of the files published at this NRS-URL using the corresponding path:
+```shell
+$ safe cat safe://mywebsite/contact/form.html
+<!DOCTYPE html>
+<html>
+<body>
+<h2>Contact Form</h2>
+<form>
+  ...
+</form>
+</body>
+</html>
+```
+
+#### Add
+
+TODO
 
 ## Further Help
 

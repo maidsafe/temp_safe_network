@@ -19,7 +19,7 @@ use rand::{thread_rng, Rng};
 use std::collections::BTreeMap;
 use std::process::Command;
 
-const PRETTY_NRS_CREATION_RESPONSE: &str = "New NrsMap";
+const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
 
 const TEST_FOLDER: &str = "./tests/testfolder/";
 
