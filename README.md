@@ -151,11 +151,14 @@ Other optional args that can be used with `keys create` sub-command are:
 
 #### Key's Balance
 
-We can retrieve a given `Key`'s balance using its XorUrl.
+We can retrieve a given `Key`'s balance simply using its secret key, which we can pass to `keys balance` subcommand with `--sk <secret key>` argument, or we can enter it when the CLI prompts us.
 
-The target `Key` can be passed as an argument (or it will be retrieved from `stdin`)
+We can optionally also pass the `Key`'s XorUrl to have the CLI to verify they correspond to each other, i.e. if the `Key`'s XorUrl is provided, the CLI will check if it corresponds to the public key derived from the passed secret key, and throw an error in it doesn't.
+
+The target `Key`'s secret key can be passed as an argument (or it will be retrieved from `stdin`), let's check the balance of the `Key` we created in previous section:
 ```bash
-$ safe keys balance safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks
+$ safe keys balance
+Enter secret key corresponding to the Key to query the balance from: c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 Key's current balance: 15.342
 ```
 
@@ -384,7 +387,7 @@ The `./other-folder/file1.txt` file will be uploaded and published in the `Files
 
 #### Cat
 
-The `cat` command is probably the more straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
+The `cat` command is probably the most straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
 ```shell
 $ safe cat safe://<XOR-URL>
 ```
@@ -394,74 +397,77 @@ If the XOR-URL targets a published `FilesContainer`, the `cat` command will fetc
 Let's see this in action, if we upload some folder using the `files put` command, e.g.:
 ```shell
 $ safe files put ./to-upload/ --recursive
-FilesContainer created at: "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w"
-+  ./to-upload/another.md              safe://hoxd4zdwamygh1yf3ujjzogsr4autg9tqn4uudjdzefx8csu3mqdrw
-+  ./to-upload/subfolder/subexists.md  safe://hoxyrscf7679gqix6wfnh4ooaiy76rqd4m85hg5uwcmxe5kero6kud
-+  ./to-upload/test.md                 safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud
+FilesContainer created at: "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc"
++  ./to-upload/another.md              safe://hbyyyynhci18zwrjmiwqgpf5ofukf3dtryrkeizk1yxda3a5zoew6mgeox
++  ./to-upload/subfolder/subexists.md  safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb
++  ./to-upload/test.md                 safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6
 ```
 
 We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
 ```shell
-$ safe cat safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w
-Files of FilesContainer (version 1) at "safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w":
-+-------------------------+------+-----------------------------------+---------------------------------------------------------------+
-| Name                    | Size | Created                           | Link                                                          |
-+-------------------------+------+-----------------------------------+---------------------------------------------------------------+
-| /another.md             | 7    | 2019-07-02 16:54:41.756670441 UTC | safe://hoxd4zdwamygh1yf3ujjzogsr4autg9tqn4uudjdzefx8csu3mqdrw |
-+-------------------------+------+-----------------------------------+---------------------------------------------------------------+
-| /subfolder/subexists.md | 8    | 2019-07-02 16:54:41.756670441 UTC | safe://hoxyrscf7679gqix6wfnh4ooaiy76rqd4m85hg5uwcmxe5kero6kud |
-+-------------------------+------+-----------------------------------+---------------------------------------------------------------+
-| /test.md                | 13   | 2019-07-02 16:54:41.756670441 UTC | safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud |
-+-------------------------+------+-----------------------------------+---------------------------------------------------------------+
+$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc
+Files of FilesContainer (version 1) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| Name                    | Size | Created              | Modified             | Link                                                              |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /another.md             | 6    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyynhci18zwrjmiwqgpf5ofukf3dtryrkeizk1yxda3a5zoew6mgeox |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /subfolder/subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /test.md                | 12   | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6 |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
 We could also take any of the XOR-URLs of the individual files and have the `cat` command to fetch the content of the file and show it in the output, e.g. let's use the XOR-URL of the `/test.md` file to fetch its content:
 ```shell
-$ safe cat safe://hoqsdoxfsg9grqd9odia9ip94pxmotpjrna1auuy8qxxjto3179pud
+$ safe cat safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6
 hello tests!
 ```
 
 Alternatively, we could use the XOR-URL of the `FilesContainer` and provide the path of the file we are trying to fetch, in this case the `cat` command will resolve the path and follow the corresponding link to read the file's content directly for us. E.g. we can also read the content of the `/test.md` file with the following command:
 ```shell
-$ safe cat safe://hbyiapu9fyfh49jansx6jsoqnb76jed1jbawfrz5awmbw7yw7f6i1uqj5w/test.md
+$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/test.md
 hello tests!
 ```
 
-As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network, at this point it only supports files (`ImmutableData`), and `FilesContainer`'s, but it will be expanded as more types are supported by the CLI and its API.
+As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network, at this point it only supports files (`ImmutableData`), `FilesContainer`'s and `NRS-Container`'s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
 In order to get additional information about the native data type holding the data of a specific content, we can pass the `--info` flag to the `cat` command:
 ```shell
 $ safe cat safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w --info
-Native data type: AppendOnlyData
-Type tag: 10100
-XOR name: 0x63a2bb2da2be0bb01125a2c306be3bba027e074c96223f92fe97e4ad38123049
+Native data type: PublishedSeqAppendOnlyData
+Type tag: 1100
+XOR name: 0x346b0335f55f3dbd4d89ecb792bc76460f6dcc8627b35c429a11d940cb15a492
 
-Files of FilesContainer (version 1) at "safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w":
-+-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
-| Name                    | Size | Created              | Modified             | Link                                                          |
-+-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
-| /another.md             | 7    | 2019-07-04T21:04:22Z | 2019-07-04T21:04:22Z | safe://hoqywhrsjwjjkn1uebmte9kb4sck4x3orac4k8e3wptatko3ir8e5n |
-+-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
-| /subfolder/subexists.md | 8    | 2019-07-04T21:04:22Z | 2019-07-04T21:04:22Z | safe://hoxgjni3c4i4f3pjtdguxquysjb9shcqneuad7nu38zx5w4pztf3px |
-+-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
-| /test.md                | 13   | 2019-07-04T21:04:22Z | 2019-07-04T21:04:22Z | safe://hoquc6dbes9m3ma1aduudp9jxh3ubjtjuyg4imixz3kamgko339z37 |
-+-------------------------+------+----------------------+----------------------+---------------------------------------------------------------+
+Files of FilesContainer (version 1) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| Name                    | Size | Created              | Modified             | Link                                                              |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /another.md             | 6    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyynhci18zwrjmiwqgpf5ofukf3dtryrkeizk1yxda3a5zoew6mgeox |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /subfolder/subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /test.md                | 12   | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6 |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
 And of course that can be used also with other type of content like `ImmutableData` files:
 ```shell
-$ safe cat safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w/subfolder/subexists.md --info
+$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder/subexists.md --info
 Native data type: ImmutableData (published)
-XOR name: 0x9922ae59aae8b96a62334dee982c90fedc638489e07d14f27bbf74d36f12e5af
+XOR name: 0xc343e62e9127559583a336ffd2e5f9e658b11387646725eec3dbda3d3cf55da1
 
 Raw content of the file:
-hellow from a subfolder!
+hello from a subfolder!
 ```
 
 ## Further Help
 
 You can discuss development-related topics on the [SAFE Dev Forum](https://forum.safedev.org/).
+
 If you are just starting to develop an application for the SAFE Network, it's very advisable to visit the [SAFE Network Dev Hub](https://hub.safedev.org) where you will find a lot of relevant information.
+
+If you find any issues, or have ideas for improvements and/or new features for this application and the project, please raise them by [creating a new issue in this repository](https://github.com/maidsafe/safe-cli/issues).
 
 ## License
 This SAFE Network application is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) http://www.gnu.org/licenses/gpl-3.0.en.html).

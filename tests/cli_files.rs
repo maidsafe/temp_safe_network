@@ -85,7 +85,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() {
 
     let subfile = format!("{}/aha/subfolder/subexists.md", files_container_xor);
     let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
-    assert_eq!(subfile_cat, "the sub");
+    assert_eq!(subfile_cat, "hello from a subfolder!");
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn calling_safe_files_put_recursive_with_slash() {
 
     let subfile = format!("{}/subfolder/subexists.md", files_container_xor);
     let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
-    assert_eq!(subfile_cat, "the sub");
+    assert_eq!(subfile_cat, "hello from a subfolder!");
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn calling_safe_files_put_recursive_without_slash() {
 
     let subfile = format!("{}/testfolder/subfolder/subexists.md", files_container_xor);
     let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
-    assert_eq!(subfile_cat, "the sub");
+    assert_eq!(subfile_cat, "hello from a subfolder!");
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn calling_safe_files_sync() {
 
     let file = format!("{}/subexists.md", files_container_xor);
     let synced_file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
-    assert_eq!(synced_file_cat, "the sub");
+    assert_eq!(synced_file_cat, "hello from a subfolder!");
 }
 
 #[test]
@@ -264,7 +264,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
         .unwrap();
 
     replace_test_md.seek(SeekFrom::Start(0)).unwrap();
-    replace_test_md.write_all(b"the sub").unwrap();
+    replace_test_md.write_all(b"hello from a subfolder!").unwrap();
 
     // readd the removed missing file
     let mut readd_missing_file = OpenOptions::new()
@@ -277,7 +277,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     readd_missing_file.write_all(b"sub2").unwrap();
 
     // and now the tests...
-    assert_eq!(file_cat, "the sub with more text!");
+    assert_eq!(file_cat, "hello from a subfolder! with more text!");
     assert!(files_sync_result.contains('*'));
     assert!(!files_sync_result.contains('+'));
 }

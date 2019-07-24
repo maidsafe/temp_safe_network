@@ -676,7 +676,7 @@ fn test_files_map_create() {
     let file_item2 = &files_map["/testfolder/subfolder/subexists.md"];
     assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
     assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "md");
-    assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "7");
+    assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
 }
 
 #[test]
