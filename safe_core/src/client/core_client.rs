@@ -116,26 +116,34 @@ impl CoreClient {
 
         let acc_loc = ClientAccount::generate_network_id(&keyword, &pin)?;
 
-        let maid_keys = ClientKeys::new(id_seed);
+        let balance_sk = BlsSecretKey::random();
+
+        let maid_keys = {
+            let mut maid_keys = ClientKeys::new(id_seed);
+            maid_keys.bls_sk = balance_sk.clone();
+            maid_keys.bls_pk = balance_sk.public_key();
+            maid_keys
+        };
         let pub_key = PublicKey::Bls(maid_keys.bls_pk);
         let full_id = Some(maid_keys.clone().into());
-        let balance_sk = BlsSecretKey::random();
 
         let acc = ClientAccount::new(maid_keys.clone())?;
 
         let acc_ciphertext = acc.encrypt(&password, &pin)?;
 
-        let mut seeder: Vec<u8> = Vec::with_capacity(acc_locator.len() + acc_password.len());
-        seeder.extend_from_slice(acc_locator);
-        seeder.extend_from_slice(acc_password);
+        let client_full_id = {
+            let mut seeder: Vec<u8> = Vec::with_capacity(acc_locator.len() + acc_password.len());
+            seeder.extend_from_slice(acc_locator);
+            seeder.extend_from_slice(acc_password);
 
-        let seed = sha3_256(&seeder);
-        let mut rng = StdRng::from_seed(seed);
-        let client_full_id = ClientFullId::new_bls(&mut rng);
+            let seed = sha3_256(&seeder);
+            let mut rng = StdRng::from_seed(seed);
+            ClientFullId::new_bls(&mut rng)
+        };
 
         let sig = client_full_id.sign(&acc_ciphertext);
         let client_pk = client_full_id.public_id().public_key();
-        let new_account_data = LoginPacket::new(acc_loc, *client_pk, acc_ciphertext, sig)?;
+        let new_login_packet = LoginPacket::new(acc_loc, *client_pk, acc_ciphertext, sig)?;
         let balance_client_id = ClientFullId::with_bls_key(balance_sk);
 
         {
@@ -153,12 +161,7 @@ impl CoreClient {
 
             let rpc_response = routing.req_as_client(
                 &routing_rx,
-                Request::CreateLoginPacketFor {
-                    new_owner: pub_key,
-                    amount: unwrap!(Coins::from_str("1")),
-                    transaction_id: new_rand::random(),
-                    new_login_packet: new_account_data,
-                },
+                Request::CreateLoginPacket(new_login_packet),
                 &balance_client_id,
             );
             match rpc_response {
