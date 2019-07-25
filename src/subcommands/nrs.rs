@@ -19,8 +19,6 @@ pub enum NrsSubCommands {
     Add {
         /// The name to give this key
         name: String,
-        /// The target NRS container where to add the subname to
-        target: String,
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "-l", long = "link")]
         link: Option<String>,
@@ -64,7 +62,7 @@ pub fn nrs_commander(
             let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, Some(&target), set_as_default, dry_run)?;
+                safe.nrs_map_container_create(&name, Some(&target), None, set_as_default, dry_run)?;
 
             // Now let's just print out the content of the NRS Map
             if OutputFmt::Pretty == output_fmt {
@@ -94,7 +92,39 @@ pub fn nrs_commander(
 
             Ok(())
         }
-        Some(NrsSubCommands::Add { .. }) => Ok(()),
+        Some(NrsSubCommands::Add { name, link, default }) => {
+            let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
+
+            let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
+                safe.nrs_map_container_add(&name, Some(&target), default, dry_run)?;
+			// 	// Now let's just print out the content of the NrsMap
+
+			if OutputFmt::Pretty == output_fmt {
+                println!(
+                    "NrsMap, \"{}\" updated at: \"{}\"",
+                    &name, &nrs_map_container_xorurl
+                );
+                let mut table = Table::new();
+                let format = FormatBuilder::new()
+                    .column_separator(' ')
+                    .padding(0, 1)
+                    .build();
+                table.set_format(format);
+
+                for (public_name, (change, name_link)) in processed_entries.iter() {
+                    table.add_row(row![change, public_name, name_link]);
+                }
+                table.printstd();
+            } else {
+                println!(
+                    "{}",
+                    serde_json::to_string(&(nrs_map_container_xorurl, processed_entries))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
+            }
+
+			Ok(())
+		},
         Some(NrsSubCommands::Remove { .. }) => Ok(()),
 
         None => Err("Missing keys sub-command. Use --help for details.".to_string()),

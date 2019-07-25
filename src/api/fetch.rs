@@ -8,7 +8,7 @@
 
 use super::files::FilesMap;
 use super::helpers::get_subnames_host_and_path;
-use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG};
+use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG, NrsMap};
 use super::xorurl::SafeContentType;
 pub use super::xorurl::SafeDataType;
 
@@ -32,14 +32,13 @@ pub enum SafeData {
         files_map: FilesMap,
         data_type: SafeDataType,
     },
-    // TODO: Enable preventing resolution
-    // NrsMapContainer {
-    //     xorname: XorName,
-    //     type_tag: u64,
-    //     version: u64,
-    //     nrs_map: NrsMap,
-    //     data_type: SafeDataType,
-    // },
+    NrsMapContainer {
+        xorname: XorName,
+        type_tag: u64,
+        version: u64,
+        nrs_map: NrsMap,
+        data_type: SafeDataType,
+    },
     PublishedImmutableData {
         xorname: XorName,
         data: Vec<u8>,
@@ -48,6 +47,70 @@ pub enum SafeData {
 
 #[allow(dead_code)]
 impl Safe {
+
+	pub fn resolve_and_get_xorurl_details(&self, xorurl: &str) -> ResultReturn<XorUrlEncoder>
+	{
+		debug!("Attempting to decode url: {}", xorurl);
+
+        XorUrlEncoder::from_url(&xorurl).or_else(|err| {
+            info!(
+                "Falling back to NRS. XorUrl decoding failed with: {:?}",
+                err
+            );
+
+            let (sub_names, host_str, path) = get_subnames_host_and_path(&xorurl)?;
+            let hashed_host = xorname_from_nrs_string(&host_str)?;
+
+            let encoded_xor = XorUrlEncoder::new(
+                hashed_host,
+                NRS_MAP_TYPE_TAG,
+                SafeDataType::PublishedSeqAppendOnlyData,
+                SafeContentType::NrsMapContainer,
+                Some(&path),
+                Some(sub_names),
+            );
+
+            let new_url = encoded_xor.to_string("base32z")?;
+
+            debug!("Checking NRS system for URL: {}", new_url);
+            Ok(encoded_xor)
+        })
+
+	}
+
+	pub fn fetch_nrs_map(&self, xorurl: &str ) -> ResultReturn<SafeData> {
+		debug!("Attempting to fetch an NRS map, {}", xorurl);
+		let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
+
+        let the_xorurl = the_xor.to_string("base32z")?;
+        // info!("URL parsed successfully, fetching: {}", the_xorurl);
+        let path = the_xor.path();
+        let sub_names = the_xor.sub_names();
+
+        debug!("Fetching content of type: {:?}", the_xor.content_type());
+
+        match the_xor.content_type() {
+			SafeContentType::NrsMapContainer => {
+                let (version, nrs_map) = self.nrs_map_container_get_latest(&the_xorurl)?;
+                debug!(
+                    "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
+                    version,
+                    the_xor.data_type(),
+                    nrs_map
+                );
+
+				Ok(SafeData::NrsMapContainer {
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
+                    version,
+                    nrs_map,
+                    data_type: the_xor.data_type(),
+                })
+            },
+			_ => Err(Error::ContentError("No NRS map was found".to_string()))
+		}
+	}
+
     /// # Retrieve data from a xorurl
     ///
     /// ## Examples
@@ -78,33 +141,7 @@ impl Safe {
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
-        debug!("Attempting to fetch url: {}", xorurl);
-        let the_xor =
-            XorUrlEncoder::from_url(xorurl).or_else(|err| -> ResultReturn<XorUrlEncoder> {
-                info!(
-                    "Falling back to NRS. XorUrl decoding failed with: {:?}",
-                    err
-                );
-
-                let (sub_names, host_str, path) = get_subnames_host_and_path(xorurl)?;
-                let hashed_host = xorname_from_nrs_string(&host_str)?;
-
-                let encoded_xor = XorUrlEncoder::new(
-                    hashed_host,
-                    NRS_MAP_TYPE_TAG,
-                    SafeDataType::PublishedSeqAppendOnlyData,
-                    SafeContentType::NrsMapContainer,
-                    Some(&path),
-                    Some(sub_names),
-                );
-
-                debug!(
-                    "Checking NRS system for URL: {}",
-                    encoded_xor.to_string("base32z")?
-                );
-                Ok(encoded_xor)
-            })?;
-
+		let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
         let the_xorurl = the_xor.to_string("base32z")?;
         info!("URL parsed successfully, fetching: {}", the_xorurl);
         let path = the_xor.path();
@@ -335,6 +372,48 @@ fn test_fetch_resolvable_container() {
             assert_eq!(version, 1);
             assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
             assert_eq!(files_map, the_files_map);
+        }
+        _ => panic!("Nrs map container was not returned."),
+    }
+}
+
+
+#[test]
+fn test_fetch_resolvable_map_data() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("")).unwrap();
+
+    let (xorurl, _, the_files_map) =
+        unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
+
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+
+    let (_nrs_map_xorurl, _, the_nrs_map) =
+        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
+
+    let content = unwrap!(safe.fetch_nrs_map(&format!("safe://{}", site_name)));
+
+    // this should resolve to a FilesContainer until we enable prevent resolution.
+    match content {
+        SafeData::NrsMapContainer {
+            xorname,
+            type_tag,
+            version,
+            nrs_map,
+            data_type,
+            ..
+        } => {
+            assert_eq!(xorname, xorurl_encoder.xorname());
+            assert_eq!(type_tag, 1_100);
+            assert_eq!(version, 1);
+            assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
+            assert_eq!(nrs_map, the_nrs_map);
         }
         _ => panic!("Nrs map container was not returned."),
     }
