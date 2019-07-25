@@ -14,6 +14,7 @@ use crate::subcommands::cat::cat_commander;
 use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
 use crate::subcommands::nrs::nrs_commander;
+use crate::subcommands::update::update_commander;
 use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::{OutputFmt, SubCommands};
 use safe_cli::Safe;
@@ -83,7 +84,11 @@ pub fn run() -> Result<(), String> {
             println!("pk={}", key_pair.pk);
             println!("sk={}", key_pair.sk);
             Ok(())
-        }
+        },
+        SubCommands::Update {} => match update_commander() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("Error performing update: {}", e))
+        },
         _ => {
             // We treat SubCommands::Auth separatelly since we need to connect before
             // handling any command but auth

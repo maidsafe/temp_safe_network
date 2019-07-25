@@ -17,6 +17,7 @@ mod helpers;
 pub mod keys;
 pub mod nrs;
 pub mod safe_id;
+pub mod update;
 pub mod wallet;
 
 #[cfg(not(feature = "fake-auth"))]
@@ -92,4 +93,7 @@ pub enum SubCommands {
         #[structopt(subcommand)]
         cmd: Option<safe_id::SafeIdSubCommands>,
     },
+    #[structopt(name = "update")]
+    /// Update the application to the latest available version
+    Update {}
 }

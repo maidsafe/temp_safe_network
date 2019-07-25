@@ -32,35 +32,8 @@ fn main() {
     env_logger::init();
     debug!("Starting SAFE CLI...");
 
-    if let Err(e) = update() {
-        error!("safe_cli error: {}", e);
-        process::exit(1);
-    }
     if let Err(e) = run() {
         error!("safe_cli error: {}", e);
         process::exit(1);
     }
-}
-
-fn update() -> Result<(), Box<::std::error::Error>> {
-    let target = self_update::get_target()?;
-    let releases = self_update::backends::github::ReleaseList::configure()
-        .repo_owner("maidsafe")
-        .repo_name("safe-cli")
-        .with_target(&target)
-        .build()?
-        .fetch()?;
-    if releases.len() > 0 {
-        let status = self_update::backends::github::Update::configure()?
-            .repo_owner("maidsafe")
-            .repo_name("safe-cli")
-            .target(&target)
-            .bin_name("safe")
-            .show_download_progress(true)
-            .current_version(cargo_crate_version!())
-            .build()?
-            .update()?;
-        println!("Update status: `{}`!", status.version());
-    }
-    Ok(())
 }
