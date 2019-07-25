@@ -527,6 +527,22 @@ $ safe cat safe://mywebsite/contact/form.html
 </html>
 ```
 
+#### Sub Names
+
+Much like ye olde internet, the NRS system provides increased flexibility for those wanting to have a variety of resources available under one public name. Via using `Sub Names`. This is doin via creating a Public name and using a `.` character to separate it into various, indivudually controllable parts. 
+
+For example, you may wish to have `safe://mywebsite` be about you in general, whereas `safe://blog.mywebsite` point to a different site which is your blog.
+
+To create a public name with subnames, you need only pass the full string with `.` separators, (just like any traditional URL), to the CLI:
+
+```shell
+$ safe nrs create blog.mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
+New NRS Map for "safe://blog.mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
++  blog.mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
+```
+
+As the NRS CLI advances, you'll be able to individually add to both `blog.mywebsite`, or indeed just `mywebsite`, as well as change what the `default` resource to retrieve is for both. 
+
 #### Add
 
 TODO
