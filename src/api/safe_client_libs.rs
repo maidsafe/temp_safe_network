@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::xorname_from_pk;
+use super::safe_net::AppendOnlyDataRawData;
 use super::xorurl::{create_random_xorname, XorUrlEncoder};
-use super::{Error, ResultReturn};
+use super::{Error, ResultReturn, SafeApp};
 use futures::future::Future;
 use log::{debug, info, warn};
 use rand::rngs::OsRng;
@@ -37,21 +38,53 @@ use unwrap::unwrap; // TODO: remove all unwraps from this file
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
-type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
-
 #[derive(Default)]
-pub struct SafeApp {
+pub struct SafeAppScl {
     safe_conn: Option<App>,
 }
 
-impl SafeApp {
-    pub fn new() -> Self {
+impl SafeAppScl {
+    // Private helper to obtain the App instance
+    fn get_safe_app(&self) -> ResultReturn<&App> {
+        match &self.safe_conn {
+            Some(app) => Ok(app),
+            None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
+        }
+    }
+
+    fn mutate_seq_mdata_entries(
+        &self,
+        xorurl: &str,
+        tag: u64,
+        entry_actions: MDataSeqEntryActions,
+        error_msg: &str,
+    ) -> ResultReturn<()> {
+        let safe_app: &App = self.get_safe_app()?;
+        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
+        let message = error_msg.to_string();
+
+        run(safe_app, move |client, _app_context| {
+            client
+                .mutate_seq_mdata_entries(xorname, tag, entry_actions)
+                .map_err(CoreError)
+        })
+        .map_err(|err| {
+            Error::NetDataError(format!(
+                "Failed to mutate seq mutable data entrues: {}: {}",
+                message, err
+            ))
+        })
+    }
+}
+
+impl SafeApp for SafeAppScl {
+    fn new() -> Self {
         Self { safe_conn: None }
     }
 
     #[allow(dead_code)]
     #[cfg(feature = "fake-auth")]
-    pub fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
+    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
         warn!("Using fake authorisation for testing...");
         self.safe_conn = Some(create_app());
         Ok(())
@@ -59,7 +92,7 @@ impl SafeApp {
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     #[cfg(not(feature = "fake-auth"))]
-    pub fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()> {
+    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()> {
         debug!("Connecting to SAFE Network...");
 
         let disconnect_cb = || {
@@ -82,15 +115,7 @@ impl SafeApp {
         Ok(())
     }
 
-    // Private helper to obtain the App instance
-    fn get_safe_app(&self) -> ResultReturn<&App> {
-        match &self.safe_conn {
-            Some(app) => Ok(app),
-            None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
-        }
-    }
-
-    pub fn create_balance(
+    fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
@@ -132,7 +157,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
         info!("Creating test CoinBalance with {} test coins", amount);
         let safe_app: &App = self.get_safe_app()?;
         let xorname = xorname_from_pk(&to_pk);
@@ -148,7 +173,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
+    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
         let safe_app: &App = self.get_safe_app()?;
         let coins_amount = run(safe_app, move |client, _app_context| {
             client
@@ -160,7 +185,7 @@ impl SafeApp {
         Ok(coins_amount.to_string())
     }
 
-    pub fn safecoin_transfer_to_xorname(
+    fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: SecretKey,
         to_xorname: XorName,
@@ -180,8 +205,7 @@ impl SafeApp {
         Ok(tx_id)
     }
 
-    #[allow(dead_code)]
-    pub fn safecoin_transfer_to_pk(
+    fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: SecretKey,
         to_pk: PublicKey,
@@ -193,17 +217,11 @@ impl SafeApp {
     }
 
     // TODO: Replace with SCL calling code
-    #[allow(dead_code)]
-    pub fn get_transaction(
-        &self,
-        _tx_id: u64,
-        _pk: &PublicKey,
-        _sk: &SecretKey,
-    ) -> ResultReturn<String> {
+    fn get_transaction(&self, _tx_id: u64, _pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
         Ok("Success(0)".to_string())
     }
 
-    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
+    fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
         let safe_app: &App = self.get_safe_app()?;
 
         let the_idata = PubImmutableData::new(data.to_vec());
@@ -218,7 +236,7 @@ impl SafeApp {
         Ok(*return_idata.name())
     }
 
-    pub fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
+    fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let safe_app: &App = self.get_safe_app()?;
@@ -234,7 +252,7 @@ impl SafeApp {
         Ok(data.value().to_vec())
     }
 
-    pub fn put_seq_append_only_data(
+    fn put_seq_append_only_data(
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -294,7 +312,7 @@ impl SafeApp {
         })
     }
 
-    pub fn append_seq_append_only_data(
+    fn append_seq_append_only_data(
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         new_version: u64,
@@ -325,7 +343,7 @@ impl SafeApp {
         Ok(new_version)
     }
 
-    pub fn get_latest_seq_append_only_data(
+    fn get_latest_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
@@ -355,7 +373,7 @@ impl SafeApp {
         Ok((data_length, data))
     }
 
-    pub fn get_current_seq_append_only_data_version(
+    fn get_current_seq_append_only_data_version(
         &self,
         name: XorName,
         tag: u64,
@@ -379,8 +397,7 @@ impl SafeApp {
         .map(|data_returned| data_returned.data_index())
     }
 
-    #[allow(dead_code)]
-    pub fn get_seq_append_only_data(
+    fn get_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
@@ -425,8 +442,8 @@ impl SafeApp {
         Ok(this_version)
     }
 
-    pub fn put_seq_mutable_data(
-        &self,
+    fn put_seq_mutable_data(
+        &mut self,
         name: Option<XorName>,
         tag: u64,
         // _data: Option<String>,
@@ -486,19 +503,16 @@ impl SafeApp {
         .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
     }
 
-    // TODO: we shouldn't need to expose this function, function like list_seq_mdata_entries should be exposed
-    #[allow(dead_code)]
-    fn get_seq_mdata(&self, xorurl: &str, tag: u64) -> ResultReturn<SeqMutableData> {
+    fn get_seq_mdata(&self, xorname: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
         let safe_app: &App = self.get_safe_app()?;
-        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         run(safe_app, move |client, _app_context| {
             client.get_seq_mdata(xorname, tag).map_err(CoreError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
-    pub fn seq_mutable_data_insert(
-        &self,
+    fn seq_mutable_data_insert(
+        &mut self,
         xorurl: &str,
         tag: u64,
         key: Vec<u8>,
@@ -510,8 +524,7 @@ impl SafeApp {
     }
 
     // TODO: Replace with real scl calling code
-    #[allow(dead_code)]
-    pub fn mutable_data_delete(
+    fn mutable_data_delete(
         &mut self,
         _xorname: &XorName,
         _tag: u64,
@@ -520,7 +533,7 @@ impl SafeApp {
         Ok(())
     }
 
-    pub fn seq_mutable_data_get_value(
+    fn seq_mutable_data_get_value(
         &mut self,
         xorurl: &str,
         tag: u64,
@@ -537,7 +550,7 @@ impl SafeApp {
         .map_err(|e| Error::NetDataError(format!("Failed to retrieve key. {:?}", e)))
     }
 
-    pub fn list_seq_mdata_entries(
+    fn list_seq_mdata_entries(
         &self,
         xorurl: &str,
         tag: u64,
@@ -553,8 +566,7 @@ impl SafeApp {
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
-    #[allow(dead_code)]
-    pub fn seq_mutable_data_update(
+    fn seq_mutable_data_update(
         &self,
         xorurl: &str,
         tag: u64,
@@ -565,31 +577,6 @@ impl SafeApp {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), version);
         self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to update MD")
-    }
-
-    // private helper method
-    fn mutate_seq_mdata_entries(
-        &self,
-        xorurl: &str,
-        tag: u64,
-        entry_actions: MDataSeqEntryActions,
-        error_msg: &str,
-    ) -> ResultReturn<()> {
-        let safe_app: &App = self.get_safe_app()?;
-        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
-        let message = error_msg.to_string();
-
-        run(safe_app, move |client, _app_context| {
-            client
-                .mutate_seq_mdata_entries(xorname, tag, entry_actions)
-                .map_err(CoreError)
-        })
-        .map_err(|err| {
-            Error::NetDataError(format!(
-                "Failed to mutate seq mutable data entrues: {}: {}",
-                message, err
-            ))
-        })
     }
 }
 

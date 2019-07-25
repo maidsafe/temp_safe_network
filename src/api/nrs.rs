@@ -14,7 +14,7 @@ use super::constants::{
 
 use super::helpers::gen_timestamp_secs;
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::{debug, warn};
 use safe_nd::XorName;
 use serde::{Deserialize, Serialize};

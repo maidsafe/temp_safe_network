@@ -8,8 +8,7 @@
 
 use super::helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, KeyPair};
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn};
-use super::{Safe, XorUrl, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::debug;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};

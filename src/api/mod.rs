@@ -9,6 +9,8 @@
 mod auth;
 mod constants;
 mod errors;
+#[cfg(feature = "scl-mock")]
+mod fake_scl;
 mod fetch;
 mod files;
 mod helpers;
@@ -16,26 +18,25 @@ mod keys;
 mod nrs;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
-#[cfg(feature = "scl-mock")]
-mod scl_mock;
+mod safe_net;
 mod wallet;
 mod xorurl;
 
 pub use errors::{Error, ResultReturn};
 pub use fetch::{SafeData, SafeDataType};
 pub use keys::BlsKeyPair;
-pub use safe_nd::{XorName, XOR_NAME_LEN};
+pub use safe_nd::XorName;
+pub use safe_net::SafeApp;
 pub use xorurl::{XorUrl, XorUrlEncoder};
 
-#[cfg(not(feature = "scl-mock"))]
-use safe_client_libs::SafeApp;
-
 #[cfg(feature = "scl-mock")]
-use scl_mock::SafeApp;
+use fake_scl::SafeAppFake as SafeAppImpl;
+#[cfg(not(feature = "scl-mock"))]
+use safe_client_libs::SafeAppScl as SafeAppImpl;
 
 pub struct Safe {
-    pub safe_app: SafeApp,
-    pub xorurl_base: String,
+    safe_app: SafeAppImpl,
+    xorurl_base: String,
 }
 
 #[allow(dead_code)]

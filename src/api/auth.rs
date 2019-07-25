@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::decode_ipc_msg;
-use super::{Error, ResultReturn, Safe};
+use super::{Error, ResultReturn, Safe, SafeApp};
 use log::{debug, info};
 use reqwest::get as httpget;
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};

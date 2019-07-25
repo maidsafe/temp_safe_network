@@ -10,7 +10,7 @@ use super::helpers::{
     parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, xorname_from_pk, KeyPair,
 };
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn, Safe, XorUrl, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
 use unwrap::unwrap;
 

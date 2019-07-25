@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::safe_net::AppendOnlyDataRawData;
 use super::xorurl::create_random_xorname;
-use super::XorUrlEncoder;
-use super::{Error, ResultReturn};
+use super::{Error, ResultReturn, SafeApp, XorUrlEncoder};
 use crate::api::helpers::{parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex};
 use log::debug;
-use safe_nd::{MDataValue, XorName};
+use safe_nd::{MDataValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
 use safecoin::{Coins, NanoCoins};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -33,9 +33,8 @@ type AppendOnlyDataMock = Vec<(Vec<u8>, Vec<u8>)>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
 type SeqMutableDataMock = BTreeMap<String, MDataValue>;
-type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
 
-const MOCK_FILE: &str = "./mock_data.txt";
+const FAKE_VAULT_FILE: &str = "./fake_vault_data.txt";
 
 #[derive(Default, Serialize, Deserialize)]
 struct MockData {
@@ -47,24 +46,55 @@ struct MockData {
 }
 
 #[derive(Default)]
-pub struct SafeApp {
+pub struct SafeAppFake {
     mock_data: MockData,
 }
 
 /// Writes the mock data onto the mock file
-impl Drop for SafeApp {
+impl Drop for SafeAppFake {
     fn drop(&mut self) {
         let serialised = unwrap!(serde_json::to_string(&self.mock_data));
         debug!("serialised = {}", serialised);
 
-        let mut file = unwrap!(fs::File::create(&MOCK_FILE));
+        let mut file = unwrap!(fs::File::create(&FAKE_VAULT_FILE));
         unwrap!(file.write(serialised.as_bytes()));
     }
 }
 
-impl SafeApp {
-    pub fn new() -> Self {
-        let mock_data = match fs::File::open(&MOCK_FILE) {
+impl SafeAppFake {
+    // private helper
+    fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<String> {
+        match self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+            None => Err(Error::ContentNotFound(
+                "CoinBalance data not found".to_string(),
+            )),
+            Some(coin_balance) => {
+                let balance_str = coin_balance
+                    .value
+                    .to_string()
+                    .replace("Coins(", "")
+                    .replace(")", "");
+                let balance = balance_str.parse::<f64>().map_err(|e| {
+                    Error::Unexpected(format!("Failed to format balance output: {}", e))
+                })?;
+                Ok(format!("{:.*}", 9, balance))
+            }
+        }
+    }
+
+    fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
+        match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+            None => Err(Error::ContentNotFound(
+                "CoinBalance data not found".to_string(),
+            )),
+            Some(coin_balance) => Ok(coin_balance.owner),
+        }
+    }
+}
+
+impl SafeApp for SafeAppFake {
+    fn new() -> SafeAppFake {
+        let mock_data = match fs::File::open(&FAKE_VAULT_FILE) {
             Ok(file) => {
                 let deserialised: MockData = unwrap!(serde_json::from_reader(&file));
                 deserialised
@@ -75,15 +105,15 @@ impl SafeApp {
             }
         };
 
-        Self { mock_data }
+        SafeAppFake { mock_data }
     }
 
-    pub fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
+    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
         debug!("Using mock so there is no connection to network");
         Ok(())
     }
 
-    pub fn create_balance(
+    fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
@@ -130,7 +160,7 @@ impl SafeApp {
         Ok(to_xorname)
     }
 
-    pub fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
         let xorname = xorname_from_pk(&to_pk);
         self.mock_data.coin_balances.insert(
             xorname_to_hex(&xorname),
@@ -143,42 +173,13 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    // private helper
-    fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<String> {
-        match self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
-            None => Err(Error::ContentNotFound(
-                "CoinBalance data not found".to_string(),
-            )),
-            Some(coin_balance) => {
-                let balance_str = coin_balance
-                    .value
-                    .to_string()
-                    .replace("Coins(", "")
-                    .replace(")", "");
-                let balance = balance_str.parse::<f64>().map_err(|e| {
-                    Error::Unexpected(format!("Failed to format balance output: {}", e))
-                })?;
-                Ok(format!("{:.*}", 9, balance))
-            }
-        }
-    }
-
-    pub fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
+    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
         let pk = sk.public_key();
         let xorname = xorname_from_pk(&pk);
         self.get_balance_from_xorname(&xorname)
     }
 
-    fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
-        match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
-            None => Err(Error::ContentNotFound(
-                "CoinBalance data not found".to_string(),
-            )),
-            Some(coin_balance) => Ok(coin_balance.owner),
-        }
-    }
-
-    pub fn safecoin_transfer_to_xorname(
+    fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: SecretKey,
         to_xorname: XorName,
@@ -241,20 +242,25 @@ impl SafeApp {
         Ok(tx_id)
     }
 
-    #[allow(dead_code)]
-    pub fn get_transaction(
-        &self,
+    fn safecoin_transfer_to_pk(
+        &mut self,
+        from_sk: SecretKey,
+        to_pk: PublicKey,
         tx_id: u64,
-        pk: PublicKey,
-        _sk: SecretKey,
-    ) -> ResultReturn<String> {
+        amount: &str,
+    ) -> ResultReturn<u64> {
+        let to_xorname = xorname_from_pk(&to_pk);
+        self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
+    }
+
+    fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
         let xorname = xorname_from_pk(&pk);
         let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
         let tx_state = unwrap!(txs_for_xorname.get(&tx_id.to_string()));
         Ok(tx_state.to_string())
     }
 
-    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
+    fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
         let xorname = create_random_xorname();
         // TODO: hash to get xorname.
         self.mock_data
@@ -264,7 +270,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
+    fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
         let data = match self
             .mock_data
             .published_immutable_data
@@ -281,7 +287,7 @@ impl SafeApp {
         Ok(data)
     }
 
-    pub fn put_seq_append_only_data(
+    fn put_seq_append_only_data(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -297,7 +303,7 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    pub fn append_seq_append_only_data(
+    fn append_seq_append_only_data(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         _new_version: u64,
@@ -323,7 +329,7 @@ impl SafeApp {
         Ok(seq_append_only.len() as u64)
     }
 
-    pub fn get_latest_seq_append_only_data(
+    fn get_latest_seq_append_only_data(
         &self,
         name: XorName,
         _tag: u64,
@@ -350,7 +356,7 @@ impl SafeApp {
     }
 
     #[allow(dead_code)]
-    pub fn get_current_seq_append_only_data_version(
+    fn get_current_seq_append_only_data_version(
         &self,
         name: XorName,
         _tag: u64,
@@ -373,7 +379,17 @@ impl SafeApp {
         Ok(length as u64)
     }
 
-    pub fn put_seq_mutable_data(
+    // TODO: add impl
+    fn get_seq_append_only_data(
+        &self,
+        _name: XorName,
+        _tag: u64,
+        _version: u64,
+    ) -> ResultReturn<AppendOnlyDataRawData> {
+        Ok(AppendOnlyDataRawData::default())
+    }
+
+    fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,
         _tag: u64,
@@ -393,12 +409,25 @@ impl SafeApp {
         Ok(xorname)
     }
 
-    fn get_seq_mdata(&self, xorname: &XorName, _tag: u64) -> ResultReturn<SeqMutableDataMock> {
+    fn get_seq_mdata(&self, xorname: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
         let xorname_hex = xorname_to_hex(&xorname);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
 
         match self.mock_data.mutable_data.get(&xorname_hex) {
-            Some(seq_md) => Ok(seq_md.clone()),
+            Some(seq_md) => {
+                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataValue> = BTreeMap::new();
+                seq_md.iter().for_each(|(k, v)| {
+                    seq_md_with_vec.insert(parse_hex(k), v.clone());
+                });
+
+                Ok(SeqMutableData::new_with_data(
+                    xorname,
+                    tag,
+                    seq_md_with_vec,
+                    BTreeMap::default(),
+                    SafeNdPublicKey::Bls(SecretKey::random().public_key()),
+                ))
+            }
             None => Err(Error::ContentNotFound(format!(
                 "Sequential AppendOnlyData not found at Xor name: {}",
                 xorname_hex
@@ -406,7 +435,7 @@ impl SafeApp {
         }
     }
 
-    pub fn seq_mutable_data_insert(
+    fn seq_mutable_data_insert(
         &mut self,
         xorurl: &str,
         tag: u64,
@@ -414,25 +443,30 @@ impl SafeApp {
         value: &[u8],
     ) -> ResultReturn<()> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let mut seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
+        let xorname = xorurl_encoder.xorname();
+        let seq_md = self.get_seq_mdata(xorname, tag)?;
+        let mut data = seq_md.entries().clone();
 
-        seq_md.insert(
-            vec_to_hex(key.to_vec()),
+        data.insert(
+            key.to_vec(),
             MDataValue {
                 data: value.to_vec(),
                 version: 0,
             },
         );
 
+        let mut seq_md_with_str: BTreeMap<String, MDataValue> = BTreeMap::new();
+        data.iter().for_each(|(k, v)| {
+            seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
+        });
         self.mock_data
             .mutable_data
-            .insert(xorname_to_hex(&xorurl_encoder.xorname()), seq_md);
+            .insert(xorname_to_hex(&xorname), seq_md_with_str);
 
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn mutable_data_delete(
+    fn mutable_data_delete(
         &mut self,
         _xorname: &XorName,
         _tag: u64,
@@ -441,35 +475,36 @@ impl SafeApp {
         Ok(())
     }
 
-    pub fn seq_mutable_data_get_value(
+    fn seq_mutable_data_get_value(
         &mut self,
         xorurl: &str,
         tag: u64,
         key: Vec<u8>,
     ) -> ResultReturn<MDataValue> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
-        match seq_md.get(&vec_to_hex(key.to_vec())) {
+        let xorname = xorurl_encoder.xorname();
+        let seq_md = self.get_seq_mdata(xorname, tag)?;
+        match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
             None => Err(Error::EntryNotFound(format!(
                 "Entry not found in Sequential MutableData found at Xor name: {}",
-                xorname_to_hex(&xorurl_encoder.xorname())
+                xorname_to_hex(&xorname)
             ))),
         }
     }
 
-    pub fn list_seq_mdata_entries(
+    fn list_seq_mdata_entries(
         &self,
         xorurl: &str,
         tag: u64,
     ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
         debug!("Listing seq_mdata_entries for: {}", xorurl);
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let seq_md = self.get_seq_mdata(&xorurl_encoder.xorname(), tag)?;
+        let seq_md = self.get_seq_mdata(xorurl_encoder.xorname(), tag)?;
 
         let mut res = BTreeMap::new();
-        seq_md.iter().for_each(|elem| {
-            res.insert(parse_hex(elem.0), elem.1.clone());
+        seq_md.entries().iter().for_each(|elem| {
+            res.insert(elem.0.clone(), elem.1.clone());
         });
 
         Ok(res)
@@ -477,7 +512,7 @@ impl SafeApp {
 
     //TODO: Replace with real mock code
     #[allow(dead_code)]
-    pub fn seq_mutable_data_update(
+    fn seq_mutable_data_update(
         &self,
         _xorurl: &str,
         _type_tag: u64,
@@ -489,12 +524,14 @@ impl SafeApp {
     }
 }
 
+// Unit tests
+
 #[test]
 fn test_allocate_test_coins() {
     use self::SafeApp;
     use threshold_crypto::SecretKey;
 
-    let mut mock = SafeApp::new();
+    let mut mock = SafeAppFake::new();
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
@@ -511,7 +548,7 @@ fn test_create_balance() {
     use self::SafeApp;
     use threshold_crypto::SecretKey;
 
-    let mut mock = SafeApp::new();
+    let mut mock = SafeAppFake::new();
 
     let sk = SecretKey::random();
     let pk = sk.public_key();
@@ -532,7 +569,7 @@ fn test_check_balance() {
     use self::SafeApp;
     use threshold_crypto::SecretKey;
 
-    let mut mock = SafeApp::new();
+    let mut mock = SafeAppFake::new();
 
     let sk = SecretKey::random();
     let pk = sk.public_key();
@@ -568,7 +605,7 @@ fn test_safecoin_transfer() {
     use rand_core::RngCore;
     use threshold_crypto::SecretKey;
 
-    let mut mock = SafeApp::new();
+    let mut mock = SafeAppFake::new();
 
     let sk1 = SecretKey::random();
     let pk1 = sk1.public_key();
