@@ -36,6 +36,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
   - [NRS](#nrs-name-resolution-system)
     - [Create](#create)
     - [Add](#add)
+  - [Update](#update)
 3. [Further Help](#further-help)
 4. [License](#license)
 
@@ -552,6 +553,10 @@ $ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u
 NRS Map updated (version 2): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
 ```
+
+### Update
+
+The CLI can update itself to the latest available version. If you run `safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/safe-cli/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
 
 ## Further Help
 
