@@ -84,10 +84,10 @@ pub fn run() -> Result<(), String> {
             println!("pk={}", key_pair.pk);
             println!("sk={}", key_pair.sk);
             Ok(())
-        },
+        }
         SubCommands::Update {} => match update_commander() {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Error performing update: {}", e))
+            Err(e) => Err(format!("Error performing update: {}", e)),
         },
         _ => {
             // We treat SubCommands::Auth separatelly since we need to connect before

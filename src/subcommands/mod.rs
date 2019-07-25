@@ -95,5 +95,5 @@ pub enum SubCommands {
     },
     #[structopt(name = "update")]
     /// Update the application to the latest available version
-    Update {}
+    Update {},
 }
