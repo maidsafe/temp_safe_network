@@ -166,10 +166,8 @@ type ProcessedEntries = BTreeMap<String, (String, String)>;
 
 pub fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
     let vec_hash = sha3_256(&name.to_string().into_bytes());
-
     let xorname = XorName(vec_hash);
-    debug!("Resulting XornName for NRS: {} is, {}", &name, &xorname);
-
+    debug!("Resulting XornName for NRS: {} is, {}", name, xorname);
     Ok(xorname)
 }
 

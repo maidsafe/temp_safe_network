@@ -79,30 +79,31 @@ impl Safe {
     /// ```
     pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
         debug!("Attempting to fetch url: {}", xorurl);
+        let the_xor =
+            XorUrlEncoder::from_url(xorurl).or_else(|err| -> ResultReturn<XorUrlEncoder> {
+                info!(
+                    "Falling back to NRS. XorUrl decoding failed with: {:?}",
+                    err
+                );
 
-        let the_xor = XorUrlEncoder::from_url(&xorurl).or_else(|err| {
-            info!(
-                "Falling back to NRS. XorUrl decoding failed with: {:?}",
-                err
-            );
+                let (sub_names, host_str, path) = get_subnames_host_and_path(xorurl)?;
+                let hashed_host = xorname_from_nrs_string(&host_str)?;
 
-            let (sub_names, host_str, path) = get_subnames_host_and_path(&xorurl)?;
-            let hashed_host = xorname_from_nrs_string(&host_str)?;
+                let encoded_xor = XorUrlEncoder::new(
+                    hashed_host,
+                    NRS_MAP_TYPE_TAG,
+                    SafeDataType::PublishedSeqAppendOnlyData,
+                    SafeContentType::NrsMapContainer,
+                    Some(&path),
+                    Some(sub_names),
+                );
 
-            let encoded_xor = XorUrlEncoder::new(
-                hashed_host,
-                NRS_MAP_TYPE_TAG,
-                SafeDataType::PublishedSeqAppendOnlyData,
-                SafeContentType::NrsMapContainer,
-                Some(&path),
-                Some(sub_names),
-            );
-
-            let new_url = encoded_xor.to_string("base32z")?;
-
-            debug!("Checking NRS system for URL: {}", new_url);
-            Ok(encoded_xor)
-        })?;
+                debug!(
+                    "Checking NRS system for URL: {}",
+                    encoded_xor.to_string("base32z")?
+                );
+                Ok(encoded_xor)
+            })?;
 
         let the_xorurl = the_xor.to_string("base32z")?;
         info!("URL parsed successfully, fetching: {}", the_xorurl);

@@ -20,7 +20,6 @@ use std::io::Write;
 use std::str::FromStr;
 use std::{fs, str};
 use threshold_crypto::{PublicKey, SecretKey};
-use unwrap::unwrap;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
@@ -53,11 +52,15 @@ pub struct SafeAppFake {
 /// Writes the mock data onto the mock file
 impl Drop for SafeAppFake {
     fn drop(&mut self) {
-        let serialised = unwrap!(serde_json::to_string(&self.mock_data));
+        let serialised = serde_json::to_string(&self.mock_data)
+            .expect("Failed to serialised fake vault data to write on file");
         debug!("serialised = {}", serialised);
 
-        let mut file = unwrap!(fs::File::create(&FAKE_VAULT_FILE));
-        unwrap!(file.write(serialised.as_bytes()));
+        let mut file =
+            fs::File::create(&FAKE_VAULT_FILE).expect("Failed to create fake vault DB file");
+        let _ = file
+            .write(serialised.as_bytes())
+            .expect("Failed to write fake vault DB file");
     }
 }
 
@@ -83,7 +86,7 @@ impl SafeAppFake {
     }
 
     fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
-        match &self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+        match self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
             None => Err(Error::ContentNotFound(
                 "CoinBalance data not found".to_string(),
             )),
@@ -96,7 +99,8 @@ impl SafeApp for SafeAppFake {
     fn new() -> SafeAppFake {
         let mock_data = match fs::File::open(&FAKE_VAULT_FILE) {
             Ok(file) => {
-                let deserialised: MockData = unwrap!(serde_json::from_reader(&file));
+                let deserialised: MockData =
+                    serde_json::from_reader(&file).expect("Failed to read fake vault DB file");
                 deserialised
             }
             Err(error) => {
@@ -123,15 +127,14 @@ impl SafeApp for SafeAppFake {
             Some(sk) => {
                 let from_pk = sk.public_key();
                 let from_xorname = xorname_from_pk(&from_pk);
-                let from_balance = unwrap!(Coins::from_str(&unwrap!(self.get_balance_from_sk(sk))));
-                let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
-                let amount_coin = unwrap!(Coins::from_str(amount));
-                let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
+                let from_balance = Coins::from_str(&self.get_balance_from_sk(sk)?)?;
+                let from_nano_balance = NanoCoins::try_from(from_balance)?;
+                let amount_coin = Coins::from_str(amount)?;
+                let amount_nano = NanoCoins::try_from(amount_coin)?;
                 if from_nano_balance.num() < amount_nano.num() {
                     return Err(Error::NotEnoughBalance(from_nano_balance.num().to_string()));
                 }
-                let from_new_amount =
-                    unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
+                let from_new_amount = NanoCoins::new(from_nano_balance.num() - amount_nano.num())?;
                 self.mock_data.coin_balances.insert(
                     xorname_to_hex(&from_xorname),
                     CoinBalance {
@@ -207,15 +210,13 @@ impl SafeApp for SafeAppFake {
             (Coins::from_str(amount)).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
 
         // reduce balance from safecoin_transferer
-        let from_balance = unwrap!(Coins::from_str(&unwrap!(
-            self.get_balance_from_sk(from_sk.clone())
-        )));
-        let from_nano_balance = unwrap!(NanoCoins::try_from(from_balance));
-        let amount_nano = unwrap!(NanoCoins::try_from(amount_coin));
+        let from_balance = Coins::from_str(&self.get_balance_from_sk(from_sk.clone())?)?;
+        let from_nano_balance = NanoCoins::try_from(from_balance)?;
+        let amount_nano = NanoCoins::try_from(amount_coin)?;
         if from_nano_balance.num() < amount_nano.num() {
             return Err(Error::NotEnoughBalance(from_nano_balance.num().to_string()));
         }
-        let from_new_amount = unwrap!(NanoCoins::new(from_nano_balance.num() - amount_nano.num()));
+        let from_new_amount = NanoCoins::new(from_nano_balance.num() - amount_nano.num())?;
         self.mock_data.coin_balances.insert(
             xorname_to_hex(&from_xorname),
             CoinBalance {
@@ -225,12 +226,10 @@ impl SafeApp for SafeAppFake {
         );
 
         // credit destination
-        let to_balance = unwrap!(Coins::from_str(&unwrap!(
-            self.get_balance_from_xorname(&to_xorname)
-        )));
+        let to_balance = Coins::from_str(&self.get_balance_from_xorname(&to_xorname)?)?;
         let to_pk = self.fetch_pk_from_xorname(&to_xorname)?;
-        let to_nano_balance = unwrap!(NanoCoins::try_from(to_balance));
-        let to_new_amount = unwrap!(NanoCoins::new(to_nano_balance.num() + amount_nano.num()));
+        let to_nano_balance = NanoCoins::try_from(to_balance)?;
+        let to_new_amount = NanoCoins::new(to_nano_balance.num() + amount_nano.num())?;
         self.mock_data.coin_balances.insert(
             to_xorname_hex,
             CoinBalance {
@@ -256,7 +255,9 @@ impl SafeApp for SafeAppFake {
     fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
         let xorname = xorname_from_pk(&pk);
         let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
-        let tx_state = unwrap!(txs_for_xorname.get(&tx_id.to_string()));
+        let tx_state = txs_for_xorname.get(&tx_id.to_string()).ok_or_else(|| {
+            Error::ContentNotFound(format!("Transaction not found with id '{}'", tx_id))
+        })?;
         Ok(tx_state.to_string())
     }
 
@@ -530,6 +531,7 @@ impl SafeApp for SafeAppFake {
 fn test_allocate_test_coins() {
     use self::SafeApp;
     use threshold_crypto::SecretKey;
+    use unwrap::unwrap;
 
     let mut mock = SafeAppFake::new();
 
@@ -547,6 +549,7 @@ fn test_allocate_test_coins() {
 fn test_create_balance() {
     use self::SafeApp;
     use threshold_crypto::SecretKey;
+    use unwrap::unwrap;
 
     let mut mock = SafeAppFake::new();
 
@@ -568,6 +571,7 @@ fn test_create_balance() {
 fn test_check_balance() {
     use self::SafeApp;
     use threshold_crypto::SecretKey;
+    use unwrap::unwrap;
 
     let mut mock = SafeAppFake::new();
 
@@ -604,6 +608,7 @@ fn test_safecoin_transfer() {
     use self::SafeApp;
     use rand_core::RngCore;
     use threshold_crypto::SecretKey;
+    use unwrap::unwrap;
 
     let mut mock = SafeAppFake::new();
 

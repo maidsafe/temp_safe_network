@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use safecoin::Error as SafeCoinError;
 use std::fmt;
 
 pub type ResultReturn<T> = Result<T, Error>;
@@ -29,8 +30,14 @@ pub enum Error {
 }
 
 impl From<Error> for String {
-    fn from(error: Error) -> Self {
+    fn from(error: Error) -> String {
         get_error_info(&error)
+    }
+}
+
+impl From<SafeCoinError> for Error {
+    fn from(error: SafeCoinError) -> Self {
+        Error::InvalidInput(format!("{:?}", error))
     }
 }
 
