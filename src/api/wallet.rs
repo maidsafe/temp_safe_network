@@ -12,7 +12,6 @@ use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::debug;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
-use unwrap::unwrap; // TODO: remove all unwraps from this file
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
@@ -137,24 +136,27 @@ impl Safe {
 
         debug!("Spendable balances: {:?}", spendable_balances);
         // Iterate through the Keys and query the balance for each
-        spendable_balances.iter().for_each(|(name, balance)| {
+        for (name, balance) in spendable_balances.iter() {
             let thename = String::from_utf8_lossy(name).to_string();
 
             // Ignore the _default Wallet MD entry key
             if thename != WALLET_DEFAULT {
                 debug!("Checking wallet of name: {:?}", thename);
                 let the_balance = String::from_utf8_lossy(&balance.data).to_string();
-                let spendable_balance: WalletSpendableBalance =
-                    unwrap!(serde_json::from_str(&the_balance));
+                let spendable_balance: WalletSpendableBalance = serde_json::from_str(&the_balance)
+                    .map_err(|_| {
+                        Error::ContentError(
+                            "Couldn't deserialise data stored in the Wallet".to_string(),
+                        )
+                    })?;
 
-                let current_balance = unwrap!(
-                    self.keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk)
-                );
+                let current_balance = self
+                    .keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk)?;
+
                 debug!("{:?}: balance: {:?}", thename, current_balance);
-
-                total_balance += unwrap!(parse_coins_amount(&current_balance));
+                total_balance += parse_coins_amount(&current_balance)?;
             }
-        });
+        }
         Ok(total_balance.to_string())
     }
 
@@ -188,8 +190,12 @@ impl Safe {
                 })?;
 
             let default_balance = String::from_utf8_lossy(&default_balance_vec.data).to_string();
-            let spendable_balance: WalletSpendableBalance =
-                unwrap!(serde_json::from_str(&default_balance));
+            let spendable_balance: WalletSpendableBalance = serde_json::from_str(&default_balance)
+                .map_err(|_| {
+                    Error::ContentError(
+                        "Couldn't deserialise data stored in the Wallet".to_string(),
+                    )
+                })?;
             spendable_balance
         };
 
@@ -259,7 +265,7 @@ impl Safe {
         let to_wallet_balance = self.wallet_get_default_balance(&to)?;
         let to_xorname = XorUrlEncoder::from_url(&to_wallet_balance.xorurl)?.xorname();
 
-        let from_sk = unwrap!(sk_from_hex(&from_wallet_balance.sk));
+        let from_sk = sk_from_hex(&from_wallet_balance.sk)?;
         let mut rng = rand::thread_rng();
         let tx_id = rng.next_u64();
 
@@ -288,6 +294,7 @@ impl Safe {
 
 #[test]
 fn test_wallet_create() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let xorurl = unwrap!(safe.wallet_create());
@@ -299,6 +306,7 @@ fn test_wallet_create() {
 
 #[test]
 fn test_wallet_insert_and_balance() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let wallet_xorurl = unwrap!(safe.wallet_create());
@@ -330,6 +338,7 @@ fn test_wallet_insert_and_balance() {
 
 #[test]
 fn test_wallet_transfer_no_default() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance
@@ -373,6 +382,7 @@ fn test_wallet_transfer_no_default() {
 
 #[test]
 fn test_wallet_transfer_diff_amounts() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let from_wallet_xorurl = unwrap!(safe.wallet_create());

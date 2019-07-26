@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use walkdir::{DirEntry, WalkDir};
+
 // Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL
 pub type FileItem = BTreeMap<String, String>;
 

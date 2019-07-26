@@ -12,7 +12,6 @@ use super::helpers::{
 use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use threshold_crypto::SecretKey;
-use unwrap::unwrap;
 
 // A trait that the Validate derive will impl
 use validator::{Validate, ValidationErrors};
@@ -102,7 +101,7 @@ impl Safe {
 
         let (xorname, key_pair) = match pk {
             Some(pk_str) => {
-                let pk = unwrap!(pk_from_hex(&pk_str));
+                let pk = pk_from_hex(&pk_str)?;
                 let xorname = create_coin_balance(pk, &amount)?;
                 (xorname, None)
             }
@@ -198,6 +197,7 @@ impl Safe {
 
 #[test]
 fn test_keys_create_preload_test_coins() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, key_pair) =
@@ -208,6 +208,7 @@ fn test_keys_create_preload_test_coins() {
 
 #[test]
 fn test_keys_create_preload_test_coins_pk() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
@@ -219,6 +220,7 @@ fn test_keys_create_preload_test_coins_pk() {
 
 #[test]
 fn test_keys_create() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_, from_key_pair) =
@@ -231,6 +233,7 @@ fn test_keys_create() {
 
 #[test]
 fn test_keys_create_preload() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_, from_key_pair) =
@@ -254,6 +257,7 @@ fn test_keys_create_preload() {
 
 #[test]
 fn test_keys_create_preload_invalid_amounts() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     match safe.keys_create_preload_test_coins(".45".to_string(), None) {
@@ -310,6 +314,7 @@ fn test_keys_create_preload_invalid_amounts() {
 
 #[test]
 fn test_keys_create_pk() {
+    use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1".to_string(), None));
