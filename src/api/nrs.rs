@@ -24,11 +24,12 @@ use std::fmt;
 use tiny_keccak::sha3_256;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
-pub const NRS_MAP_TYPE_TAG: u64 = 1500;
+pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 
-pub type PublicNameKey = String;
+type PublicNameKey = String;
+type NrsMapRawData = Vec<(Vec<u8>, Vec<u8>)>;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum PublicNameEntry {
@@ -63,7 +64,6 @@ impl fmt::Display for PublicNameEntry {
 pub struct NrsMap {
     // #[derive(PartialEq)]
     pub entries: BTreeMap<PublicNameKey, PublicNameEntry>,
-
     pub default: PublicNameKey,
 }
 
@@ -72,6 +72,7 @@ impl NrsMap {
     pub fn get_default(&self) -> ResultReturn<&str> {
         Ok(&self.default)
     }
+
     pub fn resolve_for_subnames(&self, mut sub_name_list: Vec<String>) -> ResultReturn<XorUrl> {
         debug!(
             "NRS: Attempting to resolve for subnames {:?}",
@@ -139,6 +140,7 @@ impl NrsMap {
             ))),
         }
     }
+
     #[allow(dead_code)]
     pub fn get_link_for(&self, sub_name: &str) -> ResultReturn<XorUrl> {
         let the_entry = self.entries.get(sub_name);
@@ -185,20 +187,13 @@ impl Safe {
         // GET current NRS map from &name TLD
         // NOT via normal fetch
         let content = self.fetch_nrs_map(name)?;
-
-        let the_response = match content {
-            SafeData::NrsMapContainer {
-                version,
-                nrs_map,
-                type_tag,
-                xorname,
-                data_type,
-            } => {
+        match content {
+            SafeData::NrsMapContainer { nrs_map, .. } => {
                 warn!("NRS, Existing data: {:?}", nrs_map);
 
                 let (
                     nrs_map_container_xorname,
-                    resolvable_container_data,
+                    _resolvable_container_data,
                     processed_entries,
                     resulting_nrs_map,
                 ) = self.nrs_map_update_or_create_data(
@@ -222,15 +217,11 @@ impl Safe {
 
                 Ok((xorurl, processed_entries, resulting_nrs_map))
             }
-            other => {
-                return Err(Error::ContentError(format!(
-                    "Content type '{:?}' found when expecting an NRS Map.",
-                    other
-                )))
-            }
-        };
-
-        the_response
+            other => Err(Error::ContentError(format!(
+                "Content type '{:?}' found when expecting an NRS Map.",
+                other
+            ))),
+        }
     }
 
     /// # Create a NrsMapContainer.
@@ -245,14 +236,14 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, Some("safe://somewhere"), true, false).unwrap();
+    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, Some("safe://somewhere"), None, true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn nrs_map_container_create(
         &mut self,
         name: &str,
         destination: Option<&str>,
-        existing_map: Option<NrsMap>,
+        _existing_map: Option<NrsMap>,
         default: bool,
         _dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
@@ -293,27 +284,22 @@ impl Safe {
     // / # let mut safe = Safe::new("base32z".to_string());
     // / # safe.connect("", Some("fake-credentials")).unwrap();
     // / let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    // / let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, Some("safe://somewhere"), true, false).unwrap();
+    // / let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, Some("safe://somewhere"), None, true, false).unwrap();
     // / assert!(xorurl.contains("safe://"))
     // / ```
-    pub fn nrs_map_update_or_create_data(
+    fn nrs_map_update_or_create_data(
         &mut self,
         name: &str,
         destination: Option<&str>,
         existing_map: Option<NrsMap>,
         default: bool,
         _dry_run: bool,
-    ) -> ResultReturn<(
-        XorName,
-        Vec<(Vec<u8>, Vec<u8>)>,
-        BTreeMap<String, (String, String)>,
-        NrsMap,
-    )> {
+    ) -> ResultReturn<(XorName, NrsMapRawData, ProcessedEntries, NrsMap)> {
         info!("Creating or updating an NRS map");
 
         // santize to a simple string
         let sanitized_name = str::replace(&name, "safe://", "").to_string();
-        let mut nrs_map = existing_map.unwrap_or_else(|| NrsMap::default());
+        let mut nrs_map = existing_map.unwrap_or_else(NrsMap::default);
 
         let name_vec: Vec<String> = sanitized_name.split('.').map(String::from).collect();
         // get the TLD
@@ -378,7 +364,7 @@ impl Safe {
                     // TODO: Impl get underlying map func.
                     let target2_map = target_map.clone();
                     let actual_target_map = match target2_map {
-                        PublicNameEntry::SubName(mut sub_map) => sub_map,
+                        PublicNameEntry::SubName(sub_map) => sub_map,
                         _ => another_default,
                     };
 
@@ -398,8 +384,6 @@ impl Safe {
                     info!("Subname, {:?} does not exist", existing_sub_name);
                 }
             }
-
-            let mut sub_nrs_map = &NrsMap::default();
 
             // let's loop through subnames from lowest up, building our subname tree...
             for (i, the_sub_name) in the_rest_sub_names.iter().enumerate() {
@@ -505,7 +489,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, Some("somewhere"), true, false).unwrap();
+    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, Some("somewhere"), None, true, false).unwrap();
     /// let (version, nrs_map_container) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
     /// assert_eq!(version, 1);
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");

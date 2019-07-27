@@ -78,16 +78,11 @@ impl Safe {
     pub fn fetch_nrs_map(&self, xorurl: &str) -> ResultReturn<SafeData> {
         debug!("Attempting to fetch an NRS map, {}", xorurl);
         let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
-
-        let the_xorurl = the_xor.to_string("base32z")?;
-        // info!("URL parsed successfully, fetching: {}", the_xorurl);
-        let path = the_xor.path();
-        let sub_names = the_xor.sub_names();
-
         debug!("Fetching content of type: {:?}", the_xor.content_type());
 
         match the_xor.content_type() {
             SafeContentType::NrsMapContainer => {
+                let the_xorurl = the_xor.to_string("base32z")?;
                 let (version, nrs_map) = self.nrs_map_container_get_latest(&the_xorurl)?;
                 debug!(
                     "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
@@ -384,14 +379,13 @@ fn test_fetch_resolvable_map_data() {
     let mut safe = Safe::new("base32z".to_string());
     safe.connect("", Some("")).unwrap();
 
-    let (xorurl, _, the_files_map) =
+    let (xorurl, _, _the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    let (nrs_map_xorurl, _, the_nrs_map) =
+        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), None, true, false));
 
-    let (_nrs_map_xorurl, _, the_nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
-
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
     let content = unwrap!(safe.fetch_nrs_map(&format!("safe://{}", site_name)));
 
     // this should resolve to a FilesContainer until we enable prevent resolution.
@@ -405,7 +399,7 @@ fn test_fetch_resolvable_map_data() {
             ..
         } => {
             assert_eq!(xorname, xorurl_encoder.xorname());
-            assert_eq!(type_tag, 1_100);
+            assert_eq!(type_tag, 1_500);
             assert_eq!(version, 1);
             assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
             assert_eq!(nrs_map, the_nrs_map);
