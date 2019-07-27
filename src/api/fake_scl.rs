@@ -9,50 +9,48 @@
 use super::safe_net::AppendOnlyDataRawData;
 use super::xorurl::create_random_xorname;
 use super::{Error, ResultReturn, SafeApp, XorUrlEncoder};
-use crate::api::helpers::{parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex};
+use crate::api::helpers::{
+    parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
+};
 use log::debug;
-use safe_nd::{MDataValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
-use safecoin::{Coins, NanoCoins};
+use safe_nd::{Coins, MDataValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::io::Write;
-use std::str::FromStr;
 use std::{fs, str};
 use threshold_crypto::{PublicKey, SecretKey};
 
+const FAKE_VAULT_FILE: &str = "./fake_vault_data.txt";
+
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
 struct CoinBalance {
     owner: PublicKey,
     value: String,
 }
 
-type AppendOnlyDataMock = Vec<(Vec<u8>, Vec<u8>)>;
+type AppendOnlyDataFake = Vec<(Vec<u8>, Vec<u8>)>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
-type SeqMutableDataMock = BTreeMap<String, MDataValue>;
-
-const FAKE_VAULT_FILE: &str = "./fake_vault_data.txt";
+type SeqMutableDataFake = BTreeMap<String, MDataValue>;
 
 #[derive(Default, Serialize, Deserialize)]
-struct MockData {
+struct FakeData {
     coin_balances: BTreeMap<XorNameStr, CoinBalance>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
-    published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataMock>, // keep a versioned map of data per xorname
-    mutable_data: BTreeMap<XorNameStr, SeqMutableDataMock>,
+    published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataFake>, // keep a versioned map of data per xorname
+    mutable_data: BTreeMap<XorNameStr, SeqMutableDataFake>,
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
 
 #[derive(Default)]
 pub struct SafeAppFake {
-    mock_data: MockData,
+    fake_vault: FakeData,
 }
 
-/// Writes the mock data onto the mock file
+/// Writes the fake Vault data onto the file
 impl Drop for SafeAppFake {
     fn drop(&mut self) {
-        let serialised = serde_json::to_string(&self.mock_data)
+        let serialised = serde_json::to_string(&self.fake_vault)
             .expect("Failed to serialised fake vault data to write on file");
         debug!("serialised = {}", serialised);
 
@@ -66,50 +64,58 @@ impl Drop for SafeAppFake {
 
 impl SafeAppFake {
     // private helper
-    fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<String> {
-        match self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+    fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<Coins> {
+        match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
             None => Err(Error::ContentNotFound(
                 "CoinBalance data not found".to_string(),
             )),
-            Some(coin_balance) => {
-                let balance_str = coin_balance
-                    .value
-                    .to_string()
-                    .replace("Coins(", "")
-                    .replace(")", "");
-                let balance = balance_str.parse::<f64>().map_err(|e| {
-                    Error::Unexpected(format!("Failed to format balance output: {}", e))
-                })?;
-                Ok(format!("{:.*}", 9, balance))
-            }
+            Some(coin_balance) => parse_coins_amount(&coin_balance.value),
         }
     }
 
     fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
-        match self.mock_data.coin_balances.get(&xorname_to_hex(&xorname)) {
+        match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
             None => Err(Error::ContentNotFound(
                 "CoinBalance data not found".to_string(),
             )),
             Some(coin_balance) => Ok(coin_balance.owner),
         }
     }
+
+    fn substract_coins(&mut self, sk: SecretKey, amount: Coins) -> ResultReturn<()> {
+        let from_balance = self.get_balance_from_sk(sk.clone())?;
+        match from_balance.checked_sub(amount) {
+            None => Err(Error::NotEnoughBalance(from_balance.to_string())),
+            Some(new_balance_coins) => {
+                let from_pk = sk.public_key();
+                self.fake_vault.coin_balances.insert(
+                    xorname_to_hex(&xorname_from_pk(&from_pk)),
+                    CoinBalance {
+                        owner: from_pk,
+                        value: new_balance_coins.to_string(),
+                    },
+                );
+                Ok(())
+            }
+        }
+    }
 }
 
 impl SafeApp for SafeAppFake {
     fn new() -> SafeAppFake {
-        let mock_data = match fs::File::open(&FAKE_VAULT_FILE) {
+        let fake_vault = match fs::File::open(&FAKE_VAULT_FILE) {
             Ok(file) => {
-                let deserialised: MockData =
+                let deserialised: FakeData =
                     serde_json::from_reader(&file).expect("Failed to read fake vault DB file");
                 deserialised
             }
             Err(error) => {
                 debug!("Error reading mock file. {}", error.to_string());
-                MockData::default()
+                FakeData::default()
             }
         };
 
-        SafeAppFake { mock_data }
+        SafeAppFake { fake_vault }
     }
 
     fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
@@ -121,27 +127,11 @@ impl SafeApp for SafeAppFake {
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
-        amount: &str,
+        amount: Coins,
     ) -> ResultReturn<XorName> {
         match from_sk {
             Some(sk) => {
-                let from_pk = sk.public_key();
-                let from_xorname = xorname_from_pk(&from_pk);
-                let from_balance = Coins::from_str(&self.get_balance_from_sk(sk)?)?;
-                let from_nano_balance = NanoCoins::try_from(from_balance)?;
-                let amount_coin = Coins::from_str(amount)?;
-                let amount_nano = NanoCoins::try_from(amount_coin)?;
-                if from_nano_balance.num() < amount_nano.num() {
-                    return Err(Error::NotEnoughBalance(from_nano_balance.num().to_string()));
-                }
-                let from_new_amount = NanoCoins::new(from_nano_balance.num() - amount_nano.num())?;
-                self.mock_data.coin_balances.insert(
-                    xorname_to_hex(&from_xorname),
-                    CoinBalance {
-                        owner: from_pk,
-                        value: Coins::from(from_new_amount).to_string(),
-                    },
-                );
+                self.substract_coins(sk, amount)?;
             }
             None => {
                 /* TODO: we should have a default wallet and substract from there */
@@ -152,7 +142,7 @@ impl SafeApp for SafeAppFake {
         };
 
         let to_xorname = xorname_from_pk(&new_balance_owner);
-        self.mock_data.coin_balances.insert(
+        self.fake_vault.coin_balances.insert(
             xorname_to_hex(&to_xorname),
             CoinBalance {
                 owner: new_balance_owner,
@@ -163,9 +153,9 @@ impl SafeApp for SafeAppFake {
         Ok(to_xorname)
     }
 
-    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: &str) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: Coins) -> ResultReturn<XorName> {
         let xorname = xorname_from_pk(&to_pk);
-        self.mock_data.coin_balances.insert(
+        self.fake_vault.coin_balances.insert(
             xorname_to_hex(&xorname),
             CoinBalance {
                 owner: (to_pk),
@@ -176,7 +166,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<String> {
+    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins> {
         let pk = sk.public_key();
         let xorname = xorname_from_pk(&pk);
         self.get_balance_from_xorname(&xorname)
@@ -187,14 +177,12 @@ impl SafeApp for SafeAppFake {
         from_sk: SecretKey,
         to_xorname: XorName,
         tx_id: u64,
-        amount: &str,
+        amount: Coins,
     ) -> ResultReturn<u64> {
         let to_xorname_hex = xorname_to_hex(&to_xorname);
-        let from_pk = from_sk.public_key();
-        let from_xorname = xorname_from_pk(&from_pk);
 
         // generate TX in destination section (to_pk)
-        let mut txs_for_xorname = match self.mock_data.txs.get(&to_xorname_hex) {
+        let mut txs_for_xorname = match self.fake_vault.txs.get(&to_xorname_hex) {
             Some(txs) => txs.clone(),
             None => BTreeMap::new(),
         };
@@ -202,43 +190,31 @@ impl SafeApp for SafeAppFake {
             tx_id.to_string(),
             format!("Success({})", amount).to_string(),
         );
-        self.mock_data
+        self.fake_vault
             .txs
             .insert(to_xorname_hex.clone(), txs_for_xorname);
 
-        let amount_coin =
-            (Coins::from_str(amount)).map_err(|err| Error::InvalidAmount(format!("{:?}", err)))?;
-
         // reduce balance from safecoin_transferer
-        let from_balance = Coins::from_str(&self.get_balance_from_sk(from_sk.clone())?)?;
-        let from_nano_balance = NanoCoins::try_from(from_balance)?;
-        let amount_nano = NanoCoins::try_from(amount_coin)?;
-        if from_nano_balance.num() < amount_nano.num() {
-            return Err(Error::NotEnoughBalance(from_nano_balance.num().to_string()));
-        }
-        let from_new_amount = NanoCoins::new(from_nano_balance.num() - amount_nano.num())?;
-        self.mock_data.coin_balances.insert(
-            xorname_to_hex(&from_xorname),
-            CoinBalance {
-                owner: from_pk,
-                value: Coins::from(from_new_amount).to_string(),
-            },
-        );
+        self.substract_coins(from_sk, amount)?;
 
         // credit destination
-        let to_balance = Coins::from_str(&self.get_balance_from_xorname(&to_xorname)?)?;
-        let to_pk = self.fetch_pk_from_xorname(&to_xorname)?;
-        let to_nano_balance = NanoCoins::try_from(to_balance)?;
-        let to_new_amount = NanoCoins::new(to_nano_balance.num() + amount_nano.num())?;
-        self.mock_data.coin_balances.insert(
-            to_xorname_hex,
-            CoinBalance {
-                owner: to_pk,
-                value: Coins::from(to_new_amount).to_string(),
-            },
-        );
-
-        Ok(tx_id)
+        let to_balance = self.get_balance_from_xorname(&to_xorname)?;
+        match to_balance.checked_add(amount) {
+            None => Err(Error::Unexpected(
+                "Failed to credit destination due to overflow...maybe a millionaire's problem?!"
+                    .to_string(),
+            )),
+            Some(new_balance_coins) => {
+                self.fake_vault.coin_balances.insert(
+                    to_xorname_hex,
+                    CoinBalance {
+                        owner: self.fetch_pk_from_xorname(&to_xorname)?,
+                        value: new_balance_coins.to_string(),
+                    },
+                );
+                Ok(tx_id)
+            }
+        }
     }
 
     fn safecoin_transfer_to_pk(
@@ -246,7 +222,7 @@ impl SafeApp for SafeAppFake {
         from_sk: SecretKey,
         to_pk: PublicKey,
         tx_id: u64,
-        amount: &str,
+        amount: Coins,
     ) -> ResultReturn<u64> {
         let to_xorname = xorname_from_pk(&to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
@@ -254,7 +230,7 @@ impl SafeApp for SafeAppFake {
 
     fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
         let xorname = xorname_from_pk(&pk);
-        let txs_for_xorname = &self.mock_data.txs[&xorname_to_hex(&xorname)];
+        let txs_for_xorname = &self.fake_vault.txs[&xorname_to_hex(&xorname)];
         let tx_state = txs_for_xorname.get(&tx_id.to_string()).ok_or_else(|| {
             Error::ContentNotFound(format!("Transaction not found with id '{}'", tx_id))
         })?;
@@ -264,7 +240,7 @@ impl SafeApp for SafeAppFake {
     fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
         let xorname = create_random_xorname();
         // TODO: hash to get xorname.
-        self.mock_data
+        self.fake_vault
             .published_immutable_data
             .insert(xorname_to_hex(&xorname), data.to_vec());
 
@@ -273,7 +249,7 @@ impl SafeApp for SafeAppFake {
 
     fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
         let data = match self
-            .mock_data
+            .fake_vault
             .published_immutable_data
             .get(&xorname_to_hex(&xorname))
         {
@@ -297,7 +273,7 @@ impl SafeApp for SafeAppFake {
     ) -> ResultReturn<XorName> {
         let xorname = name.unwrap_or_else(create_random_xorname);
 
-        self.mock_data
+        self.fake_vault
             .published_seq_append_only
             .insert(xorname_to_hex(&xorname), data);
 
@@ -312,7 +288,8 @@ impl SafeApp for SafeAppFake {
         _tag: u64,
     ) -> ResultReturn<u64> {
         let xorname_hex = xorname_to_hex(&name);
-        let mut seq_append_only = match self.mock_data.published_seq_append_only.get(&xorname_hex) {
+        let mut seq_append_only = match self.fake_vault.published_seq_append_only.get(&xorname_hex)
+        {
             Some(seq_append_only) => seq_append_only.clone(),
             None => {
                 return Err(Error::ContentNotFound(format!(
@@ -323,7 +300,7 @@ impl SafeApp for SafeAppFake {
         };
 
         seq_append_only.extend(data);
-        self.mock_data
+        self.fake_vault
             .published_seq_append_only
             .insert(xorname_hex, seq_append_only.to_vec());
 
@@ -338,7 +315,7 @@ impl SafeApp for SafeAppFake {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate scl mock mdata: {}", xorname_hex);
 
-        match self.mock_data.published_seq_append_only.get(&xorname_hex) {
+        match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
             Some(seq_append_only) => {
                 let latest_index = seq_append_only.len() - 1;
                 let last_entry = seq_append_only.get(latest_index).ok_or_else(|| {
@@ -366,7 +343,7 @@ impl SafeApp for SafeAppFake {
 
         let xorname_hex = xorname_to_hex(&name);
 
-        let length = match self.mock_data.published_seq_append_only.get(&xorname_hex) {
+        let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
             Some(seq_append_only) => seq_append_only.len(),
             None => {
                 return Err(Error::ContentNotFound(format!(
@@ -398,12 +375,12 @@ impl SafeApp for SafeAppFake {
         _permissions: Option<String>,
     ) -> ResultReturn<XorName> {
         let xorname = name.unwrap_or_else(create_random_xorname);
-        let seq_md = match self.mock_data.mutable_data.get(&xorname_to_hex(&xorname)) {
+        let seq_md = match self.fake_vault.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(uao) => uao.clone(),
             None => BTreeMap::new(),
         };
 
-        self.mock_data
+        self.fake_vault
             .mutable_data
             .insert(xorname_to_hex(&xorname), seq_md);
 
@@ -414,7 +391,7 @@ impl SafeApp for SafeAppFake {
         let xorname_hex = xorname_to_hex(&xorname);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
 
-        match self.mock_data.mutable_data.get(&xorname_hex) {
+        match self.fake_vault.mutable_data.get(&xorname_hex) {
             Some(seq_md) => {
                 let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataValue> = BTreeMap::new();
                 seq_md.iter().for_each(|(k, v)| {
@@ -440,7 +417,7 @@ impl SafeApp for SafeAppFake {
         &mut self,
         xorurl: &str,
         tag: u64,
-        key: Vec<u8>,
+        key: &[u8],
         value: &[u8],
     ) -> ResultReturn<()> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
@@ -460,19 +437,26 @@ impl SafeApp for SafeAppFake {
         data.iter().for_each(|(k, v)| {
             seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
         });
-        self.mock_data
+        self.fake_vault
             .mutable_data
             .insert(xorname_to_hex(&xorname), seq_md_with_str);
 
         Ok(())
     }
 
-    fn mutable_data_delete(
-        &mut self,
-        _xorname: &XorName,
-        _tag: u64,
-        _key: &[u8],
-    ) -> ResultReturn<()> {
+    fn mutable_data_delete(&mut self, xorname: XorName, _tag: u64) -> ResultReturn<()> {
+        let xorname_hex = xorname_to_hex(&xorname);
+        debug!("attempting to locate scl mock mdata: {}", xorname_hex);
+        let _ = self
+            .fake_vault
+            .mutable_data
+            .remove(&xorname_hex)
+            .ok_or_else(|| {
+                Error::ContentNotFound(format!(
+                    "Sequential AppendOnlyData not found at Xor name: {}",
+                    xorname_hex
+                ))
+            })?;
         Ok(())
     }
 
@@ -480,7 +464,7 @@ impl SafeApp for SafeAppFake {
         &mut self,
         xorurl: &str,
         tag: u64,
-        key: Vec<u8>,
+        key: &[u8],
     ) -> ResultReturn<MDataValue> {
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
         let xorname = xorurl_encoder.xorname();
@@ -511,17 +495,16 @@ impl SafeApp for SafeAppFake {
         Ok(res)
     }
 
-    //TODO: Replace with real mock code
-    #[allow(dead_code)]
     fn seq_mutable_data_update(
-        &self,
-        _xorurl: &str,
-        _type_tag: u64,
-        _key: &[u8],
-        _value: &[u8],
+        &mut self,
+        xorurl: &str,
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
         _version: u64,
     ) -> ResultReturn<()> {
-        Ok(())
+        self.seq_mutable_data_get_value(xorurl, tag, key)
+            .and_then(|_| self.seq_mutable_data_insert(xorurl, tag, key, value))
     }
 }
 
@@ -530,6 +513,7 @@ impl SafeApp for SafeAppFake {
 #[test]
 fn test_allocate_test_coins() {
     use self::SafeApp;
+    use std::str::FromStr;
     use threshold_crypto::SecretKey;
     use unwrap::unwrap;
 
@@ -538,16 +522,17 @@ fn test_allocate_test_coins() {
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
 
-    let balance = "2.345678912";
+    let balance = unwrap!(Coins::from_str("2.345678912"));
     unwrap!(mock.allocate_test_coins(pk_to, balance));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
     println!("Current balance: {}", current_balance);
-    assert_eq!(balance, &current_balance);
+    assert_eq!(balance, current_balance);
 }
 
 #[test]
 fn test_create_balance() {
     use self::SafeApp;
+    use std::str::FromStr;
     use threshold_crypto::SecretKey;
     use unwrap::unwrap;
 
@@ -556,20 +541,20 @@ fn test_create_balance() {
     let sk = SecretKey::random();
     let pk = sk.public_key();
 
-    let balance = "2.345678912";
+    let balance = unwrap!(Coins::from_str("2.345678912"));
     unwrap!(mock.allocate_test_coins(pk, balance));
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
-    println!(
-        "New CoinBalance at: {:?}",
-        mock.create_balance(Some(sk), pk_to, "1.234567891")
-    );
+    assert!(mock
+        .create_balance(Some(sk), pk_to, unwrap!(Coins::from_str("1.234567891")))
+        .is_ok());
 }
 
 #[test]
 fn test_check_balance() {
     use self::SafeApp;
+    use std::str::FromStr;
     use threshold_crypto::SecretKey;
     use unwrap::unwrap;
 
@@ -578,28 +563,28 @@ fn test_check_balance() {
     let sk = SecretKey::random();
     let pk = sk.public_key();
 
-    let balance = "2.300000000";
+    let balance = unwrap!(Coins::from_str("2.3"));
     unwrap!(mock.allocate_test_coins(pk, balance));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
     println!("Current balance: {}", current_balance);
-    assert_eq!(balance, &current_balance);
+    assert_eq!(balance, current_balance);
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
-    let preload = "1.234567891";
+    let preload = unwrap!(Coins::from_str("1.234567891"));
     println!(
         "New CoinBalance at: {:?}",
         mock.create_balance(Some(sk.clone()), pk_to, preload)
     );
     let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
     println!("Current balance: {}", current_balance);
-    assert_eq!(preload, &current_balance);
+    assert_eq!(preload, current_balance);
 
     let current_balance = unwrap!(mock.get_balance_from_sk(sk));
     println!("Current balance: {}", current_balance);
     assert_eq!(
-        "1.065432109", /* == 2.3 - 1.234567891*/
-        &current_balance
+        unwrap!(Coins::from_str("1.065432109")), /* == 2.3 - 1.234567891*/
+        current_balance
     );
 }
 
@@ -607,6 +592,7 @@ fn test_check_balance() {
 fn test_safecoin_transfer() {
     use self::SafeApp;
     use rand_core::RngCore;
+    use std::str::FromStr;
     use threshold_crypto::SecretKey;
     use unwrap::unwrap;
 
@@ -618,8 +604,8 @@ fn test_safecoin_transfer() {
     let sk2 = SecretKey::random();
     let pk2 = sk2.public_key();
 
-    let balance1 = "2.500000000";
-    let balance2 = "5.700000000";
+    let balance1 = unwrap!(Coins::from_str("2.5"));
+    let balance2 = unwrap!(Coins::from_str("5.7"));
     println!(
         "Allocate testcoins in new CoinBalance 1 at: {:?}",
         mock.allocate_test_coins(pk1, balance1)
@@ -648,7 +634,7 @@ fn test_safecoin_transfer() {
         sk1.clone(),
         xorname_from_pk(&pk2),
         tx_id,
-        "1.4"
+        unwrap!(Coins::from_str("1.4"))
     ));
     println!(
         "Current TX state: {}",
@@ -662,6 +648,6 @@ fn test_safecoin_transfer() {
         curr_balance1, curr_balance2
     );
 
-    assert_eq!(curr_balance1, "1.100000000");
-    assert_eq!(curr_balance2, "7.100000000");
+    assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
+    assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
 }

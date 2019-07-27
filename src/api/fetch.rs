@@ -263,8 +263,7 @@ fn test_fetch_key() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "1324.12";
-    let (xorurl, _key_pair) =
-        unwrap!(safe.keys_create_preload_test_coins(preload_amount.to_string(), None));
+    let (xorurl, _key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount, None));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
     let content = unwrap!(safe.fetch(&xorurl));

@@ -100,7 +100,7 @@ pub fn create_new_key(
             warn!("You must pass a preload amount with test-coins, 1000.111 will be added by default.");
         }
 
-        safe.keys_create_preload_test_coins(amount, pk)?
+        safe.keys_create_preload_test_coins(&amount, pk)?
     // }
     } else {
         // 'source' is either a Wallet XOR-URL, or a secret key

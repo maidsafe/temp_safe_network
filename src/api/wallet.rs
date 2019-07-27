@@ -11,6 +11,7 @@ use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::debug;
 use rand_core::RngCore;
+use safe_nd::Coins;
 use serde::{Deserialize, Serialize};
 
 // Type tag used for the Wallet container
@@ -81,7 +82,7 @@ impl Safe {
         self.safe_app.seq_mutable_data_insert(
             wallet_xorurl,
             WALLET_TYPE_TAG,
-            md_key.to_string().into_bytes().to_vec(),
+            &md_key.to_string().into_bytes(),
             &serialised_value.into_bytes(),
         )?;
 
@@ -94,7 +95,7 @@ impl Safe {
             self.safe_app.seq_mutable_data_insert(
                 wallet_xorurl,
                 WALLET_TYPE_TAG,
-                WALLET_DEFAULT_BYTES.to_vec(),
+                WALLET_DEFAULT_BYTES,
                 &md_key.to_string().into_bytes(),
             )?;
 
@@ -107,7 +108,12 @@ impl Safe {
     // Check the total balance of a Wallet found at a given XOR-URL
     pub fn wallet_balance(&mut self, xorurl: &str) -> ResultReturn<String> {
         debug!("Finding total wallet balance for: {:?}", xorurl);
-        let mut total_balance: f64 = 0.0;
+        let mut total_balance = Coins::from_nano(0).map_err(|err| {
+            Error::Unexpected(format!(
+                "Unexpected error when trying to instantiate a safe_nd::Coins object: {}",
+                err
+            ))
+        })?;
 
         // Let's get the list of balances from the Wallet
         let spendable_balances = match self
@@ -150,11 +156,21 @@ impl Safe {
                         )
                     })?;
 
-                let current_balance = self
-                    .keys_balance_from_xorurl(&spendable_balance.xorurl, &spendable_balance.sk)?;
+                let secret_key = sk_from_hex(&spendable_balance.sk)?;
+                let current_balance =
+                    self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
+                        Error::ContentNotFound("One of the Key's was not found".to_string())
+                    })?;
 
-                debug!("{:?}: balance: {:?}", thename, current_balance);
-                total_balance += parse_coins_amount(&current_balance)?;
+                debug!("{}: balance: {}", thename, current_balance);
+                match total_balance.checked_add(current_balance) {
+                    None => {
+                        return Err(Error::Unexpected(
+                            "Failed to calculate total balance due to overflow".to_string(),
+                        ))
+                    }
+                    Some(new_balance_coins) => total_balance = new_balance_coins,
+                };
             }
         }
         Ok(total_balance.to_string())
@@ -166,11 +182,7 @@ impl Safe {
     ) -> ResultReturn<WalletSpendableBalance> {
         let default = self
             .safe_app
-            .seq_mutable_data_get_value(
-                wallet_xorurl,
-                WALLET_TYPE_TAG,
-                WALLET_DEFAULT_BYTES.to_vec(),
-            )
+            .seq_mutable_data_get_value(wallet_xorurl, WALLET_TYPE_TAG, WALLET_DEFAULT_BYTES)
             .map_err(|_| {
                 Error::ContentError(format!(
                     "No default balance found at Wallet \"{}\"",
@@ -181,7 +193,7 @@ impl Safe {
         let the_balance: WalletSpendableBalance = {
             let default_balance_vec = self
                 .safe_app
-                .seq_mutable_data_get_value(wallet_xorurl, WALLET_TYPE_TAG, default.data)
+                .seq_mutable_data_get_value(wallet_xorurl, WALLET_TYPE_TAG, &default.data)
                 .map_err(|_| {
                     Error::ContentError(format!(
                         "Default balance set but not found at Wallet \"{}\"",
@@ -214,8 +226,8 @@ impl Safe {
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let wallet_xorurl = unwrap!(safe.wallet_create());
     /// let wallet_xorurl2 = unwrap!(safe.wallet_create());
-    /// let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14".to_string(), None));
-    /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1".to_string(), None));
+    /// let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14", None));
+    /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1", None));
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl,
     ///     Some("frombalance".to_string()),
@@ -223,7 +235,7 @@ impl Safe {
     ///     &key_pair1.clone().unwrap().sk,
     /// ));
     /// let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl));
-    /// assert_eq!("14", current_balance);
+    /// assert_eq!("14.000000000", current_balance);
     ///
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl2,
@@ -269,10 +281,12 @@ impl Safe {
         let mut rng = rand::thread_rng();
         let tx_id = rng.next_u64();
 
-        match self
-            .safe_app
-            .safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
-        {
+        match self.safe_app.safecoin_transfer_to_xorname(
+            from_sk,
+            to_xorname,
+            tx_id,
+            parse_coins_amount(amount)?,
+        ) {
             Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
                 "The amount '{}' specified for the transfer is invalid",
                 amount
@@ -301,7 +315,7 @@ fn test_wallet_create() {
     assert!(xorurl.starts_with("safe://"));
 
     let current_balance = unwrap!(safe.wallet_balance(&xorurl));
-    assert_eq!("0", current_balance);
+    assert_eq!("0.000000000", current_balance);
 }
 
 #[test]
@@ -310,10 +324,8 @@ fn test_wallet_insert_and_balance() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_key1_xorurl, key_pair1) =
-        unwrap!(safe.keys_create_preload_test_coins("12.23".to_string(), None));
-    let (_key2_xorurl, key_pair2) =
-        unwrap!(safe.keys_create_preload_test_coins("1.53".to_string(), None));
+    let (_key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23", None));
+    let (_key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1.53", None));
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
@@ -323,7 +335,7 @@ fn test_wallet_insert_and_balance() {
     ));
 
     let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl));
-    assert_eq!("12.23", current_balance);
+    assert_eq!("12.230000000", current_balance);
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
@@ -333,7 +345,7 @@ fn test_wallet_insert_and_balance() {
     ));
 
     let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl));
-    assert_eq!("13.76" /*== 12.23 + 1.53*/, current_balance);
+    assert_eq!("13.760000000" /*== 12.23 + 1.53*/, current_balance);
 }
 
 #[test]
@@ -344,8 +356,7 @@ fn test_wallet_transfer_no_default() {
     let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance
 
     let to_wallet_xorurl = unwrap!(safe.wallet_create()); // we'll insert a default balance
-    let (_key_xorurl, key_pair) =
-        unwrap!(safe.keys_create_preload_test_coins("43523".to_string(), None));
+    let (_key_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("43523", None));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
         Some("myfirstbalance".to_string()),
@@ -386,8 +397,7 @@ fn test_wallet_transfer_diff_amounts() {
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let from_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_key_xorurl1, key_pair1) =
-        unwrap!(safe.keys_create_preload_test_coins("100.5".to_string(), None));
+    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5", None));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
         Some("myfirstbalance".to_string()),
@@ -396,8 +406,7 @@ fn test_wallet_transfer_diff_amounts() {
     ));
 
     let to_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_key_xorurl2, key_pair2) =
-        unwrap!(safe.keys_create_preload_test_coins("0.5".to_string(), None));
+    let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5", None));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
         Some("alsomyfirstbalance".to_string()),
@@ -420,10 +429,7 @@ fn test_wallet_transfer_diff_amounts() {
 
     // test fail to transfer as it's a invalid/non-numeric amount
     match safe.wallet_transfer(".06", Some(from_wallet_xorurl.clone()), &to_wallet_xorurl) {
-        Err(Error::InvalidAmount(msg)) => assert_eq!(
-            msg,
-            "The amount '.06' specified for the transfer is invalid",
-        ),
+        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '.06'",),
         Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
         Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };
@@ -433,9 +439,9 @@ fn test_wallet_transfer_diff_amounts() {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
             let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl));
-            assert_eq!("0.1", from_current_balance);
+            assert_eq!("0.100000000", from_current_balance);
             let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl));
-            assert_eq!("100.9", to_current_balance);
+            assert_eq!("100.900000000", to_current_balance);
         }
     };
 }

@@ -42,7 +42,7 @@ fn calling_safe_wallet_transfer() {
     .read()
     .unwrap();
 
-    assert_eq!(to_starts_with, "5");
+    assert_eq!(to_starts_with, "5.000000000");
 
     // To got coins?
     let from_starts_with = cmd!(
@@ -55,7 +55,7 @@ fn calling_safe_wallet_transfer() {
     .read()
     .unwrap();
 
-    assert_eq!(from_starts_with, "160");
+    assert_eq!(from_starts_with, "160.000000000");
 
     cmd.args(&vec!["wallet", "transfer", "100", &wallet_to, &wallet_from])
         .assert()
@@ -74,7 +74,7 @@ fn calling_safe_wallet_transfer() {
     .read()
     .unwrap();
 
-    assert_eq!(to_has, "105");
+    assert_eq!(to_has, "105.000000000");
 
     // from lost coins?
     let from_has = cmd!(
@@ -87,7 +87,7 @@ fn calling_safe_wallet_transfer() {
     .read()
     .unwrap();
 
-    assert_eq!(from_has, "60")
+    assert_eq!(from_has, "60.000000000")
 }
 
 // TODO: this test should check for lack of SK when querying a balance not owned by user.
@@ -115,7 +115,7 @@ fn calling_safe_wallet_balance() {
 
     cmd.args(&vec!["wallet", "balance", &wallet_xor, "--json"])
         .assert()
-        .stdout("10\n")
+        .stdout("10.000000000\n")
         .success();
 }
 
@@ -142,7 +142,7 @@ fn calling_safe_wallet_insert() {
 
     cmd.args(&vec!["wallet", "balance", &wallet_xor, "--json"])
         .assert()
-        .stdout("350\n")
+        .stdout("350.000000000\n")
         .success();
 }
 
@@ -181,7 +181,7 @@ fn calling_safe_wallet_create_w_preload_has_balance() {
     )
     .read()
     .unwrap();
-    assert_eq!("55", balance);
+    assert_eq!("55.000000000", balance);
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
     )
     .read()
     .unwrap();
-    assert_eq!("300", balance);
+    assert_eq!("300.000000000", balance);
 }
 
 #[test]

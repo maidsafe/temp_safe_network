@@ -11,11 +11,11 @@ use chrono::{SecondsFormat, Utc};
 
 use log::debug;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
-use safe_nd::{XorName, XOR_NAME_LEN};
+use safe_nd::{Coins, XorName, XOR_NAME_LEN};
 use std::iter::FromIterator;
 use std::str;
-use threshold_crypto::serde_impl::SerdeSecret;
-use threshold_crypto::{PublicKey, SecretKey, PK_SIZE};
+use std::str::FromStr;
+use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use url::Url;
 
 // Out internal key pair structure to manage BLS keys
@@ -116,26 +116,9 @@ pub fn sk_from_hex(hex_str: &str) -> ResultReturn<SecretKey> {
         .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))
 }
 
-pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<f64> {
-    // TODO: implement our Error struct which is used across the lib and its API
-    let mut itr = amount_str.splitn(2, '.');
-    let _ = itr
-        .next()
-        .and_then(|s| s.parse::<u64>().ok())
-        .ok_or_else(|| {
-            Error::InvalidAmount(format!(
-                "Invalid safecoins amount '{}', expected a numeric value",
-                amount_str
-            ))
-        })?;
-
-    let amount: f64 = amount_str.parse::<f64>().map_err(|_| {
-        Error::InvalidAmount(format!(
-            "Invalid safecoins amount '{}', expected a numeric value",
-            amount_str
-        ))
-    })?;
-    Ok(amount)
+pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<Coins> {
+    Coins::from_str(amount_str)
+        .map_err(|_| Error::InvalidAmount(format!("Invalid safecoins amount '{}'", amount_str)))
 }
 
 pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
