@@ -15,12 +15,12 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum NrsSubCommands {
     #[structopt(name = "add")]
-    /// Add a subname to a public name
+    /// Add a subname to an existing NRS name
     Add {
-        /// The name to give this key
+        /// The name to add
         name: String,
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
-        #[structopt(short = "-l", long = "link")]
+        #[structopt(short = "l", long = "link")]
         link: Option<String>,
         /// Set the sub name as default for this public name.
         #[structopt(long = "default")]
@@ -32,11 +32,11 @@ pub enum NrsSubCommands {
         /// The name to give site, eg 'safenetwork'
         name: String,
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
-        #[structopt(short = "-l", long = "link")]
+        #[structopt(short = "l", long = "link")]
         link: Option<String>,
     },
     #[structopt(name = "remove")]
-    /// Remove a subname from a public name
+    /// Remove a subname from an NRS name
     Remove {
         /// The name to remove
         name: String,
@@ -59,12 +59,12 @@ pub fn nrs_commander(
             // sanitize name / spacing etc.
             // validate desination?
             let set_as_default = true;
-            let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
+            let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, Some(&target), None, set_as_default, dry_run)?;
+                safe.nrs_map_container_create(&name, Some(&link), set_as_default, dry_run)?;
 
-            // Now let's just print out the content of the NRS Map
+            // Now let's just print out a summary
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "New NRS Map for \"safe://{}\" created at: \"{}\"",
@@ -97,17 +97,12 @@ pub fn nrs_commander(
             link,
             default,
         }) => {
-            let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
+            let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
+            let (version, xorurl, processed_entries, _nrs_map) =
+                safe.nrs_map_container_add(&name, Some(&link), default, dry_run)?;
 
-            let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_add(&name, Some(&target), default, dry_run)?;
-            // 	// Now let's just print out the content of the NrsMap
-
+            // Now let's just print out the summary
             if OutputFmt::Pretty == output_fmt {
-                println!(
-                    "NrsMap, \"{}\" updated at: \"{}\"",
-                    &name, &nrs_map_container_xorurl
-                );
                 let mut table = Table::new();
                 let format = FormatBuilder::new()
                     .column_separator(' ')
@@ -118,11 +113,12 @@ pub fn nrs_commander(
                 for (public_name, (change, name_link)) in processed_entries.iter() {
                     table.add_row(row![change, public_name, name_link]);
                 }
+                println!("NRS Map updated (version {}): \"{}\"", version, xorurl);
                 table.printstd();
             } else {
                 println!(
                     "{}",
-                    serde_json::to_string(&(nrs_map_container_xorurl, processed_entries))
+                    serde_json::to_string(&(xorurl, processed_entries))
                         .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
                 );
             }

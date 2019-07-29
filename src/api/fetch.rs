@@ -7,12 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::helpers::get_subnames_host_and_path;
-use super::nrs::{xorname_from_nrs_string, NrsMap, NRS_MAP_TYPE_TAG};
 use super::xorurl::SafeContentType;
 pub use super::xorurl::SafeDataType;
 
-use super::{Error, ResultReturn, Safe, XorName, XorUrlEncoder};
+use super::{Error, ResultReturn, Safe, XorName};
 use log::{debug, info};
 
 #[derive(Debug, PartialEq)]
@@ -32,13 +30,14 @@ pub enum SafeData {
         files_map: FilesMap,
         data_type: SafeDataType,
     },
-    NrsMapContainer {
+    // TODO: allow to prevent resolution
+    /*NrsMapContainer {
         xorname: XorName,
         type_tag: u64,
         version: u64,
         nrs_map: NrsMap,
         data_type: SafeDataType,
-    },
+    },*/
     PublishedImmutableData {
         xorname: XorName,
         data: Vec<u8>,
@@ -47,63 +46,7 @@ pub enum SafeData {
 
 #[allow(dead_code)]
 impl Safe {
-    pub fn resolve_and_get_xorurl_details(&self, xorurl: &str) -> ResultReturn<XorUrlEncoder> {
-        debug!("Attempting to decode url: {}", xorurl);
-
-        XorUrlEncoder::from_url(&xorurl).or_else(|err| {
-            info!(
-                "Falling back to NRS. XorUrl decoding failed with: {:?}",
-                err
-            );
-
-            let (sub_names, host_str, path) = get_subnames_host_and_path(&xorurl)?;
-            let hashed_host = xorname_from_nrs_string(&host_str)?;
-
-            let encoded_xor = XorUrlEncoder::new(
-                hashed_host,
-                NRS_MAP_TYPE_TAG,
-                SafeDataType::PublishedSeqAppendOnlyData,
-                SafeContentType::NrsMapContainer,
-                Some(&path),
-                Some(sub_names),
-            );
-
-            let new_url = encoded_xor.to_string("base32z")?;
-
-            debug!("Checking NRS system for URL: {}", new_url);
-            Ok(encoded_xor)
-        })
-    }
-
-    pub fn fetch_nrs_map(&self, xorurl: &str) -> ResultReturn<SafeData> {
-        debug!("Attempting to fetch an NRS map, {}", xorurl);
-        let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
-        debug!("Fetching content of type: {:?}", the_xor.content_type());
-
-        match the_xor.content_type() {
-            SafeContentType::NrsMapContainer => {
-                let the_xorurl = the_xor.to_string("base32z")?;
-                let (version, nrs_map) = self.nrs_map_container_get_latest(&the_xorurl)?;
-                debug!(
-                    "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
-                    version,
-                    the_xor.data_type(),
-                    nrs_map
-                );
-
-                Ok(SafeData::NrsMapContainer {
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    nrs_map,
-                    data_type: the_xor.data_type(),
-                })
-            }
-            _ => Err(Error::ContentError("No NRS map was found".to_string())),
-        }
-    }
-
-    /// # Retrieve data from a xorurl
+    /// # Retrieve data from a safe:// URL
     ///
     /// ## Examples
     ///
@@ -132,13 +75,10 @@ impl Safe {
     ///
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
-    pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
-        let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
-        let the_xorurl = the_xor.to_string("base32z")?;
-        info!("URL parsed successfully, fetching: {}", the_xorurl);
-        let path = the_xor.path();
-        let sub_names = the_xor.sub_names();
-
+    pub fn fetch(&self, url: &str) -> ResultReturn<SafeData> {
+        let the_xor = self.parse_url(url)?;
+        let xorurl = the_xor.to_string("base32z")?;
+        info!("URL parsed successfully, fetching: {}", xorurl);
         debug!("Fetching content of type: {:?}", the_xor.content_type());
 
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
@@ -149,7 +89,7 @@ impl Safe {
                     // TODO: perhaps also return the balance if sk provided?
                 }),
                 SafeDataType::PublishedImmutableData => {
-                    let data = self.files_get_published_immutable(&xorurl)?;
+                    let data = self.files_get_published_immutable(&url)?;
                     Ok(SafeData::PublishedImmutableData {
                         xorname: the_xor.xorname(),
                         data,
@@ -166,7 +106,7 @@ impl Safe {
                 data_type: the_xor.data_type(),
             }),
             SafeContentType::FilesContainer => {
-                let (version, files_map) = self.files_container_get_latest(&the_xorurl)?;
+                let (version, files_map) = self.files_container_get_latest(&xorurl)?;
 
                 debug!(
                     "Files container found w/ v:{}, on data type: {}, containing: {:?}",
@@ -175,6 +115,7 @@ impl Safe {
                     files_map
                 );
 
+                let path = the_xor.path();
                 if path != "/" && !path.is_empty() {
                     // TODO: Count how many redirects we've done... prevent looping forever
                     let file_item = match files_map.get(path) {
@@ -182,14 +123,14 @@ impl Safe {
                         None => {
                             return Err(Error::ContentError(format!(
                                 "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-                                path, the_xorurl
+                                path, xorurl
                             )))
                         }
                     };
 
                     let new_target_xorurl = match file_item.get("link") {
 						Some(path_data) => path_data,
-						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, the_xorurl))),
+						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
 					};
 
                     let path_data = self.fetch(new_target_xorurl);
@@ -205,7 +146,9 @@ impl Safe {
                 })
             }
             SafeContentType::NrsMapContainer => {
-                let (version, nrs_map) = self.nrs_map_container_get_latest(&the_xorurl)?;
+                let (version, nrs_map) = self
+                    .nrs_map_container_get_latest(&xorurl)
+                    .map_err(|_| Error::ContentNotFound(format!("Content not found at {}", url)))?;
                 debug!(
                     "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
                     version,
@@ -220,14 +163,13 @@ impl Safe {
                     new_target_xorurl
                 );
 
+                let sub_names = the_xor.sub_names();
                 if !sub_names.is_empty() {
                     new_target_xorurl = nrs_map.resolve_for_subnames(sub_names)?;
-
                     debug!("Resolved target from subnames: {}", new_target_xorurl);
                 }
 
-                let url_with_path = format!("{}{}", &new_target_xorurl, path);
-
+                let url_with_path = format!("{}{}", &new_target_xorurl, the_xor.path());
                 info!("Resolving target from resolvable map: {}", url_with_path);
 
                 // TODO: Properly prevent resolution
@@ -251,6 +193,7 @@ impl Safe {
 
 #[test]
 fn test_fetch_key() {
+    use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -269,6 +212,7 @@ fn test_fetch_key() {
 
 #[test]
 fn test_fetch_wallet() {
+    use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -288,6 +232,7 @@ fn test_fetch_wallet() {
 
 #[test]
 fn test_fetch_files_container() {
+    use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -326,6 +271,7 @@ fn test_fetch_files_container() {
 
 #[test]
 fn test_fetch_resolvable_container() {
+    use super::xorurl::XorUrlEncoder;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use unwrap::unwrap;
@@ -369,7 +315,9 @@ fn test_fetch_resolvable_container() {
 }
 
 #[test]
+#[ignore]
 fn test_fetch_resolvable_map_data() {
+    use super::xorurl::XorUrlEncoder;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use unwrap::unwrap;
@@ -382,14 +330,14 @@ fn test_fetch_resolvable_map_data() {
     let (xorurl, _, _the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-    let (nrs_map_xorurl, _, the_nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), None, true, false));
+    let (nrs_map_xorurl, _, _the_nrs_map) =
+        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
-    let content = unwrap!(safe.fetch_nrs_map(&format!("safe://{}", site_name)));
+    let _xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
+    let _content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
     // this should resolve to a FilesContainer until we enable prevent resolution.
-    match content {
+    /*match content {
         SafeData::NrsMapContainer {
             xorname,
             type_tag,
@@ -405,11 +353,12 @@ fn test_fetch_resolvable_map_data() {
             assert_eq!(nrs_map, the_nrs_map);
         }
         _ => panic!("Nrs map container was not returned."),
-    }
+    }*/
 }
 
 #[test]
 fn test_fetch_published_immutable_data() {
+    use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -430,6 +379,7 @@ fn test_fetch_published_immutable_data() {
 #[test]
 fn test_fetch_unsupported() {
     use super::xorurl::create_random_xorname;
+    use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));

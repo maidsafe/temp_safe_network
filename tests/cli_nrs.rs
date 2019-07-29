@@ -63,7 +63,9 @@ fn calling_safe_nrs_twice_w_name_fails() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["nrs", "create", &test_name, "-l", "fake_target"])
         .assert()
-        .stderr(predicate::str::contains("Data exists"))
+        .stderr(predicate::str::contains(
+            "NRS name already exists. Please use 'nrs add' command to add sub names to it",
+        ))
         .failure();
 }
 

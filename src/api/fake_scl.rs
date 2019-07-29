@@ -52,7 +52,7 @@ impl Drop for SafeAppFake {
     fn drop(&mut self) {
         let serialised = serde_json::to_string(&self.fake_vault)
             .expect("Failed to serialised fake vault data to write on file");
-        debug!("serialised = {}", serialised);
+        debug!("Writing serialised fake vault data = {}", serialised);
 
         let mut file =
             fs::File::create(&FAKE_VAULT_FILE).expect("Failed to create fake vault DB file");

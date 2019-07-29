@@ -36,9 +36,8 @@ pub fn cat_commander(
     debug!("Running cat for: {:?}", &xorurl);
 
     // TODO: pending: https://github.com/maidsafe/safe_client_libs/issues/899
-    // switch to connect_without_auth
+    // switch to connect_without_authL: connect_without_auth(safe)?;
     auth_connect(safe)?;
-    // connect_without_auth(safe)?;
     let content = safe.fetch(&xorurl)?;
     match content {
         SafeData::FilesContainer {

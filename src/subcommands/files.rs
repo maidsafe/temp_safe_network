@@ -70,7 +70,7 @@ pub fn files_commander(
             let (files_container_xorurl, processed_files, _files_map) =
                 safe.files_container_create(&location, dest, recursive, dry_run)?;
 
-            // Now let's just print out the content of the FilesMap
+            // Now let's just print out a list of the files uploaded/processed
             if OutputFmt::Pretty == output_fmt {
                 println!("FilesContainer created at: \"{}\"", files_container_xorurl);
                 let mut table = Table::new();
@@ -105,7 +105,7 @@ pub fn files_commander(
             let (version, processed_files, _files_map) =
                 safe.files_container_sync(&location, &target, recursive, delete, dry_run)?;
 
-            // Now let's just print out the content of the FilesMap
+            // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
                 let mut table = Table::new();
                 let format = FormatBuilder::new()

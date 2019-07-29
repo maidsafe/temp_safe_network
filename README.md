@@ -527,25 +527,31 @@ $ safe cat safe://mywebsite/contact/form.html
 </html>
 ```
 
-#### Sub Names
+##### Sub Names
 
-Much like ye olde internet, the NRS system provides increased flexibility for those wanting to have a variety of resources available under one public name. Via using `Sub Names`. This is doin via creating a Public name and using a `.` character to separate it into various, indivudually controllable parts. 
+Much like the old internet, the NRS system provides increased flexibility for those wanting to have a variety of resources available under one public name, via using `Sub Names`. This is done by creating a Public name and using a `.` (dot) character to separate it into various, individually controllable parts.
 
-For example, you may wish to have `safe://mywebsite` be about you in general, whereas `safe://blog.mywebsite` point to a different site which is your blog.
+For example, you may wish to have `safe://mywebsite` to be about you in general, whereas `safe://blog.mywebsite` point to a different site which is your blog.
 
-To create a public name with subnames, you need only pass the full string with `.` separators, (just like any traditional URL), to the CLI:
-
+To create a public name with subnames, you need to only pass the full string with `.` separators, just like any traditional URL, to the CLI:
 ```shell
 $ safe nrs create blog.mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
 New NRS Map for "safe://blog.mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  blog.mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
 ```
 
-As the NRS CLI advances, you'll be able to individually add to both `blog.mywebsite`, or indeed just `mywebsite`, as well as change what the `default` resource to retrieve is for both. 
+As the NRS CLI advances, you'll be able to individually add to both `blog.mywebsite`, or indeed just `mywebsite`, as well as change what the `default` resource to retrieve is for both.
 
 #### Add
 
-TODO
+Once a public name has been created with `nrs create` command, more sub names can be added to it using the `nrs add` command. This command expects the same arguments as `nrs create` command but it only requires and assumes that the public name already exists.
+
+Let's add `profile` sub name to the `mywebsite` NRS name we created before:
+```shell
+$ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc
+NRS Map updated (version 2): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
++  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
+```
 
 ## Further Help
 
