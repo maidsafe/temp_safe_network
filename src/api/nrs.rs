@@ -385,6 +385,8 @@ impl Safe {
                 }
             }
 
+			let mut sub_nrs_map = &NrsMap::default();
+
             // let's loop through subnames from lowest up, building our subname tree...
             for (i, the_sub_name) in the_rest_sub_names.iter().enumerate() {
                 debug!("Subname {} is {}", i + 1, &the_sub_name);
