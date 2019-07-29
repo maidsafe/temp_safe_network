@@ -238,9 +238,6 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
     .read()
     .unwrap();
 
-    let test_name = get_random_nrs_string();
-    let test_name_w_sub = format!("safe://a.b.{}", &test_name);
-
     let (container_xorurl, _map): (String, BTreeMap<String, (String, String)>) =
         match serde_json::from_str(&files_container) {
             Ok(s) => s,
@@ -249,6 +246,9 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
                 err
             )),
         };
+
+    let test_name = get_random_nrs_string();
+    let test_name_w_sub = format!("safe://a.b.{}", &test_name);
 
     let cat_of_filesmap = cmd!(get_bin_location(), "cat", &container_xorurl)
         .read()
@@ -307,4 +307,89 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
     .unwrap();
 
     assert_eq!(via_default_from_root, "exists");
+}
+
+#[test]
+fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
+    let files_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (_container_xorurl, file_map): (String, BTreeMap<String, (String, String)>) =
+        match serde_json::from_str(&files_container) {
+            Ok(s) => s,
+            Err(err) => panic!(format!(
+                "Failed to parse output of `safe nrs create`: {}",
+                err
+            )),
+        };
+
+    let test_name = get_random_nrs_string();
+    let test_name_w_sub = format!("safe://a.b.{}", &test_name);
+    let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
+
+    let (_a_sign, another_md_xor) = &file_map["./tests/testfolder/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["./tests/testfolder/test.md"];
+
+    let cat_of_another_raw = cmd!(get_bin_location(), "cat", &another_md_xor)
+        .read()
+        .unwrap();
+
+    assert_eq!(cat_of_another_raw, "exists");
+
+    let _file_one_nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &test_name_w_sub,
+        "-l",
+        &another_md_xor,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let cat_of_sub_one = cmd!(get_bin_location(), "cat", &test_name_w_sub)
+        .read()
+        .unwrap();
+
+    assert_eq!(cat_of_sub_one, "exists");
+
+    let first_default = cmd!(get_bin_location(), "cat", format!("safe://{}", test_name))
+        .read()
+        .unwrap();
+
+    assert_eq!(first_default, "exists");
+
+    let _new_nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "add",
+        &test_name_w_new_sub,
+        "-l",
+        &test_md_xor,
+        "--json",
+        "--default"
+    )
+    .read()
+    .unwrap();
+
+    let new_nrs_creation_cat = cmd!(get_bin_location(), "cat", &test_name_w_new_sub)
+        .read()
+        .unwrap();
+
+    assert_eq!(new_nrs_creation_cat, "hello tests!");
+
+    let new_default = cmd!(get_bin_location(), "cat", format!("safe://{}", test_name))
+        .read()
+        .unwrap();
+
+    assert_eq!(new_default, "hello tests!");
 }
