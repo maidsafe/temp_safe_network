@@ -11,6 +11,8 @@ use std::env;
 pub const CLI: &str = "safe";
 #[allow(dead_code)]
 pub const SAFE_PROTOCOL: &str = "safe://";
+use std::collections::BTreeMap;
+const TEST_FOLDER: &str = "./tests/testfolder/";
 
 #[allow(dead_code)]
 pub fn get_bin_location() -> String {
@@ -70,4 +72,29 @@ pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
     let wallet_xor = lines.next().unwrap();
 
     (wallet_xor.to_string(), pk, sk)
+}
+
+#[allow(dead_code)]
+pub fn upload_test_folder() -> (String, BTreeMap<String, (String, String)>) {
+    let files_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (container_xorurl, file_map): (String, BTreeMap<String, (String, String)>) =
+        match serde_json::from_str(&files_container) {
+            Ok(s) => s,
+            Err(err) => panic!(format!(
+                "Failed to parse output of `safe nrs create`: {}",
+                err
+            )),
+        };
+
+    (container_xorurl, file_map)
 }

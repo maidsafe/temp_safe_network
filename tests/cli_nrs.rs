@@ -12,7 +12,7 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{get_bin_location, CLI, SAFE_PROTOCOL};
+use common::{get_bin_location, upload_test_folder, CLI, SAFE_PROTOCOL};
 use predicates::prelude::*;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -20,8 +20,6 @@ use std::collections::BTreeMap;
 use std::process::Command;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
-
-const TEST_FOLDER: &str = "./tests/testfolder/";
 
 fn get_random_nrs_string() -> String {
     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
@@ -71,31 +69,14 @@ fn calling_safe_nrs_twice_w_name_fails() {
 
 #[test]
 fn calling_safe_nrs_put_folder_and_fetch() {
-    let files_container = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .unwrap();
-
     let test_name = format!("safe://{}", get_random_nrs_string());
 
-    let (container_xorurl, _map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&files_container) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (container_xorurl, _map) = upload_test_folder();
 
     let cat_of_filesmap = cmd!(get_bin_location(), "cat", &container_xorurl)
         .read()
         .unwrap();
+
     assert!(cat_of_filesmap.contains("safe://"));
 
     let nrs_creation = cmd!(
@@ -143,28 +124,10 @@ fn calling_safe_nrs_put_folder_and_fetch() {
 
 #[test]
 fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
-    let files_container = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .unwrap();
+    let (container_xorurl, _map) = upload_test_folder();
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://subname.{}", &test_name);
-
-    let (container_xorurl, _map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&files_container) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
 
     let cat_of_filesmap = cmd!(get_bin_location(), "cat", &container_xorurl)
         .read()
@@ -227,25 +190,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
 
 #[test]
 fn calling_safe_nrs_put_and_retrieve_many_subnames() {
-    let files_container = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .unwrap();
-
-    let (container_xorurl, _map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&files_container) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (container_xorurl, _map) = upload_test_folder();
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -311,25 +256,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
 
 #[test]
 fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
-    let files_container = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .unwrap();
-
-    let (_container_xorurl, file_map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&files_container) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (_container_xorurl, file_map) = upload_test_folder();
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
