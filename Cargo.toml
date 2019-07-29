@@ -15,7 +15,7 @@ path = "src/main.rs"
 log = "0.4.6"
 safe_app = "0.9.1"
 safe_core = "0.32.1"
-routing = { package = "mock_routing", git = "https://github.com/maidsafe/safe_client_libs", branch = "experimental" }
+routing = { package = "mock_routing", git = "https://github.com/maidsafe/safe_client_libs", branch = "stable" }
 safe-nd = { git = "https://github.com/maidsafe/safe-nd", branch = "stable" }
 structopt = "0.2.15"
 env_logger = "0.6.0"
