@@ -92,14 +92,18 @@ pub fn nrs_commander(
 
             Ok(())
         }
-        Some(NrsSubCommands::Add { name, link, default }) => {
+        Some(NrsSubCommands::Add {
+            name,
+            link,
+            default,
+        }) => {
             let target = get_from_arg_or_stdin(link, Some("...awaiting target link from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
                 safe.nrs_map_container_add(&name, Some(&target), default, dry_run)?;
-			// 	// Now let's just print out the content of the NrsMap
+            // 	// Now let's just print out the content of the NrsMap
 
-			if OutputFmt::Pretty == output_fmt {
+            if OutputFmt::Pretty == output_fmt {
                 println!(
                     "NrsMap, \"{}\" updated at: \"{}\"",
                     &name, &nrs_map_container_xorurl
@@ -123,8 +127,8 @@ pub fn nrs_commander(
                 );
             }
 
-			Ok(())
-		},
+            Ok(())
+        }
         Some(NrsSubCommands::Remove { .. }) => Ok(()),
 
         None => Err("Missing keys sub-command. Use --help for details.".to_string()),

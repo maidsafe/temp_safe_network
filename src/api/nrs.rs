@@ -16,7 +16,7 @@ use super::fetch::SafeData;
 use super::helpers::gen_timestamp_secs;
 use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
-use log::{debug, warn, info};
+use log::{debug, info, warn};
 use safe_nd::XorName;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -174,57 +174,64 @@ pub fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
 
 #[allow(dead_code)]
 impl Safe {
+    pub fn nrs_map_container_add(
+        &mut self,
+        name: &str,
+        destination: Option<&str>,
+        default: bool,
+        dry_run: bool,
+    ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
+        info!("Adding to NRS map...");
+        // GET current NRS map from &name TLD
+        // NOT via normal fetch
+        let content = self.fetch_nrs_map(name)?;
 
+        let the_response = match content {
+            SafeData::NrsMapContainer {
+                version,
+                nrs_map,
+                type_tag,
+                xorname,
+                data_type,
+            } => {
+                warn!("NRS, Existing data: {:?}", nrs_map);
 
-	pub fn nrs_map_container_add(
-	&mut self,
-	name: &str,
-	destination: Option<&str>,
-	default: bool,
-	dry_run: bool,) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
+                let (
+                    nrs_map_container_xorname,
+                    resolvable_container_data,
+                    processed_entries,
+                    resulting_nrs_map,
+                ) = self.nrs_map_update_or_create_data(
+                    name,
+                    destination,
+                    Some(nrs_map),
+                    default,
+                    dry_run,
+                )?;
 
-		info!("Adding to NRS map...");
-		// GET current NRS map from &name TLD
-			// NOT via normal fetch
-		let content = self.fetch_nrs_map(name)?;
+                info!("The new dataaaaa..... {:?}", resulting_nrs_map);
+                let xorurl = XorUrlEncoder::encode(
+                    nrs_map_container_xorname,
+                    NRS_MAP_TYPE_TAG,
+                    SafeDataType::PublishedSeqAppendOnlyData,
+                    SafeContentType::NrsMapContainer,
+                    None,
+                    None,
+                    &self.xorurl_base,
+                )?;
 
-		let the_response = match content {
-			SafeData::NrsMapContainer {
-				version,
-				nrs_map,
-				type_tag,
-				xorname,
-				data_type,
-			} => {
-				warn!("NRS, Existing data: {:?}", nrs_map);
+                Ok((xorurl, processed_entries, resulting_nrs_map))
+            }
+            other => {
+                return Err(Error::ContentError(format!(
+                    "Content type '{:?}' found when expecting an NRS Map.",
+                    other
+                )))
+            }
+        };
 
-				let (nrs_map_container_xorname, resolvable_container_data, processed_entries, resulting_nrs_map) =
-					self.nrs_map_update_or_create_data(name, destination, Some(nrs_map), default, dry_run)?;
-
-				info!("The new dataaaaa..... {:?}", resulting_nrs_map );
-				let xorurl = XorUrlEncoder::encode(
-					nrs_map_container_xorname,
-					NRS_MAP_TYPE_TAG,
-					SafeDataType::PublishedSeqAppendOnlyData,
-					SafeContentType::NrsMapContainer,
-					None,
-					None,
-					&self.xorurl_base,
-				)?;
-
-				Ok((xorurl, processed_entries, resulting_nrs_map))
-
-			},
-			other => return Err( Error::ContentError(format!(
-	            "Content type '{:?}' found when expecting an NRS Map.",
-	            other
-	        ))),
-		};
-
-		the_response
-
-	}
-
+        the_response
+    }
 
     /// # Create a NrsMapContainer.
     ///
@@ -245,34 +252,34 @@ impl Safe {
         &mut self,
         name: &str,
         destination: Option<&str>,
-		existing_map : Option<NrsMap>,
+        existing_map: Option<NrsMap>,
         default: bool,
         _dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
-			debug!("Creating an NRS map");
-		    let ( nrs_xorname, resolvable_container_data, processed_entries, nrs_map ) = self.nrs_map_update_or_create_data(&name, destination, None, default, _dry_run)?;
+        debug!("Creating an NRS map");
+        let (nrs_xorname, resolvable_container_data, processed_entries, nrs_map) =
+            self.nrs_map_update_or_create_data(&name, destination, None, default, _dry_run)?;
 
-			// Store the NrsMapContainer in a Published AppendOnlyData
-			let xorname = self.safe_app.put_seq_append_only_data(
-				resolvable_container_data,
-				Some(nrs_xorname),
-				NRS_MAP_TYPE_TAG,
-				None,
-			)?;
+        // Store the NrsMapContainer in a Published AppendOnlyData
+        let xorname = self.safe_app.put_seq_append_only_data(
+            resolvable_container_data,
+            Some(nrs_xorname),
+            NRS_MAP_TYPE_TAG,
+            None,
+        )?;
 
-			let xorurl = XorUrlEncoder::encode(
-				xorname,
-				NRS_MAP_TYPE_TAG,
-				SafeDataType::PublishedSeqAppendOnlyData,
-				SafeContentType::NrsMapContainer,
-				None,
-				None,
-				&self.xorurl_base,
-			)?;
+        let xorurl = XorUrlEncoder::encode(
+            xorname,
+            NRS_MAP_TYPE_TAG,
+            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeContentType::NrsMapContainer,
+            None,
+            None,
+            &self.xorurl_base,
+        )?;
 
-		Ok( (xorurl, processed_entries, nrs_map ))
-
-	}
+        Ok((xorurl, processed_entries, nrs_map))
+    }
 
     // # Create or Update an NrsMap for a given TLD.
     //
@@ -293,24 +300,29 @@ impl Safe {
         &mut self,
         name: &str,
         destination: Option<&str>,
-		existing_map : Option<NrsMap>,
+        existing_map: Option<NrsMap>,
         default: bool,
         _dry_run: bool,
-    ) -> ResultReturn<(XorName, Vec<(Vec<u8>, Vec<u8>)>, BTreeMap<String, (String, String)>, NrsMap)> {
-		info!("Creating or updating an NRS map");
+    ) -> ResultReturn<(
+        XorName,
+        Vec<(Vec<u8>, Vec<u8>)>,
+        BTreeMap<String, (String, String)>,
+        NrsMap,
+    )> {
+        info!("Creating or updating an NRS map");
 
         // santize to a simple string
         let sanitized_name = str::replace(&name, "safe://", "").to_string();
-		let mut nrs_map = existing_map.unwrap_or_else(|| NrsMap::default() );
+        let mut nrs_map = existing_map.unwrap_or_else(|| NrsMap::default());
 
         let name_vec: Vec<String> = sanitized_name.split('.').map(String::from).collect();
         // get the TLD
         let top_level_name = &name_vec[name_vec.len() - 1];
-		//subnames
+        //subnames
         let the_rest_sub_names = &name_vec[0..name_vec.len() - 1];
-		// reverse list for resolving existing subname trees
+        // reverse list for resolving existing subname trees
         let mut the_reverse_sub_names = the_rest_sub_names.to_vec();
-		the_reverse_sub_names.reverse();
+        the_reverse_sub_names.reverse();
 
         // by default top subname is...
         let top_subname = if !the_rest_sub_names.is_empty() {
@@ -332,75 +344,80 @@ impl Safe {
 
         debug!("Sub name target data: {:?}", public_name_rdf);
 
-
         if !the_rest_sub_names.is_empty() {
             debug!("Subnames will be added...");
             let mut prev_subname: &str = "";
 
-			// let mut existing_subname_target = 0;
-			let mut testing_map = PublicNameEntry::SubName(nrs_map.clone());
+            // let mut existing_subname_target = 0;
+            let mut testing_map = PublicNameEntry::SubName(nrs_map.clone());
 
-			// let's build a map of exiting subnames related to our target...
-			let mut existing_tree : BTreeMap<usize, NrsMap> = BTreeMap::new();
+            // let's build a map of exiting subnames related to our target...
+            let mut existing_tree: BTreeMap<usize, NrsMap> = BTreeMap::new();
 
+            for (i, existing_sub_name) in the_reverse_sub_names.iter().enumerate() {
+                debug!("Checking if subname already exists.");
+                let test2_map = testing_map.clone();
+                let actual_map = match test2_map {
+                    PublicNameEntry::SubName(sub_map) => sub_map,
+                    _ => NrsMap::default(),
+                };
 
-			for (i, existing_sub_name) in the_reverse_sub_names.iter().enumerate() {
-				debug!("Checking if subname already exists.");
-				let test2_map = testing_map.clone();
-				let actual_map = match test2_map {
-					 PublicNameEntry::SubName(sub_map) => sub_map,
-					 _ => NrsMap::default()
-				};
+                if actual_map
+                    .entries
+                    .contains_key(&existing_sub_name.to_string())
+                {
+                    warn!("{} already exists", existing_sub_name);
+                    let mut target_map = actual_map
+                        .entries
+                        .get(&existing_sub_name.to_string())
+                        .ok_or_else(|| {
+                            Error::ContentNotFound("Could not find subname in question".to_string())
+                        })?;
 
-				if actual_map.entries.contains_key( &existing_sub_name.to_string() ) {
-					warn!("{} already exists", existing_sub_name);
-					let mut target_map = actual_map.entries.get(  &existing_sub_name.to_string() )
-							.ok_or_else(|| Error::ContentNotFound("Could not find subname in question".to_string()))?;
+                    let another_default = NrsMap::default();
+                    // TODO: Impl get underlying map func.
+                    let target2_map = target_map.clone();
+                    let actual_target_map = match target2_map {
+                        PublicNameEntry::SubName(mut sub_map) => sub_map,
+                        _ => another_default,
+                    };
 
-					let another_default = NrsMap::default();
-					// TODO: Impl get underlying map func.
-					let target2_map = target_map.clone();
-					let actual_target_map = match target2_map {
-						 PublicNameEntry::SubName(mut sub_map) => sub_map,
-						 _ => another_default
-					};
+                    let actual_target2 = actual_target_map.clone();
 
-					let actual_target2 = actual_target_map.clone();
+                    let the_index_normally = the_reverse_sub_names.len() - (i + 1);
+                    warn!(
+                        "Adding the existing subname {:?}, to the tree... with entry number {}",
+                        existing_sub_name, the_index_normally
+                    );
+                    existing_tree.insert(the_index_normally, actual_target_map);
 
-					let the_index_normally = the_reverse_sub_names.len() - ( i + 1 );
-					warn!("Adding the existing subname {:?}, to the tree... with entry number {}", existing_sub_name, the_index_normally);
-					existing_tree.insert( the_index_normally, actual_target_map);
+                    info!("And now existing tree looks like: {:?}", existing_tree);
+                    let the_public_entry = PublicNameEntry::SubName(actual_target2);
+                    testing_map = the_public_entry;
+                } else {
+                    info!("Subname, {:?} does not exist", existing_sub_name);
+                }
+            }
 
-					info!("And now existing tree looks like: {:?}", existing_tree);
-					let the_public_entry = PublicNameEntry::SubName(actual_target2);
-					testing_map = the_public_entry;
-				}
-				else
-				{
-					info!("Subname, {:?} does not exist", existing_sub_name);
-				}
-			}
+            let mut sub_nrs_map = &NrsMap::default();
 
-			let mut sub_nrs_map = &NrsMap::default();
-
-			// let's loop through subnames from lowest up, building our subname tree...
+            // let's loop through subnames from lowest up, building our subname tree...
             for (i, the_sub_name) in the_rest_sub_names.iter().enumerate() {
-                debug!("Subname {} is {}", i +1, &the_sub_name);
+                debug!("Subname {} is {}", i + 1, &the_sub_name);
 
-				let mut map_default = NrsMap::default();
-				// use the existing map at this level...
+                let mut map_default = NrsMap::default();
+                // use the existing map at this level...
 
-				let mut existing_map = existing_tree.get(&i);
-				info!("Okay so checking that the tree has entry {}", &i);
-                sub_nrs_map = match existing_map
-				{
-					Some( map) => {
-						debug!("It does...");
-						map
-					},
-					None => &map_default
-				};
-				// .unwrap_or_else( || &mut default );
+                let mut existing_map = existing_tree.get(&i);
+                info!("Okay so checking that the tree has entry {}", &i);
+                sub_nrs_map = match existing_map {
+                    Some(map) => {
+                        debug!("It does...");
+                        map
+                    }
+                    None => &map_default,
+                };
+                // .unwrap_or_else( || &mut default );
 
                 if i == 0 {
                     prev_subname = the_sub_name;
@@ -408,24 +425,27 @@ impl Safe {
 
                 // if we have other subnames, we add them all up
                 if i > 0 {
-					let mut our_map = sub_nrs_map.clone();
+                    let mut our_map = sub_nrs_map.clone();
                     our_map
                         .entries
                         .insert(prev_subname.to_string(), public_name_rdf);
 
-					// if we're saving data for the _last_ subname, lets set it default too
-					if default && prev_subname == the_rest_sub_names[0] {
-						debug!("Setting {:?} as default for NrsMap sub name {:?}", &prev_subname, &the_sub_name);
+                    // if we're saving data for the _last_ subname, lets set it default too
+                    if default && prev_subname == the_rest_sub_names[0] {
+                        debug!(
+                            "Setting {:?} as default for NrsMap sub name {:?}",
+                            &prev_subname, &the_sub_name
+                        );
 
-						our_map.default = prev_subname.to_string();
-					}
+                        our_map.default = prev_subname.to_string();
+                    }
 
                     public_name_rdf = PublicNameEntry::SubName(our_map);
                 }
             }
         }
 
-		// if you have only default, and add a new default...
+        // if you have only default, and add a new default...
         nrs_map
             .entries
             .insert(top_subname.to_string(), public_name_rdf);
@@ -438,14 +458,14 @@ impl Safe {
 
         debug!("Subname inserted with name {:?}", &top_subname);
 
-		// Only set this default if we're not talking about subnames here...
+        // Only set this default if we're not talking about subnames here...
         if default && the_rest_sub_names.is_empty() {
             debug!("Setting {:?} as default for NrsMap", &name);
 
             nrs_map.default = top_subname.to_string();
         }
 
-        let mut processed_entries : BTreeMap<String, (String, String)> = BTreeMap::new();
+        let mut processed_entries: BTreeMap<String, (String, String)> = BTreeMap::new();
         processed_entries.insert(
             name.to_string(),
             (
@@ -466,11 +486,13 @@ impl Safe {
             serialised_nrs_map.as_bytes().to_vec(),
         )];
 
-
-		Ok((nrs_xorname, resolvable_container_data, processed_entries, nrs_map))
-
+        Ok((
+            nrs_xorname,
+            resolvable_container_data,
+            processed_entries,
+            nrs_map,
+        ))
     }
-
 
     /// # Fetch an existing NrsMapContainer.
     ///

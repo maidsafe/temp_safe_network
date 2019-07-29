@@ -8,7 +8,7 @@
 
 use super::files::FilesMap;
 use super::helpers::get_subnames_host_and_path;
-use super::nrs::{xorname_from_nrs_string, NRS_MAP_TYPE_TAG, NrsMap};
+use super::nrs::{xorname_from_nrs_string, NrsMap, NRS_MAP_TYPE_TAG};
 use super::xorurl::SafeContentType;
 pub use super::xorurl::SafeDataType;
 
@@ -47,10 +47,8 @@ pub enum SafeData {
 
 #[allow(dead_code)]
 impl Safe {
-
-	pub fn resolve_and_get_xorurl_details(&self, xorurl: &str) -> ResultReturn<XorUrlEncoder>
-	{
-		debug!("Attempting to decode url: {}", xorurl);
+    pub fn resolve_and_get_xorurl_details(&self, xorurl: &str) -> ResultReturn<XorUrlEncoder> {
+        debug!("Attempting to decode url: {}", xorurl);
 
         XorUrlEncoder::from_url(&xorurl).or_else(|err| {
             info!(
@@ -75,12 +73,11 @@ impl Safe {
             debug!("Checking NRS system for URL: {}", new_url);
             Ok(encoded_xor)
         })
+    }
 
-	}
-
-	pub fn fetch_nrs_map(&self, xorurl: &str ) -> ResultReturn<SafeData> {
-		debug!("Attempting to fetch an NRS map, {}", xorurl);
-		let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
+    pub fn fetch_nrs_map(&self, xorurl: &str) -> ResultReturn<SafeData> {
+        debug!("Attempting to fetch an NRS map, {}", xorurl);
+        let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
 
         let the_xorurl = the_xor.to_string("base32z")?;
         // info!("URL parsed successfully, fetching: {}", the_xorurl);
@@ -90,7 +87,7 @@ impl Safe {
         debug!("Fetching content of type: {:?}", the_xor.content_type());
 
         match the_xor.content_type() {
-			SafeContentType::NrsMapContainer => {
+            SafeContentType::NrsMapContainer => {
                 let (version, nrs_map) = self.nrs_map_container_get_latest(&the_xorurl)?;
                 debug!(
                     "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
@@ -99,17 +96,17 @@ impl Safe {
                     nrs_map
                 );
 
-				Ok(SafeData::NrsMapContainer {
+                Ok(SafeData::NrsMapContainer {
                     xorname: the_xor.xorname(),
                     type_tag: the_xor.type_tag(),
                     version,
                     nrs_map,
                     data_type: the_xor.data_type(),
                 })
-            },
-			_ => Err(Error::ContentError("No NRS map was found".to_string()))
-		}
-	}
+            }
+            _ => Err(Error::ContentError("No NRS map was found".to_string())),
+        }
+    }
 
     /// # Retrieve data from a xorurl
     ///
@@ -141,7 +138,7 @@ impl Safe {
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, xorurl: &str) -> ResultReturn<SafeData> {
-		let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
+        let the_xor = self.resolve_and_get_xorurl_details(xorurl)?;
         let the_xorurl = the_xor.to_string("base32z")?;
         info!("URL parsed successfully, fetching: {}", the_xorurl);
         let path = the_xor.path();
@@ -375,7 +372,6 @@ fn test_fetch_resolvable_container() {
         _ => panic!("Nrs map container was not returned."),
     }
 }
-
 
 #[test]
 fn test_fetch_resolvable_map_data() {
