@@ -20,7 +20,7 @@ use std::io::Write;
 use std::{fs, str};
 use threshold_crypto::{PublicKey, SecretKey};
 
-const FAKE_VAULT_FILE: &str = "./fake_vault_data.txt";
+const FAKE_VAULT_FILE: &str = "./fake_vault_data.json";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CoinBalance {

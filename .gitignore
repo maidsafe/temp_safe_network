@@ -39,4 +39,4 @@ deploy/
 cargo-all.sh
 bindings
 tmp
-mock_data.txt
+fake_vault_data.json
