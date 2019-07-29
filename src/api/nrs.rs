@@ -211,6 +211,7 @@ impl Safe {
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
+
         let (_, resolvable_container_raw_data, processed_entries, resulting_nrs_map) =
             nrs_map_update_or_create_data(name, destination, Some(nrs_map), default, dry_run)?;
 
@@ -359,20 +360,15 @@ fn nrs_map_update_or_create_data(
 ) -> ResultReturn<(XorName, NrsMapRawData, ProcessedEntries, NrsMap)> {
     info!("Creating or updating an NRS map");
 
-    // TODO: This should always add/overwrite existing entries at the moment
-
     // santize to a simple string
-    let sanitised_name = str::replace(name, "safe://", "").to_string();
+    let sanitized_name = str::replace(&name, "safe://", "").to_string();
     let mut nrs_map = existing_map.unwrap_or_else(NrsMap::default);
 
-    let name_vec: Vec<String> = sanitised_name.split('.').map(String::from).collect();
+    let name_vec: Vec<String> = sanitized_name.split('.').map(String::from).collect();
     // get the TLD
     let top_level_name = &name_vec[name_vec.len() - 1];
-    // subnames
+    //subnames
     let the_rest_sub_names = &name_vec[0..name_vec.len() - 1];
-    // reverse list for resolving existing subname trees
-    let mut the_reverse_sub_names = the_rest_sub_names.to_vec();
-    the_reverse_sub_names.reverse();
 
     // by default top subname is...
     let top_subname = if !the_rest_sub_names.is_empty() {
@@ -388,109 +384,21 @@ fn nrs_map_update_or_create_data(
         &top_level_name, &nrs_xorname
     );
 
+    // Setup target RDF description
     let final_destination = destination.unwrap_or_else(|| "");
-
     let mut public_name_rdf = create_public_name_description(final_destination)?;
 
-    // TODO : Check if current subname exists...
-    // check if its a description...
-    // if so move that to default of next?
-    // what if new one should be default?? .......
+    debug!("Subname target data: {:?}", public_name_rdf);
 
-    // throw error if existing?
+    let (updated_nrs_map, updated_public_name_rdf) = setup_nrs_tree(
+        nrs_map,
+        public_name_rdf,
+        the_rest_sub_names.to_vec(),
+        default,
+    )?;
 
-    debug!("Sub name target data: {:?}", public_name_rdf);
-
-    // a.b.c
-
-    // IN C
-
-    // UPDATING a.b.c
-
-    // subname A...
-    if !the_rest_sub_names.is_empty() {
-        debug!("Subnames will be added...");
-        let mut prev_subname: &str = "";
-
-        // let mut existing_subname_target = 0;
-        let mut testing_map = PublicNameEntry::SubName(nrs_map.clone());
-
-        // let's build a map of exiting subnames related to our target...
-        let mut existing_tree: BTreeMap<usize, NrsMap> = BTreeMap::new();
-        for (i, existing_sub_name) in the_reverse_sub_names.iter().enumerate() {
-            debug!("Checking if subname already exists.");
-            let test2_map = testing_map.clone();
-            let actual_map = match test2_map {
-                PublicNameEntry::SubName(sub_map) => sub_map,
-                _ => NrsMap::default(),
-            };
-
-            if actual_map
-                .entries
-                .contains_key(&existing_sub_name.to_string())
-            {
-                debug!("{} already exists", existing_sub_name);
-                let target_map = actual_map
-                    .entries
-                    .get(&existing_sub_name.to_string())
-                    .ok_or_else(|| {
-                        Error::ContentNotFound("Could not find subname in question".to_string())
-                    })?;
-
-                let another_default = NrsMap::default();
-                // TODO: Impl get underlying map func.
-                let target2_map = target_map.clone();
-                let actual_target_map = match target2_map {
-                    PublicNameEntry::SubName(sub_map) => sub_map,
-                    _ => another_default,
-                };
-                let actual_target2 = actual_target_map.clone();
-                existing_tree.insert(the_reverse_sub_names.len() - i, actual_target_map);
-                let the_public_entry = PublicNameEntry::SubName(actual_target2);
-                testing_map = the_public_entry;
-            }
-        }
-
-        // let's loop through subnames from lowest up, building our subname tree...
-        for (i, the_sub_name) in the_rest_sub_names.iter().enumerate() {
-            debug!("Subname {} is {}", i + 1, &the_sub_name);
-
-            // let mut existing_subname_target = public_name_rdf;
-
-            // WE ONLY NEED TO KNOW IF IT EXISTS ALREADY!?!!!
-            // OR AT WHAT LEVEL IT EXISTS ALREADY
-            // let existing_sub_name_map = existing_tree[i];
-
-            let default = NrsMap::default();
-            // use the existing map at this level...
-
-            let sub_nrs_map = match existing_tree.get(&i) {
-                Some(map) => map,
-                None => &default,
-            };
-            // .unwrap_or_else( || &mut default );
-
-            if i == 0 {
-                prev_subname = the_sub_name;
-            }
-
-            // if we have other subnames, we add them all up
-            if i > 0 {
-                let mut our_map = sub_nrs_map.clone();
-                our_map
-                    .entries
-                    .insert(prev_subname.to_string(), public_name_rdf);
-                our_map.default = prev_subname.to_string();
-
-                public_name_rdf = PublicNameEntry::SubName(our_map);
-            }
-        }
-    }
-
-    // if we're not touching default
-    // if top_subname != FAKE_RDF_PREDICATE_LINK && nrs_map.entries.contains_key(&top_subname) {
-    // 	return Err(Error::ContentError(format!("The subname \"{}\" already exists", &top_subname) ))
-    // }
+    nrs_map = updated_nrs_map;
+    public_name_rdf = updated_public_name_rdf;
 
     // if you have only default, and add a new default...
     nrs_map
@@ -505,6 +413,8 @@ fn nrs_map_update_or_create_data(
 
     debug!("Subname inserted with name {:?}", &top_subname);
 
+    // Only set this default if we're not talking about subnames here...
+    // if default && the_rest_sub_names.is_empty() {
     if default {
         debug!("Setting {:?} as default for NrsMap", &name);
 
@@ -527,17 +437,131 @@ fn nrs_map_update_or_create_data(
         ))
     })?;
     let now = gen_timestamp_secs();
-    let resolvable_container_raw_data = vec![(
+    let resolvable_container_data = vec![(
         now.into_bytes().to_vec(),
         serialised_nrs_map.as_bytes().to_vec(),
     )];
 
     Ok((
         nrs_xorname,
-        resolvable_container_raw_data,
+        resolvable_container_data,
         processed_entries,
         nrs_map,
     ))
+}
+
+fn setup_nrs_tree(
+    nrs_map: NrsMap,
+    mut public_name_rdf: PublicNameEntry,
+    sub_names: Vec<String>,
+    default: bool,
+) -> ResultReturn<(NrsMap, PublicNameEntry)> {
+    if !sub_names.is_empty() {
+        debug!("Subnames will be added...");
+
+        // reverse list for resolving existing subname trees
+        let mut the_reverse_sub_names = sub_names.to_vec();
+        the_reverse_sub_names.reverse();
+
+        let mut prev_subname: &str = "";
+
+        // let mut existing_subname_target = 0;
+        let mut testing_map = PublicNameEntry::SubName(nrs_map.clone());
+
+        // let's build a map of exiting subnames related to our target...
+        let mut existing_tree: BTreeMap<usize, NrsMap> = BTreeMap::new();
+
+        for (i, existing_sub_name) in the_reverse_sub_names.iter().enumerate() {
+            debug!("Checking if subname already exists.");
+            let test2_map = testing_map.clone();
+            let actual_map = match test2_map {
+                PublicNameEntry::SubName(sub_map) => sub_map,
+                _ => NrsMap::default(),
+            };
+
+            if actual_map
+                .entries
+                .contains_key(&existing_sub_name.to_string())
+            {
+                warn!("{} already exists", existing_sub_name);
+                let target_map = actual_map
+                    .entries
+                    .get(&existing_sub_name.to_string())
+                    .ok_or_else(|| {
+                        Error::ContentNotFound("Could not find subname in question".to_string())
+                    })?;
+
+                let another_default = NrsMap::default();
+                // TODO: Impl get underlying map func.
+                let target2_map = target_map.clone();
+                let actual_target_map = match target2_map {
+                    PublicNameEntry::SubName(sub_map) => sub_map,
+                    _ => another_default,
+                };
+
+                let actual_target2 = actual_target_map.clone();
+
+                let the_index_normally = the_reverse_sub_names.len() - (i + 1);
+                warn!(
+                    "Adding the existing subname {:?}, to the tree... with entry number {}",
+                    existing_sub_name, the_index_normally
+                );
+                existing_tree.insert(the_index_normally, actual_target_map);
+
+                info!("And now existing tree looks like: {:?}", existing_tree);
+                let the_public_entry = PublicNameEntry::SubName(actual_target2);
+                testing_map = the_public_entry;
+            } else {
+                info!("Subname, {:?} does not exist", existing_sub_name);
+            }
+        }
+
+        let mut sub_nrs_map: &NrsMap;
+
+        // let's loop through subnames from lowest up, building our subname tree...
+        for (i, the_sub_name) in sub_names.iter().enumerate() {
+            debug!("Subname {} is {}", i + 1, &the_sub_name);
+
+            let map_default = NrsMap::default();
+            // use the existing map at this level...
+
+            let existing_map = existing_tree.get(&i);
+            info!("Okay so checking that the tree has entry {}", &i);
+            sub_nrs_map = match existing_map {
+                Some(map) => {
+                    debug!("It does...");
+                    map
+                }
+                None => &map_default,
+            };
+
+            if i == 0 {
+                prev_subname = the_sub_name;
+            }
+
+            // if we have other subnames, we add them all up
+            if i > 0 {
+                let mut our_map = sub_nrs_map.clone();
+                our_map
+                    .entries
+                    .insert(prev_subname.to_string(), public_name_rdf);
+
+                // if we're saving data for the _last_ subname, lets set it default too
+                if default && prev_subname == sub_names[0] {
+                    debug!(
+                        "Setting {:?} as default for NrsMap sub name {:?}",
+                        &prev_subname, &the_sub_name
+                    );
+
+                    our_map.default = prev_subname.to_string();
+                }
+
+                public_name_rdf = PublicNameEntry::SubName(our_map);
+            }
+        }
+    }
+
+    Ok((nrs_map, public_name_rdf))
 }
 
 // Unit Tests
