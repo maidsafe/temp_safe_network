@@ -251,8 +251,7 @@ impl ClientHandler {
             // ===== Mutable Data =====
             //
             PutMData(chunk) => self.handle_put_mdata(client, chunk, message_id),
-            MutateSeqMDataEntries { .. }
-            | MutateUnseqMDataEntries { .. }
+            MutateMDataEntries { .. }
             | DeleteMData(..)
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => {
@@ -792,8 +791,7 @@ impl ClientHandler {
             | DelMDataUserPermissions { .. }
             | ListMDataPermissions(_)
             | ListMDataUserPermissions { .. }
-            | MutateSeqMDataEntries { .. }
-            | MutateUnseqMDataEntries { .. }
+            | MutateMDataEntries { .. }
             | PutAData(_)
             | GetAData(_)
             | GetADataShell { .. }

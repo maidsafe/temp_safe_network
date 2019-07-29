@@ -152,12 +152,9 @@ impl DataHandler {
             } => self.mdata_handler.handle_del_mdata_user_permissions_req(
                 requester, address, user, version, message_id,
             ),
-            MutateSeqMDataEntries { address, actions } => self
+            MutateMDataEntries { address, actions } => self
                 .mdata_handler
-                .handle_mutate_seq_mdata_entries_req(requester, address, actions, message_id),
-            MutateUnseqMDataEntries { address, actions } => self
-                .mdata_handler
-                .handle_mutate_unseq_mdata_entries_req(requester, address, actions, message_id),
+                .handle_mutate_mdata_entries_req(requester, address, actions, message_id),
             //
             // ===== Append Only Data =====
             //

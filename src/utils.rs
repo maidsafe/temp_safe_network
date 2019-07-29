@@ -108,8 +108,7 @@ pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
         | DelMDataUserPermissions { ref address, .. }
         | ListMDataPermissions(ref address)
         | ListMDataUserPermissions { ref address, .. }
-        | MutateSeqMDataEntries { ref address, .. }
-        | MutateUnseqMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
+        | MutateMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
         PutAData(ref data) => Some(Cow::Borrowed(data.name())),
         GetAData(ref address)
         | GetADataValue { ref address, .. }
@@ -154,8 +153,7 @@ pub fn to_error_response(request: &Request, error: NdError) -> Response {
         | Request::DeleteMData(_)
         | Request::SetMDataUserPermissions { .. }
         | Request::DelMDataUserPermissions { .. }
-        | Request::MutateSeqMDataEntries { .. }
-        | Request::MutateUnseqMDataEntries { .. }
+        | Request::MutateMDataEntries { .. }
         | Request::PutAData(_)
         | Request::DeleteAData(_)
         | Request::AddPubADataPermissions { .. }
@@ -247,8 +245,7 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | DeleteMData(_)
         | SetMDataUserPermissions { .. }
         | DelMDataUserPermissions { .. }
-        | MutateSeqMDataEntries { .. }
-        | MutateUnseqMDataEntries { .. }
+        | MutateMDataEntries { .. }
         | PutAData(_)
         | DeleteAData(_)
         | AddPubADataPermissions { .. }

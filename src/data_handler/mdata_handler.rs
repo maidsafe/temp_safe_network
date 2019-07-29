@@ -17,9 +17,8 @@ use crate::{
 use log::error;
 
 use safe_nd::{
-    Error as NdError, MData, MDataAction, MDataAddress, MDataPermissionSet, MDataSeqEntryActions,
-    MDataUnseqEntryActions, MessageId, NodePublicId, PublicId, PublicKey, Response,
-    Result as NdResult,
+    Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions, MDataPermissionSet,
+    MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
 };
 
 use std::{
@@ -213,49 +212,17 @@ impl MDataHandler {
     }
 
     /// Mutate Sequenced MData.
-    pub(super) fn handle_mutate_seq_mdata_entries_req(
+    pub(super) fn handle_mutate_mdata_entries_req(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
-        actions: MDataSeqEntryActions,
+        actions: MDataEntryActions,
         message_id: MessageId,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
-            match data {
-                MData::Seq(ref mut mdata) => mdata.mutate_entries(actions, requester_pk)?,
-                MData::Unseq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    return Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ));
-                }
-            }
-            Ok(data)
-        })
-    }
-
-    /// Mutate Unsequenced MData.
-    pub(super) fn handle_mutate_unseq_mdata_entries_req(
-        &mut self,
-        requester: PublicId,
-        address: MDataAddress,
-        actions: MDataUnseqEntryActions,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let requester_pk = *utils::own_key(&requester)?;
-
-        self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
-            match data {
-                MData::Unseq(ref mut mdata) => mdata.mutate_entries(actions, requester_pk)?,
-                MData::Seq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    return Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ));
-                }
-            }
+            data.mutate_entries(actions, requester_pk)?;
             Ok(data)
         })
     }

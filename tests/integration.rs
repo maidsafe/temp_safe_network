@@ -2451,7 +2451,10 @@ fn mutate_seq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateSeqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2475,7 +2478,10 @@ fn mutate_seq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateSeqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2509,9 +2515,9 @@ fn mutate_seq_mutable_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::MutateSeqMDataEntries {
+        Request::MutateMDataEntries {
             address: MDataAddress::Seq { name, tag },
-            actions,
+            actions: actions.into(),
         },
         NdError::InvalidEntryActions(expected_invalid_actions),
     );
@@ -2553,7 +2559,10 @@ fn mutate_unseq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2574,7 +2583,10 @@ fn mutate_unseq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2626,7 +2638,10 @@ fn mutable_data_permissions() {
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
         NdError::AccessDenied,
     );
 
@@ -2647,7 +2662,10 @@ fn mutable_data_permissions() {
     common::perform_mutation(
         &mut env,
         &mut client_b,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Delete client B permissions.
@@ -2666,7 +2684,10 @@ fn mutable_data_permissions() {
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
         NdError::AccessDenied,
     );
 }
