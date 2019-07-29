@@ -18,11 +18,12 @@ pub fn update_commander() -> Result<(), Box<::std::error::Error>> {
         .fetch()?;
     if !releases.is_empty() {
         debug!("Found releases: {:#?}\n", releases);
+        let bin_name = if target.contains("pc-windows") { "safe.exe" } else { "safe" };
         let status = self_update::backends::github::Update::configure()?
             .repo_owner("maidsafe")
             .repo_name("safe-cli")
             .target(&target)
-            .bin_name("safe")
+            .bin_name(&bin_name)
             .show_download_progress(true)
             .current_version(cargo_crate_version!())
             .build()?
