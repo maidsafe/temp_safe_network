@@ -18,7 +18,11 @@ pub fn update_commander() -> Result<(), Box<::std::error::Error>> {
         .fetch()?;
     if !releases.is_empty() {
         debug!("Found releases: {:#?}\n", releases);
-        let bin_name = if target.contains("pc-windows") { "safe.exe" } else { "safe" };
+        let bin_name = if target.contains("pc-windows") {
+            "safe.exe"
+        } else {
+            "safe"
+        };
         let status = self_update::backends::github::Update::configure()?
             .repo_owner("maidsafe")
             .repo_name("safe-cli")

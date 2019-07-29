@@ -12,17 +12,17 @@ GITHUB_REPO_NAME := safe-cli
 
 build-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:${SAFE_CLI_VERSION}
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:${SAFE_CLI_VERSION} .
+	docker rmi -f maidsafe/safe-cli-build:build
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:build .
 
 push-container:
-	docker push maidsafe/safe-cli-build:${SAFE_CLI_VERSION}
+	docker push maidsafe/safe-cli-build:build
 
 clippy:
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:${SAFE_CLI_VERSION} \
+		maidsafe/safe-cli-build:build \
 		/bin/bash -c "cargo clippy --all-targets --all-features -- -D warnings"
 else
 	cargo clippy --all-targets --all-features -- -D warnings
@@ -37,7 +37,7 @@ endif
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:${SAFE_CLI_VERSION} \
+		maidsafe/safe-cli-build:build \
 		./resources/test-scripts/all-tests
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
