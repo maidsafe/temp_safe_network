@@ -11,7 +11,7 @@ use super::OutputFmt;
 use crate::subcommands::auth::auth_connect;
 use log::debug;
 use prettytable::Table;
-use safe_cli::{Safe, SafeData};
+use safe_cli::{NrsMapContainerInfo, Safe, SafeData};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -22,8 +22,8 @@ pub struct CatCommands {
     #[structopt(long = "version")]
     version: Option<String>,
     /// Display additional information about the content being retrieved
-    #[structopt(short = "i", long = "info")]
-    info: bool,
+    #[structopt(short = "i", long = "info", parse(from_occurrences))]
+    info: u8,
 }
 
 pub fn cat_commander(
@@ -46,13 +46,16 @@ pub fn cat_commander(
             type_tag,
             xorname,
             data_type,
+            resolved_from,
         } => {
             // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
-                if cmd.info {
+                if cmd.info > 0 {
                     println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag,);
                     println!("XOR name: 0x{}", xorname_to_hex(&xorname));
+                    println!();
+                    print_resolved_from(cmd.info, resolved_from);
                     println!();
                 }
 
@@ -74,7 +77,8 @@ pub fn cat_commander(
                     ]);
                 });
                 table.printstd();
-            } else if cmd.info {
+            } else if cmd.info > 0 {
+                // TODO: print out the resolved_from info if -ii was passed (i.e. --info level 2)
                 println!(
                         "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
                         xorurl,
@@ -87,11 +91,16 @@ pub fn cat_commander(
                 println!("[{}, {:?}]", xorurl, files_map);
             }
         }
-        SafeData::PublishedImmutableData { data, xorname } => {
-            if cmd.info {
+        SafeData::PublishedImmutableData {
+            data,
+            xorname,
+            resolved_from,
+        } => {
+            if cmd.info > 0 {
                 println!("Native data type: ImmutableData (published)");
                 println!("XOR name: 0x{}", xorname_to_hex(&xorname));
                 println!();
+                print_resolved_from(cmd.info, resolved_from);
                 println!("Raw content of the file:");
             }
 
@@ -111,4 +120,17 @@ pub fn cat_commander(
     }
 
     Ok(())
+}
+
+fn print_resolved_from(info_level: u8, resolved_from: Option<NrsMapContainerInfo>) {
+    if info_level > 1 {
+        if let Some(nrs_map_container) = resolved_from {
+            // print out the resolved_from info since it's --info level 2
+            println!("Resolved using NRS Map:");
+            println!("Native data type: {}", nrs_map_container.data_type);
+            println!("Type tag: {}", nrs_map_container.type_tag);
+            println!("XOR name: 0x{}", xorname_to_hex(&nrs_map_container.xorname));
+            println!();
+        }
+    }
 }

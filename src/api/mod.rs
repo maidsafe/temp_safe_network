@@ -23,7 +23,7 @@ mod wallet;
 mod xorurl;
 
 pub use errors::{Error, ResultReturn};
-pub use fetch::{SafeData, SafeDataType};
+pub use fetch::{NrsMapContainerInfo, SafeData, SafeDataType};
 pub use keys::BlsKeyPair;
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;

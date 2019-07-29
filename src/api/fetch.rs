@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
+use super::nrs::NrsMap;
 use super::xorurl::SafeContentType;
 pub use super::xorurl::SafeDataType;
 
@@ -14,14 +15,25 @@ use super::{Error, ResultReturn, Safe, XorName};
 use log::{debug, info};
 
 #[derive(Debug, PartialEq)]
+pub struct NrsMapContainerInfo {
+    pub xorname: XorName,
+    pub type_tag: u64,
+    pub version: u64,
+    pub nrs_map: NrsMap,
+    pub data_type: SafeDataType,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum SafeData {
     Key {
         xorname: XorName,
+        resolved_from: Option<NrsMapContainerInfo>,
     },
     Wallet {
         xorname: XorName,
         type_tag: u64,
         data_type: SafeDataType,
+        resolved_from: Option<NrsMapContainerInfo>,
     },
     FilesContainer {
         xorname: XorName,
@@ -29,18 +41,12 @@ pub enum SafeData {
         version: u64,
         files_map: FilesMap,
         data_type: SafeDataType,
+        resolved_from: Option<NrsMapContainerInfo>,
     },
-    // TODO: allow to prevent resolution
-    /*NrsMapContainer {
-        xorname: XorName,
-        type_tag: u64,
-        version: u64,
-        nrs_map: NrsMap,
-        data_type: SafeDataType,
-    },*/
     PublishedImmutableData {
         xorname: XorName,
         data: Vec<u8>,
+        resolved_from: Option<NrsMapContainerInfo>,
     },
 }
 
@@ -86,12 +92,14 @@ impl Safe {
             SafeContentType::Raw => match the_xor.data_type() {
                 SafeDataType::CoinBalance => Ok(SafeData::Key {
                     xorname: the_xor.xorname(),
+                    resolved_from: None,
                     // TODO: perhaps also return the balance if sk provided?
                 }),
                 SafeDataType::PublishedImmutableData => {
                     let data = self.files_get_published_immutable(&url)?;
                     Ok(SafeData::PublishedImmutableData {
                         xorname: the_xor.xorname(),
+                        resolved_from: None,
                         data,
                     })
                 }
@@ -104,6 +112,7 @@ impl Safe {
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
                 data_type: the_xor.data_type(),
+                resolved_from: None,
             }),
             SafeContentType::FilesContainer => {
                 let (version, files_map) = self.files_container_get_latest(&xorurl)?;
@@ -143,6 +152,7 @@ impl Safe {
                     version,
                     files_map,
                     data_type: the_xor.data_type(),
+                    resolved_from: None,
                 })
             }
             SafeContentType::NrsMapContainer => {
@@ -174,19 +184,66 @@ impl Safe {
 
                 // TODO: Properly prevent resolution
                 // if prevent_resolution {
-                // 	return Ok(SafeData::NrsMapContainer {
-                // 		xorname: the_xor.xorname(),
-                // 		type_tag: the_xor.type_tag(),
-                // 		version,
-                // 		nrs_map,
-                // 		data_type: the_xor.data_type(),
-                // 	})
-                // }
+                let content = self.fetch(&url_with_path)?;
+                let nrs_map_container = NrsMapContainerInfo {
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
+                    version,
+                    nrs_map,
+                    data_type: the_xor.data_type(),
+                };
 
-                self.fetch(&url_with_path)
+                // TODO: find a simpler way to change the 'resolved_from' filed of the enum
+                embed_resolved_from(content, nrs_map_container)
             }
         }
     }
+}
+
+fn embed_resolved_from(
+    content: SafeData,
+    nrs_map_container: NrsMapContainerInfo,
+) -> ResultReturn<SafeData> {
+    let safe_data = match content {
+        SafeData::Key { xorname, .. } => SafeData::Key {
+            xorname,
+            resolved_from: Some(nrs_map_container),
+        },
+        SafeData::Wallet {
+            xorname,
+            type_tag,
+            data_type,
+            ..
+        } => SafeData::Wallet {
+            xorname,
+            type_tag,
+            data_type,
+            resolved_from: Some(nrs_map_container),
+        },
+        SafeData::FilesContainer {
+            xorname,
+            type_tag,
+            version,
+            files_map,
+            data_type,
+            ..
+        } => SafeData::FilesContainer {
+            xorname,
+            type_tag,
+            version,
+            files_map,
+            data_type,
+            resolved_from: Some(nrs_map_container),
+        },
+        SafeData::PublishedImmutableData { xorname, data, .. } => {
+            SafeData::PublishedImmutableData {
+                xorname,
+                data,
+                resolved_from: Some(nrs_map_container),
+            }
+        }
+    };
+    Ok(safe_data)
 }
 
 // Unit Tests
@@ -205,7 +262,8 @@ fn test_fetch_key() {
     assert!(
         content
             == SafeData::Key {
-                xorname: xorurl_encoder.xorname()
+                xorname: xorurl_encoder.xorname(),
+                resolved_from: None,
             }
     );
 }
@@ -226,6 +284,7 @@ fn test_fetch_wallet() {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 1_000,
                 data_type: SafeDataType::SeqMutableData,
+                resolved_from: None,
             }
     );
 }
@@ -252,6 +311,7 @@ fn test_fetch_files_container() {
                 version: 1,
                 files_map,
                 data_type: SafeDataType::PublishedSeqAppendOnlyData,
+                resolved_from: None,
             }
     );
 
@@ -315,7 +375,6 @@ fn test_fetch_resolvable_container() {
 }
 
 #[test]
-#[ignore]
 fn test_fetch_resolvable_map_data() {
     use super::xorurl::XorUrlEncoder;
     use rand::distributions::Alphanumeric;
@@ -330,30 +389,29 @@ fn test_fetch_resolvable_map_data() {
     let (xorurl, _, _the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-    let (nrs_map_xorurl, _, _the_nrs_map) =
+    let (nrs_map_xorurl, _, the_nrs_map) =
         unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
 
-    let _xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
-    let _content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
+    let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
     // this should resolve to a FilesContainer until we enable prevent resolution.
-    /*match content {
-        SafeData::NrsMapContainer {
-            xorname,
-            type_tag,
-            version,
-            nrs_map,
-            data_type,
+    match content {
+        SafeData::FilesContainer {
+            resolved_from: Some(nrs_map_container),
             ..
         } => {
-            assert_eq!(xorname, xorurl_encoder.xorname());
-            assert_eq!(type_tag, 1_500);
-            assert_eq!(version, 1);
-            assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
-            assert_eq!(nrs_map, the_nrs_map);
+            assert_eq!(nrs_map_container.xorname, xorurl_encoder.xorname());
+            assert_eq!(nrs_map_container.type_tag, 1_500);
+            assert_eq!(nrs_map_container.version, 1);
+            assert_eq!(
+                nrs_map_container.data_type,
+                SafeDataType::PublishedSeqAppendOnlyData
+            );
+            assert_eq!(nrs_map_container.nrs_map, the_nrs_map);
         }
         _ => panic!("Nrs map container was not returned."),
-    }*/
+    }
 }
 
 #[test]
@@ -371,7 +429,8 @@ fn test_fetch_published_immutable_data() {
         content
             == SafeData::PublishedImmutableData {
                 xorname: xorurl_encoder.xorname(),
-                data: data.to_vec()
+                data: data.to_vec(),
+                resolved_from: None,
             }
     );
 }
