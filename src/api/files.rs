@@ -68,8 +68,8 @@ impl Safe {
         // TODO: use RDF format
         let files_map = files_map_create(&processed_files, location, dest)?;
 
-        if dry_run {
-            Ok(("".to_string(), processed_files, files_map))
+        let xorurl = if dry_run {
+            "".to_string()
         } else {
             let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
                 Error::Unexpected(format!(
@@ -92,7 +92,7 @@ impl Safe {
                 None,
             )?;
 
-            let xorurl = XorUrlEncoder::encode(
+            XorUrlEncoder::encode(
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
                 SafeDataType::PublishedSeqAppendOnlyData,
@@ -100,10 +100,10 @@ impl Safe {
                 None,
                 None,
                 &self.xorurl_base,
-            )?;
+            )?
+        };
 
-            Ok((xorurl, processed_files, files_map))
-        }
+        Ok((xorurl, processed_files, files_map))
     }
 
     /// # Fetch an existing FilesContaier.

@@ -8,8 +8,7 @@
 
 use super::constants::{
     CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, /*CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,*/
-    FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_DEFAULT, FAKE_RDF_PREDICATE_LINK,
-    FAKE_RDF_PREDICATE_MODIFIED,
+    FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
 };
 
 use super::helpers::{gen_timestamp_secs, get_subnames_host_and_path};
@@ -27,120 +26,171 @@ const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 
-type PublicNameKey = String;
-type NrsMapRawData = Vec<(Vec<u8>, Vec<u8>)>;
+type SubName = String;
+type DefinitionData = BTreeMap<String, String>;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum PublicNameEntry {
-    Definition(BTreeMap<String, String>),
+pub enum SubNameRDF {
+    Definition(DefinitionData),
     SubName(NrsMap),
 }
 
-impl PublicNameEntry {
+impl SubNameRDF {
     fn get(&self, key: &str) -> Option<String> {
         match self {
-            PublicNameEntry::SubName { .. } => Some(self.get(&key)?),
+            SubNameRDF::SubName { .. } => Some(self.get(&key)?),
             _ => None,
         }
     }
 }
 
-impl fmt::Display for PublicNameEntry {
+impl fmt::Display for SubNameRDF {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            PublicNameEntry::Definition(def_map) => Ok(write!(fmt, "{:?}", def_map)?),
-            PublicNameEntry::SubName(map) => Ok(write!(fmt, "{:?}", map)?),
+            SubNameRDF::Definition(def_data) => Ok(write!(fmt, "{:?}", def_data)?),
+            SubNameRDF::SubName(map) => Ok(write!(fmt, "{:?}", map)?),
         }
     }
 }
 
+// The default for a sub name can be unset (NotSet), reference to the same mapping as
+// another existing sub name (ExistingRdf), or just a different mapping (OtherRdf)
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum DefaultRdf {
+    NotSet,
+    ExistingRdf(SubName), // Not supported yet
+    OtherRdf(DefinitionData),
+}
+
+impl std::default::Default for DefaultRdf {
+    fn default() -> Self {
+        DefaultRdf::NotSet
+    }
+}
+
 // Each PublicName contains metadata and the link to the target's XOR-URL
-pub type PublicNameRDF = BTreeMap<PublicNameKey, PublicNameEntry>;
+pub type SubNamesMap = BTreeMap<SubName, SubNameRDF>;
 
 // To use for mapping sub names to PublicNames
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 pub struct NrsMap {
-    pub entries: PublicNameRDF,
-    pub default: PublicNameKey,
+    pub sub_names_map: SubNamesMap,
+    pub default: DefaultRdf,
 }
 
 impl NrsMap {
     #[allow(dead_code)]
-    pub fn get_default(&self) -> ResultReturn<&str> {
+    pub fn get_default(&self) -> ResultReturn<&DefaultRdf> {
         Ok(&self.default)
     }
 
-    pub fn resolve_for_subnames(&self, mut sub_name_list: Vec<String>) -> ResultReturn<XorUrl> {
-        debug!(
-            "NRS: Attempting to resolve for subnames {:?}",
-            sub_name_list
-        );
+    pub fn resolve_for_subnames(&self, mut sub_names: Vec<String>) -> ResultReturn<XorUrl> {
+        debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
         let mut nrs_map = self;
         let mut link = None;
 
-        sub_name_list.reverse();
-        for (_i, the_sub_name) in sub_name_list.iter().enumerate() {
-            let next = nrs_map.entries.get(the_sub_name);
+        while !sub_names.is_empty() {
+            let curr_sub_name = sub_names
+                .pop()
+                .ok_or_else(|| Error::Unexpected("Failed to parse NRS name".to_string()))?;
 
-            if let Some(PublicNameEntry::SubName(nrs_sub_name)) = &next {
-                nrs_map = nrs_sub_name;
-            }
-
-            if let Some(PublicNameEntry::Definition(def_map)) = next {
-                debug!("NRS subname resolution done. Located: \"{:?}\"", def_map);
-                link = def_map.get(FAKE_RDF_PREDICATE_LINK);
-            }
+            match nrs_map.sub_names_map.get(&curr_sub_name) {
+                Some(SubNameRDF::SubName(nrs_sub_map)) => {
+                    if nrs_sub_map.sub_names_map.is_empty() {
+                        // we need default one then
+                        if let DefaultRdf::OtherRdf(def_data) = &nrs_sub_map.default {
+                            debug!("NRS subname resolution done. Located: \"{:?}\"", def_data);
+                            link = def_data.get(FAKE_RDF_PREDICATE_LINK);
+                        } else {
+                            return Err(Error::ContentError(
+                                "Sub name not found in NRS Map Container".to_string(),
+                            ));
+                        }
+                    }
+                    nrs_map = nrs_sub_map;
+                }
+                Some(SubNameRDF::Definition(def_data)) => {
+                    debug!("NRS subname resolution done. Located: \"{:?}\"", def_data);
+                    if sub_names.is_empty() {
+                        // cool, we've gone through all subnames and we found a Definition (tree leaf)
+                        link = def_data.get(FAKE_RDF_PREDICATE_LINK);
+                    } else {
+                        // oops...we haven't gone through all subnames and we reached a Definition (tree leaf)
+                        return Err(Error::ContentError(
+                            "Not all sub names were found in NRS Map Container".to_string(),
+                        ));
+                    };
+                }
+                None => {
+                    if sub_names.is_empty() {
+                        // we need default one then
+                        if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
+                            debug!("NRS subname resolution done. Located: \"{:?}\"", def_data);
+                            link = def_data.get(FAKE_RDF_PREDICATE_LINK);
+                        } else {
+                            return Err(Error::ContentError(
+                                "Sub name not found in NRS Map Container".to_string(),
+                            ));
+                        }
+                    } else {
+                        return Err(Error::ContentError(
+                            "Sub name not found in NRS Map Container".to_string(),
+                        ));
+                    };
+                }
+            };
         }
 
         match link {
             Some(the_link) => Ok(the_link.to_string()),
             None => Err(Error::ContentError(format!(
                 "No link found for subnames: {:?}.",
-                &sub_name_list.reverse()
+                &sub_names.reverse()
             ))),
         }
     }
 
     pub fn get_default_link(&self) -> ResultReturn<XorUrl> {
         debug!("Attempting to get default link vis NRS....");
-        let default = &self.default;
-
-        let default_entry = self.entries.get(default);
-        debug!("NRS found default link target: {:?}", &default_entry);
-
         let mut dereferenced_link: String;
-        let link = match default_entry {
-            Some(entry) => match entry {
-                PublicNameEntry::Definition(def_map) => def_map.get(FAKE_RDF_PREDICATE_LINK),
-                PublicNameEntry::SubName(nrs_sub_name) => {
-                    warn!("Attempting to get a default link from a nested subname.");
-
-                    dereferenced_link = nrs_sub_name.get_default_link()?;
-                    Some(&dereferenced_link)
-                }
-            },
-            None => {
+        let link = match &self.default {
+            DefaultRdf::NotSet => {
                 return Err(Error::ContentError(
                     "No default found for resolvable map.".to_string(),
                 ))
             }
-        };
-
-        match link {
-            Some(the_link) => {
-                warn!("Default link retrieved: \"{:?}\"", the_link);
-                Ok(the_link.to_string())
-            }
-            None => Err(Error::ContentError(format!(
-                "No link found for default entry: {}.",
-                &default
-            ))),
+            DefaultRdf::OtherRdf(def_data) => def_data.get(FAKE_RDF_PREDICATE_LINK),
+            DefaultRdf::ExistingRdf(sub_name) => match self.sub_names_map.get(sub_name) {
+                Some(entry) => match entry {
+                    SubNameRDF::Definition(def_data) => def_data.get(FAKE_RDF_PREDICATE_LINK),
+                    SubNameRDF::SubName(nrs_sub_name) => {
+                        warn!("Attempting to get a default link from a nested subname.");
+                        // FIXME: we need to stop looping if there is a crossed ref with defaults
+                        dereferenced_link = nrs_sub_name.get_default_link()?;
+                        Some(&dereferenced_link)
+                    }
+                },
+                None => {
+                    return Err(Error::ContentError(
+                        "Default found in resolvable map seems corrupted.".to_string(),
+                    ))
+                }
+            },
         }
+        .ok_or_else(|| {
+            Error::ContentError(format!(
+                "No link found for default entry: {:?}.",
+                self.default
+            ))
+        })?;
+
+        debug!("Default link retrieved: \"{}\"", link);
+        Ok(link.to_string())
     }
 
     #[allow(dead_code)]
     pub fn get_link_for(&self, sub_name: &str) -> ResultReturn<XorUrl> {
-        let the_entry = self.entries.get(sub_name);
+        let the_entry = self.sub_names_map.get(sub_name);
 
         let link = match the_entry {
             Some(entry) => entry.get(FAKE_RDF_PREDICATE_LINK),
@@ -160,6 +210,9 @@ impl NrsMap {
         }
     }
 }
+
+// Raw data stored in the SAFE native data type for a NRS Map Container
+type NrsMapRawData = Vec<(Vec<u8>, Vec<u8>)>;
 
 // List of public names uploaded with details if they were added, updated or deleted from NrsMaps
 type ProcessedEntries = BTreeMap<String, (String, String)>;
@@ -198,25 +251,27 @@ impl Safe {
         dry_run: bool,
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
-        // GET current NRS map from &name TLD
+        // GET current NRS map from name's TLD
         let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let (_, resolvable_container_raw_data, processed_entries, resulting_nrs_map) =
-            nrs_map_update_or_create_data(name, destination, Some(nrs_map), default, dry_run)?;
+        let (_, processed_entries, resulting_nrs_map, nrs_map_raw_data) =
+            nrs_map_update_or_create_data(name, destination, Some(nrs_map), default)?;
 
-        info!("The new dataaaaa..... {:?}", resulting_nrs_map);
-        // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
-        let new_version = self.safe_app.append_seq_append_only_data(
-            resolvable_container_raw_data,
-            version + 1,
-            xorurl_encoder.xorname(),
-            xorurl_encoder.type_tag(),
-        )?;
+        debug!("The new dataaaaa..... {:?}", resulting_nrs_map);
+        if !dry_run {
+            // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+            self.safe_app.append_seq_append_only_data(
+                nrs_map_raw_data,
+                version + 1,
+                xorurl_encoder.xorname(),
+                xorurl_encoder.type_tag(),
+            )?;
+        }
 
-        Ok((new_version, xorurl, processed_entries, resulting_nrs_map))
+        Ok((version + 1, xorurl, processed_entries, resulting_nrs_map))
     }
 
     /// # Create a NrsMapContainer.
@@ -241,19 +296,25 @@ impl Safe {
         default: bool,
         dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
-        debug!("Creating an NRS map");
-        match self.nrs_map_container_get_latest(&sanitised_nrs_url(name)) {
-            Ok(_) => Err(Error::ContentError(
+        info!("Creating an NRS map");
+        if self
+            .nrs_map_container_get_latest(&sanitised_nrs_url(name))
+            .is_ok()
+        {
+            Err(Error::ContentError(
                 "NRS name already exists. Please use 'nrs add' command to add sub names to it"
                     .to_string(),
-            )),
-            Err(_) => {
-                let (nrs_xorname, resolvable_container_raw_data, processed_entries, nrs_map) =
-                    nrs_map_update_or_create_data(&name, destination, None, default, dry_run)?;
+            ))
+        } else {
+            let (nrs_xorname, processed_entries, nrs_map, nrs_map_raw_data) =
+                nrs_map_update_or_create_data(&name, destination, None, default)?;
 
+            if dry_run {
+                Ok(("".to_string(), processed_entries, nrs_map))
+            } else {
                 // Store the NrsMapContainer in a Published AppendOnlyData
                 let xorname = self.safe_app.put_seq_append_only_data(
-                    resolvable_container_raw_data,
+                    nrs_map_raw_data,
                     Some(nrs_xorname),
                     NRS_MAP_TYPE_TAG,
                     None,
@@ -286,19 +347,21 @@ impl Safe {
         let (version, nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let (_, resolvable_container_raw_data, processed_entries, resulting_nrs_map) =
-            nrs_map_remove_subname(name, nrs_map, dry_run)?;
+        let (_, processed_entries, resulting_nrs_map, nrs_map_raw_data) =
+            nrs_map_remove_subname(name, nrs_map)?;
 
-        info!("The new dataaaaa..... {:?}", resulting_nrs_map);
-        // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
-        let new_version = self.safe_app.append_seq_append_only_data(
-            resolvable_container_raw_data,
-            version + 1,
-            xorurl_encoder.xorname(),
-            xorurl_encoder.type_tag(),
-        )?;
+        debug!("The new dataaaaa..... {:?}", resulting_nrs_map);
+        if !dry_run {
+            // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+            self.safe_app.append_seq_append_only_data(
+                nrs_map_raw_data,
+                version + 1,
+                xorurl_encoder.xorname(),
+                xorurl_encoder.type_tag(),
+            )?;
+        }
 
-        Ok((new_version, xorurl, processed_entries, resulting_nrs_map))
+        Ok((version + 1, xorurl, processed_entries, resulting_nrs_map))
     }
 
     /// # Fetch an existing NrsMapContainer.
@@ -316,7 +379,6 @@ impl Safe {
     /// let (version, nrs_map_container) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
     /// assert_eq!(version, 1);
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");
-    /// assert_eq!(nrs_map_container.get_default().unwrap(), "_default");
     /// ```
     pub fn nrs_map_container_get_latest(&self, url: &str) -> ResultReturn<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
@@ -360,13 +422,13 @@ fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
     Ok(xorname)
 }
 
-fn create_public_name_description(destination: &str) -> ResultReturn<PublicNameEntry> {
+fn create_public_name_description(destination: &str) -> ResultReturn<DefinitionData> {
     let now = gen_timestamp_secs();
-    let mut public_name = BTreeMap::new();
+    let mut public_name = DefinitionData::new();
     public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), destination.to_string());
     public_name.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
     public_name.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now.clone());
-    Ok(PublicNameEntry::Definition(public_name))
+    Ok(public_name)
 }
 
 fn sanitised_nrs_url(name: &str) -> String {
@@ -374,7 +436,7 @@ fn sanitised_nrs_url(name: &str) -> String {
     format!("safe://{}", name.replace("safe://", ""))
 }
 
-fn parse_nrs_name(name: &str) -> ResultReturn<(XorName, String, Vec<String>)> {
+fn parse_nrs_name(name: &str) -> ResultReturn<(XorName, Vec<String>)> {
     // santize to a simple string
     let sanitized_name = str::replace(&name, "safe://", "").to_string();
 
@@ -383,12 +445,6 @@ fn parse_nrs_name(name: &str) -> ResultReturn<(XorName, String, Vec<String>)> {
     let top_level_name = sub_names
         .pop()
         .ok_or_else(|| Error::Unexpected("Failed to parse NRS name".to_string()))?;
-    // by default top subname is...
-    let top_subname = if !sub_names.is_empty() {
-        sub_names[sub_names.len() - 1].clone()
-    } else {
-        FAKE_RDF_PREDICATE_DEFAULT.to_string()
-    };
 
     let nrs_xorname = xorname_from_nrs_string(&top_level_name)?;
     debug!(
@@ -396,67 +452,42 @@ fn parse_nrs_name(name: &str) -> ResultReturn<(XorName, String, Vec<String>)> {
         &top_level_name, &nrs_xorname
     );
 
-    Ok((nrs_xorname, top_subname, sub_names))
+    Ok((nrs_xorname, sub_names))
 }
 
-fn nrs_map_remove_subname(
-    name: &str,
-    nrs_map: NrsMap,
-    _dry_run: bool,
-) -> ResultReturn<(XorName, NrsMapRawData, ProcessedEntries, NrsMap)> {
-    info!("Removing sub name \"{}\" from NRS map", name);
-    let (nrs_xorname, _top_subname, mut sub_names) = parse_nrs_name(name)?;
-    // let's walk the NRS Map tree to find the sub name we need to remove
-    let mut curr_nrs_map = &nrs_map;
-    sub_names.reverse();
-    let mut link = "";
-    for sub_name in sub_names.iter() {
-        match curr_nrs_map.entries.get(sub_name) {
-            Some(PublicNameEntry::SubName(nrs_sub_name)) => {
-                curr_nrs_map = nrs_sub_name;
-            }
-            Some(PublicNameEntry::Definition(def_map)) => {
-                println!("NRS subname resolution done. Located: \"{:?}\"", def_map);
-                link = match def_map.get(FAKE_RDF_PREDICATE_LINK) {
-                    Some(link) => link,
-                    None => "",
-                };
-            }
-            None => {
-                return Err(Error::ContentError(
-                    "Sub name not found in NRS Map Container".to_string(),
-                ))
-            }
-        };
-    }
-
-    let mut processed_entries = ProcessedEntries::new();
-    processed_entries.insert(
-        name.to_string(),
-        (CONTENT_DELETED_SIGN.to_string(), link.to_string()),
-    );
-
+fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> ResultReturn<NrsMapRawData> {
     // The NrsMapContainer is an AppendOnlyData where each NRS Map version is an entry containing
     // the timestamp as the entry's key, and the serialised NrsMap as the entry's value
     // TODO: use RDF format
-    let serialised_nrs_map = serde_json::to_string(&nrs_map).map_err(|err| {
+    let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
         Error::Unexpected(format!(
             "Couldn't serialise the NrsMap generated: {:?}",
             err
         ))
     })?;
     let now = gen_timestamp_secs();
-    let resolvable_container_data = vec![(
+
+    Ok(vec![(
         now.into_bytes().to_vec(),
         serialised_nrs_map.as_bytes().to_vec(),
-    )];
+    )])
+}
 
-    Ok((
-        nrs_xorname,
-        resolvable_container_data,
-        processed_entries,
-        nrs_map,
-    ))
+fn nrs_map_remove_subname(
+    name: &str,
+    nrs_map: NrsMap,
+) -> ResultReturn<(XorName, ProcessedEntries, NrsMap, NrsMapRawData)> {
+    info!("Removing sub name \"{}\" from NRS map", name);
+    let (nrs_xorname, sub_names) = parse_nrs_name(name)?;
+
+    // let's walk the NRS Map tree to find the sub name we need to remove
+    let (updated_nrs_map, link) = remove_nrs_sub_tree(&nrs_map, sub_names)?;
+
+    let mut processed_entries = ProcessedEntries::new();
+    processed_entries.insert(name.to_string(), (CONTENT_DELETED_SIGN.to_string(), link));
+
+    let nrs_map_raw_data = gen_nrs_map_raw_data(&updated_nrs_map)?;
+    Ok((nrs_xorname, processed_entries, nrs_map, nrs_map_raw_data))
 }
 
 fn nrs_map_update_or_create_data(
@@ -464,192 +495,154 @@ fn nrs_map_update_or_create_data(
     destination: Option<&str>,
     existing_map: Option<NrsMap>,
     default: bool,
-    _dry_run: bool,
-) -> ResultReturn<(XorName, NrsMapRawData, ProcessedEntries, NrsMap)> {
+) -> ResultReturn<(XorName, ProcessedEntries, NrsMap, NrsMapRawData)> {
     info!("Creating or updating NRS map for: {}", name);
 
-    let mut nrs_map = existing_map.unwrap_or_else(NrsMap::default);
-    let (nrs_xorname, top_subname, sub_names) = parse_nrs_name(name)?;
+    let nrs_map = existing_map.unwrap_or_else(NrsMap::default);
+    let (nrs_xorname, sub_names) = parse_nrs_name(name)?;
+    let link = destination.unwrap_or_else(|| "");
 
-    // Setup target RDF description
-    let final_destination = destination.unwrap_or_else(|| "");
-    let mut public_name_rdf = create_public_name_description(final_destination)?;
-    debug!("Subname target data: {:?}", public_name_rdf);
+    // Update NRS Map with new names
+    let mut updated_nrs_map = setup_nrs_tree(&nrs_map, sub_names, link)?;
 
-    let (updated_nrs_map, updated_public_name_rdf) =
-        setup_nrs_tree(nrs_map, public_name_rdf, sub_names.to_vec(), default)?;
-
-    nrs_map = updated_nrs_map;
-    public_name_rdf = updated_public_name_rdf;
-
-    // if you have only default, and add a new default...
-    nrs_map
-        .entries
-        .insert(top_subname.to_string(), public_name_rdf);
-
-    // TODO: Enable source for funds / ownership
-
-    debug!("Subname inserted with name {:?}", &top_subname);
-
-    // Only set this default if we're not talking about subnames here...
-    // if default && sub_names.is_empty() {
+    // Set (top level) default if was requested
     if default {
         debug!("Setting {:?} as default for NrsMap", &name);
-
-        nrs_map.default = top_subname.to_string();
+        // TODO: support DefaultRdf::ExistingRdf
+        let definition_data = create_public_name_description(link)?;
+        updated_nrs_map.default = DefaultRdf::OtherRdf(definition_data);
     }
 
     let mut processed_entries = ProcessedEntries::new();
     processed_entries.insert(
         name.to_string(),
-        (
-            CONTENT_ADDED_SIGN.to_string(),
-            final_destination.to_string(),
-        ),
+        (CONTENT_ADDED_SIGN.to_string(), link.to_string()),
     );
 
-    // The NrsMapContainer is an AppendOnlyData where each NRS Map version is an entry containing
-    // the timestamp as the entry's key, and the serialised NrsMap as the entry's value
-    // TODO: use RDF format
-    let serialised_nrs_map = serde_json::to_string(&nrs_map).map_err(|err| {
-        Error::Unexpected(format!(
-            "Couldn't serialise the NrsMap generated: {:?}",
-            err
-        ))
-    })?;
-    let now = gen_timestamp_secs();
-    let resolvable_container_data = vec![(
-        now.into_bytes().to_vec(),
-        serialised_nrs_map.as_bytes().to_vec(),
-    )];
-
+    let nrs_map_raw_data = gen_nrs_map_raw_data(&updated_nrs_map)?;
     Ok((
         nrs_xorname,
-        resolvable_container_data,
         processed_entries,
-        nrs_map,
+        updated_nrs_map,
+        nrs_map_raw_data,
     ))
 }
 
+// fix: default of subnames (e.g. c.n) not set when adding
 fn setup_nrs_tree(
-    nrs_map: NrsMap,
-    mut public_name_rdf: PublicNameEntry,
-    sub_names: Vec<String>,
-    default: bool,
-) -> ResultReturn<(NrsMap, PublicNameEntry)> {
-    if !sub_names.is_empty() {
-        debug!("Subnames will be added...");
+    nrs_map: &NrsMap,
+    mut sub_names: Vec<String>,
+    link: &str,
+) -> ResultReturn<NrsMap> {
+    let mut updated_nrs_map = nrs_map.clone();
+    let curr_sub_name = if sub_names.is_empty() {
+        let definition_data = create_public_name_description(link)?;
+        updated_nrs_map.default = DefaultRdf::OtherRdf(definition_data);
+        return Ok(updated_nrs_map);
+    } else {
+        sub_names
+            .pop()
+            .ok_or_else(|| Error::Unexpected("Failed to generate NRS Map".to_string()))?
+    };
 
-        // reverse list for resolving existing subname trees
-        let mut the_reverse_sub_names = sub_names.to_vec();
-        the_reverse_sub_names.reverse();
-
-        let mut prev_subname: &str = "";
-
-        // let mut existing_subname_target = 0;
-        let mut testing_map = PublicNameEntry::SubName(nrs_map.clone());
-
-        // let's build a map of exiting subnames related to our target...
-        let mut existing_tree: BTreeMap<usize, NrsMap> = BTreeMap::new();
-
-        for (i, existing_sub_name) in the_reverse_sub_names.iter().enumerate() {
-            debug!("Checking if subname already exists.");
-            let test2_map = testing_map.clone();
-            let actual_map = match test2_map {
-                PublicNameEntry::SubName(sub_map) => sub_map,
-                _ => NrsMap::default(),
-            };
-
-            if actual_map
-                .entries
-                .contains_key(&existing_sub_name.to_string())
-            {
-                warn!("{} already exists", existing_sub_name);
-                let target_map = actual_map
-                    .entries
-                    .get(&existing_sub_name.to_string())
-                    .ok_or_else(|| {
-                        Error::ContentNotFound("Could not find subname in question".to_string())
-                    })?;
-
-                let another_default = NrsMap::default();
-                // TODO: Impl get underlying map func.
-                let target2_map = target_map.clone();
-                let actual_target_map = match target2_map {
-                    PublicNameEntry::SubName(sub_map) => sub_map,
-                    _ => another_default,
-                };
-
-                let actual_target2 = actual_target_map.clone();
-
-                let the_index_normally = the_reverse_sub_names.len() - (i + 1);
-                warn!(
-                    "Adding the existing subname {:?}, to the tree... with entry number {}",
-                    existing_sub_name, the_index_normally
-                );
-                existing_tree.insert(the_index_normally, actual_target_map);
-
-                info!("And now existing tree looks like: {:?}", existing_tree);
-                let the_public_entry = PublicNameEntry::SubName(actual_target2);
-                testing_map = the_public_entry;
-            } else {
-                info!("Subname, {:?} does not exist", existing_sub_name);
-            }
+    match nrs_map.sub_names_map.get(&curr_sub_name) {
+        Some(SubNameRDF::SubName(nrs_sub_map)) => {
+            let updated_sub_map = setup_nrs_tree(nrs_sub_map, sub_names, link)?;
+            updated_nrs_map
+                .sub_names_map
+                .insert(curr_sub_name, SubNameRDF::SubName(updated_sub_map));
+            Ok(updated_nrs_map)
         }
-
-        let mut sub_nrs_map: &NrsMap;
-
-        // let's loop through subnames from lowest up, building our subname tree...
-        for (i, the_sub_name) in sub_names.iter().enumerate() {
-            debug!("Subname {} is {}", i + 1, &the_sub_name);
-
-            let map_default = NrsMap::default();
-            // use the existing map at this level...
-
-            let existing_map = existing_tree.get(&i);
-            info!("Okay so checking that the tree has entry {}", &i);
-            sub_nrs_map = match existing_map {
-                Some(map) => {
-                    debug!("It does...");
-                    map
-                }
-                None => &map_default,
-            };
-
-            if i == 0 {
-                prev_subname = the_sub_name;
-            }
-
-            // if we have other subnames, we add them all up
-            if i > 0 {
-                let mut our_map = sub_nrs_map.clone();
-                our_map
-                    .entries
-                    .insert(prev_subname.to_string(), public_name_rdf);
-
-                // if we're saving data for the _last_ subname, lets set it default too
-                if default && prev_subname == sub_names[0] {
-                    debug!(
-                        "Setting {:?} as default for NrsMap sub name {:?}",
-                        &prev_subname, &the_sub_name
-                    );
-
-                    our_map.default = prev_subname.to_string();
-                }
-
-                public_name_rdf = PublicNameEntry::SubName(our_map);
-            }
+        Some(SubNameRDF::Definition(def_data)) => {
+            // we need to add the new sub nrs tree but as a sibling
+            let mut new_nrs_map = NrsMap::default();
+            new_nrs_map.default = DefaultRdf::OtherRdf(def_data.clone());
+            let updated_new_nrs_map = setup_nrs_tree(&new_nrs_map, sub_names, link)?;
+            updated_nrs_map
+                .sub_names_map
+                .insert(curr_sub_name, SubNameRDF::SubName(updated_new_nrs_map));
+            Ok(updated_nrs_map)
+        }
+        None => {
+            // Sub name not found in NRS Map Container
+            // we need to add the new sub nrs tree
+            let new_nrs_map = NrsMap::default();
+            let updated_new_nrs_map = setup_nrs_tree(&new_nrs_map, sub_names, link)?;
+            updated_nrs_map
+                .sub_names_map
+                .insert(curr_sub_name, SubNameRDF::SubName(updated_new_nrs_map));
+            Ok(updated_nrs_map)
         }
     }
+}
 
-    Ok((nrs_map, public_name_rdf))
+fn remove_nrs_sub_tree(
+    nrs_map: &NrsMap,
+    mut sub_names: Vec<String>,
+) -> ResultReturn<(NrsMap, String)> {
+    let mut updated_nrs_map = nrs_map.clone();
+    let curr_sub_name = if sub_names.is_empty() {
+        match nrs_map.get_default()? {
+            DefaultRdf::NotSet => {
+                return Err(Error::ContentError(
+                    "Sub name not found in NRS Map Container".to_string(),
+                ))
+            }
+            DefaultRdf::OtherRdf(def_data) => {
+                let link = match def_data.get(FAKE_RDF_PREDICATE_LINK) {
+                    Some(link) => link.to_string(),
+                    None => "".to_string(),
+                };
+                updated_nrs_map.default = DefaultRdf::NotSet;
+                return Ok((updated_nrs_map, link));
+            }
+            DefaultRdf::ExistingRdf(sub_name) => sub_name.to_string(),
+        }
+    } else {
+        sub_names
+            .pop()
+            .ok_or_else(|| Error::Unexpected("Failed to generate NRS Map".to_string()))?
+    };
+
+    match nrs_map.sub_names_map.get(&curr_sub_name) {
+        Some(SubNameRDF::SubName(nrs_sub_map)) => {
+            let (updated_sub_map, link) = remove_nrs_sub_tree(nrs_sub_map, sub_names)?;
+            updated_nrs_map
+                .sub_names_map
+                .insert(curr_sub_name, SubNameRDF::SubName(updated_sub_map));
+            Ok((updated_nrs_map, link))
+        }
+        Some(SubNameRDF::Definition(def_data)) => {
+            println!("NRS subname resolution done. Located: \"{:?}\"", def_data);
+            if sub_names.is_empty() {
+                // cool, we've gone through all subnames and we found a Definition (tree leaf)
+                let link = match def_data.get(FAKE_RDF_PREDICATE_LINK) {
+                    Some(link) => link.to_string(),
+                    None => "".to_string(),
+                };
+                let _ = updated_nrs_map.sub_names_map.remove(&curr_sub_name);
+                if updated_nrs_map.default == DefaultRdf::ExistingRdf(curr_sub_name) {
+                    // unset the default as it's currently pointing to the sub name being removed
+                    updated_nrs_map.default = DefaultRdf::NotSet;
+                }
+                Ok((updated_nrs_map, link))
+            } else {
+                // oops...we haven't gone through all subnames and we reached a Definition (tree leaf)
+                Err(Error::ContentError(
+                    "Not all sub names were found in NRS Map Container".to_string(),
+                ))
+            }
+        }
+        None => Err(Error::ContentError(
+            "Sub name not found in NRS Map Container".to_string(),
+        )),
+    }
 }
 
 // Unit Tests
 
 #[test]
 fn test_nrs_map_container_create() {
-    use super::nrs::PublicNameEntry;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use unwrap::unwrap;
@@ -663,20 +656,20 @@ fn test_nrs_map_container_create() {
 
     let (xor_url, _entries, nrs_map) =
         unwrap!(safe.nrs_map_container_create(&site_name, Some("safe://top_xorurl"), true, false));
-    assert_eq!(nrs_map.entries.len(), 1);
+    assert_eq!(nrs_map.sub_names_map.len(), 0);
 
-    let public_name = &nrs_map.entries[FAKE_RDF_PREDICATE_DEFAULT];
-
-    if let PublicNameEntry::Definition(def_map) = public_name {
+    if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
         assert_eq!(
-            *def_map.get(FAKE_RDF_PREDICATE_LINK).unwrap(),
+            *def_data.get(FAKE_RDF_PREDICATE_LINK).unwrap(),
             "safe://top_xorurl".to_string()
         );
+        assert_eq!(
+            nrs_map.get_default().unwrap(),
+            &DefaultRdf::OtherRdf(def_data.clone())
+        );
     } else {
-        panic!("No definition map found...")
+        panic!("No default definition map found...")
     }
-
-    assert_eq!(nrs_map.get_default().unwrap(), FAKE_RDF_PREDICATE_DEFAULT);
 
     let decoder = XorUrlEncoder::from_url(&xor_url).unwrap();
     assert_eq!(nrs_xorname, decoder.xorname())

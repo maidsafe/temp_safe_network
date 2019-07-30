@@ -23,7 +23,7 @@ pub enum NrsSubCommands {
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
-        /// Set the sub name as default for this public name.
+        /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
     },
@@ -35,6 +35,9 @@ pub enum NrsSubCommands {
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
+        /// Set the sub name as default for this public name
+        #[structopt(long = "default")]
+        default: bool,
     },
     #[structopt(name = "remove")]
     /// Remove a subname from an NRS name
@@ -51,17 +54,17 @@ pub fn nrs_commander(
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(NrsSubCommands::Create { name, link }) => {
-            // TODO: Where do we store/reference these?
-            // Add a container for this...
-            // check for subdomain?
-            // sanitize name / spacing etc.
-            // validate desination?
-            let set_as_default = true;
+        Some(NrsSubCommands::Create {
+            name,
+            link,
+            default,
+        }) => {
+            // TODO: Where do we store/reference these? add it to the Root container,
+            // sanitize name / spacing etc., validate destination?
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, Some(&link), set_as_default, dry_run)?;
+                safe.nrs_map_container_create(&name, Some(&link), default, dry_run)?;
 
             // Now let's just print out a summary
             print_summary(
