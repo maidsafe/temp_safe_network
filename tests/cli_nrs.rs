@@ -42,7 +42,6 @@ fn calling_safe_nrs_create_pretty() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "mock-network"), ignore)]
 fn calling_safe_nrs_twice_w_name_fails() {
     let test_name = format!("safe://{}", get_random_nrs_string());
 

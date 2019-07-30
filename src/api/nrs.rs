@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::constants::{
-    CONTENT_ADDED_SIGN, /*CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,*/
+    CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, /*CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,*/
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_DEFAULT, FAKE_RDF_PREDICATE_LINK,
     FAKE_RDF_PREDICATE_MODIFIED,
 };
@@ -164,13 +164,6 @@ impl NrsMap {
 // List of public names uploaded with details if they were added, updated or deleted from NrsMaps
 type ProcessedEntries = BTreeMap<String, (String, String)>;
 
-fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
-    let vec_hash = sha3_256(&name.to_string().into_bytes());
-    let xorname = XorName(vec_hash);
-    debug!("Resulting XorName for NRS: {} is, {}", name, xorname);
-    Ok(xorname)
-}
-
 #[allow(dead_code)]
 impl Safe {
     pub fn parse_url(&self, url: &str) -> ResultReturn<XorUrlEncoder> {
@@ -206,7 +199,6 @@ impl Safe {
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
         // GET current NRS map from &name TLD
-        // NOT via normal fetch
         let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
@@ -282,6 +274,33 @@ impl Safe {
         }
     }
 
+    pub fn nrs_map_container_remove(
+        &mut self,
+        name: &str,
+        dry_run: bool,
+    ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
+        info!("Removing from NRS map...");
+        // GET current NRS map from &name TLD
+        let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
+        let xorurl = xorurl_encoder.to_string("")?;
+        let (version, nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
+        debug!("NRS, Existing data: {:?}", nrs_map);
+
+        let (_, resolvable_container_raw_data, processed_entries, resulting_nrs_map) =
+            nrs_map_remove_subname(name, nrs_map, dry_run)?;
+
+        info!("The new dataaaaa..... {:?}", resulting_nrs_map);
+        // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+        let new_version = self.safe_app.append_seq_append_only_data(
+            resolvable_container_raw_data,
+            version + 1,
+            xorurl_encoder.xorname(),
+            xorurl_encoder.type_tag(),
+        )?;
+
+        Ok((new_version, xorurl, processed_entries, resulting_nrs_map))
+    }
+
     /// # Fetch an existing NrsMapContainer.
     ///
     /// ## Example
@@ -334,21 +353,110 @@ impl Safe {
     }
 }
 
+fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
+    let vec_hash = sha3_256(&name.to_string().into_bytes());
+    let xorname = XorName(vec_hash);
+    debug!("Resulting XorName for NRS \"{}\" is: {}", name, xorname);
+    Ok(xorname)
+}
+
 fn create_public_name_description(destination: &str) -> ResultReturn<PublicNameEntry> {
     let now = gen_timestamp_secs();
-
     let mut public_name = BTreeMap::new();
-
     public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), destination.to_string());
-
     public_name.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
     public_name.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now.clone());
-
     Ok(PublicNameEntry::Definition(public_name))
 }
 
 fn sanitised_nrs_url(name: &str) -> String {
+    // FIXME: make sure we remove the starting 'safe://'
     format!("safe://{}", name.replace("safe://", ""))
+}
+
+fn parse_nrs_name(name: &str) -> ResultReturn<(XorName, String, Vec<String>)> {
+    // santize to a simple string
+    let sanitized_name = str::replace(&name, "safe://", "").to_string();
+
+    let mut sub_names: Vec<String> = sanitized_name.split('.').map(String::from).collect();
+    // get the TLD
+    let top_level_name = sub_names
+        .pop()
+        .ok_or_else(|| Error::Unexpected("Failed to parse NRS name".to_string()))?;
+    // by default top subname is...
+    let top_subname = if !sub_names.is_empty() {
+        sub_names[sub_names.len() - 1].clone()
+    } else {
+        FAKE_RDF_PREDICATE_DEFAULT.to_string()
+    };
+
+    let nrs_xorname = xorname_from_nrs_string(&top_level_name)?;
+    debug!(
+        "XorName for \"{:?}\" is \"{:?}\"",
+        &top_level_name, &nrs_xorname
+    );
+
+    Ok((nrs_xorname, top_subname, sub_names))
+}
+
+fn nrs_map_remove_subname(
+    name: &str,
+    nrs_map: NrsMap,
+    _dry_run: bool,
+) -> ResultReturn<(XorName, NrsMapRawData, ProcessedEntries, NrsMap)> {
+    info!("Removing sub name \"{}\" from NRS map", name);
+    let (nrs_xorname, _top_subname, mut sub_names) = parse_nrs_name(name)?;
+    // let's walk the NRS Map tree to find the sub name we need to remove
+    let mut curr_nrs_map = &nrs_map;
+    sub_names.reverse();
+    let mut link = "";
+    for sub_name in sub_names.iter() {
+        match curr_nrs_map.entries.get(sub_name) {
+            Some(PublicNameEntry::SubName(nrs_sub_name)) => {
+                curr_nrs_map = nrs_sub_name;
+            }
+            Some(PublicNameEntry::Definition(def_map)) => {
+                println!("NRS subname resolution done. Located: \"{:?}\"", def_map);
+                link = match def_map.get(FAKE_RDF_PREDICATE_LINK) {
+                    Some(link) => link,
+                    None => "",
+                };
+            }
+            None => {
+                return Err(Error::ContentError(
+                    "Sub name not found in NRS Map Container".to_string(),
+                ))
+            }
+        };
+    }
+
+    let mut processed_entries = ProcessedEntries::new();
+    processed_entries.insert(
+        name.to_string(),
+        (CONTENT_DELETED_SIGN.to_string(), link.to_string()),
+    );
+
+    // The NrsMapContainer is an AppendOnlyData where each NRS Map version is an entry containing
+    // the timestamp as the entry's key, and the serialised NrsMap as the entry's value
+    // TODO: use RDF format
+    let serialised_nrs_map = serde_json::to_string(&nrs_map).map_err(|err| {
+        Error::Unexpected(format!(
+            "Couldn't serialise the NrsMap generated: {:?}",
+            err
+        ))
+    })?;
+    let now = gen_timestamp_secs();
+    let resolvable_container_data = vec![(
+        now.into_bytes().to_vec(),
+        serialised_nrs_map.as_bytes().to_vec(),
+    )];
+
+    Ok((
+        nrs_xorname,
+        resolvable_container_data,
+        processed_entries,
+        nrs_map,
+    ))
 }
 
 fn nrs_map_update_or_create_data(
@@ -358,44 +466,18 @@ fn nrs_map_update_or_create_data(
     default: bool,
     _dry_run: bool,
 ) -> ResultReturn<(XorName, NrsMapRawData, ProcessedEntries, NrsMap)> {
-    info!("Creating or updating an NRS map");
+    info!("Creating or updating NRS map for: {}", name);
 
-    // santize to a simple string
-    let sanitized_name = str::replace(&name, "safe://", "").to_string();
     let mut nrs_map = existing_map.unwrap_or_else(NrsMap::default);
-
-    let name_vec: Vec<String> = sanitized_name.split('.').map(String::from).collect();
-    // get the TLD
-    let top_level_name = &name_vec[name_vec.len() - 1];
-    //subnames
-    let the_rest_sub_names = &name_vec[0..name_vec.len() - 1];
-
-    // by default top subname is...
-    let top_subname = if !the_rest_sub_names.is_empty() {
-        &the_rest_sub_names[the_rest_sub_names.len() - 1]
-    } else {
-        FAKE_RDF_PREDICATE_DEFAULT
-    };
-
-    let nrs_xorname = xorname_from_nrs_string(&top_level_name)?;
-
-    debug!(
-        "XorName for \"{:?}\" is \"{:?}\"",
-        &top_level_name, &nrs_xorname
-    );
+    let (nrs_xorname, top_subname, sub_names) = parse_nrs_name(name)?;
 
     // Setup target RDF description
     let final_destination = destination.unwrap_or_else(|| "");
     let mut public_name_rdf = create_public_name_description(final_destination)?;
-
     debug!("Subname target data: {:?}", public_name_rdf);
 
-    let (updated_nrs_map, updated_public_name_rdf) = setup_nrs_tree(
-        nrs_map,
-        public_name_rdf,
-        the_rest_sub_names.to_vec(),
-        default,
-    )?;
+    let (updated_nrs_map, updated_public_name_rdf) =
+        setup_nrs_tree(nrs_map, public_name_rdf, sub_names.to_vec(), default)?;
 
     nrs_map = updated_nrs_map;
     public_name_rdf = updated_public_name_rdf;
@@ -407,21 +489,17 @@ fn nrs_map_update_or_create_data(
 
     // TODO: Enable source for funds / ownership
 
-    // The NrsMapContainer is created as a AppendOnlyData with a single entry containing the
-    // timestamp as the entry's key, and the serialised NrsMap as the entry's value
-    // TODO: use RDF format
-
     debug!("Subname inserted with name {:?}", &top_subname);
 
     // Only set this default if we're not talking about subnames here...
-    // if default && the_rest_sub_names.is_empty() {
+    // if default && sub_names.is_empty() {
     if default {
         debug!("Setting {:?} as default for NrsMap", &name);
 
         nrs_map.default = top_subname.to_string();
     }
 
-    let mut processed_entries: BTreeMap<String, (String, String)> = BTreeMap::new();
+    let mut processed_entries = ProcessedEntries::new();
     processed_entries.insert(
         name.to_string(),
         (
@@ -430,6 +508,9 @@ fn nrs_map_update_or_create_data(
         ),
     );
 
+    // The NrsMapContainer is an AppendOnlyData where each NRS Map version is an entry containing
+    // the timestamp as the entry's key, and the serialised NrsMap as the entry's value
+    // TODO: use RDF format
     let serialised_nrs_map = serde_json::to_string(&nrs_map).map_err(|err| {
         Error::Unexpected(format!(
             "Couldn't serialise the NrsMap generated: {:?}",

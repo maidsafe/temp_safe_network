@@ -9,7 +9,8 @@
 use super::helpers::get_from_arg_or_stdin;
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
-use safe_cli::Safe;
+use safe_cli::{Safe, XorUrl};
+use std::collections::BTreeMap;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -40,8 +41,6 @@ pub enum NrsSubCommands {
     Remove {
         /// The name to remove
         name: String,
-        /// The target NRS container where to remove the subname from
-        target: String,
     },
 }
 
@@ -65,30 +64,15 @@ pub fn nrs_commander(
                 safe.nrs_map_container_create(&name, Some(&link), set_as_default, dry_run)?;
 
             // Now let's just print out a summary
-            if OutputFmt::Pretty == output_fmt {
-                println!(
-                    "New NRS Map for \"safe://{}\" created at: \"{}\"",
-                    name.replace("safe://", ""),
-                    nrs_map_container_xorurl
-                );
-                let mut table = Table::new();
-                let format = FormatBuilder::new()
-                    .column_separator(' ')
-                    .padding(0, 1)
-                    .build();
-                table.set_format(format);
-
-                for (public_name, (change, name_link)) in processed_entries.iter() {
-                    table.add_row(row![change, public_name, name_link]);
-                }
-                table.printstd();
-            } else {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(nrs_map_container_xorurl, processed_entries))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
-            }
+            print_summary(
+                output_fmt,
+                &format!(
+                    "New NRS Map for \"safe://{}\" created at",
+                    name.replace("safe://", "")
+                ),
+                nrs_map_container_xorurl,
+                processed_entries,
+            );
 
             Ok(())
         }
@@ -102,31 +86,57 @@ pub fn nrs_commander(
                 safe.nrs_map_container_add(&name, Some(&link), default, dry_run)?;
 
             // Now let's just print out the summary
-            if OutputFmt::Pretty == output_fmt {
-                let mut table = Table::new();
-                let format = FormatBuilder::new()
-                    .column_separator(' ')
-                    .padding(0, 1)
-                    .build();
-                table.set_format(format);
-
-                for (public_name, (change, name_link)) in processed_entries.iter() {
-                    table.add_row(row![change, public_name, name_link]);
-                }
-                println!("NRS Map updated (version {}): \"{}\"", version, xorurl);
-                table.printstd();
-            } else {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(xorurl, processed_entries))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
-            }
+            print_summary(
+                output_fmt,
+                &format!("NRS Map updated (version {})", version),
+                xorurl,
+                processed_entries,
+            );
 
             Ok(())
         }
-        Some(NrsSubCommands::Remove { .. }) => Ok(()),
+        Some(NrsSubCommands::Remove { name }) => {
+            let (version, xorurl, processed_entries, _nrs_map) =
+                safe.nrs_map_container_remove(&name, dry_run)?;
 
+            // Now let's just print out the summary
+            print_summary(
+                output_fmt,
+                &format!("NRS Map updated (version {})", version),
+                xorurl,
+                processed_entries,
+            );
+
+            Ok(())
+        }
         None => Err("Missing keys sub-command. Use --help for details.".to_string()),
+    }
+}
+
+fn print_summary(
+    output_fmt: OutputFmt,
+    header_msg: &str,
+    xorurl: XorUrl,
+    processed_entries: BTreeMap<String, (String, String)>,
+) {
+    if OutputFmt::Pretty == output_fmt {
+        let mut table = Table::new();
+        let format = FormatBuilder::new()
+            .column_separator(' ')
+            .padding(0, 1)
+            .build();
+        table.set_format(format);
+
+        for (public_name, (change, name_link)) in processed_entries.iter() {
+            table.add_row(row![change, public_name, name_link]);
+        }
+        println!("{}: \"{}\"", header_msg, xorurl);
+        table.printstd();
+    } else {
+        println!(
+            "{}",
+            serde_json::to_string(&(xorurl, processed_entries))
+                .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+        );
     }
 }
