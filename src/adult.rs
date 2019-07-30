@@ -9,7 +9,7 @@
 use crate::{chunk_store::ImmutableChunkStore, vault::Init, Result};
 use safe_nd::NodePublicId;
 use std::{
-    cell::RefCell,
+    cell::Cell,
     fmt::{self, Display, Formatter},
     path::Path,
     rc::Rc,
@@ -28,7 +28,7 @@ impl Adult {
         init_mode: Init,
     ) -> Result<Self> {
         let _immutable_chunks =
-            ImmutableChunkStore::new(root_dir, max_capacity, Rc::new(RefCell::new(0)), init_mode)?;
+            ImmutableChunkStore::new(root_dir, max_capacity, Rc::new(Cell::new(0)), init_mode)?;
         Ok(Self {
             _id: id,
             _immutable_chunks,

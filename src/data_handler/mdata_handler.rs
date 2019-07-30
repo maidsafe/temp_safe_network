@@ -23,7 +23,7 @@ use safe_nd::{
 };
 
 use std::{
-    cell::RefCell,
+    cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -37,7 +37,7 @@ impl MDataHandler {
     pub(super) fn new(
         id: NodePublicId,
         config: &Config,
-        total_used_space: &Rc<RefCell<u64>>,
+        total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let root_dir = config.root_dir();

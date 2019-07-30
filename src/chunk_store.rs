@@ -25,7 +25,7 @@ use hex;
 use log::trace;
 use safe_nd::{AData, IData, LoginPacket, MData};
 use std::{
-    cell::RefCell,
+    cell::Cell,
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
     marker::PhantomData,
@@ -69,7 +69,7 @@ where
     pub fn new<P: AsRef<Path>>(
         root: P,
         max_capacity: u64,
-        total_used_space: Rc<RefCell<u64>>,
+        total_used_space: Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());

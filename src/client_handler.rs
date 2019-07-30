@@ -34,7 +34,7 @@ use safe_nd::{
 };
 use serde::Serialize;
 use std::{
-    cell::RefCell,
+    cell::Cell,
     collections::HashMap,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -68,7 +68,7 @@ impl ClientHandler {
     pub fn new(
         id: NodePublicId,
         config: &Config,
-        total_used_space: &Rc<RefCell<u64>>,
+        total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
         let auth_keys = AuthKeysDb::new(config.root_dir(), init_mode)?;

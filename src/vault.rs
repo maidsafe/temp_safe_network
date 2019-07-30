@@ -21,7 +21,7 @@ use crossbeam_channel::Receiver;
 use log::{error, info};
 use safe_nd::{NodeFullId, Request, XorName};
 use std::{
-    cell::RefCell,
+    cell::Cell,
     fmt::{self, Display, Formatter},
     fs,
     path::PathBuf,
@@ -69,7 +69,7 @@ impl Vault {
         });
 
         let (state, event_receiver) = if is_elder {
-            let total_used_space = Rc::new(RefCell::new(0));
+            let total_used_space = Rc::new(Cell::new(0));
             let (client_handler, event_receiver) = ClientHandler::new(
                 id.public_id().clone(),
                 &config,
