@@ -34,8 +34,9 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
     - [Sync](#files-sync)
   - [Cat](#cat)
   - [NRS](#nrs-name-resolution-system)
-    - [Create](#create)
-    - [Add](#add)
+    - [Create](#nrs-create)
+    - [Add](#nrs-add)
+    - [Remove](#nrs-remove)
   - [Update](#update)
 3. [Further Help](#further-help)
 4. [License](#license)
@@ -477,7 +478,7 @@ This is why the SAFE Network also supports having such human friendly URLs throu
 
 In this section we will explore the CLI commands which allow users to generate, administer, and use the NRS and its NRS-URLs for publishing and retrieving data to/from the SAFE Network.
 
-#### Create
+#### NRS Create
 
 Creating a friendly name on the Network can be achieved with the `nrs create` subcommand. This subcommand generates an NRS Container automatically linking it to any data we decide to link the friendly name to. An NRS Container is stored on the Network as a `Published AppendOnlyData` data, and it contains an NRS Map using RDF for its data representation (since this is still under development, pseudo-RDF data is now being used temporarily), this Map has a list of subnames and where each of them are being linked to, e.g. `mysubname` can be created as a subname of `mywebsite` NRS name by having `mysubname` linked to a particular `FilesContainer` XOR-URL so that if can be fetched with `safe://mysubname.mywebsite`.
 
@@ -543,7 +544,7 @@ New NRS Map for "safe://blog.mywebsite" created at: "safe://hnyydyz7utb6npt9kg3a
 
 As the NRS CLI advances, you'll be able to individually add to both `blog.mywebsite`, or indeed just `mywebsite`, as well as change what the `default` resource to retrieve is for both.
 
-#### Add
+#### NRS Add
 
 Once a public name has been created with `nrs create` command, more sub names can be added to it using the `nrs add` command. This command expects the same arguments as `nrs create` command but it only requires and assumes that the public name already exists.
 
@@ -552,6 +553,17 @@ Let's add `profile` sub name to the `mywebsite` NRS name we created before:
 $ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc
 NRS Map updated (version 2): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
+```
+
+#### NRS Remove
+
+Removing sub names from an NRS Map Container it's very simple and straight forward, since the only information required to do so is just the NRS-URL. The `nrs remove` command will remove only the sub name specified in the provided NRS-URL without touching any of the other existing sub names, e.g. if the `safe://sub-b.sub-a.mypubname` NRS-URL is provided then only `sub-b` sub name will be removed from `mypubname` NRS Map Container (by creating a new version of it, remember this is all part of the perpetual web).
+
+Let's remove the `profile` sub name from the `mywebsite` NRS name we added before:
+```shell
+$ safe nrs remove profile.mywebsite
+NRS Map updated (version 3): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
+-  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
 ```
 
 ### Update

@@ -252,7 +252,7 @@ fn calling_safe_files_removed_sync() {
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), 5);
 
-    // Now, let's first try without --dry-run and they should be effectively removed
+    // Now, let's try without --dry-run and they should be effectively removed
     let sync_cmd_output = cmd!(
         get_bin_location(),
         "files",
@@ -269,7 +269,7 @@ fn calling_safe_files_removed_sync() {
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_xor);
     assert_eq!(processed_files.len(), 5);
-    // now all files shoudl be gone
+    // now all files should be gone
     let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
         .read()
         .unwrap();
