@@ -88,5 +88,5 @@ pub use crate::{
     config_handler::Config,
     error::{Error, Result},
     utils::to_error_response,
-    vault::Vault,
+    vault::{Command, Vault},
 };

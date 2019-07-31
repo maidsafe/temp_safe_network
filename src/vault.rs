@@ -17,8 +17,8 @@ use crate::{
     utils, Config, Error, Result,
 };
 use bincode;
-use crossbeam_channel::Receiver;
-use log::{error, info};
+use crossbeam_channel::{select, Receiver};
+use log::{error, info, trace};
 use safe_nd::{NodeFullId, Request, XorName};
 use std::{
     cell::Cell,
@@ -49,17 +49,24 @@ pub(crate) enum Init {
     New,
 }
 
+/// Command that the user can send to a running vault to control its execution.
+pub enum Command {
+    /// Shutdown the vault
+    Shutdown,
+}
+
 /// Main vault struct.
 pub struct Vault {
     id: NodeFullId,
     root_dir: PathBuf,
     state: State,
     event_receiver: Receiver<Event>,
+    command_receiver: Receiver<Command>,
 }
 
 impl Vault {
     /// Construct a new vault instance.
-    pub fn new(config: Config) -> Result<Self> {
+    pub fn new(config: Config, command_receiver: Receiver<Command>) -> Result<Self> {
         let mut init_mode = Init::Load;
         let (is_elder, id) = Self::read_state(&config)?.unwrap_or_else(|| {
             let mut rng = rand::thread_rng();
@@ -107,6 +114,7 @@ impl Vault {
             root_dir: config.root_dir().to_path_buf(),
             state,
             event_receiver,
+            command_receiver,
         };
         vault.dump_state()?;
         Ok(vault)
@@ -125,8 +133,22 @@ impl Vault {
 
     /// Runs the main event loop. Blocks until the vault is terminated.
     pub fn run(&mut self) {
-        while let Ok(event) = self.event_receiver.recv() {
-            self.step(event)
+        loop {
+            select! {
+                recv(self.event_receiver) -> event => {
+                    if let Ok(event) = event {
+                        self.step(event)
+                    } else {
+                        break
+                    }
+                }
+                recv(self.command_receiver) -> command => {
+                    if let Ok(Command::Shutdown) = command {
+                        trace!("{}: Shutdown command received", self);
+                        break
+                    }
+                }
+            }
         }
     }
 

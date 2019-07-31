@@ -136,7 +136,9 @@ impl TestVault {
         let mut config = Config::default();
         config.set_root_dir(root_dir.path());
 
-        let inner = unwrap!(Vault::new(config));
+        let (_, command_rx) = crossbeam_channel::bounded(0);
+
+        let inner = unwrap!(Vault::new(config, command_rx));
 
         Self {
             inner,

@@ -65,8 +65,8 @@ fn main() {
 #[cfg(not(feature = "mock"))]
 mod detail {
     use env_logger;
-    use log::info;
-    use safe_vault::{self, Config, Vault};
+    use log;
+    use safe_vault::{self, Command, Config, Vault};
     use structopt::StructOpt;
 
     /// Runs a SAFE Network vault.
@@ -83,9 +83,19 @@ mod detail {
             Config::clap().get_name(),
             env!("CARGO_PKG_VERSION")
         );
-        info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+        log::info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-        match Vault::new(config) {
+        let (command_tx, command_rx) = crossbeam_channel::bounded(1);
+
+        // Shutdown the vault gracefully on SIGINT (Ctrl+C).
+        let result = ctrlc::set_handler(move || {
+            let _ = command_tx.send(Command::Shutdown);
+        });
+        if let Err(error) = result {
+            log::error!("Failed to set interrupt handler: {:?}", error)
+        }
+
+        match Vault::new(config, command_rx) {
             Ok(mut vault) => vault.run(),
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);
