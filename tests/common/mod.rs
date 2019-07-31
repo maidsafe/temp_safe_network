@@ -224,7 +224,7 @@ pub trait TestClientTrait {
 
         let challenge: Challenge = unwrap!(bincode::deserialize(&bytes));
         let payload = match challenge {
-            Challenge::Request(payload) => payload,
+            Challenge::Request(_, payload) => payload,
             Challenge::Response(..) => panic!("Unexpected Challenge::Response"),
         };
 

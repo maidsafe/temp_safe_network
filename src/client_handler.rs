@@ -135,7 +135,10 @@ impl ClientHandler {
         };
 
         let challenge = utils::random_vec(8);
-        self.send(peer.clone(), &Challenge::Request(challenge.clone()));
+        self.send(
+            peer.clone(),
+            &Challenge::Request(PublicId::Node(self.id.clone()), challenge.clone()),
+        );
         let _ = self.client_candidates.insert(peer.peer_addr(), challenge);
         info!("{}: Connected to new client on {}", self, peer_addr);
     }
@@ -190,7 +193,7 @@ impl ClientHandler {
                 Ok(Challenge::Response(public_id, signature)) => {
                     self.handle_challenge(peer_addr, public_id, signature);
                 }
-                Ok(Challenge::Request(_)) => {
+                Ok(Challenge::Request(_, _)) => {
                     info!(
                         "{}: Received unexpected challenge request from {}",
                         self, peer_addr
