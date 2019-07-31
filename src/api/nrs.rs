@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::constants::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN};
-use super::helpers::{gen_timestamp_secs, get_subnames_host_and_path};
+use super::helpers::{gen_timestamp_nanos, get_subnames_host_and_path};
 use super::nrs_map::NrsMap;
 use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
@@ -270,7 +270,7 @@ fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> ResultReturn<NrsMapRawData> {
             err
         ))
     })?;
-    let now = gen_timestamp_secs();
+    let now = gen_timestamp_nanos();
 
     Ok(vec![(
         now.into_bytes().to_vec(),
