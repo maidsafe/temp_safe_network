@@ -123,21 +123,9 @@ impl NrsMap {
                     };
                 }
                 None => {
-                    if sub_names.is_empty() {
-                        // we need default one then
-                        if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
-                            debug!("NRS subname resolution done. Located: \"{:?}\"", def_data);
-                            link = def_data.get(FAKE_RDF_PREDICATE_LINK);
-                        } else {
-                            return Err(Error::ContentError(
-                                "Sub name not found in NRS Map Container".to_string(),
-                            ));
-                        }
-                    } else {
-                        return Err(Error::ContentError(
-                            "Sub name not found in NRS Map Container".to_string(),
-                        ));
-                    };
+                    return Err(Error::ContentError(
+                        "Sub name not found in NRS Map Container".to_string(),
+                    ));
                 }
             };
         }
