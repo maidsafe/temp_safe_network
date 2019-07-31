@@ -88,7 +88,11 @@ pub fn cat_commander(
                         files_map
                     );
             } else {
-                println!("[{}, {:?}]", xorurl, files_map);
+                println!(
+                    "{}",
+                    serde_json::to_string(&(xorurl, files_map))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
             }
         }
         SafeData::PublishedImmutableData {

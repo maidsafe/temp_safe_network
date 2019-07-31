@@ -12,13 +12,15 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{get_bin_location, CLI, SAFE_PROTOCOL};
+use common::{
+    get_bin_location, parse_cat_files_container_output, parse_files_put_or_sync_output, CLI,
+    SAFE_PROTOCOL,
+};
 use predicates::prelude::*;
-use std::process::Command;
-
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{prelude::*, Seek, SeekFrom};
+use std::process::Command;
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "./tests/testfolder/test.md";
@@ -205,6 +207,75 @@ fn calling_safe_files_sync() {
     let file = format!("{}/subexists.md", files_container_xor);
     let synced_file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
     assert_eq!(synced_file_cat, "hello from a subfolder!");
+}
+
+#[test]
+fn calling_safe_files_removed_sync() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+    assert_eq!(processed_files.len(), 5);
+
+    // let's first try with --dry-run and they should not be removed
+    let sync_cmd_output_dry_run = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &files_container_xor,
+        "--recursive",
+        "--delete",
+        "--dry-run",
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
+    assert_eq!(target, files_container_xor);
+    assert_eq!(processed_files.len(), 5);
+
+    let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&synced_file_cat);
+    assert_eq!(xorurl, files_container_xor);
+    assert_eq!(files_map.len(), 5);
+
+    // Now, let's first try without --dry-run and they should be effectively removed
+    let sync_cmd_output = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &files_container_xor,
+        "--recursive",
+        "--delete",
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    assert_eq!(target, files_container_xor);
+    assert_eq!(processed_files.len(), 5);
+    // now all files shoudl be gone
+    let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&synced_file_cat);
+    assert_eq!(xorurl, files_container_xor);
+    assert_eq!(files_map.len(), 0);
 }
 
 #[test]

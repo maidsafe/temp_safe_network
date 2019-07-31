@@ -461,7 +461,7 @@ fn files_map_sync(
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
                 }
 
-                // let's now remove it form the current list so we now it has been processed
+                // let's now remove it from the current list so we now it has been processed
                 current_files_map.remove(&normalised_file_name);
             }
         }
@@ -480,6 +480,7 @@ fn files_map_sync(
                     file_item[FAKE_RDF_PREDICATE_LINK].clone(),
                 ),
             );
+            success_count += 1;
         }
     });
 

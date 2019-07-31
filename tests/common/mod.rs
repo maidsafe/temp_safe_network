@@ -98,3 +98,17 @@ pub fn upload_test_folder() -> (String, BTreeMap<String, (String, String)>) {
 
     (container_xorurl, file_map)
 }
+
+#[allow(dead_code)]
+pub fn parse_cat_files_container_output(
+    output: &str,
+) -> (String, BTreeMap<String, BTreeMap<String, String>>) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe cat` on FilesContainer")
+}
+
+#[allow(dead_code)]
+pub fn parse_files_put_or_sync_output(
+    output: &str,
+) -> (String, BTreeMap<String, (String, String)>) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe files sync`")
+}
