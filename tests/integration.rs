@@ -61,10 +61,10 @@ use safe_nd::{
     ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
     AppendOnlyData, ClientFullId, Coins, EntryError, Error as NdError, IData, IDataAddress,
     LoginPacket, MData, MDataAction, MDataAddress, MDataKind, MDataPermissionSet,
-    MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, Message, MessageId, Notification,
-    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response,
-    Result as NdResult, SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, Message, MessageId, PubImmutableData,
+    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
+    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -130,7 +130,7 @@ fn login_packets() {
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     // Try to get a login packet that does not exist yet.
     common::send_request_expect_err(
@@ -193,7 +193,7 @@ fn create_login_packet_for_other() {
     let login_packet_locator: XorName = env.rng().gen();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut established_client, 1_000_000_000_000, None);
+    common::create_balance(&mut env, &mut established_client, None, 1_000_000_000_000);
 
     // `new_client` gets `established_client` to create its balance and store its new login packet.
     let login_packet = unwrap!(LoginPacket::new(
@@ -262,7 +262,7 @@ fn update_login_packet() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -338,57 +338,23 @@ fn coin_operations() {
     );
 
     // Create A's balance
-    let public_key = *client_a.public_id().public_key();
-    let amount = unwrap!(Coins::from_nano(10));
-    let mut expected = Transaction { id: 0, amount };
-    common::send_request_expect_ok(
-        &mut env,
-        &mut client_a,
-        Request::CreateBalance {
-            new_balance_owner: public_key,
-            amount,
-            transaction_id: 0,
-        },
-        expected,
-    );
-
-    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount);
+    let amount_a = unwrap!(Coins::from_nano(10));
+    common::create_balance(&mut env, &mut client_a, None, amount_a);
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
 
     // Create B's balance
-    let mut amount_b = unwrap!(Coins::from_nano(1));
-    expected.amount = amount_b;
-    common::send_request_expect_ok(
-        &mut env,
-        &mut client_a,
-        Request::CreateBalance {
-            new_balance_owner: *client_b.public_id().public_key(),
-            amount: amount_b,
-            transaction_id: 0,
-        },
-        expected,
-    );
+    let amount_b = unwrap!(Coins::from_nano(1));
+    common::create_balance(&mut env, &mut client_a, Some(&mut client_b), amount_b);
 
-    let mut amount_a = unwrap!(Coins::from_nano(9));
+    let amount_a = unwrap!(Coins::from_nano(9));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
 
     // Transfer coins from A to B
-    expected.id = 1;
-    expected.amount = unwrap!(Coins::from_nano(2));
-    common::send_request_expect_ok(
-        &mut env,
-        &mut client_a,
-        Request::TransferCoins {
-            destination: *client_b.public_id().name(),
-            amount: unwrap!(Coins::from_nano(2)),
-            transaction_id: 1,
-        },
-        expected,
-    );
-    assert_eq!(client_b.expect_notification(), Notification(expected));
+    common::transfer_coins(&mut env, &mut client_a, &mut client_b, 2, 1);
 
-    amount_a = unwrap!(Coins::from_nano(7));
-    amount_b = unwrap!(Coins::from_nano(3));
+    let amount_a = unwrap!(Coins::from_nano(7));
+    let amount_b = unwrap!(Coins::from_nano(3));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
 }
@@ -509,7 +475,7 @@ fn put_append_only_data() {
     }
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano, None);
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
 
     // Check that client B cannot put A's data
     common::send_request_expect_err(
@@ -659,7 +625,7 @@ fn delete_append_only_data_that_doesnt_exist() {
     let tag = 100;
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
 
     common::send_request_expect_err(
         &mut env,
@@ -693,7 +659,7 @@ fn delete_append_only_data_that_doesnt_exist() {
 fn get_pub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -745,7 +711,7 @@ fn get_unpub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     let mut data = UnpubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -779,7 +745,7 @@ fn get_unpub_append_only_data() {
 
     // Failure - get by non-owner not allowed
     let mut other_client = env.new_connected_client();
-    common::create_balance_from_nano(&mut env, &mut other_client, 0, None);
+    common::create_balance(&mut env, &mut other_client, None, 0);
 
     common::send_request_expect_err(
         &mut env,
@@ -794,7 +760,7 @@ fn append_only_data_get_entries() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -888,7 +854,7 @@ fn append_only_data_get_entries() {
 fn append_only_data_get_owners() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -946,7 +912,7 @@ fn append_only_data_get_owners() {
 fn pub_append_only_data_get_permissions() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1071,7 +1037,7 @@ fn unpub_append_only_data_get_permissions() {
     let mut client = env.new_connected_client();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1204,8 +1170,8 @@ fn pub_append_only_data_put_permissions() {
     let public_key_b = *client_b.public_id().public_key();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano, None);
-    common::create_balance_from_nano(&mut env, &mut client_b, start_nano, None);
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+    common::create_balance(&mut env, &mut client_b, None, start_nano);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1307,8 +1273,8 @@ fn unpub_append_only_data_put_permissions() {
     let public_key_b = *client_b.public_id().public_key();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano, None);
-    common::create_balance_from_nano(&mut env, &mut client_b, start_nano, None);
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+    common::create_balance(&mut env, &mut client_b, None, start_nano);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1410,8 +1376,8 @@ fn append_only_data_put_owners() {
     let public_key_b = *client_b.public_id().public_key();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano, None);
-    common::create_balance_from_nano(&mut env, &mut client_b, start_nano, None);
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+    common::create_balance(&mut env, &mut client_b, None, start_nano);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1539,7 +1505,7 @@ fn append_only_data_append_seq() {
     let public_key = *client.public_id().public_key();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1621,7 +1587,7 @@ fn append_only_data_append_unseq() {
     let public_key = *client.public_id().public_key();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1731,13 +1697,8 @@ fn put_immutable_data() {
     // Create balances.  Client A starts with 2000 safecoins and spends 1000 to initialise
     // Client B's balance.
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano * 2, None);
-    common::create_balance_from_nano(
-        &mut env,
-        &mut client_a,
-        start_nano,
-        Some(*client_b.public_id().public_key()),
-    );
+    common::create_balance(&mut env, &mut client_a, None, start_nano * 2);
+    common::create_balance(&mut env, &mut client_a, Some(&mut client_b), start_nano);
 
     // Check client A can't Put an UnpubIData where B is the owner.
     common::send_request_expect_err(
@@ -1810,7 +1771,7 @@ fn get_immutable_data_that_doesnt_exist() {
 
     // Try to get non-existing unpublished immutable data while having balance
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
     common::send_request_expect_err(
         &mut env,
         &mut client,
@@ -1827,8 +1788,8 @@ fn get_immutable_data_from_other_owner() {
     let mut client_b = env.new_connected_client();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano, None);
-    common::create_balance_from_nano(&mut env, &mut client_b, start_nano, None);
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+    common::create_balance(&mut env, &mut client_b, None, start_nano);
 
     // Client A uploads published data that Client B can fetch
     let pub_idata = IData::Pub(PubImmutableData::new(vec![1, 2, 3]));
@@ -1861,7 +1822,7 @@ fn put_pub_and_get_unpub_immutable_data_at_same_xor_name() {
 
     // Create balance.
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
 
     // Put and verify some published immutable data
     let pub_idata = IData::Pub(PubImmutableData::new(vec![1, 2, 3]));
@@ -1892,7 +1853,7 @@ fn put_unpub_and_get_pub_immutable_data_at_same_xor_name() {
 
     // Create balances.
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
 
     // Put and verify some unpub immutable data
     let owner = client.public_id().public_key();
@@ -1948,7 +1909,7 @@ fn delete_immutable_data_that_doesnt_exist() {
 
     // Try to delete non-existing unpublished data
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client, start_nano, None);
+    common::create_balance(&mut env, &mut client, None, start_nano);
     common::send_request_expect_err(
         &mut env,
         &mut client,
@@ -1964,7 +1925,7 @@ fn delete_immutable_data() {
     let mut client_b = env.new_connected_client();
 
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut client_a, start_nano, None);
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
 
     let raw_data = vec![1, 2, 3];
     let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
@@ -2053,7 +2014,7 @@ fn auth_keys() {
 
     // TODO - enable this once we're passed phase 1.
     if false {
-        // Try to insert and then list authorised keys using a client with no balance.  Each should
+        // Try to insert and then list authorised keys using a client with no balance. Each should
         // return `NoSuchBalance`.
         common::send_request_expect_err(
             &mut env,
@@ -2064,10 +2025,14 @@ fn auth_keys() {
         list_keys(&mut env, &mut owner, Err(NdError::NoSuchBalance));
     }
 
-    // Create a balance for the owner and check that listing authorised keys returns an empty
-    // collection.
+    // Create a balance for the owner.
     let start_nano = 1_000_000_000_000;
-    common::create_balance_from_nano(&mut env, &mut owner, start_nano, None);
+    common::create_balance(&mut env, &mut owner, None, start_nano);
+
+    // The app receives the transaction notification too.
+    let _ = app.expect_notification();
+
+    // Check that listing authorised keys returns an empty collection.
     let mut expected_map = BTreeMap::new();
     list_keys(&mut env, &mut owner, Ok((expected_map.clone(), 0)));
 
@@ -2109,7 +2074,7 @@ fn app_permissions() {
     let mut env = Environment::new();
 
     let mut owner = env.new_connected_client();
-    common::create_balance_from_nano(&mut env, &mut owner, 0, None);
+    common::create_balance(&mut env, &mut owner, None, 0);
 
     // App 0 is authorized with permission to transfer coins.
     let mut app_0 = env.new_disconnected_app(owner.public_id().clone());
@@ -2253,7 +2218,7 @@ fn put_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     // Try to put sequenced Mutable Data
     let name: XorName = env.rng().gen();
@@ -2279,7 +2244,7 @@ fn put_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     // Try to put unsequenced Mutable Data
     let name: XorName = env.rng().gen();
@@ -2305,7 +2270,7 @@ fn read_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     // Try to put sequenced Mutable Data with several entries.
     let entries: BTreeMap<_, _> = (1..4)
@@ -2377,7 +2342,7 @@ fn mutate_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     // Try to put sequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2479,7 +2444,7 @@ fn mutate_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client, 0, None);
+    common::create_balance(&mut env, &mut client, None, 0);
 
     // Try to put unsequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2564,8 +2529,8 @@ fn mutable_data_permissions() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client_a, 0, None);
-    common::create_balance_from_nano(&mut env, &mut client_b, 0, None);
+    common::create_balance(&mut env, &mut client_a, None, 0);
+    common::create_balance(&mut env, &mut client_b, None, 0);
 
     // Try to put new unsequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2635,8 +2600,8 @@ fn delete_mutable_data() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    common::create_balance_from_nano(&mut env, &mut client_a, 0, None);
-    common::create_balance_from_nano(&mut env, &mut client_b, 0, None);
+    common::create_balance(&mut env, &mut client_a, None, 0);
+    common::create_balance(&mut env, &mut client_b, None, 0);
 
     let mdata = UnseqMutableData::new(env.rng().gen(), 100, *client_a.public_id().public_key());
     let address = *mdata.address();

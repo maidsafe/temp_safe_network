@@ -19,6 +19,7 @@ use log::Record;
 use safe_nd::{
     AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, Error, Message,
     MessageId, Notification, PublicId, PublicKey, Request, Response, Signature, Transaction,
+    TransactionId,
 };
 use safe_vault::{
     mock::Network,
@@ -493,24 +494,84 @@ pub fn send_request_expect_no_response<T: TestClientTrait>(
     client.expect_no_new_message();
 }
 
-pub fn create_balance_from_nano(
+pub fn create_balance(
     env: &mut Environment,
-    client: &mut TestClient,
-    amount: u64,
-    new_owner: Option<PublicKey>,
+    src_client: &mut TestClient,
+    dst_client: Option<&mut TestClient>,
+    amount: impl IntoCoins,
 ) {
-    let public_key = new_owner.unwrap_or_else(|| *client.public_id().public_key());
-    let _: Transaction = get_from_response(
-        env,
-        client,
-        Request::CreateBalance {
-            new_balance_owner: public_key,
-            amount: unwrap!(Coins::from_nano(amount)),
-            transaction_id: 0,
-        },
-    );
+    let new_balance_owner = match dst_client {
+        Some(ref dst_client) => *dst_client.public_id().public_key(),
+        None => *src_client.public_id().public_key(),
+    };
+    let amount = amount.into_coins();
+    let transaction_id = 0;
+
+    let message_id = src_client.send_request(Request::CreateBalance {
+        new_balance_owner,
+        amount,
+        transaction_id,
+    });
+    env.poll();
+
+    let expected = Transaction {
+        id: transaction_id,
+        amount,
+    };
+
+    let notification = dst_client.unwrap_or(src_client).expect_notification();
+    assert_eq!(notification, Notification(expected));
+
+    let response = src_client.expect_response(message_id);
+    let actual = unwrap!(Transaction::try_from(response));
+    assert_eq!(actual, expected);
+}
+
+pub fn transfer_coins(
+    env: &mut Environment,
+    src_client: &mut TestClient,
+    dst_client: &mut TestClient,
+    amount: impl IntoCoins,
+    transaction_id: TransactionId,
+) {
+    let amount = amount.into_coins();
+
+    let message_id = src_client.send_request(Request::TransferCoins {
+        destination: *dst_client.public_id().name(),
+        amount,
+        transaction_id,
+    });
+    env.poll();
+
+    let expected = Transaction {
+        id: transaction_id,
+        amount,
+    };
+
+    let notification = dst_client.expect_notification();
+    assert_eq!(notification, Notification(expected));
+
+    let response = src_client.expect_response(message_id);
+    let actual = unwrap!(Transaction::try_from(response));
+    assert_eq!(actual, expected);
 }
 
 pub fn gen_public_key(rng: &mut TestRng) -> PublicKey {
     *ClientFullId::new_ed25519(rng).public_id().public_key()
+}
+
+pub trait IntoCoins {
+    fn into_coins(self) -> Coins;
+}
+
+impl IntoCoins for Coins {
+    fn into_coins(self) -> Coins {
+        self
+    }
+}
+
+impl IntoCoins for u64 {
+    fn into_coins(self) -> Coins {
+        unwrap!(Coins::from_nano(self))
+    }
 }
