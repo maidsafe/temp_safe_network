@@ -90,23 +90,6 @@ fn calling_safe_wallet_transfer() {
     assert_eq!(from_has, "60.000000000")
 }
 
-// TODO: this test should check for lack of SK when querying a balance not owned by user.
-// And should fail.
-// Blocked: until SCL queries of random balances
-//
-// #[test]
-// fn calling_safe_wallet_balance_pretty_no_sk() {
-//     let mut cmd = Command::cargo_bin(CLI).unwrap();
-//
-//     let wallet = cmd!(get_bin_location(), "wallet", "create", "--preload", "300", "--test-coins", "--json").read().unwrap();
-//     assert!(wallet.contains(SAFE_PROTOCOL));
-//
-//     cmd.args(&vec!["wallet", "balance", &wallet, "--json"])
-//         .assert()
-//         .stdout("300\n")
-//         .success();
-// }
-
 #[test]
 fn calling_safe_wallet_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -192,7 +175,8 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
         get_bin_location(),
         "wallet",
         "create",
-        &pk_pay_xor,
+        "--pay-with",
+        &pay_sk,
         "--keyurl",
         &pk_pay_xor,
         "--sk",
@@ -216,14 +200,15 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
 
 #[test]
 fn calling_safe_wallet_create_w_bad_secret() {
-    let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     cmd.args(&vec![
         "wallet",
         "create",
-        &pk_pay_xor,
+        "--pay-with",
+        &pay_sk,
         "--keyurl",
         &pk_pay_xor,
         "--sk",
@@ -237,14 +222,15 @@ fn calling_safe_wallet_create_w_bad_secret() {
 
 #[test]
 fn calling_safe_wallet_create_w_bad_pk() {
-    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+    let (_pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     cmd.args(&vec![
         "wallet",
         "create",
-        &pk_pay_xor,
+        "--pay-with",
+        &pay_sk,
         "--keyurl",
         "safe://nononooOOooo",
         "--sk",
@@ -260,19 +246,20 @@ fn calling_safe_wallet_create_w_bad_pk() {
 
 #[test]
 fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
-    let (pk_pay_xor, _pay_sk) = create_preload_and_get_keys("300");
-    let (_pk_pay_xor2, pay_sk2) = create_preload_and_get_keys("300");
+    let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
+    let (_, key_sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     cmd.args(&vec![
         "wallet",
         "create",
-        &pk_pay_xor,
+        "--pay-with",
+        &pay_sk,
         "--keyurl",
         &pk_pay_xor,
         "--sk",
-        &pay_sk2,
+        &key_sk,
         "--json",
     ])
     .assert()

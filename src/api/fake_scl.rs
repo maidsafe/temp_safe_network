@@ -12,7 +12,7 @@ use super::{Error, ResultReturn, SafeApp, XorUrlEncoder};
 use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
-use log::debug;
+use log::{debug, trace};
 use safe_nd::{Coins, MDataValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -52,7 +52,7 @@ impl Drop for SafeAppFake {
     fn drop(&mut self) {
         let serialised = serde_json::to_string(&self.fake_vault)
             .expect("Failed to serialised fake vault data to write on file");
-        debug!("Writing serialised fake vault data = {}", serialised);
+        trace!("Writing serialised fake vault data = {}", serialised);
 
         let mut file =
             fs::File::create(&FAKE_VAULT_FILE).expect("Failed to create fake vault DB file");

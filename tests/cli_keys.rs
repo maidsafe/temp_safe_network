@@ -69,7 +69,7 @@ fn calling_safe_keypair_pretty() {
 #[test]
 fn calling_safe_keys_balance() {
     let (pk_xor, sk) = create_preload_and_get_keys("123");
-
+    println!("AA: {}", pk_xor);
     assert!(pk_xor.contains("safe://"));
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();

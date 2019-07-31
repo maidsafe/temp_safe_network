@@ -41,7 +41,7 @@ struct CmdArgs {
     // /// Enable to query the output via SPARQL eg.
     // #[structopt(short = "q", long = "query", raw(global = "true"))]
     // query: Option<String>,
-    /// Dry run of command. No data will be written. No coins spent.
+    /// Dry run of command. No data will be written. No coins spent
     #[structopt(short = "n", long = "dry-run", raw(global = "true"))]
     dry: bool,
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64

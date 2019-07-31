@@ -19,8 +19,9 @@ pub enum KeysSubCommands {
     #[structopt(name = "create")]
     /// Create a new Key
     Create {
-        /// The source wallet for funds
-        source: Option<String>,
+        /// The secret key of a Key for paying the operation costs. If not provided, the default wallet from the account will be used, unless '--test-coins' was set
+        #[structopt(short = "w", long = "pay-with")]
+        pay_with: Option<String>,
         /// Create a Key and allocate test-coins onto it
         #[structopt(long = "test-coins")]
         preload_test_coins: bool,
@@ -34,10 +35,10 @@ pub enum KeysSubCommands {
     #[structopt(name = "balance")]
     /// Query a Key's current balance
     Balance {
-        /// The target Key's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'.
+        /// The target Key's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'
         #[structopt(long = "keyurl")]
         keyurl: Option<String>,
-        /// The secret key which corresponds to the target Key
+        /// The secret key which corresponds to the target Key. It will be prompted if not provided
         #[structopt(long = "sk")]
         secret: Option<String>,
     },
@@ -52,11 +53,11 @@ pub fn key_commander(
         Some(KeysSubCommands::Create {
             preload,
             pk,
-            source,
+            pay_with,
             preload_test_coins,
             ..
         }) => {
-            create_new_key(safe, preload_test_coins, source, preload, pk, output_fmt)?;
+            create_new_key(safe, preload_test_coins, pay_with, preload, pk, output_fmt)?;
             Ok(())
         }
         Some(KeysSubCommands::Balance { keyurl, secret }) => {
@@ -82,48 +83,49 @@ pub fn key_commander(
 pub fn create_new_key(
     safe: &mut Safe,
     preload_test_coins: bool,
-    source: Option<String>,
+    pay_with: Option<String>,
     preload: Option<String>,
     pk: Option<String>,
     output_fmt: OutputFmt,
 ) -> Result<(String, Option<BlsKeyPair>), String> {
     let (xorname, key_pair) = if preload_test_coins {
-        /*if cfg!(not(feature = "mock-network")) {
-            warn!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-            println!("Ignoring \"--test-coins\" flag since it's only available for \"mock-network\" feature");
-            safe.keys_create(source, preload, pk)
-        } else {*/
+        if cfg!(not(feature = "mock-network")) && cfg!(not(feature = "scl-mock")) {
+            warn!("'--test-coins' flag is not supported since it's only available for \"mock-network\" feature");
+            return Err("'--test-coins' flag is not supported since it's only available for \"mock-network\" feature".to_string());
+        }
+
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
         if amount == PRELOAD_TESTCOINS_DEFAULT_AMOUNT {
-            warn!("You must pass a preload amount with test-coins, 1000.111 will be added by default.");
+            warn!(
+                "You can pass a preload amount with test-coins, 1000.111 will be added by default."
+            );
         }
 
         safe.keys_create_preload_test_coins(&amount, pk)?
-    // }
     } else {
-        // 'source' is either a Wallet XOR-URL, or a secret key
+        // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
-        // If the source is not provided the API will use the account's default wallet/sk
-        if source == None {
-            debug!("Missing the 'source' argument, using account's default wallet for funds");
+        // If the --pay-with is not provided the API will use the account's default wallet/sk
+        if pay_with.is_none() {
+            debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
         }
-        safe.keys_create(source, preload, pk)?
+        safe.keys_create(pay_with, preload, pk)?
     };
 
     if OutputFmt::Pretty == output_fmt {
         println!("New Key created at: \"{}\"", xorname);
     } else {
-        println!("pk-xorurl={}", xorname);
+        println!("xorurl = {}", xorname);
     }
 
     if let Some(pair) = &key_pair {
         if OutputFmt::Pretty == output_fmt {
             println!("Key pair generated:");
         }
-        println!("pk={}", pair.pk);
-        println!("sk={}", pair.sk);
+        println!("pk = {}", pair.pk);
+        println!("sk = {}", pair.sk);
     }
 
     Ok((xorname, key_pair))

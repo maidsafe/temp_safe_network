@@ -43,10 +43,10 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
 
     let mut lines = pk_command_result.lines();
     let pk_xor_line = lines.next().unwrap();
-    let pk_xor = &pk_xor_line["pk-xorurl=".len()..];
+    let pk_xor = &pk_xor_line["xorurl = ".len()..];
     let _pk = lines.next().unwrap();
     let sk_line = lines.next().unwrap();
-    let sk = &sk_line["sk=".len()..];
+    let sk = &sk_line["sk = ".len()..];
 
     (pk_xor.to_string(), sk.to_string())
 }
@@ -58,7 +58,8 @@ pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
         get_bin_location(),
         "wallet",
         "create",
-        &pk,
+        "--pay-with",
+        &sk,
         "--keyurl",
         &pk,
         "--sk",
