@@ -1,4 +1,5 @@
 SHELL := /bin/bash
+SAFE_VAULT_VERSION := $(shell grep "^version" < Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
@@ -63,3 +64,80 @@ endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
 	mv ${ARCHIVE_NAME} artifacts
+
+retrieve-all-build-artifacts:
+ifndef SAFE_VAULT_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SAFE_VAULT_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SAFE_VAULT_BUILD_NUMBER
+	@echo "A build number must be supplied for build artifact packaging."
+	@echo "Please set SAFE_VAULT_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	rm -rf artifacts
+	mkdir -p artifacts/linux/release
+	mkdir -p artifacts/win/release
+	mkdir -p artifacts/macos/release
+	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-linux-x86_64.tar.gz .
+	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-windows-x86_64.tar.gz .
+	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-macos-x86_64.tar.gz .
+	tar -C artifacts/linux/release -xvf ${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-linux-x86_64.tar.gz
+	tar -C artifacts/win/release -xvf ${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-windows-x86_64.tar.gz
+	tar -C artifacts/macos/release -xvf ${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-macos-x86_64.tar.gz
+	rm ${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-linux-x86_64.tar.gz
+	rm ${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-windows-x86_64.tar.gz
+	rm ${SAFE_VAULT_BRANCH}-${SAFE_VAULT_BUILD_NUMBER}-safe_vault-macos-x86_64.tar.gz
+
+package-commit_hash-artifacts-for-deploy:
+	rm -f *.tar
+	rm -rf deploy
+	mkdir deploy
+	tar -C artifacts/linux/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar safe_vault
+	tar -C artifacts/win/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar safe_vault.exe
+	tar -C artifacts/macos/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar safe_vault
+	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar deploy
+	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar deploy
+	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar deploy
+
+package-version-artifacts-for-deploy:
+	rm -f *.tar
+	rm -rf deploy
+	mkdir deploy
+	tar -C artifacts/linux/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar safe_vault
+	tar -C artifacts/win/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar safe_vault.exe
+	tar -C artifacts/macos/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar safe_vault
+	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar deploy
+	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar deploy
+	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar deploy
+
+deploy-github-release:
+ifndef GITHUB_TOKEN
+	@echo "Please set GITHUB_TOKEN to the API token for a user who can create releases."
+	@exit 1
+endif
+	github-release release \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe-vault" \
+		--description "Command line interface for the SAFE Network";
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar;
