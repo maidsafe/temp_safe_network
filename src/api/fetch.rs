@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
-use super::nrs::NrsMap;
+use super::nrs_map::NrsMap;
 use super::xorurl::SafeContentType;
 pub use super::xorurl::SafeDataType;
 

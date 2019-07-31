@@ -16,6 +16,7 @@ mod files;
 mod helpers;
 mod keys;
 mod nrs;
+mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;
