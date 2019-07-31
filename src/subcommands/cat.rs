@@ -12,6 +12,7 @@ use crate::subcommands::auth::auth_connect;
 use log::debug;
 use prettytable::Table;
 use safe_cli::{NrsMapContainerInfo, Safe, SafeData};
+use std::io::{self, Write};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -109,13 +110,9 @@ pub fn cat_commander(
             }
 
             // Render ImmutableData file
-            let data_string = match String::from_utf8(data) {
-                Ok(string) => string,
-                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-            };
-
-            // data always has \n at end?
-            println!("{}", data_string);
+            io::stdout()
+                .write_all(&data)
+                .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
         }
         other => println!(
             "Content type '{:?}' not supported yet by 'cat' command",
