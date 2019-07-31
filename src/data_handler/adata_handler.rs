@@ -17,9 +17,10 @@ use crate::{
 use log::error;
 
 use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissions,
-    ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError, MessageId, NodePublicId,
-    PublicId, PublicKey, Response, Result as NdResult, SeqAppendOnly, UnseqAppendOnly,
+    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPermissions,
+    ADataPubPermissions, ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError,
+    MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult, SeqAppendOnly,
+    UnseqAppendOnly,
 };
 
 use std::{
@@ -90,7 +91,7 @@ impl ADataHandler {
             })
             .and_then(|adata| {
                 // TODO - AData::check_permission() doesn't support Delete yet in safe-nd
-                if utils::adata::is_published(adata.address()) {
+                if adata.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
                     adata.check_is_last_owner(requester_pk)
@@ -288,16 +289,19 @@ impl ADataHandler {
         permissions_index: ADataIndex,
         message_id: MessageId,
     ) -> Option<Action> {
-        let response = if utils::adata::is_published(&address) {
+        let response = {
             let result = self
                 .get_adata(&requester, address, ADataAction::Read)
-                .and_then(|adata| adata.pub_permissions(permissions_index).map(Clone::clone));
-            Response::GetPubADataPermissionAtIndex(result)
-        } else {
-            let result = self
-                .get_adata(&requester, address, ADataAction::Read)
-                .and_then(|adata| adata.unpub_permissions(permissions_index).map(Clone::clone));
-            Response::GetUnpubADataPermissionAtIndex(result)
+                .and_then(|adata| {
+                    let res = if adata.is_pub() {
+                        ADataPermissions::from(adata.pub_permissions(permissions_index)?.clone())
+                    } else {
+                        ADataPermissions::from(adata.unpub_permissions(permissions_index)?.clone())
+                    };
+
+                    Ok(res)
+                });
+            Response::GetADataPermissions(result)
         };
 
         Some(Action::RespondToClientHandlers {

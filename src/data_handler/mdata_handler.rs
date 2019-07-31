@@ -18,7 +18,7 @@ use log::error;
 
 use safe_nd::{
     Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions, MDataPermissionSet,
-    MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
+    MDataValue, MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
 };
 
 use std::{
@@ -298,27 +298,20 @@ impl MDataHandler {
     ) -> Option<Action> {
         let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
 
-        let response = if address.is_seq() {
-            Response::GetSeqMDataValue(res.and_then(|data| match data {
-                MData::Seq(md) => md.get(key).cloned().ok_or_else(|| NdError::NoSuchEntry),
-                MData::Unseq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ))
-                }
-            }))
-        } else {
-            Response::GetUnseqMDataValue(res.and_then(|data| match data {
-                MData::Unseq(md) => md.get(key).cloned().ok_or_else(|| NdError::NoSuchEntry),
-                MData::Seq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ))
-                }
-            }))
-        };
+        let response = Response::GetMDataValue(res.and_then(|data| {
+            match data {
+                MData::Seq(md) => md
+                    .get(key)
+                    .cloned()
+                    .map(MDataValue::from)
+                    .ok_or_else(|| NdError::NoSuchEntry),
+                MData::Unseq(md) => md
+                    .get(key)
+                    .cloned()
+                    .map(MDataValue::from)
+                    .ok_or_else(|| NdError::NoSuchEntry),
+            }
+        }));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -360,27 +353,10 @@ impl MDataHandler {
     ) -> Option<Action> {
         let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
 
-        let response = if address.is_seq() {
-            Response::ListSeqMDataValues(res.and_then(|data| match data {
-                MData::Seq(md) => Ok(md.values()),
-                MData::Unseq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ))
-                }
-            }))
-        } else {
-            Response::ListUnseqMDataValues(res.and_then(|data| match data {
-                MData::Unseq(md) => Ok(md.values()),
-                MData::Seq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ))
-                }
-            }))
-        };
+        let response = Response::ListMDataValues(res.and_then(|data| match data {
+            MData::Seq(md) => Ok(md.values().into()),
+            MData::Unseq(md) => Ok(md.values().into()),
+        }));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -401,27 +377,10 @@ impl MDataHandler {
     ) -> Option<Action> {
         let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
 
-        let response = if address.is_seq() {
-            Response::ListSeqMDataEntries(res.and_then(|data| match data {
-                MData::Seq(md) => Ok(md.entries().clone()),
-                MData::Unseq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ))
-                }
-            }))
-        } else {
-            Response::ListUnseqMDataEntries(res.and_then(|data| match data {
-                MData::Unseq(md) => Ok(md.entries().clone()),
-                MData::Seq(..) => {
-                    error!("Logic error - unexpected chunk stored at {:?}", address);
-                    Err(NdError::NetworkOther(
-                        "Logic error - unexpected chunk".to_string(),
-                    ))
-                }
-            }))
-        };
+        let response = Response::ListMDataEntries(res.and_then(|data| match data {
+            MData::Seq(md) => Ok(md.entries().clone().into()),
+            MData::Unseq(md) => Ok(md.entries().clone().into()),
+        }));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
