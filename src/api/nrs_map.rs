@@ -76,7 +76,19 @@ impl NrsMap {
     pub fn resolve_for_subnames(&self, mut sub_names: Vec<String>) -> ResultReturn<XorUrl> {
         debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
         let mut nrs_map = self;
-        let mut link = None;
+        let mut link = if sub_names.is_empty() {
+            if let DefaultRdf::OtherRdf(def_data) = &self.default {
+                debug!(
+                    "NRS subname resolution done from default. Located: \"{:?}\"",
+                    def_data
+                );
+                def_data.get(FAKE_RDF_PREDICATE_LINK)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         while !sub_names.is_empty() {
             let curr_sub_name = sub_names
@@ -139,6 +151,7 @@ impl NrsMap {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_default_link(&self) -> ResultReturn<XorUrl> {
         debug!("Attempting to get default link vis NRS....");
         let mut dereferenced_link: String;
@@ -339,9 +352,16 @@ fn remove_nrs_sub_tree(
     match nrs_map.sub_names_map.get(&curr_sub_name) {
         Some(SubNameRDF::SubName(nrs_sub_map)) => {
             let (updated_sub_map, link) = remove_nrs_sub_tree(nrs_sub_map, sub_names)?;
-            updated_nrs_map
-                .sub_names_map
-                .insert(curr_sub_name, SubNameRDF::SubName(updated_sub_map));
+            if updated_sub_map.sub_names_map.is_empty()
+                && updated_sub_map.default == DefaultRdf::NotSet
+            {
+                // there are no more sub names at this level now, so let's remove it
+                updated_nrs_map.sub_names_map.remove(&curr_sub_name);
+            } else {
+                updated_nrs_map
+                    .sub_names_map
+                    .insert(curr_sub_name, SubNameRDF::SubName(updated_sub_map));
+            }
             Ok((updated_nrs_map, link))
         }
         Some(SubNameRDF::Definition(def_data)) => {

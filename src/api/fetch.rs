@@ -159,6 +159,7 @@ impl Safe {
                 let (version, nrs_map) = self
                     .nrs_map_container_get_latest(&xorurl)
                     .map_err(|_| Error::ContentNotFound(format!("Content not found at {}", url)))?;
+
                 debug!(
                     "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
                     version,
@@ -166,18 +167,8 @@ impl Safe {
                     nrs_map
                 );
 
-                let mut new_target_xorurl = nrs_map.get_default_link()?;
-
-                debug!(
-                    "Fetch found a default link for domain: \"{}\"",
-                    new_target_xorurl
-                );
-
-                let sub_names = the_xor.sub_names();
-                if !sub_names.is_empty() {
-                    new_target_xorurl = nrs_map.resolve_for_subnames(sub_names)?;
-                    debug!("Resolved target from subnames: {}", new_target_xorurl);
-                }
+                let new_target_xorurl = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
+                debug!("Resolved target: {}", new_target_xorurl);
 
                 let url_with_path = format!("{}{}", &new_target_xorurl, the_xor.path());
                 info!("Resolving target from resolvable map: {}", url_with_path);

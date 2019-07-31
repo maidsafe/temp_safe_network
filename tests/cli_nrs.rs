@@ -122,6 +122,28 @@ fn calling_safe_nrs_put_folder_and_fetch() {
 }
 
 #[test]
+fn calling_safe_nrs_put_no_top_default_fetch() {
+    let test_name = format!("safe://a.b.c.{}", get_random_nrs_string());
+
+    let (container_xorurl, _map) = upload_test_folder();
+
+    let _nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &test_name,
+        "-l",
+        &format!("{}/test.md", container_xorurl),
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let cat_of_new_url = cmd!(get_bin_location(), "cat", &test_name).read().unwrap();
+    assert_eq!(cat_of_new_url, "hello tests!");
+}
+
+#[test]
 fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
     let (container_xorurl, _map) = upload_test_folder();
 
@@ -306,6 +328,72 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
         &test_md_xor,
         "--json",
         "--default"
+    )
+    .read()
+    .unwrap();
+
+    let new_nrs_creation_cat = cmd!(get_bin_location(), "cat", &test_name_w_new_sub)
+        .read()
+        .unwrap();
+
+    assert_eq!(new_nrs_creation_cat, "hello tests!");
+
+    let new_default = cmd!(get_bin_location(), "cat", format!("safe://{}", test_name))
+        .read()
+        .unwrap();
+
+    assert_eq!(new_default, "hello tests!");
+}
+
+#[test]
+fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
+    let (_container_xorurl, file_map) = upload_test_folder();
+
+    let test_name = get_random_nrs_string();
+    let test_name_w_sub = format!("safe://a.b.{}", &test_name);
+    let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
+
+    let (_a_sign, another_md_xor) = &file_map["./tests/testfolder/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["./tests/testfolder/test.md"];
+
+    let cat_of_another_raw = cmd!(get_bin_location(), "cat", &another_md_xor)
+        .read()
+        .unwrap();
+
+    assert_eq!(cat_of_another_raw, "exists");
+
+    let _file_one_nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &test_name_w_sub,
+        "-l",
+        &another_md_xor,
+        "--default",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let _new_nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "add",
+        &test_name_w_new_sub,
+        "-l",
+        &test_md_xor,
+        "--json",
+        "--default",
+    )
+    .read()
+    .unwrap();
+
+    let _remove_one_nrs = cmd!(
+        get_bin_location(),
+        "nrs",
+        "remove",
+        &test_name_w_sub,
+        "--json",
     )
     .read()
     .unwrap();

@@ -295,14 +295,22 @@ fn test_nrs_map_container_create() {
 
     let nrs_xorname = xorname_from_nrs_string(&site_name).unwrap();
 
-    let (xor_url, _entries, nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, Some("safe://top_xorurl"), true, false));
+    let (xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &site_name,
+        Some("safe://linked-from-[site_name]"),
+        true,
+        false
+    ));
     assert_eq!(nrs_map.sub_names_map.len(), 0);
+    assert_eq!(
+        unwrap!(nrs_map.get_default_link()),
+        "safe://linked-from-[site_name]"
+    );
 
     if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
         assert_eq!(
             *def_data.get(FAKE_RDF_PREDICATE_LINK).unwrap(),
-            "safe://top_xorurl".to_string()
+            "safe://linked-from-[site_name]".to_string()
         );
         assert_eq!(
             nrs_map.get_default().unwrap(),
@@ -314,4 +322,109 @@ fn test_nrs_map_container_create() {
 
     let decoder = XorUrlEncoder::from_url(&xor_url).unwrap();
     assert_eq!(nrs_xorname, decoder.xorname())
+}
+
+#[test]
+fn test_nrs_map_container_add() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("fake-credentials")).unwrap();
+
+    let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &format!("b.{}", site_name),
+        Some("safe://linked-from-[b.site_name]"),
+        true,
+        false
+    ));
+    assert_eq!(nrs_map.sub_names_map.len(), 1);
+    assert_eq!(
+        unwrap!(nrs_map.get_default_link()),
+        "safe://linked-from-[b.site_name]"
+    );
+
+    // add subname and set it as the new default too
+    let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(safe.nrs_map_container_add(
+        &format!("a.b.{}", site_name),
+        Some("safe://linked-from-[a.b.site_name]"),
+        true,
+        false
+    ));
+    assert_eq!(version, 2);
+    assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
+    assert_eq!(
+        unwrap!(updated_nrs_map.get_default_link()),
+        "safe://linked-from-[a.b.site_name]"
+    );
+}
+
+#[test]
+fn test_nrs_map_container_remove() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("fake-credentials")).unwrap();
+
+    let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &format!("a.b.{}", site_name),
+        Some("safe://linked-from-[a.b.site_name]"),
+        true,
+        false
+    ));
+    assert_eq!(nrs_map.sub_names_map.len(), 1);
+
+    // remove subname
+    let (version, _xorurl, _entries, updated_nrs_map) =
+        unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
+    assert_eq!(version, 2);
+    assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
+    assert_eq!(
+        unwrap!(updated_nrs_map.get_default_link()),
+        "safe://linked-from-[a.b.site_name]"
+    );
+}
+
+#[test]
+fn test_nrs_map_container_remove_one_of_two() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("fake-credentials")).unwrap();
+
+    let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &format!("a.b.{}", site_name),
+        Some("safe://linked-from-[a.b.site_name]"),
+        true,
+        false
+    ));
+    assert_eq!(nrs_map.sub_names_map.len(), 1);
+
+    let (_version, _xorurl, _entries, _updated_nrs_map) = unwrap!(safe.nrs_map_container_add(
+        &format!("a2.b.{}", site_name),
+        Some("safe://linked-from-[a2.b.site_name]"),
+        true,
+        false
+    ));
+
+    // remove subname
+    let (version, _xorurl, _entries, updated_nrs_map) =
+        unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
+    assert_eq!(version, 3);
+    assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
+    assert_eq!(
+        unwrap!(updated_nrs_map.get_default_link()),
+        "safe://linked-from-[a2.b.site_name]"
+    );
 }
