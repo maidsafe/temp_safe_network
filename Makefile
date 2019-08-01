@@ -36,10 +36,13 @@ ifeq ($(UNAME_S),Linux)
 		-v "${PWD}":/usr/src/safe_vault:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-vault-build:build \
-		./scripts/tests --verbose
+		/bin/bash -c "cargo build --release && ./scripts/tests --verbose"
 	docker cp "safe-vault-build-${UUID}":/target .
 	docker rm "safe-vault-build-${UUID}"
 else
+	# The explicit `cargo build` is because the test script does not actually
+	# produce a binary to distribute.
+	cargo build --release
 	./scripts/tests --verbose
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
