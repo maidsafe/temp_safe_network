@@ -8,25 +8,25 @@
 
 //! A simple, persistent, disk-based key-value store.
 
-// #[cfg(test)]
-// mod tests;
 mod append_only;
 mod chunk;
 pub(super) mod error;
 mod immutable;
 mod login_packet;
 mod mutable;
+#[cfg(test)]
+mod tests;
 mod used_space;
 
 use crate::{utils, vault::Init};
-use chunk::Chunk;
+use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use hex;
 use log::trace;
 use safe_nd::{AData, IData, LoginPacket, MData};
 use std::{
-    cell::RefCell,
-    fs::{self, File, Metadata},
+    cell::Cell,
+    fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -57,7 +57,7 @@ pub(crate) struct ChunkStore<T: Chunk> {
 impl<T> ChunkStore<T>
 where
     T: Chunk,
-    ChunkStore<T>: Subdir,
+    Self: Subdir,
 {
     /// Creates a new `ChunkStore` at location `root/CHUNK_STORE_DIR/<chunk type>`.
     ///
@@ -69,7 +69,7 @@ where
     pub fn new<P: AsRef<Path>>(
         root: P,
         max_capacity: u64,
-        total_used_space: Rc<RefCell<u64>>,
+        total_used_space: Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
@@ -162,21 +162,15 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     /// Lists all keys of currently stored data.
-    #[allow(unused)]
+    #[cfg_attr(not(test), allow(unused))]
     pub fn keys(&self) -> Vec<T::Id> {
-        unimplemented!();
-        // fs::read_dir(&self.dir)
-        //     .and_then(|dir_entries| {
-        //         let dir_entry_to_routing_name = |dir_entry: io::Result<fs::DirEntry>| {
-        //             dir_entry
-        //                 .ok()
-        //                 .and_then(|entry| entry.file_name().into_string().ok())
-        //                 .and_then(|hex_name| Vec::from_hex(hex_name).ok())
-        //                 .and_then(|bytes| bincode::deserialize::<T>(&bytes).ok())
-        //         };
-        //         Ok(dir_entries.filter_map(dir_entry_to_routing_name).collect())
-        //     })
-        //     .unwrap_or_else(|_| Vec::new())
+        fs::read_dir(&self.dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| to_chunk_id(entry.ok()?))
+                    .collect()
+            })
+            .unwrap_or_else(|_| Vec::new())
     }
 
     fn do_delete(&mut self, file_path: &Path) -> Result<()> {
@@ -219,4 +213,11 @@ impl Subdir for LoginPacketChunkStore {
     fn subdir() -> &'static Path {
         Path::new("login_packets")
     }
+}
+
+fn to_chunk_id<T: ChunkId>(entry: DirEntry) -> Option<T> {
+    let file_name = entry.file_name();
+    let file_name = file_name.into_string().ok()?;
+    let bytes = hex::decode(file_name).ok()?;
+    bincode::deserialize(&bytes).ok()
 }

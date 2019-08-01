@@ -23,7 +23,7 @@ use mdata_handler::MDataHandler;
 use safe_nd::{IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response, XorName};
 
 use std::{
-    cell::RefCell,
+    cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -40,7 +40,7 @@ impl DataHandler {
     pub fn new(
         id: NodePublicId,
         config: &Config,
-        total_used_space: &Rc<RefCell<u64>>,
+        total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let idata_handler = IDataHandler::new(id.clone(), config, init_mode)?;
