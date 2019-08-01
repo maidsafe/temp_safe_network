@@ -51,6 +51,7 @@ stage('deploy') {
                 packageArtifactsForDeploy(true)
                 createTag(version)
                 createGithubRelease(version)
+                publishCrate()
             } else {
                 packageArtifactsForDeploy(false)
                 uploadDeployArtifacts()
@@ -131,6 +132,13 @@ def createGithubRelease(version) {
             usernameVariable: "GITHUB_USER",
             passwordVariable: "GITHUB_TOKEN")]) {
         sh("make deploy-github-release")
+    }
+}
+
+def publishCrate() {
+    withCredentials([string(
+        credentialsId: 'crates_io_token', variable: 'CRATES_IO_TOKEN')]) {
+        sh("make publish")
     }
 }
 

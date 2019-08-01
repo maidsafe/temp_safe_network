@@ -34,6 +34,7 @@ USER maidsafe:maidsafe
 ENV CARGO_TARGET_DIR=/target YARN_GPG=no RUST_BACKTRACE=1
 
 RUN rustup component add rustfmt clippy && \
+    cargo build --release && \
     scripts/clippy --verbose && \
     scripts/tests --verbose
 ENTRYPOINT ["fixuid"]

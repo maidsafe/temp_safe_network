@@ -144,3 +144,14 @@ endif
 		--tag ${SAFE_VAULT_VERSION} \
 		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar" \
 		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar;
+
+publish:
+ifndef CRATES_IO_TOKEN
+	@echo "A login token for crates.io must be provided."
+	@exit 1
+endif
+	rm -rf artifacts
+	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-vault-build:build \
+		/bin/bash -c "cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
