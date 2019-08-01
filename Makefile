@@ -155,3 +155,19 @@ endif
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-vault-build:build \
 		/bin/bash -c "cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
+
+retrieve-cache:
+ifndef SAFE_VAULT_BRANCH
+	@echo "A branch reference must be provided."
+	@echo "Please set SAFE_VAULT_BRANCH to a valid branch reference."
+	@exit 1
+endif
+ifeq ($(OS),Windows_NT)
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/safe_vault-${SAFE_VAULT_BRANCH}-windows-cache.tar.gz .
+	mkdir target
+	tar -C target -xvf safe_vault-${SAFE_VAULT_BRANCH}-windows-cache.tar.gz
+	rm safe_vault-${SAFE_VAULT_BRANCH}-windows-cache.tar.gz
+endif

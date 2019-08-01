@@ -1,6 +1,7 @@
 properties([
     parameters([
         string(name: "ARTIFACTS_BUCKET", defaultValue: "safe-jenkins-build-artifacts"),
+        string(name: 'CACHE_BRANCH', defaultValue: 'experimental'),
         string(name: "DEPLOY_BUCKET", defaultValue: "safe-vault")
     ])
 ])
@@ -17,6 +18,7 @@ stage("build & test") {
     windows: {
         node("windows") {
             checkout(scm)
+            retrieveCache()
             sh("make test")
             packageBuildArtifacts("windows")
             uploadBuildArtifacts()
@@ -58,6 +60,18 @@ stage('deploy') {
             }
         } else {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
+        }
+    }
+    if (env.BRANCH_NAME == "master") {
+        build(job: '../rust_cache_build-safe_vault-windows', wait: false)
+        build(job: '../docker_build-safe_vault_build_container', wait: false)
+    }
+}
+
+def retrieveCache() {
+    if (!fileExists('target')) {
+        withEnv(["SAFE_VAULT_BRANCH=${params.CACHE_BRANCH}"]) {
+            sh("make retrieve-cache")
         }
     }
 }
