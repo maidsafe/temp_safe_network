@@ -994,22 +994,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.deposit(&destination, amount);
-
-        if *requester.name() == destination {
-            // This is a refund.
-            // TODO: we might want to send a response back to the client, but currently we don't
-            // know the reason for the refund. We should consider adding a `type` field to
-            // `Request::TransferCoins` with possible values: `Normal` and `Refund(Error)`.
-
-            if let Err(error) = result {
-                error!("{} Failed to refund {} coins: {:?}", self, amount, error);
-            }
-
-            return None;
-        }
-
-        let rpc = match result {
+        let rpc = match self.deposit(&destination, amount) {
             Ok(()) => {
                 let transaction = Transaction {
                     id: transaction_id,
@@ -1017,13 +1002,27 @@ impl ClientHandler {
                 };
                 self.notify_destination_owners(&destination, transaction);
 
-                Rpc::Response {
-                    response: Response::Transaction(Ok(transaction)),
-                    requester,
-                    message_id,
+                if *requester.name() == destination {
+                    // This is a successful refund.
+                    // TODO: we might want to send a response back to the client, but currently we
+                    // don't know the reason for the refund. We should maybe consider adding that
+                    // information to the `TransferCoins` request.
+                    return None;
+                } else {
+                    Rpc::Response {
+                        response: Response::Transaction(Ok(transaction)),
+                        requester,
+                        message_id,
+                    }
                 }
             }
-            Err(_) => {
+            Err(error) => {
+                if *requester.name() == destination {
+                    // This is a failed refund.
+                    error!("{} Failed to refund {} coins: {:?}", self, amount, error);
+                    return None;
+                }
+
                 // Send refund
                 Rpc::Request {
                     request: Request::TransferCoins {
