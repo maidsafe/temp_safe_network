@@ -24,7 +24,7 @@ use safe_nd::{
 use safe_vault::{
     mock::Network,
     quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
-    to_error_response, Config, Vault,
+    Config, Vault,
 };
 use serde::Serialize;
 use std::{
@@ -224,7 +224,7 @@ pub trait TestClientTrait {
 
         let challenge: Challenge = unwrap!(bincode::deserialize(&bytes));
         let payload = match challenge {
-            Challenge::Request(payload) => payload,
+            Challenge::Request(_, payload) => payload,
             Challenge::Response(..) => panic!("Unexpected Challenge::Response"),
         };
 
@@ -480,7 +480,7 @@ pub fn send_request_expect_err<T: TestClientTrait>(
     request: Request,
     expected_error: Error,
 ) {
-    let expected_response = to_error_response(&request, expected_error);
+    let expected_response = request.error_response(expected_error);
     let message_id = client.send_request(request);
     env.poll();
     assert_eq!(expected_response, client.expect_response(message_id));

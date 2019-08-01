@@ -87,6 +87,5 @@ pub use crate::{
     client_handler::COST_OF_PUT,
     config_handler::Config,
     error::{Error, Result},
-    utils::to_error_response,
     vault::{Command, Vault},
 };

@@ -57,14 +57,15 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::{distributions::Standard, Rng};
 use safe_nd::{
-    AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPubPermissionSet,
-    ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions, ADataUser, AppPermissions,
-    AppendOnlyData, ClientFullId, Coins, EntryError, Error as NdError, IData, IDataAddress,
-    LoginPacket, MData, MDataAction, MDataAddress, MDataKind, MDataPermissionSet,
-    MDataSeqEntryActions, MDataUnseqEntryActions, MDataValue, Message, MessageId, Notification,
-    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response,
-    Result as NdResult, SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPermissions,
+    ADataPubPermissionSet, ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions,
+    ADataUser, AppPermissions, AppendOnlyData, ClientFullId, Coins, EntryError, Error as NdError,
+    IData, IDataAddress, LoginPacket, MData, MDataAction, MDataAddress, MDataEntries, MDataKind,
+    MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue, MDataUnseqEntryActions, MDataValue,
+    MDataValues, Message, MessageId, Notification, PubImmutableData, PubSeqAppendOnlyData,
+    PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult, SeqAppendOnly,
+    SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
+    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1099,7 +1100,12 @@ fn pub_append_only_data_get_permissions() {
             permissions_index,
         };
         match expected_response {
-            Ok(expected) => common::send_request_expect_ok(&mut env, &mut client, req, expected),
+            Ok(expected) => common::send_request_expect_ok(
+                &mut env,
+                &mut client,
+                req,
+                ADataPermissions::from(expected),
+            ),
             Err(expected) => common::send_request_expect_err(&mut env, &mut client, req, expected),
         }
     };
@@ -1228,7 +1234,12 @@ fn unpub_append_only_data_get_permissions() {
             permissions_index,
         };
         match expected_response {
-            Ok(expected) => common::send_request_expect_ok(&mut env, &mut client, req, expected),
+            Ok(expected) => common::send_request_expect_ok(
+                &mut env,
+                &mut client,
+                req,
+                ADataPermissions::from(expected),
+            ),
             Err(expected) => common::send_request_expect_err(&mut env, &mut client, req, expected),
         }
     };
@@ -1285,7 +1296,7 @@ fn pub_append_only_data_put_permissions() {
             address: *data.address(),
             permissions_index: ADataIndex::FromStart(0),
         },
-        perms_0,
+        ADataPermissions::from(perms_0),
     );
     common::send_request_expect_err(
         &mut env,
@@ -1337,7 +1348,7 @@ fn pub_append_only_data_put_permissions() {
             address: *data.address(),
             permissions_index: ADataIndex::FromStart(1),
         },
-        perms_1,
+        ADataPermissions::from(perms_1),
     );
 }
 
@@ -1388,7 +1399,7 @@ fn unpub_append_only_data_put_permissions() {
             address: *data.address(),
             permissions_index: ADataIndex::FromStart(0),
         },
-        perms_0,
+        ADataPermissions::from(perms_0),
     );
     common::send_request_expect_err(
         &mut env,
@@ -1440,7 +1451,7 @@ fn unpub_append_only_data_put_permissions() {
             address: *data.address(),
             permissions_index: ADataIndex::FromStart(1),
         },
-        perms_1,
+        ADataPermissions::from(perms_1),
     );
 }
 
@@ -2355,7 +2366,7 @@ fn read_seq_mutable_data() {
         .map(|_| {
             let key = env.rng().sample_iter(&Standard).take(8).collect();
             let data = env.rng().sample_iter(&Standard).take(8).collect();
-            (key, MDataValue { data, version: 0 })
+            (key, MDataSeqValue { data, version: 0 })
         })
         .collect();
 
@@ -2391,7 +2402,7 @@ fn read_seq_mutable_data() {
         &mut env,
         &mut client,
         Request::ListMDataValues(address),
-        entries.values().cloned().collect::<Vec<_>>(),
+        MDataValues::from(entries.values().cloned().collect::<Vec<_>>()),
     );
 
     // Get entries.
@@ -2399,7 +2410,7 @@ fn read_seq_mutable_data() {
         &mut env,
         &mut client,
         Request::ListMDataEntries(address),
-        entries.clone(),
+        MDataEntries::from(entries.clone()),
     );
 
     // Get a value by key.
@@ -2411,7 +2422,7 @@ fn read_seq_mutable_data() {
             address,
             key: key.clone(),
         },
-        entries[&key].clone(),
+        MDataValue::from(entries[&key].clone()),
     );
 }
 
@@ -2451,7 +2462,10 @@ fn mutate_seq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateSeqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2462,10 +2476,10 @@ fn mutate_seq_mutable_data() {
             address,
             key: vec![0],
         },
-        MDataValue {
+        MDataValue::from(MDataSeqValue {
             data: vec![1],
             version: 0,
-        },
+        }),
     );
 
     // Update and delete entries.
@@ -2475,7 +2489,10 @@ fn mutate_seq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateSeqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2486,10 +2503,10 @@ fn mutate_seq_mutable_data() {
             address,
             key: vec![0],
         },
-        MDataValue {
+        MDataValue::from(MDataSeqValue {
             data: vec![2],
             version: 1,
-        },
+        }),
     );
 
     // Deleted key should not exist now.
@@ -2509,9 +2526,9 @@ fn mutate_seq_mutable_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::MutateSeqMDataEntries {
+        Request::MutateMDataEntries {
             address: MDataAddress::Seq { name, tag },
-            actions,
+            actions: actions.into(),
         },
         NdError::InvalidEntryActions(expected_invalid_actions),
     );
@@ -2553,7 +2570,10 @@ fn mutate_unseq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2564,7 +2584,7 @@ fn mutate_unseq_mutable_data() {
             address,
             key: vec![0],
         },
-        vec![1],
+        MDataValue::from(vec![1]),
     );
 
     // Update and delete entries.
@@ -2574,7 +2594,10 @@ fn mutate_unseq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Get an existing value by key.
@@ -2585,7 +2608,7 @@ fn mutate_unseq_mutable_data() {
             address,
             key: vec![0],
         },
-        vec![2],
+        MDataValue::from(vec![2]),
     );
 
     // Deleted key should not exist now.
@@ -2626,7 +2649,10 @@ fn mutable_data_permissions() {
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
         NdError::AccessDenied,
     );
 
@@ -2647,7 +2673,10 @@ fn mutable_data_permissions() {
     common::perform_mutation(
         &mut env,
         &mut client_b,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
     );
 
     // Delete client B permissions.
@@ -2666,7 +2695,10 @@ fn mutable_data_permissions() {
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::MutateUnseqMDataEntries { address, actions },
+        Request::MutateMDataEntries {
+            address,
+            actions: actions.into(),
+        },
         NdError::AccessDenied,
     );
 }

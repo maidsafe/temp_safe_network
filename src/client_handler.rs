@@ -135,7 +135,10 @@ impl ClientHandler {
         };
 
         let challenge = utils::random_vec(8);
-        self.send(peer.clone(), &Challenge::Request(challenge.clone()));
+        self.send(
+            peer.clone(),
+            &Challenge::Request(PublicId::Node(self.id.clone()), challenge.clone()),
+        );
         let _ = self.client_candidates.insert(peer.peer_addr(), challenge);
         info!("{}: Connected to new client on {}", self, peer_addr);
     }
@@ -190,7 +193,7 @@ impl ClientHandler {
                 Ok(Challenge::Response(public_id, signature)) => {
                     self.handle_challenge(peer_addr, public_id, signature);
                 }
-                Ok(Challenge::Request(_)) => {
+                Ok(Challenge::Request(_, _)) => {
                     info!(
                         "{}: Received unexpected challenge request from {}",
                         self, peer_addr
@@ -251,8 +254,7 @@ impl ClientHandler {
             // ===== Mutable Data =====
             //
             PutMData(chunk) => self.handle_put_mdata(client, chunk, message_id),
-            MutateSeqMDataEntries { .. }
-            | MutateUnseqMDataEntries { .. }
+            MutateMDataEntries { .. }
             | DeleteMData(..)
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => {
@@ -600,7 +602,7 @@ impl ClientHandler {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        if utils::adata::is_published(&address) {
+        if address.is_pub() {
             self.send_response_to_client(
                 &client.public_id,
                 message_id,
@@ -792,8 +794,7 @@ impl ClientHandler {
             | DelMDataUserPermissions { .. }
             | ListMDataPermissions(_)
             | ListMDataUserPermissions { .. }
-            | MutateSeqMDataEntries { .. }
-            | MutateUnseqMDataEntries { .. }
+            | MutateMDataEntries { .. }
             | PutAData(_)
             | GetAData(_)
             | GetADataShell { .. }
@@ -855,21 +856,17 @@ impl ClientHandler {
             | GetADataOwners(..)
             | GetPubADataUserPermissions(..)
             | GetUnpubADataUserPermissions(..)
-            | GetUnpubADataPermissionAtIndex(..)
-            | GetPubADataPermissionAtIndex(..)
+            | GetADataPermissions(..)
             | GetADataValue(..)
             | GetMData(..)
             | GetMDataShell(..)
             | GetMDataVersion(..)
-            | ListUnseqMDataEntries(..)
-            | ListSeqMDataEntries(..)
+            | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListSeqMDataValues(..)
-            | ListUnseqMDataValues(..)
+            | ListMDataValues(..)
             | ListMDataUserPermissions(..)
             | ListMDataPermissions(..)
-            | GetSeqMDataValue(..)
-            | GetUnseqMDataValue(..)
+            | GetMDataValue(..)
             | Mutation(..)
             | Transaction(..) => {
                 self.send_response_to_client(&requester, message_id, response);
@@ -1201,7 +1198,8 @@ impl ClientHandler {
             Err(NdError::InsufficientBalance) | Err(NdError::NoSuchBalance) => {
                 // Note: in phase 1, we proceed even if there are insufficient funds.
                 trace!(
-                    "{}: Insufficient balance to withdraw {} coins (but allowing the request anyway)",
+                    "{}: Insufficient balance to withdraw {} coins (but allowing the request \
+                     anyway)",
                     self,
                     cost,
                 );
@@ -1211,7 +1209,7 @@ impl ClientHandler {
                 self.send_response_to_client(
                     requester_id,
                     message_id,
-                    utils::to_error_response(&request, error),
+                    request.error_response(error),
                 );
                 None
             }
@@ -1520,7 +1518,7 @@ impl ClientHandler {
             self.send_response_to_client(
                 public_id,
                 message_id,
-                utils::to_error_response(request, NdError::InvalidSignature),
+                request.error_response(NdError::InvalidSignature),
             );
             None
         }
@@ -1545,11 +1543,7 @@ impl ClientHandler {
         };
 
         if let Err(error) = result {
-            self.send_response_to_client(
-                public_id,
-                message_id,
-                utils::to_error_response(request, error),
-            );
+            self.send_response_to_client(public_id, message_id, request.error_response(error));
             None
         } else {
             Some(())
@@ -1584,8 +1578,8 @@ impl ClientHandler {
     ) -> Option<()> {
         use Request::*;
         let consistent = match request {
-            AppendSeq { ref append, .. } => utils::adata::is_sequential(&append.address),
-            AppendUnseq(ref append) => !utils::adata::is_sequential(&append.address),
+            AppendSeq { ref append, .. } => append.address.is_seq(),
+            AppendUnseq(ref append) => !&append.address.is_seq(),
             // TODO: any other requests for which this can happen?
             _ => true,
         };

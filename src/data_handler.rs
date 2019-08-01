@@ -152,12 +152,9 @@ impl DataHandler {
             } => self.mdata_handler.handle_del_mdata_user_permissions_req(
                 requester, address, user, version, message_id,
             ),
-            MutateSeqMDataEntries { address, actions } => self
+            MutateMDataEntries { address, actions } => self
                 .mdata_handler
-                .handle_mutate_seq_mdata_entries_req(requester, address, actions, message_id),
-            MutateUnseqMDataEntries { address, actions } => self
-                .mdata_handler
-                .handle_mutate_unseq_mdata_entries_req(requester, address, actions, message_id),
+                .handle_mutate_mdata_entries_req(requester, address, actions, message_id),
             //
             // ===== Append Only Data =====
             //
@@ -316,15 +313,12 @@ impl DataHandler {
             GetMData(_)
             | GetMDataShell(_)
             | GetMDataVersion(_)
-            | ListUnseqMDataEntries(_)
-            | ListSeqMDataEntries(_)
+            | ListMDataEntries(_)
             | ListMDataKeys(_)
-            | ListSeqMDataValues(_)
-            | ListUnseqMDataValues(_)
+            | ListMDataValues(_)
             | ListMDataUserPermissions(_)
             | ListMDataPermissions(_)
-            | GetSeqMDataValue(_)
-            | GetUnseqMDataValue(_)
+            | GetMDataValue(_)
             | GetAData(_)
             | GetADataValue(_)
             | GetADataShell(_)
@@ -332,8 +326,7 @@ impl DataHandler {
             | GetADataRange(_)
             | GetADataIndices(_)
             | GetADataLastEntry(_)
-            | GetUnpubADataPermissionAtIndex(_)
-            | GetPubADataPermissionAtIndex(_)
+            | GetADataPermissions(_)
             | GetPubADataUserPermissions(_)
             | GetUnpubADataUserPermissions(_)
             | Transaction(_)
@@ -357,8 +350,9 @@ impl DataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == kind.name() {
-            // Since the src is the chunk's name, this message was sent by the data handlers to us as a
-            // single data handler, implying that we're a data handler chosen to store the chunk.
+            // Since the src is the chunk's name, this message was sent by the data handlers to us
+            // as a single data handler, implying that we're a data handler chosen to store the
+            // chunk.
             self.idata_holder.store_idata(kind, requester, message_id)
         } else {
             self.idata_handler

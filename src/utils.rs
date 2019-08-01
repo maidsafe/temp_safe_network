@@ -11,10 +11,7 @@ use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
-use safe_nd::{
-    ADataAddress, ClientPublicId, Error as NdError, IDataAddress, PublicId, PublicKey, Request,
-    Response, XorName,
-};
+use safe_nd::{ClientPublicId, IDataAddress, PublicId, PublicKey, Request, XorName};
 use serde::Serialize;
 use std::{borrow::Cow, fs, path::Path};
 use unwrap::unwrap;
@@ -108,8 +105,7 @@ pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
         | DelMDataUserPermissions { ref address, .. }
         | ListMDataPermissions(ref address)
         | ListMDataUserPermissions { ref address, .. }
-        | MutateSeqMDataEntries { ref address, .. }
-        | MutateUnseqMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
+        | MutateMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
         PutAData(ref data) => Some(Cow::Borrowed(data.name())),
         GetAData(ref address)
         | GetADataValue { ref address, .. }
@@ -145,86 +141,6 @@ pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
     }
 }
 
-/// Create an error response for the given request.
-pub fn to_error_response(request: &Request, error: NdError) -> Response {
-    match request {
-        Request::PutIData(_)
-        | Request::DeleteUnpubIData(_)
-        | Request::PutMData(_)
-        | Request::DeleteMData(_)
-        | Request::SetMDataUserPermissions { .. }
-        | Request::DelMDataUserPermissions { .. }
-        | Request::MutateSeqMDataEntries { .. }
-        | Request::MutateUnseqMDataEntries { .. }
-        | Request::PutAData(_)
-        | Request::DeleteAData(_)
-        | Request::AddPubADataPermissions { .. }
-        | Request::AddUnpubADataPermissions { .. }
-        | Request::SetADataOwner { .. }
-        | Request::AppendSeq { .. }
-        | Request::AppendUnseq { .. }
-        | Request::CreateLoginPacket(_)
-        | Request::CreateLoginPacketFor { .. }
-        | Request::UpdateLoginPacket { .. }
-        | Request::InsAuthKey { .. }
-        | Request::DelAuthKey { .. } => Response::Mutation(Err(error)),
-        Request::GetIData(_) => Response::GetIData(Err(error)),
-        Request::GetMData(_) => Response::GetMData(Err(error)),
-        Request::GetMDataValue { address, .. } => {
-            if address.is_seq() {
-                Response::GetSeqMDataValue(Err(error))
-            } else {
-                Response::GetUnseqMDataValue(Err(error))
-            }
-        }
-        Request::GetMDataShell(_) => Response::GetMDataShell(Err(error)),
-        Request::GetMDataVersion(_) => Response::GetMDataVersion(Err(error)),
-        Request::ListMDataKeys(_) => Response::ListMDataKeys(Err(error)),
-        Request::ListMDataValues(address) => {
-            if address.is_seq() {
-                Response::ListSeqMDataValues(Err(error))
-            } else {
-                Response::ListUnseqMDataValues(Err(error))
-            }
-        }
-        Request::ListMDataEntries(address) => {
-            if address.is_seq() {
-                Response::ListSeqMDataEntries(Err(error))
-            } else {
-                Response::ListUnseqMDataEntries(Err(error))
-            }
-        }
-        Request::ListMDataPermissions(_) => Response::ListMDataPermissions(Err(error)),
-        Request::ListMDataUserPermissions { .. } => Response::ListMDataUserPermissions(Err(error)),
-        Request::GetAData(_) => Response::GetAData(Err(error)),
-        Request::GetADataValue { .. } => Response::GetADataValue(Err(error)),
-        Request::GetADataShell { .. } => Response::GetADataShell(Err(error)),
-        Request::GetADataRange { .. } => Response::GetADataRange(Err(error)),
-        Request::GetADataIndices { .. } => Response::GetADataIndices(Err(error)),
-        Request::GetADataLastEntry { .. } => Response::GetADataLastEntry(Err(error)),
-        Request::GetADataOwners { .. } => Response::GetADataOwners(Err(error)),
-        Request::GetADataPermissions { address, .. } => {
-            if adata::is_published(address) {
-                Response::GetPubADataPermissionAtIndex(Err(error))
-            } else {
-                Response::GetUnpubADataPermissionAtIndex(Err(error))
-            }
-        }
-        Request::GetPubADataUserPermissions { .. } => {
-            Response::GetPubADataUserPermissions(Err(error))
-        }
-        Request::GetUnpubADataUserPermissions { .. } => {
-            Response::GetUnpubADataUserPermissions(Err(error))
-        }
-        Request::GetBalance => Response::GetBalance(Err(error)),
-        Request::TransferCoins { .. } | Request::CreateBalance { .. } => {
-            Response::Transaction(Err(error))
-        }
-        Request::GetLoginPacket(_) => Response::GetLoginPacket(Err(error)),
-        Request::ListAuthKeysAndVersion => Response::ListAuthKeysAndVersion(Err(error)),
-    }
-}
-
 // The kind of authorisation needed for a reequest.
 pub(crate) enum AuthorisationKind {
     // Get request against published data.
@@ -247,8 +163,7 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | DeleteMData(_)
         | SetMDataUserPermissions { .. }
         | DelMDataUserPermissions { .. }
-        | MutateSeqMDataEntries { .. }
-        | MutateUnseqMDataEntries { .. }
+        | MutateMDataEntries { .. }
         | PutAData(_)
         | DeleteAData(_)
         | AddPubADataPermissions { .. }
@@ -287,31 +202,11 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | GetPubADataUserPermissions { address, .. }
         | GetUnpubADataUserPermissions { address, .. }
         | GetADataOwners { address, .. } => {
-            if adata::is_published(address) {
+            if address.is_pub() {
                 GetPub
             } else {
                 GetUnpub
             }
-        }
-    }
-}
-
-pub(crate) mod adata {
-    use super::*;
-
-    pub fn is_published(address: &ADataAddress) -> bool {
-        use ADataAddress::*;
-        match address {
-            PubSeq { .. } | PubUnseq { .. } => true,
-            UnpubSeq { .. } | UnpubUnseq { .. } => false,
-        }
-    }
-
-    pub fn is_sequential(address: &ADataAddress) -> bool {
-        use ADataAddress::*;
-        match address {
-            PubSeq { .. } | UnpubSeq { .. } => true,
-            PubUnseq { .. } | UnpubUnseq { .. } => false,
         }
     }
 }
