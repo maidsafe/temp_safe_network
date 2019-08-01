@@ -107,7 +107,7 @@ fn calling_safe_nrs_put_folder_and_fetch() {
     // does our resolvable map exist?
     assert!(cat_of_nrs_map_url.contains("safe://"));
     assert!(cat_of_nrs_map_url.contains("another.md"));
-    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 1)"));
+    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 0)"));
 
     assert!(nrs_creation.contains("safe://"));
     assert!(nrs_creation.contains('+'));
@@ -185,7 +185,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
     // does our resolvable map exist?
     assert!(cat_of_nrs_map_url.contains("safe://"));
     assert!(cat_of_nrs_map_url.contains("another.md"));
-    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 1)"));
+    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 0)"));
 
     assert!(nrs_creation.contains("safe://"));
     assert!(nrs_creation.contains("subname"));
@@ -252,7 +252,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
     // does our resolvable map exist?
     assert!(cat_of_nrs_map_url.contains("safe://"));
     assert!(cat_of_nrs_map_url.contains("another.md"));
-    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 1)"));
+    assert!(cat_of_nrs_map_url.contains("Files of FilesContainer (version 0)"));
 
     assert!(nrs_creation.contains("safe://"));
     assert!(nrs_creation.contains("a.b"));

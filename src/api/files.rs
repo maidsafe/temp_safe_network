@@ -137,7 +137,7 @@ impl Safe {
                     .safe_app
                     .get_seq_append_only_data(
                         xorurl_encoder.xorname(),
-                        xorurl_encoder.type_tag(),
+                        FILES_CONTAINER_TYPE_TAG,
                         content_version,
                     )
                     .map_err(|_| {
@@ -964,7 +964,7 @@ fn test_files_container_sync() {
         false
     ));
 
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(new_processed_files.len(), 2);
     assert_eq!(new_files_map.len(), 7);
 
@@ -1030,7 +1030,7 @@ fn test_files_container_sync_dry_run() {
         true // set dry_run flag on
     ));
 
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(new_processed_files.len(), 2);
     assert_eq!(new_files_map.len(), 7);
 
@@ -1098,7 +1098,7 @@ fn test_files_container_sync_with_delete() {
         false
     ));
 
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(new_processed_files.len(), 7);
     assert_eq!(new_files_map.len(), 2);
 
@@ -1179,7 +1179,7 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
         false
     ));
 
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(new_processed_files.len(), 2);
     assert_eq!(new_files_map.len(), 7);
 
@@ -1239,7 +1239,7 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
         false,
     ));
 
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(new_processed_files.len(), 2);
     assert_eq!(new_files_map.len(), 7);
 
@@ -1290,7 +1290,7 @@ fn test_files_container_get() {
 
     let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
 
-    assert_eq!(version, 1);
+    assert_eq!(version, 0);
     assert_eq!(fetched_files_map.len(), 5);
     assert_eq!(files_map.len(), fetched_files_map.len());
     assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
@@ -1311,7 +1311,7 @@ fn test_files_container_version() {
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     let (version, _) = unwrap!(safe.files_container_get(&xorurl));
-    assert_eq!(version, 1);
+    assert_eq!(version, 0);
 
     let (version, _, _) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -1320,10 +1320,10 @@ fn test_files_container_version() {
         true, // this sets the delete flag,
         false,
     ));
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
 
     let (version, _) = unwrap!(safe.files_container_get(&xorurl));
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
 }
 
 #[test]

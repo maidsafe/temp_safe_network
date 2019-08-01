@@ -304,7 +304,7 @@ impl SafeApp for SafeAppFake {
             .published_seq_append_only
             .insert(xorname_hex, seq_append_only.to_vec());
 
-        Ok(seq_append_only.len() as u64)
+        Ok((seq_append_only.len() - 1) as u64)
     }
 
     fn get_latest_seq_append_only_data(
@@ -324,7 +324,7 @@ impl SafeApp for SafeAppFake {
                         xorname_hex
                     ))
                 })?;
-                Ok((seq_append_only.len() as u64, last_entry.clone()))
+                Ok(((seq_append_only.len() - 1) as u64, last_entry.clone()))
             }
             None => Err(Error::ContentNotFound(format!(
                 "Sequential AppendOnlyData not found at Xor name: {}",

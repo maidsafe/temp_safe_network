@@ -65,7 +65,7 @@ impl Safe {
         // GET current NRS map from name's TLD
         let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
         let xorurl = xorurl_encoder.to_string("")?;
-        let (version, mut nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
+        let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
         let link = nrs_map.nrs_map_update_or_create_data(name, destination, default)?;
@@ -115,7 +115,7 @@ impl Safe {
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
         info!("Creating an NRS map");
         let nrs_url = sanitised_nrs_url(name);
-        if self.nrs_map_container_get_latest(&nrs_url).is_ok() {
+        if self.nrs_map_container_get(&nrs_url).is_ok() {
             Err(Error::ContentError(
                 "NRS name already exists. Please use 'nrs add' command to add sub names to it"
                     .to_string(),
@@ -174,7 +174,7 @@ impl Safe {
         // GET current NRS map from &name TLD
         let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
         let xorurl = xorurl_encoder.to_string("")?;
-        let (version, mut nrs_map) = self.nrs_map_container_get_latest(&xorurl)?;
+        let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
         let removed_link = nrs_map.nrs_map_remove_subname(name)?;
@@ -211,18 +211,39 @@ impl Safe {
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, Some("somewhere"), true, false).unwrap();
-    /// let (version, nrs_map_container) = safe.nrs_map_container_get_latest(&xorurl).unwrap();
-    /// assert_eq!(version, 1);
+    /// let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).unwrap();
+    /// assert_eq!(version, 0);
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");
     /// ```
-    pub fn nrs_map_container_get_latest(&self, url: &str) -> ResultReturn<(u64, NrsMap)> {
+    pub fn nrs_map_container_get(&self, url: &str) -> ResultReturn<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
-
         let xorurl_encoder = self.parse_url(url)?;
-        match self
-            .safe_app
-            .get_latest_seq_append_only_data(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
-        {
+
+        // Check if the URL specified a specific version of the content or simply the latest available
+        let data = xorurl_encoder.content_version().map_or_else(
+            || {
+                self.safe_app
+                    .get_latest_seq_append_only_data(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
+            },
+            |content_version| {
+                let (key, value) = self
+                    .safe_app
+                    .get_seq_append_only_data(
+                        xorurl_encoder.xorname(),
+                        NRS_MAP_TYPE_TAG,
+                        content_version,
+                    )
+                    .map_err(|_| {
+                        Error::VersionNotFound(format!(
+                            "Version '{}' is invalid for NRS Map Container found at \"{}\"",
+                            content_version, url,
+                        ))
+                    })?;
+                Ok((content_version, (key, value)))
+            },
+        );
+
+        match data {
             Ok((version, (_key, value))) => {
                 debug!("Nrs map retrieved.... v{:?}, value {:?} ", &version, &value);
                 // TODO: use RDF format and deserialise it
@@ -242,6 +263,7 @@ impl Safe {
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_NRS_MAP_FOUND.to_string(),
             )),
+            Err(Error::VersionNotFound(msg)) => Err(Error::VersionNotFound(msg)),
             Err(err) => Err(Error::NetDataError(format!(
                 "Failed to get current version: {}",
                 err
@@ -356,7 +378,7 @@ fn test_nrs_map_container_add() {
         true,
         false
     ));
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
     assert_eq!(
         unwrap!(updated_nrs_map.get_default_link()),
@@ -386,7 +408,7 @@ fn test_nrs_map_container_remove() {
     // remove subname
     let (version, _xorurl, _entries, updated_nrs_map) =
         unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
-    assert_eq!(version, 2);
+    assert_eq!(version, 1);
     assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
     assert_eq!(
         unwrap!(updated_nrs_map.get_default_link()),
@@ -423,7 +445,7 @@ fn test_nrs_map_container_remove_one_of_two() {
     // remove subname
     let (version, _xorurl, _entries, updated_nrs_map) =
         unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
-    assert_eq!(version, 3);
+    assert_eq!(version, 2);
     assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
     assert_eq!(
         unwrap!(updated_nrs_map.get_default_link()),

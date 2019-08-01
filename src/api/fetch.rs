@@ -157,7 +157,7 @@ impl Safe {
             }
             SafeContentType::NrsMapContainer => {
                 let (version, nrs_map) = self
-                    .nrs_map_container_get_latest(&xorurl)
+                    .nrs_map_container_get(&xorurl)
                     .map_err(|_| Error::ContentNotFound(format!("Content not found at {}", url)))?;
 
                 debug!(
@@ -299,7 +299,7 @@ fn test_fetch_files_container() {
             == SafeData::FilesContainer {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 1_100,
-                version: 1,
+                version: 0,
                 files_map,
                 data_type: SafeDataType::PublishedSeqAppendOnlyData,
                 resolved_from: None,
@@ -354,7 +354,7 @@ fn test_fetch_resolvable_container() {
         } => {
             assert_eq!(xorname, xorurl_encoder.xorname());
             assert_eq!(type_tag, 1_100);
-            assert_eq!(version, 1);
+            assert_eq!(version, 0);
             assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
             assert_eq!(files_map, the_files_map);
         }
@@ -391,7 +391,7 @@ fn test_fetch_resolvable_map_data() {
         } => {
             assert_eq!(nrs_map_container.xorname, xorurl_encoder.xorname());
             assert_eq!(nrs_map_container.type_tag, 1_500);
-            assert_eq!(nrs_map_container.version, 1);
+            assert_eq!(nrs_map_container.version, 0);
             assert_eq!(
                 nrs_map_container.data_type,
                 SafeDataType::PublishedSeqAppendOnlyData
