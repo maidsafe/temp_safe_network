@@ -99,6 +99,7 @@ impl Safe {
                 SafeContentType::FilesContainer,
                 None,
                 None,
+                None,
                 &self.xorurl_base,
             )?
         };
@@ -115,18 +116,41 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
-    /// let (version, files_map) = safe.files_container_get_latest(&xorurl).unwrap();
+    /// let (version, files_map) = safe.files_container_get(&xorurl).unwrap();
     /// println!("FilesContainer fetched is at version: {}", version);
-    /// println!("FilesMap of latest fetched version is: {:?}", files_map);
+    /// println!("FilesMap of fetched version is: {:?}", files_map);
     /// ```
-    pub fn files_container_get_latest(&self, xorurl: &str) -> ResultReturn<(u64, FilesMap)> {
-        debug!("Getting latest files container from: {:?}", xorurl);
-
+    pub fn files_container_get(&self, xorurl: &str) -> ResultReturn<(u64, FilesMap)> {
+        debug!("Getting files container from: {:?}", xorurl);
         let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        match self
-            .safe_app
-            .get_latest_seq_append_only_data(xorurl_encoder.xorname(), FILES_CONTAINER_TYPE_TAG)
-        {
+
+        // Check if the URL specified a specific version of the content or simply the latest available
+        let data = xorurl_encoder.content_version().map_or_else(
+            || {
+                self.safe_app.get_latest_seq_append_only_data(
+                    xorurl_encoder.xorname(),
+                    FILES_CONTAINER_TYPE_TAG,
+                )
+            },
+            |content_version| {
+                let (key, value) = self
+                    .safe_app
+                    .get_seq_append_only_data(
+                        xorurl_encoder.xorname(),
+                        xorurl_encoder.type_tag(),
+                        content_version,
+                    )
+                    .map_err(|_| {
+                        Error::VersionNotFound(format!(
+                            "Version '{}' is invalid for FilesContainer found at \"{}\"",
+                            content_version, xorurl,
+                        ))
+                    })?;
+                Ok((content_version, (key, value)))
+            },
+        );
+
+        match data {
             Ok((version, (_key, value))) => {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
@@ -140,12 +164,13 @@ impl Safe {
                 Ok((version, files_map))
             }
             Err(Error::EmptyContent(_)) => {
-                warn!("Files container found at {:?} was empty", &xorurl);
+                warn!("FilesContainer found at \"{:?}\" was empty", xorurl);
                 Ok((0, FilesMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
             )),
+            Err(Error::VersionNotFound(msg)) => Err(Error::VersionNotFound(msg)),
             Err(err) => Err(Error::NetDataError(format!(
                 "Failed to get current version: {}",
                 err
@@ -181,7 +206,7 @@ impl Safe {
             ));
         }
         let (current_version, current_files_map): (u64, FilesMap) =
-            self.files_container_get_latest(xorurl)?;
+            self.files_container_get(xorurl)?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files = file_system_dir_walk(self, location, recursive, false)?;
@@ -254,6 +279,7 @@ impl Safe {
             0,
             SafeDataType::PublishedImmutableData,
             SafeContentType::Raw,
+            None,
             None,
             None,
             &self.xorurl_base,
@@ -1255,14 +1281,14 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
 }
 
 #[test]
-fn test_files_container_get_latest() {
+fn test_files_container_get() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
-    let (version, fetched_files_map) = unwrap!(safe.files_container_get_latest(&xorurl));
+    let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
 
     assert_eq!(version, 1);
     assert_eq!(fetched_files_map.len(), 5);
@@ -1284,7 +1310,7 @@ fn test_files_container_version() {
     let (xorurl, _, _) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
-    let (version, _) = unwrap!(safe.files_container_get_latest(&xorurl));
+    let (version, _) = unwrap!(safe.files_container_get(&xorurl));
     assert_eq!(version, 1);
 
     let (version, _, _) = unwrap!(safe.files_container_sync(
@@ -1296,6 +1322,69 @@ fn test_files_container_version() {
     ));
     assert_eq!(version, 2);
 
-    let (version, _) = unwrap!(safe.files_container_get_latest(&xorurl));
+    let (version, _) = unwrap!(safe.files_container_get(&xorurl));
     assert_eq!(version, 2);
+}
+
+#[test]
+fn test_files_container_get_with_version() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, _processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+
+    // let's create a new version of the files container
+    let (_version, _new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &xorurl,
+        true,
+        true, // this sets the delete flag
+        false
+    ));
+
+    // let's fetch version 0
+    let v0_xorurl = format!("{}?v=0", xorurl);
+    let (version, v0_files_map) = unwrap!(safe.files_container_get(&v0_xorurl));
+
+    assert_eq!(version, 0);
+    assert_eq!(files_map, v0_files_map);
+    // let's check that one of the files in v1 is still there
+    let file_path1 = "/test.md";
+    assert_eq!(
+        files_map[file_path1][FAKE_RDF_PREDICATE_LINK],
+        v0_files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
+    );
+
+    // let's fetch version 1
+    let v1_xorurl = format!("{}?v=1", xorurl);
+    let (version, v1_files_map) = unwrap!(safe.files_container_get(&v1_xorurl));
+
+    assert_eq!(version, 1);
+    assert_eq!(new_files_map, v1_files_map);
+    // let's check that some of the files are no in v2 anymore
+    let file_path2 = "/another.md";
+    let file_path3 = "/subfolder/subexists.md";
+    let file_path4 = "/noextension";
+    assert!(v1_files_map.get(file_path1).is_none());
+    assert!(v1_files_map.get(file_path2).is_none());
+    assert!(v1_files_map.get(file_path3).is_none());
+    assert!(v1_files_map.get(file_path4).is_none());
+
+    // let's fetch version 2 (invalid)
+    let v2_xorurl = format!("{}?v=2", xorurl);
+    match safe.files_container_get(&v2_xorurl) {
+        Ok(_) => panic!("unexpectdly retrieved verion 3 of container"),
+        Err(Error::VersionNotFound(msg)) => assert_eq!(
+            msg,
+            format!(
+                "Version '2' is invalid for FilesContainer found at \"{}\"",
+                v2_xorurl
+            )
+        ),
+        other => panic!(format!(
+            "error returned is not the expected one: {:?}",
+            other
+        )),
+    };
 }

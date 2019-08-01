@@ -12,14 +12,14 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{get_bin_location, CLI};
+use common::{get_bin_location, parse_files_put_or_sync_output, CLI};
 use predicates::prelude::*;
-use serde_json;
-use std::collections::BTreeMap;
 use std::process::Command;
 
-const OUR_DATA: &str = "hello tests!";
 const TEST_FILE: &str = "./tests/testfolder/test.md";
+const TEST_FILE_CONTENT: &str = "hello tests!";
+const ANOTHER_FILE: &str = "./tests/testfolder/another.md";
+const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
 fn calling_safe_cat() {
@@ -27,18 +27,51 @@ fn calling_safe_cat() {
         .read()
         .unwrap();
 
-    let (_container_xorurl, map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&content) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe file put`: {}",
-                err
-            )),
-        };
-
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["cat", &map[TEST_FILE].1])
         .assert()
-        .stdout(predicate::str::contains(OUR_DATA))
+        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
+}
+
+#[test]
+fn calling_safe_cat_xorurl_url_with_version() {
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json",)
+        .read()
+        .unwrap();
+    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
+
+    // let's sync with another file so we get a new version, and a different content in the file
+    let xorurl_with_path = format!("{}/test.md", container_xorurl);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &xorurl_with_path])
+        .assert()
+        .success();
+
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", &xorurl_with_path])
+        .assert()
+        .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
+        .success();
+
+    let v0_xorurl = format!("{}/test.md?v=0", container_xorurl);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", &v0_xorurl])
+        .assert()
+        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
+        .success();
+
+    let v1_xorurl = format!("{}/test.md?v=1", container_xorurl);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", &v1_xorurl])
+        .assert()
+        .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
+        .success();
+
+    let invalid_version_xorurl = format!("{}/test.md?v=2", container_xorurl);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", &invalid_version_xorurl])
+        .assert()
+        .failure();
 }

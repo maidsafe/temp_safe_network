@@ -37,7 +37,7 @@ impl Safe {
                 err
             );
 
-            let (sub_names, host_str, path) = get_subnames_host_and_path(url)?;
+            let (sub_names, host_str, path, version) = get_subnames_host_and_path(url)?;
             let hashed_host = xorname_from_nrs_string(&host_str)?;
 
             let encoded_xor = XorUrlEncoder::new(
@@ -47,6 +47,7 @@ impl Safe {
                 SafeContentType::NrsMapContainer,
                 Some(&path),
                 Some(sub_names),
+                version,
             );
 
             Ok(encoded_xor)
@@ -133,7 +134,7 @@ impl Safe {
             if dry_run {
                 Ok(("".to_string(), processed_entries, nrs_map))
             } else {
-                let (_, public_name, _) = get_subnames_host_and_path(&nrs_url)?;
+                let (_, public_name, _, _) = get_subnames_host_and_path(&nrs_url)?;
                 let nrs_xorname = xorname_from_nrs_string(&public_name)?;
                 debug!(
                     "XorName for \"{:?}\" is \"{:?}\"",
@@ -153,6 +154,7 @@ impl Safe {
                     NRS_MAP_TYPE_TAG,
                     SafeDataType::PublishedSeqAppendOnlyData,
                     SafeContentType::NrsMapContainer,
+                    None,
                     None,
                     None,
                     &self.xorurl_base,

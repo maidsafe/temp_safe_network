@@ -42,6 +42,7 @@ impl Safe {
             SafeContentType::Wallet,
             None,
             None,
+            None,
             &self.xorurl_base,
         )
     }
@@ -61,6 +62,7 @@ impl Safe {
             0,
             SafeDataType::CoinBalance,
             SafeContentType::Raw,
+            None,
             None,
             None,
             &self.xorurl_base,

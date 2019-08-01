@@ -18,6 +18,8 @@ use std::str::FromStr;
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use url::Url;
 
+const URL_VERSION_QUERY_NAME: &str = "v=";
+
 // Out internal key pair structure to manage BLS keys
 #[derive(Debug)]
 pub struct KeyPair {
@@ -134,32 +136,52 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
     }
 }
 
-pub fn get_subnames_host_and_path(xorurl: &str) -> ResultReturn<(Vec<String>, String, String)> {
+pub fn get_subnames_host_and_path(
+    xorurl: &str,
+) -> ResultReturn<(Vec<String>, String, String, Option<u64>)> {
     let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
-        Error::InvalidXorUrl(format!("Problem parsing the SAFE:// URL {:?}", parse_err))
+        Error::InvalidXorUrl(format!("Problem parsing the safe:// URL {:?}", parse_err))
     })?;
 
     let host_str = parsing_url
         .host_str()
         .unwrap_or_else(|| "Failed parsing the URL");
-
     let names_vec = Vec::from_iter(host_str.split('.').map(String::from));
-
     let top_level_name = &names_vec[names_vec.len() - 1];
     let sub_names = &names_vec[0..names_vec.len() - 1];
 
-    let mut path = str::replace(parsing_url.path(), "\\", "/");
+    let mut path = parsing_url.path();
     if path == "/" {
-        path = "".to_string();
+        path = "";
     }
 
+    let version = match parsing_url.query() {
+        Some(query) => {
+            let items: Vec<&str> = query.split('&').collect();
+            match items.iter().find(|q| q.starts_with(URL_VERSION_QUERY_NAME)) {
+                Some(version_item) => {
+                    let version_str = version_item.replace(URL_VERSION_QUERY_NAME, "");
+                    str::parse::<u64>(&version_str).ok()
+                }
+                None => None,
+            }
+        }
+        None => None,
+    };
+
     debug!(
-        "Data from url: sub names: {:?}, host: {}, path: {}",
+        "Data from url: sub names: {:?}, host: {}, path: {}, version: {:?}",
         sub_names.to_vec(),
         top_level_name.to_string(),
-        path
+        path,
+        version
     );
-    Ok((sub_names.to_vec(), top_level_name.to_string(), path))
+    Ok((
+        sub_names.to_vec(),
+        top_level_name.to_string(),
+        path.to_string(),
+        version,
+    ))
 }
 
 pub fn gen_timestamp_secs() -> String {

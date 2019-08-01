@@ -119,6 +119,7 @@ impl Safe {
             SafeContentType::Raw,
             None,
             None,
+            None,
             &self.xorurl_base,
         )?;
         Ok((xorurl, key_pair))
@@ -152,6 +153,7 @@ impl Safe {
             0,
             SafeDataType::CoinBalance,
             SafeContentType::Raw,
+            None,
             None,
             None,
             &self.xorurl_base,

@@ -412,25 +412,23 @@ impl SafeApp for SafeAppScl {
 
         let safe_app: &App = self.get_safe_app()?;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
+
+        // START TEMP BLOCK
+        // This is a temporary block to overcome an issue in SCL panicing when trying
+        // to fetch invalid versions: https://github.com/maidsafe/safe-nd/issues/93
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
             .unwrap();
-
-        let start = ADataIndex::FromStart(version);
-        let end = ADataIndex::FromStart(version + 1);
-
         if version >= data_length {
-            return Err(Error::NetDataError(format!(
-                "The version, \"{:?}\" of \"{:?}\" does not exist",
+            return Err(Error::VersionNotFound(format!(
+                "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
                 version, name
             )));
         }
+        // END TEMP BLOCK
 
-        if version == data_length {
-            let (_version, data) = self.get_latest_seq_append_only_data(name, tag).unwrap();
-            return Ok(data);
-        }
-
+        let start = ADataIndex::FromStart(version);
+        let end = ADataIndex::FromStart(version + 1);
         let data = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_range(append_only_data_address, (start, end))
@@ -724,8 +722,8 @@ fn test_put_get_update_seq_append_only_data() {
         .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),
-        Err(Error::NetDataError(msg)) => assert!(msg.contains(&format!(
-            "The version, \"{}\" of \"{}\" does not exist",
+        Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
+            "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
             nonexistant_version, xorname
         ))),
         _ => panic!("Error returned is not the expected one"),

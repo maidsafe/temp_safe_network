@@ -115,7 +115,7 @@ impl Safe {
                 resolved_from: None,
             }),
             SafeContentType::FilesContainer => {
-                let (version, files_map) = self.files_container_get_latest(&xorurl)?;
+                let (version, files_map) = self.files_container_get(&xorurl)?;
 
                 debug!(
                     "Files container found w/ v:{}, on data type: {}, containing: {:?}",
@@ -340,9 +340,6 @@ fn test_fetch_resolvable_container() {
     let (_nrs_map_xorurl, _, _nrs_map) =
         unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
 
-    println!("NRS CREATED???? {:?}", _nrs_map);
-    println!("fetching CREATED site nammeee???? safe://{}", site_name);
-
     let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
     // this should resolve to a FilesContainer until we enable prevent resolution.
@@ -440,6 +437,7 @@ fn test_fetch_unsupported() {
         type_tag,
         SafeDataType::UnpublishedImmutableData,
         SafeContentType::Raw,
+        None,
         None,
         None,
         "base32z"

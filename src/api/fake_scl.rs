@@ -340,9 +340,7 @@ impl SafeApp for SafeAppFake {
         _tag: u64,
     ) -> ResultReturn<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
-
         let xorname_hex = xorname_to_hex(&name);
-
         let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
             Some(seq_append_only) => seq_append_only.len(),
             None => {
@@ -354,17 +352,40 @@ impl SafeApp for SafeAppFake {
         };
 
         // return the version
-        Ok(length as u64)
+        Ok((length - 1) as u64)
     }
 
-    // TODO: add impl
     fn get_seq_append_only_data(
         &self,
-        _name: XorName,
+        name: XorName,
         _tag: u64,
-        _version: u64,
+        version: u64,
     ) -> ResultReturn<AppendOnlyDataRawData> {
-        Ok(AppendOnlyDataRawData::default())
+        let xorname_hex = xorname_to_hex(&name);
+        match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
+            Some(seq_append_only) => {
+                if version >= seq_append_only.len() as u64 {
+                    Err(Error::VersionNotFound(format!(
+                        "Invalid version ({}) for Sequential AppendOnlyData found at Xor name {}",
+                        version, name
+                    )))
+                } else {
+                    let index = version as usize;
+                    let entry = seq_append_only.get(index).ok_or_else(|| {
+                        Error::EmptyContent(format!(
+                            "Empty Sequential AppendOnlyData found at Xor name {}",
+                            xorname_hex
+                        ))
+                    })?;
+
+                    Ok(entry.clone())
+                }
+            }
+            None => Err(Error::ContentNotFound(format!(
+                "Sequential AppendOnlyData not found at Xor name: {}",
+                xorname_hex
+            ))),
+        }
     }
 
     fn put_seq_mutable_data(
@@ -525,7 +546,6 @@ fn test_allocate_test_coins() {
     let balance = unwrap!(Coins::from_str("2.345678912"));
     unwrap!(mock.allocate_test_coins(pk_to, balance));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
-    println!("Current balance: {}", current_balance);
     assert_eq!(balance, current_balance);
 }
 
@@ -566,22 +586,16 @@ fn test_check_balance() {
     let balance = unwrap!(Coins::from_str("2.3"));
     unwrap!(mock.allocate_test_coins(pk, balance));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
-    println!("Current balance: {}", current_balance);
     assert_eq!(balance, current_balance);
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
     let preload = unwrap!(Coins::from_str("1.234567891"));
-    println!(
-        "New CoinBalance at: {:?}",
-        mock.create_balance(Some(sk.clone()), pk_to, preload)
-    );
+    unwrap!(mock.create_balance(Some(sk.clone()), pk_to, preload));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
-    println!("Current balance: {}", current_balance);
     assert_eq!(preload, current_balance);
 
     let current_balance = unwrap!(mock.get_balance_from_sk(sk));
-    println!("Current balance: {}", current_balance);
     assert_eq!(
         unwrap!(Coins::from_str("1.065432109")), /* == 2.3 - 1.234567891*/
         current_balance
@@ -606,29 +620,17 @@ fn test_safecoin_transfer() {
 
     let balance1 = unwrap!(Coins::from_str("2.5"));
     let balance2 = unwrap!(Coins::from_str("5.7"));
-    println!(
-        "Allocate testcoins in new CoinBalance 1 at: {:?}",
-        mock.allocate_test_coins(pk1, balance1)
-    );
-
-    println!(
-        "Allocate testcoins in new CoinBalance 2 at: {:?}",
-        mock.allocate_test_coins(pk2, balance2)
-    );
+    unwrap!(mock.allocate_test_coins(pk1, balance1));
+    unwrap!(mock.allocate_test_coins(pk2, balance2));
 
     let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()));
     let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()));
-    println!(
-        "Current balances before TX: {} and {}",
-        curr_balance1, curr_balance2
-    );
 
     assert_eq!(balance1, curr_balance1);
     assert_eq!(balance2, curr_balance2);
 
     let mut rng = rand::thread_rng();
     let tx_id = rng.next_u64();
-    println!("UUID {}", tx_id);
 
     let _ = unwrap!(mock.safecoin_transfer_to_xorname(
         sk1.clone(),
@@ -636,17 +638,10 @@ fn test_safecoin_transfer() {
         tx_id,
         unwrap!(Coins::from_str("1.4"))
     ));
-    println!(
-        "Current TX state: {}",
-        unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()))
-    );
+    unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()));
 
     let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1));
     let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2));
-    println!(
-        "Current balances after TX: {} and {}",
-        curr_balance1, curr_balance2
-    );
 
     assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
     assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
