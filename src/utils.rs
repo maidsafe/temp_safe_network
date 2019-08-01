@@ -16,7 +16,7 @@ use safe_nd::{
     Response, XorName,
 };
 use serde::Serialize;
-use std::{fs, path::Path};
+use std::{borrow::Cow, fs, path::Path};
 use unwrap::unwrap;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
@@ -89,13 +89,13 @@ pub(crate) fn requester_address(rpc: &Rpc) -> &XorName {
 }
 
 /// Returns the address of the destination for `request`.
-pub(crate) fn destination_address(request: &Request) -> Option<&XorName> {
+pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
     use Request::*;
     match request {
-        PutIData(ref data) => Some(data.name()),
-        GetIData(ref address) => Some(address.name()),
-        DeleteUnpubIData(ref address) => Some(address.name()),
-        PutMData(ref data) => Some(data.name()),
+        PutIData(ref data) => Some(Cow::Borrowed(data.name())),
+        GetIData(ref address) => Some(Cow::Borrowed(address.name())),
+        DeleteUnpubIData(ref address) => Some(Cow::Borrowed(address.name())),
+        PutMData(ref data) => Some(Cow::Borrowed(data.name())),
         GetMData(ref address)
         | GetMDataValue { ref address, .. }
         | DeleteMData(ref address)
@@ -109,8 +109,8 @@ pub(crate) fn destination_address(request: &Request) -> Option<&XorName> {
         | ListMDataPermissions(ref address)
         | ListMDataUserPermissions { ref address, .. }
         | MutateSeqMDataEntries { ref address, .. }
-        | MutateUnseqMDataEntries { ref address, .. } => Some(address.name()),
-        PutAData(ref data) => Some(data.name()),
+        | MutateUnseqMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
+        PutAData(ref data) => Some(Cow::Borrowed(data.name())),
         GetAData(ref address)
         | GetADataValue { ref address, .. }
         | GetADataShell { ref address, .. }
@@ -124,26 +124,24 @@ pub(crate) fn destination_address(request: &Request) -> Option<&XorName> {
         | GetADataOwners { ref address, .. }
         | AddPubADataPermissions { ref address, .. }
         | AddUnpubADataPermissions { ref address, .. }
-        | SetADataOwner { ref address, .. } => Some(address.name()),
-        AppendSeq { ref append, .. } | AppendUnseq(ref append) => Some(append.address.name()),
+        | SetADataOwner { ref address, .. } => Some(Cow::Borrowed(address.name())),
+        AppendSeq { ref append, .. } | AppendUnseq(ref append) => {
+            Some(Cow::Borrowed(append.address.name()))
+        }
         TransferCoins {
             ref destination, ..
-        } => Some(destination),
+        } => Some(Cow::Borrowed(destination)),
         CreateBalance {
-            // ref new_balance_owner,
+            ref new_balance_owner,
             ..
-        } => None, // Some(XorName::from(new_balance_owner)),
-        CreateLoginPacket(login_packet) => Some(login_packet.destination()),
+        } => Some(Cow::Owned(XorName::from(*new_balance_owner))),
+        CreateLoginPacket(login_packet) => Some(Cow::Borrowed(login_packet.destination())),
         CreateLoginPacketFor {
-            new_login_packet,
-            ..
-        } => Some(new_login_packet.destination()),
-        UpdateLoginPacket(login_packet) => Some(login_packet.destination()),
-        GetLoginPacket(ref name) => Some(name),
-        GetBalance
-        | ListAuthKeysAndVersion
-        | InsAuthKey { .. }
-        | DelAuthKey { .. } => None,
+            new_login_packet, ..
+        } => Some(Cow::Borrowed(new_login_packet.destination())),
+        UpdateLoginPacket(login_packet) => Some(Cow::Borrowed(login_packet.destination())),
+        GetLoginPacket(ref name) => Some(Cow::Borrowed(name)),
+        GetBalance | ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => None,
     }
 }
 

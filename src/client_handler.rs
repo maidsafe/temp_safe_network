@@ -294,12 +294,12 @@ impl ClientHandler {
                 destination,
                 amount,
                 transaction_id,
-            } => self.handle_transfer_coins(
+            } => self.handle_transfer_coins_client_req(
                 &client.public_id,
-                message_id,
                 destination,
                 amount,
                 transaction_id,
+                message_id,
             ),
             GetBalance => {
                 let balance = self
@@ -313,12 +313,12 @@ impl ClientHandler {
                 new_balance_owner,
                 amount,
                 transaction_id,
-            } => self.handle_create_balance(
+            } => self.handle_create_balance_client_req(
                 &client.public_id,
-                message_id,
                 new_balance_owner,
                 amount,
                 transaction_id,
+                message_id,
             ),
             //
             // ===== Login packets =====
@@ -754,6 +754,28 @@ impl ClientHandler {
                 new_login_packet,
                 message_id,
             ),
+            CreateBalance {
+                new_balance_owner,
+                amount,
+                transaction_id,
+            } => self.handle_create_balance_vault_req(
+                requester,
+                new_balance_owner,
+                amount,
+                transaction_id,
+                message_id,
+            ),
+            TransferCoins {
+                destination,
+                amount,
+                transaction_id,
+            } => self.handle_transfer_coins_vault_req(
+                requester,
+                destination,
+                amount,
+                transaction_id,
+                message_id,
+            ),
             PutIData(_)
             | GetIData(_)
             | DeleteUnpubIData(_)
@@ -789,12 +811,10 @@ impl ClientHandler {
             | SetADataOwner { .. }
             | AppendSeq { .. }
             | AppendUnseq(_)
-            | TransferCoins { .. }
             | GetBalance
             | ListAuthKeysAndVersion
             | InsAuthKey { .. }
             | DelAuthKey { .. }
-            | CreateBalance { .. }
             | UpdateLoginPacket { .. }
             | GetLoginPacket(..) => {
                 error!(
@@ -868,58 +888,158 @@ impl ClientHandler {
         }
     }
 
-    fn handle_create_balance(
+    fn handle_create_balance_client_req(
         &mut self,
-        public_id: &PublicId,
-        message_id: MessageId,
+        requester: &PublicId,
         owner_key: PublicKey,
         amount: Coins,
         transaction_id: TransactionId,
+        message_id: MessageId,
     ) -> Option<Action> {
-        let result = self
-            .withdraw_coins_for_transfer(public_id.name(), amount)
-            .and_then(|cost| {
-                self.create_balance(owner_key, amount).map_err(|error| {
-                    self.refund(public_id.name(), cost);
-                    error
-                })
-            })
-            .map(|_| Transaction {
-                id: transaction_id,
-                amount,
-            });
+        let result = match self.withdraw_coins_for_transfer(requester.name(), amount) {
+            Ok(()) => {
+                return Some(Action::ForwardClientRequest(Rpc::Request {
+                    request: Request::CreateBalance {
+                        new_balance_owner: owner_key,
+                        amount,
+                        transaction_id,
+                    },
+                    requester: requester.clone(),
+                    message_id,
+                }));
+            }
+            Err(error) => Err(error),
+        };
 
-        self.send_response_to_client(public_id, message_id, Response::Transaction(result));
+        self.send_response_to_client(requester, message_id, Response::Transaction(result));
         None
     }
 
-    fn handle_transfer_coins(
+    fn handle_create_balance_vault_req(
         &mut self,
-        public_id: &PublicId,
+        requester: PublicId,
+        owner_key: PublicKey,
+        amount: Coins,
+        transaction_id: TransactionId,
         message_id: MessageId,
+    ) -> Option<Action> {
+        let rpc = match self.create_balance(owner_key, amount) {
+            Ok(()) => {
+                let destination = XorName::from(owner_key);
+                let transaction = Transaction {
+                    id: transaction_id,
+                    amount,
+                };
+                self.notify_destination_owners(&destination, transaction);
+                Rpc::Response {
+                    response: Response::Transaction(Ok(transaction)),
+                    requester,
+                    message_id,
+                }
+            }
+            Err(_) => {
+                // Send refund.
+                Rpc::Request {
+                    request: Request::TransferCoins {
+                        destination: *requester.name(),
+                        amount,
+                        transaction_id,
+                    },
+                    requester,
+                    message_id,
+                }
+            }
+        };
+
+        Some(Action::RespondToClientHandlers {
+            sender: *self.id.name(),
+            rpc,
+        })
+    }
+
+    fn handle_transfer_coins_client_req(
+        &mut self,
+        requester: &PublicId,
         destination: XorName,
         amount: Coins,
         transaction_id: TransactionId,
+        message_id: MessageId,
     ) -> Option<Action> {
-        let result = self
-            .withdraw_coins_for_transfer(public_id.name(), amount)
-            .and_then(|cost| {
-                self.deposit(&destination, amount).map_err(|error| {
-                    self.refund(public_id.name(), cost);
-                    error
-                })
-            })
-            .map(|_| Transaction {
-                id: transaction_id,
-                amount,
-            })
-            .map(|transaction| {
-                self.notify_destination_owners(&destination, transaction);
-                transaction
-            });
+        match self.withdraw_coins_for_transfer(requester.name(), amount) {
+            Ok(()) => Some(Action::ForwardClientRequest(Rpc::Request {
+                request: Request::TransferCoins {
+                    destination,
+                    amount,
+                    transaction_id,
+                },
+                requester: requester.clone(),
+                message_id,
+            })),
+            Err(error) => {
+                self.send_response_to_client(
+                    requester,
+                    message_id,
+                    Response::Transaction(Err(error)),
+                );
+                None
+            }
+        }
+    }
 
-        self.send_response_to_client(public_id, message_id, Response::Transaction(result));
-        None
+    fn handle_transfer_coins_vault_req(
+        &mut self,
+        requester: PublicId,
+        destination: XorName,
+        amount: Coins,
+        transaction_id: TransactionId,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let rpc = match self.deposit(&destination, amount) {
+            Ok(()) => {
+                let transaction = Transaction {
+                    id: transaction_id,
+                    amount,
+                };
+                self.notify_destination_owners(&destination, transaction);
+
+                if *requester.name() == destination {
+                    // This is a successful refund.
+                    // TODO: we might want to send a response back to the client, but currently we
+                    // don't know the reason for the refund. We should maybe consider adding that
+                    // information to the `TransferCoins` request.
+                    return None;
+                } else {
+                    Rpc::Response {
+                        response: Response::Transaction(Ok(transaction)),
+                        requester,
+                        message_id,
+                    }
+                }
+            }
+            Err(error) => {
+                if *requester.name() == destination {
+                    // This is a failed refund.
+                    error!("{} Failed to refund {} coins: {:?}", self, amount, error);
+                    return None;
+                }
+
+                // Send refund
+                Rpc::Request {
+                    request: Request::TransferCoins {
+                        destination: *requester.name(),
+                        amount,
+                        transaction_id,
+                    },
+                    requester,
+                    message_id,
+                }
+            }
+        };
+
+        Some(Action::RespondToClientHandlers {
+            sender: *self.id.name(),
+            rpc,
+        })
     }
 
     fn notify_destination_owners(&mut self, destination: &XorName, transaction: Transaction) {
@@ -932,15 +1052,12 @@ impl ClientHandler {
         &mut self,
         balance_name: &XorName,
         amount: Coins,
-    ) -> Result<Coins, NdError> {
-        match self.withdraw(balance_name, amount) {
-            Ok(()) => Ok(amount),
-            Err(error) => {
-                // Note: in phase 1, we proceed even if there are insufficient funds.
-                trace!("{}: Unable to withdraw {} coins: {}", self, amount, error);
-                Ok(unwrap!(Coins::from_nano(0)))
-            }
-        }
+    ) -> Result<(), NdError> {
+        self.withdraw(balance_name, amount).or_else(|error| {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!("{}: Unable to withdraw {} coins: {}", self, amount, error);
+            Ok(())
+        })
     }
 
     fn create_balance(&mut self, owner_key: PublicKey, amount: Coins) -> Result<(), NdError> {
@@ -962,15 +1079,6 @@ impl ClientHandler {
                 client.has_balance = true;
             }
             Ok(())
-        }
-    }
-
-    fn refund(&mut self, balance_name: &XorName, amount: Coins) {
-        if let Err(error) = self.deposit(balance_name, amount) {
-            error!(
-                "{}: Failed to refund {} coins to balance of {:?}: {:?}.",
-                self, amount, balance_name, error
-            );
         }
     }
 

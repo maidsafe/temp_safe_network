@@ -249,6 +249,14 @@ impl Vault {
                 | Rpc::Request {
                     request: Request::CreateLoginPacketFor { .. },
                     ..
+                }
+                | Rpc::Request {
+                    request: Request::CreateBalance { .. },
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::TransferCoins { .. },
+                    ..
                 } => self
                     .client_handler_mut()?
                     .handle_vault_rpc(requester_name, rpc),
