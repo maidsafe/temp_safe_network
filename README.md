@@ -378,7 +378,7 @@ All the content of the `./to-upload/` local directory is now stored and publishe
 We can now sync up all the changes we just made, recursively, with the `FilesContainer` we previously created:
 ```shell
 $ safe files sync ./to-upload/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w --recursive --delete
-FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
+FilesContainer synced up (version 1): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
 *  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
 +  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
 -  /test.md                   safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
@@ -391,7 +391,7 @@ Also, please note we provided the optional `--delete` flag to the command above,
 The `files sync` command also supports to be passed a destination path as the `files put` command, but in this case the destination path needs to be provided as part of the target XOR-URL. E.g., we can sync a `FilesContainer` using the local path and provide a specific destination path `new-files` in the target XOR-URL:
 ```shell
 $ safe files sync ./other-folder/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/new-files
-FilesContainer synced up (version 3): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
+FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
 +  ./other-folder/file1.txt     safe://hoqi7papyp7c6riyxiez6y5fh5ugj4xc7syqhmex774ws4g4b1z1xq
 ```
 
@@ -418,7 +418,7 @@ FilesContainer created at: "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznn
 We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
 ```shell
 $ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc
-Files of FilesContainer (version 1) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
+Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
@@ -451,7 +451,7 @@ Native data type: PublishedSeqAppendOnlyData
 Type tag: 1100
 XOR name: 0x346b0335f55f3dbd4d89ecb792bc76460f6dcc8627b35c429a11d940cb15a492
 
-Files of FilesContainer (version 1) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
+Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
@@ -508,7 +508,7 @@ New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgor
 We can now share the NRS-URL `safe://mywebsite` to anyone who wants to visit our website. Using this NRS-URL we can now fetch the same content we would do when using the `FilesContainer` XOR-URL we linked to it, thus we can fetch it using the following command:
 ```shell
 $ safe cat safe://mywebsite
-Files of FilesContainer (version 1) at "safe://mywebsite":
+Files of FilesContainer (version 0) at "safe://mywebsite":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
@@ -558,8 +558,16 @@ Once a public name has been created with `nrs create` command, more sub names ca
 Let's add `profile` sub name to the `mywebsite` NRS name we created before:
 ```shell
 $ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc
-NRS Map updated (version 2): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
+NRS Map updated (version 1): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
+```
+
+The safe nrs add command can also be used to update subnames after they have been added to a public name.
+For example, if we have made changes to files mapped to the `profile.mywebsite' NRS subname we created before, we can use `nrs add` to update its link:
+```shell
+$ safe nrs add profile.mywebsite --link safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
+NRS Map updated (version 2): "safe://profile.hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
++  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
 ```
 
 #### NRS Remove
@@ -570,7 +578,7 @@ Let's remove the `profile` sub name from the `mywebsite` NRS name we added befor
 ```shell
 $ safe nrs remove profile.mywebsite
 NRS Map updated (version 3): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
--  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
+-  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
 ```
 
 ### Update
