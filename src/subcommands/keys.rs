@@ -66,7 +66,7 @@ pub fn key_commander(
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(&sk)?
             } else {
-                safe.keys_balance_from_xorurl(&target, &sk)?
+                safe.keys_balance_from_url(&target, &sk)?
             };
 
             if OutputFmt::Pretty == output_fmt {

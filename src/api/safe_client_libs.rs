@@ -8,7 +8,7 @@
 
 use super::helpers::xorname_from_pk;
 use super::safe_net::AppendOnlyDataRawData;
-use super::xorurl::{create_random_xorname, XorUrlEncoder};
+use super::xorurl::create_random_xorname;
 use super::{Error, ResultReturn, SafeApp};
 use futures::future::Future;
 use log::{debug, info, warn};
@@ -52,17 +52,16 @@ impl SafeAppScl {
 
     fn mutate_seq_mdata_entries(
         &self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         entry_actions: MDataSeqEntryActions,
         error_msg: &str,
     ) -> ResultReturn<()> {
         let safe_app = self.get_safe_app()?;
-        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let message = error_msg.to_string();
         run(safe_app, move |client, _app_context| {
             client
-                .mutate_seq_mdata_entries(xorname, tag, entry_actions)
+                .mutate_seq_mdata_entries(name, tag, entry_actions)
                 .map_err(CoreError)
         })
         .map_err(|err| {
@@ -498,31 +497,31 @@ impl SafeApp for SafeAppScl {
         .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
     }
 
-    fn get_seq_mdata(&self, xorname: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
+    fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
-            client.get_seq_mdata(xorname, tag).map_err(CoreError)
+            client.get_seq_mdata(name, tag).map_err(CoreError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
     fn seq_mutable_data_insert(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
     ) -> ResultReturn<()> {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-        self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to insert to MD")
+        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to MD")
     }
 
-    fn mutable_data_delete(&mut self, xorname: XorName, tag: u64) -> ResultReturn<()> {
+    fn mutable_data_delete(&mut self, name: XorName, tag: u64) -> ResultReturn<()> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client
-                .delete_mdata(MDataAddress::Seq { name: xorname, tag })
+                .delete_mdata(MDataAddress::Seq { name: name, tag })
                 .map_err(CoreError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to delete MD: {:?}", e)))
@@ -530,16 +529,15 @@ impl SafeApp for SafeAppScl {
 
     fn seq_mutable_data_get_value(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
     ) -> ResultReturn<MDataValue> {
         let safe_app: &App = self.get_safe_app()?;
-        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
         let key_vec = key.to_vec();
         run(safe_app, move |client, _app_context| {
             client
-                .get_seq_mdata_value(xorname, tag, key_vec)
+                .get_seq_mdata_value(name, tag, key_vec)
                 .map_err(CoreError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to retrieve key. {:?}", e)))
@@ -547,23 +545,19 @@ impl SafeApp for SafeAppScl {
 
     fn list_seq_mdata_entries(
         &self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
     ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
         let safe_app: &App = self.get_safe_app()?;
-        let xorname = XorUrlEncoder::from_url(xorurl)?.xorname();
-
         run(safe_app, move |client, _app_context| {
-            client
-                .list_seq_mdata_entries(xorname, tag)
-                .map_err(CoreError)
+            client.list_seq_mdata_entries(name, tag).map_err(CoreError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
     fn seq_mutable_data_update(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
@@ -571,7 +565,7 @@ impl SafeApp for SafeAppScl {
     ) -> ResultReturn<()> {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), version);
-        self.mutate_seq_mdata_entries(xorurl, tag, entry_actions, "Failed to update MD")
+        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update MD")
     }
 }
 

@@ -94,34 +94,34 @@ pub trait SafeApp {
         permissions: Option<String>,
     ) -> ResultReturn<XorName>;
 
-    fn get_seq_mdata(&self, xorname: XorName, tag: u64) -> ResultReturn<SeqMutableData>;
+    fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData>;
 
     fn seq_mutable_data_insert(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
     ) -> ResultReturn<()>;
 
-    fn mutable_data_delete(&mut self, xorname: XorName, tag: u64) -> ResultReturn<()>;
+    fn mutable_data_delete(&mut self, name: XorName, tag: u64) -> ResultReturn<()>;
 
     fn seq_mutable_data_get_value(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
     ) -> ResultReturn<MDataValue>;
 
     fn list_seq_mdata_entries(
         &self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
     ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>>;
 
     fn seq_mutable_data_update(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],

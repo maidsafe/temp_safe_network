@@ -48,9 +48,12 @@ pub enum FilesSubCommands {
         /// Recursively sync folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
-        /// Delete files found at the target FilesContainer that are not in the source location. This is only allowed when --recursive is passed as well.
+        /// Delete files found at the target FilesContainer that are not in the source location. This is only allowed when --recursive is passed as well
         #[structopt(short = "d", long = "delete")]
         delete: bool,
+        /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
+        #[structopt(short = "u", long = "update-nrs")]
+        update_nrs: bool,
     },
 }
 
@@ -98,12 +101,13 @@ pub fn files_commander(
             target,
             recursive,
             delete,
+            update_nrs,
         }) => {
             let target = get_from_arg_or_stdin(target, None)?;
 
             // Update the FilesContainer on the Network
-            let (version, processed_files, _files_map) =
-                safe.files_container_sync(&location, &target, recursive, delete, dry_run)?;
+            let (version, processed_files, _files_map) = safe
+                .files_container_sync(&location, &target, recursive, delete, update_nrs, dry_run)?;
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {

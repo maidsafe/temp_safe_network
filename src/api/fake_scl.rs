@@ -8,7 +8,7 @@
 
 use super::safe_net::AppendOnlyDataRawData;
 use super::xorurl::create_random_xorname;
-use super::{Error, ResultReturn, SafeApp, XorUrlEncoder};
+use super::{Error, ResultReturn, SafeApp};
 use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
@@ -408,8 +408,8 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn get_seq_mdata(&self, xorname: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
-        let xorname_hex = xorname_to_hex(&xorname);
+    fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
+        let xorname_hex = xorname_to_hex(&name);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
 
         match self.fake_vault.mutable_data.get(&xorname_hex) {
@@ -420,7 +420,7 @@ impl SafeApp for SafeAppFake {
                 });
 
                 Ok(SeqMutableData::new_with_data(
-                    xorname,
+                    name,
                     tag,
                     seq_md_with_vec,
                     BTreeMap::default(),
@@ -436,14 +436,12 @@ impl SafeApp for SafeAppFake {
 
     fn seq_mutable_data_insert(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
     ) -> ResultReturn<()> {
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let xorname = xorurl_encoder.xorname();
-        let seq_md = self.get_seq_mdata(xorname, tag)?;
+        let seq_md = self.get_seq_mdata(name, tag)?;
         let mut data = seq_md.entries().clone();
 
         data.insert(
@@ -460,13 +458,13 @@ impl SafeApp for SafeAppFake {
         });
         self.fake_vault
             .mutable_data
-            .insert(xorname_to_hex(&xorname), seq_md_with_str);
+            .insert(xorname_to_hex(&name), seq_md_with_str);
 
         Ok(())
     }
 
-    fn mutable_data_delete(&mut self, xorname: XorName, _tag: u64) -> ResultReturn<()> {
-        let xorname_hex = xorname_to_hex(&xorname);
+    fn mutable_data_delete(&mut self, name: XorName, _tag: u64) -> ResultReturn<()> {
+        let xorname_hex = xorname_to_hex(&name);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
         let _ = self
             .fake_vault
@@ -483,31 +481,27 @@ impl SafeApp for SafeAppFake {
 
     fn seq_mutable_data_get_value(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
     ) -> ResultReturn<MDataValue> {
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let xorname = xorurl_encoder.xorname();
-        let seq_md = self.get_seq_mdata(xorname, tag)?;
+        let seq_md = self.get_seq_mdata(name, tag)?;
         match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
             None => Err(Error::EntryNotFound(format!(
                 "Entry not found in Sequential MutableData found at Xor name: {}",
-                xorname_to_hex(&xorname)
+                xorname_to_hex(&name)
             ))),
         }
     }
 
     fn list_seq_mdata_entries(
         &self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
     ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
-        debug!("Listing seq_mdata_entries for: {}", xorurl);
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
-        let seq_md = self.get_seq_mdata(xorurl_encoder.xorname(), tag)?;
-
+        debug!("Listing seq_mdata_entries for: {}", name);
+        let seq_md = self.get_seq_mdata(name, tag)?;
         let mut res = BTreeMap::new();
         seq_md.entries().iter().for_each(|elem| {
             res.insert(elem.0.clone(), elem.1.clone());
@@ -518,14 +512,14 @@ impl SafeApp for SafeAppFake {
 
     fn seq_mutable_data_update(
         &mut self,
-        xorurl: &str,
+        name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
         _version: u64,
     ) -> ResultReturn<()> {
-        self.seq_mutable_data_get_value(xorurl, tag, key)
-            .and_then(|_| self.seq_mutable_data_insert(xorurl, tag, key, value))
+        self.seq_mutable_data_get_value(name, tag, key)
+            .and_then(|_| self.seq_mutable_data_insert(name, tag, key, value))
     }
 }
 

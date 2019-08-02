@@ -120,11 +120,11 @@ impl Safe {
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("FilesMap of fetched version is: {:?}", files_map);
     /// ```
-    pub fn files_container_get(&self, xorurl: &str) -> ResultReturn<(u64, FilesMap)> {
-        debug!("Getting files container from: {:?}", xorurl);
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+    pub fn files_container_get(&self, url: &str) -> ResultReturn<(u64, FilesMap)> {
+        debug!("Getting files container from: {:?}", url);
+        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
 
-        // Check if the URL specified a specific version of the content or simply the latest available
+        // Check if the URL specifies a specific version of the content or simply the latest available
         let data = xorurl_encoder.content_version().map_or_else(
             || {
                 self.safe_app.get_latest_seq_append_only_data(
@@ -143,7 +143,7 @@ impl Safe {
                     .map_err(|_| {
                         Error::VersionNotFound(format!(
                             "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                            content_version, xorurl,
+                            content_version, url,
                         ))
                     })?;
                 Ok((content_version, (key, value)))
@@ -164,7 +164,7 @@ impl Safe {
                 Ok((version, files_map))
             }
             Err(Error::EmptyContent(_)) => {
-                warn!("FilesContainer found at \"{:?}\" was empty", xorurl);
+                warn!("FilesContainer found at \"{:?}\" was empty", url);
                 Ok((0, FilesMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
@@ -187,7 +187,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
-    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, false, false).unwrap();
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, false, false, false).unwrap();
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("The local files that were synced up are: {:?}", new_processed_files);
     /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
@@ -195,23 +195,40 @@ impl Safe {
     pub fn files_container_sync(
         &mut self,
         location: &str,
-        xorurl: &str,
+        url: &str,
         recursive: bool,
         delete: bool,
+        update_nrs: bool,
         dry_run: bool,
     ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
-                "--delete is not allowed if --recursive is not set".to_string(),
+                "'delete' is not allowed if --recursive is not set".to_string(),
             ));
         }
+
+        if update_nrs {
+            // Check if the URL specifies a specific version of the content or simply the latest available
+            let (xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
+            if !is_nrs_resolved {
+                return Err(Error::InvalidInput(
+                    "'update-nrs' is not allowed since the URL provided is not an NRS URL"
+                        .to_string(),
+                ));
+            } else if xorurl_encoder.content_version().is_none() {
+                return Err(Error::InvalidInput(
+                    "'update-nrs' is not allowed since the NRS name is linked to the content without a specific version".to_string(),
+                ));
+            }
+        }
+
         let (current_version, current_files_map): (u64, FilesMap) =
-            self.files_container_get(xorurl)?;
+            self.files_container_get(url)?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files = file_system_dir_walk(self, location, recursive, false)?;
 
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let dest_path = Some(xorurl_encoder.path().to_string());
         let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
             files_map_sync(
@@ -299,9 +316,9 @@ impl Safe {
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_get_published_immutable(&self, xorurl: &str) -> ResultReturn<Vec<u8>> {
+    pub fn files_get_published_immutable(&self, url: &str) -> ResultReturn<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         self.safe_app
             .files_get_published_immutable(xorurl_encoder.xorname())
     }
@@ -961,6 +978,7 @@ fn test_files_container_sync() {
         &xorurl,
         true,
         false,
+        false,
         false
     ));
 
@@ -1026,6 +1044,7 @@ fn test_files_container_sync_dry_run() {
         "./tests/testfolder/subfolder/",
         &xorurl,
         true,
+        false,
         false,
         true // set dry_run flag on
     ));
@@ -1095,6 +1114,7 @@ fn test_files_container_sync_with_delete() {
         &xorurl,
         true,
         true, // this sets the delete flag
+        false,
         false
     ));
 
@@ -1151,11 +1171,37 @@ fn test_files_container_sync_delete_without_recursive() {
         false, // this sets the recursive flag to off
         true,  // this sets the delete flag
         false,
+        false,
     ) {
         Ok(_) => panic!("Sync was unexpectdly successful"),
         Err(err) => assert_eq!(
             err,
-            Error::InvalidInput("--delete is not allowed if --recursive is not set".to_string())
+            Error::InvalidInput("'delete' is not allowed if --recursive is not set".to_string())
+        ),
+    };
+}
+
+#[test]
+fn test_files_container_sync_update_nrs_with_xorurl() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, _, _) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+    match safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &xorurl,
+        false,
+        false,
+        true, // this flag requests the update-nrs
+        false,
+    ) {
+        Ok(_) => panic!("Sync was unexpectdly successful"),
+        Err(err) => assert_eq!(
+            err,
+            Error::InvalidInput(
+                "'update-nrs' is not allowed since the URL provided is not an NRS URL".to_string()
+            )
         ),
     };
 }
@@ -1175,6 +1221,7 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
         "./tests/testfolder/subfolder",
         &xorurl_with_path,
         true,
+        false,
         false,
         false
     ));
@@ -1235,6 +1282,7 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
         "./tests/testfolder/subfolder",
         &xorurl_with_path,
         true,
+        false,
         false,
         false,
     ));
@@ -1319,6 +1367,7 @@ fn test_files_container_version() {
         true,
         true, // this sets the delete flag,
         false,
+        false,
     ));
     assert_eq!(version, 1);
 
@@ -1340,6 +1389,7 @@ fn test_files_container_get_with_version() {
         &xorurl,
         true,
         true, // this sets the delete flag
+        false,
         false
     ));
 

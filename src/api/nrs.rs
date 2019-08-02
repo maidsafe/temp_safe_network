@@ -30,14 +30,15 @@ type ProcessedEntries = BTreeMap<String, (String, String)>;
 #[allow(dead_code)]
 impl Safe {
     pub fn parse_url(&self, url: &str) -> ResultReturn<XorUrlEncoder> {
-        debug!("Attempting to decode url: {}", url);
-        XorUrlEncoder::from_url(url).or_else(|err| {
+        let sanitised_url = sanitised_url(url);
+        debug!("Attempting to decode url: {}", sanitised_url);
+        XorUrlEncoder::from_url(&sanitised_url).or_else(|err| {
             info!(
                 "Falling back to NRS. XorUrl decoding failed with: {:?}",
                 err
             );
 
-            let (sub_names, host_str, path, version) = get_subnames_host_and_path(url)?;
+            let (sub_names, host_str, path, version) = get_subnames_host_and_path(&sanitised_url)?;
             let hashed_host = xorname_from_nrs_string(&host_str)?;
 
             let encoded_xor = XorUrlEncoder::new(
@@ -54,6 +55,25 @@ impl Safe {
         })
     }
 
+    pub fn parse_and_resolve_url(&self, url: &str) -> ResultReturn<(XorUrlEncoder, bool)> {
+        let xorurl_encoder = self.parse_url(url)?;
+        if xorurl_encoder.content_type() == SafeContentType::NrsMapContainer {
+            let nrs_container_xorurl = xorurl_encoder.to_string("")?;
+            let (_version, nrs_map) =
+                self.nrs_map_container_get(&nrs_container_xorurl)
+                    .map_err(|_| {
+                        Error::InvalidInput(
+                            "The location couldn't be resolved from the NRS URL provided"
+                                .to_string(),
+                        )
+                    })?;
+            let xorurl = nrs_map.resolve_for_subnames(xorurl_encoder.sub_names())?;
+            Ok((XorUrlEncoder::from_url(&xorurl)?, true))
+        } else {
+            Ok((xorurl_encoder, false))
+        }
+    }
+
     pub fn nrs_map_container_add(
         &mut self,
         name: &str,
@@ -63,7 +83,7 @@ impl Safe {
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
         // GET current NRS map from name's TLD
-        let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
+        let xorurl_encoder = self.parse_url(name)?;
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
@@ -114,7 +134,7 @@ impl Safe {
         dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
         info!("Creating an NRS map");
-        let nrs_url = sanitised_nrs_url(name);
+        let nrs_url = sanitised_url(name);
         if self.nrs_map_container_get(&nrs_url).is_ok() {
             Err(Error::ContentError(
                 "NRS name already exists. Please use 'nrs add' command to add sub names to it"
@@ -172,7 +192,7 @@ impl Safe {
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Removing from NRS map...");
         // GET current NRS map from &name TLD
-        let xorurl_encoder = self.parse_url(&sanitised_nrs_url(name))?;
+        let xorurl_encoder = self.parse_url(name)?;
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
@@ -279,7 +299,7 @@ fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
     Ok(xorname)
 }
 
-fn sanitised_nrs_url(name: &str) -> String {
+fn sanitised_url(name: &str) -> String {
     // FIXME: make sure we remove the starting 'safe://'
     format!("safe://{}", name.replace("safe://", ""))
 }

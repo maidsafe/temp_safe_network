@@ -116,7 +116,7 @@ pub fn wallet_commander(
                 let sk = match keyurl {
                     Some(linked_key) => {
                         let sk = get_secret_key(&linked_key, secret, "the Key to insert")?;
-                        let _pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
+                        let _pk = safe.validate_sk_for_url(&sk, &linked_key)?;
                         sk
                     }
                     None => {
@@ -174,7 +174,7 @@ pub fn wallet_commander(
             let sk = match keyurl {
                 Some(linked_key) => {
                     let sk = get_secret_key(&linked_key, secret, "the Key to insert")?;
-                    let _pk = safe.validate_sk_for_xorurl(&sk, &linked_key)?;
+                    let _pk = safe.validate_sk_for_url(&sk, &linked_key)?;
                     sk
                 }
                 None => get_secret_key("", secret, "the Key to insert")?,
@@ -198,7 +198,7 @@ pub fn wallet_commander(
                 Some("...awaiting source Wallet/Key to be used for funds from STDIN stream..."),
             )?;
 
-            let tx_id = safe.wallet_transfer(&amount, Some(source), &to)?;
+            let tx_id = safe.wallet_transfer(&amount, Some(&source), &to)?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);

@@ -20,7 +20,7 @@ use std::process::Command;
 
 const PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
 const UNMATCHED_SK_XORURL: &str =
-    "The XOR-URL doesn't correspond to the public key derived from the provided secret key";
+    "The URL doesn't correspond to the public key derived from the provided secret key";
 
 #[test]
 fn calling_safe_wallet_transfer() {
@@ -221,7 +221,7 @@ fn calling_safe_wallet_create_w_bad_secret() {
 }
 
 #[test]
-fn calling_safe_wallet_create_w_bad_pk() {
+fn calling_safe_wallet_create_w_bad_location() {
     let (_pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -239,7 +239,7 @@ fn calling_safe_wallet_create_w_bad_pk() {
     ])
     .assert()
     .stderr(predicate::str::contains(
-        "Failed to decode XOR-URL: UnkownBase",
+        "The location couldn't be resolved from the NRS URL provided",
     ))
     .failure();
 }

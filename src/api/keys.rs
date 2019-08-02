@@ -170,23 +170,26 @@ impl Safe {
         Ok(coins.to_string())
     }
 
-    // Check Key's balance from the network from a given XOR-URL and secret key string.
+    // Check Key's balance from the network from a given XOR/NRS-URL and secret key string.
     // The difference between this and 'keys_balance_from_sk' function is that this will additionally
-    // check that the XOR-URL corresponds to the public key derived from the provided secret key
-    pub fn keys_balance_from_xorurl(&self, xorurl: &str, sk: &str) -> ResultReturn<String> {
-        self.validate_sk_for_xorurl(sk, xorurl)?;
+    // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
+    pub fn keys_balance_from_url(&self, url: &str, sk: &str) -> ResultReturn<String> {
+        self.validate_sk_for_url(sk, url)?;
         self.keys_balance_from_sk(sk)
     }
 
-    // Check that the XOR-URL corresponds to the public key derived from the provided secret key
-    pub fn validate_sk_for_xorurl(&self, sk: &str, xorurl: &str) -> ResultReturn<String> {
+    // Check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
+    pub fn validate_sk_for_url(&self, sk: &str, url: &str) -> ResultReturn<String> {
         let secret_key: SecretKey = sk_from_hex(sk)
             .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
-        let xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let public_key = secret_key.public_key();
         let derived_xorname = xorname_from_pk(&public_key);
         if xorurl_encoder.xorname() != derived_xorname {
-            Err(Error::InvalidInput("The XOR-URL doesn't correspond to the public key derived from the provided secret key".to_string()))
+            Err(Error::InvalidInput(
+                "The URL doesn't correspond to the public key derived from the provided secret key"
+                    .to_string(),
+            ))
         } else {
             Ok(pk_to_hex(&public_key))
         }
@@ -333,21 +336,23 @@ fn test_keys_test_coins_balance_xorurl() {
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "0.243000000";
     let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount, None));
-    let current_balance = unwrap!(safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk));
+    let current_balance = unwrap!(safe.keys_balance_from_url(&xorurl, &unwrap!(key_pair).sk));
     assert_eq!(preload_amount, current_balance);
 }
 
 #[test]
-fn test_keys_test_coins_balance_wrong_xorurl() {
+fn test_keys_test_coins_balance_wrong_url() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0", None));
 
     let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
-    let current_balance = safe.keys_balance_from_xorurl(&invalid_xorurl, &unwrap!(key_pair).sk);
+    let current_balance = safe.keys_balance_from_url(&invalid_xorurl, &unwrap!(key_pair).sk);
     match current_balance {
-        Err(Error::InvalidXorUrl(msg)) => assert!(msg.contains("Failed to decode XOR-URL")),
+        Err(Error::InvalidInput(msg)) => {
+            assert!(msg.contains("The location couldn't be resolved from the NRS URL provided"))
+        }
         Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
     };
@@ -362,15 +367,15 @@ fn test_keys_test_coins_balance_wrong_location() {
     let (mut xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(amount, None));
 
     let current_balance =
-        unwrap!(safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair.clone()).sk));
+        unwrap!(safe.keys_balance_from_url(&xorurl, &unwrap!(key_pair.clone()).sk));
     assert_eq!(amount, current_balance);
 
     // let's corrupt the XOR-URL right where the encoded xorname bytes are in the string
     xorurl.replace_range(13..18, "ccccc");
-    let current_balance = safe.keys_balance_from_xorurl(&xorurl, &unwrap!(key_pair).sk);
+    let current_balance = safe.keys_balance_from_url(&xorurl, &unwrap!(key_pair).sk);
     match current_balance {
         Err(Error::InvalidInput(msg)) => assert!(msg.contains(
-            "The XOR-URL doesn't correspond to the public key derived from the provided secret key"
+            "The URL doesn't correspond to the public key derived from the provided secret key"
         )),
         Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
@@ -439,24 +444,24 @@ fn test_keys_balance_xorname() {
     ));
 
     let from_current_balance =
-        unwrap!(safe.keys_balance_from_xorurl(&from_xorname, &from_key_pair_unwrapped.sk));
+        unwrap!(safe.keys_balance_from_url(&from_xorname, &from_key_pair_unwrapped.sk));
     assert_eq!(
         "400.040000000", /*== 435.34 - 35.3*/
         from_current_balance
     );
 
     let to_current_balance =
-        unwrap!(safe.keys_balance_from_xorurl(&to_xorname, &unwrap!(to_key_pair).sk));
+        unwrap!(safe.keys_balance_from_url(&to_xorname, &unwrap!(to_key_pair).sk));
     assert_eq!(amount, to_current_balance);
 }
 
 #[test]
-fn test_validate_sk_for_xorurl() {
+fn test_validate_sk_for_url() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.22", None));
     let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = unwrap!(safe.validate_sk_for_xorurl(&key_pair_unwrapped.sk, &xorurl));
+    let pk = unwrap!(safe.validate_sk_for_url(&key_pair_unwrapped.sk, &xorurl));
     assert_eq!(pk, key_pair_unwrapped.pk);
 }
