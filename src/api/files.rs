@@ -274,7 +274,7 @@ impl Safe {
                 // to link it to the new new_version of the FilesContainer we just generated
                 xorurl_encoder.set_content_version(Some(new_version));
                 let new_link_for_nrs = xorurl_encoder.to_string("")?;
-                let _ = self.nrs_map_container_add(url, &new_link_for_nrs, false, false)?;
+                let _ = self.nrs_map_container_add(url, &new_link_for_nrs, false, true, false)?;
             }
 
             new_version
@@ -1201,7 +1201,7 @@ fn test_files_container_sync_update_nrs_unversioned_link() {
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
 
     let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &xorurl, false, false));
+    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &xorurl, false, true, false));
 
     match safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -1261,7 +1261,7 @@ fn test_files_container_sync_update_nrs_versioned_link() {
     let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
     let versioned_xorurl = format!("{}?v=0", xorurl);
-    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &versioned_xorurl, false, false));
+    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &versioned_xorurl, false, true, false));
 
     let (version, _, _) = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder/",

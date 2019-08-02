@@ -11,10 +11,11 @@ use super::constants::{
 };
 use super::helpers::gen_timestamp_secs;
 use super::{Error, ResultReturn, XorUrl};
-use log::{debug, info, warn};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
+use std::iter::FromIterator;
 
 type SubName = String;
 type DefinitionData = BTreeMap<String, String>;
@@ -48,7 +49,7 @@ impl fmt::Display for SubNameRDF {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum DefaultRdf {
     NotSet,
-    ExistingRdf(SubName), // Not supported yet
+    ExistingRdf(SubName),
     OtherRdf(DefinitionData),
 }
 
@@ -73,18 +74,27 @@ impl NrsMap {
         Ok(&self.default)
     }
 
-    pub fn resolve_for_subnames(&self, mut sub_names: Vec<String>) -> ResultReturn<XorUrl> {
+    pub fn resolve_for_subnames(&self, mut sub_names: Vec<SubName>) -> ResultReturn<XorUrl> {
         debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
+        //println!("NRS: Attempting to resolve for subnames {:?}", sub_names);
+
         let mut nrs_map = self;
+        let mut dereferenced_link: String;
         let mut link = if sub_names.is_empty() {
-            if let DefaultRdf::OtherRdf(def_data) = &self.default {
-                debug!(
-                    "NRS subname resolution done from default. Located: \"{:?}\"",
-                    def_data
-                );
-                def_data.get(FAKE_RDF_PREDICATE_LINK)
-            } else {
-                None
+            match &self.default {
+                DefaultRdf::OtherRdf(def_data) => {
+                    debug!(
+                        "NRS subname resolution done from default. Located: \"{:?}\"",
+                        def_data
+                    );
+                    def_data.get(FAKE_RDF_PREDICATE_LINK)
+                }
+                DefaultRdf::ExistingRdf(sub_name) => {
+                    let sub_names = Vec::from_iter(sub_name.split('.').map(String::from));
+                    dereferenced_link = self.resolve_for_subnames(sub_names)?;
+                    Some(&dereferenced_link)
+                }
+                DefaultRdf::NotSet => None,
             }
         } else {
             None
@@ -150,22 +160,13 @@ impl NrsMap {
                 ))
             }
             DefaultRdf::OtherRdf(def_data) => def_data.get(FAKE_RDF_PREDICATE_LINK),
-            DefaultRdf::ExistingRdf(sub_name) => match self.sub_names_map.get(sub_name) {
-                Some(entry) => match entry {
-                    SubNameRDF::Definition(def_data) => def_data.get(FAKE_RDF_PREDICATE_LINK),
-                    SubNameRDF::SubName(nrs_sub_name) => {
-                        warn!("Attempting to get a default link from a nested subname.");
-                        // FIXME: we need to stop looping if there is a crossed ref with defaults
-                        dereferenced_link = nrs_sub_name.get_default_link()?;
-                        Some(&dereferenced_link)
-                    }
-                },
-                None => {
-                    return Err(Error::ContentError(
-                        "Default found in resolvable map seems corrupted.".to_string(),
-                    ))
-                }
-            },
+            DefaultRdf::ExistingRdf(sub_name) => {
+                let sub_names = Vec::from_iter(sub_name.split('.').map(String::from));
+                dereferenced_link = self.resolve_for_subnames(sub_names).map_err(|_| Error::ContentError(
+                    format!("Default found for resolvable map (set to sub names '{}') cannot be resolved.", sub_name),
+                ))?;
+                Some(&dereferenced_link)
+            }
         }
         .ok_or_else(|| {
             Error::ContentError(format!(
@@ -195,20 +196,36 @@ impl NrsMap {
         name: &str,
         link: &str,
         default: bool,
+        hard_link: bool,
     ) -> ResultReturn<String> {
         info!("Updating NRS map for: {}", name);
-        let sub_names = parse_nrs_name(name)?;
+        let sub_names: Vec<String> = parse_nrs_name(name)?;
 
         // Update NRS Map with new names
-        let updated_nrs_map = setup_nrs_tree(&self, sub_names, link)?;
+        let updated_nrs_map = setup_nrs_tree(&self, sub_names.clone(), link)?;
         self.sub_names_map = updated_nrs_map.sub_names_map;
 
         // Set (top level) default if was requested
         if default {
             debug!("Setting {:?} as default for NrsMap", &name);
-            // TODO: support DefaultRdf::ExistingRdf
             let definition_data = create_public_name_description(link)?;
-            self.default = DefaultRdf::OtherRdf(definition_data);
+            if hard_link || sub_names.is_empty() {
+                self.default = DefaultRdf::OtherRdf(definition_data);
+            } else {
+                let length = sub_names.len() - 1;
+                let sub_names_str = sub_names
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| {
+                        if i < length {
+                            format!("{}.", n)
+                        } else {
+                            n.to_string()
+                        }
+                    })
+                    .collect();
+                self.default = DefaultRdf::ExistingRdf(sub_names_str);
+            }
         } else {
             self.default = updated_nrs_map.default;
         }

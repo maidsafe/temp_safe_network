@@ -162,7 +162,6 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
         &test_name_w_sub,
         "-l",
         &container_xorurl,
-        "--default",
         "--json"
     )
     .read()
@@ -229,7 +228,6 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
         &test_name_w_sub,
         "-l",
         &container_xorurl,
-        "--default",
         "--json"
     )
     .read()
@@ -301,7 +299,6 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
         &test_name_w_sub,
         "-l",
         &another_md_xor,
-        "--default",
         "--json"
     )
     .read()
@@ -369,7 +366,6 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
         &test_name_w_sub,
         "-l",
         &another_md_xor,
-        "--default",
         "--json"
     )
     .read()
@@ -435,7 +431,6 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
         &test_name_w_sub,
         "-l",
         &another_md_xor,
-        "--default",
         "--json"
     )
     .read()

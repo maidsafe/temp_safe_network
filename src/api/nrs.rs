@@ -77,6 +77,7 @@ impl Safe {
         name: &str,
         link: &str,
         default: bool,
+        hard_link: bool,
         dry_run: bool,
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
@@ -86,7 +87,7 @@ impl Safe {
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let link = nrs_map.nrs_map_update_or_create_data(name, link, default)?;
+        let link = nrs_map.nrs_map_update_or_create_data(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(
             name.to_string(),
@@ -120,7 +121,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, "safe://somewhere", true, false).unwrap();
+    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, "safe://somewhere", true, false, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn nrs_map_container_create(
@@ -128,6 +129,7 @@ impl Safe {
         name: &str,
         link: &str,
         default: bool,
+        hard_link: bool,
         dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
         info!("Creating an NRS map");
@@ -139,7 +141,7 @@ impl Safe {
             ))
         } else {
             let mut nrs_map = NrsMap::default();
-            let link = nrs_map.nrs_map_update_or_create_data(&name, link, default)?;
+            let link = nrs_map.nrs_map_update_or_create_data(&name, link, default, hard_link)?;
             let mut processed_entries = ProcessedEntries::new();
             processed_entries.insert(
                 name.to_string(),
@@ -227,7 +229,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, "somewhere", true, false).unwrap();
+    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, "somewhere", true, false, false).unwrap();
     /// let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).unwrap();
     /// assert_eq!(version, 0);
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");
@@ -340,6 +342,7 @@ fn test_nrs_map_container_create() {
         &site_name,
         "safe://linked-from-[site_name]",
         true,
+        false,
         false
     ));
     assert_eq!(nrs_map.sub_names_map.len(), 0);
@@ -380,6 +383,7 @@ fn test_nrs_map_container_add() {
         &format!("b.{}", site_name),
         "safe://linked-from-[b.site_name]",
         true,
+        false,
         false
     ));
     assert_eq!(nrs_map.sub_names_map.len(), 1);
@@ -393,40 +397,11 @@ fn test_nrs_map_container_add() {
         &format!("a.b.{}", site_name),
         "safe://linked-from-[a.b.site_name]",
         true,
+        false,
         false
     ));
     assert_eq!(version, 1);
     assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
-    assert_eq!(
-        unwrap!(updated_nrs_map.get_default_link()),
-        "safe://linked-from-[a.b.site_name]"
-    );
-}
-
-#[test]
-fn test_nrs_map_container_remove() {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
-
-    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
-    let mut safe = Safe::new("base32z".to_string());
-    safe.connect("", Some("fake-credentials")).unwrap();
-
-    let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
-        &format!("a.b.{}", site_name),
-        "safe://linked-from-[a.b.site_name]",
-        true,
-        false
-    ));
-    assert_eq!(nrs_map.sub_names_map.len(), 1);
-
-    // remove subname
-    let (version, _xorurl, _entries, updated_nrs_map) =
-        unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
-    assert_eq!(version, 1);
-    assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
     assert_eq!(
         unwrap!(updated_nrs_map.get_default_link()),
         "safe://linked-from-[a.b.site_name]"
@@ -448,6 +423,7 @@ fn test_nrs_map_container_remove_one_of_two() {
         &format!("a.b.{}", site_name),
         "safe://linked-from-[a.b.site_name]",
         true,
+        false,
         false
     ));
     assert_eq!(nrs_map.sub_names_map.len(), 1);
@@ -456,6 +432,7 @@ fn test_nrs_map_container_remove_one_of_two() {
         &format!("a2.b.{}", site_name),
         "safe://linked-from-[a2.b.site_name]",
         true,
+        false,
         false
     ));
 
@@ -467,5 +444,72 @@ fn test_nrs_map_container_remove_one_of_two() {
     assert_eq!(
         unwrap!(updated_nrs_map.get_default_link()),
         "safe://linked-from-[a2.b.site_name]"
+    );
+}
+
+#[test]
+fn test_nrs_map_container_remove_default_soft_link() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("fake-credentials")).unwrap();
+
+    let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &format!("a.b.{}", site_name),
+        "safe://linked-from-[a.b.site_name]",
+        true,
+        false,
+        false
+    ));
+    assert_eq!(nrs_map.sub_names_map.len(), 1);
+
+    // remove subname
+    let (version, _xorurl, _entries, updated_nrs_map) =
+        unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
+    assert_eq!(version, 1);
+    assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
+    match updated_nrs_map.get_default_link() {
+        Ok(_) => panic!("unexpectedly retrieved a default link"),
+        Err(Error::ContentError(msg)) => assert_eq!(
+            msg,
+            "Default found for resolvable map (set to sub names 'a.b') cannot be resolved."
+                .to_string()
+        ),
+        Err(err) => panic!(format!("error returned is not the expected one: {}", err)),
+    };
+}
+
+#[test]
+fn test_nrs_map_container_remove_default_hard_link() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z".to_string());
+    safe.connect("", Some("fake-credentials")).unwrap();
+
+    let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &format!("a.b.{}", site_name),
+        "safe://linked-from-[a.b.site_name]",
+        true,
+        true, // this sets the default to be a hard-link
+        false
+    ));
+    assert_eq!(nrs_map.sub_names_map.len(), 1);
+
+    // remove subname
+    let (version, _xorurl, _entries, updated_nrs_map) =
+        unwrap!(safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false));
+    assert_eq!(version, 1);
+    assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
+    assert_eq!(
+        unwrap!(updated_nrs_map.get_default_link()),
+        "safe://linked-from-[a.b.site_name]"
     );
 }

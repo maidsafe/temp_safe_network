@@ -17,7 +17,7 @@ pub enum FilesSubCommands {
     // #[structopt(name = "add")]
     /// Add a file to a network document / container
     // Add {
-    //     /// The soure file location
+    //     /// The source file location
     //     #[structopt(short = "s", long = "source")]
     //     source: String,
     //     /// desired file name
@@ -28,7 +28,7 @@ pub enum FilesSubCommands {
     //     link: String,
     // },
     #[structopt(name = "put")]
-    /// Put a file or folder's files onto the network
+    /// Put a file or folder's files onto the SAFE Network
     Put {
         /// The source file/folder local path
         location: String,
@@ -39,9 +39,9 @@ pub enum FilesSubCommands {
         recursive: bool,
     },
     #[structopt(name = "sync")]
-    /// Sync files to the network
+    /// Sync files to the SAFE Network
     Sync {
-        /// The soure location
+        /// The source location
         location: String,
         /// The target FilesContainer to sync up source files with, optionally including the destination path (default is '/')
         target: Option<String>,

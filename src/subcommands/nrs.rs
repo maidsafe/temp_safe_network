@@ -16,9 +16,9 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum NrsSubCommands {
     #[structopt(name = "add")]
-    /// Add a subname to an existing NRS name
+    /// Add a subname to an existing NRS name, or updates its link if it already exists
     Add {
-        /// The name to add
+        /// The name to add (or update if it already exists)
         name: String,
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "l", long = "link")]
@@ -26,6 +26,9 @@ pub enum NrsSubCommands {
         /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
+        /// If --default is set, the default is set using a hard-link pointing to the final destination rather to the sub name (which is the default behaviour)
+        #[structopt(short = "k", long = "hard-link")]
+        hard_link: bool,
     },
     #[structopt(name = "create")]
     /// Create a new public name
@@ -35,9 +38,9 @@ pub enum NrsSubCommands {
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
-        /// Set the sub name as default for this public name
-        #[structopt(long = "default")]
-        default: bool,
+        /// The default is set but using a hard-link pointing to the final destination rather to the sub name (which is the default behaviour)
+        #[structopt(short = "k", long = "hard-link")]
+        hard_link: bool,
     },
     #[structopt(name = "remove")]
     /// Remove a subname from an NRS name
@@ -57,14 +60,17 @@ pub fn nrs_commander(
         Some(NrsSubCommands::Create {
             name,
             link,
-            default,
+            hard_link,
         }) => {
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
 
+            // Set it as default too, so the top level NRS name is resolvable to same link
+            let default = true;
+
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, &link, default, dry_run)?;
+                safe.nrs_map_container_create(&name, &link, default, hard_link, dry_run)?;
 
             // Now let's just print out a summary
             print_summary(
@@ -83,10 +89,11 @@ pub fn nrs_commander(
             name,
             link,
             default,
+            hard_link,
         }) => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
             let (version, xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_add(&name, &link, default, dry_run)?;
+                safe.nrs_map_container_add(&name, &link, default, hard_link, dry_run)?;
 
             // Now let's just print out the summary
             print_summary(
