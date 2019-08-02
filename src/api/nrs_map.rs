@@ -193,12 +193,11 @@ impl NrsMap {
     pub fn nrs_map_update_or_create_data(
         &mut self,
         name: &str,
-        destination: Option<&str>,
+        link: &str,
         default: bool,
     ) -> ResultReturn<String> {
         info!("Updating NRS map for: {}", name);
         let sub_names = parse_nrs_name(name)?;
-        let link = destination.unwrap_or_else(|| "");
 
         // Update NRS Map with new names
         let updated_nrs_map = setup_nrs_tree(&self, sub_names, link)?;
@@ -240,10 +239,10 @@ impl NrsMap {
     }
 }
 
-fn create_public_name_description(destination: &str) -> ResultReturn<DefinitionData> {
+fn create_public_name_description(link: &str) -> ResultReturn<DefinitionData> {
     let now = gen_timestamp_secs();
     let mut public_name = DefinitionData::new();
-    public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), destination.to_string());
+    public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
     public_name.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
     public_name.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now.clone());
     Ok(public_name)

@@ -207,9 +207,9 @@ impl Safe {
             ));
         }
 
+        let (mut xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
         if update_nrs {
             // Check if the URL specifies a specific version of the content or simply the latest available
-            let (xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
             if !is_nrs_resolved {
                 return Err(Error::InvalidInput(
                     "'update-nrs' is not allowed since the URL provided is not an NRS URL"
@@ -228,7 +228,6 @@ impl Safe {
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files = file_system_dir_walk(self, location, recursive, false)?;
 
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let dest_path = Some(xorurl_encoder.path().to_string());
         let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
             files_map_sync(
@@ -246,7 +245,7 @@ impl Safe {
         } else if dry_run {
             current_version + 1
         } else {
-            // The FilesContainer is updated adding an entry containing the timestamp as the
+            // The FilesContainer is updated by adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
             let serialised_files_map = serde_json::to_string(&new_files_map).map_err(|err| {
                 Error::Unexpected(format!(
@@ -263,12 +262,22 @@ impl Safe {
 
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
-            self.safe_app.append_seq_append_only_data(
+            let new_version = self.safe_app.append_seq_append_only_data(
                 files_container_data,
                 current_version + 1,
                 xorname,
                 type_tag,
-            )?
+            )?;
+
+            if update_nrs {
+                // We need to update the link in the NRS container as well,
+                // to link it to the new new_version of the FilesContainer we just generated
+                xorurl_encoder.set_content_version(Some(new_version));
+                let new_link_for_nrs = xorurl_encoder.to_string("")?;
+                let _ = self.nrs_map_container_add(url, &new_link_for_nrs, false, false)?;
+            }
+
+            new_version
         };
 
         Ok((version, processed_files, new_files_map))
@@ -1182,12 +1191,45 @@ fn test_files_container_sync_delete_without_recursive() {
 }
 
 #[test]
-fn test_files_container_sync_update_nrs_with_xorurl() {
+fn test_files_container_sync_update_nrs_unversioned_link() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _, _) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+
+    let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &xorurl, false, false));
+
+    match safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &nrsurl,
+        false,
+        false,
+        true, // this flag requests the update-nrs
+        false,
+    ) {
+        Ok(_) => panic!("Sync was unexpectdly successful"),
+        Err(err) => assert_eq!(
+            err,
+            Error::InvalidInput(
+                "'update-nrs' is not allowed since the NRS name is linked to the content without a specific version".to_string()
+            )
+        ),
+    };
+}
+
+#[test]
+fn test_files_container_sync_update_nrs_with_xorurl() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+
+    let (xorurl, _, _) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+
     match safe.files_container_sync(
         "./tests/testfolder/subfolder/",
         &xorurl,
@@ -1204,6 +1246,37 @@ fn test_files_container_sync_update_nrs_with_xorurl() {
             )
         ),
     };
+}
+
+#[test]
+fn test_files_container_sync_update_nrs_versioned_link() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z".to_string());
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, _, _) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+
+    let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let versioned_xorurl = format!("{}?v=0", xorurl);
+    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &versioned_xorurl, false, false));
+
+    let (version, _, _) = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &nrsurl,
+        false,
+        false,
+        true, // this flag requests the update-nrs
+        false,
+    ));
+
+    let (new_link, _) = unwrap!(safe.parse_and_resolve_url(&nrsurl));
+    assert_eq!(
+        unwrap!(new_link.to_string("")),
+        format!("{}?v={}", xorurl, version)
+    );
 }
 
 #[test]

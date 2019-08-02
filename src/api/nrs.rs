@@ -55,18 +55,16 @@ impl Safe {
         })
     }
 
+    // Parses a safe:// URL and returns all the info in a XorUrlEncoder instance.
+    // It also returns a flag indicating if it the URL has to be resolved as NRS-URL
     pub fn parse_and_resolve_url(&self, url: &str) -> ResultReturn<(XorUrlEncoder, bool)> {
         let xorurl_encoder = self.parse_url(url)?;
         if xorurl_encoder.content_type() == SafeContentType::NrsMapContainer {
-            let nrs_container_xorurl = xorurl_encoder.to_string("")?;
-            let (_version, nrs_map) =
-                self.nrs_map_container_get(&nrs_container_xorurl)
-                    .map_err(|_| {
-                        Error::InvalidInput(
-                            "The location couldn't be resolved from the NRS URL provided"
-                                .to_string(),
-                        )
-                    })?;
+            let (_version, nrs_map) = self.nrs_map_container_get(&url).map_err(|_| {
+                Error::InvalidInput(
+                    "The location couldn't be resolved from the NRS URL provided".to_string(),
+                )
+            })?;
             let xorurl = nrs_map.resolve_for_subnames(xorurl_encoder.sub_names())?;
             Ok((XorUrlEncoder::from_url(&xorurl)?, true))
         } else {
@@ -77,7 +75,7 @@ impl Safe {
     pub fn nrs_map_container_add(
         &mut self,
         name: &str,
-        destination: Option<&str>,
+        link: &str,
         default: bool,
         dry_run: bool,
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
@@ -88,18 +86,17 @@ impl Safe {
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let link = nrs_map.nrs_map_update_or_create_data(name, destination, default)?;
+        let link = nrs_map.nrs_map_update_or_create_data(name, link, default)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(
             name.to_string(),
             (CONTENT_ADDED_SIGN.to_string(), link.to_string()),
         );
 
-        let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
         debug!("The new NRS Map: {:?}", nrs_map);
-
         if !dry_run {
             // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+            let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
             self.safe_app.append_seq_append_only_data(
                 nrs_map_raw_data,
                 version + 1,
@@ -123,13 +120,13 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, Some("safe://somewhere"), true, false).unwrap();
+    /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, "safe://somewhere", true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
     pub fn nrs_map_container_create(
         &mut self,
         name: &str,
-        destination: Option<&str>,
+        link: &str,
         default: bool,
         dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
@@ -142,15 +139,14 @@ impl Safe {
             ))
         } else {
             let mut nrs_map = NrsMap::default();
-            let link = nrs_map.nrs_map_update_or_create_data(&name, destination, default)?;
+            let link = nrs_map.nrs_map_update_or_create_data(&name, link, default)?;
             let mut processed_entries = ProcessedEntries::new();
             processed_entries.insert(
                 name.to_string(),
                 (CONTENT_ADDED_SIGN.to_string(), link.to_string()),
             );
 
-            let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
-
+            debug!("The new NRS Map: {:?}", nrs_map);
             if dry_run {
                 Ok(("".to_string(), processed_entries, nrs_map))
             } else {
@@ -162,6 +158,7 @@ impl Safe {
                 );
 
                 // Store the NrsMapContainer in a Published AppendOnlyData
+                let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
                 let xorname = self.safe_app.put_seq_append_only_data(
                     nrs_map_raw_data,
                     Some(nrs_xorname),
@@ -203,11 +200,11 @@ impl Safe {
             name.to_string(),
             (CONTENT_DELETED_SIGN.to_string(), removed_link),
         );
-        let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
 
         debug!("The new NRS Map: {:?}", nrs_map);
         if !dry_run {
             // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+            let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
             self.safe_app.append_seq_append_only_data(
                 nrs_map_raw_data,
                 version + 1,
@@ -230,7 +227,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z".to_string());
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, Some("somewhere"), true, false).unwrap();
+    /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, "somewhere", true, false).unwrap();
     /// let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).unwrap();
     /// assert_eq!(version, 0);
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), "somewhere");
@@ -341,7 +338,7 @@ fn test_nrs_map_container_create() {
 
     let (xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
         &site_name,
-        Some("safe://linked-from-[site_name]"),
+        "safe://linked-from-[site_name]",
         true,
         false
     ));
@@ -381,7 +378,7 @@ fn test_nrs_map_container_add() {
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
         &format!("b.{}", site_name),
-        Some("safe://linked-from-[b.site_name]"),
+        "safe://linked-from-[b.site_name]",
         true,
         false
     ));
@@ -394,7 +391,7 @@ fn test_nrs_map_container_add() {
     // add subname and set it as the new default too
     let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(safe.nrs_map_container_add(
         &format!("a.b.{}", site_name),
-        Some("safe://linked-from-[a.b.site_name]"),
+        "safe://linked-from-[a.b.site_name]",
         true,
         false
     ));
@@ -419,7 +416,7 @@ fn test_nrs_map_container_remove() {
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
         &format!("a.b.{}", site_name),
-        Some("safe://linked-from-[a.b.site_name]"),
+        "safe://linked-from-[a.b.site_name]",
         true,
         false
     ));
@@ -449,7 +446,7 @@ fn test_nrs_map_container_remove_one_of_two() {
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
         &format!("a.b.{}", site_name),
-        Some("safe://linked-from-[a.b.site_name]"),
+        "safe://linked-from-[a.b.site_name]",
         true,
         false
     ));
@@ -457,7 +454,7 @@ fn test_nrs_map_container_remove_one_of_two() {
 
     let (_version, _xorurl, _entries, _updated_nrs_map) = unwrap!(safe.nrs_map_container_add(
         &format!("a2.b.{}", site_name),
-        Some("safe://linked-from-[a2.b.site_name]"),
+        "safe://linked-from-[a2.b.site_name]",
         true,
         false
     ));

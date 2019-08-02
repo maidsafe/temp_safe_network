@@ -240,6 +240,10 @@ impl XorUrlEncoder {
         self.content_version
     }
 
+    pub fn set_content_version(&mut self, version: Option<u64>) {
+        self.content_version = version;
+    }
+
     // XOR-URL encoding format (var length from 36 to 44 bytes):
     // 1 byte for encoding version
     // 2 bytes for content type (enough to start including some MIME types also)

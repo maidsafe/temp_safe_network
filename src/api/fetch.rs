@@ -338,7 +338,7 @@ fn test_fetch_resolvable_container() {
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
 
     let (_nrs_map_xorurl, _, _nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
+        unwrap!(safe.nrs_map_container_create(&site_name, &xorurl, true, false));
 
     let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
@@ -378,7 +378,7 @@ fn test_fetch_resolvable_map_data() {
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
     let (nrs_map_xorurl, _, the_nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, Some(&xorurl), true, false));
+        unwrap!(safe.nrs_map_container_create(&site_name, &xorurl, true, false));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
     let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));

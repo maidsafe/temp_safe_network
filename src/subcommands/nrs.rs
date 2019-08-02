@@ -64,7 +64,7 @@ pub fn nrs_commander(
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, Some(&link), default, dry_run)?;
+                safe.nrs_map_container_create(&name, &link, default, dry_run)?;
 
             // Now let's just print out a summary
             print_summary(
@@ -86,7 +86,7 @@ pub fn nrs_commander(
         }) => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
             let (version, xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_add(&name, Some(&link), default, dry_run)?;
+                safe.nrs_map_container_add(&name, &link, default, dry_run)?;
 
             // Now let's just print out the summary
             print_summary(
