@@ -329,10 +329,8 @@ impl SafeApp for SafeAppScl {
                 values: the_data,
             };
 
-            let target_index = new_version - 1;
-
             client
-                .append_seq_adata(append, target_index)
+                .append_seq_adata(append, new_version)
                 .map_err(CoreError)
         })
         .map_err(|e| {
@@ -396,7 +394,7 @@ impl SafeApp for SafeAppScl {
                 e
             ))
         })
-        .map(|data_returned| data_returned.data_index())
+        .map(|data_returned| data_returned.data_index() - 1)
     }
 
     fn get_seq_append_only_data(
@@ -419,7 +417,7 @@ impl SafeApp for SafeAppScl {
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
             .unwrap();
-        if version >= data_length {
+        if version > data_length {
             return Err(Error::VersionNotFound(format!(
                 "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
                 version, name
@@ -648,12 +646,12 @@ fn test_put_get_update_seq_append_only_data() {
         .put_seq_append_only_data(data1, None, type_tag, None)
         .unwrap();
 
-    let (_this_version, data) = safe
+    let (this_version, data) = safe
         .safe_app
         .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
-    assert_eq!(_this_version, 1);
+    assert_eq!(this_version, 0);
 
     //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
     assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
@@ -662,7 +660,7 @@ fn test_put_get_update_seq_append_only_data() {
     let key2 = b"KEY2".to_vec();
     let val2 = b"VALUE2".to_vec();
     let data2 = [(key2, val2)].to_vec();
-    let new_version = 2;
+    let new_version = 1;
 
     let updated_version = safe
         .safe_app
@@ -751,7 +749,7 @@ fn test_update_seq_append_only_data_error() {
         .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
-    assert_eq!(this_version, 1);
+    assert_eq!(this_version, 0);
 
     //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
     assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
@@ -760,7 +758,7 @@ fn test_update_seq_append_only_data_error() {
     let key2 = b"KEY2".to_vec();
     let val2 = b"VALUE2".to_vec();
     let data2 = [(key2, val2)].to_vec();
-    let wrong_new_version = 1;
+    let wrong_new_version = 0;
 
     match safe
         .safe_app
