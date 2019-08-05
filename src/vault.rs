@@ -182,7 +182,13 @@ impl Vault {
             Event::NewMessage { peer_addr, msg } => {
                 return client_handler.handle_client_message(peer_addr, msg);
             }
-            event => {
+            Event::SentUserMessage { peer_addr, .. } => {
+                trace!("{}: Succesfully sent message to: {}", self, peer_addr);
+            }
+            Event::UnsentUserMessage { peer_addr, .. } => {
+                info!("{}: Not sent message to: {}", self, peer_addr);
+            }
+            Event::BootstrapFailure | Event::BootstrappedTo { .. } | Event::Finish => {
                 info!("{}: Unexpected event: {}", self, event);
             }
         }
