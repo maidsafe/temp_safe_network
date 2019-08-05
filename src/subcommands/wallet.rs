@@ -43,9 +43,9 @@ pub enum WalletSubCommands {
         /// The target Wallet to check the total balance
         target: Option<String>,
     },
-    #[structopt(name = "check-tx")]
+    /*#[structopt(name = "check-tx")]
     /// Check the status of a given transaction
-    CheckTx {},
+    CheckTx {},*/
     #[structopt(name = "create")]
     /// Create a new Wallet
     Create {
@@ -76,12 +76,12 @@ pub enum WalletSubCommands {
     Transfer {
         /// Number of safecoins to transfer
         amount: String,
-        /// The receiving Wallet/Key
+        /// The receiving Wallet/Key URL
         to: String,
-        /// Source Wallet, or pulled from stdin if not provided
+        /// Source Wallet URL, or pulled from stdin if not provided
         from: Option<String>,
     },
-    #[structopt(name = "sweep")]
+    /*#[structopt(name = "sweep")]
     /// Move all coins within a Wallet to a second given Wallet or Key
     Sweep {
         /// The source Wallet for funds
@@ -90,7 +90,7 @@ pub enum WalletSubCommands {
         /// The receiving Wallet/Key
         #[structopt(long = "to")]
         to: String,
-    },
+    },*/
 }
 
 pub fn wallet_commander(
@@ -195,7 +195,7 @@ pub fn wallet_commander(
             //TODO: if from/to start without safe://, i.e. if they are PK hex strings.
             let source = get_from_arg_or_stdin(
                 from,
-                Some("...awaiting source Wallet/Key to be used for funds from STDIN stream..."),
+                Some("...awaiting source Wallet/Key URL to be used for funds from STDIN stream..."),
             )?;
 
             let tx_id = safe.wallet_transfer(&amount, Some(&source), &to)?;

@@ -26,9 +26,9 @@ pub enum NrsSubCommands {
         /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
-        /// If --default is set, the default is set using a hard-link pointing to the final destination rather to the sub name (which is the default behaviour)
-        #[structopt(short = "k", long = "hard-link")]
-        hard_link: bool,
+        /// If --default is set, the default is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being added (which is the default behaviour if this flag is not passed)
+        #[structopt(short = "t", long = "direct")]
+        direct_link: bool,
     },
     #[structopt(name = "create")]
     /// Create a new public name
@@ -38,9 +38,9 @@ pub enum NrsSubCommands {
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
-        /// The default is set but using a hard-link pointing to the final destination rather to the sub name (which is the default behaviour)
-        #[structopt(short = "k", long = "hard-link")]
-        hard_link: bool,
+        /// The default is set but using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being created (which is the default behaviour if this flag is not passed)
+        #[structopt(short = "t", long = "direct")]
+        direct_link: bool,
     },
     #[structopt(name = "remove")]
     /// Remove a subname from an NRS name
@@ -60,7 +60,7 @@ pub fn nrs_commander(
         Some(NrsSubCommands::Create {
             name,
             link,
-            hard_link,
+            direct_link,
         }) => {
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
@@ -70,7 +70,7 @@ pub fn nrs_commander(
             let default = true;
 
             let (nrs_map_container_xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_create(&name, &link, default, hard_link, dry_run)?;
+                safe.nrs_map_container_create(&name, &link, default, direct_link, dry_run)?;
 
             // Now let's just print out a summary
             print_summary(
@@ -89,11 +89,11 @@ pub fn nrs_commander(
             name,
             link,
             default,
-            hard_link,
+            direct_link,
         }) => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
             let (version, xorurl, processed_entries, _nrs_map) =
-                safe.nrs_map_container_add(&name, &link, default, hard_link, dry_run)?;
+                safe.nrs_map_container_add(&name, &link, default, direct_link, dry_run)?;
 
             // Now let's just print out the summary
             print_summary(

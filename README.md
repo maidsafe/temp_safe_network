@@ -463,7 +463,9 @@ Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
-And of course that can be used also with other type of content like `ImmutableData` files:
+As seen above, we get some additional information about the content we are retrieving. In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (PublishedSeqAppendOnlyData).
+
+And of course this flag can be used also with other type of content like files (`ImmutableData`):
 ```shell
 $ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder/subexists.md --info
 Native data type: ImmutableData (published)
@@ -471,6 +473,25 @@ XOR name: 0xc343e62e9127559583a336ffd2e5f9e658b11387646725eec3dbda3d3cf55da1
 
 Raw content of the file:
 hello from a subfolder!
+```
+
+#### Retrieving older versions of content
+
+As we've seen above, we can use `cat` command to retrieve the latest/current version of any type of content from the Network using their XOR-URL. But every change made to content that is uploaded to the Network as Published data is perpetual, and therefore a new version is generated when performing any amendments to it, keeping older versions also available forever.
+
+We can use the `cat` command to also retrieve any version of content that was uploaded as Published data by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w`), which reached to version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
+```shell
+$ safe cat safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0
+Files of FilesContainer (version 0) at "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0":
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| Name                    | Size | Created              | Modified             | Link                                                              |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /another.md             | 6    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /subfolder/subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| /test.md                | 12   | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx |
++-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
 ### NRS (Name Resolution System)
