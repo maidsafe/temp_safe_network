@@ -75,7 +75,7 @@ impl Safe {
         let from_sk = match from {
             Some(sk) => match sk_from_hex(&sk) {
                 Ok(sk) => Some(sk),
-                Err(_) => return Err(Error::InvalidInput("Secret key invalid".to_string())),
+                Err(_) => return Err(Error::InvalidInput("The source of funds needs to be a secret key. The secret key provided is invalid".to_string())),
             },
             None => None,
         };

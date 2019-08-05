@@ -37,10 +37,10 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
     - [Create](#nrs-create)
     - [Add](#nrs-add)
     - [Remove](#nrs-remove)
+  - [SAFE-URLs](#safe-urls)
   - [Update](#update)
 3. [Further Help](#further-help)
 4. [License](#license)
-
 
 ## Build
 
@@ -601,6 +601,16 @@ $ safe nrs remove profile.mywebsite
 NRS Map updated (version 3): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 -  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
 ```
+
+### SAFE-URLs
+
+In previous sections of this guide it is explained how we can create two types of safe:// URLs, XOR-URLs and NRS-URLs. It has been explained that safe:// URLs can contain a path as well, if they target a `FilesContainer`, and they can also be post-fixed with `v=<version>` query param in order to target a specific version of the content rather than the latest/current version when this query param is omitted.
+
+All these types of safe:// URLs can be used in any of the supported CLI commands interchangeably as the argument of any command which expects safe:// URL.
+
+E.g. we can retrieve the content of a website with the `cat` command using either its XOR-URL or its NRS-URL, and either fetching the latest version of it or supplying the query param to get a specific version of it. Thus, if we wanted to fetch `version #1` of the site we published at `safe://mywebsite` (which NRS Map Container XOR-URL is `safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh`), the following two commands would be equivalent:
+- `$ safe cat safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1`
+- `$ safe cat safe://mywebsite?v=1`
 
 ### Update
 
