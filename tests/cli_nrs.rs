@@ -12,20 +12,14 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{get_bin_location, upload_test_folder, CLI, SAFE_PROTOCOL};
+use common::{
+    get_bin_location, get_random_nrs_string, parse_nrs_create_output, upload_test_folder, CLI,
+    SAFE_PROTOCOL,
+};
 use predicates::prelude::*;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
-use std::collections::BTreeMap;
 use std::process::Command;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
-
-fn get_random_nrs_string() -> String {
-    let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
-    rand_string
-}
 
 #[test]
 fn calling_safe_nrs_create_pretty() {
@@ -90,14 +84,7 @@ fn calling_safe_nrs_put_folder_and_fetch() {
     .read()
     .unwrap();
 
-    let (nrs_map_xorurl, _change_map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&nrs_creation) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
 
     assert!(nrs_map_xorurl.contains("safe://"));
     let cat_of_nrs_map_url = cmd!(get_bin_location(), "cat", &nrs_map_xorurl)
@@ -167,14 +154,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
     .read()
     .unwrap();
 
-    let (nrs_map_xorurl, _change_map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&nrs_creation) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
 
     assert!(nrs_map_xorurl.contains("safe://"));
     let cat_of_nrs_map_url = cmd!(get_bin_location(), "cat", &nrs_map_xorurl)
@@ -233,14 +213,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
     .read()
     .unwrap();
 
-    let (nrs_map_xorurl, _change_map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&nrs_creation) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
 
     assert!(nrs_map_xorurl.contains("safe://"));
     let cat_of_nrs_map_url = cmd!(get_bin_location(), "cat", &nrs_map_xorurl)
@@ -482,3 +455,81 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
         ))
         .failure();
 }
+
+/*
+#[test]
+fn calling_safe_nrs_with_version() {
+    let (_container_xorurl, file_map) = upload_test_folder();
+
+    let test_name = get_random_nrs_string();
+    let test_name_w_sub = format!("safe://a.b.{}", &test_name);
+    let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
+
+    let (_a_sign, another_md_xor) = &file_map["./tests/testfolder/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["./tests/testfolder/test.md"];
+
+    let cat_of_another_raw = cmd!(get_bin_location(), "cat", &another_md_xor)
+        .read()
+        .unwrap();
+
+    assert_eq!(cat_of_another_raw, "exists");
+
+    let _file_one_nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &test_name_w_sub,
+        "-l",
+        &another_md_xor,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let _new_nrs_creation = cmd!(
+        get_bin_location(),
+        "nrs",
+        "add",
+        &test_name_w_new_sub,
+        "-l",
+        &test_md_xor,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let new_nrs_creation_cat = cmd!(get_bin_location(), "cat", &test_name_w_new_sub)
+        .read()
+        .unwrap();
+
+    assert_eq!(new_nrs_creation_cat, "hello tests!");
+
+    let safe_default = cmd!(get_bin_location(), "cat", format!("safe://{}", test_name))
+        .read()
+        .unwrap();
+
+    assert_eq!(safe_default, "exists");
+
+    let remove_one_nrs = cmd!(
+        get_bin_location(),
+        "nrs",
+        "remove",
+        &test_name_w_sub,
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    assert!(remove_one_nrs.contains('-'));
+    assert!(remove_one_nrs.contains(&test_name_w_sub));
+
+    let mut invalid_cat = Command::cargo_bin(CLI).unwrap();
+    invalid_cat
+        .args(&vec!["cat", &test_name_w_sub])
+        .assert()
+        .stderr(predicate::str::contains(
+            "Sub name not found in NRS Map Container",
+        ))
+        .failure();
+}
+*/

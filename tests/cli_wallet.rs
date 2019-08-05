@@ -13,7 +13,8 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use common::{
-    create_preload_and_get_keys, create_wallet_with_balance, get_bin_location, CLI, SAFE_PROTOCOL,
+    create_preload_and_get_keys, create_wallet_with_balance, get_bin_location,
+    get_random_nrs_string, CLI, SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
 use std::process::Command;
@@ -265,4 +266,110 @@ fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
     .assert()
     .stderr(predicate::str::contains(UNMATCHED_SK_XORURL))
     .failure();
+}
+
+#[test]
+fn calling_safe_wallet_transfer_to_key_xorurl() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let (wallet_from, _pk, _sk) = create_wallet_with_balance("35.65");
+    let (key_xorurl, key_sk) = create_preload_and_get_keys("0.0");
+
+    cmd.args(&vec![
+        "wallet",
+        "transfer",
+        "18.23",
+        &key_xorurl,
+        &wallet_from,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
+
+    // Key got coins?
+    let key_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &key_sk,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(key_has, "18.230000000");
+
+    // deducted coins from sending Wallet?
+    let from_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_from,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(from_has, "17.420000000" /* 35.65 - 18.23 */)
+}
+
+#[test]
+fn calling_safe_wallet_transfer_to_key_nrsurl() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let (wallet_from, _pk, _sk) = create_wallet_with_balance("1535.65");
+    let (key_xorurl, key_sk) = create_preload_and_get_keys("0.0");
+
+    let key_nrsurl = format!("safe://{}", get_random_nrs_string());
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &key_nrsurl,
+        "-l",
+        &key_xorurl,
+    )
+    .read()
+    .unwrap();
+
+    cmd.args(&vec![
+        "wallet",
+        "transfer",
+        "118.23",
+        &key_nrsurl,
+        &wallet_from,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
+
+    // Key got coins?
+    let key_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &key_sk,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(key_has, "118.230000000");
+
+    // deducted coins from sending Wallet?
+    let from_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_from,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(from_has, "1417.420000000" /* 1535.65 - 118.23 */)
 }

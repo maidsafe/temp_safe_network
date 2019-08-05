@@ -291,7 +291,7 @@ impl XorUrlEncoder {
             }
         };
         let cid_str = encode(base_encoding, cid_vec);
-        let xorurl = format!("{}{}{}{}", SAFE_URL_PROTOCOL, sub_names, cid_str, self.path,);
+        let xorurl = format!("{}{}{}{}", SAFE_URL_PROTOCOL, sub_names, cid_str, self.path);
 
         match self.content_version {
             Some(v) => Ok(format!("{}?v={}", xorurl, v)),

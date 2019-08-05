@@ -53,7 +53,7 @@ pub fn cat_commander(
             if OutputFmt::Pretty == output_fmt {
                 if cmd.info > 0 {
                     println!("Native data type: {}", data_type);
-                    println!("Type tag: {}", type_tag,);
+                    println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(&xorname));
                     println!();
                     print_resolved_from(cmd.info, resolved_from);

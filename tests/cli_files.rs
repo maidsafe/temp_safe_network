@@ -13,8 +13,8 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use common::{
-    get_bin_location, parse_cat_files_container_output, parse_files_put_or_sync_output, CLI,
-    SAFE_PROTOCOL,
+    get_bin_location, get_random_nrs_string, parse_cat_files_container_output,
+    parse_files_put_or_sync_output, CLI, SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
 use std::fs;
@@ -353,4 +353,192 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     assert_eq!(file_cat, "hello from a subfolder! with more text!");
     assert!(files_sync_result.contains('*'));
     assert!(!files_sync_result.contains('+'));
+}
+
+#[test]
+fn files_sync_and_fetch_with_version() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+    assert_eq!(processed_files.len(), 5);
+
+    let sync_cmd_output = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &files_container_xor,
+        "--recursive",
+        "--delete",
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    assert_eq!(target, files_container_xor);
+    assert_eq!(processed_files.len(), 5);
+
+    // now all files should be gone in version 1 of the FilesContainer
+    let files_container_v1 = format!("{}?v=1", files_container_xor);
+    let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&cat_container_v1);
+    assert_eq!(xorurl, files_container_v1);
+    assert_eq!(files_map.len(), 0);
+
+    // but in version 0 of the FilesContainer all files should still be there
+    let files_container_v0 = format!("{}?v=0", files_container_xor);
+    let cat_container_v0 = cmd!(get_bin_location(), "cat", &files_container_v0, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&cat_container_v0);
+    assert_eq!(xorurl, files_container_v0);
+    assert_eq!(files_map.len(), 5);
+}
+
+#[test]
+fn files_sync_and_fetch_with_nrsurl_and_nrs_update() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+    assert_eq!(processed_files.len(), 5);
+
+    let files_container_v0 = format!("{}?v=0", files_container_xor);
+    let nrsurl = format!("safe://{}", get_random_nrs_string());
+
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &nrsurl,
+        "-l",
+        &files_container_v0,
+    )
+    .read()
+    .unwrap();
+
+    let sync_cmd_output = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &nrsurl,
+        "--recursive",
+        "--delete",
+        "--json",
+        "--update-nrs"
+    )
+    .read()
+    .unwrap();
+
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    assert_eq!(target, nrsurl);
+    assert_eq!(processed_files.len(), 5);
+
+    // now all files should be gone in version 1 since NRS name was updated to link version 1 of the FilesContainer
+    let cat_nrsurl_v1 = cmd!(get_bin_location(), "cat", &nrsurl, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&cat_nrsurl_v1);
+    assert_eq!(xorurl, nrsurl);
+    assert_eq!(files_map.len(), 0);
+
+    // but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
+    // where all files should still be there
+    let nrsurl_v0 = format!("{}?v=0", nrsurl);
+    let cat_nrsurl_v0 = cmd!(get_bin_location(), "cat", &nrsurl_v0, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&cat_nrsurl_v0);
+    assert_eq!(xorurl, nrsurl_v0);
+    assert_eq!(files_map.len(), 5);
+}
+
+#[test]
+fn files_sync_and_fetch_without_nrs_update() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+    assert_eq!(processed_files.len(), 5);
+
+    let files_container_v0 = format!("{}?v=0", files_container_xor);
+    let nrsurl = format!("safe://{}", get_random_nrs_string());
+
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &nrsurl,
+        "-l",
+        &files_container_v0,
+    )
+    .read()
+    .unwrap();
+
+    let sync_cmd_output = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &nrsurl,
+        "--recursive",
+        "--delete",
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    assert_eq!(target, nrsurl);
+    assert_eq!(processed_files.len(), 5);
+
+    // now all files should be gone in version 1 of the FilesContainer
+    let files_container_v1 = format!("{}?v=1", files_container_xor);
+    let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&cat_container_v1);
+    assert_eq!(xorurl, files_container_v1);
+    assert_eq!(files_map.len(), 0);
+
+    // but the NRS name should still link to version 0 of the FilesContainer
+    // where all files should still be there
+    let cat_nrsurl = cmd!(get_bin_location(), "cat", &nrsurl, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, files_map) = parse_cat_files_container_output(&cat_nrsurl);
+    assert_eq!(xorurl, nrsurl);
+    assert_eq!(files_map.len(), 5);
 }

@@ -65,10 +65,14 @@ impl SafeAppScl {
                 .map_err(CoreError)
         })
         .map_err(|err| {
-            Error::NetDataError(format!(
-                "Failed to mutate seq mutable data entrues: {}: {}",
-                message, err
-            ))
+            if let CoreError(SafeCoreError::NewRoutingClientError(
+                SafeNdError::InvalidEntryActions(_),
+            )) = err
+            {
+                Error::EntryExists(format!("{}: {}", message, err))
+            } else {
+                Error::NetDataError(format!("{}: {}", message, err))
+            }
         })
     }
 }
@@ -514,14 +518,14 @@ impl SafeApp for SafeAppScl {
     ) -> ResultReturn<()> {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to MD")
+        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
     }
 
     fn mutable_data_delete(&mut self, name: XorName, tag: u64) -> ResultReturn<()> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client
-                .delete_mdata(MDataAddress::Seq { name: name, tag })
+                .delete_mdata(MDataAddress::Seq { name, tag })
                 .map_err(CoreError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to delete MD: {:?}", e)))
@@ -565,7 +569,7 @@ impl SafeApp for SafeAppScl {
     ) -> ResultReturn<()> {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), version);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update MD")
+        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
     }
 }
 

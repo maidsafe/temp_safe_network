@@ -81,12 +81,20 @@ impl Safe {
 
         let md_key = name.unwrap_or_else(|| xorurl);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
-        self.safe_app.seq_mutable_data_insert(
-            xorurl_encoder.xorname(),
-            WALLET_TYPE_TAG,
-            &md_key.to_string().into_bytes(),
-            &serialised_value.into_bytes(),
-        )?;
+        self.safe_app
+            .seq_mutable_data_insert(
+                xorurl_encoder.xorname(),
+                WALLET_TYPE_TAG,
+                &md_key.to_string().into_bytes(),
+                &serialised_value.into_bytes(),
+            )
+            .map_err(|err| match err {
+                Error::EntryExists(_) => Error::EntryExists(format!(
+                    "An spendable balance already exists in the Wallet with the same name: '{}'",
+                    md_key
+                )),
+                other => other,
+            })?;
 
         debug!(
             "Wallet at {} had a spendable balance added with name: {}.",
@@ -461,7 +469,7 @@ fn test_wallet_transfer_diff_amounts() {
 
     // test fail to transfer as it's a invalid/non-numeric amount
     match safe.wallet_transfer(".06", Some(&from_wallet_xorurl), &to_wallet_xorurl) {
-        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '.06'",),
+        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '.06'"),
         Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
         Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };

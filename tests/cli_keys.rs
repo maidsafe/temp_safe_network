@@ -12,7 +12,7 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{create_preload_and_get_keys, CLI, SAFE_PROTOCOL};
+use common::{create_preload_and_get_keys, get_random_nrs_string, CLI, SAFE_PROTOCOL};
 use predicates::prelude::*;
 use std::process::Command;
 
@@ -69,7 +69,6 @@ fn calling_safe_keypair_pretty() {
 #[test]
 fn calling_safe_keys_balance() {
     let (pk_xor, sk) = create_preload_and_get_keys("123");
-    println!("AA: {}", pk_xor);
     assert!(pk_xor.contains("safe://"));
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -78,5 +77,24 @@ fn calling_safe_keys_balance() {
     ])
     .assert()
     .stdout("123.000000000\n")
+    .success();
+}
+
+#[test]
+fn calling_safe_keys_balance_with_nrs_for_keyurl() {
+    let (pk_xor, sk) = create_preload_and_get_keys("3006.77");
+
+    let nrsurl = format!("safe://{}", get_random_nrs_string());
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["nrs", "create", &nrsurl, "-l", &pk_xor])
+        .assert()
+        .success();
+
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec![
+        "keys", "balance", "--keyurl", &nrsurl, "--sk", &sk, "--json",
+    ])
+    .assert()
+    .stdout("3006.770000000\n")
     .success();
 }

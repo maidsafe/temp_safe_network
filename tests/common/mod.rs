@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use std::env;
 
 pub const CLI: &str = "safe";
@@ -88,16 +90,14 @@ pub fn upload_test_folder() -> (String, BTreeMap<String, (String, String)>) {
     .read()
     .unwrap();
 
-    let (container_xorurl, file_map): (String, BTreeMap<String, (String, String)>) =
-        match serde_json::from_str(&files_container) {
-            Ok(s) => s,
-            Err(err) => panic!(format!(
-                "Failed to parse output of `safe nrs create`: {}",
-                err
-            )),
-        };
+    let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container);
 
     (container_xorurl, file_map)
+}
+
+#[allow(dead_code)]
+pub fn get_random_nrs_string() -> String {
+    thread_rng().sample_iter(&Alphanumeric).take(15).collect()
 }
 
 #[allow(dead_code)]
@@ -112,4 +112,9 @@ pub fn parse_files_put_or_sync_output(
     output: &str,
 ) -> (String, BTreeMap<String, (String, String)>) {
     serde_json::from_str(output).expect("Failed to parse output of `safe files sync`")
+}
+
+#[allow(dead_code)]
+pub fn parse_nrs_create_output(output: &str) -> (String, BTreeMap<String, (String, String)>) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe nrs create`")
 }
