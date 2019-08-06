@@ -109,7 +109,7 @@ fn calling_safe_cat_nrsurl_with_version() {
         .assert()
         .success();
 
-    // NRS name wasn't not updated (with --updated-nrs) when doing files sync,
+    // NRS name was not updated (with --updated-nrs) when doing files sync,
     // but NRS name links to latest version of FilesContainer (unversioned URL link),
     // so our file should have been updated
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
