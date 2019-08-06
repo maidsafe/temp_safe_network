@@ -10,7 +10,11 @@ RUN addgroup --gid 1001 maidsafe && \
 # We could perhaps put this into a base container at a later stage.
 RUN USER=maidsafe && \
     GROUP=maidsafe && \
-    curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - && \
+    echo "06b3e053be5aaccc91dd5a45faf2356f  fixuid-0.4-linux-amd64.tar.gz" > fixuid-0.4-linux-amd64.tar.gz.md5 && \
+    curl -OSsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz && \
+    md5sum -c fixuid-0.4-linux-amd64.tar.gz.md5 && \
+    tar -C /usr/local/bin -xzf fixuid-0.4-linux-amd64.tar.gz && \
+    rm fixuid-0.4-linux-amd64.tar.gz && \
     chown root:root /usr/local/bin/fixuid && \
     chmod 4755 /usr/local/bin/fixuid && \
     mkdir -p /etc/fixuid && \
