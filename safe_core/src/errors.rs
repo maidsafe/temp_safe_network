@@ -155,6 +155,12 @@ impl From<quic_p2p::Error> for CoreError {
     }
 }
 
+impl From<serde_json::error::Error> for CoreError {
+    fn from(error: serde_json::error::Error) -> Self {
+        CoreError::Unexpected(format!("{}", error))
+    }
+}
+
 impl Debug for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{} - ", self.description())?;

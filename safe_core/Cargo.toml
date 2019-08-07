@@ -17,6 +17,7 @@ chrono = { version = "~0.4.0", features = ["serde"] }
 config_file_handler = "~0.11.0"
 crossbeam-channel = "~0.3.9"
 data-encoding = "~2.1.1"
+directories = "~2.0.2"
 ffi_utils = "~0.12.0"
 fs2 = "~0.4.3"
 futures = "~0.1.17"
@@ -33,6 +34,7 @@ safe-nd = { git = "https://github.com/maidsafe/safe-nd" }
 self_encryption = { git = "https://github.com/maidsafe/self_encryption" }
 serde = "~1.0.27"
 serde_derive = "~1.0.27"
+serde_json = "~1.0.40"
 tiny-keccak = "~1.5.0"
 threshold_crypto = "~0.3.2"
 tokio = "~0.1.22"

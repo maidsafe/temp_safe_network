@@ -8,15 +8,61 @@
 
 use crate::CoreError;
 use config_file_handler;
-use std::ffi::OsString;
+use directories::ProjectDirs;
+use quic_p2p::Config as QuicP2pConfig;
 #[cfg(test)]
 use std::path::PathBuf;
+use std::{
+    ffi::OsString,
+    fs::File,
+    io::{self, BufReader},
+};
+
+// TODO: Currently the quic-p2p and dev config are handled through different mechanisms. We need to
+// unify and streamline, in the process getting rid of config_file_handler.
+
+const CONFIG_DIR_QUALIFIER: &str = "net";
+const CONFIG_DIR_ORGANISATION: &str = "MaidSafe";
+const CONFIG_DIR_APPLICATION: &str = "safe_core";
+const CONFIG_FILE: &str = "safe_core.config";
 
 /// Configuration for safe-core.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
+    /// QuicP2p options.
+    // TODO: This is an `Option` to play nicely with the functions deserialising `DevConfig`. We
+    // probably want unwrap this as `QuicP2pConfig` can be left in a valid default state.
+    pub quic_p2p: Option<QuicP2pConfig>,
     /// Developer options.
     pub dev: Option<DevConfig>,
+}
+
+impl Config {
+    /// Returns a new `Config` instance. Tries to read quic-p2p config from file.
+    pub fn new() -> Self {
+        let quic_p2p = Self::read_qp2p_from_file().unwrap_or_default();
+        Self {
+            quic_p2p: Some(quic_p2p),
+            dev: None,
+        }
+    }
+
+    fn read_qp2p_from_file() -> Result<QuicP2pConfig, CoreError> {
+        let path = dirs()?.config_dir().join(CONFIG_FILE);
+        let file = match File::open(&path) {
+            Ok(file) => {
+                trace!("Reading settings from {}", path.display());
+                file
+            }
+            Err(error) => {
+                trace!("No config file at available at {}", path.display());
+                return Err(error.into());
+            }
+        };
+        let reader = BufReader::new(file);
+        let config = serde_json::from_reader(reader)?;
+        Ok(config)
+    }
 }
 
 /// Extra configuration options intended for developers.
@@ -34,7 +80,7 @@ pub struct DevConfig {
 pub fn get_config() -> Config {
     read_config_file().unwrap_or_else(|error| {
         warn!("Failed to parse safe_core config file: {:?}", error);
-        Config::default()
+        Config::new()
     })
 }
 
@@ -42,6 +88,15 @@ fn read_config_file() -> Result<Config, CoreError> {
     // If the config file is not present, a default one will be generated.
     let file_handler = config_file_handler::FileHandler::new(&get_file_name()?, false)?;
     Ok(file_handler.read_file()?)
+}
+
+fn dirs() -> Result<ProjectDirs, CoreError> {
+    ProjectDirs::from(
+        CONFIG_DIR_QUALIFIER,
+        CONFIG_DIR_ORGANISATION,
+        CONFIG_DIR_APPLICATION,
+    )
+    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
 }
 
 /// Writes a `safe_core` config file **for use by tests and examples**.

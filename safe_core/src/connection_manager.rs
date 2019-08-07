@@ -37,16 +37,14 @@ pub struct ConnectionManager {
 
 impl ConnectionManager {
     pub fn new(
-        config: Option<QuicP2pConfig>,
+        config: QuicP2pConfig,
         _net_tx: &NetworkTx,
         full_id: NewFullId,
     ) -> Result<Self, CoreError> {
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
-        let mut quic_p2p_builder = Builder::new(event_tx);
-        if let Some(config) = config {
-            quic_p2p_builder = quic_p2p_builder.with_config(config);
-        }
+        let quic_p2p_builder = Builder::new(event_tx).with_config(config);
         let quic_p2p = Rc::new(RefCell::new(quic_p2p_builder.build()?));
+
         let (qp2p_stream_tx, qp2p_stream_rx) = mpsc::unbounded();
         setup_quic_p2p_event_loop(event_rx, qp2p_stream_tx);
 

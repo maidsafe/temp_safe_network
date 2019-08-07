@@ -1236,6 +1236,7 @@ fn unpub_md() {
 #[test]
 fn auth_keys() {
     let (mut routing, routing_rx, full_id, _) = setup_with_config(Config {
+        quic_p2p: None,
         dev: Some(DevConfig {
             mock_unlimited_mutations: true,
             mock_in_memory_storage: true,
@@ -1491,6 +1492,7 @@ fn auth_actions_from_app() {
 fn low_balance_check() {
     for &custom_vault in &[true, false] {
         let (mut routing, routing_rx, full_id, _) = setup_with_config(Config {
+            quic_p2p: None,
             dev: Some(DevConfig {
                 mock_unlimited_mutations: custom_vault,
                 mock_in_memory_storage: true,
@@ -1591,6 +1593,7 @@ fn invalid_config_mock_vault_path() {
 
     // Make sure that using a non-existant mock-vault path fails.
     let (mut routing, _, full_id, _) = setup_with_config(Config {
+        quic_p2p: None,
         dev: Some(DevConfig {
             mock_unlimited_mutations: false,
             mock_in_memory_storage: false,
@@ -1634,6 +1637,7 @@ fn config_mock_vault_path() {
     }
 
     let (mut routing, routing_rx, full_id, _) = setup_with_config(Config {
+        quic_p2p: None,
         dev: Some(DevConfig {
             mock_unlimited_mutations: false,
             mock_in_memory_storage: false,
