@@ -19,9 +19,6 @@ use structopt::StructOpt;
 pub struct CatCommands {
     /// The safe:// location to retrieve
     location: Option<String>,
-    /// Version of the resource to retrieve
-    #[structopt(long = "version")]
-    version: Option<String>,
     /// Display additional information about the content being retrieved
     #[structopt(short = "i", long = "info", parse(from_occurrences))]
     info: u8,
@@ -32,7 +29,6 @@ pub fn cat_commander(
     output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
-    // TODO: Get specific versions.
     let xorurl = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &xorurl);
 
