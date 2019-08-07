@@ -36,7 +36,7 @@ ifeq ($(UNAME_S),Linux)
 		-v "${PWD}":/usr/src/safe_vault:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-vault-build:build \
-		/bin/bash -c "cargo build --release && ./scripts/tests --verbose"
+		./scripts/tests --verbose
 	docker cp "safe-vault-build-${UUID}":/target .
 	docker rm "safe-vault-build-${UUID}"
 else
@@ -45,6 +45,27 @@ else
 	cargo build --release
 	./scripts/tests --verbose
 endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+musl:
+ifneq ($(UNAME_S),Linux)
+	@echo "This target only applies to Linux."
+	@exit 1
+endif
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	docker run --name "safe-vault-build-${UUID}" \
+		-v "${PWD}":/usr/src/safe_vault:Z \
+		-e CC=musl-gcc \
+		-e CFLAGS='-I/usr/include/x86_64-linux-musl -idirafter /usr/include' \
+		-e LDFLAGS=-L/usr/lib/x86_64-linux-musl \
+		-e RUSTFLAGS='-C linker=musl-gcc' \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-vault-build:build \
+		cargo build --release --target x86_64-unknown-linux-musl
+	docker cp "safe-vault-build-${UUID}":/target .
+	docker rm "safe-vault-build-${UUID}"
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 package-build-artifacts:
@@ -97,10 +118,10 @@ package-commit_hash-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
 	mkdir deploy
-	tar -C artifacts/linux/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar safe_vault
+	tar -C artifacts/linux/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-musl.tar safe_vault
 	tar -C artifacts/win/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar safe_vault.exe
 	tar -C artifacts/macos/release -cvf safe_vault-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar safe_vault
-	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar deploy
+	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-musl.tar deploy
 	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar deploy
 	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar deploy
 
@@ -108,10 +129,10 @@ package-version-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
 	mkdir deploy
-	tar -C artifacts/linux/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar safe_vault
+	tar -C artifacts/linux/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar safe_vault
 	tar -C artifacts/win/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar safe_vault.exe
 	tar -C artifacts/macos/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar safe_vault
-	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar deploy
+	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar deploy
 	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar deploy
 	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar deploy
 
@@ -130,8 +151,8 @@ endif
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_VAULT_VERSION} \
-		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar" \
-		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.tar;
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \

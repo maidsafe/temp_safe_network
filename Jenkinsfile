@@ -11,8 +11,6 @@ stage("build & test") {
         node("safe_vault") {
             checkout(scm)
             sh("make test")
-            packageBuildArtifacts("linux")
-            uploadBuildArtifacts()
         }
     },
     windows: {
@@ -36,6 +34,14 @@ stage("build & test") {
         node("safe_vault") {
             checkout(scm)
             sh("make clippy")
+        }
+    },
+    musl: {
+        node("safe_vault") {
+            checkout(scm)
+            sh("make musl")
+            packageBuildArtifacts("linux")
+            uploadBuildArtifacts()
         }
     }
 }

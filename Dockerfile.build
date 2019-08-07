@@ -21,6 +21,10 @@ RUN USER=maidsafe && \
     printf "user: $USER\ngroup: $GROUP\n" > /etc/fixuid/config.yml
 
 RUN apt-get update -y && \
+    apt-get install -y \
+        gcc \
+        musl-dev \
+        musl-tools && \
     mkdir /target && \
     chown maidsafe:maidsafe /target && \
     mkdir /usr/src/safe_vault && \
@@ -35,10 +39,8 @@ COPY . .
 # the tests write a file and you need permissions for that.
 RUN chown -R maidsafe:maidsafe /usr/src/safe_vault
 USER maidsafe:maidsafe
-ENV CARGO_TARGET_DIR=/target YARN_GPG=no RUST_BACKTRACE=1
-
+ENV CARGO_TARGET_DIR=/target RUST_BACKTRACE=1
 RUN rustup component add rustfmt clippy && \
-    cargo build --release && \
-    scripts/clippy --verbose && \
+    rustup target add x86_64-unknown-linux-musl && \
     scripts/tests --verbose
 ENTRYPOINT ["fixuid"]
