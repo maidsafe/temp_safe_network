@@ -241,6 +241,13 @@ pub enum Event {
         /// Error explaining connection failure.
         err: Error,
     },
+    /// The given message was successfully sent to this peer.
+    SentUserMessage {
+        /// Peer address.
+        peer_addr: SocketAddr,
+        /// Sent message.
+        msg: Bytes,
+    },
     /// Message sent by us but not delivered due to connection drop.
     UnsentUserMessage {
         /// Intended message recipient.
@@ -285,6 +292,12 @@ impl Display for Event {
             NewMessage { peer_addr, msg } => write!(
                 f,
                 "NewMessage {{ peer_addr: {}, msg: {:<8} }}",
+                peer_addr,
+                HexFmt(msg)
+            ),
+            SentUserMessage { peer_addr, msg } => write!(
+                f,
+                "SentUserMessage {{ peer_addr: {}, msg: {:<8} }}",
                 peer_addr,
                 HexFmt(msg)
             ),
