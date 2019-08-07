@@ -1,0 +1,46 @@
+FROM rust:latest
+
+RUN addgroup --gid 1001 maidsafe && \
+    adduser --uid 1001 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
+    # The parent container sets this to the 'staff' group, which causes problems
+    # with reading code stored in Cargo's registry.
+    chgrp -R maidsafe /usr/local
+
+# Install fixuid for dealing with permissions issues with mounted volumes.
+# We could perhaps put this into a base container at a later stage.
+RUN USER=maidsafe && \
+    GROUP=maidsafe && \
+    echo "06b3e053be5aaccc91dd5a45faf2356f  fixuid-0.4-linux-amd64.tar.gz" > fixuid-0.4-linux-amd64.tar.gz.md5 && \
+    curl -OSsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz && \
+    md5sum -c fixuid-0.4-linux-amd64.tar.gz.md5 && \
+    tar -C /usr/local/bin -xzf fixuid-0.4-linux-amd64.tar.gz && \
+    rm fixuid-0.4-linux-amd64.tar.gz && \
+    chown root:root /usr/local/bin/fixuid && \
+    chmod 4755 /usr/local/bin/fixuid && \
+    mkdir -p /etc/fixuid && \
+    printf "user: $USER\ngroup: $GROUP\n" > /etc/fixuid/config.yml
+
+RUN apt-get update -y && \
+    apt-get install -y \
+        gcc \
+        musl-dev \
+        musl-tools && \
+    mkdir /target && \
+    chown maidsafe:maidsafe /target && \
+    mkdir /usr/src/safe_vault && \
+    chown maidsafe:maidsafe /usr/src/safe_vault && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/safe_vault
+COPY . .
+
+# During the build process, ownership of the source directory needs changed in advance because
+# the tests write a file and you need permissions for that.
+RUN chown -R maidsafe:maidsafe /usr/src/safe_vault
+USER maidsafe:maidsafe
+ENV CARGO_TARGET_DIR=/target RUST_BACKTRACE=1
+RUN rustup component add rustfmt clippy && \
+    rustup target add x86_64-unknown-linux-musl && \
+    scripts/tests --verbose
+ENTRYPOINT ["fixuid"]

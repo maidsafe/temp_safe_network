@@ -3,6 +3,7 @@
 *.bk
 *.rsproj
 tags*
+artifacts/
 build/
 build-tests/
 target/*

@@ -21,8 +21,5 @@ jobs:
     - script: scripts/tests --verbose
       env: CACHE_NAME=tests_linux
       os: linux
-    - script: scripts/tests --verbose
-      env: CACHE_NAME=tests_osx
-      os: osx
 before_cache:
   - cargo prune
