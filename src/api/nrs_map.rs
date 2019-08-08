@@ -10,7 +10,7 @@ use super::constants::{
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
 };
 use super::helpers::gen_timestamp_secs;
-use super::{Error, ResultReturn, XorUrl};
+use super::{Error, ResultReturn, Safe, SafeContentType, XorUrl};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -76,10 +76,9 @@ impl NrsMap {
 
     pub fn resolve_for_subnames(&self, mut sub_names: Vec<SubName>) -> ResultReturn<XorUrl> {
         debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
-        //println!("NRS: Attempting to resolve for subnames {:?}", sub_names);
-
         let mut nrs_map = self;
         let mut dereferenced_link: String;
+        let sub_names_str = sub_names_vec_to_str(&sub_names);
         let mut link = if sub_names.is_empty() {
             match &self.default {
                 DefaultRdf::OtherRdf(def_data) => {
@@ -141,10 +140,14 @@ impl NrsMap {
         }
 
         match link {
-            Some(the_link) => Ok(the_link.to_string()),
+            Some(the_link) => {
+                // Let's make sure it's a versioned link
+                validate_nrs_link(the_link)?;
+                Ok(the_link.to_string())
+            }
             None => Err(Error::ContentError(format!(
-                "No link found for subnames: {:?}.",
-                &sub_names.reverse()
+                "No link found for subname/s \"{}\"",
+                sub_names_str
             ))),
         }
     }
@@ -176,6 +179,8 @@ impl NrsMap {
         })?;
 
         debug!("Default link retrieved: \"{}\"", link);
+        // Let's make sure it's a versioned link
+        validate_nrs_link(link)?;
         Ok(link.to_string())
     }
 
@@ -199,9 +204,12 @@ impl NrsMap {
         hard_link: bool,
     ) -> ResultReturn<String> {
         info!("Updating NRS map for: {}", name);
-        let sub_names: Vec<String> = parse_nrs_name(name)?;
+
+        // NRS resolver doesn't allow unversioned links
+        validate_nrs_link(link)?;
 
         // Update NRS Map with new names
+        let sub_names: Vec<String> = parse_nrs_name(name)?;
         let updated_nrs_map = setup_nrs_tree(&self, sub_names.clone(), link)?;
         self.sub_names_map = updated_nrs_map.sub_names_map;
 
@@ -212,18 +220,7 @@ impl NrsMap {
             if hard_link || sub_names.is_empty() {
                 self.default = DefaultRdf::OtherRdf(definition_data);
             } else {
-                let length = sub_names.len() - 1;
-                let sub_names_str = sub_names
-                    .iter()
-                    .enumerate()
-                    .map(|(i, n)| {
-                        if i < length {
-                            format!("{}.", n)
-                        } else {
-                            n.to_string()
-                        }
-                    })
-                    .collect();
+                let sub_names_str = sub_names_vec_to_str(&sub_names);
                 self.default = DefaultRdf::ExistingRdf(sub_names_str);
             }
         } else {
@@ -265,6 +262,25 @@ fn create_public_name_description(link: &str) -> ResultReturn<DefinitionData> {
     Ok(public_name)
 }
 
+fn sub_names_vec_to_str(sub_names: &[SubName]) -> String {
+    if !sub_names.is_empty() {
+        let length = sub_names.len() - 1;
+        sub_names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| {
+                if i < length {
+                    format!("{}.", n)
+                } else {
+                    n.to_string()
+                }
+            })
+            .collect()
+    } else {
+        "".to_string()
+    }
+}
+
 fn parse_nrs_name(name: &str) -> ResultReturn<Vec<String>> {
     // santize to a simple string
     let sanitized_name = str::replace(&name, "safe://", "").to_string();
@@ -276,6 +292,25 @@ fn parse_nrs_name(name: &str) -> ResultReturn<Vec<String>> {
         .ok_or_else(|| Error::Unexpected("Failed to parse NRS name".to_string()))?;
 
     Ok(sub_names)
+}
+
+fn validate_nrs_link(link: &str) -> ResultReturn<()> {
+    let link_encoder = Safe::parse_url(link)?;
+    if link_encoder.content_version().is_none() {
+        // We could try to automatically set the latest/current version,
+        // but NRSMap currently doesn't have a connection to do so.
+        match link_encoder.content_type() {
+            SafeContentType::FilesContainer | SafeContentType::NrsMapContainer => {
+                Err(Error::InvalidInput(format!(
+                    "The link is unversioned, but the linked content is versionable. NRS resolver doesn\'t allow unversioned links for this type of content: \"{}\"",
+                    link
+                )))
+            }
+            _ => Ok(()),
+        }
+    } else {
+        Ok(())
+    }
 }
 
 fn setup_nrs_tree(

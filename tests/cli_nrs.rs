@@ -17,20 +17,36 @@ use common::{
     SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
+use safe_cli::{SafeContentType, SafeDataType, XorName, XorUrlEncoder};
 use std::process::Command;
+use unwrap::unwrap;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
+
+fn gen_fake_target() -> String {
+    let xorname = XorName(*b"12345678901234567890123456789012");
+    unwrap!(XorUrlEncoder::encode(
+        xorname,
+        0x00a5_3cde,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::Raw,
+        None,
+        None,
+        Some(5),
+        "base32"
+    ))
+}
 
 #[test]
 fn calling_safe_nrs_create_pretty() {
     let test_name = format!("safe://{}", get_random_nrs_string());
-
+    let fake_target = gen_fake_target();
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["nrs", "create", &test_name, "-l", "fake_target"])
+    cmd.args(&vec!["nrs", "create", &test_name, "-l", &fake_target])
         .assert()
         .stdout(predicate::str::contains(PRETTY_NRS_CREATION_RESPONSE))
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
-        .stdout(predicate::str::contains("fake_target").count(1))
+        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(4))
+        .stdout(predicate::str::contains(fake_target).count(1))
         .stdout(predicate::str::contains("+").count(1))
         .success();
 }
@@ -38,6 +54,7 @@ fn calling_safe_nrs_create_pretty() {
 #[test]
 fn calling_safe_nrs_twice_w_name_fails() {
     let test_name = format!("safe://{}", get_random_nrs_string());
+    let fake_target = gen_fake_target();
 
     let _nrs_creation = cmd!(
         get_bin_location(),
@@ -45,14 +62,14 @@ fn calling_safe_nrs_twice_w_name_fails() {
         "create",
         &test_name,
         "-l",
-        "nowhere_good",
+        &fake_target,
         "--json"
     )
     .read()
     .unwrap();
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["nrs", "create", &test_name, "-l", "fake_target"])
+    cmd.args(&vec!["nrs", "create", &test_name, "-l", &fake_target])
         .assert()
         .stderr(predicate::str::contains(
             "NRS name already exists. Please use 'nrs add' command to add sub names to it",
@@ -113,14 +130,16 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
     let test_name = format!("safe://a.b.c.{}", get_random_nrs_string());
 
     let (container_xorurl, _map) = upload_test_folder();
-
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    xorurl_encoder.set_path("/test.md");
+    let link = unwrap!(xorurl_encoder.to_string(""));
     let _nrs_creation = cmd!(
         get_bin_location(),
         "nrs",
         "create",
         &test_name,
         "-l",
-        &format!("{}/test.md", container_xorurl),
+        &link,
         "--json"
     )
     .read()

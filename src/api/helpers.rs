@@ -136,11 +136,14 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
     }
 }
 
-pub fn get_subnames_host_and_path(
+pub fn get_subnames_host_path_and_version(
     xorurl: &str,
 ) -> ResultReturn<(Vec<String>, String, String, Option<u64>)> {
     let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
-        Error::InvalidXorUrl(format!("Problem parsing the safe:// URL {:?}", parse_err))
+        Error::InvalidXorUrl(format!(
+            "Problem parsing the safe:// URL \"{}\": {}",
+            xorurl, parse_err
+        ))
     })?;
 
     let host_str = parsing_url

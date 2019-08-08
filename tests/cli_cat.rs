@@ -14,7 +14,9 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use common::{get_bin_location, get_random_nrs_string, parse_files_put_or_sync_output, CLI};
 use predicates::prelude::*;
+use safe_cli::XorUrlEncoder;
 use std::process::Command;
+use unwrap::unwrap;
 
 const TEST_FILE: &str = "./tests/testfolder/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
@@ -43,35 +45,42 @@ fn calling_safe_cat_xorurl_url_with_version() {
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
-    let xorurl_with_path = format!("{}/test.md", container_xorurl);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    xorurl_encoder.set_path("/test.md");
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &xorurl_with_path])
-        .assert()
-        .success();
+    cmd.args(&vec![
+        "files",
+        "sync",
+        ANOTHER_FILE,
+        &unwrap!(xorurl_encoder.to_string("")),
+    ])
+    .assert()
+    .success();
 
+    xorurl_encoder.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &xorurl_with_path])
+    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string(""))])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
-    let v0_xorurl = format!("{}/test.md?v=0", container_xorurl);
+    xorurl_encoder.set_content_version(Some(0));
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &v0_xorurl])
+    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string(""))])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
-    let v1_xorurl = format!("{}/test.md?v=1", container_xorurl);
+    xorurl_encoder.set_content_version(Some(1));
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &v1_xorurl])
+    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string(""))])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
-    let invalid_version_xorurl = format!("{}/test.md?v=2", container_xorurl);
+    xorurl_encoder.set_content_version(Some(2));
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &invalid_version_xorurl])
+    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string(""))])
         .assert()
         .failure();
 }
@@ -103,20 +112,24 @@ fn calling_safe_cat_nrsurl_with_version() {
         .success();
 
     // let's sync with another file so we get a new version, and a different content in the file
-    let xorurl_with_path = format!("{}/test.md", container_xorurl);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    xorurl_encoder.set_path("/test.md");
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &xorurl_with_path])
-        .assert()
-        .success();
+    cmd.args(&vec![
+        "files",
+        "sync",
+        ANOTHER_FILE,
+        &unwrap!(xorurl_encoder.to_string("")),
+    ])
+    .assert()
+    .success();
 
     // NRS name was not updated (with --updated-nrs) when doing files sync,
-    // but NRS name links to latest version of FilesContainer (unversioned URL link),
-    // so our file should have been updated
-    let nrsurl_with_path = format!("{}/test.md", nrsurl);
+    // so our file should not have been updated
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["cat", &nrsurl_with_path])
         .assert()
-        .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
+        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
     // NRS name has only one version which is 0, so using version 0 should also fetch the file
@@ -124,7 +137,7 @@ fn calling_safe_cat_nrsurl_with_version() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["cat", &nrsurl_with_path_v0])
         .assert()
-        .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
+        .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
     // there is no version 1 of NRS name

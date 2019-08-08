@@ -8,8 +8,8 @@
 
 use super::files::FilesMap;
 use super::nrs_map::NrsMap;
-use super::xorurl::SafeContentType;
-pub use super::xorurl::SafeDataType;
+pub use super::xorurl::SafeContentType;
+pub use super::xorurl::{SafeDataType, XorUrlEncoder};
 
 use super::{Error, ResultReturn, Safe, XorName};
 use log::{debug, info};
@@ -65,7 +65,7 @@ impl Safe {
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let (xorurl, _, _) = unwrap!(safe.files_container_create("tests/testfolder/", None, true, false));
     ///
-    /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl ) ) );
+    /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ) ) );
     /// let data_string = match safe_data {
     /// 	SafeData::PublishedImmutableData { data, .. } => {
     /// 		match String::from_utf8(data) {
@@ -82,7 +82,7 @@ impl Safe {
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, url: &str) -> ResultReturn<SafeData> {
-        let the_xor = self.parse_url(url)?;
+        let the_xor = Safe::parse_url(url)?;
         let xorurl = the_xor.to_string("base32z")?;
         info!("URL parsed successfully, fetching: {}", xorurl);
         debug!("Fetching content of type: {:?}", the_xor.content_type());
@@ -127,6 +127,7 @@ impl Safe {
                 let path = the_xor.path();
                 if path != "/" && !path.is_empty() {
                     // TODO: Count how many redirects we've done... prevent looping forever
+                    // TODO: Move this logic (resolver) to the FilesMap struct
                     let file_item = match files_map.get(path) {
                         Some(item_data) => item_data,
                         None => {
@@ -170,11 +171,19 @@ impl Safe {
                 let new_target_xorurl = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
                 debug!("Resolved target: {}", new_target_xorurl);
 
-                let url_with_path = format!("{}{}", &new_target_xorurl, the_xor.path());
-                info!("Resolving target from resolvable map: {}", url_with_path);
+                let mut xorurl_encoder = XorUrlEncoder::from_url(&new_target_xorurl)?;
+                if xorurl_encoder.path().is_empty() {
+                    xorurl_encoder.set_path(the_xor.path());
+                } else if !the_xor.path().is_empty() {
+                    xorurl_encoder.set_path(&format!(
+                        "{}{}",
+                        xorurl_encoder.path(),
+                        the_xor.path()
+                    ));
+                }
+                let url_with_path = xorurl_encoder.to_string("")?;
+                debug!("Resolving target from resolvable map: {}", url_with_path);
 
-                // TODO: Properly prevent resolution
-                // if prevent_resolution {
                 let content = self.fetch(&url_with_path)?;
                 let nrs_map_container = NrsMapContainerInfo {
                     xorname: the_xor.xorname(),
@@ -306,8 +315,8 @@ fn test_fetch_files_container() {
             }
     );
 
-    let xorurl_with_path = format!("{}/subfolder/subexists.md", xorurl);
-    let xorurl_encoder_with_path = unwrap!(XorUrlEncoder::from_url(&xorurl_with_path));
+    let mut xorurl_encoder_with_path = xorurl_encoder.clone();
+    xorurl_encoder_with_path.set_path("/subfolder/subexists.md");
     assert_eq!(xorurl_encoder_with_path.path(), "/subfolder/subexists.md");
     assert_eq!(xorurl_encoder_with_path.xorname(), xorurl_encoder.xorname());
     assert_eq!(

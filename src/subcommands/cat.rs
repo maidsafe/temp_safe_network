@@ -110,10 +110,10 @@ pub fn cat_commander(
                 .write_all(&data)
                 .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
         }
-        other => println!(
-            "Content type '{:?}' not supported yet by 'cat' command",
-            other
-        ),
+        SafeData::Key { .. } => println!("Content type 'Key' not supported yet by 'cat' command"),
+        SafeData::Wallet { .. } => {
+            println!("Content type 'Wallet' not supported yet by 'cat' command")
+        }
     }
 
     Ok(())

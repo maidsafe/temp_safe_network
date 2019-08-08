@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_subnames_host_and_path;
+use super::helpers::get_subnames_host_path_and_version;
 use super::{Error, ResultReturn};
 use log::debug;
 use multibase::{decode, encode, Base};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_nd::{XorName, XOR_NAME_LEN};
+use std::fmt;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
@@ -62,7 +63,7 @@ pub fn create_random_xorname() -> XorName {
     xorname
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct XorUrlEncoder {
     encoding_version: u64, // currently only v1 supported
     xorname: XorName,
@@ -121,7 +122,8 @@ impl XorUrlEncoder {
     }
 
     pub fn from_url(xorurl: &str) -> ResultReturn<Self> {
-        let (sub_names, cid_str, path, content_version) = get_subnames_host_and_path(&xorurl)?;
+        let (sub_names, cid_str, path, content_version) =
+            get_subnames_host_path_and_version(&xorurl)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&cid_str)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -232,6 +234,15 @@ impl XorUrlEncoder {
         &self.path
     }
 
+    #[allow(dead_code)]
+    pub fn set_path(&mut self, path: &str) {
+        if path.starts_with('/') {
+            self.path = path.to_string();
+        } else {
+            self.path = format!("/{}", path);
+        }
+    }
+
     pub fn sub_names(&self) -> Vec<String> {
         self.sub_names.to_vec()
     }
@@ -297,6 +308,13 @@ impl XorUrlEncoder {
             Some(v) => Ok(format!("{}?v={}", xorurl, v)),
             None => Ok(xorurl),
         }
+    }
+}
+
+impl fmt::Display for XorUrlEncoder {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let str = self.to_string("").map_err(|_| fmt::Error)?;
+        write!(fmt, "{}", str)
     }
 }
 

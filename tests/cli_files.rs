@@ -17,10 +17,12 @@ use common::{
     parse_files_put_or_sync_output, CLI, SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
+use safe_cli::XorUrlEncoder;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{prelude::*, Seek, SeekFrom};
 use std::process::Command;
+use unwrap::unwrap;
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "./tests/testfolder/test.md";
@@ -81,12 +83,25 @@ fn calling_safe_files_put_recursive_and_set_dest_path() {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let file = format!("{}/aha/test.md", files_container_xor);
-    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/aha/test.md");
+    let file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(file_cat, "hello tests!");
 
-    let subfile = format!("{}/aha/subfolder/subexists.md", files_container_xor);
-    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
+    xorurl_encoder.set_path("/aha/subfolder/subexists.md");
+    let subfile_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(subfile_cat, "hello from a subfolder!");
 }
 
@@ -141,12 +156,26 @@ fn calling_safe_files_put_recursive_with_slash() {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let file = format!("{}/test.md", files_container_xor);
-    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/test.md");
+    let file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(file_cat, "hello tests!");
 
-    let subfile = format!("{}/subfolder/subexists.md", files_container_xor);
-    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/subfolder/subexists.md");
+    let subfile_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(subfile_cat, "hello from a subfolder!");
 }
 
@@ -167,12 +196,26 @@ fn calling_safe_files_put_recursive_without_slash() {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
-    let file = format!("{}/testfolder/test.md", files_container_xor);
-    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/testfolder/test.md");
+    let file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(file_cat, "hello tests!");
 
-    let subfile = format!("{}/testfolder/subfolder/subexists.md", files_container_xor);
-    let subfile_cat = cmd!(get_bin_location(), "cat", &subfile).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/testfolder/subfolder/subexists.md");
+    let subfile_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(subfile_cat, "hello from a subfolder!");
 }
 
@@ -204,8 +247,16 @@ fn calling_safe_files_sync() {
     .read()
     .unwrap();
 
-    let file = format!("{}/subexists.md", files_container_xor);
-    let synced_file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/subexists.md");
+    xorurl_encoder.set_content_version(Some(1));
+    let synced_file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
     assert_eq!(synced_file_cat, "hello from a subfolder!");
 }
 
@@ -269,12 +320,20 @@ fn calling_safe_files_removed_sync() {
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_xor);
     assert_eq!(processed_files.len(), 5);
+
     // now all files should be gone
-    let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
-        .read()
-        .unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    let synced_file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string("")),
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (xorurl, files_map) = parse_cat_files_container_output(&synced_file_cat);
-    assert_eq!(xorurl, files_container_xor);
+    assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string("")));
     assert_eq!(files_map.len(), 0);
 }
 
@@ -324,8 +383,16 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     .read()
     .unwrap();
 
-    let file = format!("{}/subexists.md", files_container_xor);
-    let file_cat = cmd!(get_bin_location(), "cat", &file).read().unwrap();
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_path("/subexists.md");
+    xorurl_encoder.set_content_version(None);
+    let file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string(""))
+    )
+    .read()
+    .unwrap();
 
     // remove modified lines
     let mut replace_test_md = OpenOptions::new()
@@ -390,7 +457,9 @@ fn files_sync_and_fetch_with_version() {
     assert_eq!(processed_files.len(), 5);
 
     // now all files should be gone in version 1 of the FilesContainer
-    let files_container_v1 = format!("{}?v=1", files_container_xor);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(Some(1));
+    let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
     let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
         .read()
         .unwrap();
@@ -399,7 +468,8 @@ fn files_sync_and_fetch_with_version() {
     assert_eq!(files_map.len(), 0);
 
     // but in version 0 of the FilesContainer all files should still be there
-    let files_container_v0 = format!("{}?v=0", files_container_xor);
+    xorurl_encoder.set_content_version(Some(0));
+    let files_container_v0 = unwrap!(xorurl_encoder.to_string(""));
     let cat_container_v0 = cmd!(get_bin_location(), "cat", &files_container_v0, "--json")
         .read()
         .unwrap();
@@ -425,7 +495,9 @@ fn files_sync_and_fetch_with_nrsurl_and_nrs_update() {
         parse_files_put_or_sync_output(&files_container_output);
     assert_eq!(processed_files.len(), 5);
 
-    let files_container_v0 = format!("{}?v=0", files_container_xor);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(Some(0));
+    let files_container_v0 = &unwrap!(xorurl_encoder.to_string(""));
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(
@@ -493,7 +565,9 @@ fn files_sync_and_fetch_without_nrs_update() {
         parse_files_put_or_sync_output(&files_container_output);
     assert_eq!(processed_files.len(), 5);
 
-    let files_container_v0 = format!("{}?v=0", files_container_xor);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(Some(0));
+    let files_container_v0 = unwrap!(xorurl_encoder.to_string(""));
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(
@@ -525,7 +599,9 @@ fn files_sync_and_fetch_without_nrs_update() {
     assert_eq!(processed_files.len(), 5);
 
     // now all files should be gone in version 1 of the FilesContainer
-    let files_container_v1 = format!("{}?v=1", files_container_xor);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(Some(1));
+    let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
     let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
         .read()
         .unwrap();
