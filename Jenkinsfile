@@ -74,11 +74,9 @@ def runTests() {
 }
 
 def versionChangeCommit() {
-    // Gets the 2nd commit, because the first one will be a 'Merge pull request...'
-    // commit resulting from the merge to master.
     shortCommitHash = sh(
         returnStdout: true,
-        script: "git log -n 2 --pretty=format:'%h' | tail -n 1").trim()
+        script: "git log -n 1 --no-merges --pretty=format:'%h'").trim()
     message = sh(
         returnStdout: true,
         script: "git log --format=%B -n 1 ${shortCommitHash}").trim()
