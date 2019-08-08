@@ -292,8 +292,11 @@ fn calling_safe_files_removed_sync() {
     .read()
     .unwrap();
 
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(Some(1));
+    let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
-    assert_eq!(target, files_container_xor);
+    assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), 5);
 
     let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
@@ -318,11 +321,10 @@ fn calling_safe_files_removed_sync() {
     .unwrap();
 
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
-    assert_eq!(target, files_container_xor);
+    assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), 5);
 
     // now all files should be gone
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
     let synced_file_cat = cmd!(
         get_bin_location(),
@@ -452,14 +454,14 @@ fn files_sync_and_fetch_with_version() {
     .read()
     .unwrap();
 
-    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
-    assert_eq!(target, files_container_xor);
-    assert_eq!(processed_files.len(), 5);
-
-    // now all files should be gone in version 1 of the FilesContainer
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
+    let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
+    assert_eq!(target, files_container_v1);
+    assert_eq!(processed_files.len(), 5);
+
+    // now all files should be gone in version 1 of the FilesContainer
     let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
         .read()
         .unwrap();
@@ -564,7 +566,6 @@ fn files_sync_and_fetch_without_nrs_update() {
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
     assert_eq!(processed_files.len(), 5);
-
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(0));
     let files_container_v0 = unwrap!(xorurl_encoder.to_string(""));

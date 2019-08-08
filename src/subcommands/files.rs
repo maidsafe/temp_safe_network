@@ -9,7 +9,7 @@
 use super::helpers::get_from_arg_or_stdin;
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
-use safe_cli::Safe;
+use safe_cli::{Safe, XorUrlEncoder};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -141,9 +141,16 @@ pub fn files_commander(
                     println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
+                let url = match XorUrlEncoder::from_url(&target) {
+                    Ok(mut xorurl_encoder) => {
+                        xorurl_encoder.set_content_version(Some(version));
+                        xorurl_encoder.to_string("")?
+                    }
+                    Err(_) => target,
+                };
                 println!(
                     "{}",
-                    serde_json::to_string(&(target, processed_files))
+                    serde_json::to_string(&(url, processed_files))
                         .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
                 );
             }
