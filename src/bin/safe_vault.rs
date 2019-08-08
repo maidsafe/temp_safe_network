@@ -58,6 +58,9 @@
     variant_size_differences
 )]
 
+#[macro_use]
+extern crate self_update;
+
 fn main() {
     self::detail::main()
 }
@@ -67,11 +70,23 @@ mod detail {
     use env_logger;
     use log;
     use safe_vault::{self, Command, Config, Vault};
+    use self_update::Status;
+    use std::process;
     use structopt::StructOpt;
 
     /// Runs a SAFE Network vault.
     pub fn main() {
         env_logger::init();
+
+        match update() {
+            Ok(status) => {
+                if let Status::Updated { .. } = status {
+                    println!("Vault has been updated. Please restart.");
+                    process::exit(0);
+                }
+            }
+            Err(e) => log::error!("Updating vault failed: {:?}", e),
+        }
 
         let mut config = Config::new();
         if config.quic_p2p_config().ip.is_none() {
@@ -102,6 +117,43 @@ mod detail {
             }
         }
     }
+
+    fn update() -> Result<Status, Box<::std::error::Error>> {
+        log::info!("Checking for updates...");
+        let target = self_update::get_target()?;
+        let releases = self_update::backends::github::ReleaseList::configure()
+            .repo_owner("maidsafe")
+            .repo_name("safe-cli")
+            .with_target(&target)
+            .build()?
+            .fetch()?;
+        if !releases.is_empty() {
+            log::debug!("Target for update is {}", target);
+            log::debug!("Found releases: {:#?}\n", releases);
+            let bin_name = if target.contains("pc-windows") {
+                "safe_vault.exe"
+            } else {
+                "safe_vault"
+            };
+            let status = self_update::backends::github::Update::configure()?
+                .repo_owner("maidsafe")
+                .repo_name("safe_vault")
+                .target(&target)
+                .bin_name(&bin_name)
+                .show_download_progress(true)
+                .no_confirm(true)
+                .current_version(cargo_crate_version!())
+                .build()?
+                .update()?;
+            println!("Update status: `{}`!", status.version());
+            return Ok(status);
+        }
+        log::info!("Current version is {}", cargo_crate_version!());
+        log::info!("No releases are available for updates");
+        Ok(Status::UpToDate(
+            "No releases are available for updates".to_string(),
+        ))
+    }
 }
 
 #[cfg(feature = "mock")]
@@ -109,5 +161,4 @@ mod detail {
     pub fn main() {
         println!("Cannot start vault with mock quic-p2p.");
     }
-
 }
