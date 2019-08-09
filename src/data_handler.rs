@@ -232,32 +232,36 @@ impl DataHandler {
             AddPubADataPermissions {
                 address,
                 permissions,
-                permissions_idx,
+                permissions_index,
             } => self.adata_handler.handle_add_pub_adata_permissions_req(
                 requester,
                 address,
                 permissions,
-                permissions_idx,
+                permissions_index,
                 message_id,
             ),
             AddUnpubADataPermissions {
                 address,
                 permissions,
-                permissions_idx,
+                permissions_index,
             } => self.adata_handler.handle_add_unpub_adata_permissions_req(
                 requester,
                 address,
                 permissions,
-                permissions_idx,
+                permissions_index,
                 message_id,
             ),
             SetADataOwner {
                 address,
                 owner,
-                owners_idx,
-            } => self
-                .adata_handler
-                .handle_set_adata_owner_req(requester, address, owner, owners_idx, message_id),
+                owners_index,
+            } => self.adata_handler.handle_set_adata_owner_req(
+                requester,
+                address,
+                owner,
+                owners_index,
+                message_id,
+            ),
             AppendSeq { append, index } => self
                 .adata_handler
                 .handle_append_seq_req(requester, append, index, message_id),

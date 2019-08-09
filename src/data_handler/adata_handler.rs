@@ -17,10 +17,10 @@ use crate::{
 use log::error;
 
 use safe_nd::{
-    AData, ADataAction, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPermissions,
-    ADataPubPermissions, ADataUnpubPermissions, ADataUser, AppendOnlyData, Error as NdError,
-    MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult, SeqAppendOnly,
-    UnseqAppendOnly,
+    AData, ADataAction, ADataAddress, ADataAppendOperation, ADataIndex, ADataOwner,
+    ADataPermissions, ADataPubPermissions, ADataUnpubPermissions, ADataUser, AppendOnlyData,
+    Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
+    SeqAppendOnly, UnseqAppendOnly,
 };
 
 use std::{
@@ -445,7 +445,7 @@ impl ADataHandler {
     pub(super) fn handle_append_seq_req(
         &mut self,
         requester: PublicId,
-        append: ADataAppend,
+        append: ADataAppendOperation,
         index: u64,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -473,7 +473,7 @@ impl ADataHandler {
     pub(super) fn handle_append_unseq_req(
         &mut self,
         requester: PublicId,
-        operation: ADataAppend,
+        operation: ADataAppendOperation,
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);

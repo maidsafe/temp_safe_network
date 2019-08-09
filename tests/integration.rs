@@ -57,15 +57,15 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::{distributions::Standard, Rng};
 use safe_nd::{
-    AData, ADataAddress, ADataAppend, ADataEntry, ADataIndex, ADataOwner, ADataPermissions,
-    ADataPubPermissionSet, ADataPubPermissions, ADataUnpubPermissionSet, ADataUnpubPermissions,
-    ADataUser, AppPermissions, AppendOnlyData, ClientFullId, Coins, EntryError, Error as NdError,
-    IData, IDataAddress, LoginPacket, MData, MDataAction, MDataAddress, MDataEntries, MDataKind,
-    MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue, MDataUnseqEntryActions, MDataValue,
-    MDataValues, Message, MessageId, Notification, PubImmutableData, PubSeqAppendOnlyData,
-    PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult, SeqAppendOnly,
-    SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
-    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
+    ADataPermissions, ADataPubPermissionSet, ADataPubPermissions, ADataUnpubPermissionSet,
+    ADataUnpubPermissions, ADataUser, AppPermissions, AppendOnlyData, ClientFullId, Coins,
+    EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData, MDataAction,
+    MDataAddress, MDataEntries, MDataKind, MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue,
+    MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, Notification,
+    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response,
+    Result as NdResult, SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData,
+    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1323,7 +1323,7 @@ fn pub_append_only_data_put_permissions() {
         Request::AddPubADataPermissions {
             address: *data.address(),
             permissions: perms_1.clone(),
-            permissions_idx: 1,
+            permissions_index: 1,
         },
         // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
         // changing this behaviour to AccessDenied.
@@ -1336,7 +1336,7 @@ fn pub_append_only_data_put_permissions() {
         Request::AddPubADataPermissions {
             address: *data.address(),
             permissions: perms_1.clone(),
-            permissions_idx: 1,
+            permissions_index: 1,
         },
     );
 
@@ -1426,7 +1426,7 @@ fn unpub_append_only_data_put_permissions() {
         Request::AddUnpubADataPermissions {
             address: *data.address(),
             permissions: perms_1.clone(),
-            permissions_idx: 1,
+            permissions_index: 1,
         },
         // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
         // changing this behaviour to AccessDenied.
@@ -1439,7 +1439,7 @@ fn unpub_append_only_data_put_permissions() {
         Request::AddUnpubADataPermissions {
             address: *data.address(),
             permissions: perms_1.clone(),
-            permissions_idx: 1,
+            permissions_index: 1,
         },
     );
 
@@ -1550,7 +1550,7 @@ fn append_only_data_put_owners() {
         Request::SetADataOwner {
             address: *data.address(),
             owner: owner_1,
-            owners_idx: 1,
+            owners_index: 1,
         },
         // TODO - InvalidPermissions because client B doesn't have their key registered. Maybe we
         //        should consider changing this.
@@ -1562,7 +1562,7 @@ fn append_only_data_put_owners() {
         Request::SetADataOwner {
             address: *data.address(),
             owner: owner_1,
-            owners_idx: 1,
+            owners_index: 1,
         },
     );
 
@@ -1643,7 +1643,7 @@ fn append_only_data_append_seq() {
     );
 
     let appended_values = ADataEntry::new(b"three".to_vec(), b"bar".to_vec());
-    let append = ADataAppend {
+    let append = ADataAppendOperation {
         address: *data.address(),
         values: vec![appended_values.clone()],
     };
@@ -1719,7 +1719,7 @@ fn append_only_data_append_unseq() {
     );
 
     let appended_values = ADataEntry::new(b"three".to_vec(), b"bar".to_vec());
-    let append = ADataAppend {
+    let append = ADataAppendOperation {
         address: *data.address(),
         values: vec![appended_values.clone()],
     };
@@ -2266,7 +2266,7 @@ fn app_permissions() {
 
     // Only the app with the transfer coins permission can perform mutable request.
     for address in [pub_data_address, unpub_data_address].iter().cloned() {
-        let append = ADataAppend {
+        let append = ADataAppendOperation {
             address,
             values: vec![ADataEntry {
                 key: b"key".to_vec(),
