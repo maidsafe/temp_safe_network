@@ -123,7 +123,7 @@ mod detail {
         let target = self_update::get_target()?;
         let releases = self_update::backends::github::ReleaseList::configure()
             .repo_owner("maidsafe")
-            .repo_name("safe-cli")
+            .repo_name("safe_vault")
             .with_target(&target)
             .build()?
             .fetch()?;
