@@ -38,4 +38,5 @@ after_build:
         }
 
 test_script:
+  - cargo test --verbose --release
   - cargo test --verbose --release --features=mock --no-default-features
