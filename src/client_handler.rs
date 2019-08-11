@@ -16,6 +16,7 @@ use self::{
 use crate::{
     action::Action,
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
+    config_handler::write_connection_info,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     rpc::Rpc,
     utils::{self, AuthorisationKind},
@@ -107,6 +108,13 @@ impl ClientHandler {
             "Our connection info:\n{}\n",
             unwrap!(serde_json::to_string(&our_conn_info))
         );
+        if let Ok(connection_info_file) = write_connection_info(&our_conn_info) {
+            println!(
+                "Writing connection info to: {}",
+                connection_info_file.to_string_lossy()
+            );
+        }
+
         Ok((quic_p2p, event_receiver))
     }
 

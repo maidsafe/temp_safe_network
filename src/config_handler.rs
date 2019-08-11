@@ -6,15 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{quic_p2p::Config as QuicP2pConfig, Result};
+use crate::{quic_p2p::Config as QuicP2pConfig, quic_p2p::NodeInfo, Result};
 use directories::ProjectDirs;
 use log::trace;
 use serde::{Deserialize, Serialize};
-#[cfg(test)]
-use std::fs;
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
     io::{self, BufReader},
     net::{IpAddr, Ipv4Addr},
     path::PathBuf,
@@ -26,6 +24,7 @@ const CONFIG_DIR_QUALIFIER: &str = "net";
 const CONFIG_DIR_ORGANISATION: &str = "MaidSafe";
 const CONFIG_DIR_APPLICATION: &str = "safe_vault";
 const CONFIG_FILE: &str = "vault.config";
+const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "safe_vault";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 const ARGS: [&str; 11] = [
@@ -186,11 +185,25 @@ impl Config {
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn write_config_file(config: &Config) -> Result<PathBuf> {
+    write_file(CONFIG_FILE, config)
+}
+
+/// Writes connection info to file for use by clients.
+///
+/// The file is written to the `current_bin_dir()` with the appropriate file name.
+pub fn write_connection_info(node_info: &NodeInfo) -> Result<PathBuf> {
+    write_file(CONNECTION_INFO_FILE, node_info)
+}
+
+fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
+where
+    T: Serialize,
+{
     let dirs = dirs()?;
     let dir = dirs.config_dir();
     fs::create_dir_all(dir)?;
 
-    let path = dir.join(CONFIG_FILE);
+    let path = dir.join(file);
     let mut file = File::create(&path)?;
     serde_json::to_writer_pretty(&mut file, config)?;
     file.sync_all()?;
