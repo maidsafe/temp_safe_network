@@ -58,15 +58,16 @@ endif
 	docker run --name "safe-vault-build-${UUID}" \
 		-v "${PWD}":/usr/src/safe_vault:Z \
 		-e CC=musl-gcc \
-		-e CFLAGS='-I/usr/include/x86_64-linux-musl -idirafter /usr/include' \
-		-e LDFLAGS=-L/usr/lib/x86_64-linux-musl \
+		-e OPENSSL_INCLUDE_DIR=/usr/local/musl/include \
+		-e OPENSSL_LIB_DIR=/usr/local/musl/lib \
 		-e RUSTFLAGS='-C linker=musl-gcc' \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-vault-build:build \
-		cargo build --release --target x86_64-unknown-linux-musl
+		cargo build --release --target x86_64-unknown-linux-musl --verbose
 	docker cp "safe-vault-build-${UUID}":/target .
 	docker rm "safe-vault-build-${UUID}"
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+	find target/x86_64-unknown-linux-musl/release \
+		-maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 package-build-artifacts:
 ifndef SAFE_VAULT_BRANCH
