@@ -88,7 +88,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() {
     let file_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -98,7 +98,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() {
     let subfile_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -161,7 +161,7 @@ fn calling_safe_files_put_recursive_with_slash() {
     let file_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -172,7 +172,7 @@ fn calling_safe_files_put_recursive_with_slash() {
     let subfile_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -201,7 +201,7 @@ fn calling_safe_files_put_recursive_without_slash() {
     let file_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -212,7 +212,7 @@ fn calling_safe_files_put_recursive_without_slash() {
     let subfile_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -253,7 +253,7 @@ fn calling_safe_files_sync() {
     let synced_file_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -280,7 +280,7 @@ fn calling_safe_files_removed_sync() {
     // let's first try with --dry-run and they should not be removed
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
-    let files_container_no_version = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_no_version = unwrap!(xorurl_encoder.to_string());
     let sync_cmd_output_dry_run = cmd!(
         get_bin_location(),
         "files",
@@ -296,7 +296,7 @@ fn calling_safe_files_removed_sync() {
     .unwrap();
 
     xorurl_encoder.set_content_version(Some(1));
-    let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_v1 = unwrap!(xorurl_encoder.to_string());
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
     assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), 5);
@@ -331,13 +331,13 @@ fn calling_safe_files_removed_sync() {
     let synced_file_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string("")),
+        &unwrap!(xorurl_encoder.to_string()),
         "--json"
     )
     .read()
     .unwrap();
     let (xorurl, files_map) = parse_cat_files_container_output(&synced_file_cat);
-    assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string("")));
+    assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
     assert_eq!(files_map.len(), 0);
 }
 
@@ -393,7 +393,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     let file_cat = cmd!(
         get_bin_location(),
         "cat",
-        &unwrap!(xorurl_encoder.to_string(""))
+        &unwrap!(xorurl_encoder.to_string())
     )
     .read()
     .unwrap();
@@ -445,7 +445,7 @@ fn files_sync_and_fetch_with_version() {
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
-    let files_container_no_version = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_no_version = unwrap!(xorurl_encoder.to_string());
     let sync_cmd_output = cmd!(
         get_bin_location(),
         "files",
@@ -460,7 +460,7 @@ fn files_sync_and_fetch_with_version() {
     .unwrap();
 
     xorurl_encoder.set_content_version(Some(1));
-    let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_v1 = unwrap!(xorurl_encoder.to_string());
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), 5);
@@ -475,7 +475,7 @@ fn files_sync_and_fetch_with_version() {
 
     // but in version 0 of the FilesContainer all files should still be there
     xorurl_encoder.set_content_version(Some(0));
-    let files_container_v0 = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_v0 = unwrap!(xorurl_encoder.to_string());
     let cat_container_v0 = cmd!(get_bin_location(), "cat", &files_container_v0, "--json")
         .read()
         .unwrap();
@@ -503,7 +503,7 @@ fn files_sync_and_fetch_with_nrsurl_and_nrs_update() {
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(0));
-    let files_container_v0 = &unwrap!(xorurl_encoder.to_string(""));
+    let files_container_v0 = &unwrap!(xorurl_encoder.to_string());
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(
@@ -572,7 +572,7 @@ fn files_sync_and_fetch_without_nrs_update() {
     assert_eq!(processed_files.len(), 5);
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(0));
-    let files_container_v0 = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_v0 = unwrap!(xorurl_encoder.to_string());
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(
@@ -606,7 +606,7 @@ fn files_sync_and_fetch_without_nrs_update() {
     // now all files should be gone in version 1 of the FilesContainer
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(1));
-    let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
+    let files_container_v1 = unwrap!(xorurl_encoder.to_string());
     let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
         .read()
         .unwrap();

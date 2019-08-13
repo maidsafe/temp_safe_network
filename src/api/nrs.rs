@@ -84,7 +84,7 @@ impl Safe {
         info!("Adding to NRS map...");
         // GET current NRS map from name's TLD
         let (xorurl_encoder, _) = validate_nrs_name(name)?;
-        let xorurl = xorurl_encoder.to_string("")?;
+        let xorurl = xorurl_encoder.to_string()?;
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
@@ -194,7 +194,7 @@ impl Safe {
         info!("Removing from NRS map...");
         // GET current NRS map from &name TLD
         let (xorurl_encoder, _) = validate_nrs_name(name)?;
-        let xorurl = xorurl_encoder.to_string("")?;
+        let xorurl = xorurl_encoder.to_string()?;
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 

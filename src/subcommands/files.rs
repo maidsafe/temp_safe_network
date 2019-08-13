@@ -153,7 +153,7 @@ fn print_json_output(
     let url = match XorUrlEncoder::from_url(&xorurl) {
         Ok(mut xorurl_encoder) => {
             xorurl_encoder.set_content_version(Some(version));
-            xorurl_encoder.to_string("")?
+            xorurl_encoder.to_string()?
         }
         Err(_) => xorurl,
     };

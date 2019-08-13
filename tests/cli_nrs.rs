@@ -132,7 +132,7 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
     let (container_xorurl, _map) = upload_test_folder();
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
     xorurl_encoder.set_path("/test.md");
-    let link = unwrap!(xorurl_encoder.to_string(""));
+    let link = unwrap!(xorurl_encoder.to_string());
     let _nrs_creation = cmd!(
         get_bin_location(),
         "nrs",

@@ -37,7 +37,7 @@ use safe_client_libs::SafeAppScl as SafeAppImpl;
 
 pub struct Safe {
     safe_app: SafeAppImpl,
-    xorurl_base: String,
+    pub xorurl_base: String,
 }
 
 #[allow(dead_code)]

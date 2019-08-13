@@ -29,13 +29,13 @@ pub fn cat_commander(
     output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
-    let xorurl = get_from_arg_or_stdin(cmd.location, None)?;
-    debug!("Running cat for: {:?}", &xorurl);
+    let url = get_from_arg_or_stdin(cmd.location, None)?;
+    debug!("Running cat for: {:?}", &url);
 
     // TODO: pending: https://github.com/maidsafe/safe_client_libs/issues/899
     // switch to connect_without_authL: connect_without_auth(safe)?;
     auth_connect(safe)?;
-    let content = safe.fetch(&xorurl)?;
+    let content = safe.fetch(&url)?;
     match content {
         SafeData::FilesContainer {
             version,
@@ -58,7 +58,7 @@ pub fn cat_commander(
 
                 println!(
                     "Files of FilesContainer (version {}) at \"{}\":",
-                    version, xorurl
+                    version, url
                 );
                 let mut table = Table::new();
                 table.add_row(
@@ -78,7 +78,7 @@ pub fn cat_commander(
                 // TODO: print out the resolved_from info if -ii was passed (i.e. --info level 2)
                 println!(
                         "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
-                        xorurl,
+                        url,
                         data_type,
                         type_tag,
                         xorname_to_hex(&xorname),
@@ -87,7 +87,7 @@ pub fn cat_commander(
             } else {
                 println!(
                     "{}",
-                    serde_json::to_string(&(xorurl, files_map))
+                    serde_json::to_string(&(url, files_map))
                         .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
                 );
             }
@@ -124,10 +124,31 @@ fn print_resolved_from(info_level: u8, resolved_from: Option<NrsMapContainerInfo
         if let Some(nrs_map_container) = resolved_from {
             // print out the resolved_from info since it's --info level 2
             println!("Resolved using NRS Map:");
+            println!("PublicName: \"{}\"", nrs_map_container.public_name);
+            println!("Container XOR-URL: {}", nrs_map_container.xorurl);
             println!("Native data type: {}", nrs_map_container.data_type);
             println!("Type tag: {}", nrs_map_container.type_tag);
             println!("XOR name: 0x{}", xorname_to_hex(&nrs_map_container.xorname));
-            println!();
+            println!("Version: {}", nrs_map_container.version);
+
+            if info_level > 2 {
+                let mut table = Table::new();
+                table.add_row(
+                    row![bFg->"NRS name/subname", bFg->"Created", bFg->"Modified", bFg->"Link"],
+                );
+
+                let summary = nrs_map_container.nrs_map.get_map_summary();
+                summary.iter().for_each(|(name, rdf_info)| {
+                    table.add_row(row![
+                        format!("{}{}", name, nrs_map_container.public_name),
+                        rdf_info["created"],
+                        rdf_info["modified"],
+                        rdf_info["link"],
+                    ]);
+                });
+                table.printstd();
+                println!();
+            }
         }
     }
 }

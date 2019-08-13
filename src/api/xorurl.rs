@@ -115,7 +115,7 @@ impl XorUrlEncoder {
             sub_names,
             content_version,
         );
-        xorurl_encoder.to_string(base)
+        xorurl_encoder.to_base(base)
     }
 
     pub fn from_url(xorurl: &str) -> ResultReturn<Self> {
@@ -259,7 +259,11 @@ impl XorUrlEncoder {
     // 32 bytes for XoR Name
     // and up to 8 bytes for type_tag
     // query param "v=" is treated as the content version
-    pub fn to_string(&self, base: &str) -> ResultReturn<String> {
+    pub fn to_string(&self) -> ResultReturn<String> {
+        self.to_base("")
+    }
+
+    pub fn to_base(&self, base: &str) -> ResultReturn<String> {
         // let's set the first byte with the XOR-URL format version
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
 
@@ -310,7 +314,7 @@ impl XorUrlEncoder {
 
 impl fmt::Display for XorUrlEncoder {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let str = self.to_string("").map_err(|_| fmt::Error)?;
+        let str = self.to_string().map_err(|_| fmt::Error)?;
         write!(fmt, "{}", str)
     }
 }
@@ -369,7 +373,7 @@ fn test_xorurl_base64_encoding() {
     let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
     assert_eq!(xorurl, base64_xorurl);
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&base64_xorurl));
-    assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_string("base64")));
+    assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_base("base64")));
     assert_eq!("", xorurl_encoder.path());
     assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
     assert_eq!(xorname, xorurl_encoder.xorname());
@@ -446,7 +450,7 @@ fn test_xorurl_decoding_with_path() {
     let xorurl_encoder_with_path = unwrap!(XorUrlEncoder::from_url(&xorurl_with_path));
     assert_eq!(
         xorurl_with_path,
-        unwrap!(xorurl_encoder_with_path.to_string("base32z"))
+        unwrap!(xorurl_encoder_with_path.to_base("base32z"))
     );
     assert_eq!("/subfolder/file", xorurl_encoder_with_path.path());
     assert_eq!(
@@ -486,7 +490,7 @@ fn test_xorurl_decoding_with_subname() {
     let xorurl_encoder_with_subname = unwrap!(XorUrlEncoder::from_url(&xorurl_with_subname));
     assert_eq!(
         xorurl_with_subname,
-        unwrap!(xorurl_encoder_with_subname.to_string("base32z"))
+        unwrap!(xorurl_encoder_with_subname.to_base("base32z"))
     );
     assert_eq!("", xorurl_encoder_with_subname.path());
     assert_eq!(1, xorurl_encoder_with_subname.encoding_version());

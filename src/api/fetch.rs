@@ -7,15 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::files::FilesMap;
+use super::helpers::get_subnames_host_path_and_version;
 use super::nrs_map::NrsMap;
 pub use super::xorurl::SafeContentType;
 pub use super::xorurl::{SafeDataType, XorUrlEncoder};
-
 use super::{Error, ResultReturn, Safe, XorName};
 use log::{debug, info};
 
 #[derive(Debug, PartialEq)]
 pub struct NrsMapContainerInfo {
+    pub public_name: String,
+    pub xorurl: String,
     pub xorname: XorName,
     pub type_tag: u64,
     pub version: u64,
@@ -83,7 +85,7 @@ impl Safe {
     /// ```
     pub fn fetch(&self, url: &str) -> ResultReturn<SafeData> {
         let the_xor = Safe::parse_url(url)?;
-        let xorurl = the_xor.to_string("base32z")?;
+        let xorurl = the_xor.to_string()?;
         info!("URL parsed successfully, fetching: {}", xorurl);
         debug!("Fetching content of type: {:?}", the_xor.content_type());
 
@@ -181,11 +183,14 @@ impl Safe {
                         the_xor.path()
                     ));
                 }
-                let url_with_path = xorurl_encoder.to_string("")?;
+                let url_with_path = xorurl_encoder.to_string()?;
                 debug!("Resolving target from resolvable map: {}", url_with_path);
 
+                let (_, public_name, _, _) = get_subnames_host_path_and_version(url)?;
                 let content = self.fetch(&url_with_path)?;
                 let nrs_map_container = NrsMapContainerInfo {
+                    public_name,
+                    xorurl,
                     xorname: the_xor.xorname(),
                     type_tag: the_xor.type_tag(),
                     version,
@@ -348,7 +353,7 @@ fn test_fetch_resolvable_container() {
     xorurl_encoder.set_content_version(Some(0));
     let (_nrs_map_xorurl, _, _nrs_map) = unwrap!(safe.nrs_map_container_create(
         &site_name,
-        &unwrap!(xorurl_encoder.to_string("")),
+        &unwrap!(xorurl_encoder.to_string()),
         true,
         true,
         false
@@ -395,7 +400,7 @@ fn test_fetch_resolvable_map_data() {
     xorurl_encoder.set_content_version(Some(0));
     let (nrs_map_xorurl, _, the_nrs_map) = unwrap!(safe.nrs_map_container_create(
         &site_name,
-        &unwrap!(xorurl_encoder.to_string("")),
+        &unwrap!(xorurl_encoder.to_string()),
         true,
         true,
         false

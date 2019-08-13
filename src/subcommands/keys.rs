@@ -88,7 +88,7 @@ pub fn create_new_key(
     pk: Option<String>,
     output_fmt: OutputFmt,
 ) -> Result<(String, Option<BlsKeyPair>), String> {
-    let (xorname, key_pair) = if preload_test_coins {
+    let (xorurl, key_pair) = if preload_test_coins {
         if cfg!(not(feature = "mock-network")) && cfg!(not(feature = "scl-mock")) {
             warn!("'--test-coins' flag is not supported since it's only available for \"mock-network\" feature");
             return Err("'--test-coins' flag is not supported since it's only available for \"mock-network\" feature".to_string());
@@ -115,9 +115,9 @@ pub fn create_new_key(
     };
 
     if OutputFmt::Pretty == output_fmt {
-        println!("New Key created at: \"{}\"", xorname);
+        println!("New Key created at: \"{}\"", xorurl);
     } else {
-        println!("xorurl = {}", xorname);
+        println!("xorurl = {}", xorurl);
     }
 
     if let Some(pair) = &key_pair {
@@ -128,5 +128,5 @@ pub fn create_new_key(
         println!("sk = {}", pair.sk);
     }
 
-    Ok((xorname, key_pair))
+    Ok((xorurl, key_pair))
 }

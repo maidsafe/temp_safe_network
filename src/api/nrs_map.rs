@@ -251,6 +251,13 @@ impl NrsMap {
             ))),
         }
     }
+
+    #[allow(dead_code)]
+    pub fn get_map_summary(&self) -> BTreeMap<String, BTreeMap<String, String>> {
+        let mut nrs_map_summary = BTreeMap::new();
+        gen_nrs_map_summary(&self, "", &mut nrs_map_summary);
+        nrs_map_summary
+    }
 }
 
 fn create_public_name_description(link: &str) -> ResultReturn<DefinitionData> {
@@ -427,5 +434,40 @@ fn remove_nrs_sub_tree(
         None => Err(Error::ContentError(
             "Sub name not found in NRS Map Container".to_string(),
         )),
+    }
+}
+
+fn gen_nrs_map_summary(
+    nrs_map: &NrsMap,
+    sub_names_str: &str,
+    nrs_map_summary: &mut BTreeMap<String, BTreeMap<String, String>>,
+) {
+    for (subname, subname_rdf) in &nrs_map.sub_names_map {
+        let str = format!("{}.{}", subname, sub_names_str);
+        match subname_rdf {
+            SubNameRDF::SubName(nrs_sub_map) => {
+                gen_nrs_map_summary(&nrs_sub_map, &str, nrs_map_summary);
+            }
+            SubNameRDF::Definition(def_data) => {
+                nrs_map_summary.insert(str, def_data.clone());
+            }
+        }
+    }
+
+    match &nrs_map.default {
+        DefaultRdf::NotSet => {}
+        DefaultRdf::ExistingRdf(existing_subname) => {
+            let mut info = DefinitionData::new();
+            info.insert(
+                FAKE_RDF_PREDICATE_LINK.to_string(),
+                format!("Alias to subname {}", existing_subname),
+            );
+            info.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), "".to_string());
+            info.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), "".to_string());
+            nrs_map_summary.insert(sub_names_str.to_string(), info);
+        }
+        DefaultRdf::OtherRdf(def_data) => {
+            nrs_map_summary.insert(sub_names_str.to_string(), def_data.clone());
+        }
     }
 }
