@@ -9,7 +9,8 @@
 use super::helpers::get_from_arg_or_stdin;
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
-use safe_cli::{Safe, XorUrlEncoder};
+use safe_cli::{Safe, XorUrl, XorUrlEncoder};
+use std::collections::BTreeMap;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -87,11 +88,7 @@ pub fn files_commander(
                 }
                 table.printstd();
             } else {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(files_container_xorurl, processed_files))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
+                print_json_output(files_container_xorurl, 0, processed_files)?;
             }
 
             Ok(())
@@ -104,7 +101,6 @@ pub fn files_commander(
             update_nrs,
         }) => {
             let target = get_from_arg_or_stdin(target, None)?;
-
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) = safe
                 .files_container_sync(&location, &target, recursive, delete, update_nrs, dry_run)?;
@@ -141,21 +137,31 @@ pub fn files_commander(
                     println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
-                let url = match XorUrlEncoder::from_url(&target) {
-                    Ok(mut xorurl_encoder) => {
-                        xorurl_encoder.set_content_version(Some(version));
-                        xorurl_encoder.to_string("")?
-                    }
-                    Err(_) => target,
-                };
-                println!(
-                    "{}",
-                    serde_json::to_string(&(url, processed_files))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
+                print_json_output(target, version, processed_files)?;
             }
             Ok(())
         }
         None => Err("Missing keys sub-command. Use --help for details.".to_string()),
     }
+}
+
+fn print_json_output(
+    xorurl: XorUrl,
+    version: u64,
+    processed_files: BTreeMap<String, (String, String)>,
+) -> Result<(), String> {
+    let url = match XorUrlEncoder::from_url(&xorurl) {
+        Ok(mut xorurl_encoder) => {
+            xorurl_encoder.set_content_version(Some(version));
+            xorurl_encoder.to_string("")?
+        }
+        Err(_) => xorurl,
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&(url, processed_files))
+            .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+    );
+
+    Ok(())
 }

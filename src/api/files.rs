@@ -99,7 +99,7 @@ impl Safe {
                 SafeContentType::FilesContainer,
                 None,
                 None,
-                Some(0),
+                None,
                 &self.xorurl_base,
             )?
         };
@@ -207,23 +207,24 @@ impl Safe {
             ));
         }
 
+        let xorurl_encoder = Safe::parse_url(url)?;
+        if xorurl_encoder.content_version().is_some() {
+            return Err(Error::InvalidInput(format!(
+                "The URL cannot cannot contain a version: {}. Use 'sync-with-version' argument if you whish to use a specific version for syncing",
+                url
+            )));
+        };
+
         let (mut xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
-        if update_nrs {
-            // Check if the URL specifies a specific version of the content or simply the latest available
-            if !is_nrs_resolved {
-                return Err(Error::InvalidInput(
-                    "'update-nrs' is not allowed since the URL provided is not an NRS URL"
-                        .to_string(),
-                ));
-            } else if xorurl_encoder.content_version().is_none() {
-                return Err(Error::InvalidInput(
-                    "'update-nrs' is not allowed since the NRS name is linked to the content without a specific version".to_string(),
-                ));
-            }
+        // If NRS name shall be updated then the URL has to be an NRS-URL
+        if update_nrs && !is_nrs_resolved {
+            return Err(Error::InvalidInput(
+                "'update-nrs' is not allowed since the URL provided is not an NRS URL".to_string(),
+            ));
         }
 
         let (current_version, current_files_map): (u64, FilesMap) =
-            self.files_container_get(url)?;
+            self.files_container_get(&xorurl_encoder.to_string("")?)?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files = file_system_dir_walk(self, location, recursive, false)?;
@@ -1209,7 +1210,7 @@ fn test_files_container_sync_update_nrs_unversioned_link() {
         Err(err) => assert_eq!(
             err,
             Error::InvalidInput(format!(
-                "The link is unversioned, but the linked content is versionable. NRS resolver doesn\'t allow unversioned links for this type of content: \"{}\"",
+                "The link is unversioned, but the linked content (FilesContainer) is versionable. NRS resolver doesn\'t allow unversioned links for this type of content: \"{}\"",
                 unversioned_link
             ))
         ),
@@ -1255,7 +1256,15 @@ fn test_files_container_sync_update_nrs_versioned_link() {
 
     let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let _ = unwrap!(safe.nrs_map_container_create(&nrsurl, &xorurl, false, true, false));
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    xorurl_encoder.set_content_version(Some(0));
+    let _ = unwrap!(safe.nrs_map_container_create(
+        &nrsurl,
+        &unwrap!(xorurl_encoder.to_string("")),
+        false,
+        true,
+        false
+    ));
 
     let _ = unwrap!(safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -1469,6 +1478,7 @@ fn test_files_container_get_with_version() {
 
     // let's fetch version 0
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    xorurl_encoder.set_content_version(Some(0));
     let (version, v0_files_map) =
         unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string(""))));
 

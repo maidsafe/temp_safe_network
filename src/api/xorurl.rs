@@ -10,8 +10,6 @@ use super::helpers::get_subnames_host_path_and_version;
 use super::{Error, ResultReturn};
 use log::debug;
 use multibase::{decode, encode, Base};
-use rand::rngs::OsRng;
-use rand_core::RngCore;
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::fmt;
 
@@ -34,6 +32,12 @@ pub enum SafeContentType {
     NrsMapContainer = 0x0003,
 }
 
+impl std::fmt::Display for SafeContentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 // We also encode the native SAFE data type where the content is being stored on the SAFE Network,
 // this allows us to fetch the targetted data using the corresponding API, regardless of the
 // data that is being held which is identified by the SafeContentType instead.
@@ -54,13 +58,6 @@ impl std::fmt::Display for SafeDataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
-}
-
-pub fn create_random_xorname() -> XorName {
-    let mut os_rng = OsRng::new().unwrap();
-    let mut xorname = XorName::default();
-    os_rng.fill_bytes(&mut xorname.0);
-    xorname
 }
 
 #[derive(Debug, Clone)]

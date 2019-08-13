@@ -68,7 +68,7 @@ Various global flags are available (those commented out are not yet implemented)
 # --root                   The account's Root Container address
 -V, --version              Prints version information
 # -v, --verbose            Increase output verbosity. (More logs!)
--o, --output <output_fmt>  Output data serlialisation. Currently only supported 'json'
+-o, --output <output_fmt>  Output data serialisation. Currently only supported 'json'
 # -q, --query <query>      Enable to query the output via SPARQL eg.
 --xorurl <xorurl_base>     Base encoding to be used for XOR-URLs generated. Currently supported: base32z
                            (default), base32 and base64
@@ -226,7 +226,7 @@ OPTIONS:
                                   automatically generated and inserted. The corresponding secret key will be prompted if
                                   not provided with '--sk'
         --name <name>             The name to give the spendable balance
-    -o, --output <output_fmt>     Output data serlialisation. Currently only supported 'json'
+    -o, --output <output_fmt>     Output data serialisation. Currently only supported 'json'
     -w, --pay-with <pay_with>     The secret key of a Key for paying the operation costs
         --preload <preload>       Preload the key with a balance
         --sk <secret>             Pass the secret key needed to make the balance spendable, it will be prompted if not
@@ -279,7 +279,7 @@ OPTIONS:
         --keyurl <keyurl>         The Key's safe://xor-url to verify it matches/corresponds to the secret key provided.
                                   The corresponding secret key will be prompted if not provided with '--sk'
         --name <name>             The name to give this spendable balance
-    -o, --output <output_fmt>     Output data serlialisation. Currently only supported 'json'
+    -o, --output <output_fmt>     Output data serialisation. Currently only supported 'json'
     -w, --pay-with <pay_with>     The secret key of a Key for paying the operation costs. If not provided, the default
                                   wallet from the account will be used
         --sk <secret>             Pass the secret key needed to make the balance spendable, it will be prompted if not

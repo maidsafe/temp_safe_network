@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::helpers::create_random_xorname;
 use super::safe_net::AppendOnlyDataRawData;
-use super::xorurl::create_random_xorname;
 use super::{Error, ResultReturn, SafeApp};
 use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,

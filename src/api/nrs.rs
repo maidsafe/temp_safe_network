@@ -83,8 +83,7 @@ impl Safe {
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
         // GET current NRS map from name's TLD
-        let mut xorurl_encoder = Safe::parse_url(name)?;
-        xorurl_encoder.set_content_version(None);
+        let (xorurl_encoder, _) = validate_nrs_name(name)?;
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
@@ -136,7 +135,7 @@ impl Safe {
         dry_run: bool,
     ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
         info!("Creating an NRS map");
-        let nrs_url = sanitised_url(name);
+        let (_, nrs_url) = validate_nrs_name(name)?;
         if self.nrs_map_container_get(&nrs_url).is_ok() {
             Err(Error::ContentError(
                 "NRS name already exists. Please use 'nrs add' command to add sub names to it"
@@ -194,7 +193,7 @@ impl Safe {
     ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Removing from NRS map...");
         // GET current NRS map from &name TLD
-        let xorurl_encoder = Safe::parse_url(name)?;
+        let (xorurl_encoder, _) = validate_nrs_name(name)?;
         let xorurl = xorurl_encoder.to_string("")?;
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl)?;
         debug!("NRS, Existing data: {:?}", nrs_map);
@@ -293,6 +292,18 @@ impl Safe {
             ))),
         }
     }
+}
+
+fn validate_nrs_name(name: &str) -> ResultReturn<(XorUrlEncoder, String)> {
+    let sanitised_url = sanitised_url(name);
+    let xorurl_encoder = Safe::parse_url(&sanitised_url)?;
+    if xorurl_encoder.content_version().is_some() {
+        return Err(Error::InvalidInput(format!(
+            "The NRS name/subname URL cannot cannot contain a version: {}",
+            sanitised_url
+        )));
+    };
+    Ok((xorurl_encoder, sanitised_url))
 }
 
 fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {

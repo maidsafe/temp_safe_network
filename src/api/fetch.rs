@@ -344,10 +344,15 @@ fn test_fetch_resolvable_container() {
     let (xorurl, _, the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-
-    let (_nrs_map_xorurl, _, _nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, &xorurl, true, true, false));
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    xorurl_encoder.set_content_version(Some(0));
+    let (_nrs_map_xorurl, _, _nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &site_name,
+        &unwrap!(xorurl_encoder.to_string("")),
+        true,
+        true,
+        false
+    ));
 
     let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
@@ -386,8 +391,15 @@ fn test_fetch_resolvable_map_data() {
     let (xorurl, _, _the_files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
 
-    let (nrs_map_xorurl, _, the_nrs_map) =
-        unwrap!(safe.nrs_map_container_create(&site_name, &xorurl, true, true, false));
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    xorurl_encoder.set_content_version(Some(0));
+    let (nrs_map_xorurl, _, the_nrs_map) = unwrap!(safe.nrs_map_container_create(
+        &site_name,
+        &unwrap!(xorurl_encoder.to_string("")),
+        true,
+        true,
+        false
+    ));
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
     let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
@@ -434,7 +446,7 @@ fn test_fetch_published_immutable_data() {
 
 #[test]
 fn test_fetch_unsupported() {
-    use super::xorurl::create_random_xorname;
+    use super::helpers::create_random_xorname;
     use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z".to_string());

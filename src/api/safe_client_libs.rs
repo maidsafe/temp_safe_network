@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::xorname_from_pk;
+use super::helpers::{create_random_xorname, xorname_from_pk};
 use super::safe_net::AppendOnlyDataRawData;
-use super::xorurl::create_random_xorname;
 use super::{Error, ResultReturn, SafeApp};
 use futures::future::Future;
 use log::{debug, info, warn};

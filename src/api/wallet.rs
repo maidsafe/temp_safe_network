@@ -279,21 +279,21 @@ impl Safe {
             Some(url) => {
                 // Check if 'from_url' is a valid Wallet URL
                 let (xorurl_encoder, _) = self.parse_and_resolve_url(url).map_err(|_| {
-                    Error::InvalidInput("Failed to parse the \"<from_url>\" URL".to_string())
+                    Error::InvalidInput(format!("Failed to parse the 'from_url' URL: {}", url))
                 })?;
 
                 if xorurl_encoder.content_type() == SafeContentType::Wallet {
                     Ok(url)
                 } else {
                     Err(Error::InvalidInput(format!(
-                        "The 'from' URL doesn't target a Key or Wallet, it is: {:?} ({})",
+                        "The 'from_url' URL doesn't target a Key or Wallet, it is: {:?} ({})",
                         xorurl_encoder.content_type(),
                         xorurl_encoder.data_type()
                     )))
                 }
             }
             None => Err(Error::InvalidInput(
-                "A \"<from_url>\" Wallet is required until default wallets have been configured."
+                "A 'from_url' Wallet is required until default wallets have been configured."
                     .to_string(),
             )),
         }?;

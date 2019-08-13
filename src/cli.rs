@@ -29,7 +29,7 @@ struct CmdArgs {
     // /// The account's Root Container address
     // #[structopt(long = "root", raw(global = "true"))]
     // root: bool,
-    /// Output data serlialisation. Currently only supported 'json'
+    /// Output data serialisation. Currently only supported 'json'
     #[structopt(short = "o", long = "output", raw(global = "true"))]
     output_fmt: Option<String>,
     /// Sets JSON as output serialisation format (alias of '--output json')
@@ -81,8 +81,8 @@ pub fn run() -> Result<(), String> {
             if OutputFmt::Pretty == output_fmt {
                 println!("Key pair generated:");
             }
-            println!("pk={}", key_pair.pk);
-            println!("sk={}", key_pair.sk);
+            println!("pk = {}", key_pair.pk);
+            println!("sk = {}", key_pair.sk);
             Ok(())
         }
         SubCommands::Update {} => {

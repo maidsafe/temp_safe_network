@@ -47,6 +47,7 @@ fn calling_safe_cat_xorurl_url_with_version() {
     // let's sync with another file so we get a new version, and a different content in the file
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
     xorurl_encoder.set_path("/test.md");
+    xorurl_encoder.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec![
         "files",
@@ -99,7 +100,7 @@ fn calling_safe_cat_nrsurl_with_version() {
         "create",
         &nrsurl,
         "-l",
-        &container_xorurl
+        &container_xorurl,
     )
     .read()
     .unwrap();
@@ -114,6 +115,7 @@ fn calling_safe_cat_nrsurl_with_version() {
     // let's sync with another file so we get a new version, and a different content in the file
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
     xorurl_encoder.set_path("/test.md");
+    xorurl_encoder.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec![
         "files",

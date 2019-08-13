@@ -278,12 +278,15 @@ fn calling_safe_files_removed_sync() {
     assert_eq!(processed_files.len(), 5);
 
     // let's first try with --dry-run and they should not be removed
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    let files_container_no_version = unwrap!(xorurl_encoder.to_string(""));
     let sync_cmd_output_dry_run = cmd!(
         get_bin_location(),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
-        &files_container_xor,
+        &files_container_no_version,
         "--recursive",
         "--delete",
         "--dry-run",
@@ -292,7 +295,6 @@ fn calling_safe_files_removed_sync() {
     .read()
     .unwrap();
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
@@ -312,7 +314,7 @@ fn calling_safe_files_removed_sync() {
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
-        &files_container_xor,
+        &files_container_no_version,
         "--recursive",
         "--delete",
         "--json",
@@ -441,12 +443,15 @@ fn files_sync_and_fetch_with_version() {
         parse_files_put_or_sync_output(&files_container_output);
     assert_eq!(processed_files.len(), 5);
 
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    let files_container_no_version = unwrap!(xorurl_encoder.to_string(""));
     let sync_cmd_output = cmd!(
         get_bin_location(),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
-        &files_container_xor,
+        &files_container_no_version,
         "--recursive",
         "--delete",
         "--json",
@@ -454,7 +459,6 @@ fn files_sync_and_fetch_with_version() {
     .read()
     .unwrap();
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = unwrap!(xorurl_encoder.to_string(""));
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);

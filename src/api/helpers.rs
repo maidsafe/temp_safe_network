@@ -10,6 +10,8 @@ use super::{Error, ResultReturn};
 use chrono::{SecondsFormat, Utc};
 
 use log::debug;
+use rand::rngs::OsRng;
+use rand_core::RngCore;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
 use safe_nd::{Coins, XorName, XOR_NAME_LEN};
 use std::iter::FromIterator;
@@ -73,6 +75,13 @@ pub fn xorname_from_pk(pk: &PublicKey) -> XorName {
 
 pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+pub fn create_random_xorname() -> XorName {
+    let mut os_rng = OsRng::new().unwrap();
+    let mut xorname = XorName::default();
+    os_rng.fill_bytes(&mut xorname.0);
+    xorname
 }
 
 #[allow(dead_code)]
