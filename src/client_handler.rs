@@ -901,18 +901,26 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
+        let action = Action::ForwardClientRequest(Rpc::Request {
+            request: Request::CreateBalance {
+                new_balance_owner: owner_key,
+                amount,
+                transaction_id,
+            },
+            requester: requester.clone(),
+            message_id,
+        });
+
+        // For phase 1 we allow owners to create their own balance freely.
+        let own_request = utils::own_key(requester)
+            .map(|key| key == &owner_key)
+            .unwrap_or(false);
+        if own_request {
+            return Some(action);
+        }
+
         let result = match self.withdraw_coins_for_transfer(requester.name(), amount) {
-            Ok(()) => {
-                return Some(Action::ForwardClientRequest(Rpc::Request {
-                    request: Request::CreateBalance {
-                        new_balance_owner: owner_key,
-                        amount,
-                        transaction_id,
-                    },
-                    requester: requester.clone(),
-                    message_id,
-                }));
-            }
+            Ok(()) => return Some(action),
             Err(error) => Err(error),
         };
 
@@ -928,7 +936,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let rpc = match self.create_balance(owner_key, amount) {
+        let rpc = match self.create_balance(&requester, owner_key, amount) {
             Ok(()) => {
                 let destination = XorName::from(owner_key);
                 let transaction = Transaction {
@@ -1065,8 +1073,16 @@ impl ClientHandler {
         })
     }
 
-    fn create_balance(&mut self, owner_key: PublicKey, amount: Coins) -> Result<(), NdError> {
-        if self.balances.exists(&owner_key) {
+    fn create_balance(
+        &mut self,
+        requester: &PublicId,
+        owner_key: PublicKey,
+        amount: Coins,
+    ) -> Result<(), NdError> {
+        let own_request = utils::own_key(requester)
+            .map(|key| key == &owner_key)
+            .unwrap_or(false);
+        if !own_request && self.balances.exists(&owner_key) {
             info!(
                 "{}: Failed to create balance for {:?}: already exists.",
                 self, owner_key
@@ -1340,7 +1356,7 @@ impl ClientHandler {
             // Pre-deduct payment for creating the login packet.
             let new_amount =
                 Coins::from_nano(amount.as_nano().checked_sub(COST_OF_PUT.as_nano())?).ok()?;
-            if let Err(error) = self.create_balance(new_owner, new_amount) {
+            if let Err(error) = self.create_balance(&payer, new_owner, new_amount) {
                 Some(Action::RespondToClientHandlers {
                     sender: XorName::from(new_owner),
                     rpc: Rpc::Response {

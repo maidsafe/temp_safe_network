@@ -399,6 +399,11 @@ fn create_balance_that_already_exists() {
 
     // B does not receive anything.
     client_b.expect_no_new_message();
+
+    // Attempt to create the balance for A again. This should however work for phase 1
+    common::create_balance(&mut env, &mut client_a, None, 2);
+    let balance_a = unwrap!(Coins::from_nano(2));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 }
 
 #[test]

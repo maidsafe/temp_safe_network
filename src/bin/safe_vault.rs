@@ -58,9 +58,6 @@
     variant_size_differences
 )]
 
-#[macro_use]
-extern crate self_update;
-
 fn main() {
     self::detail::main()
 }
@@ -70,6 +67,7 @@ mod detail {
     use env_logger;
     use log;
     use safe_vault::{self, Command, Config, Vault};
+    use self_update::cargo_crate_version;
     use self_update::Status;
     use std::process;
     use structopt::StructOpt;
