@@ -36,7 +36,7 @@ pub fn cat_commander(
     // switch to connect_without_authL: connect_without_auth(safe)?;
     auth_connect(safe)?;
     let content = safe.fetch(&url)?;
-    match content {
+    match &content {
         SafeData::FilesContainer {
             version,
             files_map,
@@ -50,7 +50,7 @@ pub fn cat_commander(
                 if cmd.info > 0 {
                     println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag);
-                    println!("XOR name: 0x{}", xorname_to_hex(&xorname));
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!();
                     print_resolved_from(cmd.info, resolved_from);
                     println!();
@@ -74,15 +74,21 @@ pub fn cat_commander(
                     ]);
                 });
                 table.printstd();
+            } else if resolved_from.is_some() && cmd.info > 1 {
+                // Print out the resolved_from info if -ii was passed (i.e. --info level 2)
+                println!(
+                    "{}",
+                    serde_json::to_string(&(&url, content))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
             } else if cmd.info > 0 {
-                // TODO: print out the resolved_from info if -ii was passed (i.e. --info level 2)
                 println!(
                         "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
                         url,
                         data_type,
                         type_tag,
-                        xorname_to_hex(&xorname),
-                        files_map
+                        xorname_to_hex(xorname),
+                        files_map,
                     );
             } else {
                 println!(
@@ -99,7 +105,7 @@ pub fn cat_commander(
         } => {
             if cmd.info > 0 {
                 println!("Native data type: ImmutableData (published)");
-                println!("XOR name: 0x{}", xorname_to_hex(&xorname));
+                println!("XOR name: 0x{}", xorname_to_hex(xorname));
                 println!();
                 print_resolved_from(cmd.info, resolved_from);
                 println!("Raw content of the file:");
@@ -107,7 +113,7 @@ pub fn cat_commander(
 
             // Render ImmutableData file
             io::stdout()
-                .write_all(&data)
+                .write_all(data)
                 .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
         }
         SafeData::Key { .. } => println!("Content type 'Key' not supported yet by 'cat' command"),
@@ -119,7 +125,7 @@ pub fn cat_commander(
     Ok(())
 }
 
-fn print_resolved_from(info_level: u8, resolved_from: Option<NrsMapContainerInfo>) {
+fn print_resolved_from(info_level: u8, resolved_from: &Option<NrsMapContainerInfo>) {
     if info_level > 1 {
         if let Some(nrs_map_container) = resolved_from {
             // print out the resolved_from info since it's --info level 2

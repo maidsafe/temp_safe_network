@@ -11,6 +11,7 @@ use super::{Error, ResultReturn};
 use log::debug;
 use multibase::{decode, encode, Base};
 use safe_nd::{XorName, XOR_NAME_LEN};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
@@ -24,7 +25,7 @@ pub type XorUrl = String;
 // We encode the content type that a XOR-URL is targetting, this allows the consumer/user to
 // treat the content in particular ways when the content requires it.
 // TODO: support MIME types
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeContentType {
     Raw = 0x0000,
     Wallet = 0x0001,
@@ -41,7 +42,7 @@ impl std::fmt::Display for SafeContentType {
 // We also encode the native SAFE data type where the content is being stored on the SAFE Network,
 // this allows us to fetch the targetted data using the corresponding API, regardless of the
 // data that is being held which is identified by the SafeContentType instead.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeDataType {
     CoinBalance = 0x00,
     PublishedImmutableData = 0x01,

@@ -45,7 +45,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
@@ -113,7 +113,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// let (version, files_map) = safe.files_container_get(&xorurl).unwrap();
@@ -184,7 +184,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, false, false, false).unwrap();
@@ -210,7 +210,7 @@ impl Safe {
         let xorurl_encoder = Safe::parse_url(url)?;
         if xorurl_encoder.content_version().is_some() {
             return Err(Error::InvalidInput(format!(
-                "The URL cannot cannot contain a version: {}. Use 'sync-with-version' argument if you whish to use a specific version for syncing",
+                "The target URL cannot cannot contain a version: {}",
                 url
             )));
         };
@@ -290,7 +290,7 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data).unwrap();
@@ -319,7 +319,7 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data).unwrap();
@@ -737,7 +737,7 @@ fn test_files_map_create() {
 #[test]
 fn test_files_container_create_file() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let filename = "tests/testfolder/test.md";
     let (xorurl, processed_files, files_map) =
@@ -757,7 +757,7 @@ fn test_files_container_create_file() {
 #[test]
 fn test_files_container_create_dry_run() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let filename = "./tests/testfolder/";
     let (xorurl, processed_files, files_map) =
@@ -803,7 +803,7 @@ fn test_files_container_create_dry_run() {
 #[test]
 fn test_files_container_create_folder_without_trailing_slash() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("tests/testfolder", None, true, false));
@@ -844,7 +844,7 @@ fn test_files_container_create_folder_without_trailing_slash() {
 #[test]
 fn test_files_container_create_folder_with_trailing_slash() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -885,7 +885,7 @@ fn test_files_container_create_folder_with_trailing_slash() {
 #[test]
 fn test_files_container_create_dest_path_without_trailing_slash() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) = unwrap!(safe.files_container_create(
         "./tests/testfolder",
@@ -930,7 +930,7 @@ fn test_files_container_create_dest_path_without_trailing_slash() {
 #[test]
 fn test_files_container_create_dest_path_with_trailing_slash() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) = unwrap!(safe.files_container_create(
         "./tests/testfolder",
@@ -975,7 +975,7 @@ fn test_files_container_create_dest_path_with_trailing_slash() {
 #[test]
 fn test_files_container_sync() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1042,7 +1042,7 @@ fn test_files_container_sync() {
 #[test]
 fn test_files_container_sync_dry_run() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1109,9 +1109,38 @@ fn test_files_container_sync_dry_run() {
 }
 
 #[test]
+fn test_files_container_sync_with_versioned_target() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+
+    let (xorurl, _, _) =
+        unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
+
+    let versioned_xorurl = format!("{}?v=5", xorurl);
+    match safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &versioned_xorurl,
+        false,
+        false,
+        true, // this flag requests the update-nrs
+        false,
+    ) {
+        Ok(_) => panic!("Sync was unexpectdly successful"),
+        Err(err) => assert_eq!(
+            err,
+            Error::InvalidInput(format!(
+                "The target URL cannot cannot contain a version: {}",
+                versioned_xorurl
+            ))
+        ),
+    };
+}
+
+#[test]
 fn test_files_container_sync_with_delete() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1173,7 +1202,7 @@ fn test_files_container_sync_with_delete() {
 #[test]
 fn test_files_container_sync_delete_without_recursive() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     match safe.files_container_sync(
         "./tests/testfolder/subfolder/",
@@ -1196,7 +1225,7 @@ fn test_files_container_sync_update_nrs_unversioned_link() {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _, _) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1220,7 +1249,7 @@ fn test_files_container_sync_update_nrs_unversioned_link() {
 #[test]
 fn test_files_container_sync_update_nrs_with_xorurl() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
 
     let (xorurl, _, _) =
@@ -1249,7 +1278,7 @@ fn test_files_container_sync_update_nrs_versioned_link() {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _, _) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1287,7 +1316,7 @@ fn test_files_container_sync_update_nrs_versioned_link() {
 #[test]
 fn test_files_container_sync_target_path_without_trailing_slash() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1349,7 +1378,7 @@ fn test_files_container_sync_target_path_without_trailing_slash() {
 #[test]
 fn test_files_container_sync_target_path_with_trailing_slash() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1412,7 +1441,7 @@ fn test_files_container_sync_target_path_with_trailing_slash() {
 #[test]
 fn test_files_container_get() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1434,7 +1463,7 @@ fn test_files_container_get() {
 #[test]
 fn test_files_container_version() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _, _) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));
@@ -1461,7 +1490,7 @@ fn test_files_container_version() {
 #[test]
 fn test_files_container_get_with_version() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, _processed_files, files_map) =
         unwrap!(safe.files_container_create("./tests/testfolder/", None, true, false));

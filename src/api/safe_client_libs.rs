@@ -613,7 +613,7 @@ fn get_secret_bls_key(safe_app: &App) -> ResultReturn<SecretKey> {
 #[test]
 fn test_put_and_get_immutable_data() {
     use super::Safe;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let id1 = b"HELLLOOOOOOO".to_vec();
@@ -630,7 +630,7 @@ fn test_put_and_get_immutable_data() {
 #[test]
 fn test_put_get_update_seq_append_only_data() {
     use super::Safe;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let key1 = b"KEY1".to_vec();
@@ -728,7 +728,7 @@ fn test_put_get_update_seq_append_only_data() {
 #[test]
 fn test_update_seq_append_only_data_error() {
     use super::Safe;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let key1 = b"KEY1".to_vec();

@@ -11,6 +11,7 @@ use super::helpers::{
 };
 use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
+use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;
 
 // A trait that the Validate derive will impl
@@ -18,7 +19,7 @@ use validator::{Validate, ValidationErrors};
 
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>
-#[derive(Clone, Validate)]
+#[derive(Clone, Validate, Serialize, Deserialize)]
 pub struct BlsKeyPair {
     #[validate(length(equal = "96"))]
     pub pk: String,
@@ -201,7 +202,7 @@ impl Safe {
 #[test]
 fn test_keys_create_preload_test_coins() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12.23", None));
     assert!(xorurl.starts_with("safe://"));
@@ -211,7 +212,7 @@ fn test_keys_create_preload_test_coins() {
 #[test]
 fn test_keys_create_preload_test_coins_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let pk = String::from("a252e6741b524ad70cf340f32d219c60a3f1a38aaec0d0dbfd24ea9ae7390e44ebdc93e7575711e65379eb0f4de083a8");
     let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1", Some(pk)));
@@ -222,7 +223,7 @@ fn test_keys_create_preload_test_coins_pk() {
 #[test]
 fn test_keys_create() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.23", None));
 
@@ -234,7 +235,7 @@ fn test_keys_create() {
 #[test]
 fn test_keys_create_preload() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("543.2312", None));
 
@@ -257,7 +258,7 @@ fn test_keys_create_preload() {
 #[test]
 fn test_keys_create_preload_invalid_amounts() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     match safe.keys_create_preload_test_coins(".45", None) {
         Err(err) => assert_eq!(
@@ -308,7 +309,7 @@ fn test_keys_create_preload_invalid_amounts() {
 #[test]
 fn test_keys_create_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1", None));
     let pk = pk_to_hex(&SecretKey::random().public_key());
@@ -321,7 +322,7 @@ fn test_keys_create_pk() {
 #[test]
 fn test_keys_test_coins_balance_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "1.154200000";
     let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount, None));
@@ -332,7 +333,7 @@ fn test_keys_test_coins_balance_pk() {
 #[test]
 fn test_keys_test_coins_balance_xorurl() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "0.243000000";
     let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount, None));
@@ -343,7 +344,7 @@ fn test_keys_test_coins_balance_xorurl() {
 #[test]
 fn test_keys_test_coins_balance_wrong_url() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0", None));
 
@@ -361,7 +362,7 @@ fn test_keys_test_coins_balance_wrong_url() {
 #[test]
 fn test_keys_test_coins_balance_wrong_location() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let amount = "35312.000000000";
     let (mut xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(amount, None));
@@ -385,7 +386,7 @@ fn test_keys_test_coins_balance_wrong_location() {
 #[test]
 fn test_keys_test_coins_balance_wrong_sk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0", None));
     let mut unwrapped_sk = unwrap!(key_pair).sk;
@@ -403,7 +404,7 @@ fn test_keys_test_coins_balance_wrong_sk() {
 #[test]
 fn test_keys_balance_pk() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "1743.234";
     let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount, None));
@@ -429,7 +430,7 @@ fn test_keys_balance_pk() {
 #[test]
 fn test_keys_balance_xorname() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "435.34";
     let (from_xorname, from_key_pair) =
@@ -458,7 +459,7 @@ fn test_keys_balance_xorname() {
 #[test]
 fn test_validate_sk_for_url() {
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.22", None));
     let key_pair_unwrapped = unwrap!(key_pair);

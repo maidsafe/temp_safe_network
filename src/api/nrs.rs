@@ -119,7 +119,7 @@ impl Safe {
     /// # use rand::{thread_rng, Rng};
     /// # use unwrap::unwrap;
     /// # use safe_cli::Safe;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let file_xorurl = safe.files_put_published_immutable(&vec![]).unwrap();
@@ -228,7 +228,7 @@ impl Safe {
     /// # use safe_cli::Safe;
     /// # use rand::distributions::Alphanumeric;
     /// # use rand::{thread_rng, Rng};
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let file_xorurl = safe.files_put_published_immutable(&vec![]).unwrap();
@@ -348,7 +348,7 @@ fn test_nrs_map_container_create() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let nrs_xorname = xorname_from_nrs_string(&site_name).unwrap();
@@ -391,7 +391,7 @@ fn test_nrs_map_container_add() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
@@ -424,6 +424,55 @@ fn test_nrs_map_container_add() {
 }
 
 #[test]
+fn test_nrs_map_container_add_or_remove_with_versioned_target() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+
+    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut safe = Safe::new("base32z");
+    safe.connect("", Some("fake-credentials")).unwrap();
+
+    let _ = unwrap!(safe.nrs_map_container_create(
+        &format!("b.{}", site_name),
+        "safe://linked-from-<b.site_name>?v=0",
+        true,
+        false,
+        false
+    ));
+
+    let versioned_sitename = format!("safe://a.b.{}?v=6", site_name);
+    match safe.nrs_map_container_add(
+        &versioned_sitename,
+        "safe://linked-from-<a.b.site_name>?v=0",
+        true,
+        false,
+        false,
+    ) {
+        Ok(_) => panic!("Sync was unexpectdly successful"),
+        Err(err) => assert_eq!(
+            err,
+            Error::InvalidInput(format!(
+                "The NRS name/subname URL cannot cannot contain a version: {}",
+                versioned_sitename
+            ))
+        ),
+    };
+
+    match safe.nrs_map_container_remove(&versioned_sitename, false) {
+        Ok(_) => panic!("Sync was unexpectdly successful"),
+        Err(err) => assert_eq!(
+            err,
+            Error::InvalidInput(format!(
+                "The NRS name/subname URL cannot cannot contain a version: {}",
+                versioned_sitename
+            ))
+        ),
+    };
+}
+
+#[test]
 fn test_nrs_map_container_remove_one_of_two() {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
@@ -431,7 +480,7 @@ fn test_nrs_map_container_remove_one_of_two() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
@@ -470,7 +519,7 @@ fn test_nrs_map_container_remove_default_soft_link() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
@@ -506,7 +555,7 @@ fn test_nrs_map_container_remove_default_hard_link() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("fake-credentials")).unwrap();
 
     let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(

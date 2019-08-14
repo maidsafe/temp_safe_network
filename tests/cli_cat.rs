@@ -14,7 +14,7 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use common::{get_bin_location, get_random_nrs_string, parse_files_put_or_sync_output, CLI};
 use predicates::prelude::*;
-use safe_cli::XorUrlEncoder;
+use safe_cli::{SafeData, SafeDataType, XorUrlEncoder};
 use std::process::Command;
 use unwrap::unwrap;
 
@@ -148,4 +148,54 @@ fn calling_safe_cat_nrsurl_with_version() {
     cmd.args(&vec!["cat", &invalid_version_nrsurl])
         .assert()
         .failure();
+}
+
+#[test]
+fn calling_safe_cat_nrsurl_with_info_level_2() {
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
+        .read()
+        .unwrap();
+    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
+
+    let nrsurl = format!("safe://{}", get_random_nrs_string());
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &nrsurl,
+        "-l",
+        &container_xorurl,
+    )
+    .read()
+    .unwrap();
+
+    let cat_output = cmd!(
+        get_bin_location(),
+        "cat",
+        &nrsurl,
+        "--json",
+        "--info",
+        "--info"
+    )
+    .read()
+    .unwrap();
+
+    let content_info: (String, SafeData) = serde_json::from_str(&cat_output)
+        .expect("Failed to parse output of `safe cat` with -ii on file");
+    assert_eq!(content_info.0, nrsurl);
+    if let SafeData::FilesContainer { resolved_from, .. } = content_info.1 {
+        let unwrapped_resolved_from = resolved_from.unwrap();
+        assert_eq!(
+            unwrapped_resolved_from.public_name,
+            nrsurl.replace("safe://", "")
+        );
+        assert_eq!(unwrapped_resolved_from.type_tag, 1500);
+        assert_eq!(unwrapped_resolved_from.version, 0);
+        assert_eq!(
+            unwrapped_resolved_from.data_type,
+            SafeDataType::PublishedSeqAppendOnlyData
+        );
+    } else {
+        panic!("Content retrieved was unexpected: {:?}", content_info);
+    }
 }

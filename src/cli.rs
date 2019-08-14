@@ -53,7 +53,7 @@ pub fn run() -> Result<(), String> {
     // Let's first get all the arguments passed in
     let args = CmdArgs::from_args();
 
-    let mut safe = Safe::new(args.xorurl_base.clone().unwrap_or_else(|| "".to_string()));
+    let mut safe = Safe::new(&args.xorurl_base.clone().unwrap_or_else(|| "".to_string()));
 
     let output_fmt = if args.output_json {
         OutputFmt::Json

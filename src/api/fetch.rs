@@ -13,8 +13,9 @@ pub use super::xorurl::SafeContentType;
 pub use super::xorurl::{SafeDataType, XorUrlEncoder};
 use super::{Error, ResultReturn, Safe, XorName};
 use log::{debug, info};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct NrsMapContainerInfo {
     pub public_name: String,
     pub xorurl: String,
@@ -25,7 +26,7 @@ pub struct NrsMapContainerInfo {
     pub data_type: SafeDataType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub enum SafeData {
     Key {
         xorname: XorName,
@@ -63,7 +64,7 @@ impl Safe {
     /// # use safe_cli::{Safe, SafeData};
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
-    /// # let mut safe = Safe::new("base32z".to_string());
+    /// # let mut safe = Safe::new("base32z");
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let (xorurl, _, _) = unwrap!(safe.files_container_create("tests/testfolder/", None, true, false));
     ///
@@ -257,7 +258,7 @@ fn embed_resolved_from(
 fn test_fetch_key() {
     use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let preload_amount = "1324.12";
     let (xorurl, _key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount, None));
@@ -277,7 +278,7 @@ fn test_fetch_key() {
 fn test_fetch_wallet() {
     use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let xorurl = unwrap!(safe.wallet_create());
 
@@ -298,7 +299,7 @@ fn test_fetch_wallet() {
 fn test_fetch_files_container() {
     use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     safe.connect("", Some("")).unwrap();
 
@@ -343,7 +344,7 @@ fn test_fetch_resolvable_container() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("")).unwrap();
 
     let (xorurl, _, the_files_map) =
@@ -390,7 +391,7 @@ fn test_fetch_resolvable_map_data() {
 
     let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     safe.connect("", Some("")).unwrap();
 
     let (xorurl, _, _the_files_map) =
@@ -432,7 +433,7 @@ fn test_fetch_resolvable_map_data() {
 fn test_fetch_published_immutable_data() {
     use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let data = b"Something super immutable";
     let xorurl = safe.files_put_published_immutable(data).unwrap();
@@ -454,7 +455,7 @@ fn test_fetch_unsupported() {
     use super::helpers::create_random_xorname;
     use super::xorurl::XorUrlEncoder;
     use unwrap::unwrap;
-    let mut safe = Safe::new("base32z".to_string());
+    let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let xorname = create_random_xorname();
     let type_tag = 575_756_443;

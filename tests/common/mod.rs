@@ -8,6 +8,7 @@
 
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use safe_cli::BlsKeyPair;
 use std::env;
 
 pub const CLI: &str = "safe";
@@ -30,7 +31,6 @@ pub fn get_bin_location() -> String {
 
 #[allow(dead_code)]
 pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
-    // KEY_FROM
     let pk_command_result = cmd!(
         get_bin_location(),
         "keys",
@@ -43,14 +43,9 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
     .read()
     .unwrap();
 
-    let mut lines = pk_command_result.lines();
-    let pk_xor_line = lines.next().unwrap();
-    let pk_xor = &pk_xor_line["xorurl = ".len()..];
-    let _pk = lines.next().unwrap();
-    let sk_line = lines.next().unwrap();
-    let sk = &sk_line["sk = ".len()..];
-
-    (pk_xor.to_string(), sk.to_string())
+    let (xorurl, pair): (String, BlsKeyPair) = serde_json::from_str(&pk_command_result)
+        .expect("Failed to parse output of `safe files sync`");
+    (xorurl, pair.sk)
 }
 
 #[allow(dead_code)]

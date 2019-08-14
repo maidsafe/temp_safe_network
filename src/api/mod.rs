@@ -42,10 +42,10 @@ pub struct Safe {
 
 #[allow(dead_code)]
 impl Safe {
-    pub fn new(xorurl_base: String) -> Self {
+    pub fn new(xorurl_base: &str) -> Self {
         Self {
             safe_app: SafeApp::new(),
-            xorurl_base,
+            xorurl_base: xorurl_base.to_string(),
         }
     }
 }

@@ -116,16 +116,23 @@ pub fn create_new_key(
 
     if OutputFmt::Pretty == output_fmt {
         println!("New Key created at: \"{}\"", xorurl);
-    } else {
-        println!("xorurl = {}", xorurl);
-    }
-
-    if let Some(pair) = &key_pair {
-        if OutputFmt::Pretty == output_fmt {
+        if let Some(pair) = &key_pair {
             println!("Key pair generated:");
+            println!("pk = {}", pair.pk);
+            println!("sk = {}", pair.sk);
         }
-        println!("pk = {}", pair.pk);
-        println!("sk = {}", pair.sk);
+    } else if let Some(pair) = &key_pair {
+        println!(
+            "{}",
+            serde_json::to_string(&(&xorurl, pair))
+                .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+        );
+    } else {
+        println!(
+            "{}",
+            serde_json::to_string(&xorurl)
+                .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+        );
     }
 
     Ok((xorurl, key_pair))
