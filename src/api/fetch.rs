@@ -85,7 +85,7 @@ impl Safe {
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
     pub fn fetch(&self, url: &str) -> ResultReturn<SafeData> {
-        let the_xor = Safe::parse_url(url)?;
+        let mut the_xor = Safe::parse_url(url)?;
         let xorurl = the_xor.to_string()?;
         info!("URL parsed successfully, fetching: {}", xorurl);
         debug!("Fetching content of type: {:?}", the_xor.content_type());
@@ -189,9 +189,10 @@ impl Safe {
 
                 let (_, public_name, _, _) = get_subnames_host_path_and_version(url)?;
                 let content = self.fetch(&url_with_path)?;
+                the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
                 let nrs_map_container = NrsMapContainerInfo {
                     public_name,
-                    xorurl,
+                    xorurl: the_xor.to_string()?,
                     xorname: the_xor.xorname(),
                     type_tag: the_xor.type_tag(),
                     version,

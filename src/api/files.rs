@@ -1239,7 +1239,7 @@ fn test_files_container_sync_update_nrs_unversioned_link() {
         Err(err) => assert_eq!(
             err,
             Error::InvalidInput(format!(
-                "The link is unversioned, but the linked content (FilesContainer) is versionable. NRS resolver doesn\'t allow unversioned links for this type of content: \"{}\"",
+                "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
                 unversioned_link
             ))
         ),

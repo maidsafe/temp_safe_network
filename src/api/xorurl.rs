@@ -234,7 +234,7 @@ impl XorUrlEncoder {
 
     #[allow(dead_code)]
     pub fn set_path(&mut self, path: &str) {
-        if path.starts_with('/') {
+        if path.is_empty() || path.starts_with('/') {
             self.path = path.to_string();
         } else {
             self.path = format!("/{}", path);

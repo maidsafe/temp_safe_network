@@ -508,7 +508,7 @@ In this section we will explore the CLI commands which allow users to generate, 
 
 #### NRS Create
 
-Creating a friendly name on the Network can be achieved with the `nrs create` subcommand. This subcommand generates an NRS Container automatically linking it to any data we decide to link the friendly name to. An NRS Container is stored on the Network as a `Published AppendOnlyData` data, and contains an NRS Map using RDF for its data representation (since this is still under development, pseudo-RDF data is now being used temporarily). This Map has a list of subnames and where each of them are being linked to, e.g. `mysubname` can be created as a subname of `mywebsite` NRS name by having `mysubname` linked to a particular `FilesContainer` XOR-URL so that it can be fetched with `safe://mysubname.mywebsite`.
+Creating a friendly name on the Network can be achieved with the `nrs create` subcommand. This subcommand generates an NRS Container automatically linking it to any data we decide to link the friendly name to. An NRS Container is stored on the Network as a `Published AppendOnlyData` data, and it contains an NRS Map using RDF for its data representation (since this is still under development, pseudo-RDF data is now being used temporarily). This Map has a list of subnames and where each of them are being linked to, e.g. `mysubname` can be created as a subname of `mywebsite` NRS name by having `mysubname` linked to a particular `FilesContainer` XOR-URL so that it can be fetched with `safe://mysubname.mywebsite`.
 
 Let's imagine we have uploaded the files and folders of a website we want to publish on the SAFE Network with `files put` command:
 ```shell
@@ -521,10 +521,12 @@ FilesContainer created at: "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6
 
 As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human friendly NRS-URL:
 ```shell
-$ safe nrs create mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
+$ safe nrs create mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
-+  mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
++  mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
+
+Note that we provided a versioned URL to the `--link` argument in the command above, i.e. a URL which targets a specific version of the content with `?v=<version number>`. Any type of content which can have different versions (like the case of a `FilesContainer` in our example) can be mapped/linked from an NRS name/subname only if a specific version is provided in the link URL.
 
 We can now share the NRS-URL `safe://mywebsite` to anyone who wants to visit our website. Using this NRS-URL we can now fetch the same content we would do when using the `FilesContainer` XOR-URL we linked to it, thus we can fetch it using the following command:
 ```shell
@@ -565,9 +567,9 @@ For example, you may wish to have `safe://mywebsite` to be about you in general,
 
 To create a public name with subnames, you need only to pass the full string with `.` separators, just like any traditional URL, to the CLI:
 ```shell
-$ safe nrs create blog.mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
+$ safe nrs create blog.mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 New NRS Map for "safe://blog.mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
-+  blog.mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc
++  blog.mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
 
 As the NRS CLI advances, you'll be able to individually add to both `blog.mywebsite`, or indeed just `mywebsite`, as well as change what the `default` resource to retrieve is for both.
@@ -578,7 +580,7 @@ Once a public name has been created with `nrs create` command, more sub names ca
 
 Let's add `profile` sub name to the `mywebsite` NRS name we created before:
 ```shell
-$ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc
+$ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc?v=0
 NRS Map updated (version 1): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
 ```
@@ -586,9 +588,9 @@ NRS Map updated (version 1): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4ns
 The safe nrs add command can also be used to update subnames after they have been added to a public name.
 For example, if we have made changes to files mapped to the `profile.mywebsite` NRS subname we created before, we can use `nrs add` to update its link:
 ```shell
-$ safe nrs add profile.mywebsite --link safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
+$ safe nrs add profile.mywebsite --link safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
 NRS Map updated (version 2): "safe://profile.hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
-+  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
++  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
 ```
 
 #### NRS Remove
@@ -599,7 +601,7 @@ Let's remove the `profile` sub name from the `mywebsite` NRS name we added befor
 ```shell
 $ safe nrs remove profile.mywebsite
 NRS Map updated (version 3): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
--  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc
+-  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
 ```
 
 ### SAFE-URLs
@@ -611,6 +613,41 @@ All these types of safe:// URLs can be used in any of the supported CLI commands
 E.g. we can retrieve the content of a website with the `cat` command using either its XOR-URL or its NRS-URL, and either fetching the latest version of it or supplying the query param to get a specific version of it. Thus, if we wanted to fetch `version #1` of the site we published at `safe://mywebsite` (which NRS Map Container XOR-URL is `safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh`), the following two commands would be equivalent:
 - `$ safe cat safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1`
 - `$ safe cat safe://mywebsite?v=1`
+
+In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `cat` command.
+
+We've seen before that we can provide `--info` flag to the `cat` command to obtain more information about the content being retrieved, but it's also possible to request a higher level of information by passing `-ii` or `-iii` (which are equivalent to pass `--info` twice or thrice respectively) to the `cat` command:
+```shell
+$ safe cat safe://mywebsite/contact/form.html -iii
+Native data type: ImmutableData (published)
+XOR name: 0x8fa90a8234747a9672d22d030984b94f1cd640136e8b659e23249a664eb70e71
+
+Resolved using NRS Map:
+PublicName: "mywebsite"
+Container XOR-URL: safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh
+Native data type: PublishedSeqAppendOnlyData
+Type tag: 1500
+XOR name: 0xfb3887c26c7ea3670ab1a042d16a6f1113ccf7cc09a15a6716429382a86eb1f9
+Version: 3
++------------------+----------------------+----------------------+--------------------------------------------------------------------------+
+| NRS name/subname | Created              | Modified             | Link                                                                     |
++------------------+----------------------+----------------------+--------------------------------------------------------------------------+
+| mywebsite        | 2019-07-24T14:32:13Z | 2019-07-24T14:32:13Z | safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0 |
++------------------+----------------------+----------------------+--------------------------------------------------------------------------+
+| blog.mywebsite   | 2019-07-24T16:52:30Z | 2019-07-24T16:52:30Z | safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0 |
++------------------+----------------------+----------------------+--------------------------------------------------------------------------+
+
+Raw content of the file:
+<!DOCTYPE html>
+<html>
+<body>
+<h2>Contact Form</h2>
+<form>
+  ...
+</form>
+</body>
+</html>
+```
 
 ### Update
 

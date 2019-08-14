@@ -309,7 +309,7 @@ fn validate_nrs_link(link: &str) -> ResultReturn<()> {
         match link_encoder.content_type() {
             SafeContentType::FilesContainer | SafeContentType::NrsMapContainer => {
                 Err(Error::InvalidInput(format!(
-                    "The link is unversioned, but the linked content ({}) is versionable. NRS resolver doesn\'t allow unversioned links for this type of content: \"{}\"",
+                    "The linked content ({}) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
                     link_encoder.content_type(), link
                 )))
             }
