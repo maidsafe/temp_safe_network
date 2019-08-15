@@ -17,6 +17,7 @@ stage('build & test') {
     windows: {
         node('windows') {
             checkout(scm)
+            retrieveCache('windows')
             runTests()
             packageBuildArtifacts('windows')
             uploadBuildArtifacts()
@@ -25,6 +26,7 @@ stage('build & test') {
     macos: {
         node('osx') {
             checkout(scm)
+            retrieveCache('macos')
             runTests()
             packageBuildArtifacts('macos')
             uploadBuildArtifacts()
@@ -57,6 +59,15 @@ stage('deploy') {
             }
         } else {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
+        }
+    }
+}
+
+def retrieveCache(os) {
+    if (!fileExists("target")) {
+        withEnv(["SAFE_CLI_BRANCH=${params.CACHE_BRANCH}",
+                 "SAFE_CLI_OS=${os}"]) {
+            sh("make retrieve-cache")
         }
     }
 }

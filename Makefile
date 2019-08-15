@@ -157,3 +157,22 @@ endif
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar" \
 		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar;
+
+retrieve-cache:
+ifndef SAFE_CLI_BRANCH
+	@echo "A branch reference must be provided."
+	@echo "Please set SAFE_CLI_BRANCH to a valid branch reference."
+	@exit 1
+endif
+ifndef SAFE_CLI_OS
+	@echo "The OS for the cache must be specified."
+	@echo "Please set SAFE_CLI_OS to either 'macos' or 'windows'."
+	@exit 1
+endif
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz .
+	mkdir target
+	tar -C target -xvf safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
+	rm safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
