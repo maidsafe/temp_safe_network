@@ -131,33 +131,57 @@ impl Safe {
                 if path != "/" && !path.is_empty() {
                     // TODO: Count how many redirects we've done... prevent looping forever
                     // TODO: Move this logic (resolver) to the FilesMap struct
-                    let file_item = match files_map.get(path) {
-                        Some(item_data) => item_data,
-                        None => {
-                            return Err(Error::ContentError(format!(
-                                "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-                                path, xorurl
-                            )))
+                    match files_map.get(path) {
+                        Some(file_item) => {
+                            let new_target_xorurl = match file_item.get("link") {
+        						Some(path_data) => path_data,
+        						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
+        					};
+
+                            self.fetch(new_target_xorurl)
                         }
-                    };
+                        None => {
+                            let mut filtered_filesmap = FilesMap::default();
+                            let folder_path = if !path.ends_with('/') {
+                                format!("{}/", path)
+                            } else {
+                                path.to_string()
+                            };
+                            files_map.iter().for_each(|(filepath, fileitem)| {
+                                if filepath.starts_with(&folder_path) {
+                                    let mut new_path = filepath.clone();
+                                    new_path.replace_range(..folder_path.len(), "");
+                                    filtered_filesmap.insert(new_path, fileitem.clone());
+                                }
+                            });
 
-                    let new_target_xorurl = match file_item.get("link") {
-						Some(path_data) => path_data,
-						None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
-					};
-
-                    let path_data = self.fetch(new_target_xorurl);
-                    return path_data;
+                            if filtered_filesmap.is_empty() {
+                                Err(Error::ContentError(format!(
+                                    "No data found for path \"{}\" on the FilesContainer at \"{}\"",
+                                    folder_path, xorurl
+                                )))
+                            } else {
+                                Ok(SafeData::FilesContainer {
+                                    xorname: the_xor.xorname(),
+                                    type_tag: the_xor.type_tag(),
+                                    version,
+                                    files_map: filtered_filesmap,
+                                    data_type: the_xor.data_type(),
+                                    resolved_from: None,
+                                })
+                            }
+                        }
+                    }
+                } else {
+                    Ok(SafeData::FilesContainer {
+                        xorname: the_xor.xorname(),
+                        type_tag: the_xor.type_tag(),
+                        version,
+                        files_map,
+                        data_type: the_xor.data_type(),
+                        resolved_from: None,
+                    })
                 }
-
-                Ok(SafeData::FilesContainer {
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    files_map,
-                    data_type: the_xor.data_type(),
-                    resolved_from: None,
-                })
             }
             SafeContentType::NrsMapContainer => {
                 let (version, nrs_map) = self
