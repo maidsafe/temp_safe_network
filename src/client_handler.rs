@@ -45,7 +45,7 @@ use unwrap::unwrap;
 
 lazy_static! {
     /// The cost to Put a chunk to the network.
-    pub static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
+    pub static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1));
 }
 
 #[derive(Clone, Debug)]
