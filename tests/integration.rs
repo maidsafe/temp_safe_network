@@ -131,7 +131,8 @@ fn login_packets() {
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    let balance = common::multiply_coins(*COST_OF_PUT, 2);
+    common::create_balance(&mut env, &mut client, None, balance);
 
     // Try to get a login packet that does not exist yet.
     common::send_request_expect_err(
@@ -263,7 +264,7 @@ fn update_login_packet() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -743,7 +744,7 @@ fn delete_append_only_data_that_doesnt_exist() {
 fn get_pub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -795,7 +796,7 @@ fn get_unpub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     let mut data = UnpubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -844,7 +845,7 @@ fn append_only_data_get_entries() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -865,7 +866,14 @@ fn append_only_data_get_entries() {
 
     let data = AData::PubSeq(data);
     let address = *data.address();
+    common::send_request_expect_ok(&mut env, &mut client, Request::GetBalance, *COST_OF_PUT);
     common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::PutAData(data.clone()),
+        NdError::InsufficientBalance,
+    );
 
     // GetADataRange
     let mut range_scenario = |start, end, expected_result| {
@@ -938,7 +946,7 @@ fn append_only_data_get_entries() {
 fn append_only_data_get_owners() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -996,7 +1004,7 @@ fn append_only_data_get_owners() {
 fn pub_append_only_data_get_permissions() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -2168,7 +2176,8 @@ fn app_permissions() {
     let mut env = Environment::new();
 
     let mut owner = env.new_connected_client();
-    common::create_balance(&mut env, &mut owner, None, 0);
+    let balance = common::multiply_coins(*COST_OF_PUT, 4);
+    common::create_balance(&mut env, &mut owner, None, balance);
 
     // App 0 is authorized with permission to transfer coins.
     let mut app_0 = env.new_disconnected_app(owner.public_id().clone());
@@ -2312,7 +2321,7 @@ fn put_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     // Try to put sequenced Mutable Data
     let name: XorName = env.rng().gen();
@@ -2338,7 +2347,7 @@ fn put_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     // Try to put unsequenced Mutable Data
     let name: XorName = env.rng().gen();
@@ -2364,7 +2373,7 @@ fn read_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
     // Try to put sequenced Mutable Data with several entries.
     let entries: BTreeMap<_, _> = (1..4)
@@ -2436,7 +2445,8 @@ fn mutate_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    let balance = common::multiply_coins(*COST_OF_PUT, 4);
+    common::create_balance(&mut env, &mut client, None, balance);
 
     // Try to put sequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2544,7 +2554,8 @@ fn mutate_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, 0);
+    let balance = common::multiply_coins(*COST_OF_PUT, 3);
+    common::create_balance(&mut env, &mut client, None, balance);
 
     // Try to put unsequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2635,8 +2646,10 @@ fn mutable_data_permissions() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client_a, None, 0);
-    common::create_balance(&mut env, &mut client_b, None, 0);
+    let balance_a = common::multiply_coins(*COST_OF_PUT, 3);
+    let balance_b = common::multiply_coins(*COST_OF_PUT, 3);
+    common::create_balance(&mut env, &mut client_a, None, balance_a);
+    common::create_balance(&mut env, &mut client_b, None, balance_b);
 
     // Try to put new unsequenced Mutable Data.
     let name: XorName = env.rng().gen();
@@ -2715,8 +2728,9 @@ fn delete_mutable_data() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client_a, None, 0);
-    common::create_balance(&mut env, &mut client_b, None, 0);
+    let balance_a = common::multiply_coins(*COST_OF_PUT, 3);
+    common::create_balance(&mut env, &mut client_a, None, balance_a);
+    common::create_balance(&mut env, &mut client_b, None, *COST_OF_PUT);
 
     let mdata = UnseqMutableData::new(env.rng().gen(), 100, *client_a.public_id().public_key());
     let address = *mdata.address();

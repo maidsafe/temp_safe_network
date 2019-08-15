@@ -577,3 +577,7 @@ impl IntoCoins for u64 {
         unwrap!(Coins::from_nano(self))
     }
 }
+
+pub fn multiply_coins(coins: Coins, factor: u64) -> Coins {
+    unwrap!(Coins::from_nano(coins.as_nano() * factor))
+}
