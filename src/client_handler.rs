@@ -51,7 +51,6 @@ lazy_static! {
 #[derive(Clone, Debug)]
 struct ClientInfo {
     public_id: PublicId,
-    has_balance: bool,
 }
 
 pub(crate) struct ClientHandler {
@@ -681,18 +680,8 @@ impl ClientHandler {
                         return;
                     }
 
-                    let has_balance = self.has_balance(&public_id);
-                    info!(
-                        "{}: Accepted {} on {}. Has balance: {}",
-                        self, public_id, peer_addr, has_balance
-                    );
-                    let _ = self.clients.insert(
-                        peer_addr,
-                        ClientInfo {
-                            public_id,
-                            has_balance,
-                        },
-                    );
+                    info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
+                    let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
                 }
                 Err(err) => {
                     info!(
@@ -708,20 +697,6 @@ impl ClientHandler {
                 self, public_id, peer_addr
             );
             self.quic_p2p.disconnect_from(peer_addr);
-        }
-    }
-
-    fn has_balance(&self, public_id: &PublicId) -> bool {
-        match public_id {
-            PublicId::Client(pub_id) => self.balances.exists(pub_id.name()),
-            PublicId::App(app_pub_id) => {
-                self.balances.exists(app_pub_id.owner().name())
-                    && self.auth_keys.app_permissions(app_pub_id).is_some()
-            }
-            PublicId::Node(_) => {
-                error!("{}: Logic error. This should be unreachable.", self);
-                false
-            }
         }
     }
 
@@ -1102,13 +1077,6 @@ impl ClientHandler {
         } else {
             let balance = Balance { coins: amount };
             self.put_balance(&owner_key, &balance)?;
-            for client in self
-                .clients
-                .values_mut()
-                .filter(|client| client.public_id.name() == &XorName::from(owner_key))
-            {
-                client.has_balance = true;
-            }
             Ok(())
         }
     }
