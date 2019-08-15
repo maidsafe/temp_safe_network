@@ -224,9 +224,13 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            216
+            if cfg!(target_os = "macos") {
+                216
+            } else {
+                232
+            }
         } else {
-            160
+            152
         };
         assert_eq!(
             expected_size,
