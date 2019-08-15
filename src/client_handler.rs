@@ -1208,6 +1208,12 @@ impl ClientHandler {
     }
 
     fn put_balance(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<(), NdError> {
+        trace!(
+            "{}: Setting balance to {} for {}",
+            self,
+            balance,
+            public_key
+        );
         self.balances.put(public_key, balance).map_err(|error| {
             error!(
                 "{}: Failed to update balance of {}: {}",
@@ -1227,9 +1233,11 @@ impl ClientHandler {
         message_id: MessageId,
         cost: Coins,
     ) -> Option<()> {
+        trace!("{}: {} is paying {} coins", self, requester_id, cost);
         match self.withdraw(requester_key, cost) {
             Ok(()) => Some(()),
             Err(error) => {
+                trace!("{}: Unable to withdraw {} coins: {}", self, cost, error);
                 self.send_response_to_client(
                     requester_id,
                     message_id,

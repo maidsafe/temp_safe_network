@@ -10,7 +10,11 @@ use crate::{utils, vault::Init, Result, ToDbKey};
 use pickledb::PickleDb;
 use safe_nd::{Coins, PublicKey, XorName};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+    path::Path,
+};
 
 const BALANCES_DB_NAME: &str = "balances.db";
 
@@ -87,5 +91,11 @@ impl Key for XorName {
         index: &'a HashMap<XorName, PublicKey>,
     ) -> Option<&'a PublicKey> {
         index.get(self)
+    }
+}
+
+impl Display for Balance {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.coins)
     }
 }
