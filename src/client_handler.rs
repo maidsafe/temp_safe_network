@@ -1229,16 +1229,6 @@ impl ClientHandler {
     ) -> Option<()> {
         match self.withdraw(requester_key, cost) {
             Ok(()) => Some(()),
-            Err(NdError::InsufficientBalance) | Err(NdError::NoSuchBalance) => {
-                // Note: in phase 1, we proceed even if there are insufficient funds.
-                trace!(
-                    "{}: Insufficient balance to withdraw {} coins (but allowing the request \
-                     anyway)",
-                    self,
-                    cost,
-                );
-                Some(())
-            }
             Err(error) => {
                 self.send_response_to_client(
                     requester_id,
