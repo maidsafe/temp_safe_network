@@ -671,6 +671,16 @@ impl ClientHandler {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
+                    // See if we already have a peer connected with the same ID
+                    if let Some(old_peer_addr) = self.lookup_client_peer_addr(&public_id) {
+                        info!(
+                            "{}: We already have {} on {}. Cancelling the new connection from {}.",
+                            self, public_id, old_peer_addr, peer_addr
+                        );
+                        self.quic_p2p.disconnect_from(peer_addr);
+                        return;
+                    }
+
                     let has_balance = self.has_balance(&public_id);
                     info!(
                         "{}: Accepted {} on {}. Has balance: {}",

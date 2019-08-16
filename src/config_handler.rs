@@ -237,11 +237,7 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            if cfg!(target_os = "macos") {
-                216
-            } else {
-                232
-            }
+            232
         } else {
             152
         };

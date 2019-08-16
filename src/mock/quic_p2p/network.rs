@@ -98,7 +98,7 @@ impl Network {
 }
 
 pub(super) struct Inner {
-    rng: Box<RngCore>,
+    rng: Box<dyn RngCore>,
     nodes: FxHashMap<SocketAddr, Weak<RefCell<Node>>>,
     connections: FxHashMap<Connection, Queue>,
     used_ips: FxHashSet<IpAddr>,
