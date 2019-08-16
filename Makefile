@@ -10,13 +10,49 @@ SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
 
+build:
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:build \
+		cargo build --release
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+else
+	cargo build --release
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-dev:
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:build-dev \
+		cargo build --release --features=mock-network
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+else
+	cargo build --release --features=mock-network
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
 build-container:
 	rm -rf target/
 	docker rmi -f maidsafe/safe-cli-build:build
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:build .
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:build \
+		--build-arg build_type="non-dev" .
+
+build-dev-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-cli-build:build-dev
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:build-dev \
+		--build-arg build_type="dev" .
 
 push-container:
 	docker push maidsafe/safe-cli-build:build
+
+push-dev-container:
+	docker push maidsafe/safe-cli-build:build-dev
 
 clippy:
 ifeq ($(UNAME_S),Linux)
@@ -64,7 +100,16 @@ ifndef SAFE_CLI_BUILD_OS
 	@echo "Valid values are 'linux' or 'windows' or 'macos'."
 	@exit 1
 endif
+ifndef SAFE_CLI_BUILD_TYPE
+	@echo "A value must be supplied for SAFE_CLI_BUILD_TYPE."
+	@echo "Valid values are 'dev' or 'non-dev'."
+	@exit 1
+endif
+ifeq ($(SAFE_CLI_BUILD_TYPE),dev)
+	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-${SAFE_CLI_BUILD_OS}-x86_64-${SAFE_CLI_BUILD_TYPE}.tar.gz)
+else
 	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-${SAFE_CLI_BUILD_OS}-x86_64.tar.gz)
+endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
 	mv ${ARCHIVE_NAME} artifacts

@@ -1,5 +1,8 @@
 FROM rust:latest
 
+# This is only referenced in the build-cache script.
+ARG build_type
+
 RUN addgroup --gid 1001 maidsafe && \
     adduser --uid 1001 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
     # The parent container sets this to the 'staff' group, which causes problems
@@ -27,14 +30,10 @@ RUN apt-get update -y && \
 WORKDIR /usr/src/safe-cli
 COPY . .
 
-# During the build process, ownership of the source directory needs changed in advance because
-# the tests write a file and you need permissions for that.
 RUN chown -R maidsafe:maidsafe /usr/src/safe-cli
 USER maidsafe:maidsafe
 ENV CARGO_TARGET_DIR=/target YARN_GPG=no RUST_BACKTRACE=1
 
-
 RUN rustup component add rustfmt clippy && \
-         cargo check --release && \
-         cargo test --features="scl-mock" -- --test-threads=1
+    bash resources/build-cache.sh
 ENTRYPOINT ["fixuid"]
