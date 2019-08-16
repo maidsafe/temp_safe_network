@@ -132,6 +132,8 @@ impl Vault {
     }
 
     /// Runs the main event loop. Blocks until the vault is terminated.
+    // FIXME: remove when https://github.com/crossbeam-rs/crossbeam/issues/404 is resolved
+    #[allow(clippy::zero_ptr, clippy::drop_copy)]
     pub fn run(&mut self) {
         loop {
             select! {
