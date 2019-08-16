@@ -88,12 +88,12 @@ pub fn run() -> Result<(), String> {
         SubCommands::Update {} => {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
+        SubCommands::Keys { cmd } => key_commander(cmd, output_fmt, &mut safe),
         _ => {
-            // We treat SubCommands::Auth separatelly since we need to connect before
-            // handling any command but auth
+            // We treat these separatelly since we need to connect before
+            // handling any of these commands
             auth_connect(&mut safe)?;
             match args.cmd {
-                SubCommands::Keys { cmd } => key_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),
                 SubCommands::Nrs { cmd } => nrs_commander(cmd, output_fmt, args.dry, &mut safe),

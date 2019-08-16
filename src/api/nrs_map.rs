@@ -77,7 +77,7 @@ impl NrsMap {
     pub fn resolve_for_subnames(&self, mut sub_names: Vec<SubName>) -> ResultReturn<XorUrl> {
         debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
         let mut nrs_map = self;
-        let mut dereferenced_link: String;
+        let dereferenced_link: String;
         let sub_names_str = sub_names_vec_to_str(&sub_names);
         let mut link = if sub_names.is_empty() {
             match &self.default {
@@ -155,7 +155,7 @@ impl NrsMap {
     #[allow(dead_code)]
     pub fn get_default_link(&self) -> ResultReturn<XorUrl> {
         debug!("Attempting to get default link vis NRS....");
-        let mut dereferenced_link: String;
+        let dereferenced_link: String;
         let link = match &self.default {
             DefaultRdf::NotSet => {
                 return Err(Error::ContentError(

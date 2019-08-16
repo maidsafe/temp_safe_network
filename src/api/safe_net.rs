@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::errors::ResultReturn;
-use safe_nd::{Coins, MDataValue, SeqMutableData, XorName};
+use safe_nd::{Coins, MDataSeqValue, SeqMutableData, XorName};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 
@@ -25,7 +25,7 @@ pub trait SafeApp {
         amount: Coins,
     ) -> ResultReturn<XorName>;
 
-    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: Coins) -> ResultReturn<XorName>;
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName>;
 
     fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins>;
 
@@ -104,20 +104,18 @@ pub trait SafeApp {
         value: &[u8],
     ) -> ResultReturn<()>;
 
-    fn mutable_data_delete(&mut self, name: XorName, tag: u64) -> ResultReturn<()>;
-
     fn seq_mutable_data_get_value(
         &mut self,
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> ResultReturn<MDataValue>;
+    ) -> ResultReturn<MDataSeqValue>;
 
     fn list_seq_mdata_entries(
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>>;
+    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>>;
 
     fn seq_mutable_data_update(
         &mut self,

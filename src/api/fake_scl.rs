@@ -13,7 +13,7 @@ use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
 use log::{debug, trace};
-use safe_nd::{Coins, MDataValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
+use safe_nd::{Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -31,7 +31,7 @@ struct CoinBalance {
 type AppendOnlyDataFake = Vec<(Vec<u8>, Vec<u8>)>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
-type SeqMutableDataFake = BTreeMap<String, MDataValue>;
+type SeqMutableDataFake = BTreeMap<String, MDataSeqValue>;
 
 #[derive(Default, Serialize, Deserialize)]
 struct FakeData {
@@ -153,7 +153,8 @@ impl SafeApp for SafeAppFake {
         Ok(to_xorname)
     }
 
-    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: Coins) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
+        let to_pk = owner_sk.public_key();
         let xorname = xorname_from_pk(&to_pk);
         self.fake_vault.coin_balances.insert(
             xorname_to_hex(&xorname),
@@ -414,7 +415,7 @@ impl SafeApp for SafeAppFake {
 
         match self.fake_vault.mutable_data.get(&xorname_hex) {
             Some(seq_md) => {
-                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataValue> = BTreeMap::new();
+                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataSeqValue> = BTreeMap::new();
                 seq_md.iter().for_each(|(k, v)| {
                     seq_md_with_vec.insert(parse_hex(k), v.clone());
                 });
@@ -446,13 +447,13 @@ impl SafeApp for SafeAppFake {
 
         data.insert(
             key.to_vec(),
-            MDataValue {
+            MDataSeqValue {
                 data: value.to_vec(),
                 version: 0,
             },
         );
 
-        let mut seq_md_with_str: BTreeMap<String, MDataValue> = BTreeMap::new();
+        let mut seq_md_with_str: BTreeMap<String, MDataSeqValue> = BTreeMap::new();
         data.iter().for_each(|(k, v)| {
             seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
         });
@@ -463,28 +464,12 @@ impl SafeApp for SafeAppFake {
         Ok(())
     }
 
-    fn mutable_data_delete(&mut self, name: XorName, _tag: u64) -> ResultReturn<()> {
-        let xorname_hex = xorname_to_hex(&name);
-        debug!("attempting to locate scl mock mdata: {}", xorname_hex);
-        let _ = self
-            .fake_vault
-            .mutable_data
-            .remove(&xorname_hex)
-            .ok_or_else(|| {
-                Error::ContentNotFound(format!(
-                    "Sequential AppendOnlyData not found at Xor name: {}",
-                    xorname_hex
-                ))
-            })?;
-        Ok(())
-    }
-
     fn seq_mutable_data_get_value(
         &mut self,
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> ResultReturn<MDataValue> {
+    ) -> ResultReturn<MDataSeqValue> {
         let seq_md = self.get_seq_mdata(name, tag)?;
         match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
@@ -499,7 +484,7 @@ impl SafeApp for SafeAppFake {
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
+    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>> {
         debug!("Listing seq_mdata_entries for: {}", name);
         let seq_md = self.get_seq_mdata(name, tag)?;
         let mut res = BTreeMap::new();
@@ -535,10 +520,9 @@ fn test_allocate_test_coins() {
     let mut mock = SafeAppFake::new();
 
     let sk_to = SecretKey::random();
-    let pk_to = sk_to.public_key();
 
     let balance = unwrap!(Coins::from_str("2.345678912"));
-    unwrap!(mock.allocate_test_coins(pk_to, balance));
+    unwrap!(mock.allocate_test_coins(sk_to.clone(), balance));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
     assert_eq!(balance, current_balance);
 }
@@ -553,10 +537,9 @@ fn test_create_balance() {
     let mut mock = SafeAppFake::new();
 
     let sk = SecretKey::random();
-    let pk = sk.public_key();
 
     let balance = unwrap!(Coins::from_str("2.345678912"));
-    unwrap!(mock.allocate_test_coins(pk, balance));
+    unwrap!(mock.allocate_test_coins(sk.clone(), balance));
 
     let sk_to = SecretKey::random();
     let pk_to = sk_to.public_key();
@@ -575,10 +558,9 @@ fn test_check_balance() {
     let mut mock = SafeAppFake::new();
 
     let sk = SecretKey::random();
-    let pk = sk.public_key();
 
     let balance = unwrap!(Coins::from_str("2.3"));
-    unwrap!(mock.allocate_test_coins(pk, balance));
+    unwrap!(mock.allocate_test_coins(sk.clone(), balance));
     let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
     assert_eq!(balance, current_balance);
 
@@ -607,15 +589,14 @@ fn test_safecoin_transfer() {
     let mut mock = SafeAppFake::new();
 
     let sk1 = SecretKey::random();
-    let pk1 = sk1.public_key();
 
     let sk2 = SecretKey::random();
     let pk2 = sk2.public_key();
 
     let balance1 = unwrap!(Coins::from_str("2.5"));
     let balance2 = unwrap!(Coins::from_str("5.7"));
-    unwrap!(mock.allocate_test_coins(pk1, balance1));
-    unwrap!(mock.allocate_test_coins(pk2, balance2));
+    unwrap!(mock.allocate_test_coins(sk1.clone(), balance1));
+    unwrap!(mock.allocate_test_coins(sk2.clone(), balance2));
 
     let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()));
     let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()));

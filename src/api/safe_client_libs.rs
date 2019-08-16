@@ -14,7 +14,9 @@ use log::{debug, info, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App, AppError::CoreError};
-use safe_core::{client::wallet_transfer_coins, CoreError as SafeCoreError};
+use safe_core::{
+    client::test_create_balance, client::wallet_transfer_coins, CoreError as SafeCoreError,
+};
 use safe_nd::Error as SafeNdError;
 
 #[cfg(not(feature = "fake-auth"))]
@@ -23,10 +25,10 @@ use super::helpers::decode_ipc_msg;
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
-    AData, ADataAddress, ADataAppend, ADataIndex, ADataOwner, ADataPubPermissionSet,
-    ADataPubPermissions, ADataUser, AppendOnlyData, Coins, MDataAction, MDataAddress,
-    MDataPermissionSet, MDataSeqEntryActions, MDataValue, PubImmutableData, PubSeqAppendOnlyData,
-    PublicKey as SafeNdPublicKey, SeqMutableData, XorName,
+    AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
+    ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, Coins, IDataAddress,
+    MDataAction, MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue, PubImmutableData,
+    PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SeqMutableData, XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -157,15 +159,11 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    fn allocate_test_coins(&mut self, to_pk: PublicKey, amount: Coins) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
         info!("Creating test CoinBalance with {} test coins", amount);
-        let safe_app: &App = self.get_safe_app()?;
-        let xorname = xorname_from_pk(&to_pk);
-        run(safe_app, move |client, _app_context| {
-            client.test_create_balance(&xorname, amount, SafeNdPublicKey::Bls(to_pk));
-            Ok(())
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
+        let xorname = xorname_from_pk(&owner_sk.public_key());
+        test_create_balance(&owner_sk, amount)
+            .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 
         Ok(xorname)
     }
@@ -234,9 +232,9 @@ impl SafeApp for SafeAppScl {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let safe_app: &App = self.get_safe_app()?;
-
+        let immd_data_addr = IDataAddress::Pub(xorname);
         let data = run(safe_app, move |client, _app_context| {
-            client.get_idata(xorname).map_err(CoreError)
+            client.get_idata(immd_data_addr).map_err(CoreError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
@@ -273,8 +271,8 @@ impl SafeApp for SafeAppScl {
         data.append_permissions(
             ADataPubPermissions {
                 permissions: perms,
-                data_index: 0,
-                owner_entry_index: 0,
+                entries_index: 0,
+                owners_index: 0,
             },
             0,
         )
@@ -288,7 +286,7 @@ impl SafeApp for SafeAppScl {
         let usr_acc_owner = get_owner_pk(safe_app)?;
         let owner = ADataOwner {
             public_key: usr_acc_owner,
-            data_index: 0,
+            entries_index: 0,
             permissions_index: 1,
         };
         data.append_owner(owner, 0).map_err(|e| {
@@ -298,9 +296,13 @@ impl SafeApp for SafeAppScl {
             ))
         })?;
 
-        let append = ADataAppend {
+        let entries_vec = the_data
+            .iter()
+            .map(|(k, v)| ADataEntry::new(k.to_vec(), v.to_vec()))
+            .collect();
+        let append = ADataAppendOperation {
             address: append_only_data_address,
-            values: the_data,
+            values: entries_vec,
         };
 
         run(safe_app, move |client, _app_context| {
@@ -326,9 +328,13 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             let append_only_data_address = ADataAddress::PubSeq { name, tag };
-            let append = ADataAppend {
+            let entries_vec = the_data
+                .iter()
+                .map(|(k, v)| ADataEntry::new(k.to_vec(), v.to_vec()))
+                .collect();
+            let append = ADataAppendOperation {
                 address: append_only_data_address,
-                values: the_data,
+                values: entries_vec,
             };
 
             client
@@ -363,7 +369,7 @@ impl SafeApp for SafeAppScl {
                 Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
             })?;
 
-        let data = run(safe_app, move |client, _app_context| {
+        let data_entry = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_last_entry(append_only_data_address)
                 .map_err(CoreError)
@@ -372,6 +378,7 @@ impl SafeApp for SafeAppScl {
             Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
         })?;
 
+        let data = (data_entry.key, data_entry.value);
         Ok((data_length, data))
     }
 
@@ -396,7 +403,7 @@ impl SafeApp for SafeAppScl {
                 e
             ))
         })
-        .map(|data_returned| data_returned.data_index() - 1)
+        .map(|data_returned| data_returned.entries_index() - 1)
     }
 
     fn get_seq_append_only_data(
@@ -429,7 +436,7 @@ impl SafeApp for SafeAppScl {
 
         let start = ADataIndex::FromStart(version);
         let end = ADataIndex::FromStart(version + 1);
-        let data = run(safe_app, move |client, _app_context| {
+        let data_entries = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_range(append_only_data_address, (start, end))
                 .map_err(CoreError)
@@ -438,8 +445,8 @@ impl SafeApp for SafeAppScl {
             Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
         })?;
 
-        let this_version = data[0].clone();
-        Ok(this_version)
+        let this_version = data_entries[0].clone();
+        Ok((this_version.key, this_version.value))
     }
 
     fn put_seq_mutable_data(
@@ -520,22 +527,12 @@ impl SafeApp for SafeAppScl {
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
     }
 
-    fn mutable_data_delete(&mut self, name: XorName, tag: u64) -> ResultReturn<()> {
-        let safe_app: &App = self.get_safe_app()?;
-        run(safe_app, move |client, _app_context| {
-            client
-                .delete_mdata(MDataAddress::Seq { name, tag })
-                .map_err(CoreError)
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to delete MD: {:?}", e)))
-    }
-
     fn seq_mutable_data_get_value(
         &mut self,
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> ResultReturn<MDataValue> {
+    ) -> ResultReturn<MDataSeqValue> {
         let safe_app: &App = self.get_safe_app()?;
         let key_vec = key.to_vec();
         run(safe_app, move |client, _app_context| {
@@ -550,7 +547,7 @@ impl SafeApp for SafeAppScl {
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataValue>> {
+    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client.list_seq_mdata_entries(name, tag).map_err(CoreError)
@@ -575,11 +572,9 @@ impl SafeApp for SafeAppScl {
 // Helpers
 
 fn get_owner_pk(safe_app: &App) -> ResultReturn<SafeNdPublicKey> {
-    run(safe_app, move |client, _app_context| Ok(client.owner_key()))
-        .map_err(|err| {
-            Error::Unexpected(format!("Failed to retrieve account's public key: {}", err))
-        })?
-        .ok_or_else(|| Error::Unexpected("Account doesn't have a public key".to_string()))
+    run(safe_app, move |client, _app_context| Ok(client.owner_key())).map_err(|err| {
+        Error::Unexpected(format!("Failed to retrieve account's public key: {}", err))
+    })
 }
 
 fn get_public_bls_key(safe_app: &App) -> ResultReturn<PublicKey> {
@@ -591,8 +586,7 @@ fn get_public_bls_key(safe_app: &App) -> ResultReturn<PublicKey> {
             "Failed to retrieve account's public BLS key: {}",
             err
         ))
-    })?
-    .ok_or_else(|| Error::Unexpected("Account doesn't have a public BLS key".to_string()))
+    })
 }
 
 fn get_secret_bls_key(safe_app: &App) -> ResultReturn<SecretKey> {
@@ -604,8 +598,7 @@ fn get_secret_bls_key(safe_app: &App) -> ResultReturn<SecretKey> {
             "Failed to retrieve account's secret BLS key: {}",
             err
         ))
-    })?
-    .ok_or_else(|| Error::Unexpected("Account doesn't have a secret BLS key".to_string()))
+    })
 }
 
 // Unit tests

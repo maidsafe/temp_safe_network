@@ -8,7 +8,7 @@ os:
   - linux
 language: rust
 rust:
-  - stable
+  - 1.37.0
 sudo: false
 cache:
   # Double the default timeout.
