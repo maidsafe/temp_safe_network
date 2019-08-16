@@ -13,7 +13,7 @@ use log::debug;
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
-use safe_nd::{Coins, XorName, XOR_NAME_LEN};
+use safe_nd::{Coins, PublicKey as SafeNdPublicKey, XorName};
 use std::iter::FromIterator;
 use std::str;
 use std::str::FromStr;
@@ -66,11 +66,8 @@ impl KeyPair {
     }
 }
 
-pub fn xorname_from_pk(pk: &PublicKey) -> XorName {
-    let pk_as_bytes: [u8; 48] = pk.to_bytes();
-    let mut xorname = XorName::default();
-    xorname.0.copy_from_slice(&pk_as_bytes[..XOR_NAME_LEN]);
-    xorname
+pub fn xorname_from_pk(pk: PublicKey) -> XorName {
+    XorName::from(SafeNdPublicKey::from(pk))
 }
 
 pub fn vec_to_hex(hash: Vec<u8>) -> String {

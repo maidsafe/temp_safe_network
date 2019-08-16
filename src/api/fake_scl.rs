@@ -89,7 +89,7 @@ impl SafeAppFake {
             Some(new_balance_coins) => {
                 let from_pk = sk.public_key();
                 self.fake_vault.coin_balances.insert(
-                    xorname_to_hex(&xorname_from_pk(&from_pk)),
+                    xorname_to_hex(&xorname_from_pk(from_pk)),
                     CoinBalance {
                         owner: from_pk,
                         value: new_balance_coins.to_string(),
@@ -141,7 +141,7 @@ impl SafeApp for SafeAppFake {
             }
         };
 
-        let to_xorname = xorname_from_pk(&new_balance_owner);
+        let to_xorname = xorname_from_pk(new_balance_owner);
         self.fake_vault.coin_balances.insert(
             xorname_to_hex(&to_xorname),
             CoinBalance {
@@ -155,7 +155,7 @@ impl SafeApp for SafeAppFake {
 
     fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
         let to_pk = owner_sk.public_key();
-        let xorname = xorname_from_pk(&to_pk);
+        let xorname = xorname_from_pk(to_pk);
         self.fake_vault.coin_balances.insert(
             xorname_to_hex(&xorname),
             CoinBalance {
@@ -169,7 +169,7 @@ impl SafeApp for SafeAppFake {
 
     fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins> {
         let pk = sk.public_key();
-        let xorname = xorname_from_pk(&pk);
+        let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname)
     }
 
@@ -225,12 +225,12 @@ impl SafeApp for SafeAppFake {
         tx_id: u64,
         amount: Coins,
     ) -> ResultReturn<u64> {
-        let to_xorname = xorname_from_pk(&to_pk);
+        let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
 
     fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
-        let xorname = xorname_from_pk(&pk);
+        let xorname = xorname_from_pk(pk);
         let txs_for_xorname = &self.fake_vault.txs[&xorname_to_hex(&xorname)];
         let tx_state = txs_for_xorname.get(&tx_id.to_string()).ok_or_else(|| {
             Error::ContentNotFound(format!("Transaction not found with id '{}'", tx_id))
@@ -609,7 +609,7 @@ fn test_safecoin_transfer() {
 
     let _ = unwrap!(mock.safecoin_transfer_to_xorname(
         sk1.clone(),
-        xorname_from_pk(&pk2),
+        xorname_from_pk(pk2),
         tx_id,
         unwrap!(Coins::from_str("1.4"))
     ));

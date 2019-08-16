@@ -56,7 +56,7 @@ impl Safe {
         sk: &str,
     ) -> ResultReturn<String> {
         let key_pair = KeyPair::from_hex_sk(sk)?;
-        let xorname = xorname_from_pk(&key_pair.pk);
+        let xorname = xorname_from_pk(key_pair.pk);
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,

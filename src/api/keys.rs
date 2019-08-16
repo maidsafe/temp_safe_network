@@ -175,7 +175,7 @@ impl Safe {
             .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let public_key = secret_key.public_key();
-        let derived_xorname = xorname_from_pk(&public_key);
+        let derived_xorname = xorname_from_pk(public_key);
         if xorurl_encoder.xorname() != derived_xorname {
             Err(Error::InvalidInput(
                 "The URL doesn't correspond to the public key derived from the provided secret key"

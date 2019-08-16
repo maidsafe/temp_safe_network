@@ -155,13 +155,13 @@ impl SafeApp for SafeAppScl {
             }
         })?;
 
-        let xorname = xorname_from_pk(&new_balance_owner);
+        let xorname = xorname_from_pk(new_balance_owner);
         Ok(xorname)
     }
 
     fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
         info!("Creating test CoinBalance with {} test coins", amount);
-        let xorname = xorname_from_pk(&owner_sk.public_key());
+        let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&owner_sk, amount)
             .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 
@@ -204,7 +204,7 @@ impl SafeApp for SafeAppScl {
         tx_id: u64,
         amount: Coins,
     ) -> ResultReturn<u64> {
-        let to_xorname = xorname_from_pk(&to_pk);
+        let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
 
@@ -420,20 +420,6 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
-        // START TEMP BLOCK
-        // This is a temporary block to overcome an issue in SCL panicing when trying
-        // to fetch invalid versions: https://github.com/maidsafe/safe-nd/issues/93
-        let data_length = self
-            .get_current_seq_append_only_data_version(name, tag)
-            .unwrap();
-        if version > data_length {
-            return Err(Error::VersionNotFound(format!(
-                "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
-                version, name
-            )));
-        }
-        // END TEMP BLOCK
-
         let start = ADataIndex::FromStart(version);
         let end = ADataIndex::FromStart(version + 1);
         let data_entries = run(safe_app, move |client, _app_context| {
@@ -441,8 +427,18 @@ impl SafeApp for SafeAppScl {
                 .get_adata_range(append_only_data_address, (start, end))
                 .map_err(CoreError)
         })
-        .map_err(|e| {
-            Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
+        .map_err(|err| {
+            if let CoreError(SafeCoreError::NewRoutingClientError(SafeNdError::NoSuchEntry)) = err {
+                Error::VersionNotFound(format!(
+                    "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
+                    version, name
+                ))
+            } else {
+                Error::NetDataError(format!(
+                    "Failed to get Sequenced Append Only Data: {:?}",
+                    err
+                ))
+            }
         })?;
 
         let this_version = data_entries[0].clone();
@@ -714,7 +710,7 @@ fn test_put_get_update_seq_append_only_data() {
             "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
             nonexistant_version, xorname
         ))),
-        _ => panic!("Error returned is not the expected one"),
+        err => panic!(format!("Error returned is not the expected one: {:?}", err)),
     }
 }
 
