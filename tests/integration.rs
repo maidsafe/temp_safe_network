@@ -1807,37 +1807,52 @@ fn put_immutable_data() {
     let mut expected = unwrap!(Coins::from_nano(start_nano));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
 
-    for _ in &[0, 1] {
-        // Check they can both Put valid data.
-        common::perform_mutation(
-            &mut env,
-            &mut client_a,
-            Request::PutIData(pub_idata.clone()),
-        );
-        common::perform_mutation(
-            &mut env,
-            &mut client_b,
-            Request::PutIData(unpub_idata.clone()),
-        );
+    // Check they can both Put valid data.
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutIData(pub_idata.clone()),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_b,
+        Request::PutIData(unpub_idata.clone()),
+    );
 
-        expected = unwrap!(expected.checked_sub(*COST_OF_PUT));
-        common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
-        common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected);
+    expected = unwrap!(expected.checked_sub(*COST_OF_PUT));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
+    common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected);
 
-        // Check the data is retrievable.
-        common::send_request_expect_ok(
-            &mut env,
-            &mut client_a,
-            Request::GetIData(*pub_idata.address()),
-            pub_idata.clone(),
-        );
-        common::send_request_expect_ok(
-            &mut env,
-            &mut client_b,
-            Request::GetIData(*unpub_idata.address()),
-            unpub_idata.clone(),
-        );
-    }
+    // Check the data is retrievable.
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::GetIData(*pub_idata.address()),
+        pub_idata.clone(),
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::GetIData(*unpub_idata.address()),
+        unpub_idata.clone(),
+    );
+
+    // Published data can be put again, but unpublished not
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::PutIData(pub_idata.clone()),
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::PutIData(unpub_idata.clone()),
+        NdError::DataExists,
+    );
+
+    expected = unwrap!(expected.checked_sub(*COST_OF_PUT));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
+    common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected);
 }
 
 #[test]

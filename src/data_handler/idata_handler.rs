@@ -76,12 +76,18 @@ impl IDataHandler {
         };
 
         if self.metadata.exists(&(*kind.address()).to_db_key()) {
-            trace!(
-                "{}: Replying success for Put {:?}, it already exists.",
-                self,
-                kind
-            );
-            return respond(Ok(()));
+            if kind.is_pub() {
+                trace!(
+                    "{}: Replying success for Put {:?}, it already exists.",
+                    self,
+                    kind
+                );
+                return respond(Ok(()));
+            } else {
+                // Only for unpublished immutable data do we return `DataExists` when attempting to
+                // put data that already exists.
+                return respond(Err(NdError::DataExists));
+            }
         }
         let target_holders = self
             .non_full_adults_sorted(kind.name())
