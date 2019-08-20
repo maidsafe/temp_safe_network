@@ -11,6 +11,8 @@ GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
 
 build:
+	rm -rf artifacts
+	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
@@ -24,6 +26,8 @@ endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 build-dev:
+	rm -rf artifacts
+	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \

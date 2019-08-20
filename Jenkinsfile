@@ -1,34 +1,35 @@
 properties([
     parameters([
         string(name: 'ARTIFACTS_BUCKET', defaultValue: 'safe-jenkins-build-artifacts'),
+        string(name: 'CACHE_BRANCH', defaultValue: 'master'),
         string(name: 'DEPLOY_BUCKET', defaultValue: 'safe-cli')
     ])
 ])
 
 stage('build & test') {
-    parallel linux: {
+    parallel test_linux: {
         node('safe_cli') {
             checkout(scm)
             runTests()
-            packageBuildArtifacts('linux')
+            packageBuildArtifacts('linux', 'dev')
             uploadBuildArtifacts()
         }
     },
-    windows: {
+    test_windows: {
         node('windows') {
             checkout(scm)
             retrieveCache('windows')
             runTests()
-            packageBuildArtifacts('windows')
+            packageBuildArtifacts('windows', 'dev')
             uploadBuildArtifacts()
         }
     },
-    macos: {
+    test_macos: {
         node('osx') {
             checkout(scm)
             retrieveCache('macos')
             runTests()
-            packageBuildArtifacts('macos')
+            packageBuildArtifacts('macos', 'dev')
             uploadBuildArtifacts()
         }
     },
@@ -36,6 +37,30 @@ stage('build & test') {
         node('safe_cli') {
             checkout(scm)
             sh("make clippy")
+        }
+    },
+    release_linux: {
+        node('safe_cli') {
+            checkout(scm)
+            sh("make build")
+            packageBuildArtifacts('linux', 'release')
+            uploadBuildArtifacts()
+        }
+    },
+    release_windows: {
+        node('windows') {
+            checkout(scm)
+            sh("make build")
+            packageBuildArtifacts('windows', 'release')
+            uploadBuildArtifacts()
+        }
+    },
+    release_macos: {
+        node('osx') {
+            checkout(scm)
+            sh("make build")
+            packageBuildArtifacts('macos', 'release')
+            uploadBuildArtifacts()
         }
     }
 }
@@ -133,10 +158,11 @@ def retrieveBuildArtifacts() {
     }
 }
 
-def packageBuildArtifacts(os) {
+def packageBuildArtifacts(os, type) {
     branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
     withEnv(["SAFE_CLI_BRANCH=${branch}",
              "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}",
+             "SAFE_CLI_BUILD_TYPE=${type}",
              "SAFE_CLI_BUILD_OS=${os}"]) {
         sh("make package-build-artifacts")
     }
