@@ -222,7 +222,7 @@ impl IDataHandler {
         let (idata_address, op_type) = self.idata_op_mut(&message_id).and_then(|idata_op| {
             let op_type = idata_op.op_type();
             idata_op
-                .handle_mutation_resp(sender, own_id, message_id)
+                .handle_mutation_resp(sender, result.clone(), own_id, message_id)
                 .map(|address| (address, op_type))
         })?;
 
@@ -286,46 +286,66 @@ impl IDataHandler {
         &mut self,
         idata_address: IDataAddress,
         sender: XorName,
-        _result: NdResult<()>,
+        result: NdResult<()>,
         message_id: MessageId,
     ) -> Option<Action> {
-        // TODO - Assume deletion on Adult nodes was success for phase 1.
-        let db_key = idata_address.to_db_key();
-        let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
-            warn!(
-                "{}: Failed to get metadata from DB: {:?}",
-                self, idata_address
-            );
-            None
-        });
-
-        if let Some(mut metadata) = metadata {
-            if !metadata.holders.remove(&sender) {
+        // TODO - Only rudimentary checks for if requests to Adult nodes were successful. These
+        // mostly assume we're in practice only delegating to a single Adult (ourself in phase 1).
+        if let Err(err) = result {
+            warn!("{}: Node reports error deleting: {}", self, err);
+        } else {
+            let db_key = idata_address.to_db_key();
+            let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
                 warn!(
-                    "{}: {} is not registered as a holder for {:?}",
-                    self,
-                    sender,
-                    self.idata_op(&message_id)?
+                    "{}: Failed to get metadata from DB: {:?}",
+                    self, idata_address
                 );
-            }
-            if metadata.holders.is_empty() {
-                if let Err(error) = self.metadata.rem(&db_key) {
-                    warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                None
+            });
+
+            if let Some(mut metadata) = metadata {
+                if !metadata.holders.remove(&sender) {
+                    warn!(
+                        "{}: {} is not registered as a holder for {:?}",
+                        self,
+                        sender,
+                        self.idata_op(&message_id)?
+                    );
+                }
+                if metadata.holders.is_empty() {
+                    if let Err(error) = self.metadata.rem(&db_key) {
+                        warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                        // TODO - Send failure back to client handlers?
+                    }
+                } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                     // TODO - Send failure back to client handlers?
                 }
-            } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
-                warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-                // TODO - Send failure back to client handlers?
-            }
-        };
+            };
+        }
+
         self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| Action::RespondToClientHandlers {
-                sender: *idata_address.name(),
-                rpc: Rpc::Response {
-                    requester: idata_op.client().clone(),
-                    response: Response::Mutation(Ok(())),
-                    message_id,
-                },
+            .map(|idata_op| {
+                let response = {
+                    let errors_for_req = idata_op.get_any_errors();
+                    assert!(
+                        errors_for_req.len() <= 1,
+                        "Handling more than one response is not implemented."
+                    );
+                    if let Some(response) = errors_for_req.values().next() {
+                        Err(response.clone())
+                    } else {
+                        Ok(())
+                    }
+                };
+                Action::RespondToClientHandlers {
+                    sender: *idata_address.name(),
+                    rpc: Rpc::Response {
+                        requester: idata_op.client().clone(),
+                        response: Response::Mutation(response),
+                        message_id,
+                    },
+                }
             })
     }
 

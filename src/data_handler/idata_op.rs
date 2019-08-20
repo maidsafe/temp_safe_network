@@ -9,17 +9,19 @@
 use crate::{action::Action, rpc::Rpc, Error, Result};
 use log::{error, warn};
 use safe_nd::{
-    IData, IDataAddress, MessageId, PublicId, Request, Response, Result as NdResult, XorName,
+    Error as NdError, IData, IDataAddress, MessageId, PublicId, Request, Response,
+    Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub(crate) enum RpcState {
     // Request sent to chunk holder.
     Sent,
-    // Response received from chunk holder.
-    Actioned,
+    // Response received from chunk holder. Don't store the whole response due to space concerns,
+    // instead only store if there are any errors.
+    Actioned(Option<NdError>),
     // Holder has left the section without responding.
     HolderGone,
     // Holder hasn't responded within the required time.
@@ -70,9 +72,10 @@ impl IDataOp {
     }
 
     pub fn is_any_actioned(&self) -> bool {
-        self.rpc_states
-            .values()
-            .any(|rpc_state| rpc_state == &RpcState::Actioned)
+        self.rpc_states.values().any(|rpc_state| match rpc_state {
+            RpcState::Actioned(_) => true,
+            _ => false,
+        })
     }
 
     pub fn op_type(&self) -> OpType {
@@ -92,9 +95,20 @@ impl IDataOp {
             .any(|state| *state == RpcState::Sent)
     }
 
+    pub fn get_any_errors(&self) -> BTreeMap<XorName, NdError> {
+        self.rpc_states
+            .iter()
+            .filter_map(|(sender, state)| match state {
+                RpcState::Actioned(Some(err)) => Some((*sender, err.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn handle_mutation_resp(
         &mut self,
         sender: XorName,
+        result: NdResult<()>,
         own_id: String,
         message_id: MessageId,
     ) -> Option<IDataAddress> {
@@ -108,7 +122,7 @@ impl IDataOp {
                 return None;
             }
         };
-        self.set_to_actioned(&sender, own_id)?;
+        self.set_to_actioned(&sender, result.err(), own_id)?;
 
         match self.request {
             Request::PutIData(ref kind) => Some(*kind.address()),
@@ -137,7 +151,8 @@ impl IDataOp {
             return None;
         };
 
-        self.set_to_actioned(&sender, own_id)?;
+        let response = Response::GetIData(result.clone());
+        self.set_to_actioned(&sender, result.err(), own_id)?;
         if is_already_actioned {
             None
         } else {
@@ -145,14 +160,19 @@ impl IDataOp {
                 sender: *address.name(),
                 rpc: Rpc::Response {
                     requester: self.client().clone(),
-                    response: Response::GetIData(result),
+                    response,
                     message_id,
                 },
             })
         }
     }
 
-    fn set_to_actioned(&mut self, sender: &XorName, own_id: String) -> Option<()> {
+    fn set_to_actioned(
+        &mut self,
+        sender: &XorName,
+        got_error_response: Option<NdError>,
+        own_id: String,
+    ) -> Option<()> {
         self.rpc_states
             .get_mut(sender)
             .or_else(|| {
@@ -162,6 +182,6 @@ impl IDataOp {
                 );
                 None
             })
-            .map(|rpc_state| *rpc_state = RpcState::Actioned)
+            .map(|rpc_state| *rpc_state = RpcState::Actioned(got_error_response))
     }
 }

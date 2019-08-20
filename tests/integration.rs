@@ -2149,17 +2149,13 @@ fn delete_immutable_data() {
     let unpub_idata_address: XorName = *unpub_idata.address().name();
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
-    // TODO - enable this once we're passed phase 1.
-    // Currently Elders always assume mutation requests (put/delete) to Adults succeed.
-    if false {
-        // Delete unpublished data without being the owner
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_b,
-            Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
-            NdError::AccessDenied,
-        );
-    }
+    // Delete unpublished data without being the owner
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::DeleteUnpubIData(IDataAddress::Unpub(unpub_idata_address)),
+        NdError::AccessDenied,
+    );
 
     // Delete unpublished data without having the balance
     common::perform_mutation(
