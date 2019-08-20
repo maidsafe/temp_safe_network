@@ -931,7 +931,7 @@ impl ClientHandler {
             return Some(action);
         }
 
-        let result = match self.withdraw_coins_for_transfer(requester.name(), amount) {
+        let result = match self.withdraw(requester.name(), amount) {
             Ok(()) => return Some(action),
             Err(error) => Err(error),
         };
@@ -988,7 +988,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        match self.withdraw_coins_for_transfer(requester.name(), amount) {
+        match self.withdraw(requester.name(), amount) {
             Ok(()) => Some(Action::ForwardClientRequest(Rpc::Request {
                 request: Request::TransferCoins {
                     destination,
@@ -1054,18 +1054,6 @@ impl ClientHandler {
         for client_id in self.lookup_client_and_its_apps(destination) {
             self.send_notification_to_client(client_id, Notification(transaction));
         }
-    }
-
-    fn withdraw_coins_for_transfer(
-        &mut self,
-        balance_name: &XorName,
-        amount: Coins,
-    ) -> Result<(), NdError> {
-        self.withdraw(balance_name, amount).or_else(|error| {
-            // Note: in phase 1, we proceed even if there are insufficient funds.
-            trace!("{}: Unable to withdraw {} coins: {}", self, amount, error);
-            Ok(())
-        })
     }
 
     fn create_balance(
@@ -1300,7 +1288,7 @@ impl ClientHandler {
             return None;
         }
         // TODO - (after phase 1) - if `amount` < cost to store login packet return error msg here.
-        match self.withdraw_coins_for_transfer(payer.name(), amount) {
+        match self.withdraw(payer.name(), amount) {
             Ok(_) => {
                 let request = Request::CreateLoginPacketFor {
                     new_owner,
