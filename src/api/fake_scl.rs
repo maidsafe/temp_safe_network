@@ -129,16 +129,8 @@ impl SafeApp for SafeAppFake {
         new_balance_owner: PublicKey,
         amount: Coins,
     ) -> ResultReturn<XorName> {
-        match from_sk {
-            Some(sk) => {
-                self.substract_coins(sk, amount)?;
-            }
-            None => {
-                /* TODO: we should have a default wallet and substract from there */
-                return Err(Error::NetDataError(
-                    "Failed to create a CoinBalance: \"NoSuchBalance\"".to_string(),
-                ));
-            }
+        if let Some(sk) = from_sk {
+            self.substract_coins(sk, amount)?;
         };
 
         let to_xorname = xorname_from_pk(new_balance_owner);

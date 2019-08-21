@@ -13,11 +13,10 @@ use futures::future::Future;
 use log::{debug, info, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
-use safe_app::{run, App, AppError::CoreError};
+use safe_app::{run, App, AppError::CoreError as SafeAppError};
 use safe_core::{
     client::test_create_balance, client::wallet_transfer_coins, CoreError as SafeCoreError,
 };
-use safe_nd::Error as SafeNdError;
 
 #[cfg(not(feature = "fake-auth"))]
 use super::helpers::decode_ipc_msg;
@@ -26,9 +25,10 @@ use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
-    ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, Coins, IDataAddress,
-    MDataAction, MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue, PubImmutableData,
-    PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SeqMutableData, XorName,
+    ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, Coins,
+    Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
+    MDataSeqValue, PubImmutableData, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
+    SeqMutableData, XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -63,12 +63,10 @@ impl SafeAppScl {
         run(safe_app, move |client, _app_context| {
             client
                 .mutate_seq_mdata_entries(name, tag, entry_actions)
-                .map_err(CoreError)
+                .map_err(SafeAppError)
         })
         .map_err(|err| {
-            if let CoreError(SafeCoreError::NewRoutingClientError(
-                SafeNdError::InvalidEntryActions(_),
-            )) = err
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::InvalidEntryActions(_))) = err
             {
                 Error::EntryExists(format!("{}: {}", message, err))
             } else {
@@ -123,33 +121,19 @@ impl SafeApp for SafeAppScl {
         amount: Coins,
     ) -> ResultReturn<XorName> {
         let safe_app: &App = self.get_safe_app()?;
-        let from_sk = match from_sk {
-            Some(sk) => sk,
-            None => get_secret_bls_key(safe_app)?,
-        };
-
         run(safe_app, move |client, _app_context| {
             client
                 .create_balance(
-                    Some(&from_sk),
+                    from_sk.as_ref(),
                     SafeNdPublicKey::Bls(new_balance_owner),
                     amount,
                     None,
                 )
-                .map_err(|err| match err {
-                    SafeCoreError::NewRoutingClientError(e) => {
-                        CoreError(SafeCoreError::Unexpected(format!("{:?}", e)))
-                    }
-                    other => CoreError(SafeCoreError::Unexpected(format!("{:?}", other))),
-                })
+                .map_err(SafeAppError)
         })
         .map_err(|err| {
-            if let CoreError(SafeCoreError::Unexpected(e)) = err {
-                if e == "InsufficientBalance" {
-                    Error::NotEnoughBalance(amount.to_string())
-                } else {
-                    Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", e))
-                }
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) = err {
+                Error::NotEnoughBalance(amount.to_string())
             } else {
                 Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", err))
             }
@@ -171,9 +155,7 @@ impl SafeApp for SafeAppScl {
     fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins> {
         let safe_app: &App = self.get_safe_app()?;
         let coins = run(safe_app, move |client, _app_context| {
-            client
-                .get_balance(Some(&sk))
-                .map_err(|e| CoreError(SafeCoreError::Unexpected(format!("{:?}", e))))
+            client.get_balance(Some(&sk)).map_err(SafeAppError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
 
@@ -189,7 +171,9 @@ impl SafeApp for SafeAppScl {
     ) -> ResultReturn<u64> {
         wallet_transfer_coins(&from_sk, to_xorname, amount, Some(tx_id)).map_err(
             |err| match err {
-                SafeNdError::ExcessiveValue => Error::NotEnoughBalance(amount.to_string()),
+                SafeCoreError::DataError(SafeNdError::ExcessiveValue) => {
+                    Error::NotEnoughBalance(amount.to_string())
+                }
                 other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
             },
         )?;
@@ -219,7 +203,7 @@ impl SafeApp for SafeAppScl {
         let the_idata = PubImmutableData::new(data.to_vec());
         let return_idata = the_idata.clone();
         run(safe_app, move |client, _app_context| {
-            client.put_idata(the_idata).map_err(CoreError)
+            client.put_idata(the_idata).map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to PUT Published ImmutableData: {:?}", e))
@@ -234,7 +218,7 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
         let immd_data_addr = IDataAddress::Pub(xorname);
         let data = run(safe_app, move |client, _app_context| {
-            client.get_idata(immd_data_addr).map_err(CoreError)
+            client.get_idata(immd_data_addr).map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
@@ -310,7 +294,7 @@ impl SafeApp for SafeAppScl {
             client
                 .put_adata(AData::PubSeq(data.clone()))
                 .and_then(move |_| append_client.append_seq_adata(append, 0))
-                .map_err(CoreError)
+                .map_err(SafeAppError)
                 .map(move |_| xorname)
         })
         .map_err(|e| {
@@ -339,7 +323,7 @@ impl SafeApp for SafeAppScl {
 
             client
                 .append_seq_adata(append, new_version)
-                .map_err(CoreError)
+                .map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!(
@@ -372,7 +356,7 @@ impl SafeApp for SafeAppScl {
         let data_entry = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_last_entry(append_only_data_address)
-                .map_err(CoreError)
+                .map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
@@ -395,7 +379,7 @@ impl SafeApp for SafeAppScl {
         run(safe_app, move |client, _app_context| {
             client
                 .get_adata_indices(append_only_data_address)
-                .map_err(CoreError)
+                .map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!(
@@ -425,10 +409,10 @@ impl SafeApp for SafeAppScl {
         let data_entries = run(safe_app, move |client, _app_context| {
             client
                 .get_adata_range(append_only_data_address, (start, end))
-                .map_err(CoreError)
+                .map_err(SafeAppError)
         })
         .map_err(|err| {
-            if let CoreError(SafeCoreError::NewRoutingClientError(SafeNdError::NoSuchEntry)) = err {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
                 Error::VersionNotFound(format!(
                     "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
                     version, name
@@ -497,7 +481,7 @@ impl SafeApp for SafeAppScl {
         run(safe_app, move |client, _app_context| {
             client
                 .put_seq_mutable_data(mdata)
-                .map_err(CoreError)
+                .map_err(SafeAppError)
                 .map(move |_| xorname)
         })
         .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
@@ -506,7 +490,7 @@ impl SafeApp for SafeAppScl {
     fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
-            client.get_seq_mdata(name, tag).map_err(CoreError)
+            client.get_seq_mdata(name, tag).map_err(SafeAppError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
@@ -534,7 +518,7 @@ impl SafeApp for SafeAppScl {
         run(safe_app, move |client, _app_context| {
             client
                 .get_seq_mdata_value(name, tag, key_vec)
-                .map_err(CoreError)
+                .map_err(SafeAppError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to retrieve key. {:?}", e)))
     }
@@ -546,7 +530,9 @@ impl SafeApp for SafeAppScl {
     ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
-            client.list_seq_mdata_entries(name, tag).map_err(CoreError)
+            client
+                .list_seq_mdata_entries(name, tag)
+                .map_err(SafeAppError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
@@ -580,18 +566,6 @@ fn get_public_bls_key(safe_app: &App) -> ResultReturn<PublicKey> {
     .map_err(|err| {
         Error::Unexpected(format!(
             "Failed to retrieve account's public BLS key: {}",
-            err
-        ))
-    })
-}
-
-fn get_secret_bls_key(safe_app: &App) -> ResultReturn<SecretKey> {
-    run(safe_app, move |client, _app_context| {
-        Ok(client.secret_bls_key())
-    })
-    .map_err(|err| {
-        Error::Unexpected(format!(
-            "Failed to retrieve account's secret BLS key: {}",
             err
         ))
     })
