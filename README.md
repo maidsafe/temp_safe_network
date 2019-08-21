@@ -44,7 +44,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 
 ## Build
 
-In order to build this CLI from source code you need to make sure you have `rustc v1.35.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this CLI from source code you need to make sure you have `rustc v1.37.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe_cli` crate (the build process may take several minutes the first time you run it on this crate):
 ```shell
@@ -88,7 +88,7 @@ This command simply sends an authorisation request to the Authenticator availabl
 
 You need the [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli) running locally and exposing its WebService interface for authorising applications, and also be logged in to a SAFE account created on the mock network (i.e. `MockVault` file), making sure the port number you set is `41805`, and enabling the `mock-network` feature.
 
-Please open a second/separate terminal console to execute the following commands (again, please make sure you have `rustc v1.35.0` or higher):
+Please open a second/separate terminal console to execute the following commands (again, please make sure you have `rustc v1.37.0` or higher):
 ```shell
 $ git clone https://github.com/maidsafe/safe-authenticator-cli.git
 $ cd safe-authenticator-cli
@@ -129,10 +129,11 @@ To generate a key pair and create a new `Key` on the network, the secret key of 
 $ safe keys create --pay-with <secret key>
 ```
 
-But we can also create a `Key` with test-coins since we are using the mock network:
+But we can also create a `Key` with test-coins to begin with (this is temporary and only for testing until farming is available):
 ```shell
 $ safe keys create --test-coins --preload 15.342
 New Key created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
+Preloaded with 15.342 coins
 Key pair generated:
 pk = b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61
 sk = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
@@ -142,10 +143,13 @@ Once we have some `Key`s with some test-coins we can use them to pay for the cre
 ```shell
 $ safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 New Key created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
+Preloaded with 8.15 coins
 Key pair generated:
 pk = 9754a42c0b568e692b10401c4129bff61088df6ae51bef883b28693d8c3e0e8ce23054e236bd64edc45791549ef60ce1
 sk = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c
 ```
+
+In this case, the new `Key` is preloaded with coins which are transferred from the `Key` we pay the operation with. In next section we'll see how to check the coins balance of them.
 
 Other optional args that can be used with `keys create` sub-command are:
 ```
@@ -170,7 +174,7 @@ Key's current balance: 15.342
 
 There are some scenarios that being able to generate a sign/encryption key-pair, without creating and/or storing a `Key` on the network, is required.
 
-As an example, if we want to have a friend to create a `Key` for us, and preload it with some safecoins, we can generate a key-pair, and share with our friend only the public key so they can generate the `Key` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
+As an example, if we want to have a friend to create a `Key` for us, and preload it with some coins, we can generate a key-pair, and share with our friend only the public key so he/she can generate the `Key` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
 
 Thus, let's see how this use case would work. First we create a key-pair:
 ```shell
@@ -184,9 +188,10 @@ We now take note of both the public key, and the secret key. Now, we only share 
 ```shell
 $ safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
 New Key created at: "safe://hodby8y3qgina9nqzxmsoi8ytjfh6gwnia7hdupo49ibt8yy3ytgdq"
+Preloaded with 64.24 coins
 ```
 
-Finally, our friend gives us the XOR-URL of the `Key` they have created for us, and we can now use the `Key` for any other operation, we own the balance it contains since we have the secret key associated to it.
+Finally, our friend gives us the XOR-URL of the `Key` they have created for us, we own the balance it contains since we have the secret key associated to it. Therefore we can now use the `Key` for any operation, like creating an account with safe_auth CLI to then be able to store data on the Network.
 
 ### Wallet
 

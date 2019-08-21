@@ -37,7 +37,7 @@ function download_safe_auth_nightly() {
 function run_safe_auth() {
     cd $SAFE_MOCK_VAULT_PATH
     ls -al
-    SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b ./$auth_bin_name -i nonsense || true
+    SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b ./$auth_bin_name --test-coins || true
     echo "Launching safe_auth daemon on port:" $RANDOM_PORT_NUMBER
     SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b ./$auth_bin_name \
         --daemon $RANDOM_PORT_NUMBER --allow-all-auth &

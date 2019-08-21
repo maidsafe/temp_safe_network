@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::auth::auth_connect;
 use super::helpers::get_secret_key;
 use super::OutputFmt;
 use log::{debug, warn};
@@ -24,7 +25,7 @@ pub enum KeysSubCommands {
         pay_with: Option<String>,
         /// Create a Key and allocate test-coins onto it
         #[structopt(long = "test-coins")]
-        preload_test_coins: bool,
+        test_coins: bool,
         /// Preload the Key with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
@@ -54,13 +55,22 @@ pub fn key_commander(
             preload,
             pk,
             pay_with,
-            preload_test_coins,
+            test_coins,
             ..
         }) => {
-            create_new_key(safe, preload_test_coins, pay_with, preload, pk, output_fmt)?;
+            if test_coins && (pk.is_some() | pay_with.is_some()) {
+                // We don't support these args with --test-coins
+                return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
+            } else if !test_coins {
+                // We need to connect with an authorised app since we are not creating a Key with test-coins
+                auth_connect(safe)?;
+            }
+
+            create_new_key(safe, test_coins, pay_with, preload, pk, output_fmt)?;
             Ok(())
         }
         Some(KeysSubCommands::Balance { keyurl, secret }) => {
+            auth_connect(safe)?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret, "the Key to query the balance from")?;
             let current_balance = if target.is_empty() {
@@ -82,18 +92,13 @@ pub fn key_commander(
 
 pub fn create_new_key(
     safe: &mut Safe,
-    preload_test_coins: bool,
+    test_coins: bool,
     pay_with: Option<String>,
     preload: Option<String>,
     pk: Option<String>,
     output_fmt: OutputFmt,
 ) -> Result<(String, Option<BlsKeyPair>), String> {
-    let (xorurl, key_pair) = if preload_test_coins {
-        if cfg!(not(feature = "mock-network")) && cfg!(not(feature = "scl-mock")) {
-            warn!("'--test-coins' flag is not supported since it's only available for \"mock-network\" feature");
-            return Err("'--test-coins' flag is not supported since it's only available for \"mock-network\" feature".to_string());
-        }
-
+    let (xorurl, key_pair, amount) = if test_coins {
         warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
@@ -103,7 +108,8 @@ pub fn create_new_key(
             );
         }
 
-        safe.keys_create_preload_test_coins(&amount, pk)?
+        let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount)?;
+        (xorurl, key_pair, Some(amount))
     } else {
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
@@ -111,11 +117,15 @@ pub fn create_new_key(
         if pay_with.is_none() {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
         }
-        safe.keys_create(pay_with, preload, pk)?
+        let (xorurl, key_pair) = safe.keys_create(pay_with, preload.clone(), pk)?;
+        (xorurl, key_pair, preload)
     };
 
     if OutputFmt::Pretty == output_fmt {
         println!("New Key created at: \"{}\"", xorurl);
+        if let Some(n) = amount {
+            println!("Preloaded with {} coins", n);
+        }
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");
             println!("pk = {}", pair.pk);

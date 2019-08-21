@@ -56,7 +56,7 @@ impl Safe {
         sk: &str,
     ) -> ResultReturn<String> {
         let key_pair = KeyPair::from_hex_sk(sk)?;
-        let xorname = xorname_from_pk(&key_pair.pk);
+        let xorname = xorname_from_pk(key_pair.pk);
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
@@ -240,8 +240,8 @@ impl Safe {
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let wallet_xorurl = unwrap!(safe.wallet_create());
     /// let wallet_xorurl2 = unwrap!(safe.wallet_create());
-    /// let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14", None));
-    /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1", None));
+    /// let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14"));
+    /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1"));
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl,
     ///     Some("frombalance".to_string()),
@@ -364,8 +364,8 @@ fn test_wallet_insert_and_balance() {
     let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23", None));
-    let (_key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1.53", None));
+    let (_key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
+    let (_key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1.53"));
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
@@ -396,7 +396,7 @@ fn test_wallet_transfer_no_default() {
     let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance
 
     let to_wallet_xorurl = unwrap!(safe.wallet_create()); // we'll insert a default balance
-    let (_key_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("43523", None));
+    let (_key_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("43523"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
         Some("myfirstbalance".to_string()),
@@ -437,7 +437,7 @@ fn test_wallet_transfer_diff_amounts() {
     let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let from_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5", None));
+    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
         Some("myfirstbalance".to_string()),
@@ -446,7 +446,7 @@ fn test_wallet_transfer_diff_amounts() {
     ));
 
     let to_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5", None));
+    let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
         Some("alsomyfirstbalance".to_string()),
@@ -493,7 +493,7 @@ fn test_wallet_transfer_to_key() {
     unwrap!(safe.connect("", Some("fake-credentials")));
 
     let from_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("4621.45", None));
+    let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("4621.45"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
         Some("myfirstbalance".to_string()),
@@ -501,7 +501,7 @@ fn test_wallet_transfer_to_key() {
         &unwrap!(key_pair1.clone()).sk,
     ));
 
-    let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.0", None));
+    let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.0"));
 
     // test successful transfer
     match safe.wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl) {
@@ -527,7 +527,7 @@ fn test_wallet_transfer_with_nrs_urls() {
     unwrap!(safe.connect("", Some("fake-credentials")));
 
     let from_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2", None));
+    let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
         Some("myfirstbalance".to_string()),
@@ -544,7 +544,7 @@ fn test_wallet_transfer_with_nrs_urls() {
         false
     ));
 
-    let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.1", None));
+    let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.1"));
     let to_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     let _ = unwrap!(safe.nrs_map_container_create(&to_nrsurl, &key_xorurl, false, true, false));
 

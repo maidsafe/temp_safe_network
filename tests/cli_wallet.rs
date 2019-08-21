@@ -134,12 +134,7 @@ fn calling_safe_wallet_insert() {
 fn calling_safe_wallet_create_no_source() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    cmd.args(&vec!["wallet", "create"])
-        .assert()
-        .stderr(predicate::str::contains(
-            "Failed to create a CoinBalance: \"NoSuchBalance\"",
-        ))
-        .failure();
+    cmd.args(&vec!["wallet", "create"]).assert().success();
 }
 
 #[test]

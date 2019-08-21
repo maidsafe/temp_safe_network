@@ -8,7 +8,7 @@
 
 use log::debug;
 
-pub fn update_commander() -> Result<(), Box<::std::error::Error>> {
+pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     let target = self_update::get_target()?;
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
