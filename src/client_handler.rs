@@ -107,11 +107,13 @@ impl ClientHandler {
             "Our connection info:\n{}\n",
             unwrap!(serde_json::to_string(&our_conn_info))
         );
-        if let Ok(connection_info_file) = write_connection_info(&our_conn_info) {
-            println!(
-                "Writing connection info to: {}",
-                connection_info_file.to_string_lossy()
-            );
+        if !cfg!(feature = "mock") {
+            if let Ok(connection_info_file) = write_connection_info(&our_conn_info) {
+                println!(
+                    "Writing connection info to: {}",
+                    connection_info_file.display()
+                );
+            }
         }
 
         Ok((quic_p2p, event_receiver))
