@@ -18,15 +18,15 @@ const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
     #[structopt(name = "create")]
-    /// Create a new Key
+    /// Create a new SafeKey
     Create {
-        /// The secret key of a Key for paying the operation costs. If not provided, the default wallet from the account will be used, unless '--test-coins' was set
+        /// The secret key of a SafeKey for paying the operation costs. If not provided, the default wallet from the account will be used, unless '--test-coins' was set
         #[structopt(short = "w", long = "pay-with")]
         pay_with: Option<String>,
-        /// Create a Key and allocate test-coins onto it
+        /// Create a SafeKey and allocate test-coins onto it
         #[structopt(long = "test-coins")]
         test_coins: bool,
-        /// Preload the Key with a balance
+        /// Preload the SafeKey with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
         /// Don't generate a key pair and just use the provided public key
@@ -34,12 +34,12 @@ pub enum KeysSubCommands {
         pk: Option<String>,
     },
     #[structopt(name = "balance")]
-    /// Query a Key's current balance
+    /// Query a SafeKey's current balance
     Balance {
-        /// The target Key's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'
+        /// The target SafeKey's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'
         #[structopt(long = "keyurl")]
         keyurl: Option<String>,
-        /// The secret key which corresponds to the target Key. It will be prompted if not provided
+        /// The secret key which corresponds to the target SafeKey. It will be prompted if not provided
         #[structopt(long = "sk")]
         secret: Option<String>,
     },
@@ -62,7 +62,7 @@ pub fn key_commander(
                 // We don't support these args with --test-coins
                 return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
             } else if !test_coins {
-                // We need to connect with an authorised app since we are not creating a Key with test-coins
+                // We need to connect with an authorised app since we are not creating a SafeKey with test-coins
                 auth_connect(safe)?;
             }
 
@@ -72,7 +72,7 @@ pub fn key_commander(
         Some(KeysSubCommands::Balance { keyurl, secret }) => {
             auth_connect(safe)?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
-            let sk = get_secret_key(&target, secret, "the Key to query the balance from")?;
+            let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(&sk)?
             } else {
@@ -80,7 +80,7 @@ pub fn key_commander(
             };
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Key's current balance: {}", current_balance);
+                println!("SafeKey's current balance: {}", current_balance);
             } else {
                 println!("{}", current_balance);
             }
@@ -99,7 +99,7 @@ pub fn create_new_key(
     output_fmt: OutputFmt,
 ) -> Result<(String, Option<BlsKeyPair>), String> {
     let (xorurl, key_pair, amount) = if test_coins {
-        warn!("Note that the Key to be created will be preloaded with **test coins** rather than real coins");
+        warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
         if amount == PRELOAD_TESTCOINS_DEFAULT_AMOUNT {
@@ -122,7 +122,7 @@ pub fn create_new_key(
     };
 
     if OutputFmt::Pretty == output_fmt {
-        println!("New Key created at: \"{}\"", xorurl);
+        println!("New SafeKey created at: \"{}\"", xorurl);
         if let Some(n) = amount {
             println!("Preloaded with {} coins", n);
         }

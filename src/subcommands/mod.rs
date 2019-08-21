@@ -63,7 +63,7 @@ pub enum SubCommands {
         cmd: Option<files::FilesSubCommands>,
     },
     #[structopt(name = "keypair")]
-    /// Generate a key pair without creating and/or storing a Key on the network
+    /// Generate a key pair without creating and/or storing a SafeKey on the network
     Keypair {},
     #[structopt(name = "nrs")]
     /// Manage public names on the SAFE Network

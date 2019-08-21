@@ -44,7 +44,7 @@ impl std::fmt::Display for SafeContentType {
 // data that is being held which is identified by the SafeContentType instead.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeDataType {
-    CoinBalance = 0x00,
+    SafeKey = 0x00,
     PublishedImmutableData = 0x01,
     UnpublishedImmutableData = 0x02,
     SeqMutableData = 0x03,
@@ -165,7 +165,7 @@ impl XorUrlEncoder {
         );
 
         let data_type = match xorurl_bytes[3] {
-            0 => SafeDataType::CoinBalance,
+            0 => SafeDataType::SafeKey,
             1 => SafeDataType::PublishedImmutableData,
             2 => SafeDataType::UnpublishedImmutableData,
             3 => SafeDataType::SeqMutableData,

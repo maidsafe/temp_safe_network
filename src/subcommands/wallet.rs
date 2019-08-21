@@ -21,7 +21,7 @@ pub enum WalletSubCommands {
     Insert {
         /// The target Wallet to insert the spendable balance
         target: String,
-        /// The secret key of a Key for paying the operation costs. If not provided, the default wallet from the account will be used
+        /// The secret key of a SafeKey for paying the operation costs. If not provided, the default wallet from the account will be used
         #[structopt(short = "w", long = "pay-with")]
         pay_with: Option<String>,
         /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
@@ -30,10 +30,10 @@ pub enum WalletSubCommands {
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
-        /// The Key's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'
+        /// The SafeKey's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'
         #[structopt(long = "keyurl")]
         keyurl: Option<String>,
-        /// Set the inserted Key as the default one in the target Wallet
+        /// Set the inserted SafeKey as the default one in the target Wallet
         #[structopt(long = "default")]
         default: bool,
     },
@@ -49,7 +49,7 @@ pub enum WalletSubCommands {
     #[structopt(name = "create")]
     /// Create a new Wallet
     Create {
-        /// The secret key of a Key for paying the operation costs
+        /// The secret key of a SafeKey for paying the operation costs
         #[structopt(short = "w", long = "pay-with")]
         pay_with: Option<String>,
         /// If true, do not create a spendable balance
@@ -58,13 +58,13 @@ pub enum WalletSubCommands {
         /// The name to give the spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
-        /// An existing Key's safe://xor-url. If this is not supplied, a new Key will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'
+        /// An existing SafeKey's safe://xor-url. If this is not supplied, a new SafeKey will be automatically generated and inserted. The corresponding secret key will be prompted if not provided with '--sk'
         #[structopt(long = "keyurl")]
         keyurl: Option<String>,
         /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
         #[structopt(long = "sk")]
         secret: Option<String>,
-        /// Create a Key, allocate test-coins onto it, and add the Key to the Wallet
+        /// Create a Key, allocate test-coins onto it, and add the SafeKey to the Wallet
         #[structopt(long = "test-coins")]
         test_coins: bool,
         /// Preload the key with a balance
@@ -72,7 +72,7 @@ pub enum WalletSubCommands {
         preload: Option<String>,
     },
     #[structopt(name = "transfer")]
-    /// Transfer safecoins from one Wallet, Key or pk, to another
+    /// Transfer safecoins from one Wallet, SafeKey or pk, to another
     Transfer {
         /// Number of safecoins to transfer
         amount: String,
@@ -115,7 +115,7 @@ pub fn wallet_commander(
                 // get or create keypair
                 let sk = match keyurl {
                     Some(linked_key) => {
-                        let sk = get_secret_key(&linked_key, secret, "the Key to insert")?;
+                        let sk = get_secret_key(&linked_key, secret, "the SafeKey to insert")?;
                         let _pk = safe.validate_sk_for_url(&sk, &linked_key)?;
                         sk
                     }
@@ -173,11 +173,11 @@ pub fn wallet_commander(
 
             let sk = match keyurl {
                 Some(linked_key) => {
-                    let sk = get_secret_key(&linked_key, secret, "the Key to insert")?;
+                    let sk = get_secret_key(&linked_key, secret, "the SafeKey to insert")?;
                     let _pk = safe.validate_sk_for_url(&sk, &linked_key)?;
                     sk
                 }
-                None => get_secret_key("", secret, "the Key to insert")?,
+                None => get_secret_key("", secret, "the SafeKey to insert")?,
             };
 
             let the_name = safe.wallet_insert(&target, name, default, &sk)?;

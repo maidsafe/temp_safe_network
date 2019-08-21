@@ -2,7 +2,7 @@
 name = "safe_cli"
 version = "0.0.3"
 description = "SAFE CLI"
-authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
+authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 publish = false
 license = "GPL-3.0"
 edition = "2018"

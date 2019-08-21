@@ -59,14 +59,14 @@ pub fn validate_key_pair(key_pair: &BlsKeyPair) -> ResultReturn<()> {
 
 #[allow(dead_code)]
 impl Safe {
-    // Generate a key pair without creating and/or storing a Key on the network
+    // Generate a key pair without creating and/or storing a SafeKey on the network
     pub fn keypair(&self) -> ResultReturn<BlsKeyPair> {
         let key_pair = KeyPair::random();
         let (pk, sk) = key_pair.to_hex_key_pair()?;
         Ok(BlsKeyPair { pk, sk })
     }
 
-    // Create a Key on the network and return its XOR-URL.
+    // Create a SafeKey on the network and return its XOR-URL.
     pub fn keys_create(
         &mut self,
         from: Option<String>,
@@ -116,7 +116,7 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
-            SafeDataType::CoinBalance,
+            SafeDataType::SafeKey,
             SafeContentType::Raw,
             None,
             None,
@@ -126,7 +126,7 @@ impl Safe {
         Ok((xorurl, key_pair))
     }
 
-    // Create a Key on the network, allocates testcoins onto it, and return the Key's XOR-URL
+    // Create a SafeKey on the network, allocates testcoins onto it, and return the SafeKey's XOR-URL
     pub fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: &str,
@@ -142,7 +142,7 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
-            SafeDataType::CoinBalance,
+            SafeDataType::SafeKey,
             SafeContentType::Raw,
             None,
             None,
@@ -152,16 +152,16 @@ impl Safe {
         Ok((xorurl, key_pair))
     }
 
-    // Check Key's balance from the network from a given SecretKey string
+    // Check SafeKey's balance from the network from a given SecretKey string
     pub fn keys_balance_from_sk(&self, sk: &str) -> ResultReturn<String> {
         let secret_key = sk_from_hex(sk)?;
         let coins = self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
-            Error::ContentNotFound("No Key found at specified location".to_string())
+            Error::ContentNotFound("No SafeKey found at specified location".to_string())
         })?;
         Ok(coins.to_string())
     }
 
-    // Check Key's balance from the network from a given XOR/NRS-URL and secret key string.
+    // Check SafeKey's balance from the network from a given XOR/NRS-URL and secret key string.
     // The difference between this and 'keys_balance_from_sk' function is that this will additionally
     // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
     pub fn keys_balance_from_url(&self, url: &str, sk: &str) -> ResultReturn<String> {
@@ -373,7 +373,7 @@ fn test_keys_test_coins_balance_wrong_sk() {
     let current_balance = safe.keys_balance_from_sk(&unwrapped_sk);
     match current_balance {
         Err(Error::ContentNotFound(msg)) => {
-            assert!(msg.contains("No Key found at specified location"))
+            assert!(msg.contains("No SafeKey found at specified location"))
         }
         Err(err) => panic!("Error returned is not the expected: {:?}", err),
         Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),

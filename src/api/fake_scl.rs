@@ -23,7 +23,7 @@ use threshold_crypto::{PublicKey, SecretKey};
 const FAKE_VAULT_FILE: &str = "./fake_vault_data.json";
 
 #[derive(Debug, Serialize, Deserialize)]
-struct CoinBalance {
+struct SafeKey {
     owner: PublicKey,
     value: String,
 }
@@ -35,7 +35,7 @@ type SeqMutableDataFake = BTreeMap<String, MDataSeqValue>;
 
 #[derive(Default, Serialize, Deserialize)]
 struct FakeData {
-    coin_balances: BTreeMap<XorNameStr, CoinBalance>,
+    coin_balances: BTreeMap<XorNameStr, SafeKey>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
     published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataFake>, // keep a versioned map of data per xorname
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataFake>,
@@ -66,18 +66,14 @@ impl SafeAppFake {
     // private helper
     fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<Coins> {
         match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
-            None => Err(Error::ContentNotFound(
-                "CoinBalance data not found".to_string(),
-            )),
+            None => Err(Error::ContentNotFound("SafeKey data not found".to_string())),
             Some(coin_balance) => parse_coins_amount(&coin_balance.value),
         }
     }
 
     fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
         match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
-            None => Err(Error::ContentNotFound(
-                "CoinBalance data not found".to_string(),
-            )),
+            None => Err(Error::ContentNotFound("SafeKey data not found".to_string())),
             Some(coin_balance) => Ok(coin_balance.owner),
         }
     }
@@ -90,7 +86,7 @@ impl SafeAppFake {
                 let from_pk = sk.public_key();
                 self.fake_vault.coin_balances.insert(
                     xorname_to_hex(&xorname_from_pk(from_pk)),
-                    CoinBalance {
+                    SafeKey {
                         owner: from_pk,
                         value: new_balance_coins.to_string(),
                     },
@@ -136,7 +132,7 @@ impl SafeApp for SafeAppFake {
         let to_xorname = xorname_from_pk(new_balance_owner);
         self.fake_vault.coin_balances.insert(
             xorname_to_hex(&to_xorname),
-            CoinBalance {
+            SafeKey {
                 owner: new_balance_owner,
                 value: amount.to_string(),
             },
@@ -150,7 +146,7 @@ impl SafeApp for SafeAppFake {
         let xorname = xorname_from_pk(to_pk);
         self.fake_vault.coin_balances.insert(
             xorname_to_hex(&xorname),
-            CoinBalance {
+            SafeKey {
                 owner: (to_pk),
                 value: amount.to_string(),
             },
@@ -200,7 +196,7 @@ impl SafeApp for SafeAppFake {
             Some(new_balance_coins) => {
                 self.fake_vault.coin_balances.insert(
                     to_xorname_hex,
-                    CoinBalance {
+                    SafeKey {
                         owner: self.fetch_pk_from_xorname(&to_xorname)?,
                         value: new_balance_coins.to_string(),
                     },

@@ -135,7 +135,7 @@ impl SafeApp for SafeAppScl {
             if let SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) = err {
                 Error::NotEnoughBalance(amount.to_string())
             } else {
-                Error::NetDataError(format!("Failed to create a CoinBalance: {:?}", err))
+                Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
             }
         })?;
 
@@ -144,7 +144,7 @@ impl SafeApp for SafeAppScl {
     }
 
     fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
-        info!("Creating test CoinBalance with {} test coins", amount);
+        info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&owner_sk, amount)
             .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
