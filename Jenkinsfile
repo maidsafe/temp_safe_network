@@ -71,16 +71,18 @@ stage('deploy') {
             checkout(scm)
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
-            if (versionChangeCommit()) {
+            if (isVersionChangeCommit()) {
                 version = sh(
                     returnStdout: true,
                     script: "grep '^version' < Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
                 packageArtifactsForDeploy(true)
                 createTag(version)
                 createGithubRelease(version)
+                uploadDeployArtifacts("dev")
             } else {
                 packageArtifactsForDeploy(false)
-                uploadDeployArtifacts()
+                uploadDeployArtifacts("dev")
+                uploadDeployArtifacts("release")
             }
         } else {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
@@ -109,7 +111,7 @@ def runTests() {
     }
 }
 
-def versionChangeCommit() {
+def isVersionChangeCommit() {
     shortCommitHash = sh(
         returnStdout: true,
         script: "git log -n 1 --no-merges --pretty=format:'%h'").trim()
@@ -181,14 +183,15 @@ def uploadBuildArtifacts() {
     }
 }
 
-def uploadDeployArtifacts() {
+def uploadDeployArtifacts(type) {
     withAWS(credentials: 'aws_jenkins_deploy_artifacts_user', region: 'eu-west-2') {
-        def artifacts = sh(returnStdout: true, script: 'ls -1 deploy').trim().split("\\r?\\n")
+        def artifacts = sh(
+            returnStdout: true, script: "ls -1 deploy/${type}").trim().split("\\r?\\n")
         for (artifact in artifacts) {
             s3Upload(
                 bucket: "${params.DEPLOY_BUCKET}",
                 file: artifact,
-                workingDir: "${env.WORKSPACE}/deploy",
+                workingDir: "${env.WORKSPACE}/deploy/${type}",
                 acl: 'PublicRead')
         }
     }

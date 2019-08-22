@@ -133,15 +133,27 @@ endif
 	mkdir -p artifacts/linux/release
 	mkdir -p artifacts/win/release
 	mkdir -p artifacts/macos/release
+	mkdir -p artifacts/linux/dev
+	mkdir -p artifacts/win/dev
+	mkdir -p artifacts/macos/dev
 	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64.tar.gz .
 	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64.tar.gz .
 	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64.tar.gz .
+	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64-dev.tar.gz .
+	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64-dev.tar.gz .
+	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64-dev.tar.gz .
 	tar -C artifacts/linux/release -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64.tar.gz
 	tar -C artifacts/win/release -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64.tar.gz
 	tar -C artifacts/macos/release -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64.tar.gz
+	tar -C artifacts/linux/dev -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64-dev.tar.gz
+	tar -C artifacts/win/dev -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64-dev.tar.gz
+	tar -C artifacts/macos/dev -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64-dev.tar.gz
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64.tar.gz
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64.tar.gz
 	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64.tar.gz
+	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-linux-x86_64-dev.tar.gz
+	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-windows-x86_64-dev.tar.gz
+	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe_cli-macos-x86_64-dev.tar.gz
 
 clean:
 ifndef SAFE_AUTH_PORT
@@ -158,24 +170,38 @@ endif
 package-commit_hash-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
-	mkdir deploy
+	mkdir -p deploy/dev
+	mkdir -p deploy/release
 	tar -C artifacts/linux/release -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar safe
 	tar -C artifacts/win/release -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar safe.exe
 	tar -C artifacts/macos/release -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar safe
-	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar deploy
-	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar deploy
-	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar deploy
+	tar -C artifacts/linux/dev -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu-dev.tar safe
+	tar -C artifacts/win/dev -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu-dev.tar safe.exe
+	tar -C artifacts/macos/dev -cvf safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin-dev.tar safe
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.tar deploy/release
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar deploy/release
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar deploy/release
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu-dev.tar deploy/dev
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu-dev.tar deploy/dev
+	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin-dev.tar deploy/dev
 
 package-version-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
-	mkdir deploy
+	mkdir -p deploy/dev
+	mkdir -p deploy/release
 	tar -C artifacts/linux/release -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar safe
 	tar -C artifacts/win/release -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar safe.exe
 	tar -C artifacts/macos/release -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar safe
-	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar deploy
-	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar deploy
-	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar deploy
+	tar -C artifacts/linux/dev -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.tar safe
+	tar -C artifacts/win/dev -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.tar safe.exe
+	tar -C artifacts/macos/dev -cvf safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.tar safe
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar deploy/release
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar deploy/release
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar deploy/release
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.tar deploy/dev
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.tar deploy/dev
+	mv safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.tar deploy/dev
 
 deploy-github-release:
 ifndef GITHUB_TOKEN
@@ -193,19 +219,19 @@ endif
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar" \
-		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar;
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar" \
-		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar;
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar" \
-		--file deploy/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar;
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar;
 
 retrieve-cache:
 ifndef SAFE_CLI_BRANCH
