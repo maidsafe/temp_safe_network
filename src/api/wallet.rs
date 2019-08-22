@@ -90,7 +90,7 @@ impl Safe {
             )
             .map_err(|err| match err {
                 Error::EntryExists(_) => Error::EntryExists(format!(
-                    "An spendable balance already exists in the Wallet with the same name: '{}'",
+                    "A spendable balance already exists in the Wallet with the same name: '{}'",
                     md_key
                 )),
                 other => other,
