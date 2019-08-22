@@ -62,9 +62,15 @@ $ cargo build
 
 ### Using the Mock or Non-Mock SAFE Network
 
-The `safe_cli` is currently built by default with [Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). Thus, every command executed will be against the `Mock` network regardless if you are using `cargo run` or the binary from `target` folder.
+By default, the `safe_cli` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
+```
+$ cargo build --features mock-network
+```
 
-We will be changing this as soon as the first release of local Vaults is published, and therefore the `safe_cli` will also support connecting to the local Vault, in addition to the `Mock` network.
+Keep in mind that when running the safe_cli with `cargo run`, please also make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe_cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
+```
+$ cargo run --features mock-network -- keys create --test-coins
+```
 
 ## Using the CLI
 
