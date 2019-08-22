@@ -282,7 +282,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() {
     .stdout(predicate::str::contains("TX_ID"))
     .success();
 
-    // Key got coins?
+    // SafeKey got coins?
     let key_has = cmd!(
         get_bin_location(),
         "keys",
@@ -341,7 +341,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() {
     .stdout(predicate::str::contains("TX_ID"))
     .success();
 
-    // Key got coins?
+    // SafeKey got coins?
     let key_has = cmd!(
         get_bin_location(),
         "keys",

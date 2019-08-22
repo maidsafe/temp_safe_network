@@ -47,7 +47,7 @@ impl Safe {
         )
     }
 
-    // Add a Key to a Wallet to make it spendable, and returns the friendly name set for it
+    // Add a SafeKey to a Wallet to make it spendable, and returns the friendly name set for it
     pub fn wallet_insert(
         &mut self,
         url: &str,
@@ -60,7 +60,7 @@ impl Safe {
         let xorurl = XorUrlEncoder::encode(
             xorname,
             0,
-            SafeDataType::CoinBalance,
+            SafeDataType::SafeKey,
             SafeContentType::Raw,
             None,
             None,
@@ -170,7 +170,7 @@ impl Safe {
                 let secret_key = sk_from_hex(&spendable_balance.sk)?;
                 let current_balance =
                     self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
-                        Error::ContentNotFound("One of the Key's was not found".to_string())
+                        Error::ContentNotFound("One of the SafeKey's was not found".to_string())
                     })?;
 
                 debug!("{}: balance: {}", thename, current_balance);
@@ -286,7 +286,7 @@ impl Safe {
                     Ok(url)
                 } else {
                     Err(Error::InvalidInput(format!(
-                        "The 'from_url' URL doesn't target a Key or Wallet, it is: {:?} ({})",
+                        "The 'from_url' URL doesn't target a SafeKey or Wallet, it is: {:?} ({})",
                         xorurl_encoder.content_type(),
                         xorurl_encoder.data_type()
                     )))
@@ -298,18 +298,18 @@ impl Safe {
             )),
         }?;
 
-        // Now check if the 'to_url' is a valid Wallet or a Key URL
+        // Now check if the 'to_url' is a valid Wallet or a SafeKey URL
         let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url)?;
         let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
             let to_balance = self.wallet_get_default_balance(&to_xorurl_encoder.to_string()?)?;
             XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
         } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
-            && to_xorurl_encoder.data_type() == SafeDataType::CoinBalance
+            && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
         {
             to_xorurl_encoder.xorname()
         } else {
             return Err(Error::InvalidInput(format!(
-                "The destination URL doesn't target a Key or Wallet, target is: {:?} ({})",
+                "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
                 to_xorurl_encoder.content_type(),
                 to_xorurl_encoder.data_type()
             )));

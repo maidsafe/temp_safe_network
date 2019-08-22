@@ -28,7 +28,7 @@ pub struct NrsMapContainerInfo {
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub enum SafeData {
-    Key {
+    SafeKey {
         xorname: XorName,
         resolved_from: Option<NrsMapContainerInfo>,
     },
@@ -93,7 +93,7 @@ impl Safe {
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         match the_xor.content_type() {
             SafeContentType::Raw => match the_xor.data_type() {
-                SafeDataType::CoinBalance => Ok(SafeData::Key {
+                SafeDataType::SafeKey => Ok(SafeData::SafeKey {
                     xorname: the_xor.xorname(),
                     resolved_from: None,
                     // TODO: perhaps also return the balance if sk provided?
@@ -212,7 +212,7 @@ fn embed_resolved_from(
     nrs_map_container: NrsMapContainerInfo,
 ) -> ResultReturn<SafeData> {
     let safe_data = match content {
-        SafeData::Key { xorname, .. } => SafeData::Key {
+        SafeData::SafeKey { xorname, .. } => SafeData::SafeKey {
             xorname,
             resolved_from: Some(nrs_map_container),
         },
@@ -268,7 +268,7 @@ fn test_fetch_key() {
     let content = unwrap!(safe.fetch(&xorurl));
     assert!(
         content
-            == SafeData::Key {
+            == SafeData::SafeKey {
                 xorname: xorurl_encoder.xorname(),
                 resolved_from: None,
             }

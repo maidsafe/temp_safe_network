@@ -16,7 +16,7 @@ use common::{create_preload_and_get_keys, get_random_nrs_string, CLI, SAFE_PROTO
 use predicates::prelude::*;
 use std::process::Command;
 
-const PRETTY_KEYS_CREATION_RESPONSE: &str = "New Key created at:";
+const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created at:";
 
 #[test]
 fn calling_safe_keys_create_pretty() {

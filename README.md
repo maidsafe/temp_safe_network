@@ -15,14 +15,15 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 
 ## Table of contents
 
-1. [Build](#build)
-2. [Using the CLI](#using-the-cli)
+1. [Download](#download)
+2. [Build](#build)
+3. [Using the CLI](#using-the-cli)
   - [Auth](#auth)
     - [Prerequisite: run the Authenticator](#prerequisite-run-the-authenticator)
     - [Authorise the safe CLI app](#authorise-the-safe-cli-app)
-  - [Keys](#keys)
-    - [Create](#keys-creation)
-    - [Balance](#keys-balance)
+  - [SafeKeys](#safekeys)
+    - [Create](#safekeys-creation)
+    - [Balance](#safekeys-balance)
   - [Key pair](#key-pair)
   - [Wallet](#wallet)
     - [Create](#wallet-creation)
@@ -39,8 +40,14 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
     - [Remove](#nrs-remove)
   - [SAFE-URLs](#safe-urls)
   - [Update](#update)
-3. [Further Help](#further-help)
-4. [License](#license)
+4. [Further Help](#further-help)
+5. [License](#license)
+
+## Download
+
+The latest version of the SAFE CLI can be downloaded from the [releases page](https://github.com/maidsafe/safe-cli/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
+
+If otherwise you prefer to build the SAFE CLI from source code, please follow the instructions in the next two section below.
 
 ## Build
 
@@ -52,6 +59,12 @@ $ git clone https://github.com/maidsafe/safe-cli.git
 $ cd safe-cli
 $ cargo build
 ```
+
+### Using the Mock or Non-Mock SAFE Network
+
+The `safe_cli` is currently built by default with [Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). Thus, every command executed will be against the `Mock` network regardless if you are using `cargo run` or the binary from `target` folder.
+
+We will be changing this as soon as the first release of local Vaults is published, and therefore the `safe_cli` will also support connecting to the local Vault, in addition to the `Mock` network.
 
 ## Using the CLI
 
@@ -80,26 +93,30 @@ All commands have a `--help` function which lists args, options and subcommands.
 
 ### Auth
 
-The CLI is just another client SAFE application, therefore it needs to be authorised by the user to gain access to the SAFE Network on behalf of the user. The CLI `auth` command allows us to obtain such authorisation from the account owner (the user) via the SAFE Authenticator.
+The CLI is just another client SAFE application, therefore it needs to be authorised by the user to gain access to the SAFE Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the account owner (the user) via the SAFE Authenticator.
 
-This command simply sends an authorisation request to the Authenticator available, e.g. the safe_auth CLI daemon (see further bellow for explanation of how to run it), and it then stores the authorisation response (credentials) in `<user's home directory>/.safe/credentials` file. Any subsequent CLI command will read the `~/.safe/credentials` file, to obtain the credentials and connect to the network for the corresponding operation.
+This command simply sends an authorisation request to the Authenticator available, e.g. the `safe_auth` CLI daemon (see further bellow for explanation of how to run it), and it then stores the authorisation response (credentials) in `<user's home directory>/.safe/credentials` file. Any subsequent CLI command will read the `~/.safe/credentials` file, to obtain the credentials and connect to the network for the corresponding operation.
 
 #### Prerequisite: run the Authenticator
 
 You need the [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli) running locally and exposing its WebService interface for authorising applications, and also be logged in to a SAFE account created on the mock network (i.e. `MockVault` file), making sure the port number you set is `41805`, and enabling the `mock-network` feature.
 
-Please open a second/separate terminal console to execute the following commands (again, please make sure you have `rustc v1.37.0` or higher):
+Please open a second/separate terminal console, and follow the instructions found in the [SAFE Authenticator guide](https://github.com/maidsafe/safe-authenticator-cli/blob/master/README.md). Once you have an account created on the `Mock` network, and have the `safe_auth` CLI running with the `--daemon` flag:
 ```shell
-$ git clone https://github.com/maidsafe/safe-authenticator-cli.git
-$ cd safe-authenticator-cli
-$ cargo run --features mock-network -- --daemon 41805
+$ safe_auth --daemon 41805
+Secret:
+Password:
+Exposing service on 127.0.0.1:41805
 ```
+
+You can then continue with the next step below.
 
 #### Authorise the safe CLI app
 
 Now that the Authenticator is running and ready to authorise applications, we can simply invoke the `auth` command:
 ```shell
 $ safe auth
+Authorising CLI application...
 ```
 
 At this point, you need to authorise the application on the Authenticator, you should see a prompt like the following:
@@ -114,67 +131,77 @@ The following application authorisation request was received:
 Allow authorisation? [y/N]:
 ```
 
-### Keys
+Please go ahead and allow the authorisation by entering `y`. The Authenticator will send a response back to the `safe_cli` with the corresponding credentials it can use to connect directly with the Network. When the `safe_cli` receives the authorisation response, it will display a message like the following:
+```shell
+SAFE CLI app was successfully authorised
+Credentials were stored in <home directory>/.safe/credentials
+```
 
-`Key` management allows users to generate sign/encryption key pairs that can be used for different type of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a `Key` is linked from a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
+We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.
 
-Users can record `Key`s in a `Wallet` (see further below for more details about `Wallet`s), having friendly names to refer to them, but they can also be created as throw away `Key`s which are not linked from any `Wallet`, container, or any other type of data on the network.
+### SafeKeys
 
-Note that even though the key pair is automatically generated by the CLI, `Key`s don’t hold the secret key on the network but just the public key, and `Key`s can optionally have a safecoin balance attached to it. Thus `Key`s can also be used for safecoin transactions. In this sense, a `Key` can be compared to a Bitcoin address, it has a coin balance associated to it, such balance can be queried using the public key (since its location on the network is based on the public key itself), but in order to spend its balance the corresponding secret key needs to be provided in the `transfer` request. The secret key can be provided by the user, or retrieved from a `Wallet`, at the moment of creating the transaction (again, see the [`Wallet` section](#wallet) below for more details)
+`SafeKey` management allows users to generate sign/encryption key pairs that can be used for different type of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a `SafeKey` is linked from a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
 
-#### Keys Creation
+Users can record `SafeKey`s in a `Wallet` (see further below for more details about `Wallet`s), having friendly names to refer to them, but they can also be created as throw away `SafeKey`s which are not linked from any `Wallet`, container, or any other type of data on the network.
 
-To generate a key pair and create a new `Key` on the network, the secret key of another `Key` is needed to pay for storage costs:
+Note that even though the key pair is automatically generated by the CLI, `SafeKey`s don’t hold the secret key on the network but just the public key, and `SafeKey`s can optionally have a safecoin balance attached to it. Thus `SafeKey`s can also be used for safecoin transactions. In this sense, a `SafeKey` can be compared to a Bitcoin address, it has a coin balance associated to it, such balance can be queried using the public key (since its location on the network is based on the public key itself), but in order to spend its balance the corresponding secret key needs to be provided in the `transfer` request. The secret key can be provided by the user, or retrieved from a `Wallet`, at the moment of creating the transaction (again, see the [`Wallet` section](#wallet) below for more details)
+
+#### SafeKeys Creation
+
+To generate a key pair and create a new `SafeKey` on the network, the secret key of another `SafeKey` is needed to pay for storage costs:
 ```shell
 $ safe keys create --pay-with <secret key>
 ```
 
-But we can also create a `Key` with test-coins to begin with (this is temporary and only for testing until farming is available):
+But we can also create a `SafeKey` with test-coins to begin with (this is temporary and only for testing until farming is available):
 ```shell
 $ safe keys create --test-coins --preload 15.342
-New Key created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
+New SafeKey created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
 Preloaded with 15.342 coins
 Key pair generated:
 pk = b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61
 sk = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 ```
 
-Once we have some `Key`s with some test-coins we can use them to pay for the creation of new `Key`s, thus if we use the `Key` we just created with test-coins we can create a second `Key`:
+Once we have some `SafeKey`s with some test-coins we can use them to pay for the creation of a SAFE Account (using the [SAFE Authenticator](https://github.com/maidsafe/safe-authenticator-cli)), or to pay for the creation of new `SafeKey`s. Thus if we use the `SafeKey` we just created with test-coins we can create a second `SafeKey`:
 ```shell
 $ safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
-New Key created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
+New SafeKey created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
 Preloaded with 8.15 coins
 Key pair generated:
 pk = 9754a42c0b568e692b10401c4129bff61088df6ae51bef883b28693d8c3e0e8ce23054e236bd64edc45791549ef60ce1
 sk = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c
 ```
 
-In this case, the new `Key` is preloaded with coins which are transferred from the `Key` we pay the operation with. In next section we'll see how to check the coins balance of them.
+In this case, the new `SafeKey` is preloaded with coins which are transferred from the `SafeKey` we pay the operation with. In next section we'll see how to check the coins balance of them.
+
+If we omit the `--pay-with` argument from the command above, or from any other command which supports it, the CLI will make use of the default `SafeKey` which is linked from the account for paying the costs of the operation. Upon the creation of a SAFE Account, a default `SafeKey` is linked to it and used for paying the costs incurred in any operations made by the applications that have been authorised by the owner of that account, like it's the case of the `safe_cli` application. Currently it's not possible to change the default `SafeKey` linked from an account, but it will be possible with the `safe_cli` in the near future.
 
 Other optional args that can be used with `keys create` sub-command are:
 ```
 --pk <pk>            Don't generate a key pair and just use the provided public key
---preload <preload>  Preload the Key with a coin balance
+--preload <preload>  Preload the SafeKey with a coin balance
 ```
 
-#### Key's Balance
+#### SafeKey's Balance
 
-We can retrieve a given `Key`'s balance simply using its secret key, which we can pass to `keys balance` subcommand with `--sk <secret key>` argument, or we can enter it when the CLI prompts us.
+We can retrieve a given `SafeKey`'s balance simply using its secret key, which we can pass to `keys balance` subcommand with `--sk <secret key>` argument, or we can enter it when the CLI prompts us.
 
-We can optionally also pass the `Key`'s XorUrl to have the CLI to verify they correspond to each other, i.e. if the `Key`'s XorUrl is provided, the CLI will check if it corresponds to the public key derived from the passed secret key, and throw an error in it doesn't.
+We can optionally also pass the `SafeKey`'s XorUrl to have the CLI to verify they correspond to each other, i.e. if the `SafeKey`'s XorUrl is provided, the CLI will check if it corresponds to the public key derived from the passed secret key, and throw an error in it doesn't.
 
-The target `Key`'s secret key can be passed as an argument (or it will be retrieved from `stdin`), let's check the balance of the `Key` we created in previous section:
+The target `SafeKey`'s secret key can be passed as an argument (or it will be retrieved from `stdin`), let's check the balance of the `SafeKey` we created in previous section:
 ```bash
 $ safe keys balance
-Enter secret key corresponding to the Key to query the balance from: c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
-Key's current balance: 15.342
+Enter secret key corresponding to the SafeKey to query the balance from: c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
+SafeKey's current balance: 15.342000000
 ```
 
 ### Key-pair
 
-There are some scenarios that being able to generate a sign/encryption key-pair, without creating and/or storing a `Key` on the network, is required.
+There are some scenarios that being able to generate a sign/encryption key-pair, without creating and/or storing a `SafeKey` on the network, is required.
 
-As an example, if we want to have a friend to create a `Key` for us, and preload it with some coins, we can generate a key-pair, and share with our friend only the public key so he/she can generate the `Key` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
+As an example, if we want to have a friend to create a `SafeKey` for us, and preload it with some coins, we can generate a key-pair, and share with our friend only the public key so he/she can generate the `SafeKey` to be owned by it (this is where we can use the `--pk` argument on the `keys create` sub-command).
 
 Thus, let's see how this use case would work. First we create a key-pair:
 ```shell
@@ -184,20 +211,20 @@ pk = b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83
 sk = 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
 ```
 
-We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `Key` to be owned by it and preload it with some test-coins:
+We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `SafeKey` to be owned by it and preload it with some test-coins:
 ```shell
 $ safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
-New Key created at: "safe://hodby8y3qgina9nqzxmsoi8ytjfh6gwnia7hdupo49ibt8yy3ytgdq"
+New SafeKey created at: "safe://hodby8y3qgina9nqzxmsoi8ytjfh6gwnia7hdupo49ibt8yy3ytgdq"
 Preloaded with 64.24 coins
 ```
 
-Finally, our friend gives us the XOR-URL of the `Key` they have created for us, we own the balance it contains since we have the secret key associated to it. Therefore we can now use the `Key` for any operation, like creating an account with safe_auth CLI to then be able to store data on the Network.
+Finally, our friend gives us the XOR-URL of the `SafeKey` he/she has created for us. We own the balance this `SafeKey` holds since we have the secret key associated to it. Therefore we can now use the `SafeKey` for any operation, like creating an account with safe_auth CLI to then be able to store data on the Network.
 
 ### Wallet
 
 A `Wallet` is a specific type of Container on the network, holding a set of spendable safecoin balances.
 
-A `Wallet` effectively contains links to `Key`s which have safecoin balances attached to them, but the `Wallet` also stores the secret keys needed to spend them. `Wallet`s are stored encrypted and only accessible to the owner by default.
+A `Wallet` effectively contains links to `SafeKey`s which have safecoin balances attached to them, but the `Wallet` also stores the secret keys needed to spend them. `Wallet`s are stored encrypted and only accessible to the owner by default.
 
 There are several sub-commands that can be used to manage the `Wallet`s with the `safe wallet` command (those commented out are not yet implemented):
 
@@ -209,7 +236,7 @@ SUBCOMMANDS:
     help          Prints this message or the help of the given subcommand(s)
     insert        Insert a spendable balance into a Wallet
     # sweep       Move all coins within a Wallet to a second given Wallet or Key
-    transfer      Transfer safecoins from one Wallet, Key or pk, to another.
+    transfer      Transfer safecoins from one Wallet, SafeKey or pk, to another.
 ```
 
 #### Wallet Creation
@@ -223,16 +250,16 @@ FLAGS:
     -h, --help          Prints help information
         --no-balance    If true, do not create a spendable balance
         --json          Sets JSON as output serialisation format (alias of '--output json')
-        --test-coins    Create a Key, allocate test-coins onto it, and add the Key to the Wallet
+        --test-coins    Create a Key, allocate test-coins onto it, and add the SafeKey to the Wallet
     -V, --version       Prints version information
 
 OPTIONS:
-        --keyurl <keyurl>         An existing Key's safe://xor-url. If this is not supplied, a new Key will be
+        --keyurl <keyurl>         An existing SafeKey's safe://xor-url. If this is not supplied, a new SafeKey will be
                                   automatically generated and inserted. The corresponding secret key will be prompted if
                                   not provided with '--sk'
         --name <name>             The name to give the spendable balance
     -o, --output <output_fmt>     Output data serialisation. Currently only supported 'json'
-    -w, --pay-with <pay_with>     The secret key of a Key for paying the operation costs
+    -w, --pay-with <pay_with>     The secret key of a SafeKey for paying the operation costs
         --preload <preload>       Preload the key with a balance
         --sk <secret>             Pass the secret key needed to make the balance spendable, it will be prompted if not
                                   provided
@@ -240,13 +267,13 @@ OPTIONS:
                                   (default), base32 and base64
 ```
 
-Right now, only a secret key (of a `Key` with coins) can be used to pay for the costs, but in the future a `Wallet` will be also allowed for this purpose.
+Right now, only a secret key (of a `SafeKey` with coins) can be used to pay for the costs, but in the future a `Wallet` will be also allowed for this purpose.
 
-For example, if we use the secret key we obtained when creating a `Key` in our example in previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
+For example, if we use the secret key we obtained when creating a `SafeKey` in our example in previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
 
 ```shell
 $ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
-New Key created at: "safe://hodqmc6ht5ezpprkh1cbw54n3mjyckcpm95qmygon897ft5dq8oxpc"
+New SafeKey created at: "safe://hodqmc6ht5ezpprkh1cbw54n3mjyckcpm95qmygon897ft5dq8oxpc"
 Key pair generated:
 pk = a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
 sk = 65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
@@ -265,27 +292,27 @@ Wallet at "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao" ha
 
 #### Wallet Insert
 
-As mentioned before, a `Key` doesn't hold the secret key on the network, therefore even if it has some non-zero coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `Key`s, and making their balances spendable by storing the corresponding secret keys.
+As mentioned before, a `SafeKey` doesn't hold the secret key on the network, therefore even if it has some non-zero coin balance, it cannot be spent. This is where the `Wallet` comes into play, holding the links to `SafeKey`s, and making their balances spendable by storing the corresponding secret keys.
 
-Aside from at wallet creation, we can add _more_ keys to use as spendable balances by `insert`-ing into a `Wallet` a link to a `Key`, making it a spendable balance.
+Aside from at wallet creation, we can add _more_ keys to use as spendable balances by `insert`-ing into a `Wallet` a link to a `SafeKey`, making it a spendable balance.
 
 ```shell
 USAGE:
     safe wallet insert [FLAGS] [OPTIONS] <target>
 
 FLAGS:
-        --default    Set the inserted Key as the default one in the target Wallet
+        --default    Set the inserted SafeKey as the default one in the target Wallet
     -n, --dry-run    Dry run of command. No data will be written. No coins spent
     -h, --help       Prints help information
         --json       Sets JSON as output serialisation format (alias of '--output json')
     -V, --version    Prints version information
 
 OPTIONS:
-        --keyurl <keyurl>         The Key's safe://xor-url to verify it matches/corresponds to the secret key provided.
+        --keyurl <keyurl>         The SafeKey's safe://xor-url to verify it matches/corresponds to the secret key provided.
                                   The corresponding secret key will be prompted if not provided with '--sk'
         --name <name>             The name to give this spendable balance
     -o, --output <output_fmt>     Output data serialisation. Currently only supported 'json'
-    -w, --pay-with <pay_with>     The secret key of a Key for paying the operation costs. If not provided, the default
+    -w, --pay-with <pay_with>     The secret key of a SafeKey for paying the operation costs. If not provided, the default
                                   wallet from the account will be used
         --sk <secret>             Pass the secret key needed to make the balance spendable, it will be prompted if not
                                   provided
@@ -300,9 +327,9 @@ ARGS:
 - The `--name` is an optional nickname to give a spendable balance for easy reference
 - The `--default` flag sets _this_ new spendable balance as the default for the containing `Wallet`. This can be used by wallet applications to apply some logic on how to spend and/or choose the balances for a transaction
 
-With the above options, the user will be prompted to input the secret key corresponding to the `Key` to be inserted, unless it was already provided with `--sk`. This is stored in the `Wallet`.
+With the above options, the user will be prompted to input the secret key corresponding to the `SafeKey` to be inserted, unless it was already provided with `--sk`. This is stored in the `Wallet`.
 
-The `--sk` argument can also be combined with `--keyurl` to pass the `Key`'s XorUrl as part of the command line instruction itself, e.g.:
+The `--sk` argument can also be combined with `--keyurl` to pass the `SafeKey`'s XorUrl as part of the command line instruction itself, e.g.:
 
 ```shell
 $ safe wallet insert safe://<wallet-xorurl> --keyurl safe://<key-xor-url> --name my_default_balance --default
@@ -313,7 +340,7 @@ Spendable balance inserted with name 'my_default_balance' in Wallet located at "
 
 #### Wallet Transfer
 
-Once a `Wallet` contains some spendable balance/s, we can transfer `<from>` a `Wallet` an `<amount>` of safecoins `<to>` another `Wallet` or `Key`. The destination `Wallet`/`Key` currently must be passed as a XorUrl in the arguments list, but reading it from `stdin` will be supported later on.
+Once a `Wallet` contains some spendable balance/s, we can transfer `<from>` a `Wallet` an `<amount>` of safecoins `<to>` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` currently must be passed as a XorUrl in the arguments list, but reading it from `stdin` will be supported later on.
 
 Both the `<from>` and `<to>` Wallets must have a _default_ spendable balance for the transfer to succeed. In the future different type of logics will be implemented for using different Wallet's balances and not just the default one.
 
