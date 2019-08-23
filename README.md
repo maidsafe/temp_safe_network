@@ -62,9 +62,15 @@ $ cargo build
 
 ### Using the Mock or Non-Mock SAFE Network
 
-The `safe_cli` is currently built by default with [Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). Thus, every command executed will be against the `Mock` network regardless if you are using `cargo run` or the binary from `target` folder.
+By default, the `safe_cli` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
+```
+$ cargo build --features mock-network
+```
 
-We will be changing this as soon as the first release of local Vaults is published, and therefore the `safe_cli` will also support connecting to the local Vault, in addition to the `Mock` network.
+Keep in mind that when running the safe_cli with `cargo run`, please also make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe_cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
+```
+$ cargo run --features mock-network -- keys create --test-coins
+```
 
 ## Using the CLI
 
@@ -273,11 +279,11 @@ For example, if we use the secret key we obtained when creating a `SafeKey` in o
 
 ```shell
 $ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
+Wallet created at: "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao"
 New SafeKey created at: "safe://hodqmc6ht5ezpprkh1cbw54n3mjyckcpm95qmygon897ft5dq8oxpc"
 Key pair generated:
 pk = a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
 sk = 65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
-Wallet created at: "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao"
 ```
 
 #### Wallet Balance

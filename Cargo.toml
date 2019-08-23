@@ -56,10 +56,6 @@ assert_cmd = "0.11.1"
 duct = "0.12.0"
 unwrap = "~1.2.1"
 
-[dev-dependencies.safe_app]
-version = "0.9.1"
-features = ["mock-network", "testing"]
-
 [dev-dependencies.cargo-husky]
 version = "1"
 default-features = false # Disable features which are enabled by default
