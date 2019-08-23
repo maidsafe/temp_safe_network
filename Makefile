@@ -20,7 +20,7 @@ There are also development versions of this release:
 [macOS](${S3_MACOS_DEPLOY_URL})
 [Windows](${S3_WIN_DEPLOY_URL})
 
-The development version uses a mocked SAFE network, which allows you to work against a local network where SafeCoins are created for local use. This removes PUT limits on data.
+The development version uses a mocked SAFE network, which allows you to work against a file that mimics the network, where SafeCoins are created for local use.
 endef
 export GITHUB_RELEASE_DESCRIPTION
 
