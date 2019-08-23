@@ -110,6 +110,11 @@ pub fn wallet_commander(
         }) => {
             // create wallet
             let wallet_xorurl = safe.wallet_create()?;
+            if OutputFmt::Pretty == output_fmt {
+                println!("Wallet created at: \"{}\"", wallet_xorurl);
+            } else {
+                println!("{}", wallet_xorurl);
+            }
 
             if !no_balance {
                 // get or create keypair
@@ -132,11 +137,6 @@ pub fn wallet_commander(
                 safe.wallet_insert(&wallet_xorurl, name, true, &sk)?;
             }
 
-            if OutputFmt::Pretty == output_fmt {
-                println!("Wallet created at: \"{}\"", wallet_xorurl);
-            } else {
-                println!("{}", wallet_xorurl);
-            }
             Ok(())
         }
         Some(WalletSubCommands::Balance { target }) => {
