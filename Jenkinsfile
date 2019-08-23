@@ -88,6 +88,10 @@ stage('deploy') {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
         }
     }
+    if (env.BRANCH_NAME == "master") {
+        build(job: "../rust_cache_build-safe_cli", wait: false)
+        build(job: "../docker_build-safe_cli_build_container", wait: false)
+    }
 }
 
 def retrieveCache(os) {

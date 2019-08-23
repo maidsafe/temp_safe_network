@@ -6,9 +6,9 @@ UNAME_S := $(shell uname -s)
 PWD := $(shell echo $$PWD)
 UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
-S3_LINUX_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar
-S3_WIN_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar
-S3_MACOS_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar
+S3_LINUX_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.tar
+S3_WIN_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.tar
+S3_MACOS_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.tar
 SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
@@ -20,7 +20,7 @@ There are also development versions of this release:
 [macOS](${S3_MACOS_DEPLOY_URL})
 [Windows](${S3_WIN_DEPLOY_URL})
 
-The development version uses a mocked SAFE network, allowing you to work against a local network, where safecoins are created for local use. This removes PUT limits on data.
+The development version uses a mocked SAFE network, which allows you to work against a local network where SafeCoins are created for local use. This removes PUT limits on data.
 endef
 export GITHUB_RELEASE_DESCRIPTION
 
@@ -91,7 +91,7 @@ endif
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:build \
+		maidsafe/safe-cli-build:build-dev \
 		./resources/test-scripts/all-tests
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
