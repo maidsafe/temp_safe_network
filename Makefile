@@ -6,9 +6,23 @@ UNAME_S := $(shell uname -s)
 PWD := $(shell echo $$PWD)
 UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
+S3_LINUX_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar
+S3_WIN_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar
+S3_MACOS_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar
 SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
+define GITHUB_RELEASE_DESCRIPTION
+Command line interface for the SAFE Network.
+
+There are also development versions of this release:
+[Linux](${S3_LINUX_DEPLOY_URL})
+[macOS](${S3_MACOS_DEPLOY_URL})
+[Windows](${S3_WIN_DEPLOY_URL})
+
+The development version uses a mocked SAFE network, allowing you to work against a local network, where safecoins are created for local use. This removes PUT limits on data.
+endef
+export GITHUB_RELEASE_DESCRIPTION
 
 build:
 	rm -rf artifacts
@@ -213,7 +227,7 @@ endif
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli" \
-		--description "Command line interface for the SAFE Network";
+		--description "$$GITHUB_RELEASE_DESCRIPTION";
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
