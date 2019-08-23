@@ -21,6 +21,7 @@ extern crate prettytable;
 #[macro_use]
 extern crate human_panic;
 
+#[cfg(not(feature = "mock-network"))]
 #[macro_use]
 extern crate self_update;
 
