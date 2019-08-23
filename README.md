@@ -166,8 +166,8 @@ $ safe keys create --test-coins --preload 15.342
 New SafeKey created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
 Preloaded with 15.342 coins
 Key pair generated:
-pk = b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61
-sk = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
+Public Key = b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61
+Secret Key = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 ```
 
 Once we have some `SafeKey`s with some test-coins we can use them to pay for the creation of a SAFE Account (using the [SAFE Authenticator](https://github.com/maidsafe/safe-authenticator-cli)), or to pay for the creation of new `SafeKey`s. Thus if we use the `SafeKey` we just created with test-coins we can create a second `SafeKey`:
@@ -176,8 +176,8 @@ $ safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c
 New SafeKey created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
 Preloaded with 8.15 coins
 Key pair generated:
-pk = 9754a42c0b568e692b10401c4129bff61088df6ae51bef883b28693d8c3e0e8ce23054e236bd64edc45791549ef60ce1
-sk = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c
+Public Key = 9754a42c0b568e692b10401c4129bff61088df6ae51bef883b28693d8c3e0e8ce23054e236bd64edc45791549ef60ce1
+Secret Key = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c
 ```
 
 In this case, the new `SafeKey` is preloaded with coins which are transferred from the `SafeKey` we pay the operation with. In next section we'll see how to check the coins balance of them.
@@ -213,8 +213,8 @@ Thus, let's see how this use case would work. First we create a key-pair:
 ```shell
 $ safe keypair
 Key pair generated:
-pk = b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
-sk = 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
+Public Key = b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
+Secret Key = 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
 ```
 
 We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `SafeKey` to be owned by it and preload it with some test-coins:
@@ -282,8 +282,8 @@ $ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fc
 Wallet created at: "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao"
 New SafeKey created at: "safe://hodqmc6ht5ezpprkh1cbw54n3mjyckcpm95qmygon897ft5dq8oxpc"
 Key pair generated:
-pk = a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
-sk = 65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
+Public Key = a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
+Secret Key = 65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
 ```
 
 #### Wallet Balance

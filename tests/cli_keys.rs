@@ -50,8 +50,8 @@ fn calling_safe_keypair() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["keypair"])
         .assert()
-        .stdout(predicate::str::contains("sk = "))
-        .stdout(predicate::str::contains("pk = "))
+        .stdout(predicate::str::contains("Secret Key = "))
+        .stdout(predicate::str::contains("Public Key = "))
         .success();
 }
 
@@ -61,8 +61,8 @@ fn calling_safe_keypair_pretty() {
     cmd.args(&vec!["keypair"])
         .assert()
         .stdout(predicate::str::contains("Key pair generated:"))
-        .stdout(predicate::str::contains("sk = "))
-        .stdout(predicate::str::contains("pk = "))
+        .stdout(predicate::str::contains("Secret Key = "))
+        .stdout(predicate::str::contains("Public Key = "))
         .success();
 }
 

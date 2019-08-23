@@ -128,8 +128,8 @@ pub fn create_new_key(
         }
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");
-            println!("pk = {}", pair.pk);
-            println!("sk = {}", pair.sk);
+            println!("Public Key = {}", pair.pk);
+            println!("Secret Key = {}", pair.sk);
         }
     } else if let Some(pair) = &key_pair {
         println!(

@@ -171,7 +171,8 @@ impl SafeApp for SafeAppScl {
     ) -> ResultReturn<u64> {
         wallet_transfer_coins(&from_sk, to_xorname, amount, Some(tx_id)).map_err(
             |err| match err {
-                SafeCoreError::DataError(SafeNdError::ExcessiveValue) => {
+                SafeCoreError::DataError(SafeNdError::ExcessiveValue)
+                | SafeCoreError::DataError(SafeNdError::InsufficientBalance) => {
                     Error::NotEnoughBalance(amount.to_string())
                 }
                 other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),

@@ -81,8 +81,8 @@ pub fn run() -> Result<(), String> {
             if OutputFmt::Pretty == output_fmt {
                 println!("Key pair generated:");
             }
-            println!("pk = {}", key_pair.pk);
-            println!("sk = {}", key_pair.sk);
+            println!("Public Key = {}", key_pair.pk);
+            println!("Secret Key = {}", key_pair.sk);
             Ok(())
         }
         SubCommands::Update {} => {
