@@ -23,13 +23,17 @@ use safe_nd::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::env;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
+#[cfg(not(test))]
+use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use std::time::SystemTime;
+#[cfg(test)]
+use tempfile::tempfile;
 
 // TODO: Replace this with `Data` from safe-nd
 #[derive(Clone, Deserialize, Serialize)]
@@ -62,9 +66,10 @@ fn init_vault_path(devconfig: Option<&DevConfig>) -> PathBuf {
 }
 
 // Initializes vault storage. The type of storage is chosen with the following precedence:
-// 1. "SAFE_MOCK_IN_MEMORY_STORAGE" env var => in-memory storage
-// 2. DevConfig `mock_in_memory_storage` option => in-memory storage
-// 3. Else => file storage, use path from `init_vault_path`
+// 1.  "SAFE_MOCK_IN_MEMORY_STORAGE" env var => in-memory storage
+// 2.  DevConfig `mock_in_memory_storage` option => in-memory storage
+// 3a. Else (not test) => file storage, use path from `init_vault_path`
+// 3b. Else (test) => file storage, use random temporary file
 fn init_vault_store(config: &Config) -> Box<dyn Store> {
     match env::var("SAFE_MOCK_IN_MEMORY_STORAGE") {
         Ok(_) => {
@@ -81,9 +86,15 @@ fn init_vault_store(config: &Config) -> Box<dyn Store> {
                 trace!("Mock vault: using file store");
                 Box::new(FileStore::new(&init_vault_path(Some(dev))))
             }
+            #[cfg(not(test))]
             None => {
                 trace!("Mock vault: using file store");
                 Box::new(FileStore::new(&init_vault_path(None)))
+            }
+            #[cfg(test)]
+            None => {
+                trace!("Mock vault: using temporary file store");
+                Box::new(FileStore::new_with_temp())
             }
         },
     }
@@ -1495,7 +1506,9 @@ struct FileStore {
     // `bool` element indicates whether the store is being written to.
     file: Option<(File, bool)>,
     sync_time: Option<SystemTime>,
-    path: PathBuf,
+    // The path that we're provided. If we're not provided a path we're going to create a random
+    // temporary file.
+    path: Option<PathBuf>,
 }
 
 impl FileStore {
@@ -1503,20 +1516,44 @@ impl FileStore {
         Self {
             file: None,
             sync_time: None,
-            path: path.join(FILE_NAME),
+            path: Some(path.join(FILE_NAME)),
         }
+    }
+
+    #[cfg(test)]
+    fn new_with_temp() -> Self {
+        Self {
+            file: None,
+            sync_time: None,
+            path: None,
+        }
+    }
+}
+
+impl FileStore {
+    #[cfg(not(test))]
+    fn open_file(&self) -> File {
+        unwrap!(self.path.as_ref().and_then(|ref path| {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&path)
+                .ok()
+        }))
+    }
+
+    #[cfg(test)]
+    fn open_file(&self) -> File {
+        assert!(self.path.is_none());
+        unwrap!(tempfile())
     }
 }
 
 impl Store for FileStore {
     fn load(&mut self, writing: bool) -> Option<Cache> {
-        // Create the file if it doesn't exist yet.
-        let mut file = unwrap!(OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&self.path));
+        let mut file = self.open_file();
 
         if writing {
             unwrap!(file.lock_exclusive());
