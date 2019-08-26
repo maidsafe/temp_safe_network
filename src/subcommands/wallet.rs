@@ -26,7 +26,7 @@ pub enum WalletSubCommands {
         pay_with: Option<String>,
         /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
         #[structopt(long = "sk")]
-        secret: Option<String>,
+        secret_key: Option<String>,
         /// The name to give this spendable balance
         #[structopt(long = "name")]
         name: Option<String>,
@@ -63,7 +63,7 @@ pub enum WalletSubCommands {
         keyurl: Option<String>,
         /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
         #[structopt(long = "sk")]
-        secret: Option<String>,
+        secret_key: Option<String>,
         /// Create a Key, allocate test-coins onto it, and add the SafeKey to the Wallet
         #[structopt(long = "test-coins")]
         test_coins: bool,
@@ -106,7 +106,7 @@ pub fn wallet_commander(
             keyurl,
             name,
             pay_with,
-            secret,
+            secret_key,
         }) => {
             // create wallet
             let wallet_xorurl = safe.wallet_create()?;
@@ -120,17 +120,21 @@ pub fn wallet_commander(
                 // get or create keypair
                 let sk = match keyurl {
                     Some(linked_key) => {
-                        let sk = get_secret_key(&linked_key, secret, "the SafeKey to insert")?;
+                        let sk = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
                         let _pk = safe.validate_sk_for_url(&sk, &linked_key)?;
                         sk
                     }
-                    None => {
-                        let (_xorurl, key_pair) =
-                            create_new_key(safe, test_coins, pay_with, preload, None, output_fmt)?;
-                        let unwrapped_key_pair =
-                            key_pair.ok_or("Failed to read the generated key pair")?;
-                        unwrapped_key_pair.sk
-                    }
+                    None => match secret_key {
+                        Some(sk) => sk,
+                        None => {
+                            let (_xorurl, key_pair) = create_new_key(
+                                safe, test_coins, pay_with, preload, None, output_fmt,
+                            )?;
+                            let unwrapped_key_pair =
+                                key_pair.ok_or("Failed to read the generated key pair")?;
+                            unwrapped_key_pair.sk
+                        }
+                    },
                 };
 
                 // insert and set as default
@@ -164,7 +168,7 @@ pub fn wallet_commander(
             keyurl,
             name,
             default,
-            secret,
+            secret_key,
             pay_with,
         }) => {
             if pay_with.is_some() {
@@ -173,11 +177,11 @@ pub fn wallet_commander(
 
             let sk = match keyurl {
                 Some(linked_key) => {
-                    let sk = get_secret_key(&linked_key, secret, "the SafeKey to insert")?;
+                    let sk = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
                     let _pk = safe.validate_sk_for_url(&sk, &linked_key)?;
                     sk
                 }
-                None => get_secret_key("", secret, "the SafeKey to insert")?,
+                None => get_secret_key("", secret_key, "the SafeKey to insert")?,
             };
 
             let the_name = safe.wallet_insert(&target, name, default, &sk)?;

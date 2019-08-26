@@ -195,6 +195,26 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
 }
 
 #[test]
+fn calling_safe_wallet_create_w_sk_only() {
+    let (_xorurl, sk) = create_preload_and_get_keys("333");
+
+    let wallet_create_result = cmd!(get_bin_location(), "wallet", "create", "--sk", sk, "--json")
+        .read()
+        .unwrap();
+
+    let balance = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_create_result,
+        "--json"
+    )
+    .read()
+    .unwrap();
+    assert_eq!("333.000000000", balance);
+}
+
+#[test]
 fn calling_safe_wallet_create_w_bad_secret() {
     let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
 
