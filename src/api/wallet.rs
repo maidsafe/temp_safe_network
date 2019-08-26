@@ -575,6 +575,52 @@ fn test_wallet_transfer_no_default() {
 }
 
 #[test]
+fn test_wallet_transfer_from_zero_balance() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let from_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
+    unwrap!(safe.wallet_insert(
+        &from_wallet_xorurl,
+        Some("myfirstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair1).sk,
+    ));
+
+    let (to_key_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
+
+    // test fail to transfer with 0 balance at wallet in <from> argument
+    match safe.wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl) {
+        Err(Error::InvalidAmount(msg)) => assert_eq!(
+            msg,
+            "The amount '0' specified for the transfer is invalid".to_string()
+        ),
+        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+        Ok(_) => panic!("Transfer succeeded unexpectedly"),
+    };
+
+    let to_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
+    unwrap!(safe.wallet_insert(
+        &to_wallet_xorurl,
+        Some("alsomyfirstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair2).sk,
+    ));
+
+    // test fail to transfer with 0 balance at wallet in <from> argument
+    match safe.wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl) {
+        Err(Error::InvalidAmount(msg)) => assert_eq!(
+            msg,
+            "The amount '0' specified for the transfer is invalid".to_string()
+        ),
+        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+        Ok(_) => panic!("Transfer succeeded unexpectedly"),
+    };
+}
+
+#[test]
 fn test_wallet_transfer_diff_amounts() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z");

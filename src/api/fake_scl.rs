@@ -168,6 +168,10 @@ impl SafeApp for SafeAppFake {
         tx_id: u64,
         amount: Coins,
     ) -> ResultReturn<u64> {
+        if amount.as_nano() == 0 {
+            return Err(Error::InvalidAmount(amount.to_string()));
+        }
+
         let to_xorname_hex = xorname_to_hex(&to_xorname);
 
         // generate TX in destination section (to_pk)
