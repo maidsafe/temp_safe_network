@@ -122,9 +122,17 @@ pub fn files_commander(
                 }
 
                 if success_count > 0 {
+                    let url = match XorUrlEncoder::from_url(&target) {
+                        Ok(mut xorurl_encoder) => {
+                            xorurl_encoder.set_content_version(Some(version));
+                            xorurl_encoder.to_string()?
+                        }
+                        Err(_) => target,
+                    };
+
                     println!(
                         "FilesContainer synced up (version {}): \"{}\"",
-                        version, target
+                        version, url
                     );
                     table.printstd();
                 } else if !processed_files.is_empty() {
