@@ -14,9 +14,7 @@ use log::{debug, info, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App, AppError::CoreError as SafeAppError};
-use safe_core::{
-    client::test_create_balance, client::wallet_transfer_coins, CoreError as SafeCoreError,
-};
+use safe_core::{client::test_create_balance, CoreError as SafeCoreError};
 
 #[cfg(not(feature = "fake-auth"))]
 use super::helpers::decode_ipc_msg;
@@ -169,17 +167,21 @@ impl SafeApp for SafeAppScl {
         tx_id: u64,
         amount: Coins,
     ) -> ResultReturn<u64> {
-        wallet_transfer_coins(&from_sk, to_xorname, amount, Some(tx_id)).map_err(
-            |err| match err {
-                SafeCoreError::DataError(SafeNdError::ExcessiveValue)
-                | SafeCoreError::DataError(SafeNdError::InsufficientBalance) => {
-                    Error::NotEnoughBalance(amount.to_string())
-                }
-                other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
-            },
-        )?;
+        let safe_app: &App = self.get_safe_app()?;
+        let tx = run(safe_app, move |client, _app_context| {
+            client
+                .transfer_coins(Some(&from_sk), to_xorname, amount, Some(tx_id))
+                .map_err(SafeAppError)
+        })
+        .map_err(|err| match err {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::ExcessiveValue))
+            | SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) => {
+                Error::NotEnoughBalance(amount.to_string())
+            }
+            other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
+        })?;
 
-        Ok(tx_id)
+        Ok(tx.id)
     }
 
     fn safecoin_transfer_to_pk(
