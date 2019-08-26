@@ -332,11 +332,11 @@ fn coin_operations() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    common::send_request_expect_ok(
+    common::send_request_expect_err(
         &mut env,
         &mut client_a,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(0)),
+        NdError::NoSuchBalance,
     );
 
     // Create A's balance

@@ -315,8 +315,8 @@ impl ClientHandler {
             GetBalance => {
                 let balance = self
                     .balance(client.public_id.name())
-                    .or_else(|| Coins::from_nano(0).ok())?;
-                let response = Response::GetBalance(Ok(balance));
+                    .ok_or(NdError::NoSuchBalance);
+                let response = Response::GetBalance(balance);
                 self.send_response_to_client(&client.public_id, message_id, response);
                 None
             }
