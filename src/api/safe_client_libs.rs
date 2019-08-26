@@ -523,7 +523,13 @@ impl SafeApp for SafeAppScl {
                 .get_seq_mdata_value(name, tag, key_vec)
                 .map_err(SafeAppError)
         })
-        .map_err(|e| Error::NetDataError(format!("Failed to retrieve key. {:?}", e)))
+        .map_err(|err| {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) = err {
+                Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
+            } else {
+                Error::NetDataError(format!("Failed to retrieve a key. {:?}", err))
+            }
+        })
     }
 
     fn list_seq_mdata_entries(

@@ -196,8 +196,14 @@ impl Safe {
                 WALLET_TYPE_TAG,
                 WALLET_DEFAULT_BYTES,
             )
-            .map_err(|_| {
-                Error::ContentError(format!("No default balance found at Wallet \"{}\"", url))
+            .map_err(|err| match err {
+                Error::AccessDenied(_) => Error::AccessDenied(format!(
+                    "Couldn't read source Wallet for the transfer at \"{}\"",
+                    url
+                )),
+                _other => {
+                    Error::ContentError(format!("No default balance found at Wallet \"{}\"", url))
+                }
             })?;
 
         let the_balance: WalletSpendableBalance = {
@@ -560,5 +566,38 @@ fn test_wallet_transfer_with_nrs_urls() {
             let key_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair2).sk));
             assert_eq!("0.300000000", key_current_balance);
         }
+    };
+}
+
+#[test]
+#[cfg(not(feature = "scl-mock"))]
+fn test_wallet_transfer_from_not_owned_wallet() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let account1_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
+    unwrap!(safe.wallet_insert(
+        &account1_wallet_xorurl,
+        Some("myfirstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair1.clone()).sk,
+    ));
+
+    let mut another_safe = Safe::new("base32z");
+    unwrap!(another_safe.connect("", Some("another-fake-credentials")));
+    let (key_xorurl, _key_pair) = unwrap!(another_safe.keys_create_preload_test_coins("100.5"));
+
+    // test fail to transfer from a not owned wallet in <from> argument
+    match another_safe.wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl) {
+        Err(Error::AccessDenied(msg)) => assert_eq!(
+            msg,
+            format!(
+                "Couldn't read source Wallet for the transfer at \"{}\"",
+                account1_wallet_xorurl
+            )
+        ),
+        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+        Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };
 }
