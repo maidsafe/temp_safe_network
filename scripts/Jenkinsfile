@@ -62,6 +62,42 @@ stage('build') {
             package_build_artifacts('mock', 'osx')
             upload_build_artifacts()
         }
+    },
+    real_linux: {
+        node('safe_client_libs') {
+            checkout(scm)
+            clean()
+            sh("make build")
+            strip_build_artifacts()
+            package_build_artifacts('real', 'linux')
+            upload_build_artifacts()
+        }
+    },
+    real_windows: {
+        node('windows') {
+            checkout(scm)
+            clean()
+            sh("make build")
+            strip_build_artifacts()
+            package_build_artifacts('real', 'windows')
+            upload_build_artifacts()
+        }
+    },
+    real_macos: {
+        node('osx') {
+            checkout(scm)
+            clean()
+            sh("make build")
+            strip_build_artifacts()
+            package_build_artifacts('real', 'osx')
+            upload_build_artifacts()
+        }
+    },
+    integration_tests: {
+        node('safe_client_libs') {
+            checkout(scm)
+            run_tests('integration')
+        }
     }
 }
 
@@ -258,9 +294,9 @@ def run_tests(mode, bct_test_path='') {
     if (mode == 'mock') {
         sh("make test-artifacts-mock")
     } else if (mode == 'binary') {
-        command = "SCL_BCT_PATH=${bct_test_path} "
-        command += "make test-artifacts-binary"
-        sh(command)
+        withEnv(["SCL_BCT_PATH=${bct_test_path}"]) {
+            sh("make test-artifacts-binary")
+        }
     } else {
         sh("make test-artifacts-integration")
     }
