@@ -1151,6 +1151,9 @@ impl ClientHandler {
     }
 
     fn withdraw<K: balance::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+        if amount.as_nano() == 0 {
+            return Err(NdError::InvalidOperation);
+        }
         let (public_key, mut balance) = self
             .balances
             .get_key_value(key)

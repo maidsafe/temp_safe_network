@@ -344,7 +344,19 @@ fn coin_operations() {
     common::create_balance(&mut env, &mut client_a, None, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
 
-    // Create B's balance
+    // Create B's balance (first attempt with zero balance shouldn't be possible)
+    let amount_zero = unwrap!(Coins::from_nano(0));
+    let transaction_id = 1;
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: *client_b.public_id().public_key(),
+            amount: amount_zero,
+            transaction_id,
+        },
+        NdError::InvalidOperation,
+    );
     let amount_b = unwrap!(Coins::from_nano(1));
     common::create_balance(&mut env, &mut client_a, Some(&mut client_b), amount_b);
 
@@ -352,8 +364,19 @@ fn coin_operations() {
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
 
-    // Transfer coins from A to B
-    common::transfer_coins(&mut env, &mut client_a, &mut client_b, 2, 1);
+    // Transfer coins from A to B (first attempt with zero amount doesn't work)
+    let transaction_id = 2;
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::TransferCoins {
+            destination: *client_b.public_id().name(),
+            amount: amount_zero,
+            transaction_id,
+        },
+        NdError::InvalidOperation,
+    );
+    common::transfer_coins(&mut env, &mut client_a, &mut client_b, 2, 3);
 
     let amount_a = unwrap!(Coins::from_nano(7));
     let amount_b = unwrap!(Coins::from_nano(3));
