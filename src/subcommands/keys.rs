@@ -66,7 +66,9 @@ pub fn key_commander(
                 auth_connect(safe)?;
             }
 
-            create_new_key(safe, test_coins, pay_with, preload, pk, output_fmt)?;
+            let (xorurl, key_pair, amount) =
+                create_new_key(safe, test_coins, pay_with, preload, pk)?;
+            print_new_key_output(output_fmt, xorurl, key_pair, amount);
             Ok(())
         }
         Some(KeysSubCommands::Balance { keyurl, secret }) => {
@@ -96,8 +98,7 @@ pub fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     pk: Option<String>,
-    output_fmt: OutputFmt,
-) -> Result<(String, Option<BlsKeyPair>), String> {
+) -> Result<(String, Option<BlsKeyPair>, Option<String>), String> {
     let (xorurl, key_pair, amount) = if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
@@ -121,6 +122,15 @@ pub fn create_new_key(
         (xorurl, key_pair, preload)
     };
 
+    Ok((xorurl, key_pair, amount))
+}
+
+pub fn print_new_key_output(
+    output_fmt: OutputFmt,
+    xorurl: String,
+    key_pair: Option<BlsKeyPair>,
+    amount: Option<String>,
+) {
     if OutputFmt::Pretty == output_fmt {
         println!("New SafeKey created at: \"{}\"", xorurl);
         if let Some(n) = amount {
@@ -144,6 +154,4 @@ pub fn create_new_key(
                 .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
         );
     }
-
-    Ok((xorurl, key_pair))
 }

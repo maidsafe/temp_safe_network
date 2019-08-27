@@ -9,10 +9,10 @@
 use structopt::StructOpt;
 
 use super::helpers::{get_from_arg_or_stdin, get_secret_key};
-use super::keys::create_new_key;
+use super::keys::{create_new_key, print_new_key_output};
 use super::OutputFmt;
 use log::debug;
-use safe_cli::Safe;
+use safe_cli::{BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -110,12 +110,8 @@ pub fn wallet_commander(
         }) => {
             // create wallet
             let wallet_xorurl = safe.wallet_create()?;
-            if OutputFmt::Pretty == output_fmt {
-                println!("Wallet created at: \"{}\"", wallet_xorurl);
-            } else {
-                println!("{}", wallet_xorurl);
-            }
-
+            let mut key_generated_output: (String, Option<BlsKeyPair>, Option<String>) =
+                Default::default();
             if !no_balance {
                 // get or create keypair
                 let sk = match keyurl {
@@ -127,11 +123,12 @@ pub fn wallet_commander(
                     None => match secret_key {
                         Some(sk) => sk,
                         None => {
-                            let (_xorurl, key_pair) = create_new_key(
-                                safe, test_coins, pay_with, preload, None, output_fmt,
-                            )?;
-                            let unwrapped_key_pair =
-                                key_pair.ok_or("Failed to read the generated key pair")?;
+                            key_generated_output =
+                                create_new_key(safe, test_coins, pay_with, preload, None)?;
+                            let unwrapped_key_pair = key_generated_output
+                                .1
+                                .clone()
+                                .ok_or("Failed to read the generated key pair")?;
                             unwrapped_key_pair.sk
                         }
                     },
@@ -139,6 +136,30 @@ pub fn wallet_commander(
 
                 // insert and set as default
                 safe.wallet_insert(&wallet_xorurl, name, true, &sk)?;
+            }
+
+            if OutputFmt::Pretty == output_fmt {
+                println!("Wallet created at: \"{}\"", wallet_xorurl);
+                if !key_generated_output.0.is_empty() {
+                    print_new_key_output(
+                        output_fmt,
+                        key_generated_output.0,
+                        key_generated_output.1,
+                        key_generated_output.2,
+                    );
+                }
+            } else if let Some(pair) = &key_generated_output.1 {
+                println!(
+                    "{}",
+                    serde_json::to_string(&(&wallet_xorurl, &key_generated_output.0, pair))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
+            } else {
+                println!(
+                    "{}",
+                    serde_json::to_string(&(&wallet_xorurl, &key_generated_output.0))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
             }
 
             Ok(())

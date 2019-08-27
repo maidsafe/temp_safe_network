@@ -182,11 +182,14 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
     .read()
     .unwrap();
 
+    let (wallet_xorurl, _): (String, String) = serde_json::from_str(&wallet_create_result)
+        .expect("Failed to parse output of `safe wallet create`");
+
     let balance = cmd!(
         get_bin_location(),
         "wallet",
         "balance",
-        &wallet_create_result,
+        &wallet_xorurl,
         "--json"
     )
     .read()
@@ -202,11 +205,14 @@ fn calling_safe_wallet_create_w_sk_only() {
         .read()
         .unwrap();
 
+    let (wallet_xorurl, _): (String, String) = serde_json::from_str(&wallet_create_result)
+        .expect("Failed to parse output of `safe wallet create`");
+
     let balance = cmd!(
         get_bin_location(),
         "wallet",
         "balance",
-        &wallet_create_result,
+        &wallet_xorurl,
         "--json"
     )
     .read()

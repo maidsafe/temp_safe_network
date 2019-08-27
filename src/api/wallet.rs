@@ -441,6 +441,45 @@ fn test_wallet_insert_and_balance() {
 }
 
 #[test]
+fn test_wallet_insert_and_get() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let wallet_xorurl = unwrap!(safe.wallet_create());
+    let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
+    let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1.53"));
+
+    unwrap!(safe.wallet_insert(
+        &wallet_xorurl,
+        Some("myfirstbalance".to_string()),
+        true,
+        &unwrap!(key_pair1.clone()).sk,
+    ));
+
+    unwrap!(safe.wallet_insert(
+        &wallet_xorurl,
+        Some("mysecondbalance".to_string()),
+        false,
+        &unwrap!(key_pair2.clone()).sk,
+    ));
+
+    let wallet_balances = unwrap!(safe.wallet_get(&wallet_xorurl));
+    assert_eq!(wallet_balances["myfirstbalance"].0, true);
+    assert_eq!(wallet_balances["myfirstbalance"].1.xorurl, key1_xorurl);
+    assert_eq!(
+        wallet_balances["myfirstbalance"].1.sk,
+        unwrap!(key_pair1).sk
+    );
+
+    assert_eq!(wallet_balances["mysecondbalance"].0, false);
+    assert_eq!(wallet_balances["mysecondbalance"].1.xorurl, key2_xorurl);
+    assert_eq!(
+        wallet_balances["mysecondbalance"].1.sk,
+        unwrap!(key_pair2).sk
+    );
+}
+
+#[test]
 fn test_wallet_transfer_no_default() {
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z");

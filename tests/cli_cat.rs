@@ -12,9 +12,12 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{get_bin_location, get_random_nrs_string, parse_files_put_or_sync_output, CLI};
+use common::{
+    create_preload_and_get_keys, get_bin_location, get_random_nrs_string, parse_cat_wallet_output,
+    parse_files_put_or_sync_output, CLI,
+};
 use predicates::prelude::*;
-use safe_cli::{SafeData, SafeDataType, XorUrlEncoder};
+use safe_cli::{BlsKeyPair, SafeData, SafeDataType, XorUrlEncoder};
 use std::process::Command;
 use unwrap::unwrap;
 
@@ -198,4 +201,50 @@ fn calling_safe_cat_nrsurl_with_info_level_2() {
     } else {
         panic!("Content retrieved was unexpected: {:?}", content_info);
     }
+}
+
+#[test]
+fn calling_safe_cat_wallet_xorurl() {
+    let wallet_create = cmd!(
+        get_bin_location(),
+        "wallet",
+        "create",
+        "--test-coins",
+        "--json"
+    )
+    .read()
+    .unwrap();
+    let (wallet_xorurl, key_xorurl, key_pair): (String, String, Option<BlsKeyPair>) =
+        serde_json::from_str(&wallet_create)
+            .expect("Failed to parse output of `safe wallet create`");
+
+    let (key_pk_xor, sk) = create_preload_and_get_keys("7");
+    let _wallet_insert_result = cmd!(
+        get_bin_location(),
+        "wallet",
+        "insert",
+        &wallet_xorurl,
+        "--keyurl",
+        &key_pk_xor,
+        "--sk",
+        &sk,
+    )
+    .read()
+    .unwrap();
+
+    let wallet_cat = cmd!(get_bin_location(), "cat", &wallet_xorurl, "--json")
+        .read()
+        .unwrap();
+    let (xorurl, balances) = parse_cat_wallet_output(&wallet_cat);
+
+    assert_eq!(wallet_xorurl, xorurl);
+    assert_eq!(balances.len(), 2);
+
+    assert_eq!(balances[&key_xorurl].0, true);
+    assert_eq!(balances[&key_xorurl].1.xorurl, key_xorurl);
+    assert_eq!(balances[&key_xorurl].1.sk, unwrap!(key_pair).sk);
+
+    assert_eq!(balances[&key_pk_xor].0, false);
+    assert_eq!(balances[&key_pk_xor].1.xorurl, key_pk_xor);
+    assert_eq!(balances[&key_pk_xor].1.sk, sk);
 }

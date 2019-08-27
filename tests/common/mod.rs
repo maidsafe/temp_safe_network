@@ -8,8 +8,9 @@
 
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_cli::BlsKeyPair;
+use safe_cli::{BlsKeyPair, WalletSpendableBalances};
 use std::env;
+use unwrap::unwrap;
 
 pub const CLI: &str = "safe";
 #[allow(dead_code)]
@@ -50,26 +51,27 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
 
 #[allow(dead_code)]
 pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
-    let (pk, sk) = create_preload_and_get_keys(&preload);
+    let (_pk, sk) = create_preload_and_get_keys(&preload);
     let wallet_create_result = cmd!(
         get_bin_location(),
         "wallet",
         "create",
         "--pay-with",
         &sk,
-        "--keyurl",
-        &pk,
-        "--sk",
-        &sk,
+        "--preload",
+        preload,
         "--json",
     )
     .read()
     .unwrap();
 
-    let mut lines = wallet_create_result.lines().rev();
-    let wallet_xor = lines.next().unwrap();
-
-    (wallet_xor.to_string(), pk, sk)
+    let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
+    let unwrapped_key_pair = unwrap!(key_pair);
+    (
+        wallet_xor.to_string(),
+        unwrapped_key_pair.pk,
+        unwrapped_key_pair.sk,
+    )
 }
 
 #[allow(dead_code)]
@@ -112,4 +114,14 @@ pub fn parse_files_put_or_sync_output(
 #[allow(dead_code)]
 pub fn parse_nrs_create_output(output: &str) -> (String, BTreeMap<String, (String, String)>) {
     serde_json::from_str(output).expect("Failed to parse output of `safe nrs create`")
+}
+
+#[allow(dead_code)]
+pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<BlsKeyPair>) {
+    serde_json::from_str(&output).expect("Failed to parse output of `safe wallet create`")
+}
+
+#[allow(dead_code)]
+pub fn parse_cat_wallet_output(output: &str) -> (String, WalletSpendableBalances) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe cat wallet`")
 }
