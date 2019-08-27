@@ -511,7 +511,7 @@ impl SafeApp for SafeAppScl {
     }
 
     fn seq_mutable_data_get_value(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         key: &[u8],
@@ -543,7 +543,13 @@ impl SafeApp for SafeAppScl {
                 .list_seq_mdata_entries(name, tag)
                 .map_err(SafeAppError)
         })
-        .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
+        .map_err(|err| {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) = err {
+                Error::AccessDenied(format!("Failed to get MD at: {:?}", name))
+            } else {
+                Error::NetDataError(format!("Failed to get MD. {:?}", err))
+            }
+        })
     }
 
     fn seq_mutable_data_update(

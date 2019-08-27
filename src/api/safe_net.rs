@@ -105,7 +105,7 @@ pub trait SafeApp {
     ) -> ResultReturn<()>;
 
     fn seq_mutable_data_get_value(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         key: &[u8],

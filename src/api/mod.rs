@@ -24,7 +24,9 @@ mod wallet;
 mod xorurl;
 
 pub use errors::{Error, ResultReturn};
-pub use fetch::{NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType};
+pub use fetch::{
+    NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
+};
 pub use keys::BlsKeyPair;
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;

@@ -9,8 +9,8 @@
 use super::files::FilesMap;
 use super::helpers::get_subnames_host_path_and_version;
 use super::nrs_map::NrsMap;
-pub use super::xorurl::SafeContentType;
-pub use super::xorurl::{SafeDataType, XorUrlEncoder};
+pub use super::wallet::WalletSpendableBalances;
+pub use super::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder};
 use super::{Error, ResultReturn, Safe, XorName};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,7 @@ pub enum SafeData {
     Wallet {
         xorname: XorName,
         type_tag: u64,
+        balances: WalletSpendableBalances,
         data_type: SafeDataType,
         resolved_from: Option<NrsMapContainerInfo>,
     },
@@ -111,12 +112,16 @@ impl Safe {
                     other
                 ))),
             },
-            SafeContentType::Wallet => Ok(SafeData::Wallet {
-                xorname: the_xor.xorname(),
-                type_tag: the_xor.type_tag(),
-                data_type: the_xor.data_type(),
-                resolved_from: None,
-            }),
+            SafeContentType::Wallet => {
+                let balances = self.wallet_get(&url)?;
+                Ok(SafeData::Wallet {
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
+                    balances,
+                    data_type: the_xor.data_type(),
+                    resolved_from: None,
+                })
+            }
             SafeContentType::FilesContainer => {
                 let (version, files_map) = self.files_container_get(&xorurl)?;
 
@@ -243,11 +248,13 @@ fn embed_resolved_from(
         SafeData::Wallet {
             xorname,
             type_tag,
+            balances,
             data_type,
             ..
         } => SafeData::Wallet {
             xorname,
             type_tag,
+            balances,
             data_type,
             resolved_from: Some(nrs_map_container),
         },
@@ -314,6 +321,7 @@ fn test_fetch_wallet() {
             == SafeData::Wallet {
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 1_000,
+                balances: WalletSpendableBalances::default(),
                 data_type: SafeDataType::SeqMutableData,
                 resolved_from: None,
             }

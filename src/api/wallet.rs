@@ -13,6 +13,7 @@ use log::debug;
 use rand_core::RngCore;
 use safe_nd::Coins;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
@@ -21,11 +22,13 @@ const WALLET_DEFAULT: &str = "_default";
 const WALLET_DEFAULT_BYTES: &[u8] = b"_default";
 
 // Struct which is serialised and stored in Wallet MD for linking to a spendable balance (Key)
-#[derive(Serialize, Deserialize, Debug)]
-struct WalletSpendableBalance {
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct WalletSpendableBalance {
     pub xorurl: XorUrl,
     pub sk: String,
 }
+
+pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalance)>;
 
 #[allow(dead_code)]
 impl Safe {
@@ -127,7 +130,7 @@ impl Safe {
 
         // Let's get the list of balances from the Wallet
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
-        let spendable_balances = match self
+        let balances = match self
             .safe_app
             .list_seq_mdata_entries(xorurl_encoder.xorname(), WALLET_TYPE_TAG)
         {
@@ -151,9 +154,9 @@ impl Safe {
             }
         };
 
-        debug!("Spendable balances: {:?}", spendable_balances);
+        debug!("Spendable balances: {:?}", balances);
         // Iterate through the Keys and query the balance for each
-        for (name, balance) in spendable_balances.iter() {
+        for (name, balance) in balances.iter() {
             let thename = String::from_utf8_lossy(name).to_string();
 
             // Ignore the _default Wallet MD entry key
@@ -187,7 +190,7 @@ impl Safe {
         Ok(total_balance.to_string())
     }
 
-    fn wallet_get_default_balance(&mut self, url: &str) -> ResultReturn<WalletSpendableBalance> {
+    fn wallet_get_default_balance(&self, url: &str) -> ResultReturn<WalletSpendableBalance> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let default = self
             .safe_app
@@ -347,6 +350,49 @@ impl Safe {
             ))),
             Ok(tx_id) => Ok(tx_id),
         }
+    }
+
+    pub fn wallet_get(&self, url: &str) -> ResultReturn<WalletSpendableBalances> {
+        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
+
+        let entries = self
+            .safe_app
+            .list_seq_mdata_entries(xorurl_encoder.xorname(), WALLET_TYPE_TAG)
+            .map_err(|err| match err {
+                Error::AccessDenied(_) => {
+                    Error::AccessDenied(format!("Couldn't read Wallet at \"{}\"", url))
+                }
+                _other => Error::ContentError(format!("No Wallet found at \"{}\"", url)),
+            })?;
+
+        let mut balances = WalletSpendableBalances::default();
+        let mut default_balance = "".to_string();
+        for (key, value) in entries.iter() {
+            let value_str = String::from_utf8_lossy(&value.data).to_string();
+            if key.as_slice() == WALLET_DEFAULT_BYTES {
+                default_balance = value_str;
+            } else {
+                let spendable_balance: WalletSpendableBalance = serde_json::from_str(&value_str)
+                    .map_err(|_| {
+                        Error::ContentError(
+                            "Couldn't deserialise data stored in the Wallet".to_string(),
+                        )
+                    })?;
+                let thename = String::from_utf8_lossy(key).to_string();
+                balances.insert(thename, (false, spendable_balance));
+            }
+        }
+
+        if !default_balance.is_empty() {
+            let mut default = balances.get_mut(&default_balance).ok_or_else(|| {
+                Error::Unexpected(format!(
+                    "Failed to get default spendable balance from Wallet at \"{}\"",
+                    url
+                ))
+            })?;
+            default.0 = true;
+        }
+        Ok(balances)
     }
 }
 

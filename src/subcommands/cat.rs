@@ -116,11 +116,58 @@ pub fn cat_commander(
                 .write_all(data)
                 .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
         }
+        SafeData::Wallet {
+            xorname,
+            type_tag,
+            balances,
+            data_type,
+            resolved_from,
+        } => {
+            // Render Wallet
+            if OutputFmt::Pretty == output_fmt {
+                if cmd.info > 0 {
+                    println!("Native data type: {}", data_type);
+                    println!("Type tag: {}", type_tag);
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!();
+                    print_resolved_from(cmd.info, resolved_from);
+                    println!();
+                }
+
+                println!("Spendable balances of Wallet at \"{}\":", url);
+                let mut table = Table::new();
+                table.add_row(row![bFg->"Default", bFg->"Friendly Name", bFg->"SafeKey URL"]);
+                balances.iter().for_each(|(name, (default, balance))| {
+                    let def = if *default { "*" } else { "" };
+                    table.add_row(row![def, name, balance.xorurl]);
+                });
+                table.printstd();
+            } else if resolved_from.is_some() && cmd.info > 1 {
+                // Print out the resolved_from info if -ii was passed (i.e. --info level 2)
+                println!(
+                    "{}",
+                    serde_json::to_string(&(&url, content))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
+            } else if cmd.info > 0 {
+                println!(
+                        "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
+                        url,
+                        data_type,
+                        type_tag,
+                        xorname_to_hex(xorname),
+                        balances,
+                    );
+            } else {
+                println!(
+                    "{}",
+                    serde_json::to_string(&(url, balances))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
+            }
+        }
         SafeData::SafeKey { .. } => {
             println!("Content type 'SafeKey' not supported yet by 'cat' command")
-        }
-        SafeData::Wallet { .. } => {
-            println!("Content type 'Wallet' not supported yet by 'cat' command")
         }
     }
 
