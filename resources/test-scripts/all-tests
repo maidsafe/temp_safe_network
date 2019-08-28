@@ -11,18 +11,18 @@ function download_safe_auth_nightly() {
     case $uname_output in
         Linux*)
             curl -L -O https://safe-authenticator-cli.s3.amazonaws.com/safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu-dev.tar
-            tar xvf safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu.tar
-            rm safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu.tar
+            tar xvf safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu-dev.tar
+            rm safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu-dev.tar
             ;;
         Darwin*)
             curl -L -O https://safe-authenticator-cli.s3.amazonaws.com/safe_authenticator_cli-nightly-x86_64-apple-darwin-dev.tar
-            tar xvf safe_authenticator_cli-nightly-x86_64-apple-darwin.tar
-            rm safe_authenticator_cli-nightly-x86_64-apple-darwin.tar
+            tar xvf safe_authenticator_cli-nightly-x86_64-apple-darwin-dev.tar
+            rm safe_authenticator_cli-nightly-x86_64-apple-darwin-dev.tar
             ;;
         MSYS_NT*)
             curl -L -O https://safe-authenticator-cli.s3.amazonaws.com/safe_authenticator_cli-nightly-x86_64-pc-windows-gnu-dev.tar
-            tar xvf safe_authenticator_cli-nightly-x86_64-pc-windows-gnu.tar
-            rm safe_authenticator_cli-nightly-x86_64-pc-windows-gnu.tar
+            tar xvf safe_authenticator_cli-nightly-x86_64-pc-windows-gnu-dev.tar
+            rm safe_authenticator_cli-nightly-x86_64-pc-windows-gnu-dev.tar
             auth_bin_name="safe_auth.exe"
             ;;
         *)
