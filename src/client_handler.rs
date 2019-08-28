@@ -264,11 +264,11 @@ impl ClientHandler {
             //
             PutMData(chunk) => self.handle_put_mdata(client, chunk, message_id),
             MutateMDataEntries { .. }
-            | DeleteMData(..)
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => {
-                self.handle_mdata_mutation(request, client, message_id)
+                self.handle_mutate_mdata(request, client, message_id)
             }
+            DeleteMData(..) => self.handle_delete_mdata(request, client, message_id),
             GetMData(..)
             | GetMDataVersion(..)
             | GetMDataShell(..)
@@ -414,7 +414,7 @@ impl ClientHandler {
         }))
     }
 
-    fn handle_mdata_mutation(
+    fn handle_mutate_mdata(
         &mut self,
         request: Request,
         client: &ClientInfo,
@@ -429,6 +429,19 @@ impl ClientHandler {
             *COST_OF_PUT,
         )?;
 
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
+    }
+
+    fn handle_delete_mdata(
+        &mut self,
+        request: Request,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
             request,

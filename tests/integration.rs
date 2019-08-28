@@ -2852,6 +2852,8 @@ fn delete_mutable_data() {
         &mut client_a,
         Request::PutMData(MData::Unseq(mdata.clone())),
     );
+    let balance_a = unwrap!(balance_a.checked_sub(*COST_OF_PUT));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Attempt to delete non-existent data.
     let invalid_address = MDataAddress::from_kind(MDataKind::Unseq, env.rng().gen(), 101);
@@ -2861,6 +2863,7 @@ fn delete_mutable_data() {
         Request::DeleteMData(invalid_address),
         NdError::NoSuchData,
     );
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Attempt to delete the data by non-owner.
     common::send_request_expect_err(
@@ -2869,9 +2872,11 @@ fn delete_mutable_data() {
         Request::DeleteMData(address),
         NdError::AccessDenied,
     );
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Successfully delete.
     common::send_request_expect_ok(&mut env, &mut client_a, Request::DeleteMData(address), ());
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Verify the data doesn't exist any more.
     common::send_request_expect_err(
