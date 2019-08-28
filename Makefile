@@ -358,3 +358,22 @@ endif
 		--tag ${SAFE_AUTH_VERSION} \
 		--name "safe_authenticator-${SAFE_AUTH_VERSION}-win-x64.tar.gz" \
 		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-win-x64.tar.gz
+
+publish:
+ifndef CRATES_IO_TOKEN
+	@echo "A login token for crates.io must be provided."
+	@exit 1
+endif
+	rm -rf artifacts
+	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-client-libs-build:build-mock \
+		/bin/bash -c "cd safe_core && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
+	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-client-libs-build:build-mock \
+		/bin/bash -c "cd safe_app && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
+	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-client-libs-build:build-mock \
+		/bin/bash -c "cd safe_authenticator && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"

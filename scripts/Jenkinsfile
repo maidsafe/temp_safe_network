@@ -93,6 +93,7 @@ stage('deployment') {
                 create_tag(version)
                 create_github_release(version)
                 upload_deploy_artifacts("mock")
+                publish_crates()
             } else {
                 package_deploy_artifacts(false)
                 upload_deploy_artifacts("mock")
@@ -220,6 +221,13 @@ def create_github_release(version) {
             usernameVariable: "GITHUB_USER",
             passwordVariable: "GITHUB_TOKEN")]) {
         sh("make deploy-github-release")
+    }
+}
+
+def publish_crates() {
+    withCredentials([string(
+        credentialsId: 'crates_io_token', variable: 'CRATES_IO_TOKEN')]) {
+        sh("make publish")
     }
 }
 
