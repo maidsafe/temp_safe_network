@@ -105,12 +105,25 @@ impl Safe {
         );
 
         if default {
-            self.safe_app.seq_mutable_data_insert(
+            match self.safe_app.seq_mutable_data_insert(
                 xorurl_encoder.xorname(),
                 WALLET_TYPE_TAG,
                 WALLET_DEFAULT_BYTES,
                 &md_key.to_string().into_bytes(),
-            )?;
+            ) {
+                Err(Error::EntryExists(_)) => {
+                    let (_, version) = self.wallet_get_default_balance(url)?;
+                    println!("AAAA: {}", version);
+                    self.safe_app.seq_mutable_data_update(
+                        xorurl_encoder.xorname(),
+                        WALLET_TYPE_TAG,
+                        WALLET_DEFAULT_BYTES,
+                        &md_key.to_string().into_bytes(),
+                        version + 1,
+                    )
+                }
+                other => other,
+            }?;
 
             debug!("Default wallet set.");
         }
@@ -190,7 +203,7 @@ impl Safe {
         Ok(total_balance.to_string())
     }
 
-    fn wallet_get_default_balance(&self, url: &str) -> ResultReturn<WalletSpendableBalance> {
+    fn wallet_get_default_balance(&self, url: &str) -> ResultReturn<(WalletSpendableBalance, u64)> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let default = self
             .safe_app
@@ -209,7 +222,7 @@ impl Safe {
                 }
             })?;
 
-        let the_balance: WalletSpendableBalance = {
+        let the_balance: (WalletSpendableBalance, u64) = {
             let default_balance_vec = self
                 .safe_app
                 .seq_mutable_data_get_value(
@@ -231,7 +244,7 @@ impl Safe {
                         "Couldn't deserialise data stored in the Wallet".to_string(),
                     )
                 })?;
-            spendable_balance
+            (spendable_balance, default_balance_vec.version)
         };
 
         Ok(the_balance)
@@ -310,7 +323,8 @@ impl Safe {
         // Now check if the 'to_url' is a valid Wallet or a SafeKey URL
         let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url)?;
         let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
-            let to_balance = self.wallet_get_default_balance(&to_xorurl_encoder.to_string()?)?;
+            let (to_balance, _) =
+                self.wallet_get_default_balance(&to_xorurl_encoder.to_string()?)?;
             XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
         } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
             && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
@@ -328,7 +342,7 @@ impl Safe {
         let tx_id = rand::thread_rng().next_u64();
 
         // Figure out which is the default spendable balance we should use as the origin for the transfer
-        let from_wallet_balance = self.wallet_get_default_balance(&from_wallet_url)?;
+        let (from_wallet_balance, _) = self.wallet_get_default_balance(&from_wallet_url)?;
         let from_sk = sk_from_hex(&from_wallet_balance.sk)?;
 
         // Finally, let's make the transfer
@@ -472,6 +486,45 @@ fn test_wallet_insert_and_get() {
     );
 
     assert_eq!(wallet_balances["mysecondbalance"].0, false);
+    assert_eq!(wallet_balances["mysecondbalance"].1.xorurl, key2_xorurl);
+    assert_eq!(
+        wallet_balances["mysecondbalance"].1.sk,
+        unwrap!(key_pair2).sk
+    );
+}
+
+#[test]
+fn test_wallet_insert_and_set_default() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let wallet_xorurl = unwrap!(safe.wallet_create());
+    let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("65.82"));
+    let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("11.44"));
+
+    unwrap!(safe.wallet_insert(
+        &wallet_xorurl,
+        Some("myfirstbalance".to_string()),
+        true,
+        &unwrap!(key_pair1.clone()).sk,
+    ));
+
+    unwrap!(safe.wallet_insert(
+        &wallet_xorurl,
+        Some("mysecondbalance".to_string()),
+        true,
+        &unwrap!(key_pair2.clone()).sk,
+    ));
+
+    let wallet_balances = unwrap!(safe.wallet_get(&wallet_xorurl));
+    assert_eq!(wallet_balances["myfirstbalance"].0, false);
+    assert_eq!(wallet_balances["myfirstbalance"].1.xorurl, key1_xorurl);
+    assert_eq!(
+        wallet_balances["myfirstbalance"].1.sk,
+        unwrap!(key_pair1).sk
+    );
+
+    assert_eq!(wallet_balances["mysecondbalance"].0, true);
     assert_eq!(wallet_balances["mysecondbalance"].1.xorurl, key2_xorurl);
     assert_eq!(
         wallet_balances["mysecondbalance"].1.sk,

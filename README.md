@@ -278,12 +278,12 @@ Right now, only a secret key (of a `SafeKey` with coins) can be used to pay for 
 For example, if we use the secret key we obtained when creating a `SafeKey` in our example in previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
 
 ```shell
-$ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
-Wallet created at: "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao"
-New SafeKey created at: "safe://hodqmc6ht5ezpprkh1cbw54n3mjyckcpm95qmygon897ft5dq8oxpc"
+$ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a --name first-spendable-balance
+Wallet created at: "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e"
+New SafeKey created at: "safe://hbyyyybqk69tpm67ecnzjg66tcrja3ugq81oh6gfaffwaty614rmttmyeu"
 Key pair generated:
-Public Key = a7086bbc7f7dad7db400a99ace99fd46abfef652d04788dbc3b9d1b6e45dec08806ee9cd318ee914577fae6a58009cae
-Secret Key = 65f7cd252d3b66456239611f293325f94f4f89e1eda0b3b1d5bc41743999003c
+Public Key = b95efc5abf750c15d26f7a2c22719999c79439e317052d31107a5a22e3158113d6003af4980b72ff076813eda30f1d8b
+Secret Key = b9b2edffa8ef103dc98ba2160e295f98fdf981eb572bc2f8b018a12574ce435e
 ```
 
 #### Wallet Balance
@@ -292,8 +292,8 @@ The balance of a given `Wallet` can be queried using its XorUrl. This returns th
 
 The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
 ```shell
-$ safe wallet balance safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao
-Wallet at "safe://hbymipwqmm3ityq3ox5xuu6j7mjm8aw11nhnjnzpy1dib4cgmr63rc1jao" has a total balance of 0 safecoins
+$ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
+Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e" has a total balance of 0 safecoins
 ```
 
 #### Wallet Insert
@@ -338,10 +338,10 @@ With the above options, the user will be prompted to input the secret key corres
 The `--sk` argument can also be combined with `--keyurl` to pass the `SafeKey`'s XorUrl as part of the command line instruction itself, e.g.:
 
 ```shell
-$ safe wallet insert safe://<wallet-xorurl> --keyurl safe://<key-xor-url> --name my_default_balance --default
+$ safe wallet insert safe://<wallet-xorurl> --keyurl safe://<key-xor-url> --name my-default-balance --default
 Enter secret key corresponding to public key at safe://<key-xor-url>:
 b493a84e3b35239cbffdf10b8ebfa49c0013a5d1b59e5ef3c000320e2d303311
-Spendable balance inserted with name 'my_default_balance' in Wallet located at "safe://<wallet-xorurl>"
+Spendable balance inserted with name 'my-default-balance' in Wallet located at "safe://<wallet-xorurl>"
 ```
 
 #### Wallet Transfer
@@ -355,7 +355,7 @@ $ safe wallet transfer <amount> <to> <from>
 ```
 E.g.:
 ```shell
-$ safe wallet transfer 323.23 safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao safe://hodn6ny9jwhrnokdrgrfmn1jyksh7exctuuzh9w35bpuw5wmpp7hhp
+$ safe wallet transfer 323.23 safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
 Success. TX_ID: 6183829450183485238
 ```
 
@@ -480,7 +480,31 @@ $ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/
 hello tests!
 ```
 
-As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
+And if we provide a path to a subfolder of the `FilesContainer`, the `cat` command will resolve the path and list only those files which path is a child of the provided path:
+```shell
+$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder
+Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder":
++--------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| Name         | Size | Created              | Modified             | Link                                                              |
++--------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+| subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb |
++--------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+```
+
+A `Wallet` can be also fetched with `cat` to inspect its content, the list of spendable balances it holds will be listed, and we can see which of them is currently the default to be used in a transaction operation:
+```shell
+$ safe cat safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
+Spendable balances of Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e":
++---------+-------------------------+-------------------------------------------------------------------+
+| Default | Friendly Name           | SafeKey URL                                                       |
++---------+-------------------------+-------------------------------------------------------------------+
+| *       | my-default-balance      | safe://hbyyyybffgc3smq1ynjewsbtqkm5h9rq367n6krzd9rz65p8684x9wy81m |
++---------+-------------------------+-------------------------------------------------------------------+
+|         | first-spendable-balance | safe://hbyyyybqk69tpm67ecnzjg66tcrja3ugq81oh6gfaffwaty614rmttmyeu |
++---------+-------------------------+-------------------------------------------------------------------+
+```
+
+As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
 In order to get additional information about the native data type holding the data of a specific content, we can pass the `--info` flag to the `cat` command:
 ```shell
@@ -501,7 +525,7 @@ Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
-As seen above, we get some additional information about the content we are retrieving. In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (PublishedSeqAppendOnlyData).
+We've got some additional information about the content we are retrieving. In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (PublishedSeqAppendOnlyData).
 
 And of course this flag can be used also with other type of content like files (`ImmutableData`):
 ```shell

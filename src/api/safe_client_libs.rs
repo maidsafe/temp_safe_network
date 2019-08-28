@@ -561,7 +561,7 @@ impl SafeApp for SafeAppScl {
         version: u64,
     ) -> ResultReturn<()> {
         let entry_actions = MDataSeqEntryActions::new();
-        let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), version);
+        let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
     }
 }
