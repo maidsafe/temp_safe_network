@@ -29,11 +29,11 @@ use safe_core::ConnectionManager;
 use safe_core::{Client, CoreError};
 use safe_nd::{
     ADataAddress, ADataOwner, AppPermissions, AppendOnlyData, Coins, Error as SndError,
-    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData,
-    UnpubUnseqAppendOnlyData, XorName,
+    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, UnpubUnseqAppendOnlyData,
+    XorName,
 };
 #[cfg(feature = "mock-network")]
-use safe_nd::{ RequestType, Response };
+use safe_nd::{RequestType, Response};
 use std::collections::HashMap;
 use std::rc::Rc;
 

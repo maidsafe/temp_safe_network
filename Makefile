@@ -1,4 +1,4 @@
-.PHONY: build
+.PHONY: build tests
 .DEFAULT_GOAL: build
 
 SHELL := /bin/bash
