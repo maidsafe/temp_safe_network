@@ -398,7 +398,7 @@ fn test_keys_balance_pk() {
 
     let from_current_balance = unwrap!(safe.keys_balance_from_sk(&from_key_pair_unwrapped.sk));
     assert_eq!(
-        "3.234000000", /*== 1743.234 - 1740*/
+        "3.233999999", /*== 1743.234 - 1740 - 0.000000001 (creation cost) */
         from_current_balance
     );
 
@@ -426,7 +426,7 @@ fn test_keys_balance_xorname() {
     let from_current_balance =
         unwrap!(safe.keys_balance_from_url(&from_xorname, &from_key_pair_unwrapped.sk));
     assert_eq!(
-        "400.040000000", /*== 435.34 - 35.3*/
+        "400.039999999", /*== 435.34 - 35.3 - 0.000000001 (creation cost)*/
         from_current_balance
     );
 

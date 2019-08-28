@@ -126,7 +126,13 @@ impl SafeApp for SafeAppFake {
         amount: Coins,
     ) -> ResultReturn<XorName> {
         if let Some(sk) = from_sk {
-            self.substract_coins(sk, amount)?;
+            let amount_with_cost = Coins::from_nano(amount.as_nano() + 1).map_err(|err| {
+                Error::Unexpected(format!(
+                    "Unexpected error when trying to instantiate a safe_nd::Coins object: {}",
+                    err
+                ))
+            })?; // 1 nano is the creation cost
+            self.substract_coins(sk, amount_with_cost)?;
         };
 
         let to_xorname = xorname_from_pk(new_balance_owner);
@@ -565,7 +571,7 @@ fn test_check_balance() {
 
     let current_balance = unwrap!(mock.get_balance_from_sk(sk));
     assert_eq!(
-        unwrap!(Coins::from_str("1.065432109")), /* == 2.3 - 1.234567891*/
+        unwrap!(Coins::from_str("1.065432108")), /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
         current_balance
     );
 }
