@@ -113,7 +113,6 @@ impl Safe {
             ) {
                 Err(Error::EntryExists(_)) => {
                     let (_, version) = self.wallet_get_default_balance(url)?;
-                    println!("AAAA: {}", version);
                     self.safe_app.seq_mutable_data_update(
                         xorurl_encoder.xorname(),
                         WALLET_TYPE_TAG,
