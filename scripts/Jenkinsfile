@@ -98,6 +98,13 @@ stage('build') {
             checkout(scm)
             run_tests('integration')
         }
+    },
+    clippy_and_rustfmt: {
+        node("safe_client_libs") {
+            checkout(scm)
+            sh("make clippy")
+            sh("make rustfmt")
+        }
     }
 }
 

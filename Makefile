@@ -55,6 +55,28 @@ endif
 	mkdir artifacts
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+clippy:
+ifeq ($(UNAME_S),Linux)
+	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		-e CARGO_TARGET_DIR=/target \
+		maidsafe/safe-client-libs-build:build-mock \
+		scripts/clippy-all
+else
+	./scripts/clippy-all
+endif
+
+rustfmt:
+ifeq ($(UNAME_S),Linux)
+	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		-e CARGO_TARGET_DIR=/target \
+		maidsafe/safe-client-libs-build:build-mock \
+		scripts/rustfmt
+else
+	./scripts/rustfmt
+endif
+
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
 	find artifacts -name "*.dll" -exec strip -x '{}' \;
@@ -240,7 +262,7 @@ tests-integration: clean
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:build-mock \
 		scripts/test-integration
 
 debug:
