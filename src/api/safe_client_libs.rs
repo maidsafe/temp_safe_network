@@ -178,6 +178,9 @@ impl SafeApp for SafeAppScl {
             | SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) => {
                 Error::NotEnoughBalance(amount.to_string())
             }
+            SafeAppError(SafeCoreError::DataError(SafeNdError::InvalidOperation)) => {
+                Error::InvalidAmount(amount.to_string())
+            }
             other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
         })?;
 
