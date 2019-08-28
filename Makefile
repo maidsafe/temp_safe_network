@@ -17,7 +17,7 @@ build-container:
 		-t maidsafe/safe-client-libs-build:build \
 		--build-arg build_type="real" .
 
-build-dev-container:
+build-mock-container:
 	rm -rf target/
 	docker rmi -f maidsafe/safe-client-libs-build:build-mock
 	docker build -f scripts/Dockerfile.build \
@@ -27,7 +27,7 @@ build-dev-container:
 push-container:
 	docker push maidsafe/safe-client-libs-build:build
 
-push-dev-container:
+push-mock-container:
 	docker push maidsafe/safe-client-libs-build:build-mock
 
 clean:
@@ -247,8 +247,8 @@ ifeq ($(UNAME_S),Linux)
 		-v "${PWD}":/usr/src/safe_client_libs \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build \
-		scripts/test-mock
+		maidsafe/safe-client-libs-build:build-mock \
+		scripts/build-and-test-mock
 	docker cp "safe_app_tests-${UUID}":/target .
 	docker rm -f "safe_app_tests-${UUID}"
 else
