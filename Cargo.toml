@@ -45,8 +45,8 @@ fake-auth = ["safe_app/testing"]
 scl-mock = ["fake-auth"]
 
 [patch.crates-io]
-safe_app = { git = "https://github.com/maidsafe/safe_client_libs", rev = "e50691cf" }
-safe_core = { git = "https://github.com/maidsafe/safe_client_libs", rev = "e50691cf" }
+safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
