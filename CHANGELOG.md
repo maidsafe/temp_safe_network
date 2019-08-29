@@ -1,6 +1,7 @@
 # Safe Vault - Change Log
 
 ## [0.19.0]
+- Rewrite the Vault code.
 - Support new data types (AppendOnlyData, unpublished sequenced/unsequenced MutableData, and unpublished ImmutableData).
 - Support coin operations.
 - Use quic-p2p for communication with clients.
