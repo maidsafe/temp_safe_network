@@ -1,6 +1,6 @@
 [package]
 name = "safe_cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 publish = false
@@ -13,8 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 log = "0.4.6"
-safe_app = "0.9.1"
-safe_core = "0.32.1"
+safe_app = "~0.10.0"
+safe_core = "~0.33.0"
 safe-nd = "~0.3.0"
 structopt = "0.2.15"
 env_logger = "0.6.0"
@@ -43,10 +43,6 @@ self_update = "0.5.1"
 mock-network = ["safe_app/mock-network"]
 fake-auth = ["safe_app/testing"]
 scl-mock = ["fake-auth"]
-
-[patch.crates-io]
-safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
-safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
