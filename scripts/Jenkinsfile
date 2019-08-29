@@ -10,7 +10,6 @@ stage('build & test') {
     parallel mock_linux: {
         node('safe_client_libs') {
             checkout(scm)
-            clean()
             run_tests('mock')
             strip_build_artifacts()
             package_build_artifacts('mock', 'linux')
@@ -39,7 +38,6 @@ stage('build & test') {
     real_linux: {
         node('safe_client_libs') {
             checkout(scm)
-            clean()
             sh("make build")
             strip_build_artifacts()
             package_build_artifacts('real', 'linux')
@@ -49,7 +47,6 @@ stage('build & test') {
     real_windows: {
         node('windows') {
             checkout(scm)
-            clean()
             sh("make build")
             strip_build_artifacts()
             package_build_artifacts('real', 'windows')
@@ -59,7 +56,6 @@ stage('build & test') {
     real_macos: {
         node('osx') {
             checkout(scm)
-            clean()
             sh("make build")
             strip_build_artifacts()
             package_build_artifacts('real', 'osx')

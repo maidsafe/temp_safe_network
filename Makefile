@@ -53,11 +53,6 @@ push-container:
 push-mock-container:
 	docker push maidsafe/safe-client-libs-build:build-mock
 
-clean:
-	@if docker ps -a | grep safe_app_build &> /dev/null; then \
-		docker rm -f safe_app_build; \
-	fi
-
 build:
 	rm -rf artifacts
 ifeq ($(UNAME_S),Linux)
