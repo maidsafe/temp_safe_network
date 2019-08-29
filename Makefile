@@ -359,7 +359,7 @@ ifndef CRATES_IO_TOKEN
 	@echo "A login token for crates.io must be provided."
 	@exit 1
 endif
-	rm -rf artifacts
+	rm -rf artifacts deploy
 	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-client-libs-build:build-mock \
