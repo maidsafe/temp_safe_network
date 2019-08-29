@@ -1,5 +1,13 @@
 # Safe Vault - Change Log
 
+## [0.19.0]
+- Support new data types (AppendOnlyData, unpublished sequenced/unsequenced MutableData, and unpublished ImmutableData).
+- Support coin operations.
+- Use quic-p2p for communication with clients.
+- Temporarily remove the Routing dependency.
+- Refactor the personas system into a new Vault architecture.
+- Use Rust stable / 2018 edition.
+
 ## [0.18.0]
 - Improve Docker configuration scripts (thanks to @mattmccarty)
 - Use rust 1.22.1 stable / 2017-11-23 nightly
