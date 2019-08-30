@@ -46,7 +46,13 @@ function run_safe_auth() {
 }
 
 function run_unit_tests() {
-    cargo test --release --features=scl-mock -- --test-threads=1
+	rm -f fake_vault_data.json
+    cargo test --lib --release --features=scl-mock -- --test-threads=1
+	rm -f fake_vault_data.json
+    cargo test --doc --release --features=scl-mock -- --test-threads=1
+	rm -f fake_vault_data.json
+    cargo test --bins --release --features=scl-mock -- --test-threads=1
+	rm -f fake_vault_data.json
     cargo test --lib --release --features=mock-network,fake-auth -- --test-threads=1
     cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
 }
@@ -65,12 +71,11 @@ function run_integration_tests() {
 }
 
 function build_dev_artifacts() {
-    cargo build --release --features=mock-network
+	cargo build --release --features=mock-network
 }
-
-#download_safe_auth_nightly
-#run_safe_auth
-#cargo fmt -- --check
-#run_unit_tests
-#run_integration_tests
+download_safe_auth_nightly
+run_safe_auth
+cargo fmt -- --check
+run_unit_tests
+run_integration_tests
 build_dev_artifacts
