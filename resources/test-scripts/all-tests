@@ -80,12 +80,10 @@ function run_integration_tests() {
     cargo test --release --features=mock-network --test cli_nrs -- --test-threads=1
 }
 
-function build_dev_artifacts() {
-	cargo build --release --features=mock-network
-}
+
+
 download_safe_auth_nightly
 run_safe_auth
 cargo fmt -- --check
 run_unit_tests
 run_integration_tests
-build_dev_artifacts
