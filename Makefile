@@ -12,17 +12,6 @@ S3_MACOS_DEPLOY_URL := https://safe-cli.s3.amazonaws.com/safe_cli-${SAFE_CLI_VER
 SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
-define GITHUB_RELEASE_DESCRIPTION
-Command line interface for the SAFE Network.
-
-There are also development versions of this release:
-[Linux](${S3_LINUX_DEPLOY_URL})
-[macOS](${S3_MACOS_DEPLOY_URL})
-[Windows](${S3_WIN_DEPLOY_URL})
-
-The development version uses a mocked SAFE network, which allows you to work against a file that mimics the network, where SafeCoins are created for local use.
-endef
-export GITHUB_RELEASE_DESCRIPTION
 
 build-clean:
 	rm -rf artifacts
@@ -252,7 +241,7 @@ endif
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli" \
-		--description "$$GITHUB_RELEASE_DESCRIPTION";
+		--description "$$(./resources/get_release_description.sh ${SAFE_CLI_VERSION})";
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
