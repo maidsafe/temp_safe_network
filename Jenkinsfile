@@ -3,7 +3,7 @@ properties([
         string(name: 'ARTIFACTS_BUCKET', defaultValue: 'safe-jenkins-build-artifacts'),
         string(name: 'CACHE_BRANCH', defaultValue: 'master'),
         string(name: 'DEPLOY_BUCKET', defaultValue: 'safe-cli'),
-        string(name: 'CLEAN_BUILD_BRANCH', defaultValue: 'PR-231')
+        string(name: 'CLEAN_BUILD_BRANCH', defaultValue: 'master')
     ])
 ])
 

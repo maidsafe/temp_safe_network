@@ -263,6 +263,12 @@ endif
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip" \
 		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_completion.sh" \
+		--file resources/safe_completion.sh
 
 retrieve-cache:
 ifndef SAFE_CLI_BRANCH
