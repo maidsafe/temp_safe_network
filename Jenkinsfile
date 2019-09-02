@@ -2,7 +2,8 @@ properties([
     parameters([
         string(name: 'ARTIFACTS_BUCKET', defaultValue: 'safe-jenkins-build-artifacts'),
         string(name: 'CACHE_BRANCH', defaultValue: 'master'),
-        string(name: 'DEPLOY_BUCKET', defaultValue: 'safe-cli')
+        string(name: 'DEPLOY_BUCKET', defaultValue: 'safe-cli'),
+        string(name: 'CLEAN_BUILD_BRANCH', defaultValue: 'PR-231')
     ])
 ])
 
@@ -42,7 +43,8 @@ stage('build & test') {
     release_linux: {
         node('safe_cli') {
             checkout(scm)
-            sh("make build")
+            runReleaseBuild()
+            stripArtifacts()
             packageBuildArtifacts('linux', 'release')
             uploadBuildArtifacts()
         }
@@ -50,7 +52,8 @@ stage('build & test') {
     release_windows: {
         node('windows') {
             checkout(scm)
-            sh("make build")
+            runReleaseBuild()
+            stripArtifacts()
             packageBuildArtifacts('windows', 'release')
             uploadBuildArtifacts()
         }
@@ -58,7 +61,8 @@ stage('build & test') {
     release_macos: {
         node('osx') {
             checkout(scm)
-            sh("make build")
+            runReleaseBuild()
+            stripArtifacts()
             packageBuildArtifacts('macos', 'release')
             uploadBuildArtifacts()
         }
@@ -101,6 +105,18 @@ def retrieveCache(os) {
             sh("make retrieve-cache")
         }
     }
+}
+
+def runReleaseBuild() {
+    if (env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}") {
+        sh("make build-clean")
+    } else {
+        sh("make build")
+    }
+}
+
+def stripArtifacts() {
+    sh("make strip-artifacts")
 }
 
 def runTests() {

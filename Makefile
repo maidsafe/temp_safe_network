@@ -24,6 +24,22 @@ The development version uses a mocked SAFE network, which allows you to work aga
 endef
 export GITHUB_RELEASE_DESCRIPTION
 
+build-clean:
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:build \
+		bash -c "rm -rf /target/release && cargo build --release"
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+else
+	rm -rf target
+	cargo build --release
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
 build:
 	rm -rf artifacts
 	mkdir artifacts
@@ -53,6 +69,15 @@ else
 	cargo build --release --features=mock-network
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+strip-artifacts:
+ifeq ($(OS),Windows_NT)
+	find artifacts -name "*.dll" -exec strip -x '{}' \;
+else ifeq ($(UNAME_S),Darwin)
+	find artifacts -name "*.dylib" -exec strip -x '{}' \;
+else
+	find artifacts -name "*.so" -exec strip '{}' \;
+endif
 
 build-container:
 	rm -rf target/
