@@ -346,16 +346,16 @@ Spendable balance inserted with name 'my-default-balance' in Wallet located at "
 
 #### Wallet Transfer
 
-Once a `Wallet` contains some spendable balance/s, we can transfer `<from>` a `Wallet` an `<amount>` of safecoins `<to>` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` currently must be passed as a XorUrl in the arguments list, but reading it from `stdin` will be supported later on.
+Once a `Wallet` contains some spendable balance/s, we can transfer `<from>` a `Wallet` an `<amount>` of safecoins `<to>` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` can be passed as an argument with `--to`, or it will be read from `stdin`.
 
-Both the `<from>` and `<to>` Wallets must have a _default_ spendable balance for the transfer to succeed. In the future different type of logics will be implemented for using different Wallet's balances and not just the default one.
+When using a `Wallet` either as the source or destination of a transfer, it must have a _default_ spendable balance for the transfer to succeed. In the future different type of logics will be implemented for using different Wallet's balances and not just the default one.
 
 ```shell
-$ safe wallet transfer <amount> <to> <from>
+$ safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL>
 ```
 E.g.:
 ```shell
-$ safe wallet transfer 323.23 safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
+$ safe wallet transfer 323.23 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao 
 Success. TX_ID: 6183829450183485238
 ```
 

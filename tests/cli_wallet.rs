@@ -58,11 +58,19 @@ fn calling_safe_wallet_transfer() {
 
     assert_eq!(from_starts_with, "160.000000000");
 
-    cmd.args(&vec!["wallet", "transfer", "100", &wallet_to, &wallet_from])
-        .assert()
-        .stdout(predicate::str::contains("Success"))
-        .stdout(predicate::str::contains("TX_ID"))
-        .success();
+    cmd.args(&vec![
+        "wallet",
+        "transfer",
+        "100",
+        "--from",
+        &wallet_from,
+        "--to",
+        &wallet_to,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
 
     // To got coins?
     let to_has = cmd!(
@@ -300,8 +308,10 @@ fn calling_safe_wallet_transfer_to_key_xorurl() {
         "wallet",
         "transfer",
         "18.23",
-        &key_xorurl,
+        "--from",
         &wallet_from,
+        "--to",
+        &key_xorurl,
     ])
     .assert()
     .stdout(predicate::str::contains("Success"))
@@ -359,8 +369,10 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() {
         "wallet",
         "transfer",
         "118.23",
-        &key_nrsurl,
+        "--from",
         &wallet_from,
+        "--to",
+        &key_nrsurl,
     ])
     .assert()
     .stdout(predicate::str::contains("Success"))
