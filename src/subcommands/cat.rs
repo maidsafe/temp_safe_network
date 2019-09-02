@@ -19,7 +19,7 @@ use structopt::StructOpt;
 pub struct CatCommands {
     /// The safe:// location to retrieve
     location: Option<String>,
-    /// Display additional information about the content being retrieved
+    /// Display additional information about the content being retrieved. Different levels of details can be obtained by passing this flag several times, i.e. `-i`, `-ii`, or `-iii`
     #[structopt(short = "i", long = "info", parse(from_occurrences))]
     info: u8,
 }
@@ -51,7 +51,6 @@ pub fn cat_commander(
                     println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!();
                     print_resolved_from(cmd.info, resolved_from);
                     println!();
                 }
@@ -75,7 +74,6 @@ pub fn cat_commander(
                 });
                 table.printstd();
             } else if resolved_from.is_some() && cmd.info > 1 {
-                // Print out the resolved_from info if -ii was passed (i.e. --info level 2)
                 println!(
                     "{}",
                     serde_json::to_string(&(&url, content))
@@ -106,7 +104,6 @@ pub fn cat_commander(
             if cmd.info > 0 {
                 println!("Native data type: ImmutableData (published)");
                 println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                println!();
                 print_resolved_from(cmd.info, resolved_from);
                 println!("Raw content of the file:");
             }
@@ -129,7 +126,6 @@ pub fn cat_commander(
                     println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!();
                     print_resolved_from(cmd.info, resolved_from);
                     println!();
                 }
@@ -143,7 +139,6 @@ pub fn cat_commander(
                 });
                 table.printstd();
             } else if resolved_from.is_some() && cmd.info > 1 {
-                // Print out the resolved_from info if -ii was passed (i.e. --info level 2)
                 println!(
                     "{}",
                     serde_json::to_string(&(&url, content))
@@ -166,8 +161,31 @@ pub fn cat_commander(
                 );
             }
         }
-        SafeData::SafeKey { .. } => {
-            println!("Content type 'SafeKey' not supported yet by 'cat' command")
+        SafeData::SafeKey {
+            xorname,
+            resolved_from,
+        } => {
+            if OutputFmt::Pretty == output_fmt {
+                if cmd.info > 0 {
+                    println!("Native data type: SafeKey");
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    print_resolved_from(cmd.info, resolved_from);
+                } else {
+                    println!("No content to show since the URL targets a SafeKey. Use -i / --info flag to obtain additional information about the targeted SafeKey.");
+                }
+            } else if resolved_from.is_some() && cmd.info > 1 {
+                println!(
+                    "{}",
+                    serde_json::to_string(&(&url, content))
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
+                );
+            } else {
+                println!(
+                    "[{}, {{ \"data_type\": \"SafeKey\", \"xorname\": \"{}\" }}]",
+                    url,
+                    xorname_to_hex(xorname),
+                );
+            }
         }
     }
 
@@ -178,6 +196,7 @@ fn print_resolved_from(info_level: u8, resolved_from: &Option<NrsMapContainerInf
     if info_level > 1 {
         if let Some(nrs_map_container) = resolved_from {
             // print out the resolved_from info since it's --info level 2
+            println!();
             println!("Resolved using NRS Map:");
             println!("PublicName: \"{}\"", nrs_map_container.public_name);
             println!("Container XOR-URL: {}", nrs_map_container.xorurl);
@@ -202,7 +221,6 @@ fn print_resolved_from(info_level: u8, resolved_from: &Option<NrsMapContainerInf
                     ]);
                 });
                 table.printstd();
-                println!();
             }
         }
     }

@@ -97,7 +97,6 @@ impl Safe {
                 SafeDataType::SafeKey => Ok(SafeData::SafeKey {
                     xorname: the_xor.xorname(),
                     resolved_from: None,
-                    // TODO: perhaps also return the balance if sk provided?
                 }),
                 SafeDataType::PublishedImmutableData => {
                     let data = self.files_get_published_immutable(&url)?;
@@ -229,7 +228,7 @@ impl Safe {
                     data_type: the_xor.data_type(),
                 };
 
-                // TODO: find a simpler way to change the 'resolved_from' filed of the enum
+                // TODO: find a simpler way to change the 'resolved_from' field of the enum
                 embed_resolved_from(content, nrs_map_container)
             }
         }

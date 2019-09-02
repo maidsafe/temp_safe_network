@@ -248,3 +248,60 @@ fn calling_safe_cat_wallet_xorurl() {
     assert_eq!(balances[&key_pk_xor].1.xorurl, key_pk_xor);
     assert_eq!(balances[&key_pk_xor].1.sk, sk);
 }
+
+#[test]
+fn calling_safe_cat_safekey() {
+    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
+
+    let cat_output = cmd!(get_bin_location(), "cat", &safekey_xorurl,)
+        .read()
+        .unwrap();
+
+    assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use -i / --info flag to obtain additional information about the targeted SafeKey.");
+}
+
+#[test]
+fn calling_safe_cat_safekey_nrsurl_with_info_level_3() {
+    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
+
+    let nrsurl = format!("safe://{}", get_random_nrs_string());
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &nrsurl,
+        "-l",
+        &safekey_xorurl,
+    )
+    .read()
+    .unwrap();
+
+    let cat_output = cmd!(
+        get_bin_location(),
+        "cat",
+        &nrsurl,
+        "--json",
+        "--info",
+        "--info",
+        "--info"
+    )
+    .read()
+    .unwrap();
+
+    let content_info: (String, SafeData) = serde_json::from_str(&cat_output)
+        .expect("Failed to parse output of `safe cat` with -ii on file");
+    assert_eq!(content_info.0, nrsurl);
+    if let SafeData::SafeKey { resolved_from, .. } = content_info.1 {
+        let unwrapped_resolved_from = resolved_from.unwrap();
+        assert_eq!(
+            unwrapped_resolved_from.public_name,
+            nrsurl.replace("safe://", "")
+        );
+        assert_eq!(
+            unwrapped_resolved_from.data_type,
+            SafeDataType::PublishedSeqAppendOnlyData
+        );
+    } else {
+        panic!("Content retrieved was unexpected: {:?}", content_info);
+    }
+}
