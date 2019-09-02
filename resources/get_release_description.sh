@@ -35,17 +35,17 @@ WIN_CHECKSUM
 * [SAFE vault](https://github.com/maidsafe/safe_vault/releases/latest/)
 EOF
 
-s3_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-${version}-x86_64-unknown-linux-gnu-dev.tar"
-s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-${version}-x86_64-pc-windows-gnu-dev.tar"
-s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-${version}-x86_64-apple-darwin-dev.tar"
+s3_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-${version}-x86_64-unknown-linux-gnu-dev.zip"
+s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-${version}-x86_64-pc-windows-gnu-dev.zip"
+s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-${version}-x86_64-apple-darwin-dev.zip"
 linux_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-unknown-linux-gnu.tar" | \
+    "./deploy/release/safe_cli-$version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
 macos_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-apple-darwin.tar" | \
+    "./deploy/release/safe_cli-$version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 win_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-pc-windows-gnu.tar" | \
+    "./deploy/release/safe_cli-$version-x86_64-pc-windows-gnu.zip" | \
     awk '{ print $1 }')
 
 release_description=$(sed "s/S3_LINUX_DEPLOY_URL/$s3_linux_deploy_url/g" <<< "$release_description")
