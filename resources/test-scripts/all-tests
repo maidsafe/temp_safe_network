@@ -46,13 +46,23 @@ function run_safe_auth() {
 }
 
 function run_unit_tests() {
-	rm -f fake_vault_data.json
+    rm -f fake_vault_data.json
     cargo test --lib --release --features=scl-mock -- --test-threads=1
-	rm -f fake_vault_data.json
+    rm -f fake_vault_data.json
     cargo test --doc --release --features=scl-mock -- --test-threads=1
-	rm -f fake_vault_data.json
-    cargo test --bins --release --features=scl-mock -- --test-threads=1
-	rm -f fake_vault_data.json
+
+    rm -f fake_vault_data.json
+    cargo test --release --features=scl-mock --test cli_cat -- --test-threads=1
+    rm -f fake_vault_data.json
+    cargo test --release --features=scl-mock --test cli_files -- --test-threads=1
+    rm -f fake_vault_data.json
+    cargo test --release --features=scl-mock --test cli_keys -- --test-threads=1
+    rm -f fake_vault_data.json
+    cargo test --release --features=scl-mock --test cli_wallet -- --test-threads=1
+    rm -f fake_vault_data.json
+    cargo test --release --features=scl-mock --test cli_nrs -- --test-threads=1
+
+    rm -f fake_vault_data.json
     cargo test --lib --release --features=mock-network,fake-auth -- --test-threads=1
     cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
 }
