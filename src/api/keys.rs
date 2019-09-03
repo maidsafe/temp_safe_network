@@ -253,8 +253,8 @@ impl Safe {
                 amount
             ))),
             Err(Error::NotEnoughBalance(_)) => {
-                let msg = if let Some(sk) = from_sk {
-                    format!("Not enough balance for the transfer at SafeKey \"{}\"", sk)
+                let msg = if from_sk.is_some() {
+                    "Not enough balance for the transfer at provided source SafeKey".to_string()
                 } else {
                     "Not enough balance for the transfer at Account's default SafeKey".to_string()
                 };
@@ -564,10 +564,7 @@ fn test_keys_transfer_diff_amounts() {
     ) {
         Err(Error::NotEnoughBalance(msg)) => assert_eq!(
             msg,
-            format!(
-                "Not enough balance for the transfer at SafeKey \"{}\"",
-                unwrap!(key_pair1.clone()).sk
-            )
+            "Not enough balance for the transfer at provided source SafeKey".to_string()
         ),
         Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
         Ok(_) => panic!("Transfer succeeded unexpectedly"),

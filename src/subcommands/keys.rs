@@ -101,6 +101,9 @@ pub fn key_commander(
             Ok(())
         }
         Some(KeysSubCommands::Transfer { amount, from, to }) => {
+            // TODO: don't connect if --from sk was passed
+            auth_connect(safe)?;
+
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(
                 to,
