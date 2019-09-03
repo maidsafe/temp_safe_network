@@ -79,7 +79,7 @@ pub enum WalletSubCommands {
         /// Source Wallet URL
         #[structopt(long = "from")]
         from: Option<String>,
-        /// The receiving Wallet/Key URL, or pulled from stdin if not provided
+        /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
     },
@@ -235,6 +235,6 @@ pub fn wallet_commander(
 
             Ok(())
         }
-        _ => Err("Sub-command not supported yet".to_string()),
+        None => Err("Missing wallet sub-command. Use -h / --help for details.".to_string()),
     }
 }

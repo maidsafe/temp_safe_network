@@ -13,7 +13,10 @@ use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
 use log::{debug, trace};
-use safe_nd::{Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, XorName};
+use safe_nd::{
+    Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
+    XorName,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -169,11 +172,11 @@ impl SafeApp for SafeAppFake {
 
     fn safecoin_transfer_to_xorname(
         &mut self,
-        from_sk: SecretKey,
+        from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: u64,
+        tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<u64> {
+    ) -> ResultReturn<Transaction> {
         if amount.as_nano() == 0 {
             return Err(Error::InvalidAmount(amount.to_string()));
         }
@@ -193,8 +196,10 @@ impl SafeApp for SafeAppFake {
             .txs
             .insert(to_xorname_hex.clone(), txs_for_xorname);
 
-        // reduce balance from safecoin_transferer
-        self.substract_coins(from_sk, amount)?;
+        if let Some(sk) = from_sk {
+            // reduce balance from safecoin_transferer
+            self.substract_coins(sk, amount)?;
+        }
 
         // credit destination
         let to_balance = self.get_balance_from_xorname(&to_xorname)?;
@@ -211,18 +216,18 @@ impl SafeApp for SafeAppFake {
                         value: new_balance_coins.to_string(),
                     },
                 );
-                Ok(tx_id)
+                Ok(Transaction { id: tx_id, amount })
             }
         }
     }
 
     fn safecoin_transfer_to_pk(
         &mut self,
-        from_sk: SecretKey,
+        from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: u64,
+        tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<u64> {
+    ) -> ResultReturn<Transaction> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
@@ -606,7 +611,7 @@ fn test_safecoin_transfer() {
     let tx_id = rng.next_u64();
 
     let _ = unwrap!(mock.safecoin_transfer_to_xorname(
-        sk1.clone(),
+        Some(sk1.clone()),
         xorname_from_pk(pk2),
         tx_id,
         unwrap!(Coins::from_str("1.4"))

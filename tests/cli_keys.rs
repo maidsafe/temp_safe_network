@@ -12,7 +12,10 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{create_preload_and_get_keys, get_random_nrs_string, CLI, SAFE_PROTOCOL};
+use common::{
+    create_preload_and_get_keys, create_wallet_with_balance, get_bin_location,
+    get_random_nrs_string, CLI, SAFE_PROTOCOL,
+};
 use predicates::prelude::*;
 use std::process::Command;
 
@@ -97,4 +100,164 @@ fn calling_safe_keys_balance_with_nrs_for_keyurl() {
     .assert()
     .stdout("3006.770000000\n")
     .success();
+}
+
+#[test]
+fn calling_safe_keys_transfer() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let (_safekey1_xorurl, sk1) = create_preload_and_get_keys("160.0");
+    let (safekey2_xorurl, sk2) = create_preload_and_get_keys("5.0");
+
+    cmd.args(&vec![
+        "keys",
+        "transfer",
+        "100",
+        "--from",
+        &sk1,
+        "--to",
+        &safekey2_xorurl,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
+
+    // To got coins?
+    let to_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &sk2,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(to_has, "105.000000000");
+
+    // from lost coins?
+    let from_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &sk1,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(from_has, "60.000000000")
+}
+
+#[test]
+fn calling_safe_keys_transfer_to_wallet_xorurl() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let (to_wallet, _pk, _sk) = create_wallet_with_balance("0.000000001"); // we need 1 nano to pay for the costs of creation
+    let (_safekey_xorurl, safekey_sk) = create_preload_and_get_keys("35.65");
+
+    cmd.args(&vec![
+        "keys",
+        "transfer",
+        "18.23",
+        "--from",
+        &safekey_sk,
+        "--to",
+        &to_wallet,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
+
+    // deducted coins from sending SafeKey?
+    let safekey_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &safekey_sk,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(safekey_has, "17.420000000" /* 35.65 - 18.23 */);
+
+    // Wallet got coins?
+    let to_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &to_wallet,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(to_has, "18.230000000")
+}
+
+#[test]
+fn calling_safe_keys_transfer_to_key_nrsurl() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let (_from_safekey_xorurl, from_safekey_sk) = create_preload_and_get_keys("1535.65");
+    let (to_safekey_xorurl, to_safekey_sk) = create_preload_and_get_keys("0.0");
+
+    let to_safekey_nrsurl = format!("safe://{}", get_random_nrs_string());
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &to_safekey_nrsurl,
+        "-l",
+        &to_safekey_xorurl,
+    )
+    .read()
+    .unwrap();
+
+    cmd.args(&vec![
+        "keys",
+        "transfer",
+        "118.23",
+        "--from",
+        &from_safekey_sk,
+        "--to",
+        &to_safekey_nrsurl,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
+
+    // SafeKey at NRS got coins?
+    let key_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &to_safekey_sk,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(key_has, "118.230000000");
+
+    // deducted coins from sending SafeKey?
+    let from_has = cmd!(
+        get_bin_location(),
+        "keys",
+        "balance",
+        "--sk",
+        &from_safekey_sk,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(from_has, "1417.420000000" /* 1535.65 - 118.23 */)
 }

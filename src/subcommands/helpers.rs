@@ -32,7 +32,7 @@ pub fn get_from_arg_or_stdin(
                     input.truncate(input.len() - 1);
                     Ok(input)
                 }
-                Err(_) => Err("There is no `--target` specified and no STDIN stream".to_string()),
+                Err(_) => Err("Failed to read from STDIN stream".to_string()),
             }
         }
     }

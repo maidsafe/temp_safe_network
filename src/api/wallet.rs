@@ -202,7 +202,10 @@ impl Safe {
         Ok(total_balance.to_string())
     }
 
-    fn wallet_get_default_balance(&self, url: &str) -> ResultReturn<(WalletSpendableBalance, u64)> {
+    pub fn wallet_get_default_balance(
+        &self,
+        url: &str,
+    ) -> ResultReturn<(WalletSpendableBalance, u64)> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let default = self
             .safe_app
@@ -345,10 +348,12 @@ impl Safe {
         let from_sk = sk_from_hex(&from_wallet_balance.sk)?;
 
         // Finally, let's make the transfer
-        match self
-            .safe_app
-            .safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount_coins)
-        {
+        match self.safe_app.safecoin_transfer_to_xorname(
+            Some(from_sk),
+            to_xorname,
+            tx_id,
+            amount_coins,
+        ) {
             Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
                 "The amount '{}' specified for the transfer is invalid",
                 amount
@@ -361,7 +366,7 @@ impl Safe {
                 "Unexpected error when attempting to transfer: {}",
                 other_error
             ))),
-            Ok(tx_id) => Ok(tx_id),
+            Ok(tx) => Ok(tx.id),
         }
     }
 
@@ -763,12 +768,9 @@ fn test_wallet_transfer_with_nrs_urls() {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
             let from_current_balance = unwrap!(safe.wallet_balance(&from_nrsurl));
-            assert_eq!(
-                "0.000000000", /* 4621.45 - 523.87 */
-                from_current_balance
-            );
+            assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
             let key_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair2).sk));
-            assert_eq!("0.300000000", key_current_balance);
+            assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
         }
     };
 }

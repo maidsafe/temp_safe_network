@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::errors::ResultReturn;
-use safe_nd::{Coins, MDataSeqValue, SeqMutableData, XorName};
+use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId, XorName};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 
@@ -31,19 +31,19 @@ pub trait SafeApp {
 
     fn safecoin_transfer_to_xorname(
         &mut self,
-        from_sk: SecretKey,
+        from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: u64,
+        tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<u64>;
+    ) -> ResultReturn<Transaction>;
 
     fn safecoin_transfer_to_pk(
         &mut self,
-        from_sk: SecretKey,
+        from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: u64,
+        tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<u64>;
+    ) -> ResultReturn<Transaction>;
 
     fn get_transaction(&self, tx_id: u64, pk: PublicKey, sk: SecretKey) -> ResultReturn<String>;
 

@@ -26,7 +26,7 @@ use safe_nd::{
     ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, Coins,
     Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
     MDataSeqValue, PubImmutableData, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
-    SeqMutableData, XorName,
+    SeqMutableData, Transaction, TransactionId, XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -162,15 +162,15 @@ impl SafeApp for SafeAppScl {
 
     fn safecoin_transfer_to_xorname(
         &mut self,
-        from_sk: SecretKey,
+        from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: u64,
+        tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<u64> {
+    ) -> ResultReturn<Transaction> {
         let safe_app: &App = self.get_safe_app()?;
         let tx = run(safe_app, move |client, _app_context| {
             client
-                .transfer_coins(Some(&from_sk), to_xorname, amount, Some(tx_id))
+                .transfer_coins(from_sk.as_ref(), to_xorname, amount, Some(tx_id))
                 .map_err(SafeAppError)
         })
         .map_err(|err| match err {
@@ -184,16 +184,16 @@ impl SafeApp for SafeAppScl {
             other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
         })?;
 
-        Ok(tx.id)
+        Ok(tx)
     }
 
     fn safecoin_transfer_to_pk(
         &mut self,
-        from_sk: SecretKey,
+        from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: u64,
+        tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<u64> {
+    ) -> ResultReturn<Transaction> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
