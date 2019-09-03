@@ -58,11 +58,11 @@ endif
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
-	find artifacts -name "*.dll" -exec strip -x '{}' \;
+	find artifacts -name "safe.exe" -exec strip -x '{}' \;
 else ifeq ($(UNAME_S),Darwin)
-	find artifacts -name "*.dylib" -exec strip -x '{}' \;
+	find artifacts -name "safe" -exec strip -x '{}' \;
 else
-	find artifacts -name "*.so" -exec strip '{}' \;
+	find artifacts -name "safe" -exec strip '{}' \;
 endif
 
 build-container:
@@ -211,26 +211,31 @@ package-commit_hash-artifacts-for-deploy:
 	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin-dev.zip deploy/dev
 
 package-version-artifacts-for-deploy:
-	rm -f *.zip
 	rm -rf deploy
 	mkdir -p deploy/dev
 	mkdir -p deploy/release
 	( \
 		cd deploy/release; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip \
 			../../artifacts/linux/release/safe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip \
 			../../artifacts/win/release/safe.exe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip \
 			../../artifacts/macos/release/safe; \
+		tar -C ../../artifacts/linux/release \
+			-zcvf safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz safe; \
+		tar -C ../../artifacts/win/release \
+			-zcvf safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz safe.exe; \
+		tar -C ../../artifacts/macos/release \
+			-zcvf safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz safe; \
 	)
 	( \
 		cd deploy/dev; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.zip \
 			../../artifacts/linux/dev/safe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.zip \
 			../../artifacts/win/dev/safe.exe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.zip \
 			../../artifacts/macos/dev/safe; \
 	)
 
@@ -263,6 +268,24 @@ endif
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip" \
 		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz" \
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
