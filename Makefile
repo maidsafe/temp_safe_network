@@ -217,20 +217,20 @@ package-version-artifacts-for-deploy:
 	mkdir -p deploy/release
 	( \
 		cd deploy/release; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip \
 			../../artifacts/linux/release/safe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip \
 			../../artifacts/win/release/safe.exe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip \
 			../../artifacts/macos/release/safe; \
 	)
 	( \
 		cd deploy/dev; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.zip \
 			../../artifacts/linux/dev/safe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.zip \
 			../../artifacts/win/dev/safe.exe; \
-		zip safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.zip \
+		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.zip \
 			../../artifacts/macos/dev/safe; \
 	)
 
