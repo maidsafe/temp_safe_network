@@ -211,7 +211,6 @@ package-commit_hash-artifacts-for-deploy:
 	mv safe_cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin-dev.zip deploy/dev
 
 package-version-artifacts-for-deploy:
-	rm -f *.zip
 	rm -rf deploy
 	mkdir -p deploy/dev
 	mkdir -p deploy/release

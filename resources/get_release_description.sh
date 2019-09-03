@@ -24,20 +24,23 @@ The development version uses a mocked SAFE network, allowing you to work against
 If you are using Bash on Linux, you can get autocompletion for `safe` by doing the following:
 ```
 curl -L SAFE_COMPLETION_URL > ~/.safe_completion
-chmod +x ~/..safe_completion
+chmod +x ~/.safe_completion
 echo "source ~/.safe_completion" >> ~/.bashrc
 ```
 
 ## SHA-256 checksums for release versions:
 ```
 Linux
-LINUX_CHECKSUM
+zip: ZIP_LINUX_CHECKSUM
+tar.gz: TAR_LINUX_CHECKSUM
 
 macOS
-MACOS_CHECKSUM
+zip: ZIP_MACOS_CHECKSUM
+tar.gz: TAR_MACOS_CHECKSUM
 
 Windows
-WIN_CHECKSUM
+zip: ZIP_WIN_CHECKSUM
+tar.gz: TAR_WIN_CHECKSUM
 ```
 
 ## Related Links
@@ -50,21 +53,33 @@ safe_completion_url="https:\/\/github.com\/maidsafe\/safe-cli\/releases\/downloa
 s3_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-$version-x86_64-unknown-linux-gnu-dev.zip"
 s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-$version-x86_64-pc-windows-gnu-dev.zip"
 s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-$version-x86_64-apple-darwin-dev.zip"
-linux_checksum=$(sha256sum \
+zip_linux_checksum=$(sha256sum \
     "./deploy/release/safe_cli-$version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
-macos_checksum=$(sha256sum \
+zip_macos_checksum=$(sha256sum \
     "./deploy/release/safe_cli-$version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
-win_checksum=$(sha256sum \
+zip_win_checksum=$(sha256sum \
     "./deploy/release/safe_cli-$version-x86_64-pc-windows-gnu.zip" | \
+    awk '{ print $1 }')
+tar_linux_checksum=$(sha256sum \
+    "./deploy/release/safe_cli-$version-x86_64-unknown-linux-gnu.tar.gz" | \
+    awk '{ print $1 }')
+tar_macos_checksum=$(sha256sum \
+    "./deploy/release/safe_cli-$version-x86_64-apple-darwin.tar.gz" | \
+    awk '{ print $1 }')
+tar_win_checksum=$(sha256sum \
+    "./deploy/release/safe_cli-$version-x86_64-pc-windows-gnu.tar.gz" | \
     awk '{ print $1 }')
 
 release_description=$(sed "s/S3_LINUX_DEPLOY_URL/$s3_linux_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/S3_MACOS_DEPLOY_URL/$s3_macos_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/S3_WIN_DEPLOY_URL/$s3_win_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/SAFE_COMPLETION_URL/$safe_completion_url/g" <<< "$release_description")
-release_description=$(sed "s/LINUX_CHECKSUM/$linux_checksum/g" <<< "$release_description")
-release_description=$(sed "s/MACOS_CHECKSUM/$macos_checksum/g" <<< "$release_description")
-release_description=$(sed "s/WIN_CHECKSUM/$win_checksum/g" <<< "$release_description")
+release_description=$(sed "s/ZIP_LINUX_CHECKSUM/$zip_linux_checksum/g" <<< "$release_description")
+release_description=$(sed "s/ZIP_MACOS_CHECKSUM/$zip_macos_checksum/g" <<< "$release_description")
+release_description=$(sed "s/ZIP_WIN_CHECKSUM/$zip_win_checksum/g" <<< "$release_description")
+release_description=$(sed "s/TAR_LINUX_CHECKSUM/$tar_linux_checksum/g" <<< "$release_description")
+release_description=$(sed "s/TAR_MACOS_CHECKSUM/$tar_macos_checksum/g" <<< "$release_description")
+release_description=$(sed "s/TAR_WIN_CHECKSUM/$tar_win_checksum/g" <<< "$release_description")
 echo "$release_description"
