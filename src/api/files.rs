@@ -223,6 +223,12 @@ impl Safe {
             ));
         }
 
+        // If the FilesContainer URL was resolved from an NRS name we need to remove
+        // the version from it so we can fetch latest version of it for sync-ing
+        if is_nrs_resolved {
+            xorurl_encoder.set_content_version(None);
+        }
+
         let (current_version, current_files_map): (u64, FilesMap) =
             self.files_container_get(&xorurl_encoder.to_string()?)?;
 
@@ -1552,4 +1558,49 @@ fn test_files_container_get_with_version() {
             other
         )),
     };
+}
+
+#[test]
+fn test_files_container_sync_with_nrs_url() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, _, _) =
+        unwrap!(safe.files_container_create("./tests/testfolder/test.md", None, false, false));
+
+    let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    xorurl_encoder.set_content_version(Some(0));
+    let _ = unwrap!(safe.nrs_map_container_create(
+        &nrsurl,
+        &unwrap!(xorurl_encoder.to_string()),
+        false,
+        true,
+        false
+    ));
+
+    let _ = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/subfolder/",
+        &xorurl,
+        false,
+        false,
+        false,
+        false,
+    ));
+
+    let _ = unwrap!(safe.files_container_sync(
+        "./tests/testfolder/",
+        &nrsurl,
+        false,
+        false,
+        true, // this flag requests the update-nrs
+        false,
+    ));
+
+    let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
+    assert_eq!(version, 2);
+    assert_eq!(fetched_files_map.len(), 5);
 }
