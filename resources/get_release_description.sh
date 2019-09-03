@@ -10,18 +10,21 @@ fi
 read -r -d '' release_description << 'EOF'
 Command line interface for the SAFE Network.
 
+## Development Builds
+
 There are also development versions of this release:
 [Linux](S3_LINUX_DEPLOY_URL)
 [macOS](S3_MACOS_DEPLOY_URL)
 [Windows](S3_WIN_DEPLOY_URL)
 
-The development version uses a mocked SAFE network, which allows you to work against a file that mimics the network, where SafeCoins are created for local use.
+The development version uses a mocked SAFE network, allowing you to work against a file that mimics the network, where SafeCoins are created for local use.
 
 ## Bash Autocompletion
 
-If you are using Bash on Linux, you can get auto completion for `safe` by doing the following:
+If you are using Bash on Linux, you can get autocompletion for `safe` by doing the following:
 ```
 curl -L SAFE_COMPLETION_URL > ~/.safe_completion
+chmod +x ~/..safe_completion
 echo "source ~/.safe_completion" >> ~/.bashrc
 ```
 
@@ -40,7 +43,7 @@ WIN_CHECKSUM
 ## Related Links
 * [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli/releases/latest/)
 * [SAFE Browser PoC](https://github.com/maidsafe/safe_browser/releases/)
-* [SAFE vault](https://github.com/maidsafe/safe_vault/releases/latest/)
+* [SAFE Vault](https://github.com/maidsafe/safe_vault/releases/latest/)
 EOF
 
 safe_completion_url="https:\/\/github.com\/maidsafe\/safe-cli\/releases\/download\/$version\/safe_completion.sh"
