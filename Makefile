@@ -233,6 +233,12 @@ package-version-artifacts-for-deploy:
 		zip -j safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.zip \
 			../../artifacts/macos/dev/safe; \
 	)
+	tar -C artifacts/linux/release \
+		-zcvf safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz safe
+	tar -C artifacts/win/release \
+		-zcvf safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz safe.exe
+	tar -C artifacts/macos/release \
+		-zcvf safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz safe
 
 deploy-github-release:
 ifndef GITHUB_TOKEN
@@ -263,6 +269,23 @@ endif
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip" \
 		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
+		--file deploy/release/safe_cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_CLI_VERSION} \
+		--name "safe_cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz" \
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
