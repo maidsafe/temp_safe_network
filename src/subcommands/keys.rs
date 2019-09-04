@@ -54,6 +54,9 @@ pub enum KeysSubCommands {
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
+        /// The transaction ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
+        #[structopt(long = "tx-id")]
+        tx_id: Option<u64>,
     },
 }
 
@@ -100,7 +103,12 @@ pub fn key_commander(
             }
             Ok(())
         }
-        Some(KeysSubCommands::Transfer { amount, from, to }) => {
+        Some(KeysSubCommands::Transfer {
+            amount,
+            from,
+            to,
+            tx_id,
+        }) => {
             // TODO: don't connect if --from sk was passed
             auth_connect(safe)?;
 
@@ -110,7 +118,7 @@ pub fn key_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe.keys_transfer(&amount, from, &destination)?;
+            let tx_id = safe.keys_transfer(&amount, from, &destination, tx_id)?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);

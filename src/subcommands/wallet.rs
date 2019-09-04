@@ -82,6 +82,9 @@ pub enum WalletSubCommands {
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
+        /// The transaction ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
+        #[structopt(long = "tx-id")]
+        tx_id: Option<u64>,
     },
     /*#[structopt(name = "sweep")]
     /// Move all coins within a Wallet to a second given Wallet or Key
@@ -218,14 +221,19 @@ pub fn wallet_commander(
             }
             Ok(())
         }
-        Some(WalletSubCommands::Transfer { amount, from, to }) => {
+        Some(WalletSubCommands::Transfer {
+            amount,
+            from,
+            to,
+            tx_id,
+        }) => {
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(
                 to,
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe.wallet_transfer(&amount, from, &destination)?;
+            let tx_id = safe.wallet_transfer(&amount, from, &destination, tx_id)?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);
