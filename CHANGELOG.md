@@ -1,5 +1,10 @@
 # Safe Vault - Change Log
 
+## [0.19.1]
+- Add `verbose` command line flag.
+- Fix the UX problem related to the self-update process (requiring to have a network connectivity even if a user just wanted to display the `--help` menu).
+- Improve the release process, adding `.zip` and `.tar.gz` packages to distribution.
+
 ## [0.19.0]
 - Rewrite the Vault code.
 - Support new data types (AppendOnlyData, unpublished sequenced/unsequenced MutableData, and unpublished ImmutableData).
