@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.19.2]
+- This is a technical release without any changes from `0.19.1`.
+
 ## [0.19.1]
 - Add `verbose` command line flag.
 - Fix the UX problem related to the self-update process (requiring to have a network connectivity even if a user just wanted to display the `--help` menu).
