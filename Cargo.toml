@@ -7,6 +7,9 @@ publish = false
 license = "GPL-3.0"
 edition = "2018"
 
+[lib]
+crate-type = ["cdylib"]
+
 [[bin]]
 name = "safe"
 path = "src/main.rs"
@@ -40,6 +43,7 @@ validator_derive = "0.8.0"
 self_update = "0.5.1"
 mime_guess = "2.0.1"
 lazy_static = "1.2.0"
+ffi_utils = "~0.12.0"
 
 [features]
 mock-network = ["safe_app/mock-network"]

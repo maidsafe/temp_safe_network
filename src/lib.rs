@@ -9,6 +9,10 @@
 #[macro_use]
 extern crate validator_derive;
 
-mod api;
+extern crate ffi_utils;
+
+pub mod api;
+pub mod ffi;
 
 pub use api::*;
+pub use ffi::*;

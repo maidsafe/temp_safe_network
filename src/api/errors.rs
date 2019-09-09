@@ -7,6 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use std::fmt;
+use ffi_utils::{ErrorCode, StringError};
+pub use self::codes::*;
 
 pub type ResultReturn<T> = Result<T, Error>;
 
@@ -30,6 +32,7 @@ pub enum Error {
     FilesSystemError(String),
     Unexpected(String),
     Unknown(String),
+    StringError(String)
 }
 
 impl From<Error> for String {
@@ -64,6 +67,50 @@ fn get_error_info(error: &Error) -> String {
         Error::FilesSystemError(info) => ("FilesSystemError".to_string(), info.to_string()),
         Error::Unexpected(info) => ("Unexpected".to_string(), info.to_string()),
         Error::Unknown(info) => ("Unknown".to_string(), info.to_string()),
+        Error::StringError(info) => ("Error".to_string(), info.to_string()),
     };
     format!("[Error] {} - {}", error_type, error_msg)
+}
+
+#[allow(missing_docs)]
+mod codes {
+    // Core errors
+    pub const ERR_DUMMY_ERROR: i32 = -1;
+}
+
+impl ErrorCode for Error {
+    fn error_code(&self) -> i32 {
+        match *self {
+            Error::AuthError(ref _error) => {ERR_DUMMY_ERROR},
+            Error::ConnectionError(ref _error) => {ERR_DUMMY_ERROR},
+            Error::NetDataError(ref _error) => {ERR_DUMMY_ERROR},
+            Error::ContentNotFound(ref _error) => {ERR_DUMMY_ERROR},
+            Error::VersionNotFound(ref _error) => {ERR_DUMMY_ERROR},
+            Error::ContentError(ref _error) => {ERR_DUMMY_ERROR},
+            Error::EmptyContent(ref _error) => {ERR_DUMMY_ERROR},
+            Error::AccessDenied(ref _error) => {ERR_DUMMY_ERROR},
+            Error::EntryNotFound(ref _error) => {ERR_DUMMY_ERROR},
+            Error::EntryExists(ref _error) => {ERR_DUMMY_ERROR},
+            Error::InvalidInput(ref _error) => {ERR_DUMMY_ERROR},
+            Error::InvalidAmount(ref _error) => {ERR_DUMMY_ERROR},
+            Error::InvalidXorUrl(ref _error) => {ERR_DUMMY_ERROR},
+            Error::NotEnoughBalance(ref _error) => {ERR_DUMMY_ERROR},
+            Error::FilesSystemError(ref _error) => {ERR_DUMMY_ERROR},
+            Error::Unexpected(ref _error) => {ERR_DUMMY_ERROR},
+            Error::Unknown(ref _error) => {ERR_DUMMY_ERROR},
+            Error::StringError(ref _error) => {ERR_DUMMY_ERROR},
+        }
+    }
+}
+
+impl From<StringError> for Error {
+    fn from(_err: StringError) -> Self {
+        Error::StringError("Error".to_string())
+    }
+}
+
+impl<'a> From<&'a str> for Error {
+    fn from(s: &'a str) -> Self {
+        Error::Unexpected(s.to_string())
+    }
 }

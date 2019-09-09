@@ -10,7 +10,7 @@ use super::auth::auth_connect;
 use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::OutputFmt;
 use log::{debug, warn};
-use safe_cli::{BlsKeyPair, Safe};
+use crate::api::{BlsKeyPair, Safe};
 use structopt::StructOpt;
 
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";

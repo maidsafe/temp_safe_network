@@ -8,7 +8,7 @@
 
 use dirs;
 use log::debug;
-use safe_cli::Safe;
+use crate::api::Safe;
 use std::fs::{DirBuilder, File};
 use std::io::{Read, Write};
 use std::path::Path;

@@ -8,10 +8,10 @@
 
 mod auth;
 mod constants;
-mod errors;
+pub mod errors;
 #[cfg(feature = "scl-mock")]
 mod fake_scl;
-mod fetch;
+pub mod fetch;
 mod files;
 mod helpers;
 mod keys;

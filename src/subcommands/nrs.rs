@@ -9,7 +9,7 @@
 use super::helpers::{get_from_arg_or_stdin, notice_dry_run};
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
-use safe_cli::{Safe, XorUrl};
+use crate::api::{Safe, XorUrl};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 
