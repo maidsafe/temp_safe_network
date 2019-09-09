@@ -93,7 +93,7 @@ impl Safe {
 
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         match the_xor.content_type() {
-            SafeContentType::Raw => match the_xor.data_type() {
+            SafeContentType::MediaType(_) | SafeContentType::Raw => match the_xor.data_type() {
                 SafeDataType::SafeKey => Ok(SafeData::SafeKey {
                     xorname: the_xor.xorname(),
                     resolved_from: None,
@@ -468,7 +468,9 @@ fn test_fetch_published_immutable_data() {
     let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let data = b"Something super immutable";
-    let xorurl = safe.files_put_published_immutable(data).unwrap();
+    let xorurl = safe
+        .files_put_published_immutable(data, Some("text/plain"))
+        .unwrap();
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
     let content = unwrap!(safe.fetch(&xorurl));

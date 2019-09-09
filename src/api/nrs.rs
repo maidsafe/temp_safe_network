@@ -122,7 +122,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let file_xorurl = safe.files_put_published_immutable(&vec![]).unwrap();
+    /// let file_xorurl = safe.files_put_published_immutable(&vec![], None).unwrap();
     /// let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
     /// ```
@@ -231,7 +231,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    /// let file_xorurl = safe.files_put_published_immutable(&vec![]).unwrap();
+    /// let file_xorurl = safe.files_put_published_immutable(&vec![], Some("text/plain")).unwrap();
     /// let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).unwrap();
     /// let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).unwrap();
     /// assert_eq!(version, 0);

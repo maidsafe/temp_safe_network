@@ -15,6 +15,7 @@ use super::helpers::{gen_timestamp_nanos, gen_timestamp_secs};
 use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::{debug, info, warn};
+use mime_guess;
 use relative_path::RelativePath;
 use std::collections::BTreeMap;
 use std::fs;
@@ -299,19 +300,27 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let data = b"Something super good";
-    /// let xorurl = safe.files_put_published_immutable(data).unwrap();
+    /// let xorurl = safe.files_put_published_immutable(data, Some("text/plain")).unwrap();
     /// # let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorUrl> {
+    pub fn files_put_published_immutable(
+        &mut self,
+        data: &[u8],
+        media_type: Option<&str>,
+    ) -> ResultReturn<XorUrl> {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_app.files_put_published_immutable(&data)?;
+        let content_type = media_type.map_or_else(
+            || SafeContentType::Raw,
+            |mime_str| SafeContentType::MediaType(mime_str.to_string()),
+        );
 
         XorUrlEncoder::encode(
             xorname,
             0,
             SafeDataType::PublishedImmutableData,
-            SafeContentType::Raw,
+            content_type,
             None,
             None,
             None,
@@ -328,7 +337,7 @@ impl Safe {
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # let data = b"Something super good";
-    /// let xorurl = safe.files_put_published_immutable(data).unwrap();
+    /// let xorurl = safe.files_put_published_immutable(data, None).unwrap();
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
@@ -351,7 +360,11 @@ fn normalise_path_separator(from: &str) -> String {
 // the destination path considering ending '/' in both the  location and dest path
 fn get_base_paths(location: &str, dest_path: Option<String>) -> ResultReturn<(String, String)> {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
-    let location_base_path = normalise_path_separator(location);
+    let location_base_path = if location == "." {
+        "./".to_string()
+    } else {
+        normalise_path_separator(location)
+    };
 
     let new_dest_path = match dest_path {
         Some(path) => {
@@ -366,11 +379,11 @@ fn get_base_paths(location: &str, dest_path: Option<String>) -> ResultReturn<(St
 
     // Let's first check if it ends with '/'
     let dest_base_path = if new_dest_path.ends_with('/') {
-        if location.ends_with('/') {
+        if location_base_path.ends_with('/') {
             new_dest_path
         } else {
             // Location is a folder, then append it to dest path
-            let parts_vec: Vec<&str> = location.split('/').collect();
+            let parts_vec: Vec<&str> = location_base_path.split('/').collect();
             let dir_name = parts_vec[parts_vec.len() - 1];
             format!("{}{}", new_dest_path, dir_name)
         }
@@ -551,7 +564,8 @@ fn upload_file_to_net(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
-    safe.files_put_published_immutable(&data)
+    let mime_type = mime_guess::from_path(&path);
+    safe.files_put_published_immutable(&data, mime_type.first_raw())
 }
 
 // Get file metadata from local filesystem

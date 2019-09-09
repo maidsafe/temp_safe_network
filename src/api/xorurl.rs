@@ -27,10 +27,11 @@ pub type XorUrl = String;
 // TODO: support MIME types
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeContentType {
-    Raw = 0x0000,
-    Wallet = 0x0001,
-    FilesContainer = 0x0002,
-    NrsMapContainer = 0x0003,
+    Raw,
+    Wallet,
+    FilesContainer,
+    NrsMapContainer,
+    MediaType(String),
 }
 
 impl std::fmt::Display for SafeContentType {
@@ -151,6 +152,7 @@ impl XorUrlEncoder {
             1 => SafeContentType::Wallet,
             2 => SafeContentType::FilesContainer,
             3 => SafeContentType::NrsMapContainer,
+            4 => SafeContentType::MediaType("test/plain".to_string()),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid content type encoded in the XOR-URL string: {}",
@@ -269,7 +271,13 @@ impl XorUrlEncoder {
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
 
         // add the content type bytes
-        let content_type: u16 = self.content_type.clone() as u16;
+        let content_type: u16 = match &self.content_type {
+            SafeContentType::Raw => 0x0000,
+            SafeContentType::Wallet => 0x0001,
+            SafeContentType::FilesContainer => 0x0002,
+            SafeContentType::NrsMapContainer => 0x0003,
+            SafeContentType::MediaType(_mime_type) => 0x0004,
+        };
         cid_vec.extend_from_slice(&content_type.to_be_bytes());
 
         // push the SAFE data type byte
