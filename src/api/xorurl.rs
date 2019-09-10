@@ -41,6 +41,19 @@ impl std::fmt::Display for SafeContentType {
     }
 }
 
+impl SafeContentType {
+    #[allow(dead_code)]
+    pub fn from_u64(value: u64) -> SafeContentType {
+        match value {
+            0 => SafeContentType::Raw,
+            1 => SafeContentType::Wallet,
+            2 => SafeContentType::FilesContainer,
+            3 => SafeContentType::NrsMapContainer,
+            _ => panic!("Unknown value: {}", value),
+        }
+    }
+}
+
 // We also encode the native SAFE data type where the content is being stored on the SAFE Network,
 // this allows us to fetch the targetted data using the corresponding API, regardless of the
 // data that is being held which is identified by the SafeContentType instead.
@@ -60,6 +73,24 @@ pub enum SafeDataType {
 impl std::fmt::Display for SafeDataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl SafeDataType {
+    #[allow(dead_code)]
+    pub fn from_u64(value: u64) -> SafeDataType {
+        match value {
+            0 => SafeDataType::SafeKey,
+            1 => SafeDataType::PublishedImmutableData,
+            2 => SafeDataType::UnpublishedImmutableData,
+            3 => SafeDataType::SeqMutableData,
+            4 => SafeDataType::UnseqMutableData,
+            5 => SafeDataType::PublishedSeqAppendOnlyData,
+            6 => SafeDataType::PublishedUnseqAppendOnlyData,
+            7 => SafeDataType::UnpublishedSeqAppendOnlyData,
+            8 => SafeDataType::UnpublishedUnseqAppendOnlyData,
+            _ => panic!("Unknown value: {}", value),
+        }
     }
 }
 

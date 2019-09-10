@@ -15,4 +15,6 @@ pub mod api;
 pub mod ffi;
 
 pub use api::*;
-pub use ffi::*;
+pub use crate::ffi::xorurl::*;
+pub use crate::ffi::content_fetch::*;
+pub use crate::ffi::*;
