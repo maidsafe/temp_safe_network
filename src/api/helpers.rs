@@ -13,7 +13,9 @@ use log::debug;
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
-use safe_nd::{Coins, PublicKey as SafeNdPublicKey, XorName};
+use safe_nd::{
+    Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName, MAX_COINS_VALUE,
+};
 use std::iter::FromIterator;
 use std::str;
 use std::str::FromStr;
@@ -125,8 +127,22 @@ pub fn sk_from_hex(hex_str: &str) -> ResultReturn<SecretKey> {
 }
 
 pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<Coins> {
-    Coins::from_str(amount_str)
-        .map_err(|_| Error::InvalidAmount(format!("Invalid safecoins amount '{}'", amount_str)))
+    Coins::from_str(amount_str).map_err(|err| {
+        println!("ERR {:?}", err);
+        match err {
+            SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
+                "Invalid safecoins amount '{}', it exceeds the maximum possible value '{}'",
+                amount_str, MAX_COINS_VALUE
+            )),
+            SafeNdError::LossOfPrecision => {
+                Error::InvalidAmount(format!("Invalid safecoins amount '{}', the minimum possible amount is one nano coin (0.000000001)", amount_str))
+            }
+            SafeNdError::FailedToParse(msg) => {
+                Error::InvalidAmount(format!("Invalid safecoins amount '{}' ({})", amount_str, msg))
+            },
+            _ => Error::InvalidAmount(format!("Invalid safecoins amount '{}'", amount_str)),
+        }
+    })
 }
 
 pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {

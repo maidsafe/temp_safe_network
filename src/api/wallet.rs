@@ -324,7 +324,10 @@ impl Safe {
         }?;
 
         // Now check if the 'to_url' is a valid Wallet or a SafeKey URL
-        let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url)?;
+        let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url).map_err(|_| {
+            Error::InvalidInput(format!("Failed to parse the 'to_url' URL: {}", to_url))
+        })?;
+
         let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
             let (to_balance, _) =
                 self.wallet_get_default_balance(&to_xorurl_encoder.to_string()?)?;
@@ -684,7 +687,10 @@ fn test_wallet_transfer_diff_amounts() {
         &to_wallet_xorurl,
         None,
     ) {
-        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '.06'"),
+        Err(Error::InvalidAmount(msg)) => assert_eq!(
+            msg,
+            "Invalid safecoins amount '.06' (Can\'t parse coin units)"
+        ),
         Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
         Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };

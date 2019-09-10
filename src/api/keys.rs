@@ -326,7 +326,9 @@ fn test_keys_create_preload_invalid_amounts() {
     match safe.keys_create_preload_test_coins(".45") {
         Err(err) => assert_eq!(
             err,
-            Error::InvalidAmount("Invalid safecoins amount '.45'".to_string())
+            Error::InvalidAmount(
+                "Invalid safecoins amount '.45' (Can\'t parse coin units)".to_string()
+            )
         ),
         Ok(_) => panic!("Key with test-coins was created unexpectedly"),
     };
@@ -339,23 +341,27 @@ fn test_keys_create_preload_invalid_amounts() {
     ) {
         Err(err) => assert_eq!(
             err,
-            Error::InvalidAmount("Invalid safecoins amount '.003'".to_string())
+            Error::InvalidAmount(
+                "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
+            )
         ),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
 
-    // test fail with corrupted secret key
+    // test it fails with corrupted secret key
     let mut unwrapped_key_pair = unwrap!(key_pair.clone());
     unwrapped_key_pair.sk.replace_range(..6, "ababab");
     match safe.keys_create(Some(unwrapped_key_pair.sk), Some(".003".to_string()), None) {
         Err(err) => assert_eq!(
             err,
-            Error::InvalidAmount("Invalid safecoins amount '.003'".to_string())
+            Error::InvalidAmount(
+                "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
+            )
         ),
         Ok(_) => panic!("Key was created unexpectedly"),
     };
 
-    // test fail to preload with more than available balance in source (which has only 12 coins)
+    // test it fails to preload with more than available balance in source (which has only 12 coins)
     match safe.keys_create(
         Some(unwrap!(key_pair).sk),
         Some("12.000000001".to_string()),
@@ -538,7 +544,7 @@ fn test_keys_transfer_from_zero_balance() {
     let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
     let (to_safekey_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
 
-    // test fail to transfer with 0 balance at SafeKey in <from> argument
+    // test it fails to transfer with 0 balance at SafeKey in <from> argument
     match safe.keys_transfer("0", Some(unwrap!(key_pair1).sk), &to_safekey_xorurl, None) {
         Err(Error::InvalidAmount(msg)) => assert_eq!(
             msg,
@@ -557,7 +563,7 @@ fn test_keys_transfer_diff_amounts() {
     let (safekey1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
     let (safekey2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
 
-    // test fail to transfer more than current balance at SafeKey in <from> argument
+    // test it fails to transfer more than current balance at SafeKey in <from> argument
     match safe.keys_transfer(
         "100.6",
         Some(unwrap!(key_pair1.clone()).sk),
@@ -572,14 +578,29 @@ fn test_keys_transfer_diff_amounts() {
         Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };
 
-    // test fail to transfer as it's a invalid/non-numeric amount
+    // test it fails to transfer as it's a invalid/non-numeric amount
     match safe.keys_transfer(
         ".06",
         Some(unwrap!(key_pair1.clone()).sk),
         &safekey2_xorurl,
         None,
     ) {
-        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '.06'"),
+        Err(Error::InvalidAmount(msg)) => assert_eq!(
+            msg,
+            "Invalid safecoins amount '.06' (Can\'t parse coin units)"
+        ),
+        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+        Ok(_) => panic!("Transfer succeeded unexpectedly"),
+    };
+
+    // test it fails to transfer less than 1 nano coin
+    match safe.keys_transfer(
+        "0.0000000009",
+        Some(unwrap!(key_pair1.clone()).sk),
+        &safekey2_xorurl,
+        None,
+    ) {
+        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '0.0000000009', the minimum possible amount is one nano coin (0.000000001)"),
         Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
         Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };
