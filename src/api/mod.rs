@@ -22,6 +22,7 @@ mod safe_client_libs;
 mod safe_net;
 mod wallet;
 mod xorurl;
+mod xorurl_media_types;
 
 pub use errors::{Error, ResultReturn};
 pub use fetch::{

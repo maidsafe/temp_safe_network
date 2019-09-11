@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::get_subnames_host_path_and_version;
+use super::xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 use super::{Error, ResultReturn};
 use log::debug;
 use multibase::{decode, encode, Base};
@@ -152,13 +153,15 @@ impl XorUrlEncoder {
             1 => SafeContentType::Wallet,
             2 => SafeContentType::FilesContainer,
             3 => SafeContentType::NrsMapContainer,
-            4 => SafeContentType::MediaType("test/plain".to_string()),
-            other => {
-                return Err(Error::InvalidXorUrl(format!(
-                    "Invalid content type encoded in the XOR-URL string: {}",
-                    other
-                )))
-            }
+            other => match MEDIA_TYPE_STR.get(&other) {
+                Some(media_type_str) => SafeContentType::MediaType(media_type_str.to_string()),
+                None => {
+                    return Err(Error::InvalidXorUrl(format!(
+                        "Invalid content type encoded in the XOR-URL string: {}",
+                        other
+                    )))
+                }
+            },
         };
 
         debug!(
@@ -276,7 +279,15 @@ impl XorUrlEncoder {
             SafeContentType::Wallet => 0x0001,
             SafeContentType::FilesContainer => 0x0002,
             SafeContentType::NrsMapContainer => 0x0003,
-            SafeContentType::MediaType(_mime_type) => 0x0004,
+            SafeContentType::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
+                Some(media_type_code) => *media_type_code,
+                None => {
+                    return Err(Error::Unexpected(format!(
+                        "Failed to encode Media-type '{}'",
+                        media_type
+                    )))
+                }
+            },
         };
         cid_vec.extend_from_slice(&content_type.to_be_bytes());
 
@@ -509,5 +520,28 @@ fn test_xorurl_decoding_with_subname() {
     assert_eq!(
         SafeContentType::NrsMapContainer,
         xorurl_encoder_with_subname.content_type()
+    );
+}
+
+#[test]
+fn test_xorurl_encoding_decoding_with_media_type() {
+    use unwrap::unwrap;
+    let xorname = XorName(*b"12345678901234567890123456789012");
+    let type_tag: u64 = 0x4c2f;
+    let xorurl = unwrap!(XorUrlEncoder::encode(
+        xorname,
+        type_tag,
+        SafeDataType::PublishedImmutableData,
+        SafeContentType::MediaType("text/html".to_string()),
+        None,
+        None,
+        None,
+        "base32z"
+    ));
+
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+    assert_eq!(
+        SafeContentType::MediaType("text/html".to_string()),
+        xorurl_encoder.content_type()
     );
 }

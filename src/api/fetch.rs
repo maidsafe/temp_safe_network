@@ -51,6 +51,7 @@ pub enum SafeData {
         xorname: XorName,
         data: Vec<u8>,
         resolved_from: Option<NrsMapContainerInfo>,
+        media_type: Option<String>,
     },
 }
 
@@ -93,7 +94,7 @@ impl Safe {
 
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         match the_xor.content_type() {
-            SafeContentType::MediaType(_) | SafeContentType::Raw => match the_xor.data_type() {
+            SafeContentType::Raw => match the_xor.data_type() {
                 SafeDataType::SafeKey => Ok(SafeData::SafeKey {
                     xorname: the_xor.xorname(),
                     resolved_from: None,
@@ -104,6 +105,22 @@ impl Safe {
                         xorname: the_xor.xorname(),
                         resolved_from: None,
                         data,
+                        media_type: None,
+                    })
+                }
+                other => Err(Error::ContentError(format!(
+                    "Data type '{:?}' not supported yet by fetch",
+                    other
+                ))),
+            },
+            SafeContentType::MediaType(media_type_str) => match the_xor.data_type() {
+                SafeDataType::PublishedImmutableData => {
+                    let data = self.files_get_published_immutable(&url)?;
+                    Ok(SafeData::PublishedImmutableData {
+                        xorname: the_xor.xorname(),
+                        resolved_from: None,
+                        data,
+                        media_type: Some(media_type_str),
                     })
                 }
                 other => Err(Error::ContentError(format!(
@@ -272,13 +289,17 @@ fn embed_resolved_from(
             data_type,
             resolved_from: Some(nrs_map_container),
         },
-        SafeData::PublishedImmutableData { xorname, data, .. } => {
-            SafeData::PublishedImmutableData {
-                xorname,
-                data,
-                resolved_from: Some(nrs_map_container),
-            }
-        }
+        SafeData::PublishedImmutableData {
+            xorname,
+            data,
+            media_type,
+            ..
+        } => SafeData::PublishedImmutableData {
+            xorname,
+            data,
+            media_type,
+            resolved_from: Some(nrs_map_container),
+        },
     };
     Ok(safe_data)
 }
@@ -480,6 +501,7 @@ fn test_fetch_published_immutable_data() {
                 xorname: xorurl_encoder.xorname(),
                 data: data.to_vec(),
                 resolved_from: None,
+                media_type: Some("text/plain".to_string())
             }
     );
 }
@@ -498,6 +520,36 @@ fn test_fetch_unsupported() {
         type_tag,
         SafeDataType::UnpublishedImmutableData,
         SafeContentType::Raw,
+        None,
+        None,
+        None,
+        "base32z"
+    ));
+    match safe.fetch(&xorurl) {
+        Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+        Err(msg) => assert_eq!(
+            msg,
+            Error::ContentError(
+                "Data type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
+            )
+        ),
+    };
+}
+
+#[test]
+fn test_fetch_unsupported_with_media_type() {
+    use super::helpers::create_random_xorname;
+    use super::xorurl::XorUrlEncoder;
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let xorname = create_random_xorname();
+    let type_tag = 575_756_443;
+    let xorurl = unwrap!(XorUrlEncoder::encode(
+        xorname,
+        type_tag,
+        SafeDataType::UnpublishedImmutableData,
+        SafeContentType::MediaType("text/html".to_string()),
         None,
         None,
         None,

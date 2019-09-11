@@ -128,7 +128,6 @@ pub fn sk_from_hex(hex_str: &str) -> ResultReturn<SecretKey> {
 
 pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<Coins> {
     Coins::from_str(amount_str).map_err(|err| {
-        println!("ERR {:?}", err);
         match err {
             SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
                 "Invalid safecoins amount '{}', it exceeds the maximum possible value '{}'",

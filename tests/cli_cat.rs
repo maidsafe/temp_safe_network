@@ -17,7 +17,7 @@ use common::{
     parse_files_put_or_sync_output, CLI,
 };
 use predicates::prelude::*;
-use safe_cli::{BlsKeyPair, SafeData, SafeDataType, XorUrlEncoder};
+use safe_cli::{BlsKeyPair, SafeContentType, SafeData, SafeDataType, XorUrlEncoder};
 use std::process::Command;
 use unwrap::unwrap;
 
@@ -38,6 +38,16 @@ fn calling_safe_cat() {
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
+
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
+    assert_eq!(
+        xorurl_encoder.content_type(),
+        SafeContentType::MediaType("text/x-markdown".to_string())
+    );
+    assert_eq!(
+        xorurl_encoder.data_type(),
+        SafeDataType::PublishedImmutableData
+    );
 }
 
 #[test]

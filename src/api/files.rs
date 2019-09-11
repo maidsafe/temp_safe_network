@@ -961,6 +961,7 @@ fn test_files_container_create_dest_path_with_trailing_slash() {
 
     assert!(xorurl.starts_with("safe://"));
     assert_eq!(processed_files.len(), 5);
+    println!("AAA: {:?}", files_map);
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";

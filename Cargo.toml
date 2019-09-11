@@ -39,6 +39,7 @@ validator = "0.8.0"
 validator_derive = "0.8.0"
 self_update = "0.5.1"
 mime_guess = "2.0.1"
+lazy_static = "1.2.0"
 
 [features]
 mock-network = ["safe_app/mock-network"]

@@ -100,10 +100,15 @@ pub fn cat_commander(
             data,
             xorname,
             resolved_from,
+            media_type,
         } => {
             if cmd.info > 0 {
                 println!("Native data type: ImmutableData (published)");
                 println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                println!(
+                    "Media type: {}",
+                    media_type.clone().unwrap_or_else(|| "Unknown".to_string())
+                );
                 print_resolved_from(cmd.info, resolved_from);
                 println!("Raw content of the file:");
             }
