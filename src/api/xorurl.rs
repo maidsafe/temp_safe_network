@@ -84,8 +84,17 @@ impl XorUrlEncoder {
         path: Option<&str>,
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
-    ) -> Self {
-        Self {
+    ) -> ResultReturn<Self> {
+        if let SafeContentType::MediaType(ref media_type) = content_type {
+            if !XorUrlEncoder::is_media_type_supported(media_type) {
+                return Err(Error::InvalidMediaType(format!(
+                        "Media-type '{}' not supported. You can use 'SafeContentType::Raw' as the 'content_type' for this type of content",
+                        media_type
+                    )));
+            }
+        }
+
+        Ok(Self {
             encoding_version: XOR_URL_VERSION_1,
             xorname,
             type_tag,
@@ -94,7 +103,12 @@ impl XorUrlEncoder {
             path: path.unwrap_or_else(|| "").to_string(),
             sub_names: sub_names.unwrap_or_else(|| vec![]),
             content_version,
-        }
+        })
+    }
+
+    // A non-member utility function to check if a media-type is currently supported by XOR-URL encoding
+    pub fn is_media_type_supported(media_type: &str) -> bool {
+        MEDIA_TYPE_CODES.get(media_type).is_some()
     }
 
     // A non-member encoder function for convinience in some cases
@@ -117,7 +131,7 @@ impl XorUrlEncoder {
             path,
             sub_names,
             content_version,
-        );
+        )?;
         xorurl_encoder.to_base(base)
     }
 
@@ -428,9 +442,10 @@ fn test_xorurl_default_base_encoding() {
 
 #[test]
 fn test_xorurl_decoding() {
+    use unwrap::unwrap;
     let xorname = XorName(*b"12345678901234567890123456789012");
     let type_tag: u64 = 0x0eef;
-    let xorurl_encoder = XorUrlEncoder::new(
+    let xorurl_encoder = unwrap!(XorUrlEncoder::new(
         xorname,
         type_tag,
         SafeDataType::PublishedImmutableData,
@@ -438,7 +453,7 @@ fn test_xorurl_decoding() {
         None,
         None,
         None,
-    );
+    ));
     assert_eq!("", xorurl_encoder.path());
     assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
     assert_eq!(xorname, xorurl_encoder.xorname());

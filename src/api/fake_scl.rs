@@ -297,7 +297,7 @@ impl SafeApp for SafeAppFake {
             Some(seq_append_only) => seq_append_only.clone(),
             None => {
                 return Err(Error::ContentNotFound(format!(
-                    "Sequential AppendOnlyData not found at Xor name: {}",
+                    "Sequenced AppendOnlyData not found at Xor name: {}",
                     xorname_hex
                 )))
             }
@@ -324,14 +324,14 @@ impl SafeApp for SafeAppFake {
                 let latest_index = seq_append_only.len() - 1;
                 let last_entry = seq_append_only.get(latest_index).ok_or_else(|| {
                     Error::EmptyContent(format!(
-                        "Empty Sequential AppendOnlyData found at Xor name {}",
+                        "Empty Sequenced AppendOnlyData found at Xor name {}",
                         xorname_hex
                     ))
                 })?;
                 Ok(((seq_append_only.len() - 1) as u64, last_entry.clone()))
             }
             None => Err(Error::ContentNotFound(format!(
-                "Sequential AppendOnlyData not found at Xor name: {}",
+                "Sequenced AppendOnlyData not found at Xor name: {}",
                 xorname_hex
             ))),
         }
@@ -349,7 +349,7 @@ impl SafeApp for SafeAppFake {
             Some(seq_append_only) => seq_append_only.len(),
             None => {
                 return Err(Error::ContentNotFound(format!(
-                    "Sequential AppendOnlyData not found at Xor name: {}",
+                    "Sequenced AppendOnlyData not found at Xor name: {}",
                     xorname_hex
                 )))
             }
@@ -370,14 +370,14 @@ impl SafeApp for SafeAppFake {
             Some(seq_append_only) => {
                 if version >= seq_append_only.len() as u64 {
                     Err(Error::VersionNotFound(format!(
-                        "Invalid version ({}) for Sequential AppendOnlyData found at Xor name {}",
+                        "Invalid version ({}) for Sequenced AppendOnlyData found at Xor name {}",
                         version, name
                     )))
                 } else {
                     let index = version as usize;
                     let entry = seq_append_only.get(index).ok_or_else(|| {
                         Error::EmptyContent(format!(
-                            "Empty Sequential AppendOnlyData found at Xor name {}",
+                            "Empty Sequenced AppendOnlyData found at Xor name {}",
                             xorname_hex
                         ))
                     })?;
@@ -386,7 +386,7 @@ impl SafeApp for SafeAppFake {
                 }
             }
             None => Err(Error::ContentNotFound(format!(
-                "Sequential AppendOnlyData not found at Xor name: {}",
+                "Sequenced AppendOnlyData not found at Xor name: {}",
                 xorname_hex
             ))),
         }
@@ -432,7 +432,7 @@ impl SafeApp for SafeAppFake {
                 ))
             }
             None => Err(Error::ContentNotFound(format!(
-                "Sequential AppendOnlyData not found at Xor name: {}",
+                "Sequenced MutableData not found at Xor name: {}",
                 xorname_hex
             ))),
         }
@@ -477,7 +477,7 @@ impl SafeApp for SafeAppFake {
         match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
             None => Err(Error::EntryNotFound(format!(
-                "Entry not found in Sequential MutableData found at Xor name: {}",
+                "Entry not found in Sequenced MutableData found at Xor name: {}",
                 xorname_to_hex(&name)
             ))),
         }

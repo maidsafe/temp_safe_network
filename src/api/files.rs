@@ -309,12 +309,22 @@ impl Safe {
         data: &[u8],
         media_type: Option<&str>,
     ) -> ResultReturn<XorUrl> {
+        let content_type = media_type.map_or_else(
+            || Ok(SafeContentType::Raw),
+            |media_type_str| {
+                if XorUrlEncoder::is_media_type_supported(media_type_str) {
+                    Ok(SafeContentType::MediaType(media_type_str.to_string()))
+                } else {
+                    Err(Error::InvalidMediaType(format!(
+                        "Media-type '{}' not supported. You can pass 'None' as the 'media_type' for this content to be treated as raw",
+                        media_type_str
+                    )))
+                }
+            },
+        )?;
+
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_app.files_put_published_immutable(&data)?;
-        let content_type = media_type.map_or_else(
-            || SafeContentType::Raw,
-            |mime_str| SafeContentType::MediaType(mime_str.to_string()),
-        );
 
         XorUrlEncoder::encode(
             xorname,
@@ -564,8 +574,17 @@ fn upload_file_to_net(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
+
     let mime_type = mime_guess::from_path(&path);
     safe.files_put_published_immutable(&data, mime_type.first_raw())
+        .or_else(|err| {
+            // Let's then upload it and set media-type to be simply raw content
+            if let Error::InvalidMediaType(_) = err {
+                safe.files_put_published_immutable(&data, None)
+            } else {
+                Err(err)
+            }
+        })
 }
 
 // Get file metadata from local filesystem
@@ -961,7 +980,6 @@ fn test_files_container_create_dest_path_with_trailing_slash() {
 
     assert!(xorurl.starts_with("safe://"));
     assert_eq!(processed_files.len(), 5);
-    println!("AAA: {:?}", files_map);
     assert_eq!(files_map.len(), 5);
 
     let filename1 = "./tests/testfolder/test.md";

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{create_random_xorname, xorname_from_pk};
+use super::helpers::{create_random_xorname, xorname_from_pk, xorname_to_hex};
 use super::safe_net::AppendOnlyDataRawData;
 use super::{Error, ResultReturn, SafeApp};
 use futures::future::Future;
@@ -420,7 +420,7 @@ impl SafeApp for SafeAppScl {
         .map_err(|err| {
             if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
                 Error::VersionNotFound(format!(
-                    "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
+                    "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
                     version, name
                 ))
             } else {
@@ -526,12 +526,23 @@ impl SafeApp for SafeAppScl {
                 .get_seq_mdata_value(name, tag, key_vec)
                 .map_err(SafeAppError)
         })
-        .map_err(|err| {
-            if let SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) = err {
+        .map_err(|err| match err {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) => {
                 Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
-            } else {
-                Error::NetDataError(format!("Failed to retrieve a key. {:?}", err))
             }
+            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData)) => {
+                Error::ContentNotFound(format!(
+                    "Sequenced MutableData not found at Xor name: {}",
+                    xorname_to_hex(&name)
+                ))
+            }
+            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) => {
+                Error::EntryNotFound(format!(
+                    "Entry not found in Sequenced MutableData found at Xor name: {}",
+                    xorname_to_hex(&name)
+                ))
+            }
+            err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
         })
     }
 
@@ -699,7 +710,7 @@ fn test_put_get_update_seq_append_only_data() {
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),
         Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
-            "Invalid version ({}) for Sequential AppendOnlyData found at XoR name {}",
+            "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
             nonexistant_version, xorname
         ))),
         err => panic!(format!("Error returned is not the expected one: {:?}", err)),

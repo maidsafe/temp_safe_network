@@ -219,6 +219,9 @@ impl Safe {
                     "Couldn't read source Wallet for the transfer at \"{}\"",
                     url
                 )),
+                Error::ContentNotFound(_) => {
+                    Error::ContentError(format!("No Wallet found at Wallet \"{}\"", url))
+                }
                 _other => {
                     Error::ContentError(format!("No default balance found at Wallet \"{}\"", url))
                 }

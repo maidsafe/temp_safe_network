@@ -50,7 +50,7 @@ impl Safe {
                 Some(&path),
                 Some(sub_names),
                 version,
-            );
+            )?;
 
             Ok(encoded_xor)
         })
