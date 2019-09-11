@@ -15,19 +15,6 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum FilesSubCommands {
-    // #[structopt(name = "add")]
-    /// Add a file to a network document / container
-    // Add {
-    //     /// The source file location
-    //     #[structopt(short = "s", long = "source")]
-    //     source: String,
-    //     /// desired file name
-    //     #[structopt(long = "name")]
-    //     name: String,
-    //     /// desired file name
-    //     #[structopt(short = "l", long = "link")]
-    //     link: String,
-    // },
     #[structopt(name = "put")]
     /// Put a file or folder's files onto the SAFE Network
     Put {
@@ -52,6 +39,17 @@ pub enum FilesSubCommands {
         /// Delete files found at the target FilesContainer that are not in the source location. This is only allowed when --recursive is passed as well
         #[structopt(short = "d", long = "delete")]
         delete: bool,
+        /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
+        #[structopt(short = "u", long = "update-nrs")]
+        update_nrs: bool,
+    },
+    #[structopt(name = "add")]
+    /// Add a file to an existing FilesContainer on the network
+    Add {
+        /// The source file location
+        location: String,
+        /// The target FilesContainer to add the source file to, optionally including the destination path (default is '/') and new file name
+        target: Option<String>,
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
         #[structopt(short = "u", long = "update-nrs")]
         update_nrs: bool,
@@ -107,24 +105,12 @@ pub fn files_commander(
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
-                let mut table = Table::new();
-                let format = FormatBuilder::new()
-                    .column_separator(' ')
-                    .padding(0, 1)
-                    .build();
-                table.set_format(format);
-                let mut success_count = 0;
-                for (file_name, (change, link)) in processed_files.iter() {
-                    if change != "E" {
-                        success_count += 1;
-                    }
-                    table.add_row(row![change, file_name, link]);
-                }
-
+                let (table, success_count) = gen_processed_files_table(&processed_files);
                 if success_count > 0 {
                     let url = match XorUrlEncoder::from_url(&target) {
                         Ok(mut xorurl_encoder) => {
                             xorurl_encoder.set_content_version(Some(version));
+                            xorurl_encoder.set_path("");
                             xorurl_encoder.to_string()?
                         }
                         Err(_) => target,
@@ -149,8 +135,67 @@ pub fn files_commander(
             }
             Ok(())
         }
+        Some(FilesSubCommands::Add {
+            location,
+            target,
+            update_nrs,
+        }) => {
+            let target = get_from_arg_or_stdin(target, None)?;
+            // Update the FilesContainer on the Network
+            let (version, processed_files, _files_map) =
+                safe.files_container_add(&location, &target, update_nrs, dry_run)?;
+
+            // Now let's just print out a list of the files synced/processed
+            if OutputFmt::Pretty == output_fmt {
+                let (table, success_count) = gen_processed_files_table(&processed_files);
+                if success_count > 0 {
+                    let url = match XorUrlEncoder::from_url(&target) {
+                        Ok(mut xorurl_encoder) => {
+                            xorurl_encoder.set_content_version(Some(version));
+                            xorurl_encoder.set_path("");
+                            xorurl_encoder.to_string()?
+                        }
+                        Err(_) => target,
+                    };
+
+                    println!("FilesContainer updated (version {}): \"{}\"", version, url);
+                    table.printstd();
+                } else if !processed_files.is_empty() {
+                    println!(
+                        "No changes were made to FilesContainer (version {}) at \"{}\"",
+                        version, target
+                    );
+                    table.printstd();
+                } else {
+                    println!(
+                        "No changes were made to the FilesContainer (version {}) at: \"{}\"",
+                        version, target
+                    );
+                }
+            } else {
+                print_json_output(target, version, processed_files)?;
+            }
+            Ok(())
+        }
         None => Err("Missing keys sub-command. Use --help for details.".to_string()),
     }
+}
+
+fn gen_processed_files_table(processed_files: &BTreeMap<String, (String, String)>) -> (Table, u64) {
+    let mut table = Table::new();
+    let format = FormatBuilder::new()
+        .column_separator(' ')
+        .padding(0, 1)
+        .build();
+    table.set_format(format);
+    let mut success_count = 0;
+    for (file_name, (change, link)) in processed_files.iter() {
+        if change != "E" {
+            success_count += 1;
+        }
+        table.add_row(row![change, file_name, link]);
+    }
+    (table, success_count)
 }
 
 fn print_json_output(

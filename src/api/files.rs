@@ -40,7 +40,7 @@ const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
 #[allow(dead_code)]
 impl Safe {
-    /// # Create a FilesContaier.
+    /// # Create a FilesContainer.
     ///
     /// ## Example
     ///
@@ -108,7 +108,7 @@ impl Safe {
         Ok((xorurl, processed_files, files_map))
     }
 
-    /// # Fetch an existing FilesContaier.
+    /// # Fetch an existing FilesContainer.
     ///
     /// ## Example
     ///
@@ -179,7 +179,7 @@ impl Safe {
         }
     }
 
-    /// # Sync up local folder with the content on a FilesContaier.
+    /// # Sync up local folder with the content on a FilesContainer.
     ///
     /// ## Example
     ///
@@ -189,7 +189,7 @@ impl Safe {
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("tests/testfolder", &xorurl, true, false, false, false).unwrap();
-    /// println!("FilesContainer fetched is at version: {}", version);
+    /// println!("FilesContainer synced up is at version: {}", version);
     /// println!("The local files that were synced up are: {:?}", new_processed_files);
     /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
     /// ```
@@ -216,13 +216,14 @@ impl Safe {
             )));
         };
 
-        let (mut xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
         // If NRS name shall be updated then the URL has to be an NRS-URL
-        if update_nrs && !is_nrs_resolved {
+        if update_nrs && xorurl_encoder.content_type() != SafeContentType::NrsMapContainer {
             return Err(Error::InvalidInput(
                 "'update-nrs' is not allowed since the URL provided is not an NRS URL".to_string(),
             ));
         }
+
+        let (mut xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it for sync-ing
@@ -248,6 +249,129 @@ impl Safe {
                 !dry_run,
             )?;
 
+        let version = self.append_version_to_nrs_map_container(
+            success_count,
+            current_version,
+            &new_files_map,
+            url,
+            xorurl_encoder,
+            dry_run,
+            update_nrs,
+        )?;
+
+        Ok((version, processed_files, new_files_map))
+    }
+
+    /// # Add a file, either a local path or a published file, on an existing FilesContainer.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// # use safe_cli::Safe;
+    /// # let mut safe = Safe::new("base32z");
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
+    /// let new_file_name = format!("{}/new_name_test.md", xorurl);
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_add("tests/testfolder/test.md", &new_file_name, false, false).unwrap();
+    /// println!("FilesContainer is now at version: {}", version);
+    /// println!("The local files that were synced up are: {:?}", new_processed_files);
+    /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    /// ```
+    pub fn files_container_add(
+        &mut self,
+        source_file: &str,
+        url: &str,
+        update_nrs: bool,
+        dry_run: bool,
+    ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
+        let xorurl_encoder = Safe::parse_url(url)?;
+        if xorurl_encoder.content_version().is_some() {
+            return Err(Error::InvalidInput(format!(
+                "The target URL cannot cannot contain a version: {}",
+                url
+            )));
+        };
+
+        // If NRS name shall be updated then the URL has to be an NRS-URL
+        if update_nrs && xorurl_encoder.content_type() != SafeContentType::NrsMapContainer {
+            return Err(Error::InvalidInput(
+                "'update-nrs' is not allowed since the URL provided is not an NRS URL".to_string(),
+            ));
+        }
+
+        let (mut xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
+
+        // If the FilesContainer URL was resolved from an NRS name we need to remove
+        // the version from it so we can fetch latest version of it for sync-ing
+        if is_nrs_resolved {
+            xorurl_encoder.set_content_version(None);
+        }
+
+        let (current_version, current_files_map): (u64, FilesMap) =
+            self.files_container_get(&xorurl_encoder.to_string()?)?;
+
+        // Let's act according to if it's a local file path or a safe:// location
+        let processed_files = if source_file.starts_with("safe://") {
+            // Let's generate the single file list with the URL provided
+            let mut processed_files = ProcessedFiles::default();
+            match Safe::parse_url(source_file) {
+                Ok(xorurl) => {
+                    processed_files.insert(
+                        url.to_string(),
+                        (CONTENT_ADDED_SIGN.to_string(), xorurl.to_string()?),
+                    );
+                }
+                Err(err) => {
+                    processed_files.insert(
+                        source_file.to_string(),
+                        (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                    );
+                    info!("Skipping file \"{}\". {}", source_file, err);
+                }
+            }
+            processed_files
+        } else {
+            // Let's generate the list of local files paths, without uploading any new file yet
+            file_system_single_file(self, source_file, false)?
+        };
+
+        let dest_path = Some(xorurl_encoder.path().to_string());
+        let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
+            files_map_sync(
+                self,
+                current_files_map,
+                source_file,
+                processed_files,
+                dest_path,
+                false,
+                !dry_run,
+            )?;
+
+        let version = self.append_version_to_nrs_map_container(
+            success_count,
+            current_version,
+            &new_files_map,
+            url,
+            xorurl_encoder,
+            dry_run,
+            update_nrs,
+        )?;
+
+        Ok((version, processed_files, new_files_map))
+    }
+
+    // Private helper function to append new version of the FilesMap to the NRS Container
+    #[allow(clippy::too_many_arguments)]
+    fn append_version_to_nrs_map_container(
+        &mut self,
+        success_count: u64,
+        current_version: u64,
+        new_files_map: &FilesMap,
+        url: &str,
+        mut xorurl_encoder: XorUrlEncoder,
+        dry_run: bool,
+        update_nrs: bool,
+    ) -> ResultReturn<u64> {
         let version = if success_count == 0 {
             current_version
         } else if dry_run {
@@ -255,7 +379,7 @@ impl Safe {
         } else {
             // The FilesContainer is updated by adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
-            let serialised_files_map = serde_json::to_string(&new_files_map).map_err(|err| {
+            let serialised_files_map = serde_json::to_string(new_files_map).map_err(|err| {
                 Error::Unexpected(format!(
                     "Couldn't serialise the FilesMap generated: {:?}",
                     err
@@ -288,7 +412,7 @@ impl Safe {
             new_version
         };
 
-        Ok((version, processed_files, new_files_map))
+        Ok(version)
     }
 
     /// # Put Published ImmutableData
@@ -685,6 +809,66 @@ fn not_hidden_and_valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
         .to_str()
         .map(|s| entry.depth() <= max_depth && (entry.depth() == 0 || !s.starts_with('.')))
         .unwrap_or(false)
+}
+
+// Read the local filesystem at `location`, creating a list of one single file's path,
+// and if requested with `upload_files` arg, upload the file to the network and putting
+// the obtained XOR-URL in the single file list returned
+fn file_system_single_file(
+    safe: &mut Safe,
+    location: &str,
+    upload_files: bool,
+) -> ResultReturn<ProcessedFiles> {
+    let file_path = Path::new(location);
+    //let (metadata, _) = get_metadata(&file_path)?;
+    info!("Reading file {}", file_path.display());
+
+    // We now compare both FilesMaps to upload the missing files
+    let mut processed_files = BTreeMap::new();
+    let normalised_path = normalise_path_separator(file_path.to_str().unwrap_or_else(|| ""));
+    match fs::metadata(&file_path) {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                Err(Error::InvalidInput(format!(
+                    "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",
+                    location
+                )))
+            } else if upload_files {
+                match upload_file_to_net(safe, &file_path) {
+                    Ok(xorurl) => {
+                        processed_files
+                            .insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
+                    }
+                    Err(err) => {
+                        processed_files.insert(
+                            normalised_path.clone(),
+                            (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                        );
+                        info!("Skipping file \"{}\". {}", normalised_path, err);
+                    }
+                };
+                Ok(processed_files)
+            } else {
+                processed_files.insert(
+                    normalised_path,
+                    (CONTENT_ADDED_SIGN.to_string(), "".to_string()),
+                );
+                Ok(processed_files)
+            }
+        }
+        Err(err) => {
+            processed_files.insert(
+                normalised_path.clone(),
+                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+            );
+            info!(
+                "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
+                normalised_path, err
+            );
+
+            Ok(processed_files)
+        }
+    }
 }
 
 // From the provided list of local files paths and corresponding files XOR-URLs,
@@ -1636,4 +1820,75 @@ fn test_files_container_sync_with_nrs_url() {
     let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
     assert_eq!(version, 2);
     assert_eq!(fetched_files_map.len(), 5);
+}
+
+#[test]
+fn test_files_container_add() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/subfolder/", None, false, false));
+    assert_eq!(processed_files.len(), 2);
+    assert_eq!(files_map.len(), 2);
+
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+        "./tests/testfolder/test.md",
+        &format!("{}/new_filename_test.md", xorurl),
+        false,
+        false
+    ));
+
+    assert_eq!(version, 1);
+    assert_eq!(new_processed_files.len(), 1);
+    assert_eq!(new_files_map.len(), 3);
+
+    let filename1 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename1].1,
+        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+    );
+
+    let filename2 = "./tests/testfolder/subfolder/sub2.md";
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename2].1,
+        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+    );
+
+    let filename3 = "./tests/testfolder/test.md";
+    assert_eq!(new_processed_files[filename3].0, CONTENT_ADDED_SIGN);
+    assert_eq!(
+        new_processed_files[filename3].1,
+        new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
+    );
+}
+
+#[test]
+fn test_files_container_add_dir() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/subfolder/", None, false, false));
+    assert_eq!(processed_files.len(), 2);
+    assert_eq!(files_map.len(), 2);
+
+    match safe.files_container_add(
+        "./tests/testfolder",
+        &xorurl,
+        false,
+        false
+    ) {
+        Ok(_) => panic!("unexpectdly added a folder to files container"),
+        Err(Error::InvalidInput(msg)) => assert_eq!(
+            msg,
+            "'./tests/testfolder' is a directory, only individual files can be added. Use files sync operation for uploading folders".to_string(),
+        ),
+        other => panic!(format!(
+            "error returned is not the expected one: {:?}",
+            other
+        )),
+    }
 }
