@@ -18,4 +18,5 @@ pub use api::*;
 pub use crate::ffi::xorurl::*;
 pub use crate::ffi::content_fetch::*;
 pub use crate::ffi::keys::*;
+pub use crate::ffi::nrs::*;
 pub use crate::ffi::*;

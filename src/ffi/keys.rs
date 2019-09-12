@@ -27,7 +27,7 @@ pub unsafe extern "C" fn generate_new_safe_key_pair(
         let preload_option = from_c_str(preload)?;
         let pay_with_option = from_c_str(pay_with)?;
         let pk_with_option = from_c_str(pk)?;
-        let (xorurl, key_pair, amount) = if test_coins {
+        let (xorurl, key_pair, _amount) = if test_coins {
             let (xorurl, key_pair) = (*app).keys_create_preload_test_coins(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)?;
             (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT))
         } else {

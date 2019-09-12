@@ -15,8 +15,8 @@ pub mod fetch;
 mod files;
 mod helpers;
 pub mod keys;
-mod nrs;
-mod nrs_map;
+pub mod nrs;
+pub mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;

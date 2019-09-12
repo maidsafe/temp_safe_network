@@ -15,7 +15,7 @@ pub unsafe extern "C" fn encode_xor_url(
     data_type: u64,
     content_type: u64,
     path: *const c_char,
-    sub_names: *const c_char,
+    _sub_names: *const c_char, // todo: update this later
     content_version: u64,
     base_encoding: *const c_char,
     user_data: *mut c_void,
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn new_xor_url_encoder(
     data_type: u64,
     content_type: u64,
     path: *const c_char,
-    sub_names: *const c_char,
+    _sub_names: *const c_char, // todo: update this later
     content_version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
