@@ -14,7 +14,7 @@ mod fake_scl;
 pub mod fetch;
 mod files;
 mod helpers;
-mod keys;
+pub mod keys;
 mod nrs;
 mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]
