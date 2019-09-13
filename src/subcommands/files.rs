@@ -72,8 +72,13 @@ pub fn files_commander(
             recursive,
         }) => {
             // create FilesContainer from a given path to local files/folders
-            let (files_container_xorurl, processed_files, _files_map) =
-                safe.files_container_create(&location, dest, recursive, dry_run)?;
+            let (files_container_xorurl, processed_files, _files_map) = safe
+                .files_container_create(
+                    &location,
+                    dest.as_ref().map(String::as_str),
+                    recursive,
+                    dry_run,
+                )?;
 
             // Now let's just print out a list of the files uploaded/processed
             if OutputFmt::Pretty == output_fmt {
