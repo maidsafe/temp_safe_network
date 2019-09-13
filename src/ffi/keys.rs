@@ -24,14 +24,14 @@ pub unsafe extern "C" fn generate_new_safe_key_pair(
 ) {
     catch_unwind_cb(user_data, o_cb,  || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
-        let preload_option = from_c_str(preload)?;
-        let pay_with_option = from_c_str(pay_with)?;
-        let pk_with_option = from_c_str(pk)?;
+        let preload_str = from_c_str(preload)?;
+        let pay_with_str = from_c_str(pay_with)?;
+        let pk_with_str = from_c_str(pk)?;
         let (xorurl, key_pair, _amount) = if test_coins {
             let (xorurl, key_pair) = (*app).keys_create_preload_test_coins(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)?;
             (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT))
         } else {
-            let (xorurl, key_pair) = (*app).keys_create(Some(pay_with_option), Some(preload_option), Some(pk_with_option))?;
+            let (xorurl, key_pair) = (*app).keys_create(Some(pay_with_str), Some(preload_str), Some(pk_with_str))?;
             (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)) // Todo: return amount not the default value
         };
         let key_xor_url = CString::new(xorurl).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn query_key_balance(
         let secret_key = from_c_str(secret)?;
         let sk = Some(secret_key).unwrap_or_else(|| String::from(""));
         let current_balance = if key_url.is_empty() {
-            (*app).keys_balance_from_sk(&sk)?
+            (*app).keys_balance_from_sk(&sk)? 
         } else {
             (*app).keys_balance_from_url(&key_url, &sk)?
         };

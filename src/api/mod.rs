@@ -20,8 +20,8 @@ pub mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;
-mod wallet;
 mod xorurl_media_types;
+pub mod wallet;
 pub mod xorurl;
 
 pub use errors::{Error, ResultReturn};

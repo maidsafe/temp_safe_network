@@ -3,6 +3,7 @@ pub mod content_fetch;
 pub mod xorurl;
 pub mod keys;
 pub mod nrs;
+pub mod wallet;
 
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use std::os::raw::{c_char, c_void};
