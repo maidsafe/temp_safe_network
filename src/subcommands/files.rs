@@ -53,6 +53,9 @@ pub enum FilesSubCommands {
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
         #[structopt(short = "u", long = "update-nrs")]
         update_nrs: bool,
+        /// Overwrite the file on the FilesContainer if there already exists a file with the same name
+        #[structopt(short = "f", long = "force")]
+        force: bool,
     },
 }
 
@@ -139,11 +142,12 @@ pub fn files_commander(
             location,
             target,
             update_nrs,
+            force,
         }) => {
             let target = get_from_arg_or_stdin(target, None)?;
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) =
-                safe.files_container_add(&location, &target, update_nrs, dry_run)?;
+                safe.files_container_add(&location, &target, force, update_nrs, dry_run)?;
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {

@@ -97,7 +97,7 @@ static APPLICATION_SUBTYPES: [&str; 38] = [
 ];
 
 // Range 0x8000 - 0x8fff (12 bits) reserved for 'audio/*' (there currently are ~150 subtypes)
-static AUDIO_SUBTYPES: [&str; 9] = [
+static AUDIO_SUBTYPES: [&str; 10] = [
     "audio/aac",
     "audio/midi",
     "audio/x-midi",
@@ -107,6 +107,7 @@ static AUDIO_SUBTYPES: [&str; 9] = [
     "audio/3gpp",
     "audio/3gpp2",
     "audio/mp4",
+    "audio/mpeg",
 ];
 
 // Range 0x9000 - 0x9fff (12 bits) reserved for 'font/*' (there currently are ~8 subtypes)

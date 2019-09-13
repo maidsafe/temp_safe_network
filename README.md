@@ -34,6 +34,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
   - [Files](#files)
     - [Put](#files-put)
     - [Sync](#files-sync)
+    - [Add](#files-add)
   - [Cat](#cat)
   - [NRS](#nrs-name-resolution-system)
     - [Create](#nrs-create)
@@ -448,6 +449,11 @@ FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiu
 ```
 
 The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
+
+#### Files Add
+
+TODO
+
 
 ### Cat
 

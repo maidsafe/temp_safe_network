@@ -247,6 +247,7 @@ impl Safe {
                 dest_path,
                 delete,
                 !dry_run,
+                false,
             )?;
 
         let version = self.append_version_to_nrs_map_container(
@@ -272,7 +273,7 @@ impl Safe {
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
     /// let new_file_name = format!("{}/new_name_test.md", xorurl);
-    /// let (version, new_processed_files, new_files_map) = safe.files_container_add("tests/testfolder/test.md", &new_file_name, false, false).unwrap();
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_add("tests/testfolder/test.md", &new_file_name, false, false, false).unwrap();
     /// println!("FilesContainer is now at version: {}", version);
     /// println!("The local files that were synced up are: {:?}", new_processed_files);
     /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
@@ -281,6 +282,7 @@ impl Safe {
         &mut self,
         source_file: &str,
         url: &str,
+        force: bool,
         update_nrs: bool,
         dry_run: bool,
     ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
@@ -310,14 +312,32 @@ impl Safe {
         let (current_version, current_files_map): (u64, FilesMap) =
             self.files_container_get(&xorurl_encoder.to_string()?)?;
 
+        let dest_path = xorurl_encoder.path().to_string();
+
         // Let's act according to if it's a local file path or a safe:// location
-        let processed_files = if source_file.starts_with("safe://") {
+        let (processed_files, new_files_map, success_count) = if source_file.starts_with("safe://")
+        {
+            let source_xorurl_encoder = Safe::parse_url(source_file)?;
+            if source_xorurl_encoder.data_type() != SafeDataType::PublishedImmutableData {
+                return Err(Error::InvalidInput(format!(
+                    "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
+                    SafeDataType::PublishedImmutableData,
+                    source_xorurl_encoder.content_type()
+                )));
+            }
+
+            if dest_path.is_empty() {
+                return Err(Error::InvalidInput(
+                    "The destination URL should include a target file path since we are adding a link".to_string(),
+                ));
+            }
+
             // Let's generate the single file list with the URL provided
             let mut processed_files = ProcessedFiles::default();
             match Safe::parse_url(source_file) {
                 Ok(xorurl) => {
                     processed_files.insert(
-                        url.to_string(),
+                        dest_path,
                         (CONTENT_ADDED_SIGN.to_string(), xorurl.to_string()?),
                     );
                 }
@@ -329,23 +349,23 @@ impl Safe {
                     info!("Skipping file \"{}\". {}", source_file, err);
                 }
             }
-            processed_files
+
+            files_map_add_link(self, current_files_map, processed_files, force)?
         } else {
             // Let's generate the list of local files paths, without uploading any new file yet
-            file_system_single_file(self, source_file, false)?
-        };
+            let processed_files = file_system_single_file(self, source_file, false)?;
 
-        let dest_path = Some(xorurl_encoder.path().to_string());
-        let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
             files_map_sync(
                 self,
                 current_files_map,
                 source_file,
                 processed_files,
-                dest_path,
+                Some(dest_path),
                 false,
                 !dry_run,
-            )?;
+                force,
+            )?
+        };
 
         let version = self.append_version_to_nrs_map_container(
             success_count,
@@ -537,16 +557,15 @@ fn gen_new_file_item(
     file_type: &str,
     file_size: &str,
     file_created: Option<&str>,
-    upload_file: bool,
+    link: Option<&str>,
 ) -> Result<FileItem, String> {
     let now = gen_timestamp_secs();
     let mut file_item = FileItem::new();
-    let xorurl = if upload_file {
-        upload_file_to_net(safe, file_path)?
-    } else {
-        "".to_string()
+    let xorurl = match link {
+        None => upload_file_to_net(safe, file_path)?,
+        Some(link) => link.to_string(),
     };
-    file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl.to_string());
+    file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl);
     file_item.insert(FAKE_RDF_PREDICATE_TYPE.to_string(), file_type.to_string());
     file_item.insert(FAKE_RDF_PREDICATE_SIZE.to_string(), file_size.to_string());
     file_item.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
@@ -556,9 +575,70 @@ fn gen_new_file_item(
     Ok(file_item)
 }
 
+// Helper function to add or update a FileItem in a FilesMap
+#[allow(clippy::too_many_arguments)]
+fn add_or_update_file_item(
+    safe: &mut Safe,
+    file_name: &str,
+    file_name_for_map: &str,
+    file_path: &Path,
+    file_type: &str,
+    file_size: &str,
+    file_created: Option<&str>,
+    file_link: Option<&str>,
+    name_exists: bool,
+    files_map: &mut FilesMap,
+    processed_files: &mut ProcessedFiles,
+) -> bool {
+    // We need to add a new FileItem, let's generate the FileItem first
+    match gen_new_file_item(
+        safe,
+        file_path,
+        file_type,
+        file_size,
+        file_created,
+        file_link,
+    ) {
+        Ok(new_file_item) => {
+            let content_added_sign = if name_exists {
+                CONTENT_UPDATED_SIGN.to_string()
+            } else {
+                CONTENT_ADDED_SIGN.to_string()
+            };
+
+            debug!("New FileItem item: {:?}", new_file_item);
+            debug!("New FileItem item inserted as {:?}", file_name);
+            files_map.insert(file_name_for_map.to_string(), new_file_item.clone());
+            processed_files.insert(
+                file_name.to_string(),
+                (
+                    content_added_sign,
+                    new_file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+                ),
+            );
+
+            true
+        }
+        Err(err) => {
+            processed_files.insert(
+                file_name.to_string(),
+                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+            );
+            info!(
+                "Skipping file \"{}\": {:?}",
+                file_link.unwrap_or_else(|| ""),
+                err
+            );
+
+            false
+        }
+    }
+}
+
 // From the provided list of local files paths, find the local changes made in comparison with the
 // target FilesContainer, uploading new files as necessary, and creating a new FilesMap with file's
 // metadata and their corresponding links, as well as generating the report of processed files
+#[allow(clippy::too_many_arguments)]
 fn files_map_sync(
     safe: &mut Safe,
     mut current_files_map: FilesMap,
@@ -567,22 +647,24 @@ fn files_map_sync(
     dest_path: Option<String>,
     delete: bool,
     upload_files: bool,
+    force: bool,
 ) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     let mut updated_files_map = FilesMap::new();
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
 
-    for (key, _value) in new_content
+    for (local_file_name, _) in new_content
         .iter()
         .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
     {
-        let file_path = Path::new(&key);
+        let file_path = Path::new(&local_file_name);
         let (metadata, file_type) = get_metadata(&file_path)?;
         let file_size = metadata.len().to_string();
 
         let file_name = RelativePath::new(
-            &key.to_string()
+            &local_file_name
+                .to_string()
                 .replace(&location_base_path, &dest_base_path),
         )
         .normalize();
@@ -590,81 +672,64 @@ fn files_map_sync(
         let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()));
 
         // Let's update FileItem if there is a change or it doesn't exist in current_files_map
+        let link = if upload_files { None } else { Some("") };
         match current_files_map.get(&normalised_file_name) {
             None => {
-                // We need to add a new FileItem, let's upload it first
-                match gen_new_file_item(
+                // We need to add a new FileItem
+                if add_or_update_file_item(
                     safe,
+                    &local_file_name,
+                    &normalised_file_name,
                     &file_path,
                     &file_type,
                     &file_size,
                     None,
-                    upload_files,
+                    link,
+                    false,
+                    &mut updated_files_map,
+                    &mut processed_files,
                 ) {
-                    Ok(new_file_item) => {
-                        debug!("New FileItem item: {:?}", new_file_item);
-                        debug!("New FileItem item inserted as {:?}", &file_name);
-                        updated_files_map.insert(normalised_file_name, new_file_item.clone());
-                        processed_files.insert(
-                            key.to_string(),
-                            (
-                                CONTENT_ADDED_SIGN.to_string(),
-                                new_file_item[FAKE_RDF_PREDICATE_LINK].clone(),
-                            ),
-                        );
-                        success_count += 1;
-                    }
-                    Err(err) => {
-                        processed_files.insert(
-                            key.to_string(),
-                            (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
-                        );
-                        info!(
-                        "Skipping file \"{}\" since it couldn't be uploaded to the network: {:?}",
-                        normalised_file_name, err);
-                    }
-                };
+                    success_count += 1;
+                }
             }
             Some(file_item) => {
-                // TODO: we don't record the original creation/modified timestamp from the,
-                // filesystem thus we cannot compare to see if they changed
-                if file_item[FAKE_RDF_PREDICATE_SIZE] != file_size
+                if force
+                    || file_item[FAKE_RDF_PREDICATE_SIZE] != file_size
                     || file_item[FAKE_RDF_PREDICATE_TYPE] != file_type
                 {
-                    // We need to update the current FileItem, let's upload it first
-                    match gen_new_file_item(
+                    // We need to update the current FileItem
+                    if add_or_update_file_item(
                         safe,
+                        &local_file_name,
+                        &normalised_file_name,
                         &file_path,
                         &file_type,
                         &file_size,
                         Some(&file_item[FAKE_RDF_PREDICATE_CREATED]),
-                        upload_files,
+                        link,
+                        true,
+                        &mut updated_files_map,
+                        &mut processed_files,
                     ) {
-                        Ok(new_file_item) => {
-                            debug!("Updated FileItem item: {:?}", new_file_item);
-                            debug!("Updated FileItem item inserted as {:?}", &file_name);
-                            updated_files_map
-                                .insert(normalised_file_name.to_string(), new_file_item.clone());
-                            processed_files.insert(
-                                key.to_string(),
-                                (
-                                    CONTENT_UPDATED_SIGN.to_string(),
-                                    new_file_item[FAKE_RDF_PREDICATE_LINK].clone(),
-                                ),
-                            );
-                            success_count += 1;
-                        }
-                        Err(err) => {
-                            processed_files.insert(
-                                key.to_string(),
-                                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
-                            );
-                            info!("Skipping file \"{}\": {}", &normalised_file_name, err);
-                        }
-                    };
+                        success_count += 1;
+                    }
                 } else {
                     // No need to update FileItem just copy the existing one
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
+
+                    if !force {
+                        processed_files.insert(
+                            local_file_name.to_string(),
+                            (
+                                CONTENT_ERROR_SIGN.to_string(),
+                                format!(
+                                    "File named \"{}\" already exists on target with same link",
+                                    normalised_file_name
+                                ),
+                            ),
+                        );
+                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", local_file_name, normalised_file_name);
+                    }
                 }
 
                 // let's now remove it from the current list so we now it has been processed
@@ -691,6 +756,87 @@ fn files_map_sync(
     });
 
     Ok((processed_files, updated_files_map, success_count))
+}
+
+fn files_map_add_link(
+    safe: &mut Safe,
+    mut files_map: FilesMap,
+    new_content: ProcessedFiles,
+    force: bool,
+) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
+    let mut processed_files = ProcessedFiles::new();
+    let mut success_count = 0;
+    for (file_name, (_, file_link)) in new_content
+        .iter()
+        .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
+    {
+        let file_path = Path::new("");
+        let xorurl_encoder = XorUrlEncoder::from_url(file_link)?;
+        let file_type = match xorurl_encoder.content_type() {
+            SafeContentType::MediaType(media_type) => media_type,
+            other => format!("{}", other),
+        };
+        let file_size = ""; // unknown
+
+        // Let's update FileItem if the link is different or it doesn't exist in the files_map
+        match files_map.get(file_name) {
+            Some(current_file_item) => {
+                if &current_file_item[FAKE_RDF_PREDICATE_LINK] != file_link {
+                    if force {
+                        if add_or_update_file_item(
+                            safe,
+                            file_name,
+                            file_name,
+                            &file_path,
+                            &file_type,
+                            &file_size,
+                            None,
+                            Some(file_link),
+                            true,
+                            &mut files_map,
+                            &mut processed_files,
+                        ) {
+                            success_count += 1;
+                        }
+                    } else {
+                        processed_files.insert(file_name.to_string(), (CONTENT_ERROR_SIGN.to_string(), format!("File named \"{}\" already exists on target. Use the 'force' flag to replace it", file_name)));
+                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name);
+                    }
+                } else {
+                    processed_files.insert(
+                        file_link.to_string(),
+                        (
+                            CONTENT_ERROR_SIGN.to_string(),
+                            format!(
+                                "File named \"{}\" already exists on target with same link",
+                                file_name
+                            ),
+                        ),
+                    );
+                    info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name);
+                }
+            }
+            None => {
+                if add_or_update_file_item(
+                    safe,
+                    file_name,
+                    file_name,
+                    &file_path,
+                    &file_type,
+                    &file_size,
+                    None,
+                    Some(file_link),
+                    false,
+                    &mut files_map,
+                    &mut processed_files,
+                ) {
+                    success_count += 1;
+                }
+            }
+        };
+    }
+
+    Ok((processed_files, files_map, success_count))
 }
 
 // Upload a files to the Network as a Published-ImmutableData
@@ -722,15 +868,9 @@ fn get_metadata(path: &Path) -> ResultReturn<(fs::Metadata, String)> {
     })?;
     debug!("Metadata for location: {:?}", metadata);
 
-    let extension = match path.extension() {
-        Some(ext) => ext
-            .to_str()
-            .ok_or("unknown")
-            .map_err(|err| Error::Unexpected(err.to_string()))?,
-        None => "unknown",
-    };
-
-    Ok((metadata, extension.to_string()))
+    let mime_type = mime_guess::from_path(&path);
+    let media_type = mime_type.first_raw().unwrap_or("Raw");
+    Ok((metadata, media_type.to_string()))
 }
 
 // Walk the local filesystem starting from `location`, creating a list of files paths,
@@ -1836,7 +1976,8 @@ fn test_files_container_add() {
         "./tests/testfolder/test.md",
         &format!("{}/new_filename_test.md", xorurl),
         false,
-        false
+        false,
+        false,
     ));
 
     assert_eq!(version, 1);
@@ -1879,6 +2020,7 @@ fn test_files_container_add_dir() {
         "./tests/testfolder",
         &xorurl,
         false,
+        false,
         false
     ) {
         Ok(_) => panic!("unexpectdly added a folder to files container"),
@@ -1892,3 +2034,80 @@ fn test_files_container_add_dir() {
         )),
     }
 }
+
+#[test]
+fn test_files_container_add_a_url() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/subfolder/", None, false, false));
+    assert_eq!(processed_files.len(), 2);
+    assert_eq!(files_map.len(), 2);
+    let data = b"0123456789";
+    let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
+    let new_filename = "/new_filename_test.md";
+
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+        &file_xorurl,
+        &format!("{}{}", xorurl, new_filename),
+        false,
+        false,
+        false
+    ));
+
+    assert_eq!(version, 1);
+    assert_eq!(new_processed_files.len(), 1);
+    assert_eq!(new_files_map.len(), 3);
+
+    let filename1 = "./tests/testfolder/subfolder/subexists.md";
+    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename1].1,
+        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+    );
+
+    let filename2 = "./tests/testfolder/subfolder/sub2.md";
+    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+    assert_eq!(
+        processed_files[filename2].1,
+        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+    );
+
+    assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+    assert_eq!(
+        new_processed_files[new_filename].1,
+        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+    );
+    assert_eq!(
+        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
+        file_xorurl
+    );
+
+    // let's add another file but with the same name
+    let data = b"9876543210";
+    let other_file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+        &other_file_xorurl,
+        &format!("{}{}", xorurl, new_filename),
+        true, // force to overwrite it with new link
+        false,
+        false
+    ));
+
+    assert_eq!(version, 2);
+    assert_eq!(new_processed_files.len(), 1);
+    assert_eq!(new_files_map.len(), 3);
+    assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+    assert_eq!(
+        new_processed_files[new_filename].1,
+        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+    );
+    assert_eq!(
+        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
+        other_file_xorurl
+    );
+}
+
+#[test]
+fn test_files_container_add_from_raw() {}

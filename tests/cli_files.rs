@@ -623,3 +623,82 @@ fn files_sync_and_fetch_without_nrs_update() {
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), 5);
 }
+
+#[test]
+fn calling_safe_files_add() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, _processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    let _ = cmd!(
+        get_bin_location(),
+        "files",
+        "add",
+        TEST_FILE,
+        &format!("{}/new_test.md", xorurl_encoder),
+    )
+    .read()
+    .unwrap();
+
+    xorurl_encoder.set_path("/new_test.md");
+    let synced_file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string())
+    )
+    .read()
+    .unwrap();
+    assert_eq!(synced_file_cat, "hello tests!");
+}
+
+#[test]
+fn calling_safe_files_add_a_url() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    xorurl_encoder.set_path("/new_test.md");
+    let _ = cmd!(
+        get_bin_location(),
+        "files",
+        "add",
+        &processed_files[TEST_FILE].1,
+        &unwrap!(xorurl_encoder.to_string()),
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let synced_file_cat = cmd!(
+        get_bin_location(),
+        "cat",
+        &unwrap!(xorurl_encoder.to_string())
+    )
+    .read()
+    .unwrap();
+    assert_eq!(synced_file_cat, "hello tests!");
+}
