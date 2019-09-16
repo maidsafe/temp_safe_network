@@ -1,9 +1,9 @@
-use crate::api::{ResultReturn, Error};
+use crate::api::{ResultReturn};
 use crate::api::nrs_map::{NrsMap};
 use crate::api::{Safe};
+use super::helpers::{to_c_str};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use std::os::raw::{c_char, c_void};
-use std::ffi::{CString};
 
 #[no_mangle]
 pub unsafe extern "C" fn create_new_public_name(
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn create_new_public_name(
         let link_str = from_c_str(link)?;
         let (nrs_map_container_xorurl, _processed_entries, nrs_map) =
             (*app).nrs_map_container_create(&nrs_str, &link_str, default, direct_link, dry_run)?;
-        let xor_url_string = CString::new(nrs_map_container_xorurl).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
+        let xor_url_string = to_c_str(nrs_map_container_xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, &nrs_map, xor_url_string.as_ptr());
         Ok(())
     })
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn add_update_sub_name(
         let link_str = from_c_str(link)?;
         let (version, xorurl, _processed_entries, nrs_map) =
             (*app).nrs_map_container_add(&name_str, &link_str, default, direct_link, dry_run)?;
-        let xor_url_string = CString::new(xorurl).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
+        let xor_url_string = to_c_str(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, &nrs_map, xor_url_string.as_ptr(), version);
         Ok(())
     })
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn remove_sub_name(
         let name_str = from_c_str(name)?;
         let (version, xorurl, _processed_entries, nrs_map) =
             (*app).nrs_map_container_remove(&name_str, dry_run)?;
-        let xor_url_string = CString::new(xorurl).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
+        let xor_url_string = to_c_str(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, &nrs_map, xor_url_string.as_ptr(), version);
         Ok(())
     })

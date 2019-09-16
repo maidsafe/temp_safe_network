@@ -1,9 +1,9 @@
-use crate::api::{ResultReturn, Error};
+use crate::api::{ResultReturn};
 use crate::api::keys::{BlsKeyPair};
 use crate::api::{Safe};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
+use super::helpers::{from_c_str_to_string_option, to_c_str};
 use std::os::raw::{c_char, c_void};
-use std::ffi::{CString};
 
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 
@@ -24,18 +24,18 @@ pub unsafe extern "C" fn generate_new_safe_key_pair(
 ) {
     catch_unwind_cb(user_data, o_cb,  || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
-        let preload_str = from_c_str(preload)?;
-        let pay_with_str = from_c_str(pay_with)?;
-        let pk_with_str = from_c_str(pk)?;
+        let preload_str = from_c_str_to_string_option(preload);
+        let pay_with_str = from_c_str_to_string_option(pay_with);
+        let pk_with_str = from_c_str_to_string_option(pk);
         let (xorurl, key_pair, _amount) = if test_coins {
             let (xorurl, key_pair) = (*app).keys_create_preload_test_coins(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)?;
             (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT))
         } else {
-            let (xorurl, key_pair) = (*app).keys_create(Some(pay_with_str), Some(preload_str), Some(pk_with_str))?;
+            let (xorurl, key_pair) = (*app).keys_create(pay_with_str, preload_str, pk_with_str)?;
             (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)) // Todo: return amount not the default value
         };
-        let key_xor_url = CString::new(xorurl).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
-        let amount_result = CString::new(PRELOAD_TESTCOINS_DEFAULT_AMOUNT).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
+        let key_xor_url = to_c_str(xorurl)?;
+        let amount_result = to_c_str(PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string())?;
         o_cb(user_data.0, FFI_RESULT_OK, key_xor_url.as_ptr(), &key_pair.unwrap(), amount_result.as_ptr());
         Ok(())
     })
@@ -55,14 +55,14 @@ pub unsafe extern "C" fn query_key_balance(
     catch_unwind_cb(user_data, o_cb,  || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
         let key_url = from_c_str(key)?;
-        let secret_key = from_c_str(secret)?;
-        let sk = Some(secret_key).unwrap_or_else(|| String::from(""));
+        let secret_key = from_c_str_to_string_option(secret);
+        let sk = secret_key.unwrap_or_else(|| String::from(""));
         let current_balance = if key_url.is_empty() {
             (*app).keys_balance_from_sk(&sk)? 
         } else {
             (*app).keys_balance_from_url(&key_url, &sk)?
         };
-        let amount_result = CString::new(current_balance).map_err(|_| Error::Unexpected("Couldn't convert to string".to_string()))?;
+        let amount_result = to_c_str(current_balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
     })
@@ -83,10 +83,10 @@ pub unsafe extern "C" fn transfer_key_balance(
 ) {
     catch_unwind_cb(user_data, o_cb,  || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
-        let from_key = from_c_str(from)?;
+        let from_key = from_c_str_to_string_option(from);
         let to_key = from_c_str(to)?;
         let amount_tranfer = from_c_str(amount)?;
-        let tx_id = (*app).keys_transfer(&amount_tranfer, Some(from_key), &to_key, Some(id))?;
+        let tx_id = (*app).keys_transfer(&amount_tranfer, from_key, &to_key, Some(id))?;
         o_cb(user_data.0, FFI_RESULT_OK, tx_id);
         Ok(())
     })
