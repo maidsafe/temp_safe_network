@@ -431,7 +431,7 @@ All the content of the `./to-upload/` local directory is now stored and publishe
 We can now sync up all the changes we just made, recursively, with the `FilesContainer` we previously created:
 ```shell
 $ safe files sync ./to-upload/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w --recursive --delete
-FilesContainer synced up (version 1): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
+FilesContainer synced up (version 1): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=1"
 *  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
 +  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
 -  /test.md                   safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
@@ -444,16 +444,29 @@ Also, please note we provided the optional `--delete` flag to the command above 
 The `files sync` command also supports to be passed a destination path as the `files put` command, but in this case the destination path needs to be provided as part of the target XOR-URL. E.g., we can sync a `FilesContainer` using the local path and provide a specific destination path `new-files` in the target XOR-URL:
 ```shell
 $ safe files sync ./other-folder/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/new-files
-FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
-+  ./other-folder/file1.txt     safe://hoqi7papyp7c6riyxiez6y5fh5ugj4xc7syqhmex774ws4g4b1z1xq
+FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=2"
++  ./other-folder/file1.txt  safe://hoqi7papyp7c6riyxiez6y5fh5ugj4xc7syqhmex774ws4g4b1z1xq
 ```
 
 The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
 
 #### Files Add
 
-TODO
+It could be desirable in some scenarios to simply add a file to a `FilesContainer` rather than having the CLI to sync up a complete local folder, so the `files add` command could be used in such cases.
 
+We can add a single file from a local path, let's say `./some-other-folder/file.txt`, to our existing `FilesContainer` on the SAFE Network with the following command:
+```shell
+$ safe files add ./some-other-folder/file.txt safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/files-added/just-a-file.txt
+FilesContainer updated (version 3): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=3"
++  ./some-other-folder/file1.txt  safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n
+```
+
+If we have previously uploaded a file to the network, we can also add it to any existing `FilesContainer` by providing its XOR-URL as the `<location>` argument to the `files add` command. Let's add a file (same file we uploaded in previous command) to our `FilesContainer` again, but choosing a new destination filename, e.g. `/files-added/same-file.txt`:
+```shell
+$ safe files add safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/files-added/same-file.txt
+FilesContainer updated (version 4): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=4"
++  /files-added/same-file1.txt  safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n
+```
 
 ### Cat
 

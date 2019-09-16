@@ -768,12 +768,12 @@ fn files_map_sync(
                             (
                                 CONTENT_ERROR_SIGN.to_string(),
                                 format!(
-                                    "File named \"{}\" already exists on target with same link",
+                                    "File named \"{}\" already exists on target. Use the 'force' flag to replace it",
                                     normalised_file_name
                                 ),
                             ),
                         );
-                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", local_file_name, normalised_file_name);
+                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name, normalised_file_name);
                     }
                 }
 
@@ -1012,7 +1012,6 @@ fn file_system_single_file(
     upload_files: bool,
 ) -> ResultReturn<ProcessedFiles> {
     let file_path = Path::new(location);
-    //let (metadata, _) = get_metadata(&file_path)?;
     info!("Reading file {}", file_path.display());
 
     // We now compare both FilesMaps to upload the missing files

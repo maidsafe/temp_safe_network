@@ -460,7 +460,7 @@ fn gen_nrs_map_summary(
             let mut info = DefinitionData::new();
             info.insert(
                 FAKE_RDF_PREDICATE_LINK.to_string(),
-                format!("Alias to subname {}", existing_subname),
+                format!("Alias to subname '{}'", existing_subname),
             );
             info.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), "".to_string());
             info.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), "".to_string());
