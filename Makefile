@@ -105,9 +105,9 @@ else
 endif
 
 package-build-artifacts:
-ifndef SCL_BRANCH
+ifndef SCL_BUILD_BRANCH
 	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
 ifndef SCL_BUILD_NUMBER
@@ -126,9 +126,9 @@ ifndef SCL_BUILD_OS
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
 endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
@@ -149,25 +149,25 @@ package-commit_hash-deploy-artifacts:
 		scripts/package-runner-container "false"
 
 retrieve-cache:
-ifndef SCL_BRANCH
+ifndef SCL_BUILD_BRANCH
 	@echo "A branch reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch reference."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch reference."
 	@exit 1
 endif
 ifeq ($(OS),Windows_NT)
 	aws s3 cp \
 		--no-sign-request \
 		--region eu-west-2 \
-		s3://${S3_BUCKET}/scl-${SCL_BRANCH}-windows-cache.tar.gz .
+		s3://${S3_BUCKET}/scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz .
 endif
 	mkdir target
-	tar -C target -xvf scl-${SCL_BRANCH}-windows-cache.tar.gz
-	rm scl-${SCL_BRANCH}-windows-cache.tar.gz
+	tar -C target -xvf scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz
+	rm scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz
 
 retrieve-build-artifacts:
-ifndef SCL_BRANCH
+ifndef SCL_BUILD_BRANCH
 	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
 ifndef SCL_BUILD_NUMBER
@@ -186,9 +186,9 @@ ifndef SCL_BUILD_OS
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
 endif
 	aws s3 cp \
 		--no-sign-request \
@@ -211,9 +211,9 @@ endif
 	rm ${ARCHIVE_NAME}
 
 retrieve-all-build-artifacts:
-ifndef SCL_BRANCH
+ifndef SCL_BUILD_BRANCH
 	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BRANCH to a valid branch or PR reference."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
 ifndef SCL_BUILD_NUMBER
@@ -228,24 +228,48 @@ endif
 	mkdir -p artifacts/win/mock/release
 	mkdir -p artifacts/osx/real/release
 	mkdir -p artifacts/osx/mock/release
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz .
-	tar -C artifacts/linux/real/release -xvf ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
-	tar -C artifacts/linux/mock/release -xvf ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz
-	tar -C artifacts/win/real/release -xvf ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz
-	tar -C artifacts/win/mock/release -xvf ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz
-	tar -C artifacts/osx/real/release -xvf ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
-	tar -C artifacts/osx/mock/release -xvf ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
-	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
-	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz
-	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz
-	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz
-	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
-	rm ${SCL_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz .
+	tar -C artifacts/linux/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
+	tar -C artifacts/linux/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz
+	tar -C artifacts/win/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz
+	tar -C artifacts/win/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz
+	tar -C artifacts/osx/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
+	tar -C artifacts/osx/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
 
 test-artifacts-binary:
 ifndef SCL_BCT_PATH
