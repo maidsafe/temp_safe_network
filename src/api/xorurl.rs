@@ -14,6 +14,7 @@ use multibase::{decode, encode, Base};
 use safe_nd::{XorName, XOR_NAME_LEN};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use crate::ffi::ffi_structs::XorUrlEncoder as FfiXorUrlEncoder;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
@@ -374,6 +375,30 @@ impl XorUrlEncoder {
             Some(v) => Ok(format!("{}?v={}", xorurl, v)),
             None => Ok(xorurl),
         }
+    }
+
+    pub fn into_repr_c(self) -> ResultReturn<FfiXorUrlEncoder> {
+        let XorUrlEncoder {
+            encoding_version,
+            xorname,
+            type_tag,
+            data_type,
+            content_type,
+            path: _,
+            sub_names: _,
+            content_version: _,
+        } = self;
+
+        Ok(FfiXorUrlEncoder {
+            encoding_version,
+            xorname: xorname.0,
+            type_tag,
+            data_type: data_type as u64,
+            content_type: content_type as u64,
+            path: std::ptr::null(),
+            sub_names: std::ptr::null(),
+            content_version: 0,
+        })
     }
 }
 

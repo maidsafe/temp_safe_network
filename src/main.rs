@@ -9,6 +9,7 @@
 mod api;
 mod cli;
 mod subcommands;
+mod ffi;
 
 use cli::run;
 use env_logger;

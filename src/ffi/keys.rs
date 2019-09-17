@@ -1,6 +1,6 @@
 use crate::api::{ResultReturn};
-use crate::api::keys::{BlsKeyPair};
 use crate::api::{Safe};
+use super::ffi_structs::{BlsKeyPair};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use super::helpers::{from_c_str_to_string_option, to_c_str};
 use std::os::raw::{c_char, c_void};
@@ -36,7 +36,8 @@ pub unsafe extern "C" fn generate_new_safe_key_pair(
         };
         let key_xor_url = to_c_str(xorurl)?;
         let amount_result = to_c_str(PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string())?;
-        o_cb(user_data.0, FFI_RESULT_OK, key_xor_url.as_ptr(), &key_pair.unwrap(), amount_result.as_ptr());
+        let ffi_bls_key_pair = key_pair.unwrap().into_repr_c()?;
+        o_cb(user_data.0, FFI_RESULT_OK, key_xor_url.as_ptr(), &ffi_bls_key_pair, amount_result.as_ptr());
         Ok(())
     })
 }

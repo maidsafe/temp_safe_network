@@ -9,6 +9,7 @@ edition = "2018"
 
 [lib]
 crate_type = ["staticlib", "rlib", "cdylib"]
+path = "src/lib.rs"
 
 [[bin]]
 name = "safe"

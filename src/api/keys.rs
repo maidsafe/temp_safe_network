@@ -14,6 +14,8 @@ use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;
+use crate::ffi::ffi_structs::BlsKeyPair as FfiBlsKeyPair;
+use std::ffi::{CString};
 
 // A trait that the Validate derive will impl
 use validator::{Validate, ValidationErrors};
@@ -26,6 +28,20 @@ pub struct BlsKeyPair {
     pub pk: String,
     #[validate(length(equal = "64"))]
     pub sk: String,
+}
+
+impl BlsKeyPair {
+    pub fn into_repr_c(self) -> ResultReturn<FfiBlsKeyPair> {
+        let BlsKeyPair {
+            pk,
+            sk,
+        } = self;
+
+        Ok(FfiBlsKeyPair {
+            pk: CString::new(pk)?.into_raw(),
+            sk: CString::new(sk)?.into_raw()
+        })
+    }
 }
 
 #[allow(dead_code)]

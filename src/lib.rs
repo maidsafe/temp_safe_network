@@ -11,13 +11,14 @@ extern crate validator_derive;
 
 extern crate ffi_utils;
 
-pub mod api;
 pub mod ffi;
+pub mod api;
 
 pub use api::*;
-pub use crate::ffi::xorurl::*;
-pub use crate::ffi::content_fetch::*;
-pub use crate::ffi::keys::*;
-pub use crate::ffi::nrs::*;
-pub use crate::ffi::wallet::*;
-pub use crate::ffi::*;
+pub use ffi::xorurl::*;
+pub use ffi::content_fetch::*;
+pub use ffi::keys::*;
+pub use ffi::nrs::*;
+pub use ffi::wallet::*;
+pub use ffi::ffi_structs::*;
+pub use ffi::*;

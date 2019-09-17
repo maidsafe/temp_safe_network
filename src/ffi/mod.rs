@@ -5,11 +5,12 @@ pub mod keys;
 pub mod nrs;
 pub mod wallet;
 pub mod helpers;
+pub mod ffi_structs;
 
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use std::os::raw::{c_char, c_void};
-use super::{Safe, ResultReturn};
-use super::helpers::{from_c_str_to_str_option};
+use crate::api::{Safe, ResultReturn};
+use helpers::{from_c_str_to_str_option};
 
 #[no_mangle]
 pub unsafe extern "C" fn safe_connect(
