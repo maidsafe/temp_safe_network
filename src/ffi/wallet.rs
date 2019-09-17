@@ -76,7 +76,7 @@ pub unsafe extern "C" fn insert_balance_to_wallet(
     secret_key: *const c_char,
     name: *const c_char,
     key_url: *const c_char,
-    default: bool,
+    set_default: bool,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn insert_balance_to_wallet(
             }
             None => secret_key_str.unwrap_or_else(|| String::from("")) // todo:  needs to be updated to use a helper function to get the secret key
         };
-        let the_name = (*app).wallet_insert(&target_str, name_str, default, &sk)?;
+        let the_name = (*app).wallet_insert(&target_str, name_str, set_default, &sk)?;
         let result_name = to_c_str(the_name)?;
         o_cb(user_data.0, FFI_RESULT_OK, result_name.as_ptr());
         Ok(())

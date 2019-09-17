@@ -12,7 +12,7 @@ pub unsafe extern "C" fn create_new_public_name(
     link: *const c_char,
     direct_link: bool,
     dry_run: bool,
-    default: bool,
+    set_default: bool,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -25,7 +25,7 @@ pub unsafe extern "C" fn create_new_public_name(
         let nrs_str = from_c_str(name)?;
         let link_str = from_c_str(link)?;
         let (nrs_map_container_xorurl, _processed_entries, nrs_map) =
-            (*app).nrs_map_container_create(&nrs_str, &link_str, default, direct_link, dry_run)?;
+            (*app).nrs_map_container_create(&nrs_str, &link_str, set_default, direct_link, dry_run)?;
         let xor_url_string = to_c_str(nrs_map_container_xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, &nrs_map, xor_url_string.as_ptr());
         Ok(())
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn add_update_sub_name(
     app: *mut Safe,
     name: *const c_char,
     link: *const c_char,
-    default: bool,
+    set_default: bool,
     direct_link: bool,
     dry_run: bool,
     user_data: *mut c_void,
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn add_update_sub_name(
         let name_str = from_c_str(name)?;
         let link_str = from_c_str(link)?;
         let (version, xorurl, _processed_entries, nrs_map) =
-            (*app).nrs_map_container_add(&name_str, &link_str, default, direct_link, dry_run)?;
+            (*app).nrs_map_container_add(&name_str, &link_str, set_default, direct_link, dry_run)?;
         let xor_url_string = to_c_str(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, &nrs_map, xor_url_string.as_ptr(), version);
         Ok(())
