@@ -73,6 +73,58 @@ endif
 	mkdir artifacts
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+build-ios-aarch64:
+	( \
+		cd safe_app; \
+		cargo build --release --target=aarch64-apple-ios; \
+	)
+	( \
+		cd safe_authenticator; \
+		cargo build --release --target=aarch64-apple-ios; \
+	)
+	rm -rf artifacts
+	mkdir artifacts
+	find target/aarch64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ios-mock-aarch64:
+	( \
+		cd safe_app; \
+		cargo build --release --target=aarch64-apple-ios --features="mock-network"; \
+	)
+	( \
+		cd safe_authenticator; \
+		cargo build --release --target=aarch64-apple-ios --features="mock-network"; \
+	)
+	rm -rf artifacts
+	mkdir artifacts
+	find target/aarch64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ios-x86_64:
+	( \
+		cd safe_app; \
+		cargo build --release --target=x86_64-apple-ios; \
+	)
+	( \
+		cd safe_authenticator; \
+		cargo build --release --target=x86_64-apple-ios; \
+	)
+	rm -rf artifacts
+	mkdir artifacts
+	find target/x86_64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ios-mock-x86_64:
+	( \
+		cd safe_app; \
+		cargo build --release --target=x86_64-apple-ios --features="mock-network"; \
+	)
+	( \
+		cd safe_authenticator; \
+		cargo build --release --target=x86_64-apple-ios --features="mock-network"; \
+	)
+	rm -rf artifacts
+	mkdir artifacts
+	find target/x86_64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
 clippy:
 ifeq ($(UNAME_S),Linux)
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
@@ -120,15 +172,19 @@ ifndef SCL_BUILD_MOCK
 	@echo "Please set SCL_BUILD_MOCK to true or false."
 	@exit 1
 endif
+ifndef SCL_BUILD_ARCH
+	@echo "A value must be supplied for SCL_BUILD_ARCH."
+	@echo "Please set SCL_BUILD_ARCH to 'x86_64' or 'aarch64'."
+	@exit 1
+endif
 ifndef SCL_BUILD_OS
 	@echo "A value must be supplied for SCL_BUILD_OS."
-	@echo "Valid values are 'linux' or 'windows'."
 	@exit 1
 endif
 ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-${SCL_BUILD_ARCH}.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-${SCL_BUILD_ARCH}.tar.gz)
 endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
@@ -164,52 +220,6 @@ endif
 	tar -C target -xvf scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz
 	rm scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz
 
-retrieve-build-artifacts:
-ifndef SCL_BUILD_BRANCH
-	@echo "A branch or PR reference must be provided."
-	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
-	@exit 1
-endif
-ifndef SCL_BUILD_NUMBER
-	@echo "A valid build number must be supplied for the artifacts to be retrieved."
-	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
-	@exit 1
-endif
-ifndef SCL_BUILD_MOCK
-	@echo "A true or false value must be supplied indicating whether the build uses mocking."
-	@echo "Please set SCL_BUILD_MOCK to true or false."
-	@exit 1
-endif
-ifndef SCL_BUILD_OS
-	@echo "A value must be supplied for SCL_BUILD_OS."
-	@echo "Valid values are 'linux' or 'windows'."
-	@exit 1
-endif
-ifeq ($(SCL_BUILD_MOCK),true)
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-${SCL_BUILD_OS}-x86_64.tar.gz)
-else
-	$(eval ARCHIVE_NAME := ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-${SCL_BUILD_OS}-x86_64.tar.gz)
-endif
-	aws s3 cp \
-		--no-sign-request \
-		--region eu-west-2 \
-		s3://${S3_BUCKET}/${ARCHIVE_NAME} .
-ifeq ($(UNAME_S),Linux)
-	rm -rf artifacts && mkdir artifacts
-	tar -C artifacts -xvf ${ARCHIVE_NAME}
-else
-	# The first case would apply for running on a 'fresh' slave in a distributed setup.
-	# All the dependencies would of course need to be rebuilt here.
-	# This scenario should be very rare.
-	if [[ ! -d "target"  ]]; then \
-		mkdir -p target/release; \
-	else \
-		find target/release -maxdepth 1 -type f -exec rm '{}' \; ;\
-	fi
-	tar -C target/release -xvf ${ARCHIVE_NAME}
-endif
-	rm ${ARCHIVE_NAME}
-
 retrieve-all-build-artifacts:
 ifndef SCL_BUILD_BRANCH
 	@echo "A branch or PR reference must be provided."
@@ -228,6 +238,10 @@ endif
 	mkdir -p artifacts/win/mock/release
 	mkdir -p artifacts/osx/real/release
 	mkdir -p artifacts/osx/mock/release
+	mkdir -p artifacts/ios-x86_64/real/release
+	mkdir -p artifacts/ios-x86_64/mock/release
+	mkdir -p artifacts/ios-aarch64/real/release
+	mkdir -p artifacts/ios-aarch64/mock/release
 	aws s3 cp \
 		--no-sign-request \
 		--region eu-west-2 \
@@ -252,6 +266,22 @@ endif
 		--no-sign-request \
 		--region eu-west-2 \
 		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz .
 	tar -C artifacts/linux/real/release \
 		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
 	tar -C artifacts/linux/mock/release \
@@ -264,12 +294,24 @@ endif
 		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
 	tar -C artifacts/osx/mock/release \
 		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
+	tar -C artifacts/ios-x86_64/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-x86_64.tar.gz
+	tar -C artifacts/ios-x86_64/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-x86_64.tar.gz
+	tar -C artifacts/ios-aarch64/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz
+	tar -C artifacts/ios-aarch64/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz
 	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
 	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz
 	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz
 	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz
 	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
 	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz
 
 test-artifacts-binary:
 ifndef SCL_BCT_PATH
@@ -327,6 +369,7 @@ debug:
 	docker run --rm -v "${PWD}":/usr/src/crust maidsafe/safe-client-libs-build:build /bin/bash
 
 copy-artifacts:
+	rm -rf artifacts
 	mkdir artifacts
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
