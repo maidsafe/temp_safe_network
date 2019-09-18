@@ -44,13 +44,29 @@ impl std::fmt::Display for SafeContentType {
 
 impl SafeContentType {
     #[allow(dead_code)]
-    pub fn from_u64(value: u64) -> SafeContentType {
+    pub fn from_u16(value: u16) -> SafeContentType {
         match value {
             0 => SafeContentType::Raw,
             1 => SafeContentType::Wallet,
             2 => SafeContentType::FilesContainer,
             3 => SafeContentType::NrsMapContainer,
-            _ => panic!("Unknown value: {}", value),
+            other => match MEDIA_TYPE_STR.get(&other) {
+                Some(media_type_str) => SafeContentType::MediaType(media_type_str.to_string()),
+                None => panic!("Failed to find Media-type '{}'", other)
+            },
+        }
+    }
+
+    fn value(&self) -> u16 {
+        match &*self {
+            SafeContentType::Raw => 0,
+            SafeContentType::Wallet => 1,
+            SafeContentType::FilesContainer => 2,
+            SafeContentType::NrsMapContainer => 3,
+            SafeContentType::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
+                Some(media_type_code) => *media_type_code,
+                None => panic!("Failed to find Media-type '{}'",media_type)
+            }, // Todo: Update this for correct result
         }
     }
 }
@@ -394,7 +410,7 @@ impl XorUrlEncoder {
             xorname: xorname.0,
             type_tag,
             data_type: data_type as u64,
-            content_type: content_type as u64,
+            content_type: content_type.value(),
             path: std::ptr::null(),
             sub_names: std::ptr::null(),
             content_version: 0,

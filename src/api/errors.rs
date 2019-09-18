@@ -90,6 +90,7 @@ mod codes {
     pub const ERR_ENTRY_EXISTS_ERROR: i32 = -206;
     pub const ERR_INVALID_INPUT_ERROR: i32 = -207;
     pub const ERR_FILE_SYSTEM_ERROR: i32 = -208;
+    pub const ERR_INVALID_MEDIA_TYPE_ERROR: i32 = -209;
 
     // Balance Errors
     pub const ERR_INVALID_AMOUNT_ERROR: i32 = -300;
@@ -120,6 +121,7 @@ impl ErrorCode for Error {
             Error::InvalidXorUrl(ref _error) => { ERR_INVALID_XOR_URL_ERROR },
             Error::NotEnoughBalance(ref _error) => { ERR_NOT_ENOUGH_BALANCE_ERROR },
             Error::FilesSystemError(ref _error) => { ERR_FILE_SYSTEM_ERROR },
+            Error::InvalidMediaType(ref _error) => { ERR_INVALID_MEDIA_TYPE_ERROR },
             Error::Unexpected(ref _error) => { ERR_UNEXPECTED_ERROR },
             Error::Unknown(ref _error) => { ERR_UNKNOWN_ERROR },
             Error::StringError(ref _error) => { ERR_STRING_ERROR },

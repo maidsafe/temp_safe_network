@@ -13,7 +13,7 @@ pub unsafe extern "C" fn encode_xor_url(
     name: *const XorNameArray,
     type_tag: u64,
     data_type: u64,
-    content_type: u64,
+    content_type: u16,
     path: *const c_char,
     _sub_names: *const c_char, // todo: update this later
     content_version: u64,
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn encode_xor_url(
         let user_data = OpaqueCtx(user_data);
         let xor_name = XorName(*name);
         let data_type_enum = SafeDataType::from_u64(data_type);
-        let content_type_enum = SafeContentType::from_u64(content_type);
+        let content_type_enum = SafeContentType::from_u16(content_type);
         let url_path = from_c_str_to_str_option(path);
         let encoding_base = from_c_str(base_encoding)?;
         let encoded_xor_url = NativeXorUrlEncoder::encode(xor_name, type_tag, data_type_enum, content_type_enum, url_path, Some(vec![]), Some(content_version), &encoding_base)?; //todo: update sub_names parameter
@@ -44,7 +44,7 @@ pub unsafe extern "C" fn new_xor_url_encoder(
     name: *const XorNameArray,
     type_tag: u64,
     data_type: u64,
-    content_type: u64,
+    content_type: u16,
     path: *const c_char,
     _sub_names: *const c_char, // todo: update this later
     content_version: u64,
@@ -58,9 +58,9 @@ pub unsafe extern "C" fn new_xor_url_encoder(
         let user_data = OpaqueCtx(user_data);
         let xor_name = XorName(*name);
         let data_type_enum = SafeDataType::from_u64(data_type);
-        let content_type_enum = SafeContentType::from_u64(content_type);
+        let content_type_enum = SafeContentType::from_u16(content_type);
         let url_path = from_c_str_to_str_option(path);
-        let encoder = NativeXorUrlEncoder::new(xor_name, type_tag, data_type_enum, content_type_enum, url_path, Some(vec![]), Some(content_version)); //todo: update sub_names parameter
+        let encoder = NativeXorUrlEncoder::new(xor_name, type_tag, data_type_enum, content_type_enum, url_path, Some(vec![]), Some(content_version))?; //todo: update sub_names parameter
         let ffi_encoder = encoder.into_repr_c()?;
         o_cb(user_data.0, FFI_RESULT_OK, &ffi_encoder);
         Ok(())

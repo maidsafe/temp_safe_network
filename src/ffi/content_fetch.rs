@@ -23,6 +23,7 @@ pub unsafe extern "C" fn safe_fetch(
             data,
             xorname: _,
             resolved_from: _,
+            media_type: _
         } => {
             o_cb(
                 user_data.0,

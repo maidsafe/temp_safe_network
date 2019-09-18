@@ -7,7 +7,7 @@ pub struct XorUrlEncoder {
     pub xorname: XorNameArray,
     pub type_tag: u64,
     pub data_type: u64,
-    pub content_type: u64,
+    pub content_type: u16,
     pub path: *const c_char,
     pub sub_names: *const c_char,
     pub content_version: u64
