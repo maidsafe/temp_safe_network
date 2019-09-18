@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_from_arg_or_stdin;
+use super::helpers::{get_from_arg_or_stdin, notice_dry_run};
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::{Safe, XorUrl, XorUrlEncoder};
@@ -72,6 +72,9 @@ pub fn files_commander(
             recursive,
         }) => {
             // create FilesContainer from a given path to local files/folders
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
             let (files_container_xorurl, processed_files, _files_map) = safe
                 .files_container_create(
                     &location,
@@ -107,6 +110,9 @@ pub fn files_commander(
             update_nrs,
         }) => {
             let target = get_from_arg_or_stdin(target, None)?;
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) = safe
                 .files_container_sync(&location, &target, recursive, delete, update_nrs, dry_run)?;
@@ -150,6 +156,9 @@ pub fn files_commander(
             force,
         }) => {
             let target = get_from_arg_or_stdin(target, None)?;
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) =
                 safe.files_container_add(&location, &target, force, update_nrs, dry_run)?;

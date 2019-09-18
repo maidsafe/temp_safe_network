@@ -248,6 +248,7 @@ impl Safe {
                 delete,
                 !dry_run,
                 false,
+                true,
             )?;
 
         let version = self.append_version_to_nrs_map_container(
@@ -308,6 +309,7 @@ impl Safe {
                 false,
                 !dry_run,
                 force,
+                false,
             )?
         };
 
@@ -693,6 +695,7 @@ fn files_map_sync(
     delete: bool,
     upload_files: bool,
     force: bool,
+    compare_file_content: bool,
 ) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     let mut updated_files_map = FilesMap::new();
@@ -739,8 +742,9 @@ fn files_map_sync(
             }
             Some(file_item) => {
                 if force
-                    || file_item[FAKE_RDF_PREDICATE_SIZE] != file_size
-                    || file_item[FAKE_RDF_PREDICATE_TYPE] != file_type
+                    || (compare_file_content
+                        && (file_item[FAKE_RDF_PREDICATE_SIZE] != file_size
+                            || file_item[FAKE_RDF_PREDICATE_TYPE] != file_type))
                 {
                     // We need to update the current FileItem
                     if add_or_update_file_item(
@@ -762,7 +766,7 @@ fn files_map_sync(
                     // No need to update FileItem just copy the existing one
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
 
-                    if !force {
+                    if !force && !compare_file_content {
                         processed_files.insert(
                             local_file_name.to_string(),
                             (
@@ -2076,6 +2080,55 @@ fn test_files_container_add_dir() {
             other
         )),
     }
+}
+
+#[test]
+fn test_files_container_add_existing_name() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create("./tests/testfolder/subfolder/", None, false, false));
+    assert_eq!(processed_files.len(), 2);
+    assert_eq!(files_map.len(), 2);
+
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+        "./tests/testfolder/test.md",
+        &format!("{}/sub2.md", xorurl),
+        false,
+        false,
+        false
+    ));
+
+    assert_eq!(version, 0);
+    assert_eq!(new_processed_files.len(), 1);
+    assert_eq!(new_files_map.len(), 2);
+    assert_eq!(
+        new_processed_files["./tests/testfolder/test.md"].1,
+        "File named \"/sub2.md\" already exists on target. Use the \'force\' flag to replace it"
+    );
+    assert_eq!(files_map, new_files_map);
+
+    // let's now force it
+    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+        "./tests/testfolder/test.md",
+        &format!("{}/sub2.md", xorurl),
+        true, //force it
+        false,
+        false
+    ));
+
+    assert_eq!(version, 1);
+    assert_eq!(new_processed_files.len(), 1);
+    assert_eq!(new_files_map.len(), 2);
+    assert_eq!(
+        new_processed_files["./tests/testfolder/test.md"].0,
+        CONTENT_UPDATED_SIGN
+    );
+    assert_eq!(
+        new_processed_files["./tests/testfolder/test.md"].1,
+        new_files_map["/sub2.md"]["link"]
+    );
 }
 
 #[test]

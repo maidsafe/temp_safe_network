@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_from_arg_or_stdin;
+use super::helpers::{get_from_arg_or_stdin, notice_dry_run};
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_cli::{Safe, XorUrl};
@@ -26,8 +26,8 @@ pub enum NrsSubCommands {
         /// Set the sub name as default for this public name
         #[structopt(long = "default")]
         default: bool,
-        /// If --default is set, the default is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being added (which is the default behaviour if this flag is not passed)
-        #[structopt(short = "t", long = "direct")]
+        /// If --default is set, the default name is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being added (which is the default behaviour if this flag is not passed)
+        #[structopt(long = "direct")]
         direct_link: bool,
     },
     #[structopt(name = "create")]
@@ -38,8 +38,8 @@ pub enum NrsSubCommands {
         /// The safe:// URL to map this to. Usually a FilesContainer for a website
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
-        /// The default is set but using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being created (which is the default behaviour if this flag is not passed)
-        #[structopt(short = "t", long = "direct")]
+        /// The default name is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being created (which is the default behaviour if this flag is not passed)
+        #[structopt(long = "direct")]
         direct_link: bool,
     },
     #[structopt(name = "remove")]
@@ -65,6 +65,10 @@ pub fn nrs_commander(
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
+
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
 
             // Set it as default too, so the top level NRS name is resolvable to same link
             let default = true;
@@ -92,6 +96,11 @@ pub fn nrs_commander(
             direct_link,
         }) => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
+
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
+
             let (version, xorurl, processed_entries, _nrs_map) =
                 safe.nrs_map_container_add(&name, &link, default, direct_link, dry_run)?;
 
@@ -106,6 +115,10 @@ pub fn nrs_commander(
             Ok(())
         }
         Some(NrsSubCommands::Remove { name }) => {
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
+
             let (version, xorurl, processed_entries, _nrs_map) =
                 safe.nrs_map_container_remove(&name, dry_run)?;
 
