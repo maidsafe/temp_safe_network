@@ -9,16 +9,6 @@
 #[macro_use]
 extern crate validator_derive;
 
-extern crate ffi_utils;
-
-pub mod ffi;
-pub mod api;
+mod api;
 
 pub use api::*;
-pub use ffi::xorurl::*;
-pub use ffi::fetch::*;
-pub use ffi::keys::*;
-pub use ffi::nrs::*;
-pub use ffi::wallet::*;
-pub use ffi::ffi_structs::*;
-pub use ffi::*;

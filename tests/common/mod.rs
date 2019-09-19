@@ -8,7 +8,7 @@
 
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_cli::{BlsKeyPair, WalletSpendableBalances};
+use safe_api::{BlsKeyPair, WalletSpendableBalances};
 use safe_nd::Coins;
 use std::env;
 use std::str::FromStr;

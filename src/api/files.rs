@@ -45,7 +45,7 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
@@ -113,7 +113,7 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
@@ -184,7 +184,7 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
@@ -269,7 +269,7 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
@@ -331,7 +331,7 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("tests/testfolder", None, true, false).unwrap();
@@ -431,7 +431,7 @@ impl Safe {
     ///
     /// ## Example
     /// ```
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let data = b"Something super good";
@@ -478,7 +478,7 @@ impl Safe {
     ///
     /// ## Example
     /// ```
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # let data = b"Something super good";

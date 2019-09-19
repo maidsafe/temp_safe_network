@@ -12,7 +12,7 @@ use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::keys::{create_new_key, print_new_key_output};
 use super::OutputFmt;
 use log::debug;
-use crate::api::{BlsKeyPair, Safe};
+use safe_api::{BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {

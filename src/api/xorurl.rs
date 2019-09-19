@@ -14,7 +14,6 @@ use multibase::{decode, encode, Base};
 use safe_nd::{XorName, XOR_NAME_LEN};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use crate::ffi::ffi_structs::XorUrlEncoder as FfiXorUrlEncoder;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
@@ -26,7 +25,6 @@ pub type XorUrl = String;
 
 // We encode the content type that a XOR-URL is targetting, this allows the consumer/user to
 // treat the content in particular ways when the content requires it.
-// TODO: support MIME types
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeContentType {
     Raw,
@@ -44,29 +42,27 @@ impl std::fmt::Display for SafeContentType {
 
 impl SafeContentType {
     #[allow(dead_code)]
-    pub fn from_u16(value: u16) -> SafeContentType {
+    pub fn from_u16(value: u16) -> ResultReturn<SafeContentType> {
         match value {
-            0 => SafeContentType::Raw,
-            1 => SafeContentType::Wallet,
-            2 => SafeContentType::FilesContainer,
-            3 => SafeContentType::NrsMapContainer,
-            other => match MEDIA_TYPE_STR.get(&other) {
-                Some(media_type_str) => SafeContentType::MediaType(media_type_str.to_string()),
-                None => panic!("Failed to find Media-type '{}'", other)
-            },
+            0 => Ok(SafeContentType::Raw),
+            1 => Ok(SafeContentType::Wallet),
+            2 => Ok(SafeContentType::FilesContainer),
+            3 => Ok(SafeContentType::NrsMapContainer),
+            _other => Err(Error::InvalidInput("Invalid Media-type code".to_string())),
         }
     }
 
-    fn value(&self) -> u16 {
+    #[allow(dead_code)]
+    fn value(&self) -> ResultReturn<u16> {
         match &*self {
-            SafeContentType::Raw => 0,
-            SafeContentType::Wallet => 1,
-            SafeContentType::FilesContainer => 2,
-            SafeContentType::NrsMapContainer => 3,
+            SafeContentType::Raw => Ok(0),
+            SafeContentType::Wallet => Ok(1),
+            SafeContentType::FilesContainer => Ok(2),
+            SafeContentType::NrsMapContainer => Ok(3),
             SafeContentType::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
-                Some(media_type_code) => *media_type_code,
-                None => panic!("Failed to find Media-type '{}'",media_type)
-            }, // Todo: Update this for correct result
+                Some(media_type_code) => Ok(*media_type_code),
+                None => Err(Error::Unexpected("Unsupported Media-type".to_string())),
+            },
         }
     }
 }
@@ -95,18 +91,18 @@ impl std::fmt::Display for SafeDataType {
 
 impl SafeDataType {
     #[allow(dead_code)]
-    pub fn from_u64(value: u64) -> SafeDataType {
+    pub fn from_u64(value: u64) -> ResultReturn<SafeDataType> {
         match value {
-            0 => SafeDataType::SafeKey,
-            1 => SafeDataType::PublishedImmutableData,
-            2 => SafeDataType::UnpublishedImmutableData,
-            3 => SafeDataType::SeqMutableData,
-            4 => SafeDataType::UnseqMutableData,
-            5 => SafeDataType::PublishedSeqAppendOnlyData,
-            6 => SafeDataType::PublishedUnseqAppendOnlyData,
-            7 => SafeDataType::UnpublishedSeqAppendOnlyData,
-            8 => SafeDataType::UnpublishedUnseqAppendOnlyData,
-            _ => panic!("Unknown value: {}", value),
+            0 => Ok(SafeDataType::SafeKey),
+            1 => Ok(SafeDataType::PublishedImmutableData),
+            2 => Ok(SafeDataType::UnpublishedImmutableData),
+            3 => Ok(SafeDataType::SeqMutableData),
+            4 => Ok(SafeDataType::UnseqMutableData),
+            5 => Ok(SafeDataType::PublishedSeqAppendOnlyData),
+            6 => Ok(SafeDataType::PublishedUnseqAppendOnlyData),
+            7 => Ok(SafeDataType::UnpublishedSeqAppendOnlyData),
+            8 => Ok(SafeDataType::UnpublishedUnseqAppendOnlyData),
+            _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
 }
@@ -391,30 +387,6 @@ impl XorUrlEncoder {
             Some(v) => Ok(format!("{}?v={}", xorurl, v)),
             None => Ok(xorurl),
         }
-    }
-
-    pub fn into_repr_c(self) -> ResultReturn<FfiXorUrlEncoder> {
-        let XorUrlEncoder {
-            encoding_version,
-            xorname,
-            type_tag,
-            data_type,
-            content_type,
-            path: _,
-            sub_names: _,
-            content_version: _,
-        } = self;
-
-        Ok(FfiXorUrlEncoder {
-            encoding_version,
-            xorname: xorname.0,
-            type_tag,
-            data_type: data_type as u64,
-            content_type: content_type.value(),
-            path: std::ptr::null(),
-            sub_names: std::ptr::null(),
-            content_version: 0,
-        })
     }
 }
 

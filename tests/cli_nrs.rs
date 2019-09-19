@@ -17,7 +17,7 @@ use common::{
     SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
-use safe_cli::{SafeContentType, SafeDataType, XorName, XorUrlEncoder};
+use safe_api::{SafeContentType, SafeDataType, XorName, XorUrlEncoder};
 use std::process::Command;
 use unwrap::unwrap;
 

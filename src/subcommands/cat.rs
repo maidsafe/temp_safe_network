@@ -11,7 +11,7 @@ use super::OutputFmt;
 use crate::subcommands::auth::auth_connect;
 use log::debug;
 use prettytable::Table;
-use crate::api::{NrsMapContainerInfo, Safe, SafeData};
+use safe_api::{NrsMapContainerInfo, Safe, SafeData};
 use std::io::{self, Write};
 use structopt::StructOpt;
 

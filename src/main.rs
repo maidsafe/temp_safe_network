@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod api;
 mod cli;
 mod subcommands;
-mod ffi;
 
 use cli::run;
 use env_logger;
@@ -25,9 +23,6 @@ extern crate human_panic;
 #[cfg(not(feature = "mock-network"))]
 #[macro_use]
 extern crate self_update;
-
-#[macro_use]
-extern crate validator_derive;
 
 fn main() {
     setup_panic!();

@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::fmt;
+pub use self::codes::*;
 use ffi_utils::{ErrorCode, StringError};
 use std::ffi::NulError;
-pub use self::codes::*;
+use std::fmt;
 
 pub type ResultReturn<T> = Result<T, Error>;
 
@@ -33,7 +33,7 @@ pub enum Error {
     FilesSystemError(String),
     Unexpected(String),
     Unknown(String),
-    StringError(String)
+    StringError(String),
 }
 
 impl From<Error> for String {
@@ -106,25 +106,25 @@ mod codes {
 impl ErrorCode for Error {
     fn error_code(&self) -> i32 {
         match *self {
-            Error::AuthError(ref _error) => { ERR_AUTH_ERROR },
-            Error::ConnectionError(ref _error) => { ERR_CONNECTION_ERROR },
-            Error::NetDataError(ref _error) => { ERR_NET_DATA_ERROR },
-            Error::ContentNotFound(ref _error) => { ERR_CONTENT_NOT_FOUND_ERROR },
-            Error::VersionNotFound(ref _error) => { ERR_VERSION_NOT_FOUND_ERROR },
-            Error::ContentError(ref _error) => { ERR_CONTENT_ERROR },
-            Error::EmptyContent(ref _error) => { ERR_EMPTY_CONTENT_ERROR },
-            Error::AccessDenied(ref _error) => { ERR_ACCESS_DENIED_ERROR },
-            Error::EntryNotFound(ref _error) => { ERR_ENTRY_NOT_FOUND_ERROR },
-            Error::EntryExists(ref _error) => { ERR_ENTRY_EXISTS_ERROR },
-            Error::InvalidInput(ref _error) => { ERR_INVALID_INPUT_ERROR },
-            Error::InvalidAmount(ref _error) => { ERR_INVALID_AMOUNT_ERROR },
-            Error::InvalidXorUrl(ref _error) => { ERR_INVALID_XOR_URL_ERROR },
-            Error::NotEnoughBalance(ref _error) => { ERR_NOT_ENOUGH_BALANCE_ERROR },
-            Error::FilesSystemError(ref _error) => { ERR_FILE_SYSTEM_ERROR },
-            Error::InvalidMediaType(ref _error) => { ERR_INVALID_MEDIA_TYPE_ERROR },
-            Error::Unexpected(ref _error) => { ERR_UNEXPECTED_ERROR },
-            Error::Unknown(ref _error) => { ERR_UNKNOWN_ERROR },
-            Error::StringError(ref _error) => { ERR_STRING_ERROR },
+            Error::AuthError(ref _error) => ERR_AUTH_ERROR,
+            Error::ConnectionError(ref _error) => ERR_CONNECTION_ERROR,
+            Error::NetDataError(ref _error) => ERR_NET_DATA_ERROR,
+            Error::ContentNotFound(ref _error) => ERR_CONTENT_NOT_FOUND_ERROR,
+            Error::VersionNotFound(ref _error) => ERR_VERSION_NOT_FOUND_ERROR,
+            Error::ContentError(ref _error) => ERR_CONTENT_ERROR,
+            Error::EmptyContent(ref _error) => ERR_EMPTY_CONTENT_ERROR,
+            Error::AccessDenied(ref _error) => ERR_ACCESS_DENIED_ERROR,
+            Error::EntryNotFound(ref _error) => ERR_ENTRY_NOT_FOUND_ERROR,
+            Error::EntryExists(ref _error) => ERR_ENTRY_EXISTS_ERROR,
+            Error::InvalidInput(ref _error) => ERR_INVALID_INPUT_ERROR,
+            Error::InvalidAmount(ref _error) => ERR_INVALID_AMOUNT_ERROR,
+            Error::InvalidXorUrl(ref _error) => ERR_INVALID_XOR_URL_ERROR,
+            Error::NotEnoughBalance(ref _error) => ERR_NOT_ENOUGH_BALANCE_ERROR,
+            Error::FilesSystemError(ref _error) => ERR_FILE_SYSTEM_ERROR,
+            Error::InvalidMediaType(ref _error) => ERR_INVALID_MEDIA_TYPE_ERROR,
+            Error::Unexpected(ref _error) => ERR_UNEXPECTED_ERROR,
+            Error::Unknown(ref _error) => ERR_UNKNOWN_ERROR,
+            Error::StringError(ref _error) => ERR_STRING_ERROR,
         }
     }
 }

@@ -1,10 +1,13 @@
 [package]
-name = "safe_cli"
+name = "safe-api"
 version = "0.4.0"
 description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 publish = false
 license = "GPL-3.0"
+repository = "https://github.com/maidsafe/safe-cli"
+build = "src/ffi/build.rs"
+include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 
 [lib]

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use log::debug;
-use crate::api::XorName;
+use safe_api::XorName;
 use std::io::{self, stdin, stdout, Write};
 
 // Warn the user about a dry-run being performed

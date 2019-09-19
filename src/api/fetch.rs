@@ -63,7 +63,7 @@ impl Safe {
     ///
     /// ### Fetch FilesContainer relative path file
     /// ```rust
-    /// # use safe_cli::{Safe, SafeData};
+    /// # use safe_api::{Safe, SafeData};
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::new("base32z");

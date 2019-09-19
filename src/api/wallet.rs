@@ -261,7 +261,7 @@ impl Safe {
     ///
     /// ## Example
     /// ```
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # use unwrap::unwrap;
     /// let mut safe = Safe::new("base32z");
     /// # unwrap!(safe.connect("", Some("fake-credentials")));

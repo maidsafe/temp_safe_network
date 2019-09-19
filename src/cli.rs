@@ -17,7 +17,7 @@ use crate::subcommands::nrs::nrs_commander;
 use crate::subcommands::update::update_commander;
 use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::{OutputFmt, SubCommands};
-use super::api::Safe;
+use safe_api::Safe;
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network

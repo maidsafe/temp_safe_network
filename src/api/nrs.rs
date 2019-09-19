@@ -118,7 +118,7 @@ impl Safe {
     /// # use rand::distributions::Alphanumeric;
     /// # use rand::{thread_rng, Rng};
     /// # use unwrap::unwrap;
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # let mut safe = Safe::new("base32z");
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
@@ -225,7 +225,7 @@ impl Safe {
     /// ## Example
     ///
     /// ```rust
-    /// # use safe_cli::Safe;
+    /// # use safe_api::Safe;
     /// # use rand::distributions::Alphanumeric;
     /// # use rand::{thread_rng, Rng};
     /// # let mut safe = Safe::new("base32z");
