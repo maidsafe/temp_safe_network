@@ -152,3 +152,9 @@ impl From<NulError> for Error {
         Error::Unexpected("Null error".to_string())
     }
 }
+
+impl From<serde_json::error::Error> for Error {
+    fn from(_error: serde_json::error::Error) -> Self {
+        Error::StringError("Failed to serialize or deserialize to json".to_string())
+    }
+}

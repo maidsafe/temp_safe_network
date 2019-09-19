@@ -1,4 +1,4 @@
-use super::ffi_structs::{nrs_map_into_repr_c, xorurl_encoder_into_repr_c, NrsMap, XorUrlEncoder};
+use super::ffi_structs::{nrs_map_into_repr_c, NrsMap};
 use super::helpers::to_c_str;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn nrs_map_container_create(
         user_data: *mut c_void,
         result: *const FfiResult,
         nrs_map: *const NrsMap,
-        xorurl: *const c_char, // todo: processed entries
+        xorurl: *const c_char,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
