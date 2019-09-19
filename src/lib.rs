@@ -16,7 +16,7 @@ pub mod api;
 
 pub use api::*;
 pub use ffi::xorurl::*;
-pub use ffi::content_fetch::*;
+pub use ffi::fetch::*;
 pub use ffi::keys::*;
 pub use ffi::nrs::*;
 pub use ffi::wallet::*;

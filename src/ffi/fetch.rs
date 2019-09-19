@@ -4,7 +4,7 @@ use super::{Safe, ResultReturn};
 use crate::api::fetch::SafeData;
 
 #[no_mangle]
-pub unsafe extern "C" fn safe_fetch(
+pub unsafe extern "C" fn fetch(
     app: *mut Safe,
     url: *const c_char,
     user_data: *mut c_void,

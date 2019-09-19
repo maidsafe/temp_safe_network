@@ -8,7 +8,7 @@ use std::os::raw::{c_char, c_void};
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 
 #[no_mangle]
-pub unsafe extern "C" fn generate_new_safe_key_pair(
+pub unsafe extern "C" fn generate_safe_key_pair(
     app: *mut Safe,
     test_coins: bool,
     pay_with: *const c_char,
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn generate_new_safe_key_pair(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn query_key_balance(
+pub unsafe extern "C" fn keys_balance_from_sk(
     app: *mut Safe,
     key: *const c_char,
     secret: *const c_char,
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn query_key_balance(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn transfer_key_balance(
+pub unsafe extern "C" fn keys_transfer(
     app: *mut Safe,
     from: *const c_char,
     to: *const c_char,

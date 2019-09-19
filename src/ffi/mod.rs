@@ -1,5 +1,5 @@
 /// Fetch API
-pub mod content_fetch;
+pub mod fetch;
 pub mod xorurl;
 pub mod keys;
 pub mod nrs;
@@ -13,7 +13,7 @@ use crate::api::{Safe, ResultReturn};
 use helpers::{from_c_str_to_str_option};
 
 #[no_mangle]
-pub unsafe extern "C" fn safe_connect(
+pub unsafe extern "C" fn connect(
     app_id: *const c_char,
     auth_credentials: *const c_char,
     user_data: *mut c_void,

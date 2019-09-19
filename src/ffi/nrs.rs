@@ -6,7 +6,7 @@ use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
-pub unsafe extern "C" fn create_new_public_name(
+pub unsafe extern "C" fn nrs_map_container_create(
     app: *mut Safe,
     name: *const c_char,
     link: *const c_char,
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn create_new_public_name(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn add_update_sub_name(
+pub unsafe extern "C" fn nrs_map_container_add(
     app: *mut Safe,
     name: *const c_char,
     link: *const c_char,
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn add_update_sub_name(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn remove_sub_name(
+pub unsafe extern "C" fn nrs_map_container_remove(
     app: *mut Safe,
     name: *const c_char,
     dry_run: bool,

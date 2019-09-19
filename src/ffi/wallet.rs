@@ -7,7 +7,7 @@ use std::os::raw::{c_char, c_void};
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 
 #[no_mangle]
-pub unsafe extern "C" fn create_new_wallet(
+pub unsafe extern "C" fn wallet_create(
     app: *mut Safe,
     pay_with: *const c_char,
     no_balance: bool,
@@ -69,7 +69,7 @@ pub unsafe extern "C" fn create_new_wallet(
 
 
 #[no_mangle]
-pub unsafe extern "C" fn insert_balance_to_wallet(
+pub unsafe extern "C" fn wallet_insert(
     app: *mut Safe,
     target: *const c_char,
     _pay_with: *const c_char,
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn insert_balance_to_wallet(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn query_wallet_balance(
+pub unsafe extern "C" fn wallet_balance(
     app: *mut Safe,
     target: *const c_char,
     user_data: *mut c_void,
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn query_wallet_balance(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn transfer_wallet_balance(
+pub unsafe extern "C" fn wallet_transfer(
     app: *mut Safe,
     from: *const c_char,
     to: *const c_char,

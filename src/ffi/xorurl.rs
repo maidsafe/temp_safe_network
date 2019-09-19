@@ -9,7 +9,7 @@ use super::ffi_structs::XorUrlEncoder;
 
 // todo: Can be convertered to a struct
 #[no_mangle]
-pub unsafe extern "C" fn encode_xor_url(
+pub unsafe extern "C" fn xorurl_encode(
     name: *const XorNameArray,
     type_tag: u64,
     data_type: u64,
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn encode_xor_url(
 
 // todo: Can be convertered to a struct
 #[no_mangle]
-pub unsafe extern "C" fn new_xor_url_encoder(
+pub unsafe extern "C" fn xor_url_encoder(
     name: *const XorNameArray,
     type_tag: u64,
     data_type: u64,
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn new_xor_url_encoder(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn new_xor_url_encoder_from_xor_url(
+pub unsafe extern "C" fn xorurl_encoder_from_url(
     xor_url: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
