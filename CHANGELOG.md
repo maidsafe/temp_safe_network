@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+### [0.4.0] (19-09-2019)
+
+### Bug Fixes
+
+    **wallet:** reporting a more accurate error messages for `safe wallet transfer` when passing invalid xorurls to `--to`, fixes #238
+
+### Features
+
+    **files:** when uploading files to FilesContainers encode the MIME-type as the ContentType in the resulting XOR-URL
+    **safekeys:** error message more informative when attempting to preload too high a number of test-coins, closes #213
+    **files:** support adding individual files with a files add command, either from a local path or with a file's safe:// URL
+    **user-guide:** add details about the safe files add command
+
 ### [0.3.0] (4-09-2019)
 
 ### Bug Fixes
