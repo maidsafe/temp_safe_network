@@ -1,11 +1,13 @@
 use ffi_utils::vec_into_raw_parts;
+use safe_api::files::{FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles};
+use safe_api::nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap};
 use safe_api::wallet::{
     WalletSpendableBalance as NativeWalletSpendableBalance,
     WalletSpendableBalances as NativeWalletSpendableBalances,
 };
-use safe_api::NrsMap as NativeNrsMap;
 use safe_api::{
-    BlsKeyPair as NativeBlsKeyPair, ResultReturn, XorUrlEncoder as NativeXorUrlEncoder,
+    BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo, ResultReturn,
+    XorUrlEncoder as NativeXorUrlEncoder,
 };
 use safe_core::ffi::arrays::XorNameArray;
 use std::ffi::CString;
@@ -94,10 +96,90 @@ pub fn wallet_spendable_balances_into_repr_c(
 }
 
 #[repr(C)]
-pub struct NrsMap {
-    // TODO
+pub struct ProcessedFiles {
+    // todo
 }
 
-pub fn nrs_map_into_repr_c(_nrs_map: &NativeNrsMap) -> ResultReturn<NrsMap> {
-    Ok(NrsMap {})
+pub fn processed_files_into_repr_c(
+    _nrs_map: &NativeProcessedFiles,
+) -> ResultReturn<ProcessedFiles> {
+    Ok(ProcessedFiles {}) // todo
+}
+
+#[repr(C)]
+pub struct FilesMap {
+    // todo
+}
+
+pub fn files_map_into_repr_c(_nrs_map: &NativeFilesMap) -> ResultReturn<FilesMap> {
+    Ok(FilesMap {}) //todo
+}
+
+#[repr(C)]
+pub struct NrsMapContainerInfo {
+    pub public_name: *const c_char,
+    pub xorurl: *const c_char,
+    pub xorname: XorNameArray,
+    pub type_tag: u64,
+    pub version: u64,
+    pub nrs_map: NrsMap,
+    pub data_type: u64,
+}
+
+pub fn nrs_map_container_info_into_repr_c(
+    nrs_container_info: &NativeNrsMapContainerInfo,
+) -> ResultReturn<NrsMapContainerInfo> {
+    Ok(NrsMapContainerInfo {
+        public_name: CString::new(nrs_container_info.public_name.clone())?.into_raw(),
+        xorurl: CString::new(nrs_container_info.xorurl.clone())?.into_raw(),
+        xorname: nrs_container_info.xorname.0,
+        type_tag: nrs_container_info.type_tag,
+        version: nrs_container_info.version,
+        nrs_map: nrs_map_into_repr_c(&nrs_container_info.nrs_map)?,
+        data_type: nrs_container_info.data_type.clone() as u64,
+    })
+}
+
+#[repr(C)]
+pub struct NrsMap {
+    pub sub_names_map: SubNamesMapEntry,
+    pub default: *const c_char,
+}
+
+pub fn nrs_map_into_repr_c(nrs_map: &NativeNrsMap) -> ResultReturn<NrsMap> {
+    Ok(NrsMap {
+        sub_names_map: sub_names_map_into_repr_c(nrs_map.sub_names_map.clone())?,
+        default: std::ptr::null(), // todo: update to return correct format
+    })
+}
+
+#[repr(C)]
+pub struct SubNamesMap {
+    pub sub_name: *const c_char,
+    pub sub_name_rdf: *const c_char, // Needs to be updated to correct format
+}
+
+#[repr(C)]
+pub struct SubNamesMapEntry {
+    pub sub_names: *const SubNamesMap,
+    pub sub_name_len: usize,
+    pub sub_name_cap: usize,
+}
+
+pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> ResultReturn<SubNamesMapEntry> {
+    let mut vec = Vec::with_capacity(map.len());
+
+    for (sub_name, _sub_name_rdf) in map {
+        vec.push(SubNamesMap {
+            sub_name: CString::new(sub_name)?.into_raw(),
+            sub_name_rdf: std::ptr::null(), // todo: update to return correct format
+        })
+    }
+
+    let (sub_names, sub_name_len, sub_name_cap) = vec_into_raw_parts(vec);
+    Ok(SubNamesMapEntry {
+        sub_names,
+        sub_name_len,
+        sub_name_cap,
+    })
 }

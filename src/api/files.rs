@@ -29,7 +29,7 @@ pub type FileItem = BTreeMap<String, String>;
 pub type FilesMap = BTreeMap<String, FileItem>;
 
 // List of files uploaded with details if they were added, updated or deleted from FilesContainer
-type ProcessedFiles = BTreeMap<String, (String, String)>;
+pub type ProcessedFiles = BTreeMap<String, (String, String)>;
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
 const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;

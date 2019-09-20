@@ -12,7 +12,7 @@ pub mod errors;
 #[cfg(feature = "scl-mock")]
 mod fake_scl;
 pub mod fetch;
-mod files;
+pub mod files;
 mod helpers;
 pub mod keys;
 pub mod nrs;
