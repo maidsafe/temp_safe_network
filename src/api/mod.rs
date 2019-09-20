@@ -8,20 +8,20 @@
 
 mod auth;
 mod constants;
-mod errors;
+pub mod errors;
 #[cfg(feature = "scl-mock")]
 mod fake_scl;
-mod fetch;
+pub mod fetch;
 mod files;
 mod helpers;
-mod keys;
-mod nrs;
-mod nrs_map;
+pub mod keys;
+pub mod nrs;
+pub mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;
-mod wallet;
-mod xorurl;
+pub mod wallet;
+pub mod xorurl;
 mod xorurl_media_types;
 
 pub use errors::{Error, ResultReturn};

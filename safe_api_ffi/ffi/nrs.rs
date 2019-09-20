@@ -1,4 +1,4 @@
-use super::ffi_structs::{nrs_map_into_repr_c, FfiNrsMap};
+use super::ffi_structs::{nrs_map_into_repr_c, NrsMap};
 use super::helpers::to_c_str;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
@@ -16,7 +16,7 @@ pub unsafe extern "C" fn nrs_map_container_create(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const FfiNrsMap,
+        nrs_map: *const NrsMap,
         xorurl: *const c_char,
     ),
 ) {
@@ -50,7 +50,7 @@ pub unsafe extern "C" fn nrs_map_container_add(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const FfiNrsMap,
+        nrs_map: *const NrsMap,
         xorurl: *const c_char,
         version: u64,
     ),
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn nrs_map_container_remove(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const FfiNrsMap,
+        nrs_map: *const NrsMap,
         xorurl: *const c_char,
         version: u64,
     ),
