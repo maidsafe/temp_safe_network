@@ -28,8 +28,9 @@ pub use errors::{Error, ResultReturn};
 pub use fetch::{
     NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
 };
+pub use files::ProcessedFiles;
 pub use keys::BlsKeyPair;
-pub use nrs_map::NrsMap;
+pub use nrs_map::{NrsMap, SubNamesMap};
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;
 pub use xorurl::{XorUrl, XorUrlEncoder};
