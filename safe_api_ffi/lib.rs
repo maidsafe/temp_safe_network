@@ -8,10 +8,13 @@
 
 extern crate ffi_utils;
 
-mod fetch;
-mod ffi_structs;
-mod helpers;
-mod keys;
-mod nrs;
-mod wallet;
-mod xorurl;
+pub mod ffi;
+
+pub use ffi::fetch::*;
+pub use ffi::ffi_structs::*;
+pub use ffi::helpers::*;
+pub use ffi::keys::*;
+pub use ffi::nrs::*;
+pub use ffi::wallet::*;
+pub use ffi::xorurl::*;
+pub use ffi::*;

@@ -10,7 +10,7 @@ include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 
 [workspace]
-members = ["safe_cli", "ffi"]
+members = ["safe_cli", "safe_api_ffi"]
 default-members = ["safe_cli"]
 
 [dependencies]
