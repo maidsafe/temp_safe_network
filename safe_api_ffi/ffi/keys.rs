@@ -19,11 +19,7 @@ pub unsafe extern "C" fn generate_keypair(
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
         let keypair = bls_key_pair_into_repr_c(&(*app).keypair()?)?;
-        o_cb(
-            user_data.0,
-            FFI_RESULT_OK,
-            &keypair,
-        );
+        o_cb(user_data.0, FFI_RESULT_OK, &keypair);
         Ok(())
     })
 }
@@ -138,7 +134,6 @@ pub unsafe extern "C" fn validate_sk_for_url(
         Ok(())
     })
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn generate_safe_key_pair(

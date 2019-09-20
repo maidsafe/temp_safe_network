@@ -38,7 +38,7 @@ mod bindings {
 
     fn gen_bindings_csharp() {
         let target_dir = Path::new("../bindings/csharp/safe_api");
-        
+
         let mut bindgen = unwrap!(Bindgen::new());
         let mut lang = LangCSharp::new();
 
