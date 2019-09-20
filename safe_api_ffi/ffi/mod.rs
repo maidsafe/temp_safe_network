@@ -1,7 +1,6 @@
 /// Fetch API
 pub mod fetch;
 pub mod ffi_structs;
-pub mod files;
 pub mod helpers;
 pub mod keys;
 pub mod nrs;
