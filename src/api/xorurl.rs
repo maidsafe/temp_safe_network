@@ -53,7 +53,7 @@ impl SafeContentType {
     }
 
     #[allow(dead_code)]
-    fn value(&self) -> ResultReturn<u16> {
+    pub fn value(&self) -> ResultReturn<u16> {
         match &*self {
             SafeContentType::Raw => Ok(0),
             SafeContentType::Wallet => Ok(1),

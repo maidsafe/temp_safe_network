@@ -1,4 +1,4 @@
-use crate::api::Error;
+use safe_api::Error;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -22,5 +22,6 @@ pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static st
 
 #[inline]
 pub unsafe fn to_c_str(native_string: String) -> Result<CString, Error> {
-    CString::new(native_string).map_err(|_| Error::StringError("Couldn't convert to string".to_string()))
+    CString::new(native_string)
+        .map_err(|_| Error::StringError("Couldn't convert to string".to_string()))
 }

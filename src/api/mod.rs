@@ -29,6 +29,7 @@ pub use fetch::{
     NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
 };
 pub use keys::BlsKeyPair;
+pub use nrs_map::NrsMap;
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;
 pub use xorurl::{XorUrl, XorUrlEncoder};
