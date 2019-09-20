@@ -47,37 +47,36 @@ function run_safe_auth() {
 
 function run_unit_tests() {
     rm -f fake_vault_data.json
-    cargo test --lib --release --features=scl-mock -- --test-threads=1
+    cargo test --lib --release --features=scl-mock -p safe_api -- --test-threads=1
     rm -f fake_vault_data.json
-    cargo test --doc --release --features=scl-mock -- --test-threads=1
+    cargo test --doc --release --features=scl-mock -p safe_api -- --test-threads=1
 
-    rm -f fake_vault_data.json
-    cargo test --release --features=scl-mock --test cli_cat -- --test-threads=1
-    rm -f fake_vault_data.json
-    cargo test --release --features=scl-mock --test cli_files -- --test-threads=1
-    rm -f fake_vault_data.json
-    cargo test --release --features=scl-mock --test cli_keys -- --test-threads=1
-    rm -f fake_vault_data.json
-    cargo test --release --features=scl-mock --test cli_wallet -- --test-threads=1
-    rm -f fake_vault_data.json
-    cargo test --release --features=scl-mock --test cli_nrs -- --test-threads=1
+    rm -f safe_cli/fake_vault_data.json
+    cargo test --release --features=scl-mock -p safe_cli --test cli_cat -- --test-threads=1
+    rm -f safe_cli/fake_vault_data.json
+    cargo test --release --features=scl-mock -p safe_cli --test cli_files -- --test-threads=1
+    rm -f safe_cli/fake_vault_data.json
+    cargo test --release --features=scl-mock -p safe_cli --test cli_keys -- --test-threads=1
+    rm -f safe_cli/fake_vault_data.json
+    cargo test --release --features=scl-mock -p safe_cli --test cli_wallet -- --test-threads=1
+    rm -f safe_cli/fake_vault_data.json
+    cargo test --release --features=scl-mock -p safe_cli --test cli_nrs -- --test-threads=1
 
-    rm -f fake_vault_data.json
-    cargo test --lib --release --features=mock-network,fake-auth -- --test-threads=1
-    cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
+    cargo test --lib --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
+    cargo test --doc --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
 }
 
 function run_integration_tests() {
     # now let's run the integration tests but without fake-auth, using the safe_auth CLI to get credentials
     # get auth credentials which will be then used by the integration tests to connect to mock-network
     echo "Sending auth request to port:" $RANDOM_PORT_NUMBER
-    cargo run --release --features=mock-network -- auth --port $RANDOM_PORT_NUMBER
+    cargo run --release --features=mock-network -p safe_cli -- auth --port $RANDOM_PORT_NUMBER
 
-    cargo test --release --features=mock-network --test cli_cat -- --test-threads=1
-    cargo test --release --features=mock-network --test cli_files -- --test-threads=1
-    cargo test --release --features=mock-network --test cli_keys -- --test-threads=1
-    cargo test --release --features=mock-network --test cli_wallet -- --test-threads=1
-    cargo test --release --features=mock-network --test cli_nrs -- --test-threads=1
+    cargo test --release --features=mock-network -p safe_cli --test cli_cat -- --test-threads=1
+    cargo test --release --features=mock-network -p safe_cli --test cli_files -- --test-threads=1
+    cargo test --release --features=mock-network -p safe_cli --test cli_keys -- --test-threads=1
+    cargo test --release --features=mock-network -p safe_cli --test cli_wallet -- --test-threads=1
+    cargo test --release --features=mock-network -p safe_cli --test cli_nrs -- --test-threads=1
 }
 
 

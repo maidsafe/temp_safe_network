@@ -2463,6 +2463,7 @@ dependencies = [
  "rand_core 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "relative-path 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.20 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe-nd 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_api 0.4.0",
  "self_update 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",

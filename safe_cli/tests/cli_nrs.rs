@@ -275,8 +275,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
     let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["./tests/testfolder/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["./tests/testfolder/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["../testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["../testdata/test.md"];
 
     let cat_of_another_raw = cmd!(get_bin_location(), "cat", &another_md_xor)
         .read()
@@ -342,8 +342,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
     let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["./tests/testfolder/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["./tests/testfolder/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["../testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["../testdata/test.md"];
 
     let cat_of_another_raw = cmd!(get_bin_location(), "cat", &another_md_xor)
         .read()
@@ -407,8 +407,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
     let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["./tests/testfolder/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["./tests/testfolder/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["../testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["../testdata/test.md"];
 
     let cat_of_another_raw = cmd!(get_bin_location(), "cat", &another_md_xor)
         .read()

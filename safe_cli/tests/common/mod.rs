@@ -18,18 +18,20 @@ pub const CLI: &str = "safe";
 #[allow(dead_code)]
 pub const SAFE_PROTOCOL: &str = "safe://";
 use std::collections::BTreeMap;
-const TEST_FOLDER: &str = "./tests/testfolder/";
+const TEST_FOLDER: &str = "../testdata/";
 
 #[allow(dead_code)]
 pub fn get_bin_location() -> String {
     let target_dir = match env::var("CARGO_TARGET_DIR") {
         Ok(target_dir) => target_dir,
-        Err(_) => "./target".to_string(),
+        Err(_) => "../target".to_string(),
     };
+
     if cfg!(debug_assertions) {
-        return format!("{}{}", target_dir, "/debug/safe");
+        format!("{}{}", target_dir, "/debug/safe")
+    } else {
+        format!("{}{}", target_dir, "/release/safe")
     }
-    format!("{}{}", target_dir, "/release/safe")
 }
 
 #[allow(dead_code)]

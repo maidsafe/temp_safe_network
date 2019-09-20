@@ -25,11 +25,11 @@ use std::process::Command;
 use unwrap::unwrap;
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
-const TEST_FILE: &str = "./tests/testfolder/test.md";
-const TEST_FOLDER: &str = "./tests/testfolder/";
-const TEST_FOLDER_NO_TRAILING_SLASH: &str = "./tests/testfolder";
-const TEST_FOLDER_SUBFOLDER: &str = "./tests/testfolder/subfolder/";
-const TEST_EMPTY_FOLDER: &str = "./tests/testfolder/emptyfolder/";
+const TEST_FILE: &str = "../testdata/test.md";
+const TEST_FOLDER: &str = "../testdata/";
+const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
+const TEST_FOLDER_SUBFOLDER: &str = "../testdata/subfolder/";
+const TEST_EMPTY_FOLDER: &str = "../testdata/emptyfolder/";
 
 #[test]
 fn calling_safe_files_put_pretty() {
@@ -59,9 +59,9 @@ fn calling_safe_files_put_recursive() {
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(6))
-        .stdout(predicate::str::contains("./tests/testfolder/test.md").count(1))
-        .stdout(predicate::str::contains("./tests/testfolder/another.md").count(1))
-        .stdout(predicate::str::contains("./tests/testfolder/subfolder/subexists.md").count(1))
+        .stdout(predicate::str::contains("../testdata/test.md").count(1))
+        .stdout(predicate::str::contains("../testdata/another.md").count(1))
+        .stdout(predicate::str::contains("../testdata/subfolder/subexists.md").count(1))
         .success();
 }
 
@@ -117,9 +117,9 @@ fn calling_safe_files_put_recursive_subfolder() {
     ])
     .assert()
     .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
-    .stdout(predicate::str::contains("./tests/testfolder/test.md").count(0))
-    .stdout(predicate::str::contains("./tests/testfolder/another.md").count(0))
-    .stdout(predicate::str::contains("./tests/testfolder/subfolder/subexists.md").count(1))
+    .stdout(predicate::str::contains("../testdata/test.md").count(0))
+    .stdout(predicate::str::contains("../testdata/another.md").count(0))
+    .stdout(predicate::str::contains("../testdata/subfolder/subexists.md").count(1))
     .success();
 }
 
@@ -135,7 +135,7 @@ fn calling_safe_files_put_emptyfolder() {
     ])
     .assert()
     .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
-    .stdout(predicate::str::contains("./tests/testfolder/emptyfolder/").count(0))
+    .stdout(predicate::str::contains("../testdata/emptyfolder/").count(0))
     .success();
 }
 
@@ -197,7 +197,7 @@ fn calling_safe_files_put_recursive_without_slash() {
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
-    xorurl_encoder.set_path("/testfolder/test.md");
+    xorurl_encoder.set_path("/testdata/test.md");
     let file_cat = cmd!(
         get_bin_location(),
         "cat",
@@ -208,7 +208,7 @@ fn calling_safe_files_put_recursive_without_slash() {
     assert_eq!(file_cat, "hello tests!");
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
-    xorurl_encoder.set_path("/testfolder/subfolder/subexists.md");
+    xorurl_encoder.set_path("/testdata/subfolder/subexists.md");
     let subfile_cat = cmd!(
         get_bin_location(),
         "cat",

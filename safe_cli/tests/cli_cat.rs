@@ -21,9 +21,9 @@ use safe_api::{BlsKeyPair, SafeContentType, SafeData, SafeDataType, XorUrlEncode
 use std::process::Command;
 use unwrap::unwrap;
 
-const TEST_FILE: &str = "./tests/testfolder/test.md";
+const TEST_FILE: &str = "../testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
-const ANOTHER_FILE: &str = "./tests/testfolder/another.md";
+const ANOTHER_FILE: &str = "../testdata/another.md";
 const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]

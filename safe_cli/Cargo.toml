@@ -43,6 +43,7 @@ fake-auth = ["safe_api/fake-auth"]
 scl-mock = ["safe_api/scl-mock"]
 
 [dev-dependencies]
+safe-nd = "~0.3.0"
 pretty_assertions = "0.6.1"
 predicates = "1.0.0"
 assert_cmd = "0.11.1"
