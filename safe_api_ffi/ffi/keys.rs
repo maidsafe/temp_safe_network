@@ -4,8 +4,6 @@ use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK
 use safe_api::{ResultReturn, Safe};
 use std::os::raw::{c_char, c_void};
 
-const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
-
 #[no_mangle]
 pub unsafe extern "C" fn generate_keypair(
     app: *mut Safe,
@@ -131,49 +129,6 @@ pub unsafe extern "C" fn validate_sk_for_url(
         let balance = (*app).validate_sk_for_url(&secret_key, &key_url)?;
         let amount_result = to_c_str(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
-        Ok(())
-    })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn generate_safe_key_pair(
-    app: *mut Safe,
-    test_coins: bool,
-    pay_with: *const c_char,
-    preload: *const c_char,
-    pk: *const c_char,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(
-        user_data: *mut c_void,
-        result: *const FfiResult,
-        xorurl: *const c_char,
-        safe_key: *const BlsKeyPair,
-        pre_load: *const c_char,
-    ),
-) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
-        let user_data = OpaqueCtx(user_data);
-        let preload_str = from_c_str_to_string_option(preload);
-        let pay_with_str = from_c_str_to_string_option(pay_with);
-        let pk_with_str = from_c_str_to_string_option(pk);
-        let (xorurl, key_pair, _amount) = if test_coins {
-            let (xorurl, key_pair) =
-                (*app).keys_create_preload_test_coins(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)?;
-            (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT))
-        } else {
-            let (xorurl, key_pair) = (*app).keys_create(pay_with_str, preload_str, pk_with_str)?;
-            (xorurl, key_pair, Some(&PRELOAD_TESTCOINS_DEFAULT_AMOUNT)) // Todo: return amount not the default value
-        };
-        let key_xorurl = to_c_str(xorurl)?;
-        let amount_result = to_c_str(PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string())?;
-        let ffi_bls_key_pair = bls_key_pair_into_repr_c(&key_pair.unwrap())?;
-        o_cb(
-            user_data.0,
-            FFI_RESULT_OK,
-            key_xorurl.as_ptr(),
-            &ffi_bls_key_pair,
-            amount_result.as_ptr(),
-        );
         Ok(())
     })
 }
