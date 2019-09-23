@@ -100,7 +100,7 @@ push-android-x86_64-mock-container:
 build:
 	rm -rf artifacts
 ifeq ($(UNAME_S),Linux)
-	./scripts/build-with-container "real"
+	./scripts/build-with-container "real" "x86_64"
 else
 	./scripts/build-real
 endif
@@ -110,7 +110,7 @@ endif
 build-mock:
 	rm -rf artifacts
 ifeq ($(UNAME_S),Linux)
-	./scripts/build-with-container "mock"
+	./scripts/build-with-container "mock" "x86_64-mock"
 else
 	./scripts/build-mock
 endif
@@ -168,6 +168,46 @@ build-ios-mock-x86_64:
 	rm -rf artifacts
 	mkdir artifacts
 	find target/x86_64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-android-armv7:
+ifeq ($(UNAME_S),Linux)
+	rm -rf artifacts
+	./scripts/build-with-container "real" "android-armv7"
+	mkdir artifacts
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+else
+	echo "Only Linux is supported for this target."
+endif
+
+build-android-mock-armv7:
+ifeq ($(UNAME_S),Linux)
+	rm -rf artifacts
+	./scripts/build-with-container "mock" "android-armv7-mock"
+	mkdir artifacts
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+else
+	echo "Only Linux is supported for this target."
+endif
+
+build-android-x86_64:
+ifeq ($(UNAME_S),Linux)
+	rm -rf artifacts
+	./scripts/build-with-container "real" "android-x86_64"
+	mkdir artifacts
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+else
+	echo "Only Linux is supported for this target."
+endif
+
+build-android-mock-x86_64:
+ifeq ($(UNAME_S),Linux)
+	rm -rf artifacts
+	./scripts/build-with-container "mock" "android-x86_64-mock"
+	mkdir artifacts
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+else
+	echo "Only Linux is supported for this target."
+endif
 
 clippy:
 ifeq ($(UNAME_S),Linux)

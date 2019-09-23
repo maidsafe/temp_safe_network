@@ -51,6 +51,22 @@ stage("build & test") {
             uploadBuildArtifacts()
         }
     },
+    mock_android_armv7: {
+        node("safe_client_libs") {
+            checkout(scm)
+            sh("make build-android-mock-armv7")
+            packageBuildArtifacts("mock", "android", "armv7")
+            uploadBuildArtifacts()
+        }
+    },
+    mock_android_x86_64: {
+        node("safe_client_libs") {
+            checkout(scm)
+            sh("make build-android-mock-x86_64")
+            packageBuildArtifacts("mock", "android", "x86_64")
+            uploadBuildArtifacts()
+        }
+    },
     real_linux: {
         node("safe_client_libs") {
             checkout(scm)
@@ -91,6 +107,22 @@ stage("build & test") {
             checkout(scm)
             sh("make build-ios-x86_64")
             packageBuildArtifacts("real", "ios", "x86_64")
+            uploadBuildArtifacts()
+        }
+    },
+    real_android_armv7: {
+        node("safe_client_libs") {
+            checkout(scm)
+            sh("make build-android-armv7")
+            packageBuildArtifacts("real", "android", "armv7")
+            uploadBuildArtifacts()
+        }
+    },
+    real_android_x86_64: {
+        node("safe_client_libs") {
+            checkout(scm)
+            sh("make build-android-x86_64")
+            packageBuildArtifacts("real", "android", "x86_64")
             uploadBuildArtifacts()
         }
     },
