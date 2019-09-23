@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(not(feature = "fake-auth"))]
+#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 pub mod auth;
 pub mod cat;
 pub mod container;
-#[cfg(feature = "fake-auth")]
+#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
 pub mod fake_auth;
 pub mod files;
 mod helpers;
@@ -20,9 +20,9 @@ pub mod safe_id;
 pub mod update;
 pub mod wallet;
 
-#[cfg(not(feature = "fake-auth"))]
+#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 use auth::AuthSubCommands;
-#[cfg(feature = "fake-auth")]
+#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
 pub use fake_auth::{self as auth, AuthSubCommands};
 
 use structopt::StructOpt;

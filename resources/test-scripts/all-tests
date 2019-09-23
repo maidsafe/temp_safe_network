@@ -45,28 +45,35 @@ function run_safe_auth() {
     cd -
 }
 
-function run_unit_tests() {
+function run_api_tests() {
     rm -f fake_vault_data.json
     cargo test --lib --release --features=scl-mock -p safe_api -- --test-threads=1
     rm -f fake_vault_data.json
     cargo test --doc --release --features=scl-mock -p safe_api -- --test-threads=1
 
-    rm -f safe_cli/fake_vault_data.json
+    cargo test --lib --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
+    cargo test --doc --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
+}
+
+function run_cli_tests() {
+    cd safe_cli
+    rm -f fake_vault_data.json
     cargo test --release --features=scl-mock -p safe_cli --test cli_cat -- --test-threads=1
-    rm -f safe_cli/fake_vault_data.json
+    rm -f fake_vault_data.json
     cargo test --release --features=scl-mock -p safe_cli --test cli_files -- --test-threads=1
-    rm -f safe_cli/fake_vault_data.json
+    rm -f fake_vault_data.json
     cargo test --release --features=scl-mock -p safe_cli --test cli_keys -- --test-threads=1
-    rm -f safe_cli/fake_vault_data.json
+    rm -f fake_vault_data.json
     cargo test --release --features=scl-mock -p safe_cli --test cli_wallet -- --test-threads=1
-    rm -f safe_cli/fake_vault_data.json
+    rm -f fake_vault_data.json
     cargo test --release --features=scl-mock -p safe_cli --test cli_nrs -- --test-threads=1
+    cd ..
 
     cargo test --lib --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
     cargo test --doc --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
 }
 
-function run_integration_tests() {
+function run_cli_tests_with_auth_daemon() {
     # now let's run the integration tests but without fake-auth, using the safe_auth CLI to get credentials
     # get auth credentials which will be then used by the integration tests to connect to mock-network
     echo "Sending auth request to port:" $RANDOM_PORT_NUMBER
@@ -84,5 +91,6 @@ function run_integration_tests() {
 download_safe_auth_nightly
 run_safe_auth
 cargo fmt -- --check
-run_unit_tests
-run_integration_tests
+run_api_tests
+run_cli_tests
+run_cli_tests_with_auth_daemon
