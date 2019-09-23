@@ -21,8 +21,8 @@ if [[ -z "$build_mode" ]]; then
     exit 1
 fi
 
-container_tag="build"
-[[ "$build_mode" == "mock" ]] && container_tag="build-mock"
+container_tag="x86_64"
+[[ "$build_mode" == "mock" ]] && container_tag="x86_64-mock"
 
 user_id=$(id -u)
 group_id=$(id -g)

@@ -35,23 +35,67 @@ export GITHUB_RELEASE_DESCRIPTION
 
 build-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:build
+	docker rmi -f maidsafe/safe-client-libs-build:x86_64
 	docker build -f scripts/Dockerfile.build \
-		-t maidsafe/safe-client-libs-build:build \
+		-t maidsafe/safe-client-libs-build:x86_64 \
 		--build-arg build_type="real" .
 
 build-mock-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:build-mock
+	docker rmi -f maidsafe/safe-client-libs-build:x86_64-mock
 	docker build -f scripts/Dockerfile.build \
-		-t maidsafe/safe-client-libs-build:build-mock \
+		-t maidsafe/safe-client-libs-build:x86_64-mock \
 		--build-arg build_type="mock" .
 
+build-android-armv7-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-client-libs-build:android-armv7
+	docker build -f scripts/Dockerfile.android.armv7.build \
+		-t maidsafe/safe-client-libs-build:android-armv7 \
+		--build-arg build_type="real" \
+		--build-arg target="armv7-linux-androideabi" .
+
+build-android-armv7-mock-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-client-libs-build:android-armv7-mock
+	docker build -f scripts/Dockerfile.android.armv7.build \
+		-t maidsafe/safe-client-libs-build:android-armv7-mock \
+		--build-arg build_type="mock" \
+		--build-arg target="armv7-linux-androideabi" .
+
+build-android-x86_64-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-client-libs-build:android-x86_64
+	docker build -f scripts/Dockerfile.android.x86_64.build \
+		-t maidsafe/safe-client-libs-build:android-x86_64 \
+		--build-arg build_type="real" \
+		--build-arg target="x86_64-linux-android" .
+
+build-android-x86_64-mock-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-client-libs-build:android-x86_64-mock
+	docker build -f scripts/Dockerfile.android.x86_64.build \
+		-t maidsafe/safe-client-libs-build:android-x86_64-mock \
+		--build-arg build_type="mock" \
+		--build-arg target="x86_64-linux-android" .
+
 push-container:
-	docker push maidsafe/safe-client-libs-build:build
+	docker push maidsafe/safe-client-libs-build:x86_64
 
 push-mock-container:
-	docker push maidsafe/safe-client-libs-build:build-mock
+	docker push maidsafe/safe-client-libs-build:x86_64-mock
+
+push-android-armv7-container:
+	docker push maidsafe/safe-client-libs-build:android-armv7
+
+push-android-armv7-mock-container:
+	docker push maidsafe/safe-client-libs-build:android-armv7-mock
+
+push-android-x86_64-container:
+	docker push maidsafe/safe-client-libs-build:android-x86_64
+
+push-android-x86_64-mock-container:
+	docker push maidsafe/safe-client-libs-build:android-x86_64-mock
 
 build:
 	rm -rf artifacts
@@ -130,7 +174,7 @@ ifeq ($(UNAME_S),Linux)
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		scripts/clippy-all
 else
 	./scripts/clippy-all
@@ -141,7 +185,7 @@ ifeq ($(UNAME_S),Linux)
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		scripts/rustfmt
 else
 	./scripts/rustfmt
@@ -194,14 +238,14 @@ package-versioned-deploy-artifacts:
 	@rm -rf deploy
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:x86_64 \
 		scripts/package-runner-container "true"
 
 package-commit_hash-deploy-artifacts:
 	@rm -rf deploy
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:x86_64 \
 		scripts/package-runner-container "false"
 
 retrieve-cache:
@@ -327,7 +371,7 @@ endif
 		-e CARGO_TARGET_DIR=/target \
 		-e COMPAT_TESTS=/bct/tests \
 		-e SCL_TEST_SUITE=binary \
-		maidsafe/safe-client-libs-build:build \
+		maidsafe/safe-client-libs-build:x86_64 \
 		scripts/test-runner-container
 
 tests:
@@ -338,7 +382,7 @@ ifeq ($(UNAME_S),Linux)
 		-v "${PWD}":/usr/src/safe_client_libs \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		scripts/build-and-test-mock
 	docker cp "safe_app_tests-${UUID}":/target .
 	docker rm -f "safe_app_tests-${UUID}"
@@ -362,11 +406,11 @@ tests-integration:
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs \
 		-u ${USER_ID}:${GROUP_ID} \
 		-e CARGO_TARGET_DIR=/target \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		scripts/test-integration
 
 debug:
-	docker run --rm -v "${PWD}":/usr/src/crust maidsafe/safe-client-libs-build:build /bin/bash
+	docker run --rm -v "${PWD}":/usr/src/crust maidsafe/safe-client-libs-build:x86_64 /bin/bash
 
 copy-artifacts:
 	rm -rf artifacts
@@ -429,7 +473,7 @@ endif
 	rm -rf artifacts deploy
 	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		/bin/bash -c "cd safe_core && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
 
 publish-safe_auth:
@@ -439,7 +483,7 @@ ifndef CRATES_IO_TOKEN
 endif
 	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		/bin/bash -c "cd safe_authenticator && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
 
 publish-safe_app:
@@ -449,5 +493,5 @@ ifndef CRATES_IO_TOKEN
 endif
 	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:build-mock \
+		maidsafe/safe-client-libs-build:x86_64-mock \
 		/bin/bash -c "cd safe_app && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
