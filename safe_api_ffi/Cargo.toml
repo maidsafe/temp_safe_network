@@ -16,3 +16,4 @@ path = "lib.rs"
 safe_api = { path = "../" }
 ffi_utils = "~0.12.0"
 safe_core = "~0.33.0"
+safe-nd = "~0.3.0"
