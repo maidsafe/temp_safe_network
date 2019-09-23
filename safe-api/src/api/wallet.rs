@@ -6,19 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, KeyPair};
+use super::helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, xorname_to_hex, KeyPair};
 use super::xorurl::{SafeContentType, SafeDataType};
 use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::debug;
 use rand_core::RngCore;
-use safe_nd::Coins;
+use safe_nd::{Coins, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
 
-const WALLET_DEFAULT: &str = "_default";
 const WALLET_DEFAULT_BYTES: &[u8] = b"_default";
 
 // Struct which is serialised and stored in Wallet MD for linking to a spendable balance (Key)
@@ -142,63 +141,41 @@ impl Safe {
 
         // Let's get the list of balances from the Wallet
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
-        let balances = match self
-            .safe_app
-            .list_seq_mdata_entries(xorurl_encoder.xorname(), WALLET_TYPE_TAG)
-        {
-            Ok(entries) => entries,
-            Err(Error::ContentNotFound(_)) => {
-                return Err(Error::ContentNotFound(format!(
-                    "No Wallet found at {}",
-                    url
-                )))
-            }
-            Err(Error::InvalidXorUrl(_)) => {
-                return Err(Error::InvalidXorUrl(
-                    "The XOR-URL provided is invalid and cannot be decoded".to_string(),
-                ))
-            }
-            Err(err) => {
-                return Err(Error::ContentError(format!(
-                    "Failed to read balances from Wallet: {}",
-                    err
-                )))
-            }
+        let balances = if xorurl_encoder.path().is_empty() {
+            gen_wallet_spendable_balances_list(&self, xorurl_encoder.xorname(), url)?
+        } else {
+            let balance_name = &xorurl_encoder.path()[1..]; // we get rid of starting '/'
+            let (spendable_balance, _) = wallet_get_spendable_balance(
+                &self,
+                xorurl_encoder.xorname(),
+                balance_name.as_bytes(),
+            )?;
+            let mut balances = WalletSpendableBalances::default();
+            balances.insert(balance_name.to_string(), (false, spendable_balance));
+            balances
         };
 
-        debug!("Spendable balances: {:?}", balances);
+        debug!("Spendable balances to check: {:?}", balances);
         // Iterate through the Keys and query the balance for each
-        for (name, balance) in balances.iter() {
-            let thename = String::from_utf8_lossy(name).to_string();
-
+        for (name, (_, balance)) in balances.iter() {
             // Ignore the _default Wallet MD entry key
-            if thename != WALLET_DEFAULT {
-                debug!("Checking wallet of name: {:?}", thename);
-                let the_balance = String::from_utf8_lossy(&balance.data).to_string();
-                let spendable_balance: WalletSpendableBalance = serde_json::from_str(&the_balance)
-                    .map_err(|_| {
-                        Error::ContentError(
-                            "Couldn't deserialise data stored in the Wallet".to_string(),
-                        )
-                    })?;
+            debug!("Checking wallet of name: {:?}", name);
+            let secret_key = sk_from_hex(&balance.sk)?;
+            let current_balance = self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
+                Error::ContentNotFound("One of the SafeKey's was not found".to_string())
+            })?;
 
-                let secret_key = sk_from_hex(&spendable_balance.sk)?;
-                let current_balance =
-                    self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
-                        Error::ContentNotFound("One of the SafeKey's was not found".to_string())
-                    })?;
-
-                debug!("{}: balance: {}", thename, current_balance);
-                match total_balance.checked_add(current_balance) {
-                    None => {
-                        return Err(Error::Unexpected(
-                            "Failed to calculate total balance due to overflow".to_string(),
-                        ))
-                    }
-                    Some(new_balance_coins) => total_balance = new_balance_coins,
-                };
-            }
+            debug!("{}: balance: {}", name, current_balance);
+            match total_balance.checked_add(current_balance) {
+                None => {
+                    return Err(Error::Unexpected(
+                        "Failed to calculate total balance due to overflow".to_string(),
+                    ))
+                }
+                Some(new_balance_coins) => total_balance = new_balance_coins,
+            };
         }
+
         Ok(total_balance.to_string())
     }
 
@@ -227,32 +204,7 @@ impl Safe {
                 }
             })?;
 
-        let the_balance: (WalletSpendableBalance, u64) = {
-            let default_balance_vec = self
-                .safe_app
-                .seq_mutable_data_get_value(
-                    xorurl_encoder.xorname(),
-                    WALLET_TYPE_TAG,
-                    &default.data,
-                )
-                .map_err(|_| {
-                    Error::ContentError(format!(
-                        "Default balance set but not found at Wallet \"{}\"",
-                        url
-                    ))
-                })?;
-
-            let default_balance = String::from_utf8_lossy(&default_balance_vec.data).to_string();
-            let spendable_balance: WalletSpendableBalance = serde_json::from_str(&default_balance)
-                .map_err(|_| {
-                    Error::ContentError(
-                        "Couldn't deserialise data stored in the Wallet".to_string(),
-                    )
-                })?;
-            (spendable_balance, default_balance_vec.version)
-        };
-
-        Ok(the_balance)
+        wallet_get_spendable_balance(&self, xorurl_encoder.xorname(), &default.data)
     }
 
     /// # Transfer safecoins from one Wallet to another
@@ -303,7 +255,7 @@ impl Safe {
         let amount_coins = parse_coins_amount(amount)?;
 
         // 'from_url' is not optional until we know the account's default Wallet
-        let from_wallet_url = match from_url {
+        let (from_wallet_url, from_xorurl_encoder) = match from_url {
             Some(url) => {
                 // Check if 'from_url' is a valid Wallet URL
                 let (xorurl_encoder, _) = self.parse_and_resolve_url(&url).map_err(|_| {
@@ -311,7 +263,7 @@ impl Safe {
                 })?;
 
                 if xorurl_encoder.content_type() == SafeContentType::Wallet {
-                    Ok(url)
+                    Ok((url, xorurl_encoder))
                 } else {
                     Err(Error::InvalidInput(format!(
                         "The 'from_url' URL doesn't target a Wallet, it is: {:?} ({})",
@@ -332,8 +284,17 @@ impl Safe {
         })?;
 
         let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
-            let (to_balance, _) =
-                self.wallet_get_default_balance(&to_xorurl_encoder.to_string()?)?;
+            let (to_balance, _) = if to_xorurl_encoder.path().is_empty() {
+                // Figure out which is the default spendable balance we should use as the destination for the transfer
+                self.wallet_get_default_balance(&to_xorurl_encoder.to_string()?)?
+            } else {
+                wallet_get_spendable_balance(
+                    &self,
+                    to_xorurl_encoder.xorname(),
+                    to_xorurl_encoder.path()[1..].as_bytes(), // we get rid of starting '/'
+                )?
+            };
+
             XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
         } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
             && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
@@ -350,8 +311,16 @@ impl Safe {
         // Generate a random transfer TX ID
         let tx_id = tx_id.unwrap_or_else(|| rand::thread_rng().next_u64());
 
-        // Figure out which is the default spendable balance we should use as the origin for the transfer
-        let (from_wallet_balance, _) = self.wallet_get_default_balance(&from_wallet_url)?;
+        let (from_wallet_balance, _) = if from_xorurl_encoder.path().is_empty() {
+            // Figure out which is the default spendable balance we should use as the origin for the transfer
+            self.wallet_get_default_balance(&from_wallet_url)?
+        } else {
+            wallet_get_spendable_balance(
+                &self,
+                from_xorurl_encoder.xorname(),
+                from_xorurl_encoder.path()[1..].as_bytes(), // we get rid of starting '/'
+            )?
+        };
         let from_sk = sk_from_hex(&from_wallet_balance.sk)?;
 
         // Finally, let's make the transfer
@@ -379,46 +348,103 @@ impl Safe {
 
     pub fn wallet_get(&self, url: &str) -> ResultReturn<WalletSpendableBalances> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
+        gen_wallet_spendable_balances_list(&self, xorurl_encoder.xorname(), url)
+    }
+}
 
-        let entries = self
-            .safe_app
-            .list_seq_mdata_entries(xorurl_encoder.xorname(), WALLET_TYPE_TAG)
-            .map_err(|err| match err {
-                Error::AccessDenied(_) => {
-                    Error::AccessDenied(format!("Couldn't read Wallet at \"{}\"", url))
-                }
-                _other => Error::ContentError(format!("No Wallet found at \"{}\"", url)),
-            })?;
-
-        let mut balances = WalletSpendableBalances::default();
-        let mut default_balance = "".to_string();
-        for (key, value) in entries.iter() {
-            let value_str = String::from_utf8_lossy(&value.data).to_string();
-            if key.as_slice() == WALLET_DEFAULT_BYTES {
-                default_balance = value_str;
-            } else {
-                let spendable_balance: WalletSpendableBalance = serde_json::from_str(&value_str)
-                    .map_err(|_| {
-                        Error::ContentError(
-                            "Couldn't deserialise data stored in the Wallet".to_string(),
-                        )
-                    })?;
-                let thename = String::from_utf8_lossy(key).to_string();
-                balances.insert(thename, (false, spendable_balance));
-            }
+// Private helper to generate the list of SpendableBalances which is used for different purposes
+fn gen_wallet_spendable_balances_list(
+    safe: &Safe,
+    xorname: XorName,
+    url: &str,
+) -> ResultReturn<WalletSpendableBalances> {
+    let entries = match safe
+        .safe_app
+        .list_seq_mdata_entries(xorname, WALLET_TYPE_TAG)
+    {
+        Ok(entries) => entries,
+        Err(Error::AccessDenied(_)) => {
+            return Err(Error::AccessDenied(format!(
+                "Couldn't read Wallet at \"{}\"",
+                url
+            )))
         }
+        Err(Error::ContentNotFound(_)) => {
+            return Err(Error::ContentNotFound(format!(
+                "No Wallet found at {}",
+                url
+            )))
+        }
+        Err(Error::InvalidXorUrl(_)) => {
+            return Err(Error::InvalidXorUrl(
+                "The XOR-URL provided is invalid and cannot be decoded".to_string(),
+            ))
+        }
+        Err(err) => {
+            return Err(Error::ContentError(format!(
+                "Failed to read balances from Wallet: {}",
+                err
+            )))
+        }
+    };
 
-        if !default_balance.is_empty() {
-            let mut default = balances.get_mut(&default_balance).ok_or_else(|| {
-                Error::Unexpected(format!(
-                    "Failed to get default spendable balance from Wallet at \"{}\"",
-                    url
+    let mut balances = WalletSpendableBalances::default();
+    let mut default_balance = "".to_string();
+    for (key, value) in entries.iter() {
+        let value_str = String::from_utf8_lossy(&value.data).to_string();
+        if key.as_slice() == WALLET_DEFAULT_BYTES {
+            default_balance = value_str;
+        } else {
+            let spendable_balance: WalletSpendableBalance = serde_json::from_str(&value_str)
+                .map_err(|_| {
+                    Error::ContentError(
+                        "Couldn't deserialise data stored in the Wallet".to_string(),
+                    )
+                })?;
+            let thename = String::from_utf8_lossy(key).to_string();
+            balances.insert(thename, (false, spendable_balance));
+        }
+    }
+
+    if !default_balance.is_empty() {
+        let mut default = balances.get_mut(&default_balance).ok_or_else(|| {
+            Error::Unexpected(format!(
+                "Failed to get default spendable balance from Wallet at \"{}\"",
+                url
+            ))
+        })?;
+        default.0 = true;
+    }
+    Ok(balances)
+}
+
+// Private helper to fetch a specific spendable balance from a Wallet usng its assigned frienly name
+// TODO: move this out to a WalletRdf API
+fn wallet_get_spendable_balance(
+    safe: &Safe,
+    xorname: XorName,
+    balance_name: &[u8],
+) -> ResultReturn<(WalletSpendableBalance, u64)> {
+    let the_balance: (WalletSpendableBalance, u64) = {
+        let default_balance_vec = safe
+            .safe_app
+            .seq_mutable_data_get_value(xorname, WALLET_TYPE_TAG, balance_name)
+            .map_err(|_| {
+                Error::ContentError(format!(
+                    "Default balance set but not found at Wallet \"{}\"",
+                    xorname_to_hex(&xorname)
                 ))
             })?;
-            default.0 = true;
-        }
-        Ok(balances)
-    }
+
+        let default_balance = String::from_utf8_lossy(&default_balance_vec.data).to_string();
+        let spendable_balance: WalletSpendableBalance = serde_json::from_str(&default_balance)
+            .map_err(|_| {
+                Error::ContentError("Couldn't deserialise data stored in the Wallet".to_string())
+            })?;
+        (spendable_balance, default_balance_vec.version)
+    };
+
+    Ok(the_balance)
 }
 
 // Unit Tests
@@ -811,6 +837,136 @@ fn test_wallet_transfer_with_nrs_urls() {
             assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
             let key_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair2).sk));
             assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
+        }
+    };
+}
+
+#[test]
+fn test_wallet_transfer_from_specific_balance() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let from_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
+    unwrap!(safe.wallet_insert(
+        &from_wallet_xorurl,
+        Some("from-firstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair1.clone()).sk,
+    ));
+
+    let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("200.5"));
+    unwrap!(safe.wallet_insert(
+        &from_wallet_xorurl,
+        Some("from-secondbalance".to_string()),
+        false,
+        &unwrap!(key_pair2.clone()).sk,
+    ));
+
+    let to_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("10.5"));
+    unwrap!(safe.wallet_insert(
+        &to_wallet_xorurl,
+        Some("to-firstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair3.clone()).sk,
+    ));
+
+    // test fail to transfer more than current balance at 'from-firstbaance'
+    let mut from_wallet_spendable_balance = unwrap!(XorUrlEncoder::from_url(&from_wallet_xorurl));
+    from_wallet_spendable_balance.set_path("from-secondbalance");
+    match safe.wallet_transfer(
+        "200.6",
+        Some(unwrap!(from_wallet_spendable_balance.to_string())),
+        &to_wallet_xorurl,
+        None,
+    ) {
+        Err(Error::NotEnoughBalance(msg)) => assert_eq!(
+            msg,
+            format!(
+                "Not enough balance for the transfer at Wallet \"{}\"",
+                unwrap!(from_wallet_spendable_balance.to_string())
+            )
+        ),
+        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+        Ok(_) => panic!("Transfer succeeded unexpectedly"),
+    };
+
+    // test successful transfer
+    match safe.wallet_transfer(
+        "100.3",
+        Some(unwrap!(from_wallet_spendable_balance.to_string())),
+        &to_wallet_xorurl,
+        None,
+    ) {
+        Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+        Ok(_) => {
+            let from_second_current_balance =
+                unwrap!(safe.wallet_balance(&unwrap!(from_wallet_spendable_balance.to_string())));
+            assert_eq!(
+                "100.200000000", /* 200.5 - 100.3 */
+                from_second_current_balance
+            );
+            let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl));
+            assert_eq!("200.700000000" /* 301 - 100.3 */, from_current_balance);
+            let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl));
+            assert_eq!("110.800000000" /* 10.5 + 100.3 */, to_current_balance);
+        }
+    };
+}
+
+#[test]
+fn test_wallet_transfer_to_specific_balance() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let from_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.7"));
+    unwrap!(safe.wallet_insert(
+        &from_wallet_xorurl,
+        Some("from-firstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair1.clone()).sk,
+    ));
+
+    let to_wallet_xorurl = unwrap!(safe.wallet_create());
+    let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.2"));
+    unwrap!(safe.wallet_insert(
+        &to_wallet_xorurl,
+        Some("to-firstbalance".to_string()),
+        true, // set --default
+        &unwrap!(key_pair2.clone()).sk,
+    ));
+
+    let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("20.2"));
+    unwrap!(safe.wallet_insert(
+        &to_wallet_xorurl,
+        Some("to-secondbalance".to_string()),
+        false,
+        &unwrap!(key_pair3.clone()).sk,
+    ));
+
+    // test successful transfer to 'to-secondbalance'
+    let mut to_wallet_spendable_balance = unwrap!(XorUrlEncoder::from_url(&to_wallet_xorurl));
+    to_wallet_spendable_balance.set_path("to-secondbalance");
+    match safe.wallet_transfer(
+        "100.5",
+        Some(from_wallet_xorurl.clone()),
+        &unwrap!(to_wallet_spendable_balance.to_string()),
+        None,
+    ) {
+        Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+        Ok(_) => {
+            let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl));
+            assert_eq!("0.200000000" /* 100.7 - 100.5 */, from_current_balance);
+            let to_second_current_balance =
+                unwrap!(safe.wallet_balance(&unwrap!(to_wallet_spendable_balance.to_string())));
+            assert_eq!(
+                "120.700000000", /* 20.2 + 100.5 */
+                to_second_current_balance
+            );
+            let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl));
+            assert_eq!("130.900000000", /* 30.4 + 100.5 */ to_current_balance);
         }
     };
 }
