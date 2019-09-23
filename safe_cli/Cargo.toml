@@ -37,6 +37,11 @@ validator = "0.8.0"
 validator_derive = "0.8.0"
 self_update = "0.5.1"
 
+[features]
+mock-network = ["safe_api/mock-network"]
+fake-auth = ["safe_api/fake-auth"]
+scl-mock = ["safe_api/scl-mock"]
+
 [dev-dependencies]
 safe-nd = "~0.3.0"
 pretty_assertions = "0.6.1"
