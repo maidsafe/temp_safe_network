@@ -141,6 +141,19 @@ stage("build & test") {
     }
 }
 
+stage("build universal iOS lib") {
+    node("osx") {
+        checkout(scm)
+        def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
+        withEnv(["SCL_BUILD_BRANCH=${branch}",
+                 "SCL_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+            sh("make universal-ios-lib")
+            sh("make package-universal-ios-lib")
+            uploadBuildArtifacts()
+        }
+    }
+}
+
 stage("deployment") {
     parallel deploy_artifacts: {
         node("safe_client_libs") {

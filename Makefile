@@ -304,6 +304,119 @@ endif
 	tar -C target -xvf scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz
 	rm scl-${SCL_BUILD_BRANCH}-windows-cache.tar.gz
 
+retrieve-ios-build-artifacts:
+ifndef SCL_BUILD_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SCL_BUILD_NUMBER
+	@echo "A valid build number must be supplied for the artifacts to be retrieved."
+	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	rm -rf artifacts
+	mkdir -p artifacts/ios-x86_64/real/release
+	mkdir -p artifacts/ios-x86_64/mock/release
+	mkdir -p artifacts/ios-aarch64/real/release
+	mkdir -p artifacts/ios-aarch64/mock/release
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz .
+	tar -C artifacts/ios-x86_64/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-x86_64.tar.gz
+	tar -C artifacts/ios-x86_64/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-x86_64.tar.gz
+	tar -C artifacts/ios-aarch64/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz
+	tar -C artifacts/ios-aarch64/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz
+
+universal-ios-lib: retrieve-ios-build-artifacts
+ifneq ($(UNAME_S),Darwin)
+	@echo "This target can only be run on macOS"
+	@exit 1
+endif
+ifndef SCL_BUILD_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SCL_BUILD_NUMBER
+	@echo "A valid build number must be supplied for the artifacts to be retrieved."
+	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	mkdir -p artifacts/universal/safe_app/real
+	mkdir -p artifacts/universal/safe_app/mock
+	mkdir -p artifacts/universal/safe_auth/real
+	mkdir -p artifacts/universal/safe_auth/mock
+	mkdir -p artifacts/universal/real
+	mkdir -p artifacts/universal/mock
+	cp artifacts/ios-x86_64/real/release/libsafe_app.a artifacts/universal/safe_app/real/libsafe_app.x86_64.a
+	cp artifacts/ios-aarch64/real/release/libsafe_app.a artifacts/universal/safe_app/real/libsafe_app.aarch64.a
+	cp artifacts/ios-x86_64/mock/release/libsafe_app.a artifacts/universal/safe_app/mock/libsafe_app.x86_64.a
+	cp artifacts/ios-aarch64/mock/release/libsafe_app.a artifacts/universal/safe_app/mock/libsafe_app.aarch64.a
+	cp artifacts/ios-x86_64/real/release/libsafe_authenticator.a artifacts/universal/safe_auth/real/libsafe_authenticator.x86_64.a
+	cp artifacts/ios-aarch64/real/release/libsafe_authenticator.a artifacts/universal/safe_auth/real/libsafe_authenticator.aarch64.a
+	cp artifacts/ios-x86_64/mock/release/libsafe_authenticator.a artifacts/universal/safe_auth/mock/libsafe_authenticator.x86_64.a
+	cp artifacts/ios-aarch64/mock/release/libsafe_authenticator.a artifacts/universal/safe_auth/mock/libsafe_authenticator.aarch64.a
+	( \
+		cd artifacts/universal/safe_app/real; \
+		lipo -create -output ../../../universal/real/libsafe_app.a libsafe_app.x86_64.a libsafe_app.aarch64.a; \
+	)
+	( \
+		cd artifacts/universal/safe_auth/real; \
+		lipo -create -output ../../../universal/real/libsafe_authenticator.a \
+			libsafe_authenticator.x86_64.a libsafe_authenticator.aarch64.a; \
+	)
+	( \
+		cd artifacts/universal/safe_app/mock; \
+		lipo -create -output ../../../universal/mock/libsafe_app.a libsafe_app.x86_64.a libsafe_app.aarch64.a; \
+	)
+	( \
+		cd artifacts/universal/safe_auth/real; \
+		lipo -create -output ../../../universal/mock/libsafe_authenticator.a \
+			libsafe_authenticator.x86_64.a libsafe_authenticator.aarch64.a; \
+	)
+
+package-universal-ios-lib:
+ifndef SCL_BUILD_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SCL_BUILD_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SCL_BUILD_NUMBER
+	@echo "A valid build number must be supplied for the artifacts to be retrieved."
+	@echo "Please set SCL_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	( \
+		cd artifacts; \
+		tar -C universal/real -zcvf \
+			${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-universal.tar.gz .; \
+	)
+	( \
+		cd artifacts; \
+		tar -C universal/mock -zcvf \
+			${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-universal.tar.gz .; \
+	)
+	rm -rf artifacts/universal
+	rm -rf artifacts/ios-*
+
 retrieve-all-build-artifacts:
 ifndef SCL_BUILD_BRANCH
 	@echo "A branch or PR reference must be provided."
@@ -326,6 +439,10 @@ endif
 	mkdir -p artifacts/ios-x86_64/mock/release
 	mkdir -p artifacts/ios-aarch64/real/release
 	mkdir -p artifacts/ios-aarch64/mock/release
+	mkdir -p artifacts/android-armv7/real/release
+	mkdir -p artifacts/android-armv7/mock/release
+	mkdir -p artifacts/android-x86_64/real/release
+	mkdir -p artifacts/android-x86_64/mock/release
 	aws s3 cp \
 		--no-sign-request \
 		--region eu-west-2 \
@@ -366,6 +483,22 @@ endif
 		--no-sign-request \
 		--region eu-west-2 \
 		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-android-armv7.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-android-armv7.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-android-x86_64.tar.gz .
+	aws s3 cp \
+		--no-sign-request \
+		--region eu-west-2 \
+		s3://${S3_BUCKET}/${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-android-x86_64.tar.gz .
 	tar -C artifacts/linux/real/release \
 		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
 	tar -C artifacts/linux/mock/release \
@@ -386,16 +519,15 @@ endif
 		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz
 	tar -C artifacts/ios-aarch64/real/release \
 		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-linux-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-linux-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-windows-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-windows-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-osx-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-osx-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-x86_64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-aarch64.tar.gz
-	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-aarch64.tar.gz
+	tar -C artifacts/android-armv7/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-android-armv7.tar.gz
+	tar -C artifacts/android-armv7/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-android-armv7.tar.gz
+	tar -C artifacts/android-x86_64/mock/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-android-x86_64.tar.gz
+	tar -C artifacts/android-x86_64/real/release \
+		-xvf ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-android-x86_64.tar.gz
+	rm ${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-*
 
 test-artifacts-binary:
 ifndef SCL_BCT_PATH
