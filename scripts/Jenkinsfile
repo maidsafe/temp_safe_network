@@ -12,7 +12,7 @@ stage("build & test") {
             checkout(scm)
             runTests("mock")
             stripBuildArtifacts()
-            packageBuildArtifacts("mock", "linux", "x86_64")
+            packageBuildArtifacts("mock", "x86_64-unknown-linux-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -22,7 +22,7 @@ stage("build & test") {
             retrieveCache()
             runTests("mock")
             stripBuildArtifacts()
-            packageBuildArtifacts("mock", "windows", "x86_64")
+            packageBuildArtifacts("mock", "x86_64-pc-windows-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -31,7 +31,7 @@ stage("build & test") {
             checkout(scm)
             runTests("mock")
             stripBuildArtifacts()
-            packageBuildArtifacts("mock", "osx", "x86_64")
+            packageBuildArtifacts("mock", "x86_64-apple-darwin")
             uploadBuildArtifacts()
         }
     },
@@ -39,7 +39,7 @@ stage("build & test") {
         node("osx") {
             checkout(scm)
             sh("make build-ios-mock-aarch64")
-            packageBuildArtifacts("mock", "ios", "aarch64")
+            packageBuildArtifacts("mock", "aarch64-apple-ios")
             uploadBuildArtifacts()
         }
     },
@@ -47,7 +47,7 @@ stage("build & test") {
         node("osx") {
             checkout(scm)
             sh("make build-ios-mock-x86_64")
-            packageBuildArtifacts("mock", "ios", "x86_64")
+            packageBuildArtifacts("mock", "x86_64-apple-ios")
             uploadBuildArtifacts()
         }
     },
@@ -55,7 +55,7 @@ stage("build & test") {
         node("safe_client_libs") {
             checkout(scm)
             sh("make build-android-mock-armv7")
-            packageBuildArtifacts("mock", "android", "armv7")
+            packageBuildArtifacts("mock", "armv7-linux-androideabi")
             uploadBuildArtifacts()
         }
     },
@@ -63,7 +63,7 @@ stage("build & test") {
         node("safe_client_libs") {
             checkout(scm)
             sh("make build-android-mock-x86_64")
-            packageBuildArtifacts("mock", "android", "x86_64")
+            packageBuildArtifacts("mock", "x86_64-linux-android")
             uploadBuildArtifacts()
         }
     },
@@ -72,7 +72,7 @@ stage("build & test") {
             checkout(scm)
             sh("make build")
             stripBuildArtifacts()
-            packageBuildArtifacts("real", "linux", "x86_64")
+            packageBuildArtifacts("real", "x86_64-unknown-linux-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -81,7 +81,7 @@ stage("build & test") {
             checkout(scm)
             sh("make build")
             stripBuildArtifacts()
-            packageBuildArtifacts("real", "windows", "x86_64")
+            packageBuildArtifacts("real", "x86_64-pc-windows-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -90,7 +90,7 @@ stage("build & test") {
             checkout(scm)
             sh("make build")
             stripBuildArtifacts()
-            packageBuildArtifacts("real", "osx", "x86_64")
+            packageBuildArtifacts("real", "x86_64-apple-darwin")
             uploadBuildArtifacts()
         }
     },
@@ -98,7 +98,7 @@ stage("build & test") {
         node("osx") {
             checkout(scm)
             sh("make build-ios-aarch64")
-            packageBuildArtifacts("real", "ios", "aarch64")
+            packageBuildArtifacts("real", "aarch64-apple-ios")
             uploadBuildArtifacts()
         }
     },
@@ -106,7 +106,7 @@ stage("build & test") {
         node("osx") {
             checkout(scm)
             sh("make build-ios-x86_64")
-            packageBuildArtifacts("real", "ios", "x86_64")
+            packageBuildArtifacts("real", "x86_64-apple-ios")
             uploadBuildArtifacts()
         }
     },
@@ -114,7 +114,7 @@ stage("build & test") {
         node("safe_client_libs") {
             checkout(scm)
             sh("make build-android-armv7")
-            packageBuildArtifacts("real", "android", "armv7")
+            packageBuildArtifacts("real", "armv7-linux-androideabi")
             uploadBuildArtifacts()
         }
     },
@@ -122,7 +122,7 @@ stage("build & test") {
         node("safe_client_libs") {
             checkout(scm)
             sh("make build-android-x86_64")
-            packageBuildArtifacts("real", "android", "x86_64")
+            packageBuildArtifacts("real", "x86_64-linux-android")
             uploadBuildArtifacts()
         }
     },
@@ -229,13 +229,12 @@ def isVersionChangeCommit() {
     return message.startsWith("Version change")
 }
 
-def packageBuildArtifacts(mode, os, arch) {
+def packageBuildArtifacts(mode, target) {
     def isMock = mode == "mock" ? "true" : "false"
     def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
     withEnv(["SCL_BUILD_NUMBER=${env.BUILD_NUMBER}",
              "SCL_BUILD_BRANCH=${branch}",
-             "SCL_BUILD_OS=${os}",
-             "SCL_BUILD_ARCH=${arch}",
+             "SCL_BUILD_TARGET=${target}",
              "SCL_BUILD_MOCK=${isMock}"]) {
         sh("make package-build-artifacts")
     }

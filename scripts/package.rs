@@ -45,6 +45,7 @@ const TARGET_WINDOWS_X64: &str = "x86_64-pc-windows-gnu";
 const TARGET_IOS_X64: &str = "x86_64-apple-ios";
 const TARGET_IOS_ARM64: &str = "aarch64-apple-ios";
 const TARGET_ANDROID_X86: &str = "i686-linux-android";
+const TARGET_ANDROID_X64: &str = "x86_64-linux-android";
 const TARGET_ANDROID_ARMEABIV7A: &str = "armv7-linux-androideabi";
 
 const CRATES: &[&str] = &["safe_app", "safe_authenticator"];
@@ -56,7 +57,7 @@ const ARCHS: &[Arch] = &[
         toolchain: "",
     },
     Arch {
-        name: "linux-x64",
+        name: "linux-x86_64",
         target: TARGET_LINUX_X64,
         toolchain: "",
     },
@@ -66,7 +67,7 @@ const ARCHS: &[Arch] = &[
         toolchain: "",
     },
     Arch {
-        name: "osx-x64",
+        name: "osx-x86_64",
         target: TARGET_OSX_X64,
         toolchain: "",
     },
@@ -76,7 +77,7 @@ const ARCHS: &[Arch] = &[
         toolchain: "",
     },
     Arch {
-        name: "win-x64",
+        name: "win-x86_64",
         target: TARGET_WINDOWS_X64,
         toolchain: "",
     },
@@ -91,6 +92,11 @@ const ARCHS: &[Arch] = &[
         toolchain: "i686-linux-android-",
     },
     Arch {
+        name: "android-x86_64",
+        target: TARGET_ANDROID_X86,
+        toolchain: "x86_64-linux-android-",
+    },
+    Arch {
         name: "ios-arm64",
         target: TARGET_IOS_ARM64,
         toolchain: "",
@@ -100,20 +106,25 @@ const ARCHS: &[Arch] = &[
         target: TARGET_IOS_X64,
         toolchain: "",
     },
+    Arch {
+        name: "ios-universal",
+        target: "",
+        toolchain: "",
+    },
 ];
 
 #[cfg(all(target_os = "linux", target_arch = "x86"))]
 const HOST_ARCH_NAME: &str = "linux-x86";
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const HOST_ARCH_NAME: &str = "linux-x64";
+const HOST_ARCH_NAME: &str = "linux-x86_64";
 #[cfg(all(target_os = "macos", target_arch = "x86"))]
 const HOST_ARCH_NAME: &str = "osx-x86";
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const HOST_ARCH_NAME: &str = "osx-x64";
+const HOST_ARCH_NAME: &str = "osx-x86_64";
 #[cfg(all(target_os = "windows", target_arch = "x86"))]
 const HOST_ARCH_NAME: &str = "win-x86";
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-const HOST_ARCH_NAME: &str = "win-x64";
+const HOST_ARCH_NAME: &str = "win-x86_64";
 
 const BINDINGS_LANGS: &[&str] = &["csharp"];
 
