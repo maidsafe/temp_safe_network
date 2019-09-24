@@ -28,58 +28,58 @@ export RUST_BACKTRACE=1
 declare -a targets=(\
     "x86_64-unknown-linux-gnu" "x86_64-pc-windows-gnu" "x86_64-apple-darwin" \
     "armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
-    "aarch64-apple-ios" "ios-universal")
+    "aarch64-apple-ios" "apple-ios")
 for target in "${targets[@]}"; do
     pwd
     if [[ $is_versioned == "true" ]]; then
         ./scripts/package.rs --lib \
             --name safe_app \
             --dest deploy/mock \
-            --arch "$target" \
-            --artifacts "artifacts/$target/mock" \
+            --target "$target" \
+            --artifacts "artifacts/mock" \
             --mock
         ./scripts/package.rs --lib \
             --name safe_app \
             --dest deploy/real \
-            --arch "$target" \
-            --artifacts "artifacts/$target/real"
+            --target "$target" \
+            --artifacts "artifacts/real"
         ./scripts/package.rs --lib \
             --name safe_authenticator \
             --dest deploy/mock \
-            --arch "$target" \
-            --artifacts "artifacts/$target/mock" \
+            --target "$target" \
+            --artifacts "artifacts/mock" \
             --mock
         ./scripts/package.rs --lib \
             --name safe_authenticator \
             --dest deploy/real \
-            --arch "$target" \
-            --artifacts "artifacts/$target/real"
+            --target "$target" \
+            --artifacts "artifacts/real"
     else
         ./scripts/package.rs --lib \
             --name safe_app \
             --dest deploy/mock \
-            --arch "$target" \
-            --artifacts "artifacts/$target/mock" \
+            --target "$target" \
+            --artifacts "artifacts/mock" \
             --mock \
             --commit
         ./scripts/package.rs --lib \
             --name safe_app \
             --dest deploy/real \
-            --arch "$target" \
-            --artifacts "artifacts/$target/real" \
+            --target "$target" \
+            --artifacts "artifacts/real" \
             --commit
         ./scripts/package.rs --lib \
             --name safe_authenticator \
             --dest deploy/mock \
-            --arch "$target" \
-            --artifacts "artifacts/$target/mock" \
+            --target "$target" \
+            --artifacts "artifacts/mock" \
             --mock \
             --commit
         ./scripts/package.rs --lib \
             --name safe_authenticator \
             --dest deploy/real \
-            --arch "$target" \
-            --artifacts "artifacts/$target/real" \
+            --target "$target" \
+            --artifacts "artifacts/real" \
             --commit
     fi
 done

@@ -10,28 +10,8 @@ USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
 S3_BUCKET := safe-jenkins-build-artifacts
-S3_SAFE_APP_LINUX_DEPLOY_URL := https://safe-client-libs.s3.amazonaws.com/safe_app-mock-${SAFE_APP_VERSION}-linux-x64.tar.gz
-S3_SAFE_APP_WIN_DEPLOY_URL := https://safe-client-libs.s3.amazonaws.com/safe_app-mock-${SAFE_APP_VERSION}-win-x64.tar.gz
-S3_SAFE_APP_MACOS_DEPLOY_URL := https://safe-client-libs.s3.amazonaws.com/safe_app-mock-${SAFE_APP_VERSION}-osx-x64.tar.gz
-S3_SAFE_AUTH_LINUX_DEPLOY_URL := https://safe-client-libs.s3.amazonaws.com/safe_authenticator-mock-${SAFE_AUTH_VERSION}-linux-x64.tar.gz
-S3_SAFE_AUTH_WIN_DEPLOY_URL := https://safe-client-libs.s3.amazonaws.com/safe_authenticator-mock-${SAFE_AUTH_VERSION}-win-x64.tar.gz
-S3_SAFE_AUTH_MACOS_DEPLOY_URL := https://safe-client-libs.s3.amazonaws.com/safe_authenticator-mock-${SAFE_AUTH_VERSION}-osx-x64.tar.gz
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe_client_libs
-define GITHUB_RELEASE_DESCRIPTION
-SAFE Network client side Rust module(s)
-
-There are also development versions of this release:
-[Safe App Linux](${S3_SAFE_APP_LINUX_DEPLOY_URL})
-[Safe App macOS](${S3_SAFE_APP_MACOS_DEPLOY_URL})
-[Safe App Windows](${S3_SAFE_APP_WIN_DEPLOY_URL})
-[Safe Auth Linux](${S3_SAFE_AUTH_LINUX_DEPLOY_URL})
-[Safe Auth macOS](${S3_SAFE_AUTH_MACOS_DEPLOY_URL})
-[Safe Auth Windows](${S3_SAFE_AUTH_WIN_DEPLOY_URL})
-
-The development version uses a mocked SAFE network, which allows you to work against a file that mimics the network, where SafeCoins are created for local use.
-endef
-export GITHUB_RELEASE_DESCRIPTION
 
 build-container:
 	rm -rf target/
@@ -345,12 +325,12 @@ endif
 	( \
 		cd artifacts; \
 		tar -C real/universal -zcvf \
-			${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-ios-universal.tar.gz .; \
+			${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-apple-ios.tar.gz .; \
 	)
 	( \
 		cd artifacts; \
 		tar -C mock/universal -zcvf \
-			${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-ios-universal.tar.gz .; \
+			${SCL_BUILD_BRANCH}-${SCL_BUILD_NUMBER}-scl-mock-apple-ios.tar.gz .; \
 	)
 	rm -rf artifacts/real
 	rm -rf artifacts/mock
@@ -369,7 +349,7 @@ endif
 	./scripts/retrieve-build-artifacts \
 		"x86_64-unknown-linux-gnu" "x86_64-pc-windows-gnu" "x86_64-apple-darwin" \
 		"armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
-		"aarch64-apple-ios" "ios-universal"
+		"aarch64-apple-ios" "apple-ios"
 
 retrieve-ios-build-artifacts:
 ifndef SCL_BUILD_BRANCH
@@ -454,43 +434,80 @@ endif
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_APP_VERSION} \
 		--name "safe_client_libs" \
-		--description "$$GITHUB_RELEASE_DESCRIPTION"
+		--description "$$(./scripts/get-release-description ${SAFE_APP_VERSION})"
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_APP_VERSION} \
-		--name "safe_app-${SAFE_APP_VERSION}-linux-x64.tar.gz" \
-		--file deploy/real/safe_app-${SAFE_APP_VERSION}-linux-x64.tar.gz
+		--name "safe_app-${SAFE_APP_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+		--file deploy/real/safe_app-${SAFE_APP_VERSION}-x86_64-unknown-linux-gnu.tar.gz
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_APP_VERSION} \
-		--name "safe_app-${SAFE_APP_VERSION}-osx-x64.tar.gz" \
-		--file deploy/real/safe_app-${SAFE_APP_VERSION}-osx-x64.tar.gz
+		--name "safe_app-${SAFE_APP_VERSION}-x86_64-apple-darwin.tar.gz" \
+		--file deploy/real/safe_app-${SAFE_APP_VERSION}-x86_64-apple-darwin.tar.gz
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_APP_VERSION} \
-		--name "safe_app-${SAFE_APP_VERSION}-win-x64.tar.gz" \
-		--file deploy/real/safe_app-${SAFE_APP_VERSION}-win-x64.tar.gz
+		--name "safe_app-${SAFE_APP_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
+		--file deploy/real/safe_app-${SAFE_APP_VERSION}-x86_64-pc-windows-gnu.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_APP_VERSION} \
+		--name "safe_app-${SAFE_APP_VERSION}-apple-ios.tar.gz" \
+		--file deploy/real/safe_app-${SAFE_APP_VERSION}-apple-ios.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_APP_VERSION} \
+		--name "safe_app-${SAFE_APP_VERSION}-armv7-linux-androideabi.tar.gz" \
+		--file deploy/real/safe_app-${SAFE_APP_VERSION}-armv7-linux-androideabi.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_APP_VERSION} \
+		--name "safe_app-${SAFE_APP_VERSION}-x86_64-linux-android.tar.gz" \
+		--file deploy/real/safe_app-${SAFE_APP_VERSION}-x86_64-linux-android.tar.gz
+
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_AUTH_VERSION} \
-		--name "safe_authenticator-${SAFE_AUTH_VERSION}-linux-x64.tar.gz" \
-		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-linux-x64.tar.gz
+		--name "safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-unknown-linux-gnu.tar.gz
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_AUTH_VERSION} \
-		--name "safe_authenticator-${SAFE_AUTH_VERSION}-osx-x64.tar.gz" \
-		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-osx-x64.tar.gz
+		--name "safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-apple-darwin.tar.gz" \
+		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-apple-darwin.tar.gz
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_AUTH_VERSION} \
-		--name "safe_authenticator-${SAFE_AUTH_VERSION}-win-x64.tar.gz" \
-		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-win-x64.tar.gz
+		--name "safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
+		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-pc-windows-gnu.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTH_VERSION} \
+		--name "safe_authenticator-${SAFE_AUTH_VERSION}-apple-ios.tar.gz" \
+		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-apple-ios.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTH_VERSION} \
+		--name "safe_authenticator-${SAFE_AUTH_VERSION}-armv7-linux-androideabi.tar.gz" \
+		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-armv7-linux-androideabi.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTH_VERSION} \
+		--name "safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-linux-android.tar.gz" \
+		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-linux-android.tar.gz
 
 publish-safe_core:
 ifndef CRATES_IO_TOKEN
