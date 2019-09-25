@@ -151,7 +151,6 @@ impl SafeApp for SafeAppScl {
     }
 
     fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins> {
-        
         let safe_app: &App = self.get_safe_app()?;
         let coins = run(safe_app, move |client, _app_context| {
             client.get_balance(Some(&sk)).map_err(SafeAppError)

@@ -77,7 +77,7 @@ mod bindings {
         lang.add_const("ulong", "SIGN_PUBLIC_KEY_LEN", sign::PUBLICKEYBYTES);
         lang.add_const("ulong", "SIGN_SECRET_KEY_LEN", sign::SECRETKEYBYTES);
         lang.add_const("ulong", "XOR_NAME_LEN", XOR_NAME_LEN);
-        lang.add_const("ulong", "BLS_PUBLIC_KEY_LEN", XOR_NAME_LEN);
+        lang.add_const("ulong", "BLS_PUBLIC_KEY_LEN", "48");
         lang.add_opaque_type("App");
 
         lang.reset_filter(FilterMode::Blacklist);

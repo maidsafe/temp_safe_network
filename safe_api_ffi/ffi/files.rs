@@ -45,6 +45,71 @@ pub unsafe extern "C" fn files_container_create(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn files_container_get(
+    app: *mut Safe,
+    url: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        version: u64,
+        files_map: *const FilesMap,
+    ),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+        let user_data = OpaqueCtx(user_data);
+        let url_str = from_c_str(url)?;
+        let (version, files_map) = (*app).files_container_get(&url_str)?;
+        let ffi_files_map = files_map_into_repr_c(&files_map)?;
+        o_cb(user_data.0, FFI_RESULT_OK, version, &ffi_files_map);
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn files_container_sync(
+    app: *mut Safe,
+    location: *const c_char,
+    url: *const c_char,
+    recursive: bool,
+    delete: bool,
+    update_nrs: bool,
+    dry_run: bool,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        version: u64,
+        process_files: *const ProcessedFiles,
+        files_map: *const FilesMap,
+    ),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+        let user_data = OpaqueCtx(user_data);
+        let location_str = from_c_str(location)?;
+        let url_str = from_c_str(url)?;
+        let (version, processed_files, files_map) = (*app).files_container_sync(
+            &location_str,
+            &url_str,
+            recursive,
+            delete,
+            update_nrs,
+            dry_run,
+        )?;
+        let ffi_files_map = files_map_into_repr_c(&files_map)?;
+        let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            version,
+            &ffi_processed_files,
+            &ffi_files_map,
+        );
+        Ok(())
+    })
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn files_container_add(
     app: *mut Safe,
     source_file: *const c_char,
@@ -76,28 +141,6 @@ pub unsafe extern "C" fn files_container_add(
             &ffi_processed_files,
             &ffi_files_map,
         );
-        Ok(())
-    })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn files_container_get(
-    app: *mut Safe,
-    url: *const c_char,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(
-        user_data: *mut c_void,
-        result: *const FfiResult,
-        version: u64,
-        files_map: *const FilesMap,
-    ),
-) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
-        let user_data = OpaqueCtx(user_data);
-        let url_str = from_c_str(url)?;
-        let (version, files_map) = (*app).files_container_get(&url_str)?;
-        let ffi_files_map = files_map_into_repr_c(&files_map)?;
-        o_cb(user_data.0, FFI_RESULT_OK, version, &ffi_files_map);
         Ok(())
     })
 }
@@ -138,33 +181,6 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         Ok(())
     })
 }
-
-// #[no_mangle]
-// pub unsafe extern "C" fn append_version_to_nrs_map_container(
-//     app: *mut Safe,
-//     success_count: u64,
-//     current_version: u64,
-//     new_files_map: *const FilesMap,
-//     url: *const c_char,
-//     xorurl_encoder: *const XorUrlEncoder,
-//     dry_run: bool,
-//     update_nrs: bool,
-//     user_data: *mut c_void,
-//     o_cb: extern "C" fn(
-//         user_data: *mut c_void,
-//         result: *const FfiResult,
-//         version: u64,
-//     ),
-// ) {
-//     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
-//         let user_data = OpaqueCtx(user_data);
-//         let url_str = from_c_str(url)?;
-//         let native_xorurl_endoder = xorurl_encoder_from_repr_c()
-//         let new_version = (*app).append_version_to_nrs_map_container(success_count, current_version, , &url_str, , dry_run, update_nrs)?;
-//         o_cb(user_data.0, FFI_RESULT_OK, new_version);
-//         Ok(())
-//     })
-// }
 
 #[no_mangle]
 pub unsafe extern "C" fn files_put_published_immutable(

@@ -1,9 +1,11 @@
+use ffi_utils::from_c_str;
 use safe_api::Error;
 use serde::de::{Deserialize, DeserializeOwned, Deserializer};
 use serde::ser::{Serialize, Serializer};
 use serde_json;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::slice;
 
 #[inline]
 pub unsafe fn from_c_str_to_string_option(ptr: *const c_char) -> Option<String> {
@@ -27,6 +29,35 @@ pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static st
 pub unsafe fn to_c_str(native_string: String) -> Result<CString, Error> {
     CString::new(native_string)
         .map_err(|_| Error::StringError("Couldn't convert to string".to_string()))
+}
+
+#[inline]
+pub fn string_vec_to_c_str_str(argv: Vec<String>) -> Result<*const *const c_char, Error> {
+    let cstr_argv: Vec<_> = argv
+        .iter()
+        .map(|arg| CString::new(arg.as_str()).unwrap())
+        .collect();
+
+    let p_argv: Vec<_> = cstr_argv.iter().map(|arg| arg.as_ptr()).collect();
+
+    Ok(p_argv.as_ptr())
+}
+
+#[inline]
+pub unsafe fn c_str_str_to_string_vec(
+    argv: *const *const c_char,
+    len: usize,
+) -> Option<Vec<String>> {
+    if len > 0 {
+        let data_vec = slice::from_raw_parts(argv, len).to_vec();
+        let string_vec: Vec<String> = data_vec
+            .iter()
+            .map(|s| from_c_str(*s).expect("Cannot convert"))
+            .collect();
+        Some(string_vec)
+    } else {
+        None
+    }
 }
 
 // Serialize to a JSON string, then serialize the string to the output
