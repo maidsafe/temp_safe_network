@@ -140,8 +140,9 @@ fn ffi_test() {
         ffi_utils::test_utils::call_1(
             |ud, cb| keys_balance_from_sk(
                 &safe,
-                unwrap!(CString::new(unwrap!(key_pair).sk)).as_ptr(),
-                ud, cb
+                unwrap!(CString::new(unwrap!(key_pair1).sk)).as_ptr(),
+                ud,
+                cb
             )
         )
     );

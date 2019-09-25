@@ -80,6 +80,113 @@ pub fn xorurl_encoder_into_repr_c(
 }
 
 #[repr(C)]
+pub struct WalletSpendableBalance {
+    pub xorurl: *const c_char,
+    pub sk: *const c_char,
+}
+
+pub fn wallet_spendable_balance_into_repr_c(
+    wallet_balance: &NativeWalletSpendableBalance,
+) -> ResultReturn<WalletSpendableBalance> {
+    Ok(WalletSpendableBalance {
+        xorurl: CString::new(wallet_balance.xorurl.clone())?.into_raw(),
+        sk: CString::new(wallet_balance.sk.clone())?.into_raw(),
+    })
+}
+
+#[repr(C)]
+pub struct SependableWalletBalance {
+    pub wallet_name: *const c_char,
+    pub is_default: bool,
+    pub spendable_wallet_balance: WalletSpendableBalance,
+}
+
+#[repr(C)]
+pub struct WalletSpendableBalances {
+    pub wallet_balances: *const SependableWalletBalance,
+    pub wallet_balances_len: usize,
+    pub wallet_balances_cap: usize,
+}
+
+impl Drop for WalletSpendableBalances {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.wallet_balances as *mut SependableWalletBalance,
+                self.wallet_balances_len,
+                self.wallet_balances_cap,
+            );
+        }
+    }
+}
+
+pub fn wallet_spendable_balances_into_repr_c(
+    wallet_balances: NativeWalletSpendableBalances,
+) -> ResultReturn<WalletSpendableBalances> {
+    let mut vec = Vec::with_capacity(wallet_balances.len());
+
+    for (name, (is_default, spendable_balance)) in wallet_balances {
+        vec.push(SependableWalletBalance {
+            wallet_name: CString::new(name)?.into_raw(),
+            is_default: is_default,
+            spendable_wallet_balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
+        })
+    }
+
+    let (balance, balance_len, balance_cap) = vec_into_raw_parts(vec);
+    Ok(WalletSpendableBalances {
+        wallet_balances: balance,
+        wallet_balances_len: balance_len,
+        wallet_balances_cap: balance_cap,
+    })
+}
+
+#[repr(C)]
+pub struct ProcessedFiles {
+    // todo
+}
+
+pub fn processed_files_into_repr_c(
+    _nrs_map: &NativeProcessedFiles,
+) -> ResultReturn<ProcessedFiles> {
+    Ok(ProcessedFiles {}) // todo
+}
+
+#[repr(C)]
+pub struct FilesMap {
+    // todo
+}
+
+pub fn files_map_into_repr_c(_nrs_map: &NativeFilesMap) -> ResultReturn<FilesMap> {
+    Ok(FilesMap {}) //todo
+}
+
+#[repr(C)]
+pub struct NrsMapContainerInfo {
+    pub public_name: *const c_char,
+    pub xorurl: *const c_char,
+    pub xorname: XorNameArray,
+    pub type_tag: u64,
+    pub version: u64,
+    pub nrs_map: NrsMap,
+    pub data_type: u64,
+}
+
+pub fn nrs_map_container_info_into_repr_c(
+    nrs_container_info: &NativeNrsMapContainerInfo,
+) -> ResultReturn<NrsMapContainerInfo> {
+    Ok(NrsMapContainerInfo {
+        public_name: CString::new(nrs_container_info.public_name.clone())?.into_raw(),
+        xorurl: CString::new(nrs_container_info.xorurl.clone())?.into_raw(),
+        xorname: nrs_container_info.xorname.0,
+        type_tag: nrs_container_info.type_tag,
+        version: nrs_container_info.version,
+        nrs_map: nrs_map_into_repr_c(&nrs_container_info.nrs_map)?,
+        data_type: nrs_container_info.data_type.clone() as u64,
+    })
+}
+
+#[repr(C)]
 pub struct NrsMap {
     // TODO
 }

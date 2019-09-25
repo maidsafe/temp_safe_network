@@ -11,7 +11,7 @@ use std::os::raw::{c_char, c_void};
 pub unsafe extern "C" fn wallet_create(
     app: *mut Safe,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, name: *const c_char),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, xorurl: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
