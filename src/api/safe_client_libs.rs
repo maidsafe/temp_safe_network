@@ -113,7 +113,7 @@ impl SafeApp for SafeAppScl {
     }
 
     fn create_balance(
-        &self,
+        &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
         amount: Coins,
@@ -141,7 +141,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    fn allocate_test_coins(&self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
         info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&owner_sk, amount)

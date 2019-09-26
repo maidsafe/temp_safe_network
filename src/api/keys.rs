@@ -69,7 +69,7 @@ impl Safe {
 
     // Create a SafeKey on the network and return its XOR-URL.
     pub fn keys_create(
-        &self,
+        &mut self,
         from: Option<String>,
         preload_amount: Option<String>,
         pk: Option<String>,
@@ -129,7 +129,7 @@ impl Safe {
 
     // Create a SafeKey on the network, allocates testcoins onto it, and return the SafeKey's XOR-URL
     pub fn keys_create_preload_test_coins(
-        &self,
+        &mut self,
         preload_amount: &str,
     ) -> ResultReturn<(XorUrl, Option<BlsKeyPair>)> {
         let amount = parse_coins_amount(preload_amount)?;
@@ -156,8 +156,8 @@ impl Safe {
     // Check SafeKey's balance from the network from a given SecretKey string
     pub fn keys_balance_from_sk(&self, sk: &str) -> ResultReturn<String> {
         let secret_key = sk_from_hex(sk)?;
-        let coins = self.safe_app.get_balance_from_sk(secret_key).map_err(|e| {
-            Error::ContentNotFound(format!("No SafeKey found at specified location, {}", e))
+        let coins = self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
+            Error::ContentNotFound("No SafeKey found at specified location".to_string())
         })?;
         Ok(coins.to_string())
     }

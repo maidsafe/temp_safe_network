@@ -19,13 +19,13 @@ pub trait SafeApp {
     fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()>;
 
     fn create_balance(
-        &self,
+        &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
         amount: Coins,
     ) -> ResultReturn<XorName>;
 
-    fn allocate_test_coins(&self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName>;
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName>;
 
     fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins>;
 

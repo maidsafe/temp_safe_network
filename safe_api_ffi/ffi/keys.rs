@@ -24,7 +24,7 @@ pub unsafe extern "C" fn generate_keypair(
 
 #[no_mangle]
 pub unsafe extern "C" fn keys_create(
-    app: *const Safe,
+    app: *mut Safe,
     from: *const c_char,
     preload: *const c_char,
     pk: *const c_char,
@@ -34,7 +34,34 @@ pub unsafe extern "C" fn keys_create(
         result: *const FfiResult,
         xorurl: *const c_char,
         safe_key: *const BlsKeyPair,
-        pre_load: *const c_char,
+    ),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+        let user_data = OpaqueCtx(user_data);
+        let preload_option = from_c_str_to_string_option(preload);
+        let from_option = from_c_str_to_string_option(from);
+        let pk_option = from_c_str_to_string_option(pk);
+        let (xorurl, keypair) = (*app).keys_create(from_option, preload_option, pk_option)?;
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            to_c_str(xorurl.to_string())?.as_ptr(),
+            &bls_key_pair_into_repr_c(&keypair.as_ref().unwrap())?,
+        );
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn keys_create_preload_test_coins(
+    app: *mut Safe,
+    preload: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        xorurl: *const c_char,
+        safe_key: *const BlsKeyPair,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
@@ -53,7 +80,7 @@ pub unsafe extern "C" fn keys_create(
 
 #[no_mangle]
 pub unsafe extern "C" fn keys_balance_from_sk(
-    app: *const Safe,
+    app: *mut Safe,
     sk: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, balance: *const c_char),
@@ -125,27 +152,4 @@ pub unsafe extern "C" fn keys_transfer(
         o_cb(user_data.0, FFI_RESULT_OK, tx_id);
         Ok(())
     })
-}
-
-#[test]
-fn ffi_test() {
-    use unwrap::unwrap;
-    use std::ffi::CString;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("10.0"));
-
-    unsafe {
-        let balance: String = unwrap!(
-        ffi_utils::test_utils::call_1(
-            |ud, cb| keys_balance_from_sk(
-                &safe,
-                unwrap!(CString::new(unwrap!(key_pair1).sk)).as_ptr(),
-                ud,
-                cb
-            )
-        )
-    );
-    println!("{}", balance);
-    }
 }
