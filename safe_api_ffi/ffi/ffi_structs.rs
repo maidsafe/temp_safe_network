@@ -1,6 +1,8 @@
 use super::helpers::{from_c_str_to_str_option, to_c_str};
 use ffi_utils::{from_c_str, vec_into_raw_parts};
-use safe_api::files::{FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles, FileItem as NativeFileItem};
+use safe_api::files::{
+    FileItem as NativeFileItem, FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles,
+};
 use safe_api::nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap};
 use safe_api::wallet::{
     WalletSpendableBalance as NativeWalletSpendableBalance,
@@ -31,16 +33,16 @@ pub fn bls_key_pair_into_repr_c(key_pair: &NativeBlsKeyPair) -> ResultReturn<Bls
 #[repr(C)]
 pub struct SafeKey {
     pub xorname: XorNameArray,
-    pub resolved_from: *const c_char,
+    pub resolved_from: NrsMapContainerInfo,
 }
 
 #[repr(C)]
 pub struct Wallet {
     pub xorname: XorNameArray,
     pub type_tag: u64,
-    pub balances: *const WalletSpendableBalances,
+    pub balances: WalletSpendableBalances,
     pub data_type: u64,
-    pub resolved_from: *const c_char,
+    pub resolved_from: NrsMapContainerInfo,
 }
 
 #[repr(C)]
@@ -48,9 +50,9 @@ pub struct FilesContainer {
     pub xorname: XorNameArray,
     pub type_tag: u64,
     pub version: u64,
-    pub files_map: *const FilesMap,
+    pub files_map: FilesMap,
     pub data_type: u64,
-    pub resolved_from: *const c_char,
+    pub resolved_from: NrsMapContainerInfo,
 }
 
 #[repr(C)]
@@ -58,7 +60,7 @@ pub struct PublishedImmutableData {
     pub xorname: XorNameArray,
     pub data: *const u8,
     pub data_len: usize,
-    pub resolved_from: *const c_char,
+    pub resolved_from: NrsMapContainerInfo,
     pub media_type: *const c_char,
 }
 
@@ -177,7 +179,7 @@ pub fn wallet_spendable_balances_into_repr_c(
 pub struct ProcessedFile {
     pub file_name: *const c_char,
     pub file_meta_data: *const c_char,
-    pub file_xorurl: *const c_char
+    pub file_xorurl: *const c_char,
 }
 
 #[repr(C)]
@@ -187,7 +189,9 @@ pub struct ProcessedFiles {
     pub processed_files_cap: usize,
 }
 
-pub unsafe fn processed_files_into_repr_c(map: &NativeProcessedFiles) -> ResultReturn<ProcessedFiles> {
+pub unsafe fn processed_files_into_repr_c(
+    map: &NativeProcessedFiles,
+) -> ResultReturn<ProcessedFiles> {
     let mut vec = Vec::with_capacity(map.len());
 
     for (file_name, (file_meta_data, file_xorurl)) in map {
@@ -221,7 +225,7 @@ impl Drop for ProcessedFiles {
 #[repr(C)]
 pub struct FileItem {
     pub file_meta_data: *const c_char,
-    pub xorurl: *const c_char
+    pub xorurl: *const c_char,
 }
 
 #[repr(C)]
@@ -239,13 +243,28 @@ pub struct FilesMap {
     pub file_items_cap: usize,
 }
 
-pub unsafe fn file_item_into_repr_c(file_name: &String, file_item_map: &NativeFileItem) -> ResultReturn<FileInfo> {
+impl Drop for FilesMap {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.file_items as *mut FileInfo,
+                self.file_items_len,
+                self.file_items_cap,
+            );
+        }
+    }
+}
+
+pub unsafe fn file_item_into_repr_c(
+    file_name: &String,
+    file_item_map: &NativeFileItem,
+) -> ResultReturn<FileInfo> {
     let mut vec = Vec::with_capacity(file_item_map.len());
 
     for (file_meta_data, xorurl) in file_item_map {
         vec.push(FileItem {
             file_meta_data: to_c_str(file_meta_data.to_string())?.as_ptr(),
-            xorurl: to_c_str(xorurl.to_string())?.as_ptr()
+            xorurl: to_c_str(xorurl.to_string())?.as_ptr(),
         })
     }
 
@@ -280,20 +299,21 @@ pub struct NrsMapContainerInfo {
     pub xorname: XorNameArray,
     pub type_tag: u64,
     pub version: u64,
-    pub nrs_map: NrsMap,
+    pub nrs_map: *const c_char,
     pub data_type: u64,
 }
 
-pub fn nrs_map_container_info_into_repr_c(
+pub unsafe fn nrs_map_container_info_into_repr_c(
     nrs_container_info: &NativeNrsMapContainerInfo,
 ) -> ResultReturn<NrsMapContainerInfo> {
+    let nrs_map_json = serde_json::to_string(&nrs_container_info.nrs_map)?;
     Ok(NrsMapContainerInfo {
-        public_name: CString::new(nrs_container_info.public_name.clone())?.into_raw(),
-        xorurl: CString::new(nrs_container_info.xorurl.clone())?.into_raw(),
+        public_name: to_c_str(nrs_container_info.public_name.clone())?.as_ptr(),
+        xorurl: to_c_str(nrs_container_info.xorurl.clone())?.as_ptr(),
         xorname: nrs_container_info.xorname.0,
         type_tag: nrs_container_info.type_tag,
         version: nrs_container_info.version,
-        nrs_map: nrs_map_into_repr_c(&nrs_container_info.nrs_map)?,
+        nrs_map: to_c_str(nrs_map_json)?.as_ptr(),
         data_type: nrs_container_info.data_type.clone() as u64,
     })
 }
