@@ -1,18 +1,17 @@
 [package]
-name = "safe_api"
+name = "safe-api"
 version = "0.4.0"
 description = "SAFE API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
-publish = false
 license = "GPL-3.0"
 repository = "https://github.com/maidsafe/safe-cli"
-include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
+include = ["Cargo.toml", "src/api/*", "src/lib.rs", "build.rs"]
 build = "build.rs"
 edition = "2018"
 
 [workspace]
-members = ["safe_cli", "safe_api_ffi"]
-default-members = ["safe_cli"]
+members = ["safe-cli", "safe-api-ffi"]
+default-members = ["safe-cli"]
 
 [dependencies]
 log = "0.4.6"

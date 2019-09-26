@@ -1,5 +1,5 @@
 [package]
-name = "safe_cli"
+name = "safe-cli"
 version = "0.4.0"
 description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
@@ -13,7 +13,7 @@ name = "safe"
 path = "main.rs"
 
 [dependencies]
-safe_api = { path = "../" }
+safe-api = { path = "../" }
 log = "0.4.6"
 structopt = "0.2.15"
 env_logger = "0.6.0"
@@ -38,9 +38,9 @@ validator_derive = "0.8.0"
 self_update = "0.5.1"
 
 [features]
-mock-network = ["safe_api/mock-network"]
-fake-auth = ["safe_api/fake-auth"]
-scl-mock = ["safe_api/scl-mock"]
+mock-network = ["safe-api/mock-network"]
+fake-auth = ["safe-api/fake-auth"]
+scl-mock = ["safe-api/scl-mock"]
 
 [dev-dependencies]
 safe-nd = "~0.3.0"

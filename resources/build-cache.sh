@@ -6,7 +6,7 @@ if [[ -z "$build_type" ]]; then
 fi
 
 if [[ "$build_type" == "dev" ]]; then
-    cargo test --release --features=mock-network,fake-auth -p safe_api -- --test-threads=1
+    cargo test --release --features=mock-network,fake-auth -p safe-api -- --test-threads=1
 else
     cargo build --release
 fi

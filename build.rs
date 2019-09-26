@@ -40,7 +40,7 @@ mod bindings {
     }
 
     fn gen_bindings_csharp() {
-        let target_dir = Path::new("bindings/csharp/safe_api");
+        let target_dir = Path::new("bindings/csharp/safe-api");
 
         let mut bindgen = unwrap!(Bindgen::new());
         let mut lang = LangCSharp::new();
@@ -83,7 +83,7 @@ mod bindings {
         lang.reset_filter(FilterMode::Blacklist);
 
         let mut outputs = HashMap::new();
-        bindgen.source_file("safe_api_ffi/lib.rs");
+        bindgen.source_file("safe-api-ffi/lib.rs");
         bindgen.compile_or_panic(&mut lang, &mut outputs, true);
         apply_patches(&mut outputs);
         bindgen.write_outputs_or_panic(target_dir, &outputs);

@@ -30,7 +30,7 @@ fn main() {
     debug!("Starting SAFE CLI...");
 
     if let Err(e) = run() {
-        error!("safe_cli error: {}", e);
+        error!("safe-cli error: {}", e);
         process::exit(1);
     }
 }

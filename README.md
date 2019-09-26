@@ -55,7 +55,7 @@ If otherwise you prefer to build the SAFE CLI from source code, please follow th
 
 In order to build this CLI from source code you need to make sure you have `rustc v1.37.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
-Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe_cli` crate (the build process may take several minutes the first time you run it on this crate):
+Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-cli` crate (the build process may take several minutes the first time you run it on this crate):
 ```shell
 $ git clone https://github.com/maidsafe/safe-cli.git
 $ cd safe-cli
@@ -64,12 +64,12 @@ $ cargo build
 
 ### Using the Mock or Non-Mock SAFE Network
 
-By default, the `safe_cli` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
+By default, the `safe-cli` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
 ```
 $ cargo build --features mock-network
 ```
 
-Keep in mind that when running the safe_cli with `cargo run`, please also make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe_cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
+Keep in mind that when running the safe-cli with `cargo run`, please also make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe-cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
 ```
 $ cargo run --features mock-network -- keys create --test-coins
 ```
@@ -139,7 +139,7 @@ The following application authorisation request was received:
 Allow authorisation? [y/N]:
 ```
 
-Please go ahead and allow the authorisation by entering `y`. The Authenticator will send a response back to the `safe_cli` with the corresponding credentials it can use to connect directly with the Network. When the `safe_cli` receives the authorisation response, it will display a message like the following:
+Please go ahead and allow the authorisation by entering `y`. The Authenticator will send a response back to the `safe-cli` with the corresponding credentials it can use to connect directly with the Network. When the `safe-cli` receives the authorisation response, it will display a message like the following:
 ```shell
 SAFE CLI app was successfully authorised
 Credentials were stored in <home directory>/.safe/credentials
@@ -184,7 +184,7 @@ Secret Key = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c
 
 In this case, the new `SafeKey` is preloaded with coins which are transferred from the `SafeKey` we pay the operation with. In next section we'll see how to check the coins balance of them.
 
-If we omit the `--pay-with` argument from the command above, or from any other command which supports it, the CLI will make use of the default `SafeKey` which is linked from the account for paying the costs of the operation. Upon the creation of a SAFE Account, a default `SafeKey` is linked to it and used for paying the costs incurred in any operations made by the applications that have been authorised by the owner of that account, like it's the case of the `safe_cli` application. Currently it's not possible to change the default `SafeKey` linked from an account, but it will be possible with the `safe_cli` in the near future.
+If we omit the `--pay-with` argument from the command above, or from any other command which supports it, the CLI will make use of the default `SafeKey` which is linked from the account for paying the costs of the operation. Upon the creation of a SAFE Account, a default `SafeKey` is linked to it and used for paying the costs incurred in any operations made by the applications that have been authorised by the owner of that account, like it's the case of the `safe-cli` application. Currently it's not possible to change the default `SafeKey` linked from an account, but it will be possible with the `safe-cli` in the near future.
 
 Other optional args that can be used with `keys create` sub-command are:
 ```
