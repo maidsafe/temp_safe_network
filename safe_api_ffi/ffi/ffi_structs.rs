@@ -65,7 +65,7 @@ pub struct PublishedImmutableData {
 }
 
 #[repr(C)]
-pub struct FfiXorUrlEncoder {
+pub struct XorUrlEncoder {
     pub encoding_version: u64,
     pub xorname: XorNameArray,
     pub type_tag: u64,
