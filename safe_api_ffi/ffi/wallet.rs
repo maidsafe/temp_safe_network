@@ -120,7 +120,7 @@ pub unsafe extern "C" fn wallet_get(
         let user_data = OpaqueCtx(user_data);
         let wallet_url = from_c_str(url)?;
         let spendables = (*app).wallet_get(&wallet_url)?;
-        let wallet_spendable = wallet_spendable_balances_into_repr_c(spendables)?;
+        let wallet_spendable = wallet_spendable_balances_into_repr_c(&spendables)?;
         o_cb(user_data.0, FFI_RESULT_OK, &wallet_spendable);
         Ok(())
     })

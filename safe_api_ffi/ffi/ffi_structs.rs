@@ -1,6 +1,6 @@
 use super::helpers::{from_c_str_to_str_option, to_c_str};
 use ffi_utils::{from_c_str, vec_into_raw_parts};
-use safe_api::files::{FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles};
+use safe_api::files::{FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles, FileItem as NativeFileItem};
 use safe_api::nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap};
 use safe_api::wallet::{
     WalletSpendableBalance as NativeWalletSpendableBalance,
@@ -38,7 +38,7 @@ pub struct SafeKey {
 pub struct Wallet {
     pub xorname: XorNameArray,
     pub type_tag: u64,
-    pub balances: *const c_char,
+    pub balances: *const WalletSpendableBalances,
     pub data_type: u64,
     pub resolved_from: *const c_char,
 }
@@ -48,7 +48,7 @@ pub struct FilesContainer {
     pub xorname: XorNameArray,
     pub type_tag: u64,
     pub version: u64,
-    pub files_map: *const c_char,
+    pub files_map: *const FilesMap,
     pub data_type: u64,
     pub resolved_from: *const c_char,
 }
@@ -153,14 +153,14 @@ impl Drop for WalletSpendableBalances {
 }
 
 pub fn wallet_spendable_balances_into_repr_c(
-    wallet_balances: NativeWalletSpendableBalances,
+    wallet_balances: &NativeWalletSpendableBalances,
 ) -> ResultReturn<WalletSpendableBalances> {
     let mut vec = Vec::with_capacity(wallet_balances.len());
 
     for (name, (is_default, spendable_balance)) in wallet_balances {
         vec.push(SependableWalletBalance {
-            wallet_name: CString::new(name)?.into_raw(),
-            is_default: is_default,
+            wallet_name: CString::new(name.to_string())?.into_raw(),
+            is_default: *is_default,
             spendable_wallet_balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
         })
     }
@@ -174,23 +174,103 @@ pub fn wallet_spendable_balances_into_repr_c(
 }
 
 #[repr(C)]
-pub struct ProcessedFiles {
-    // todo
+pub struct ProcessedFile {
+    pub file_name: *const c_char,
+    pub file_meta_data: *const c_char,
+    pub file_xorurl: *const c_char
 }
 
-pub fn processed_files_into_repr_c(
-    _nrs_map: &NativeProcessedFiles,
-) -> ResultReturn<ProcessedFiles> {
-    Ok(ProcessedFiles {}) // todo
+#[repr(C)]
+pub struct ProcessedFiles {
+    pub processed_files: *const ProcessedFile,
+    pub processed_files_len: usize,
+    pub processed_files_cap: usize,
+}
+
+pub unsafe fn processed_files_into_repr_c(map: &NativeProcessedFiles) -> ResultReturn<ProcessedFiles> {
+    let mut vec = Vec::with_capacity(map.len());
+
+    for (file_name, (file_meta_data, file_xorurl)) in map {
+        vec.push(ProcessedFile {
+            file_name: to_c_str(file_name.to_string())?.as_ptr(),
+            file_meta_data: to_c_str(file_meta_data.to_string())?.as_ptr(),
+            file_xorurl: to_c_str(file_xorurl.to_string())?.as_ptr(),
+        })
+    }
+
+    let (processed_files, processed_files_len, processed_files_cap) = vec_into_raw_parts(vec);
+    Ok(ProcessedFiles {
+        processed_files,
+        processed_files_len,
+        processed_files_cap,
+    })
+}
+
+impl Drop for ProcessedFiles {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.processed_files as *mut ProcessedFile,
+                self.processed_files_len,
+                self.processed_files_cap,
+            );
+        }
+    }
+}
+
+#[repr(C)]
+pub struct FileItem {
+    pub file_meta_data: *const c_char,
+    pub xorurl: *const c_char
+}
+
+#[repr(C)]
+pub struct FileInfo {
+    pub file_name: *const c_char,
+    pub file_items: *const FileItem,
+    pub file_items_len: usize,
+    pub file_items_cap: usize,
 }
 
 #[repr(C)]
 pub struct FilesMap {
-    // todo
+    pub file_items: *const FileInfo,
+    pub file_items_len: usize,
+    pub file_items_cap: usize,
 }
 
-pub fn files_map_into_repr_c(_nrs_map: &NativeFilesMap) -> ResultReturn<FilesMap> {
-    Ok(FilesMap {}) //todo
+pub unsafe fn file_item_into_repr_c(file_name: &String, file_item_map: &NativeFileItem) -> ResultReturn<FileInfo> {
+    let mut vec = Vec::with_capacity(file_item_map.len());
+
+    for (file_meta_data, xorurl) in file_item_map {
+        vec.push(FileItem {
+            file_meta_data: to_c_str(file_meta_data.to_string())?.as_ptr(),
+            xorurl: to_c_str(xorurl.to_string())?.as_ptr()
+        })
+    }
+
+    let (file_items, file_items_len, file_items_cap) = vec_into_raw_parts(vec);
+    Ok(FileInfo {
+        file_name: to_c_str(file_name.to_string())?.as_ptr(),
+        file_items,
+        file_items_len,
+        file_items_cap,
+    })
+}
+
+pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> ResultReturn<FilesMap> {
+    let mut vec = Vec::with_capacity(files_map.len());
+
+    for (file_name, file_items) in files_map {
+        vec.push(file_item_into_repr_c(file_name, file_items)?);
+    }
+
+    let (file_items, file_items_len, file_items_cap) = vec_into_raw_parts(vec);
+    Ok(FilesMap {
+        file_items,
+        file_items_len,
+        file_items_cap,
+    })
 }
 
 #[repr(C)]
@@ -220,9 +300,56 @@ pub fn nrs_map_container_info_into_repr_c(
 
 #[repr(C)]
 pub struct NrsMap {
-    // TODO
+    pub sub_names_map: SubNamesMap,
+    pub default: *const c_char,
 }
 
-pub fn nrs_map_into_repr_c(_nrs_map: &NativeNrsMap) -> ResultReturn<NrsMap> {
-    Ok(NrsMap {})
+pub fn nrs_map_into_repr_c(nrs_map: &NativeNrsMap) -> ResultReturn<NrsMap> {
+    Ok(NrsMap {
+        sub_names_map: sub_names_map_into_repr_c(nrs_map.sub_names_map.clone())?,
+        default: std::ptr::null(), // todo: update to return correct format
+    })
+}
+
+#[repr(C)]
+pub struct SubNamesMapEntry {
+    pub sub_name: *const c_char,
+    pub sub_name_rdf: *const c_char, // Needs to be updated to correct format
+}
+
+#[repr(C)]
+pub struct SubNamesMap {
+    pub sub_names: *const SubNamesMapEntry,
+    pub sub_name_len: usize,
+    pub sub_name_cap: usize,
+}
+
+pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> ResultReturn<SubNamesMap> {
+    let mut vec = Vec::with_capacity(map.len());
+
+    for (sub_name, _sub_name_rdf) in map {
+        vec.push(SubNamesMapEntry {
+            sub_name: CString::new(sub_name)?.into_raw(),
+            sub_name_rdf: std::ptr::null(), // todo: update to return correct format
+        })
+    }
+
+    let (sub_names, sub_name_len, sub_name_cap) = vec_into_raw_parts(vec);
+    Ok(SubNamesMap {
+        sub_names,
+        sub_name_len,
+        sub_name_cap,
+    })
+}
+
+impl Drop for SubNamesMap {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.sub_names as *mut SubNamesMapEntry,
+                self.sub_name_len,
+                self.sub_name_cap,
+            );
+        }
+    }
 }

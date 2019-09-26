@@ -1,4 +1,4 @@
-use super::ffi_structs::{FilesContainer, PublishedImmutableData, SafeKey, Wallet};
+use super::ffi_structs::{FilesContainer, PublishedImmutableData, SafeKey, Wallet, files_map_into_repr_c, wallet_spendable_balances_into_repr_c};
 use super::helpers::to_c_str;
 use super::{ResultReturn, Safe};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx};
@@ -46,10 +46,9 @@ pub unsafe extern "C" fn fetch(
                 resolved_from,
             } => {
                 let resolved_from_json = serde_json::to_string(&resolved_from)?;
-                let files_map_json = serde_json::to_string(&files_map)?;
                 let container = FilesContainer {
                     version: *version,
-                    files_map: to_c_str(files_map_json)?.as_ptr(),
+                    files_map: &files_map_into_repr_c(&files_map)?,
                     type_tag: *type_tag,
                     xorname: xorname.0,
                     data_type: (*data_type).clone() as u64,
@@ -65,11 +64,10 @@ pub unsafe extern "C" fn fetch(
                 resolved_from,
             } => {
                 let resolved_from_json = serde_json::to_string(&resolved_from)?;
-                let balances_json = serde_json::to_string(&balances)?;
                 let wallet = Wallet {
                     xorname: xorname.0,
                     type_tag: *type_tag,
-                    balances: to_c_str(balances_json)?.as_ptr(),
+                    balances: &wallet_spendable_balances_into_repr_c(balances)?,
                     data_type: (*data_type).clone() as u64,
                     resolved_from: to_c_str(resolved_from_json)?.as_ptr(),
                 };
