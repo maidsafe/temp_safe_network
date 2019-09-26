@@ -238,6 +238,7 @@ impl Safe {
         let processed_files = file_system_dir_walk(self, location, recursive, false)?;
 
         let dest_path = Some(xorurl_encoder.path());
+
         let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
             files_map_sync(
                 self,
@@ -939,8 +940,8 @@ fn file_system_dir_walk(
     upload_files: bool,
 ) -> ResultReturn<ProcessedFiles> {
     let file_path = Path::new(location);
-    let (metadata, _) = get_metadata(&file_path)?;
     info!("Reading files from {}", file_path.display());
+    let (metadata, _) = get_metadata(&file_path)?;
     if metadata.is_dir() || !recursive {
         // TODO: option to enable following symlinks and hidden files?
         // We now compare both FilesMaps to upload the missing files
@@ -1017,52 +1018,37 @@ fn file_system_single_file(
 ) -> ResultReturn<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading file {}", file_path.display());
+    let (metadata, _) = get_metadata(&file_path)?;
 
     // We now compare both FilesMaps to upload the missing files
     let mut processed_files = BTreeMap::new();
     let normalised_path = normalise_path_separator(file_path.to_str().unwrap_or_else(|| ""));
-    match fs::metadata(&file_path) {
-        Ok(metadata) => {
-            if metadata.is_dir() {
-                Err(Error::InvalidInput(format!(
-                    "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",
-                    location
-                )))
-            } else if upload_files {
-                match upload_file_to_net(safe, &file_path) {
-                    Ok(xorurl) => {
-                        processed_files
-                            .insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
-                    }
-                    Err(err) => {
-                        processed_files.insert(
-                            normalised_path.clone(),
-                            (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
-                        );
-                        info!("Skipping file \"{}\". {}", normalised_path, err);
-                    }
-                };
-                Ok(processed_files)
-            } else {
-                processed_files.insert(
-                    normalised_path,
-                    (CONTENT_ADDED_SIGN.to_string(), "".to_string()),
-                );
-                Ok(processed_files)
+    println!("META: {}", file_path.display());
+    if metadata.is_dir() {
+        Err(Error::InvalidInput(format!(
+            "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",
+            location
+        )))
+    } else if upload_files {
+        match upload_file_to_net(safe, &file_path) {
+            Ok(xorurl) => {
+                processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
             }
-        }
-        Err(err) => {
-            processed_files.insert(
-                normalised_path.clone(),
-                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
-            );
-            info!(
-                "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
-                normalised_path, err
-            );
-
-            Ok(processed_files)
-        }
+            Err(err) => {
+                processed_files.insert(
+                    normalised_path.clone(),
+                    (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                );
+                info!("Skipping file \"{}\". {}", normalised_path, err);
+            }
+        };
+        Ok(processed_files)
+    } else {
+        processed_files.insert(
+            normalised_path,
+            (CONTENT_ADDED_SIGN.to_string(), "".to_string()),
+        );
+        Ok(processed_files)
     }
 }
 
@@ -2120,6 +2106,45 @@ fn test_files_container_add_existing_name() {
         new_processed_files["../testdata/test.md"].1,
         new_files_map["/sub2.md"]["link"]
     );
+}
+
+#[test]
+fn test_files_container_fail_add_or_sync_invalid_path() {
+    use unwrap::unwrap;
+    let mut safe = Safe::new("base32z");
+    unwrap!(safe.connect("", Some("fake-credentials")));
+    let (xorurl, processed_files, files_map) =
+        unwrap!(safe.files_container_create("./testdata/test.md", None, false, false));
+    assert_eq!(processed_files.len(), 1);
+    assert_eq!(files_map.len(), 1);
+
+    match safe.files_container_sync("/non-existing-path", &xorurl, false, false, false, false) {
+        Ok(_) => panic!("unexpectdly added a folder to files container"),
+        Err(Error::FilesSystemError(msg)) => assert!(
+            msg.starts_with("Couldn't read metadata from source path ('/non-existing-path')")
+        ),
+        other => panic!(format!(
+            "error returned is not the expected one: {:?}",
+            other
+        )),
+    }
+
+    match safe.files_container_add(
+        "/non-existing-path",
+        &format!("{}/test.md", xorurl),
+        true, // force it
+        false,
+        false,
+    ) {
+        Ok(_) => panic!("unexpectdly added a folder to files container"),
+        Err(Error::FilesSystemError(msg)) => assert!(
+            msg.starts_with("Couldn't read metadata from source path ('/non-existing-path')")
+        ),
+        other => panic!(format!(
+            "error returned is not the expected one: {:?}",
+            other
+        )),
+    }
 }
 
 #[test]
