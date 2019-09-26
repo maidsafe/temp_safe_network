@@ -10,7 +10,7 @@ USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
 S3_BUCKET := safe-jenkins-build-artifacts
-GITHUB_REPO_OWNER := maidsafe
+GITHUB_REPO_OWNER := jacderida
 GITHUB_REPO_NAME := safe_client_libs
 
 build-container:
@@ -394,6 +394,7 @@ ifeq ($(UNAME_S),Linux)
 	docker cp "safe_app_tests-${UUID}":/target .
 	docker rm -f "safe_app_tests-${UUID}"
 else
+	./scripts/build-mock
 	./scripts/test-mock
 endif
 	make copy-artifacts
@@ -509,33 +510,7 @@ endif
 		--name "safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-linux-android.tar.gz" \
 		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-linux-android.tar.gz
 
-publish-safe_core:
-ifndef CRATES_IO_TOKEN
-	@echo "A login token for crates.io must be provided."
-	@exit 1
-endif
-	rm -rf artifacts deploy
-	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:x86_64-mock \
-		/bin/bash -c "cd safe_core && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
-
-publish-safe_auth:
-ifndef CRATES_IO_TOKEN
-	@echo "A login token for crates.io must be provided."
-	@exit 1
-endif
-	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:x86_64-mock \
-		/bin/bash -c "cd safe_authenticator && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
-
-publish-safe_app:
-ifndef CRATES_IO_TOKEN
-	@echo "A login token for crates.io must be provided."
-	@exit 1
-endif
-	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:x86_64-mock \
-		/bin/bash -c "cd safe_app && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
+publish:
+	./scripts/publish "safe_core"
+	./scripts/publish "safe_authenticator"
+	./scripts/publish "safe_app"
