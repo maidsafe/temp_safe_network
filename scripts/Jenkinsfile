@@ -164,10 +164,10 @@ stage("deployment") {
                 sh("git fetch --tags --force")
                 retrieveBuildArtifacts()
                 if (isVersionChangeCommit()) {
-                    def version = getVersion()
+                    def version = getVersion('safe_app')
                     packageDeployArtifacts(true)
-                    createTag(version)
-                    createGitHubRelease(version)
+                    createTags()
+                    createGitHubRelease()
                     uploadDeployArtifacts("mock")
                 } else {
                     packageDeployArtifacts(false)
@@ -275,13 +275,10 @@ def uploadBuildArtifacts() {
     }
 }
 
-def getVersion() {
-    // For now we"re just taking the version from either safe auth or safe app.
-    // We may change this eventually to deploy each component separately, or possibly
-    // even refactor into separate repos.
+def getVersion(crate) {
     return sh(
         returnStdout: true,
-        script: "grep '^version' < safe_app/Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
+        script: "grep '^version' < ${crate}/Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
 }
 
 def uploadDeployArtifacts(type) {
@@ -298,22 +295,26 @@ def uploadDeployArtifacts(type) {
     }
 }
 
-def createTag(version) {
+def createTags() {
     withCredentials(
         [usernamePassword(
             credentialsId: "github_maidsafe_qa_user_credentials",
             usernameVariable: "GIT_USER",
             passwordVariable: "GIT_PASSWORD")]) {
-        sh("git config --global user.name \$GIT_USER")
-        sh("git config --global user.email qa@maidsafe.net")
-        sh("git config credential.username \$GIT_USER")
-        sh("git config credential.helper '!f() { echo password=\$GIT_PASSWORD; }; f'")
-        sh("git tag -a ${version} -m 'Creating tag for ${version}'")
-        sh("GIT_ASKPASS=true git push origin --tags")
+        ["safe_app", "safe_authenticator", "safe_core"].each({
+            def version = getVersion(it)
+            def tag_name = "${it}-${version}"
+            sh("git config --global user.name \$GIT_USER")
+            sh("git config --global user.email qa@maidsafe.net")
+            sh("git config credential.username \$GIT_USER")
+            sh("git config credential.helper '!f() { echo password=\$GIT_PASSWORD; }; f'")
+            sh("git tag -a ${tag_name} -m 'Creating tag for ${tag_name}'")
+            sh("GIT_ASKPASS=true git push origin --tags")
+        })
     }
 }
 
-def createGitHubRelease(version) {
+def createGitHubRelease() {
     withCredentials(
         [usernamePassword(
             credentialsId: "github_maidsafe_token_credentials",
