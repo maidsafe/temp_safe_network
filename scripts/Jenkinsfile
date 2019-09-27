@@ -167,7 +167,6 @@ stage("deployment") {
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
             if (isVersionChangeCommit()) {
-                def version = getVersion("safe_app")
                 packageDeployArtifacts(true)
                 createTags()
                 createGitHubRelease()
@@ -191,13 +190,17 @@ stage("publishing") {
     node("safe_client_libs") {
         if (shouldPublish()) {
             checkout(scm)
+            def components = getComponentsWithVersionChanges()
             def dryRun = isNightlyBuild() ? "true" : "false"
             withEnv(["SCL_PUBLISH_DRY_RUN=${dryRun}"]) {
-                withCredentials(
-                    [string(
-                        credentialsId: "crates_io_token", variable: "CRATES_IO_TOKEN")]) {
-                    sh("make publish")
-                }
+                components.each({
+                    publishCrate(it)
+                    // The next crate may have references to the one that was just published,
+                    // and sometimes it's possible the next publishing process will complain
+                    // that the one that was just published doesn't exist. We can sleep for a
+                    // few seconds to give it a chance to register on crates.io.
+                    sh("sleep 10")
+                })
             }
         } else {
             echo("Not publishing.")
@@ -224,13 +227,18 @@ def retrieveCache() {
 }
 
 def isVersionChangeCommit() {
+    def message = getLatestCommitMessage()
+    return message.startsWith("Version change")
+}
+
+def getLatestCommitMessage() {
     def shortCommitHash = sh(
         returnStdout: true,
         script: "git log -n 1 --no-merges --pretty=format:'%h'").trim()
     def message = sh(
         returnStdout: true,
         script: "git log --format=%B -n 1 ${shortCommitHash}").trim()
-    return message.startsWith("Version change")
+    return message
 }
 
 def packageBuildArtifacts(mode, target) {
@@ -298,12 +306,13 @@ def uploadDeployArtifacts(type) {
 }
 
 def createTags() {
+    def components = getComponentsWithVersionChanges()
     withCredentials(
         [usernamePassword(
             credentialsId: "github_maidsafe_qa_user_credentials",
             usernameVariable: "GIT_USER",
             passwordVariable: "GIT_PASSWORD")]) {
-        ["safe_app", "safe_authenticator", "safe_core"].each({
+        components.each({
             def version = getVersion(it)
             def tag_name = "${it}-${version}"
             sh("git config --global user.name \$GIT_USER")
@@ -314,6 +323,21 @@ def createTags() {
             sh("GIT_ASKPASS=true git push origin --tags")
         })
     }
+}
+
+def getComponentsWithVersionChanges() {
+    def components = []
+    def message = getLatestCommitMessage()
+    if (message.contains("safe_core")) {
+        components.add("safe_core")
+    }
+    if (message.contains("safe_authenticator")) {
+        components.add("safe_authenticator")
+    }
+    if (message.contains("safe_app")) {
+        components.add("safe_app")
+    }
+    return components
 }
 
 def createGitHubRelease() {

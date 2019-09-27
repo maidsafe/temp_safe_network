@@ -510,7 +510,11 @@ endif
 		--name "safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-linux-android.tar.gz" \
 		--file deploy/real/safe_authenticator-${SAFE_AUTH_VERSION}-x86_64-linux-android.tar.gz
 
-publish:
+publish-safe_core:
 	./scripts/publish "safe_core"
+
+publish-safe_authenticator:
 	./scripts/publish "safe_authenticator"
+
+publish-safe_app:
 	./scripts/publish "safe_app"
