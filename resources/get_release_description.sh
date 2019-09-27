@@ -50,26 +50,26 @@ tar.gz: TAR_WIN_CHECKSUM
 EOF
 
 safe_completion_url="https:\/\/github.com\/maidsafe\/safe-cli\/releases\/download\/$version\/safe_completion.sh"
-s3_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-$version-x86_64-unknown-linux-gnu-dev.zip"
-s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-$version-x86_64-pc-windows-gnu-dev.zip"
-s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe_cli-$version-x86_64-apple-darwin-dev.zip"
+s3_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-unknown-linux-gnu-dev.zip"
+s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-pc-windows-gnu-dev.zip"
+s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-apple-darwin-dev.zip"
 zip_linux_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-unknown-linux-gnu.zip" | \
+    "./deploy/release/safe-cli-$version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
 zip_macos_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-apple-darwin.zip" | \
+    "./deploy/release/safe-cli-$version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-pc-windows-gnu.zip" | \
+    "./deploy/release/safe-cli-$version-x86_64-pc-windows-gnu.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-unknown-linux-gnu.tar.gz" | \
+    "./deploy/release/safe-cli-$version-x86_64-unknown-linux-gnu.tar.gz" | \
     awk '{ print $1 }')
 tar_macos_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/release/safe-cli-$version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 tar_win_checksum=$(sha256sum \
-    "./deploy/release/safe_cli-$version-x86_64-pc-windows-gnu.tar.gz" | \
+    "./deploy/release/safe-cli-$version-x86_64-pc-windows-gnu.tar.gz" | \
     awk '{ print $1 }')
 
 release_description=$(sed "s/S3_LINUX_DEPLOY_URL/$s3_linux_deploy_url/g" <<< "$release_description")
