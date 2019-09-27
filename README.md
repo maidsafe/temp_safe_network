@@ -245,7 +245,7 @@ Finally, our friend gives us the XOR-URL of the `SafeKey` he/she has created for
 
 A `Wallet` is a specific type of Container on the network, holding a set of spendable safecoin balances.
 
-A `Wallet` effectively contains links to `SafeKey`s which have safecoin balances attached to them, but the `Wallet` also stores the secret keys needed to spend them, and this is why each of these links/items in a `Wallet` are called `spendable balances`. `Wallet`s are stored encrypted and only accessible to the owner by default.
+A `Wallet` effectively contains links to `SafeKey`s which have safecoin balances attached to them, but the `Wallet` also stores the secret keys needed to spend them, and this is why each of these links/items in a `Wallet` is called a `spendable balances`. `Wallet`s are stored encrypted and only accessible to the owner by default.
 
 Each of these links to `SafeKey`s (the spendable balances) can have a friendly name provided by the user, and these friendly names can then be used in different types of operations. E.g. one spendable balance in a `Wallet` can be named 'for-night-outs', while another one is named 'to-pay-the-rent', so when using the `Wallet` you could provide those names to the command in order to choose which spendable balance to use for the operation.
 
@@ -311,7 +311,7 @@ $ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38
 Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e" has a total balance of 0 safecoins
 ```
 
-The coin balance of an individual spendable balance can also be queried by providing it's friendly name as part of the `Wallet` URL, e.g. the `Wallet` we created above contains an spendable balance named 'first-spendable-balance', so we can check the balance of it (instead of the total balance of the `Wallet`) with the followign command:
+The coin balance of an individual spendable balance can also be queried by providing its friendly name as part of the `Wallet` URL, e.g. the `Wallet` we created above contains an spendable balance named 'first-spendable-balance', so we can check the balance of it (instead of the total balance of the `Wallet`) with the following command:
 ```shell
 $ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance
 Wallet's spendable balance at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance" has a balance of 0 safecoins
