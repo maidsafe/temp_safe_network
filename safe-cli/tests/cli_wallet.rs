@@ -27,9 +27,9 @@ const UNMATCHED_SK_XORURL: &str =
 fn calling_safe_wallet_transfer() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let (wallet_from, _pk, _sk) = create_wallet_with_balance("160.000000001"); // we need 1 nano to pay for the costs of creation
+    let (wallet_from, _pk, _sk) = create_wallet_with_balance("160.000000001", None); // we need 1 nano to pay for the costs of creation
     assert!(wallet_from.contains(SAFE_PROTOCOL));
-    let (wallet_to, _pk, _sk) = create_wallet_with_balance("5.000000001"); // we need 1 nano to pay for the costs of creation
+    let (wallet_to, _pk, _sk) = create_wallet_with_balance("5.000000001", None); // we need 1 nano to pay for the costs of creation
     assert!(wallet_to.contains(SAFE_PROTOCOL));
 
     // To got coins?
@@ -45,7 +45,7 @@ fn calling_safe_wallet_transfer() {
 
     assert_eq!(to_starts_with, "5.000000000");
 
-    // To got coins?
+    // From got coins?
     let from_starts_with = cmd!(
         get_bin_location(),
         "wallet",
@@ -100,10 +100,89 @@ fn calling_safe_wallet_transfer() {
 }
 
 #[test]
+fn calling_safe_wallet_transfer_spendable_balance_urls() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let (wallet_from, _pk, _sk) =
+        create_wallet_with_balance("96.000000001", Some("one-spendable-balance")); // we need 1 nano to pay for the costs of creation
+    assert!(wallet_from.contains(SAFE_PROTOCOL));
+    let (wallet_to, _pk, _sk) = create_wallet_with_balance("5.100000001", Some("my-savings")); // we need 1 nano to pay for the costs of creation
+    assert!(wallet_to.contains(SAFE_PROTOCOL));
+
+    // To got coins?
+    let to_spendable_balance = format!("{}/my-savings", wallet_to);
+    let to_starts_with = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &to_spendable_balance,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(to_starts_with, "5.100000000");
+
+    // From got coins?
+    let from_spendable_balance = format!("{}/one-spendable-balance", wallet_from);
+    let from_starts_with = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &from_spendable_balance,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(from_starts_with, "96.000000000");
+
+    cmd.args(&vec![
+        "wallet",
+        "transfer",
+        "50",
+        "--from",
+        &from_spendable_balance,
+        "--to",
+        &to_spendable_balance,
+    ])
+    .assert()
+    .stdout(predicate::str::contains("Success"))
+    .stdout(predicate::str::contains("TX_ID"))
+    .success();
+
+    // To got coins?
+    let to_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_to,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(to_has, "55.100000000");
+
+    // from lost coins?
+    let from_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_from,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(from_has, "46.000000000")
+}
+
+#[test]
 fn calling_safe_wallet_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("10.000000001"); // we need 1 nano to pay for the costs of creation
+    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("10.000000001", None); // we need 1 nano to pay for the costs of creation
 
     cmd.args(&vec!["wallet", "balance", &wallet_xor, "--json"])
         .assert()
@@ -112,8 +191,27 @@ fn calling_safe_wallet_balance() {
 }
 
 #[test]
+fn calling_safe_wallet_balance_with_spendable_balance_url() {
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+
+    let (wallet_xor, _pk, _sk) =
+        create_wallet_with_balance("453.006000001", Some("my-first-balance")); // we need 1 nano to pay for the costs of creation
+
+    let spendable_balace_xorurl = format!("{}/my-first-balance", wallet_xor);
+    cmd.args(&vec![
+        "wallet",
+        "balance",
+        &spendable_balace_xorurl,
+        "--json",
+    ])
+    .assert()
+    .stdout("453.006000000\n")
+    .success();
+}
+
+#[test]
 fn calling_safe_wallet_insert() {
-    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("50");
+    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("50", None);
     let (key_pk_xor, sk) = create_preload_and_get_keys("300.000000001"); // we need 1 nano to pay for the costs of creation
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -157,7 +255,7 @@ fn calling_safe_wallet_no_balance() {
 
 #[test]
 fn calling_safe_wallet_create_w_preload_has_balance() {
-    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("55.000000001"); // we need 1 nano to pay for the costs of creation
+    let (wallet_xor, _pk, _sk) = create_wallet_with_balance("55.000000001", None); // we need 1 nano to pay for the costs of creation
 
     let balance = cmd!(
         get_bin_location(),
@@ -301,7 +399,7 @@ fn calling_safe_wallet_create_w_wrong_pk_for_sk() {
 fn calling_safe_wallet_transfer_to_key_xorurl() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let (wallet_from, _pk, _sk) = create_wallet_with_balance("35.650000001"); // we need 1 nano to pay for the costs of creation
+    let (wallet_from, _pk, _sk) = create_wallet_with_balance("35.650000001", None); // we need 1 nano to pay for the costs of creation
     let (key_xorurl, key_sk) = create_preload_and_get_keys("0.0");
 
     cmd.args(&vec![
@@ -350,7 +448,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() {
 fn calling_safe_wallet_transfer_to_key_nrsurl() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
-    let (wallet_from, _pk, _sk) = create_wallet_with_balance("1535.650000001"); // we need 1 nano to pay for the costs of creation
+    let (wallet_from, _pk, _sk) = create_wallet_with_balance("1535.650000001", None); // we need 1 nano to pay for the costs of creation
     let (key_xorurl, key_sk) = create_preload_and_get_keys("0.0");
 
     let key_nrsurl = format!("safe://{}", get_random_nrs_string());

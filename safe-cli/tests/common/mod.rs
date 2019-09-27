@@ -54,7 +54,10 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
 }
 
 #[allow(dead_code)]
-pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
+pub fn create_wallet_with_balance(
+    preload: &str,
+    balance_name: Option<&str>,
+) -> (String, String, String) {
     let (_pk, sk) = create_preload_and_get_keys(&preload);
     // we spent 1 nano for creating the SafeKey, so we now preload it
     // with 1 nano less than amount request provided
@@ -69,6 +72,8 @@ pub fn create_wallet_with_balance(preload: &str) -> (String, String, String) {
         &sk,
         "--preload",
         preload_minus_costs,
+        "--name",
+        balance_name.unwrap_or_else(|| "default-balance"),
         "--json",
     )
     .read()

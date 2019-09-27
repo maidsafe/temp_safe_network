@@ -12,7 +12,7 @@ use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::keys::{create_new_key, print_new_key_output};
 use super::OutputFmt;
 use log::debug;
-use safe_api::{BlsKeyPair, Safe};
+use safe_api::{BlsKeyPair, Safe, XorUrlEncoder};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -64,10 +64,10 @@ pub enum WalletSubCommands {
         /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided
         #[structopt(long = "sk")]
         secret_key: Option<String>,
-        /// Create a Key, allocate test-coins onto it, and add the SafeKey to the Wallet
+        /// Create a SafeKey, allocate test-coins onto it, and add the SafeKey to the Wallet
         #[structopt(long = "test-coins")]
         test_coins: bool,
-        /// Preload the key with a balance
+        /// Preload with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
     },
@@ -179,10 +179,18 @@ pub fn wallet_commander(
             let balance = safe.wallet_balance(&target)?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!(
-                    "Wallet at \"{}\" has a total balance of {} safecoins",
-                    target, balance
-                );
+                let xorurl_encoder = XorUrlEncoder::from_url(&target)?;
+                if xorurl_encoder.path().is_empty() {
+                    println!(
+                        "Wallet at \"{}\" has a total balance of {} safecoins",
+                        target, balance
+                    );
+                } else {
+                    println!(
+                        "Wallet's spendable balance at \"{}\" has a balance of {} safecoins",
+                        target, balance
+                    );
+                }
             } else {
                 println!("{}", balance);
             }

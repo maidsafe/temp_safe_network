@@ -245,7 +245,9 @@ Finally, our friend gives us the XOR-URL of the `SafeKey` he/she has created for
 
 A `Wallet` is a specific type of Container on the network, holding a set of spendable safecoin balances.
 
-A `Wallet` effectively contains links to `SafeKey`s which have safecoin balances attached to them, but the `Wallet` also stores the secret keys needed to spend them. `Wallet`s are stored encrypted and only accessible to the owner by default.
+A `Wallet` effectively contains links to `SafeKey`s which have safecoin balances attached to them, but the `Wallet` also stores the secret keys needed to spend them, and this is why each of these links/items in a `Wallet` are called `spendable balances`. `Wallet`s are stored encrypted and only accessible to the owner by default.
+
+Each of these links to `SafeKey`s (the spendable balances) can have a friendly name provided by the user, and these friendly names can then be used in different types of operations. E.g. one spendable balance in a `Wallet` can be named 'for-night-outs', while another one is named 'to-pay-the-rent', so when using the `Wallet` you could provide those names to the command in order to choose which spendable balance to use for the operation.
 
 There are several sub-commands that can be used to manage the `Wallet`s with the `safe wallet` command (those commented out are not yet implemented):
 
@@ -271,7 +273,7 @@ FLAGS:
     -h, --help          Prints help information
         --no-balance    If true, do not create a spendable balance
         --json          Sets JSON as output serialisation format (alias of '--output json')
-        --test-coins    Create a Key, allocate test-coins onto it, and add the SafeKey to the Wallet
+        --test-coins    Create a SafeKey, allocate test-coins onto it, and add the SafeKey to the Wallet
     -V, --version       Prints version information
 
 OPTIONS:
@@ -281,7 +283,7 @@ OPTIONS:
         --name <name>             The name to give the spendable balance
     -o, --output <output_fmt>     Output data serialisation. Currently only supported 'json'
     -w, --pay-with <pay_with>     The secret key of a SafeKey for paying the operation costs
-        --preload <preload>       Preload the key with a balance
+        --preload <preload>       Preload with a balance
         --sk <secret>             Pass the secret key needed to make the balance spendable, it will be prompted if not
                                   provided
         --xorurl <xorurl_base>    Base encoding to be used for XOR-URLs generated. Currently supported: base32z
@@ -303,12 +305,16 @@ Secret Key = b9b2edffa8ef103dc98ba2160e295f98fdf981eb572bc2f8b018a12574ce435e
 
 #### Wallet Balance
 
-The balance of a given `Wallet` can be queried using its XorUrl. This returns the balance of the whole `Wallet`, including the contained spendable balances, or any child/nested `Wallet`s (this is not implemented just yet).
-
-The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
+The balance of a given `Wallet` can be queried using its XorUrl. This returns the balance of the whole `Wallet`, i.e. the sum of the contained spendable balances. The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
 ```shell
 $ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
 Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e" has a total balance of 0 safecoins
+```
+
+The coin balance of an individual spendable balance can also be queried by providing it's friendly name as part of the `Wallet` URL, e.g. the `Wallet` we created above contains an spendable balance named 'first-spendable-balance', so we can check the balance of it (instead of the total balance of the `Wallet`) with the followign command:
+```shell
+$ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance
+Wallet's spendable balance at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance" has a balance of 0 safecoins
 ```
 
 #### Wallet Insert
@@ -363,15 +369,20 @@ Spendable balance inserted with name 'my-default-balance' in Wallet located at "
 
 Once a `Wallet` contains some spendable balance/s, we can transfer `--from` a `Wallet` an `<amount>` of safecoins `--to` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` can be passed as an argument with `--to`, or it will be read from `stdin`.
 
-When using a `Wallet` either as the source or destination of a transfer, it must have a _default_ spendable balance for the transfer to succeed. In the future different type of logics will be implemented for using different Wallet's balances and not just the default one.
-
 ```shell
 $ safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL>
 ```
-E.g.:
+
+If the `Wallet` being provided either as the source or destination of a transfer has a _default_ spendable balance, we then only need to provide its URL, e.g.:
 ```shell
 $ safe wallet transfer 323.23 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao
 Success. TX_ID: 6183829450183485238
+```
+
+If on the contrary a `Wallet` being used (either as the source or destination of a transfer) doesn't have a _default_ spendable balance set, we can specify which spendable balance the operation should be applied to by passing its friendly name as the path of the `Wallet` URL. Or even if it has a _default_ spendable balance set, we can still choose which spendable balance to use in the operation. E.g. we can transfer from 'for-night-outs' spendable balance of the source `Wallet` with the following command:
+```shell
+$ safe wallet transfer 0.053 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/for-night-outs --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao
+Success. TX_ID: 277748716389078887
 ```
 
 ### Files
