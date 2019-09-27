@@ -140,11 +140,28 @@ impl Safe {
         })?;
 
         // Let's get the list of balances from the Wallet
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
-        let balances = if xorurl_encoder.path().is_empty() {
+        let (xorurl_encoder, was_nrs_url) = self.parse_and_resolve_url(url)?;
+        debug!(
+            "Wallet URL was parsed and resolved to: {:?}",
+            xorurl_encoder
+        );
+        let url_path = if was_nrs_url {
+            // TODO: return this info as part of parse_and_resolve_url returned values
+            let xorurl_encoder = Safe::parse_url(url)?;
+            xorurl_encoder.path().to_string()
+        } else {
+            xorurl_encoder.path().to_string()
+        };
+
+        let balances = if url_path.is_empty() {
+            debug!("We'll check the total balance of the Wallet");
             gen_wallet_spendable_balances_list(&self, xorurl_encoder.xorname(), url)?
         } else {
-            let balance_name = &xorurl_encoder.path()[1..]; // we get rid of starting '/'
+            let balance_name = &url_path[1..]; // we get rid of starting '/'
+            debug!(
+                "We'll check only the balance for spendable balance named: '{}'",
+                balance_name
+            );
             let (spendable_balance, _) = wallet_get_spendable_balance(
                 &self,
                 xorurl_encoder.xorname(),
@@ -165,7 +182,7 @@ impl Safe {
                 Error::ContentNotFound("One of the SafeKey's was not found".to_string())
             })?;
 
-            debug!("{}: balance: {}", name, current_balance);
+            debug!("{}: balance is {}", name, current_balance);
             match total_balance.checked_add(current_balance) {
                 None => {
                     return Err(Error::Unexpected(
@@ -247,7 +264,7 @@ impl Safe {
     pub fn wallet_transfer(
         &mut self,
         amount: &str,
-        from_url: Option<String>,
+        from_url: Option<&str>,
         to_url: &str,
         tx_id: Option<u64>,
     ) -> ResultReturn<u64> {
@@ -374,11 +391,6 @@ fn gen_wallet_spendable_balances_list(
                 "No Wallet found at {}",
                 url
             )))
-        }
-        Err(Error::InvalidXorUrl(_)) => {
-            return Err(Error::InvalidXorUrl(
-                "The XOR-URL provided is invalid and cannot be decoded".to_string(),
-            ))
         }
         Err(err) => {
             return Err(Error::ContentError(format!(
@@ -586,12 +598,7 @@ fn test_wallet_transfer_no_default() {
     ));
 
     // test no default balance at wallet in <from> argument
-    match safe.wallet_transfer(
-        "10",
-        Some(from_wallet_xorurl.clone()),
-        &to_wallet_xorurl,
-        None,
-    ) {
+    match safe.wallet_transfer("10", Some(&from_wallet_xorurl), &to_wallet_xorurl, None) {
         Err(Error::ContentError(msg)) => assert_eq!(
             msg,
             format!(
@@ -604,7 +611,7 @@ fn test_wallet_transfer_no_default() {
     };
 
     // invert wallets and test no default balance at wallet in <to> argument
-    match safe.wallet_transfer("10", Some(to_wallet_xorurl), &from_wallet_xorurl, None) {
+    match safe.wallet_transfer("10", Some(&to_wallet_xorurl), &from_wallet_xorurl, None) {
         Err(Error::ContentError(msg)) => assert_eq!(
             msg,
             format!(
@@ -634,7 +641,7 @@ fn test_wallet_transfer_from_zero_balance() {
     let (to_key_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
 
     // test fail to transfer with 0 balance at wallet in <from> argument
-    match safe.wallet_transfer("0", Some(from_wallet_xorurl.clone()), &to_key_xorurl, None) {
+    match safe.wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl, None) {
         Err(Error::InvalidAmount(msg)) => assert_eq!(
             msg,
             "The amount '0' specified for the transfer is invalid".to_string()
@@ -653,12 +660,7 @@ fn test_wallet_transfer_from_zero_balance() {
     ));
 
     // test fail to transfer with 0 balance at wallet in <from> argument
-    match safe.wallet_transfer(
-        "0",
-        Some(from_wallet_xorurl.clone()),
-        &to_wallet_xorurl,
-        None,
-    ) {
+    match safe.wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl, None) {
         Err(Error::InvalidAmount(msg)) => assert_eq!(
             msg,
             "The amount '0' specified for the transfer is invalid".to_string()
@@ -692,12 +694,7 @@ fn test_wallet_transfer_diff_amounts() {
     ));
 
     // test fail to transfer more than current balance at wallet in <from> argument
-    match safe.wallet_transfer(
-        "100.6",
-        Some(from_wallet_xorurl.clone()),
-        &to_wallet_xorurl,
-        None,
-    ) {
+    match safe.wallet_transfer("100.6", Some(&from_wallet_xorurl), &to_wallet_xorurl, None) {
         Err(Error::NotEnoughBalance(msg)) => assert_eq!(
             msg,
             format!(
@@ -710,12 +707,7 @@ fn test_wallet_transfer_diff_amounts() {
     };
 
     // test fail to transfer as it's a invalid/non-numeric amount
-    match safe.wallet_transfer(
-        ".06",
-        Some(from_wallet_xorurl.clone()),
-        &to_wallet_xorurl,
-        None,
-    ) {
+    match safe.wallet_transfer(".06", Some(&from_wallet_xorurl), &to_wallet_xorurl, None) {
         Err(Error::InvalidAmount(msg)) => assert_eq!(
             msg,
             "Invalid safecoins amount '.06' (Can\'t parse coin units)"
@@ -725,12 +717,7 @@ fn test_wallet_transfer_diff_amounts() {
     };
 
     // test successful transfer
-    match safe.wallet_transfer(
-        "100.4",
-        Some(from_wallet_xorurl.clone()),
-        &to_wallet_xorurl,
-        None,
-    ) {
+    match safe.wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl, None) {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
             let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl));
@@ -759,12 +746,7 @@ fn test_wallet_transfer_to_safekey() {
     let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.0"));
 
     // test successful transfer
-    match safe.wallet_transfer(
-        "523.87",
-        Some(from_wallet_xorurl.clone()),
-        &key_xorurl,
-        None,
-    ) {
+    match safe.wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl, None) {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
             let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl));
@@ -787,7 +769,7 @@ fn test_wallet_transfer_from_safekey() {
     let (safekey_xorurl1, _) = unwrap!(safe.keys_create_preload_test_coins("7"));
     let (safekey_xorurl2, _) = unwrap!(safe.keys_create_preload_test_coins("0"));
 
-    match safe.wallet_transfer("1", Some(safekey_xorurl1), &safekey_xorurl2, None) {
+    match safe.wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2, None) {
         Ok(_) => panic!("Transfer from SafeKey was expected to fail".to_string()),
         Err(Error::InvalidInput(msg)) => {
             assert_eq!(
@@ -830,7 +812,7 @@ fn test_wallet_transfer_with_nrs_urls() {
     let _ = unwrap!(safe.nrs_map_container_create(&to_nrsurl, &key_xorurl, false, true, false));
 
     // test successful transfer
-    match safe.wallet_transfer("0.2", Some(from_nrsurl.clone()), &to_nrsurl, None) {
+    match safe.wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl, None) {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
             let from_current_balance = unwrap!(safe.wallet_balance(&from_nrsurl));
@@ -850,7 +832,7 @@ fn test_wallet_transfer_from_specific_balance() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("from-firstbalance".to_string()),
+        Some("from-first-balance".to_string()),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -858,7 +840,7 @@ fn test_wallet_transfer_from_specific_balance() {
     let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("200.5"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("from-secondbalance".to_string()),
+        Some("from-second-balance".to_string()),
         false,
         &unwrap!(key_pair2.clone()).sk,
     ));
@@ -867,17 +849,18 @@ fn test_wallet_transfer_from_specific_balance() {
     let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("10.5"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("to-firstbalance".to_string()),
+        Some("to-first-balance".to_string()),
         true, // set --default
         &unwrap!(key_pair3.clone()).sk,
     ));
 
     // test fail to transfer more than current balance at 'from-firstbaance'
     let mut from_wallet_spendable_balance = unwrap!(XorUrlEncoder::from_url(&from_wallet_xorurl));
-    from_wallet_spendable_balance.set_path("from-secondbalance");
+    from_wallet_spendable_balance.set_path("from-second-balance");
+    let from_spendable_balance = unwrap!(from_wallet_spendable_balance.to_string());
     match safe.wallet_transfer(
         "200.6",
-        Some(unwrap!(from_wallet_spendable_balance.to_string())),
+        Some(&from_spendable_balance),
         &to_wallet_xorurl,
         None,
     ) {
@@ -885,7 +868,7 @@ fn test_wallet_transfer_from_specific_balance() {
             msg,
             format!(
                 "Not enough balance for the transfer at Wallet \"{}\"",
-                unwrap!(from_wallet_spendable_balance.to_string())
+                from_spendable_balance
             )
         ),
         Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
@@ -895,14 +878,16 @@ fn test_wallet_transfer_from_specific_balance() {
     // test successful transfer
     match safe.wallet_transfer(
         "100.3",
-        Some(unwrap!(from_wallet_spendable_balance.to_string())),
+        Some(&from_spendable_balance),
         &to_wallet_xorurl,
         None,
     ) {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
-            let from_second_current_balance =
-                unwrap!(safe.wallet_balance(&unwrap!(from_wallet_spendable_balance.to_string())));
+            let from_first_current_balance =
+                unwrap!(safe.wallet_balance(&format!("{}/from-first-balance", from_wallet_xorurl)));
+            assert_eq!("100.500000000", from_first_current_balance);
+            let from_second_current_balance = unwrap!(safe.wallet_balance(&from_spendable_balance));
             assert_eq!(
                 "100.200000000", /* 200.5 - 100.3 */
                 from_second_current_balance
@@ -917,6 +902,8 @@ fn test_wallet_transfer_from_specific_balance() {
 
 #[test]
 fn test_wallet_transfer_to_specific_balance() {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use unwrap::unwrap;
     let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
@@ -924,7 +911,7 @@ fn test_wallet_transfer_to_specific_balance() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.7"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("from-firstbalance".to_string()),
+        Some("from-first-balance".to_string()),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -933,7 +920,7 @@ fn test_wallet_transfer_to_specific_balance() {
     let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.2"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("to-firstbalance".to_string()),
+        Some("to-first-balance".to_string()),
         true, // set --default
         &unwrap!(key_pair2.clone()).sk,
     ));
@@ -941,26 +928,29 @@ fn test_wallet_transfer_to_specific_balance() {
     let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("20.2"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("to-secondbalance".to_string()),
+        Some("to-second-balance".to_string()),
         false,
         &unwrap!(key_pair3.clone()).sk,
     ));
 
-    // test successful transfer to 'to-secondbalance'
+    // test successful transfer to 'to-second-balance'
     let mut to_wallet_spendable_balance = unwrap!(XorUrlEncoder::from_url(&to_wallet_xorurl));
-    to_wallet_spendable_balance.set_path("to-secondbalance");
+    to_wallet_spendable_balance.set_path("to-second-balance");
+    let to_spendable_balance = unwrap!(to_wallet_spendable_balance.to_string());
     match safe.wallet_transfer(
         "100.5",
-        Some(from_wallet_xorurl.clone()),
-        &unwrap!(to_wallet_spendable_balance.to_string()),
+        Some(&from_wallet_xorurl),
+        &to_spendable_balance,
         None,
     ) {
         Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
         Ok(_) => {
             let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl));
             assert_eq!("0.200000000" /* 100.7 - 100.5 */, from_current_balance);
-            let to_second_current_balance =
-                unwrap!(safe.wallet_balance(&unwrap!(to_wallet_spendable_balance.to_string())));
+            let to_first_current_balance =
+                unwrap!(safe.wallet_balance(&format!("{}/to-first-balance", to_wallet_xorurl)));
+            assert_eq!("10.200000000", to_first_current_balance);
+            let to_second_current_balance = unwrap!(safe.wallet_balance(&to_spendable_balance));
             assert_eq!(
                 "120.700000000", /* 20.2 + 100.5 */
                 to_second_current_balance
@@ -969,6 +959,23 @@ fn test_wallet_transfer_to_specific_balance() {
             assert_eq!("130.900000000", /* 30.4 + 100.5 */ to_current_balance);
         }
     };
+
+    // let's also test checking the balance with NRS URL of the destination spendable balances
+    let to_wallet_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+    let _ = unwrap!(safe.nrs_map_container_create(
+        &to_wallet_nrsurl,
+        &to_wallet_xorurl,
+        false,
+        true,
+        false
+    ));
+
+    let to_first_current_balance =
+        unwrap!(safe.wallet_balance(&format!("{}/to-first-balance", to_wallet_nrsurl)));
+    assert_eq!("10.200000000", to_first_current_balance);
+    let to_second_current_balance =
+        unwrap!(safe.wallet_balance(&format!("{}/to-second-balance", to_wallet_nrsurl)));
+    assert_eq!("120.700000000", to_second_current_balance);
 }
 
 #[test]

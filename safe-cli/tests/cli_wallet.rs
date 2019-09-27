@@ -504,3 +504,47 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() {
 
     assert_eq!(from_has, "1417.420000000" /* 1535.65 - 118.23 */)
 }
+
+#[test]
+fn calling_safe_wallet_balance_with_nrsurl() {
+    let (wallet_xorurl, _pk, _sk) =
+        create_wallet_with_balance("1.120000001", Some("for-night-outs")); // we need 1 nano to pay for the costs of creation
+    let wallet_nrsurl = format!("safe://{}", get_random_nrs_string());
+    let _ = cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &wallet_nrsurl,
+        "-l",
+        &wallet_xorurl,
+    )
+    .read()
+    .unwrap();
+
+    // check wallet balance with NRS url
+    let wallet_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_nrsurl,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(wallet_has, "1.120000000");
+
+    // check wallet's spendable balance with NRS url with
+    let wallet_spendable_balance = format!("{}/for-night-outs", wallet_nrsurl);
+    let spendable_balance_has = cmd!(
+        get_bin_location(),
+        "wallet",
+        "balance",
+        &wallet_spendable_balance,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    assert_eq!(spendable_balance_has, "1.120000000");
+}

@@ -12,7 +12,7 @@ use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::keys::{create_new_key, print_new_key_output};
 use super::OutputFmt;
 use log::debug;
-use safe_api::{BlsKeyPair, Safe, XorUrlEncoder};
+use safe_api::{BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -179,7 +179,7 @@ pub fn wallet_commander(
             let balance = safe.wallet_balance(&target)?;
 
             if OutputFmt::Pretty == output_fmt {
-                let xorurl_encoder = XorUrlEncoder::from_url(&target)?;
+                let xorurl_encoder = Safe::parse_url(&target)?;
                 if xorurl_encoder.path().is_empty() {
                     println!(
                         "Wallet at \"{}\" has a total balance of {} safecoins",
@@ -241,7 +241,12 @@ pub fn wallet_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe.wallet_transfer(&amount, from, &destination, tx_id)?;
+            let tx_id = safe.wallet_transfer(
+                &amount,
+                from.as_ref().map(String::as_str),
+                &destination,
+                tx_id,
+            )?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);
