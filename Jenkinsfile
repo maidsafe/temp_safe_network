@@ -9,7 +9,7 @@ properties([
 
 stage('build & test') {
     parallel test_linux: {
-        node('safe_cli') {
+        node('safe-cli') {
             checkout(scm)
             runTests()
             packageBuildArtifacts('linux', 'dev')
@@ -35,13 +35,13 @@ stage('build & test') {
         }
     },
     clippy: {
-        node('safe_cli') {
+        node('safe-cli') {
             checkout(scm)
             sh("make clippy")
         }
     },
     release_linux: {
-        node('safe_cli') {
+        node('safe-cli') {
             checkout(scm)
             runReleaseBuild()
             stripArtifacts()
@@ -70,7 +70,7 @@ stage('build & test') {
 }
 
 stage('deploy') {
-    node('safe_cli') {
+    node('safe-cli') {
         if (env.BRANCH_NAME == "master") {
             checkout(scm)
             sh("git fetch --tags --force")
@@ -93,8 +93,8 @@ stage('deploy') {
         }
     }
     if (env.BRANCH_NAME == "master") {
-        build(job: "../rust_cache_build-safe_cli", wait: false)
-        build(job: "../docker_build-safe_cli_build_container", wait: false)
+        build(job: "../rust_cache_build-safe-cli", wait: false)
+        build(job: "../docker_build-safe-cli_build_container", wait: false)
     }
 }
 
