@@ -10,7 +10,7 @@ USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
 S3_BUCKET := safe-jenkins-build-artifacts
-GITHUB_REPO_OWNER := jacderida
+GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe_client_libs
 
 build-container:
