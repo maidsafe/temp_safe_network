@@ -2,7 +2,7 @@ use super::ffi_structs::{
     wallet_spendable_balance_into_repr_c, wallet_spendable_balances_into_repr_c,
     WalletSpendableBalance, WalletSpendableBalances,
 };
-use super::helpers::{from_c_str_to_string_option, to_c_str};
+use super::helpers::{from_c_str_to_str_option, to_c_str};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
 use std::os::raw::{c_char, c_void};
@@ -36,7 +36,7 @@ pub unsafe extern "C" fn wallet_insert(
         let user_data = OpaqueCtx(user_data);
         let key_url_str = from_c_str(key_url)?;
         let secret_key_str = from_c_str(secret_key)?;
-        let name_str = from_c_str_to_string_option(name);
+        let name_str = from_c_str_to_str_option(name);
         let wallet_name =
             (*app).wallet_insert(&key_url_str, name_str, set_default, &secret_key_str)?;
         let wallet_name_c_str = to_c_str(wallet_name)?;
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn wallet_transfer(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
-        let from_key = from_c_str_to_string_option(from);
+        let from_key = from_c_str_to_str_option(from);
         let to_key = from_c_str(to)?;
         let amount_tranfer = from_c_str(amount)?;
         let tx_id = (*app).wallet_transfer(&amount_tranfer, from_key, &to_key, Some(id))?;

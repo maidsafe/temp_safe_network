@@ -140,7 +140,7 @@ pub fn wallet_commander(
                 };
 
                 // insert and set as default
-                safe.wallet_insert(&wallet_xorurl, name, true, &sk)?;
+                safe.wallet_insert(&wallet_xorurl, name.as_ref().map(String::as_str), true, &sk)?;
             }
 
             if OutputFmt::Pretty == output_fmt {
@@ -218,7 +218,8 @@ pub fn wallet_commander(
                 None => get_secret_key("", secret_key, "the SafeKey to insert")?,
             };
 
-            let the_name = safe.wallet_insert(&target, name, default, &sk)?;
+            let the_name =
+                safe.wallet_insert(&target, name.as_ref().map(String::as_str), default, &sk)?;
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",

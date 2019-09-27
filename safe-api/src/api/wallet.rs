@@ -53,7 +53,7 @@ impl Safe {
     pub fn wallet_insert(
         &mut self,
         url: &str,
-        name: Option<String>,
+        name: Option<&str>,
         default: bool,
         sk: &str,
     ) -> ResultReturn<String> {
@@ -81,7 +81,7 @@ impl Safe {
             ))
         })?;
 
-        let md_key = name.unwrap_or_else(|| xorurl);
+        let md_key = name.unwrap_or_else(|| &xorurl);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         self.safe_app
             .seq_mutable_data_insert(
@@ -240,7 +240,7 @@ impl Safe {
     /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1"));
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl,
-    ///     Some("frombalance".to_string()),
+    ///     Some("frombalance"),
     ///     true,
     ///     &key_pair1.clone().unwrap().sk,
     /// ));
@@ -249,13 +249,13 @@ impl Safe {
     ///
     /// unwrap!(safe.wallet_insert(
     ///     &wallet_xorurl2,
-    ///     Some("tobalance".to_string()),
+    ///     Some("tobalance"),
     ///     true,
     ///     &key_pair2.clone().unwrap().sk,
     /// ));
     ///
     ///
-    /// unwrap!(safe.wallet_transfer( "10", Some(wallet_xorurl), &wallet_xorurl2, None ));
+    /// unwrap!(safe.wallet_transfer( "10", Some(&wallet_xorurl), &wallet_xorurl2, None ));
     /// let from_balance = unwrap!(safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ));
     /// assert_eq!("4.000000000", from_balance);
     /// let to_balance = unwrap!(safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ));
@@ -484,7 +484,7 @@ fn test_wallet_insert_and_balance() {
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true,
         &unwrap!(key_pair1).sk,
     ));
@@ -494,7 +494,7 @@ fn test_wallet_insert_and_balance() {
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        Some("mysecondbalance".to_string()),
+        Some("my-second-balance"),
         false,
         &unwrap!(key_pair2).sk,
     ));
@@ -514,30 +514,30 @@ fn test_wallet_insert_and_get() {
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true,
         &unwrap!(key_pair1.clone()).sk,
     ));
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        Some("mysecondbalance".to_string()),
+        Some("my-second-balance"),
         false,
         &unwrap!(key_pair2.clone()).sk,
     ));
 
     let wallet_balances = unwrap!(safe.wallet_get(&wallet_xorurl));
-    assert_eq!(wallet_balances["myfirstbalance"].0, true);
-    assert_eq!(wallet_balances["myfirstbalance"].1.xorurl, key1_xorurl);
+    assert_eq!(wallet_balances["my-first-balance"].0, true);
+    assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
     assert_eq!(
-        wallet_balances["myfirstbalance"].1.sk,
+        wallet_balances["my-first-balance"].1.sk,
         unwrap!(key_pair1).sk
     );
 
-    assert_eq!(wallet_balances["mysecondbalance"].0, false);
-    assert_eq!(wallet_balances["mysecondbalance"].1.xorurl, key2_xorurl);
+    assert_eq!(wallet_balances["my-second-balance"].0, false);
+    assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
     assert_eq!(
-        wallet_balances["mysecondbalance"].1.sk,
+        wallet_balances["my-second-balance"].1.sk,
         unwrap!(key_pair2).sk
     );
 }
@@ -553,30 +553,30 @@ fn test_wallet_insert_and_set_default() {
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true,
         &unwrap!(key_pair1.clone()).sk,
     ));
 
     unwrap!(safe.wallet_insert(
         &wallet_xorurl,
-        Some("mysecondbalance".to_string()),
+        Some("my-second-balance"),
         true,
         &unwrap!(key_pair2.clone()).sk,
     ));
 
     let wallet_balances = unwrap!(safe.wallet_get(&wallet_xorurl));
-    assert_eq!(wallet_balances["myfirstbalance"].0, false);
-    assert_eq!(wallet_balances["myfirstbalance"].1.xorurl, key1_xorurl);
+    assert_eq!(wallet_balances["my-first-balance"].0, false);
+    assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
     assert_eq!(
-        wallet_balances["myfirstbalance"].1.sk,
+        wallet_balances["my-first-balance"].1.sk,
         unwrap!(key_pair1).sk
     );
 
-    assert_eq!(wallet_balances["mysecondbalance"].0, true);
-    assert_eq!(wallet_balances["mysecondbalance"].1.xorurl, key2_xorurl);
+    assert_eq!(wallet_balances["my-second-balance"].0, true);
+    assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
     assert_eq!(
-        wallet_balances["mysecondbalance"].1.sk,
+        wallet_balances["my-second-balance"].1.sk,
         unwrap!(key_pair2).sk
     );
 }
@@ -592,7 +592,7 @@ fn test_wallet_transfer_no_default() {
     let (_key_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("43523"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrap!(key_pair).sk,
     ));
@@ -633,7 +633,7 @@ fn test_wallet_transfer_from_zero_balance() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrap!(key_pair1).sk,
     ));
@@ -654,7 +654,7 @@ fn test_wallet_transfer_from_zero_balance() {
     let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("alsomyfirstbalance".to_string()),
+        Some("also-my-balance"),
         true, // set --default
         &unwrap!(key_pair2).sk,
     ));
@@ -679,7 +679,7 @@ fn test_wallet_transfer_diff_amounts() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -688,7 +688,7 @@ fn test_wallet_transfer_diff_amounts() {
     let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("alsomyfirstbalance".to_string()),
+        Some("also-my-balance"),
         true, // set --default
         &unwrap!(key_pair2.clone()).sk,
     ));
@@ -738,7 +738,7 @@ fn test_wallet_transfer_to_safekey() {
     let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("4621.45"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -793,7 +793,7 @@ fn test_wallet_transfer_with_nrs_urls() {
     let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -832,7 +832,7 @@ fn test_wallet_transfer_from_specific_balance() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("from-first-balance".to_string()),
+        Some("from-first-balance"),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -840,7 +840,7 @@ fn test_wallet_transfer_from_specific_balance() {
     let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("200.5"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("from-second-balance".to_string()),
+        Some("from-second-balance"),
         false,
         &unwrap!(key_pair2.clone()).sk,
     ));
@@ -849,7 +849,7 @@ fn test_wallet_transfer_from_specific_balance() {
     let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("10.5"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("to-first-balance".to_string()),
+        Some("to-first-balance"),
         true, // set --default
         &unwrap!(key_pair3.clone()).sk,
     ));
@@ -911,7 +911,7 @@ fn test_wallet_transfer_to_specific_balance() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.7"));
     unwrap!(safe.wallet_insert(
         &from_wallet_xorurl,
-        Some("from-first-balance".to_string()),
+        Some("from-first-balance"),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -920,7 +920,7 @@ fn test_wallet_transfer_to_specific_balance() {
     let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.2"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("to-first-balance".to_string()),
+        Some("to-first-balance"),
         true, // set --default
         &unwrap!(key_pair2.clone()).sk,
     ));
@@ -928,7 +928,7 @@ fn test_wallet_transfer_to_specific_balance() {
     let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("20.2"));
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("to-second-balance".to_string()),
+        Some("to-second-balance"),
         false,
         &unwrap!(key_pair3.clone()).sk,
     ));
@@ -988,7 +988,7 @@ fn test_wallet_transfer_from_not_owned_wallet() {
     let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
     unwrap!(safe.wallet_insert(
         &account1_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrap!(key_pair1.clone()).sk,
     ));
@@ -998,12 +998,7 @@ fn test_wallet_transfer_from_not_owned_wallet() {
     let (key_xorurl, _key_pair) = unwrap!(another_safe.keys_create_preload_test_coins("100.5"));
 
     // test fail to transfer from a not owned wallet in <from> argument
-    match another_safe.wallet_transfer(
-        "0.2",
-        Some(account1_wallet_xorurl.clone()),
-        &key_xorurl,
-        None,
-    ) {
+    match another_safe.wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl, None) {
         Err(Error::AccessDenied(msg)) => assert_eq!(
             msg,
             format!(

@@ -614,7 +614,7 @@ fn test_keys_transfer_to_wallet() {
     let unwrapped_key_pair1 = unwrap!(key_pair1);
     unwrap!(safe.wallet_insert(
         &to_wallet_xorurl,
-        Some("myfirstbalance".to_string()),
+        Some("my-first-balance"),
         true, // set --default
         &unwrapped_key_pair1.sk,
     ));
