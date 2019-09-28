@@ -1,5 +1,5 @@
 use super::ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
-use super::helpers::{from_c_str_to_string_option, to_c_str};
+use super::helpers::{from_c_str_to_str_option, to_c_str};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
 use std::os::raw::{c_char, c_void};
@@ -38,9 +38,9 @@ pub unsafe extern "C" fn keys_create(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
-        let preload_option = from_c_str_to_string_option(preload);
-        let from_option = from_c_str_to_string_option(from);
-        let pk_option = from_c_str_to_string_option(pk);
+        let from_option = from_c_str_to_str_option(from);
+        let preload_option = from_c_str_to_str_option(preload);
+        let pk_option = from_c_str_to_str_option(pk);
         let (xorurl, keypair) = (*app).keys_create(from_option, preload_option, pk_option)?;
         o_cb(
             user_data.0,
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn keys_transfer(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
-        let from_key = from_c_str_to_string_option(from);
+        let from_key = from_c_str_to_str_option(from);
         let to_key = from_c_str(to)?;
         let amount_tranfer = from_c_str(amount)?;
         let tx_id = (*app).keys_transfer(&amount_tranfer, from_key, &to_key, Some(id))?;
