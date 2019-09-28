@@ -1,66 +1,10 @@
-[package]
-name = "safe-api"
-version = "0.4.0"
-description = "SAFE API"
-authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
-license = "GPL-3.0"
-repository = "https://github.com/maidsafe/safe-cli"
-include = ["Cargo.toml", "src/api/*", "src/lib.rs", "build.rs"]
-build = "build.rs"
-edition = "2018"
+# Copyright 2019 MaidSafe.net limited.
+#
+# This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+# Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+# under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. Please review the Licences for the specific language governing
+# permissions and limitations relating to use of the SAFE Network Software.
 
 [workspace]
-members = ["safe-cli", "safe-api-ffi"]
-default-members = ["safe-cli"]
-
-[dependencies]
-log = "0.4.6"
-safe_app = "~0.10.0"
-safe_core = "~0.33.0"
-safe-nd = "~0.3.0"
-env_logger = "0.6.0"
-rand = "0.6.5"
-rand_core = "0.4.0"
-threshold_crypto = "~0.3.2"
-serde = "1.0.91"
-serde_json = "1.0.39"
-bincode = "1.1.4"
-multibase = "0.6.0"
-reqwest = "0.9.5"
-tiny-keccak = "~1.5.0"
-futures = "~0.1.17"
-walkdir = "~2.0.1" #ffi utils needs this version
-chrono = "0.4.6"
-human-panic = "1.0.1"
-url = "1.7.2"
-relative-path = "0.4.0"
-validator = "0.8.0"
-validator_derive = "0.8.0"
-mime_guess = "2.0.1"
-lazy_static = "1.2.0"
-ffi_utils = "~0.12.0"
-maidsafe_utilities = "~0.18.0"
-
-[build-dependencies]
-safe_bindgen = { version = "~0.13.1", optional = true }
-rust_sodium = "~0.10.2"
-safe-nd = "~0.3.0"
-unwrap = "~1.2.1"
-
-[features]
-mock-network = ["safe_app/mock-network"]
-fake-auth = ["safe_app/testing"]
-scl-mock = ["fake-auth"]
-bindings = ["safe_bindgen"]
-
-[dev-dependencies]
-pretty_assertions = "0.6.1"
-predicates = "1.0.0"
-assert_cmd = "0.11.1"
-duct = "0.12.0"
-unwrap = "~1.2.1"
-
-[dev-dependencies.cargo-husky]
-version = "1"
-default-features = false # Disable features which are enabled by default
-features = ["precommit-hook","user-hooks"]
+members = ["safe-cli", "safe-api", "safe-ffi"]

@@ -1,0 +1,44 @@
+# Copyright 2019 MaidSafe.net limited.
+#
+# This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+# Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+# under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. Please review the Licences for the specific language governing
+# permissions and limitations relating to use of the SAFE Network Software.
+
+[package]
+name = "safe-ffi"
+version = "0.4.0"
+description = "SAFE API FFI"
+authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
+publish = false
+license = "GPL-3.0"
+repository = "https://github.com/maidsafe/safe-cli"
+build = "build.rs"
+edition = "2018"
+
+[lib]
+crate_type = ["staticlib", "rlib", "cdylib"]
+path = "lib.rs"
+
+[dependencies]
+safe-api = { path = "../safe-api" }
+ffi_utils = "~0.12.0"
+safe_core = "~0.33.0"
+serde = "1.0.91"
+serde_json = "1.0.39"
+safe-nd = "~0.3.0"
+
+[dev-dependencies]
+unwrap = "~1.2.1"
+
+[build-dependencies]
+safe_bindgen = { version = "~0.13.1", optional = true }
+rust_sodium = "~0.10.2"
+safe-nd = "~0.3.0"
+unwrap = "~1.2.1"
+
+[features]
+mock-network = ["safe-api/mock-network"]
+fake-auth = ["safe-api/fake-auth"]
+bindings = ["safe_bindgen"]
