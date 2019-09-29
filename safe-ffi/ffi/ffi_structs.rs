@@ -256,7 +256,7 @@ impl Drop for FilesMap {
 }
 
 pub unsafe fn file_item_into_repr_c(
-    file_name: &String,
+    file_name: &str,
     file_item_map: &NativeFileItem,
 ) -> ResultReturn<FileInfo> {
     let mut vec = Vec::with_capacity(file_item_map.len());
