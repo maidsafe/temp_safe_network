@@ -118,7 +118,12 @@ pub fn key_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe.keys_transfer(&amount, from.as_ref().map(String::as_str), &destination, tx_id)?;
+            let tx_id = safe.keys_transfer(
+                &amount,
+                from.as_ref().map(String::as_str),
+                &destination,
+                tx_id,
+            )?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);
@@ -158,7 +163,11 @@ pub fn create_new_key(
         if pay_with.is_none() {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
         }
-        let (xorurl, key_pair) = safe.keys_create(pay_with.as_ref().map(String::as_str), preload.as_ref().map(String::as_str), pk.as_ref().map(String::as_str))?;
+        let (xorurl, key_pair) = safe.keys_create(
+            pay_with.as_ref().map(String::as_str),
+            preload.as_ref().map(String::as_str),
+            pk.as_ref().map(String::as_str),
+        )?;
         (xorurl, key_pair, preload)
     };
 
