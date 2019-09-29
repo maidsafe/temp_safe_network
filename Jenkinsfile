@@ -9,7 +9,7 @@ properties([
 
 stage('build & test') {
     parallel test_linux: {
-        node('safe-cli') {
+        node('safe_cli') {
             checkout(scm)
             runTests()
             packageBuildArtifacts('linux', 'dev')
@@ -35,13 +35,13 @@ stage('build & test') {
         }
     },
     clippy: {
-        node('safe-cli') {
+        node('safe_cli') {
             checkout(scm)
             sh("make clippy")
         }
     },
     release_linux: {
-        node('safe-cli') {
+        node('safe_cli') {
             checkout(scm)
             runReleaseBuild()
             stripArtifacts()
@@ -70,7 +70,7 @@ stage('build & test') {
 }
 
 stage('deploy') {
-    node('safe-cli') {
+    node('safe_cli') {
         if (env.BRANCH_NAME == "master") {
             checkout(scm)
             sh("git fetch --tags --force")
