@@ -3,7 +3,6 @@ use ffi_utils::{from_c_str, vec_into_raw_parts};
 use safe_api::files::{
     FileItem as NativeFileItem, FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles,
 };
-use safe_api::nrs::ProcessedEntries as NativeProcessedEntries;
 use safe_api::nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap};
 use safe_api::wallet::{
     WalletSpendableBalance as NativeWalletSpendableBalance,
@@ -12,6 +11,7 @@ use safe_api::wallet::{
 use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder};
 use safe_api::{
     BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo, ResultReturn,
+    ProcessedEntries as NativeProcessedEntries
 };
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::ffi::CString;

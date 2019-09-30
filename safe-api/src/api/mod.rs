@@ -30,6 +30,7 @@ pub use fetch::{
 };
 pub use files::ProcessedFiles;
 pub use keys::BlsKeyPair;
+pub use nrs::ProcessedEntries;
 pub use nrs_map::{NrsMap, SubNamesMap};
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;
