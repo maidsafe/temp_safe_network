@@ -13,12 +13,9 @@ use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXor
 use safe_api::{
     BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo, ResultReturn,
 };
-use safe_nd::XorName;
+use safe_nd::{XorName, XOR_NAME_LEN};
 use std::ffi::CString;
 use std::os::raw::c_char;
-
-/// Constant byte length of `XorName`.
-pub const XOR_NAME_LEN: usize = 32;
 
 /// Array containing `XorName` bytes.
 /// Adding this here because bindgen not picking this correctly from the safe-nd.
