@@ -10,8 +10,8 @@ use safe_api::wallet::{
 };
 use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder};
 use safe_api::{
-    BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo, ResultReturn,
-    ProcessedEntries as NativeProcessedEntries
+    BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo,
+    ProcessedEntries as NativeProcessedEntries, ResultReturn,
 };
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::ffi::CString;
