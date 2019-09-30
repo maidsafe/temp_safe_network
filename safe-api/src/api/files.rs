@@ -1023,7 +1023,6 @@ fn file_system_single_file(
     // We now compare both FilesMaps to upload the missing files
     let mut processed_files = BTreeMap::new();
     let normalised_path = normalise_path_separator(file_path.to_str().unwrap_or_else(|| ""));
-    println!("META: {}", file_path.display());
     if metadata.is_dir() {
         Err(Error::InvalidInput(format!(
             "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",
@@ -2114,7 +2113,7 @@ fn test_files_container_fail_add_or_sync_invalid_path() {
     let mut safe = Safe::new("base32z");
     unwrap!(safe.connect("", Some("fake-credentials")));
     let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("./testdata/test.md", None, false, false));
+        unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
     assert_eq!(processed_files.len(), 1);
     assert_eq!(files_map.len(), 1);
 
