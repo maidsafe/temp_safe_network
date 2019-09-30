@@ -15,12 +15,15 @@ if [[ -z "$CRATES_IO_TOKEN" ]]; then
 fi
 
 if [[ -z "$SCL_PUBLISH_DRY_RUN" ]]; then
-    echo "Please set $SCL_PUBLISH_DRY_RUN to 'true'or 'false'"
+    echo "Please set SCL_PUBLISH_DRY_RUN to 'true'or 'false'"
     exit 1
 fi
 
 publish_command="cd $crate_name && cargo login $CRATES_IO_TOKEN && cargo package && cargo publish"
-[[ "$SCL_PUBLISH_DRY_RUN" == "true" ]] && publish_command="$publish_command --dry-run"
+if [[ "$SCL_PUBLISH_DRY_RUN" == "true" ]]; then
+    echo "Running publish with --dry-run"
+    publish_command="$publish_command --dry-run"
+fi
 
 rm -rf artifacts deploy
 docker run --rm -v "$(pwd)":/usr/src/safe_client_libs:Z \

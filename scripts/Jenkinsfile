@@ -166,13 +166,19 @@ stage("deployment") {
             checkout(scm)
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
-            if (isVersionChangeCommit()) {
-                packageDeployArtifacts(true)
+            if (isNightlyBuild()) {
+                packageDeployArtifacts("nightly")
+                deletePreviousNightly()
+                uploadDeployArtifacts("mock")
+                uploadDeployArtifacts("real")
+            } else if (isVersionChangeCommit()) {
+                packageDeployArtifacts("versioned")
                 createTags()
                 createGitHubRelease()
                 uploadDeployArtifacts("mock")
+                uploadDeployArtifacts("real")
             } else {
-                packageDeployArtifacts(false)
+                packageDeployArtifacts("commit_hash")
                 uploadDeployArtifacts("mock")
                 uploadDeployArtifacts("real")
             }
@@ -260,11 +266,19 @@ def retrieveBuildArtifacts() {
     }
 }
 
-def packageDeployArtifacts(isVersionChangeCommit) {
-    if (isVersionChangeCommit) {
-        sh("make package-versioned-deploy-artifacts")
-    } else {
-        sh("make package-commit_hash-deploy-artifacts")
+def packageDeployArtifacts(type) {
+    switch (type) {
+        case "versioned":
+            sh("make package-versioned-deploy-artifacts")
+            break
+        case "commit_hash":
+            sh("make package-commit_hash-deploy-artifacts")
+            break
+        case "nightly":
+            sh("make package-nightly-deploy-artifacts")
+            break
+        default:
+            error("The deployment type ${type} is not supported. Please extend for support.")
     }
 }
 
@@ -289,6 +303,21 @@ def getVersion(crate) {
     return sh(
         returnStdout: true,
         script: "grep '^version' < ${crate}/Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
+}
+
+def deletePreviousNightly() {
+    withAWS(credentials: "aws_jenkins_user_credentials", region: "eu-west-2") {
+        ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-gnu", "x86_64-apple-darwin",
+         "armv7-linux-androideabi", "x86_64-linux-android", "x86_64-apple-ios",
+         "aarch64-apple-ios", "apple-ios"].each({
+            s3Delete(
+                bucket: "${params.DEPLOY_BUCKET}",
+                path: "safe_app-nightly-${it}.tar.gz")
+            s3Delete(
+                bucket: "${params.DEPLOY_BUCKET}",
+                path: "safe_authenticator-nightly-${it}.tar.gz")
+        })
+    }
 }
 
 def uploadDeployArtifacts(type) {
@@ -326,6 +355,10 @@ def createTags() {
 }
 
 def getComponentsWithVersionChanges() {
+    if (isNightlyBuild()) {
+        // For a nightly we want to run a dry run publish on all components.
+        return ["safe_core", "safe_authenticator", "safe_app"]
+    }
     def components = []
     def message = getLatestCommitMessage()
     if (message.contains("safe_core")) {

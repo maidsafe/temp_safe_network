@@ -254,14 +254,22 @@ package-versioned-deploy-artifacts:
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-client-libs-build:x86_64 \
-		scripts/package-runner-container "true"
+		scripts/package-runner-container "versioned"
 
 package-commit_hash-deploy-artifacts:
 	@rm -rf deploy
 	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-client-libs-build:x86_64 \
-		scripts/package-runner-container "false"
+		scripts/package-runner-container "commit_hash"
+
+package-nightly-deploy-artifacts:
+	@rm -rf deploy
+	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-client-libs-build:x86_64 \
+		scripts/package-runner-container "nightly"
+	find . -name "*.zip" -exec rm "{}" \;
 
 retrieve-cache:
 ifndef SCL_BUILD_BRANCH
