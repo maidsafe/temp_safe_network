@@ -133,7 +133,7 @@ pub fn wallet_spendable_balance_into_repr_c(
 }
 
 #[repr(C)]
-pub struct SependableWalletBalance {
+pub struct SpendableWalletBalance {
     pub wallet_name: *const c_char,
     pub is_default: bool,
     pub spendable_wallet_balance: WalletSpendableBalance,
@@ -141,7 +141,7 @@ pub struct SependableWalletBalance {
 
 #[repr(C)]
 pub struct WalletSpendableBalances {
-    pub wallet_balances: *const SependableWalletBalance,
+    pub wallet_balances: *const SpendableWalletBalance,
     pub wallet_balances_len: usize,
     pub wallet_balances_cap: usize,
 }
@@ -150,7 +150,7 @@ impl Drop for WalletSpendableBalances {
     fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(
-                self.wallet_balances as *mut SependableWalletBalance,
+                self.wallet_balances as *mut SpendableWalletBalance,
                 self.wallet_balances_len,
                 self.wallet_balances_cap,
             );
@@ -164,7 +164,7 @@ pub fn wallet_spendable_balances_into_repr_c(
     let mut vec = Vec::with_capacity(wallet_balances.len());
 
     for (name, (is_default, spendable_balance)) in wallet_balances {
-        vec.push(SependableWalletBalance {
+        vec.push(SpendableWalletBalance {
             wallet_name: CString::new(name.to_string())?.into_raw(),
             is_default: *is_default,
             spendable_wallet_balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
