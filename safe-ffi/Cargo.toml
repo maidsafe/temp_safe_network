@@ -18,6 +18,7 @@ build = "build.rs"
 edition = "2018"
 
 [lib]
+name = "safe_api"
 crate_type = ["staticlib", "rlib", "cdylib"]
 path = "lib.rs"
 
