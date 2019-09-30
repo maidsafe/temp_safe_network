@@ -3,6 +3,7 @@ use ffi_utils::{from_c_str, vec_into_raw_parts};
 use safe_api::files::{
     FileItem as NativeFileItem, FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles,
 };
+use safe_api::nrs::ProcessedEntries as NativeProcessedEntries;
 use safe_api::nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap};
 use safe_api::wallet::{
     WalletSpendableBalance as NativeWalletSpendableBalance,
@@ -295,6 +296,53 @@ pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> ResultReturn<
         file_items,
         file_items_len,
         file_items_cap,
+    })
+}
+
+#[repr(C)]
+pub struct ProcessedEntry {
+    pub name: *const c_char,
+    pub action: *const c_char,
+    pub link: *const c_char,
+}
+
+#[repr(C)]
+pub struct ProcessedEntries {
+    pub processed_entries: *const ProcessedEntry,
+    pub processed_entries_len: usize,
+    pub processed_entries_cap: usize,
+}
+
+impl Drop for ProcessedEntries {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.processed_entries as *mut ProcessedEntry,
+                self.processed_entries_len,
+                self.processed_entries_cap,
+            );
+        }
+    }
+}
+
+pub unsafe fn processed_entries_into_repr_c(
+    entries: &NativeProcessedEntries,
+) -> ResultReturn<ProcessedEntries> {
+    let mut vec = Vec::with_capacity(entries.len());
+
+    for (name, (action, link)) in entries {
+        vec.push(ProcessedEntry {
+            name: to_c_str(name.to_string())?.as_ptr(),
+            action: to_c_str(action.to_string())?.as_ptr(),
+            link: to_c_str(link.to_string())?.as_ptr(),
+        })
+    }
+
+    let (processed_entries, processed_entries_len, processed_entries_cap) = vec_into_raw_parts(vec);
+    Ok(ProcessedEntries {
+        processed_entries,
+        processed_entries_len,
+        processed_entries_cap,
     })
 }
 

@@ -25,7 +25,7 @@ const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 type NrsMapRawData = Vec<(Vec<u8>, Vec<u8>)>;
 
 // List of public names uploaded with details if they were added, updated or deleted from NrsMaps
-type ProcessedEntries = BTreeMap<String, (String, String)>;
+pub type ProcessedEntries = BTreeMap<String, (String, String)>;
 
 #[allow(dead_code)]
 impl Safe {
