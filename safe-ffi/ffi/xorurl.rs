@@ -1,9 +1,8 @@
-use super::ffi_structs::{xorurl_encoder_into_repr_c, XorUrlEncoder};
+use super::ffi_structs::{xorurl_encoder_into_repr_c, XorUrlEncoder, XorNameArray};
 use super::helpers::{from_c_str_to_str_option, to_c_str};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder};
 use safe_api::ResultReturn;
-use safe_core::ffi::arrays::XorNameArray;
 use safe_nd::XorName;
 use std::os::raw::{c_char, c_void};
 

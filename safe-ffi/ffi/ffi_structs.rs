@@ -12,10 +12,16 @@ use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXor
 use safe_api::{
     BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo, ResultReturn,
 };
-use safe_core::ffi::arrays::XorNameArray;
 use safe_nd::XorName;
 use std::ffi::CString;
 use std::os::raw::c_char;
+
+/// Constant byte length of `XorName`.
+pub const XOR_NAME_LEN: usize = 32;
+
+/// Array containing `XorName` bytes.
+/// Adding this here because bindgen not picking this correctly from the safe-nd.
+pub type XorNameArray = [u8; XOR_NAME_LEN];
 
 #[repr(C)]
 pub struct BlsKeyPair {
