@@ -24,6 +24,8 @@ mod bindings {
     use std::path::Path;
     use unwrap::unwrap;
 
+    const BLS_PUBLIC_KEY_LEN: usize = 48;
+
     const BSD_MIT_LICENSE: &str =
         "// Copyright 2019 MaidSafe.net limited.\n\
          //\n\
@@ -77,8 +79,8 @@ mod bindings {
         lang.add_const("ulong", "SIGN_PUBLIC_KEY_LEN", sign::PUBLICKEYBYTES);
         lang.add_const("ulong", "SIGN_SECRET_KEY_LEN", sign::SECRETKEYBYTES);
         lang.add_const("ulong", "XOR_NAME_LEN", XOR_NAME_LEN);
-        lang.add_const("ulong", "BLS_PUBLIC_KEY_LEN", "48");
-        lang.add_opaque_type("App");
+        lang.add_const("ulong", "BLS_PUBLIC_KEY_LEN", BLS_PUBLIC_KEY_LEN);
+        lang.add_opaque_type("Safe");
 
         lang.reset_filter(FilterMode::Blacklist);
 
