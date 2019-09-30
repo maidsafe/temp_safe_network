@@ -13,6 +13,7 @@ description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 publish = false
 license = "GPL-3.0"
+default-run = "safe"
 repository = "https://github.com/maidsafe/safe-cli"
 edition = "2018"
 
