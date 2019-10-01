@@ -133,15 +133,15 @@ pub fn wallet_spendable_balance_into_repr_c(
 }
 
 #[repr(C)]
-pub struct SpendableWalletBalance {
+pub struct WalletSpendableBalanceInfo {
     pub wallet_name: *const c_char,
     pub is_default: bool,
-    pub balance: WalletSpendableBalance,
+    pub spendable_balance: WalletSpendableBalance,
 }
 
 #[repr(C)]
 pub struct WalletSpendableBalances {
-    pub wallet_balances: *const SpendableWalletBalance,
+    pub wallet_balances: *const WalletSpendableBalanceInfo,
     pub wallet_balances_len: usize,
     pub wallet_balances_cap: usize,
 }
@@ -150,7 +150,7 @@ impl Drop for WalletSpendableBalances {
     fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(
-                self.wallet_balances as *mut SpendableWalletBalance,
+                self.wallet_balances as *mut WalletSpendableBalanceInfo,
                 self.wallet_balances_len,
                 self.wallet_balances_cap,
             );
@@ -164,10 +164,10 @@ pub fn wallet_spendable_balances_into_repr_c(
     let mut vec = Vec::with_capacity(wallet_balances.len());
 
     for (name, (is_default, spendable_balance)) in wallet_balances {
-        vec.push(SpendableWalletBalance {
+        vec.push(WalletSpendableBalanceInfo {
             wallet_name: CString::new(name.to_string())?.into_raw(),
             is_default: *is_default,
-            balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
+            spendable_balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
         })
     }
 
@@ -364,8 +364,8 @@ pub struct NrsMapContainerInfo {
 }
 
 impl NrsMapContainerInfo {
-    pub fn new_nrs_map_containet_info() -> ResultReturn<NrsMapContainerInfo> {
-        Ok(NrsMapContainerInfo {
+    pub fn new() -> ResultReturn<Self> {
+        Ok(Self {
             public_name: std::ptr::null(),
             xorurl: std::ptr::null(),
             xorname: [0; 32],

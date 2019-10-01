@@ -38,7 +38,7 @@ pub unsafe extern "C" fn fetch(
                         Some(nrs_container_map) => {
                             nrs_map_container_info_into_repr_c(&nrs_container_map)?
                         }
-                        None => NrsMapContainerInfo::new_nrs_map_containet_info()?,
+                        None => NrsMapContainerInfo::new()?,
                     },
                     media_type: CString::new(media_type.clone().unwrap())?.as_ptr(),
                 };
@@ -63,7 +63,7 @@ pub unsafe extern "C" fn fetch(
                         Some(nrs_container_map) => {
                             nrs_map_container_info_into_repr_c(&nrs_container_map)?
                         }
-                        None => NrsMapContainerInfo::new_nrs_map_containet_info()?,
+                        None => NrsMapContainerInfo::new()?,
                     },
                 };
                 o_container(user_data.0, &container);
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn fetch(
                         Some(nrs_container_map) => {
                             nrs_map_container_info_into_repr_c(&nrs_container_map)?
                         }
-                        None => NrsMapContainerInfo::new_nrs_map_containet_info()?,
+                        None => NrsMapContainerInfo::new()?,
                     },
                 };
                 o_wallet(user_data.0, &wallet);
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn fetch(
                         Some(nrs_container_map) => {
                             nrs_map_container_info_into_repr_c(&nrs_container_map)?
                         }
-                        None => NrsMapContainerInfo::new_nrs_map_containet_info()?,
+                        None => NrsMapContainerInfo::new()?,
                     },
                 };
                 o_keys(user_data.0, &keys);
