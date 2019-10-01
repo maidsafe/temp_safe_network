@@ -7,15 +7,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::slice;
 
-#[inline]
-pub unsafe fn from_c_str_to_string_option(ptr: *const c_char) -> Option<String> {
-    if ptr.is_null() {
-        None
-    } else {
-        CStr::from_ptr(ptr).to_owned().into_string().ok()
-    }
-}
-
+// NOTE: The returned &str is only valid as long as the data in `ptr` is valid.
 #[inline]
 pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static str> {
     if ptr.is_null() {
@@ -27,10 +19,10 @@ pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static st
 
 #[inline]
 pub fn string_vec_to_c_str_str(argv: Vec<String>) -> Result<*const *const c_char, Error> {
-    let cstr_argv: Vec<_> = argv
+    let cstr_argv = argv
         .iter()
-        .map(|arg| CString::new(arg.as_str()).unwrap())
-        .collect();
+        .map(|arg| CString::new(arg.as_str()))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let p_argv: Vec<_> = cstr_argv.iter().map(|arg| arg.as_ptr()).collect();
 
@@ -41,17 +33,10 @@ pub fn string_vec_to_c_str_str(argv: Vec<String>) -> Result<*const *const c_char
 pub unsafe fn c_str_str_to_string_vec(
     argv: *const *const c_char,
     len: usize,
-) -> Option<Vec<String>> {
-    if len > 0 {
-        let data_vec = slice::from_raw_parts(argv, len).to_vec();
-        let string_vec: Vec<String> = data_vec
-            .iter()
-            .map(|s| from_c_str(*s).expect("Cannot convert"))
-            .collect();
-        Some(string_vec)
-    } else {
-        None
-    }
+) -> Result<Vec<String>, Error> {
+    let data_vec = slice::from_raw_parts(argv, len).to_vec();
+    let string_vec: Result<Vec<String>, _> = data_vec.iter().map(|s| from_c_str(*s)).collect();
+    Ok(string_vec?)
 }
 
 // Serialize to a JSON string, then serialize the string to the output
