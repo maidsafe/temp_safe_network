@@ -36,15 +36,25 @@ pub unsafe extern "C" fn parse_and_resolve_url(
         user_data: *mut c_void,
         result: *const FfiResult,
         xorurl_encoder: *const XorUrlEncoder,
-        is_resolved: bool,
+        resolved_from: *const XorUrlEncoder,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = from_c_str(url)?;
-        let (encoder, resolved) = (*app).parse_and_resolve_url(&url_string)?;
+        let (encoder, resolved_from) = (*app).parse_and_resolve_url(&url_string)?;
         let ffi_xorurl_encoder = xorurl_encoder_into_repr_c(encoder)?;
-        o_cb(user_data.0, FFI_RESULT_OK, &ffi_xorurl_encoder, resolved);
+        let ffi_nrs_xorurl_encoder = if let Some(nrs_xorurl_encoder) = resolved_from {
+            &xorurl_encoder_into_repr_c(nrs_xorurl_encoder)?
+        } else {
+            std::ptr::null()
+        };
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            &ffi_xorurl_encoder,
+            ffi_nrs_xorurl_encoder,
+        );
         Ok(())
     })
 }
