@@ -164,7 +164,14 @@ impl Safe {
                 &self,
                 xorurl_encoder.xorname(),
                 balance_name.as_bytes(),
-            )?;
+            )
+            .map_err(|_| {
+                Error::InvalidInput(format!(
+                    "No spendable balance named '{}' found in Wallet: '{}'",
+                    balance_name, url
+                ))
+            })?;
+
             let mut balances = WalletSpendableBalances::default();
             balances.insert(balance_name.to_string(), (false, spendable_balance));
             balances
@@ -467,7 +474,14 @@ fn resolve_wallet_url(
             safe,
             xorurl_encoder.xorname(),
             url_path[1..].as_bytes(), // we get rid of starting '/' from the URL path
-        )?
+        )
+        .map_err(|_| {
+            Error::InvalidInput(format!(
+                "No spendable balance named '{}' found in Wallet: '{}'",
+                url_path[1..].to_string(),
+                wallet_url
+            ))
+        })?
     };
 
     Ok(wallet_balance)
