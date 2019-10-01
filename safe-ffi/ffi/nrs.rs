@@ -1,6 +1,5 @@
 use super::ffi_structs::{
-    nrs_map_into_repr_c, processed_entries_into_repr_c, xorurl_encoder_into_repr_c, NrsMap,
-    ProcessedEntries, XorUrlEncoder,
+    processed_entries_into_repr_c, xorurl_encoder_into_repr_c, ProcessedEntries, XorUrlEncoder,
 };
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
@@ -71,7 +70,7 @@ pub unsafe extern "C" fn nrs_map_container_create(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const NrsMap,
+        nrs_map: *const c_char,
         processed_entries: *const ProcessedEntries,
         xorurl: *const c_char,
     ),
@@ -83,12 +82,12 @@ pub unsafe extern "C" fn nrs_map_container_create(
         let (nrs_map_container_xorurl, processed_entries, nrs_map) = (*app)
             .nrs_map_container_create(&nrs_str, &link_str, set_default, direct_link, dry_run)?;
         let xorurl_string = CString::new(nrs_map_container_xorurl)?;
-        let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
+        let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         let ffi_processed_entries = processed_entries_into_repr_c(&processed_entries)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
-            &ffi_nrs_map,
+            nrs_map_json.as_ptr(),
             &ffi_processed_entries,
             xorurl_string.as_ptr(),
         );
@@ -108,7 +107,7 @@ pub unsafe extern "C" fn nrs_map_container_add(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const NrsMap,
+        nrs_map: *const c_char,
         xorurl: *const c_char,
         version: u64, // todo: add processed entries
     ),
@@ -125,11 +124,11 @@ pub unsafe extern "C" fn nrs_map_container_add(
             dry_run,
         )?;
         let xorurl_string = CString::new(xorurl)?;
-        let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
+        let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
-            &ffi_nrs_map,
+            nrs_map_json.as_ptr(),
             xorurl_string.as_ptr(),
             version,
         );
@@ -146,7 +145,7 @@ pub unsafe extern "C" fn nrs_map_container_remove(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const NrsMap,
+        nrs_map: *const c_char,
         xorurl: *const c_char,
         version: u64, // todo: add processed entries
     ),
@@ -157,11 +156,11 @@ pub unsafe extern "C" fn nrs_map_container_remove(
         let (version, xorurl, _processed_entries, nrs_map) =
             (*app).nrs_map_container_remove(&name_str, dry_run)?;
         let xorurl_string = CString::new(xorurl)?;
-        let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
+        let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
-            &ffi_nrs_map,
+            nrs_map_json.as_ptr(),
             xorurl_string.as_ptr(),
             version,
         );
@@ -177,7 +176,7 @@ pub unsafe extern "C" fn nrs_map_container_get(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        nrs_map: *const NrsMap,
+        nrs_map: *const c_char,
         version: u64,
     ),
 ) {
@@ -185,8 +184,8 @@ pub unsafe extern "C" fn nrs_map_container_get(
         let user_data = OpaqueCtx(user_data);
         let url_string = from_c_str(url)?;
         let (version, nrs_map) = (*app).nrs_map_container_get(&url_string)?;
-        let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
-        o_cb(user_data.0, FFI_RESULT_OK, &ffi_nrs_map, version);
+        let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
+        o_cb(user_data.0, FFI_RESULT_OK, nrs_map_json.as_ptr(), version);
         Ok(())
     })
 }
