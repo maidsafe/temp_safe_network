@@ -223,13 +223,11 @@ impl Safe {
             ));
         }
 
-        let (mut xorurl_encoder, is_nrs_resolved) = self.parse_and_resolve_url(url)?;
+        let (mut xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it for sync-ing
-        if is_nrs_resolved {
-            xorurl_encoder.set_content_version(None);
-        }
+        xorurl_encoder.set_content_version(None);
 
         let (current_version, current_files_map): (u64, FilesMap) =
             self.files_container_get(&xorurl_encoder.to_string()?)?;
@@ -519,13 +517,11 @@ fn validate_files_add_params(
         ));
     }
 
-    let (mut xorurl_encoder, is_nrs_resolved) = safe.parse_and_resolve_url(url)?;
+    let (mut xorurl_encoder, _) = safe.parse_and_resolve_url(url)?;
 
     // If the FilesContainer URL was resolved from an NRS name we need to remove
     // the version from it so we can fetch latest version of it for sync-ing
-    if is_nrs_resolved {
-        xorurl_encoder.set_content_version(None);
-    }
+    xorurl_encoder.set_content_version(None);
 
     let (current_version, current_files_map): (u64, FilesMap) =
         safe.files_container_get(&xorurl_encoder.to_string()?)?;

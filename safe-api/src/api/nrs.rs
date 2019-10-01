@@ -57,8 +57,12 @@ impl Safe {
     }
 
     // Parses a safe:// URL and returns all the info in a XorUrlEncoder instance.
-    // It also returns a flag indicating if it the URL has to be resolved as NRS-URL
-    pub fn parse_and_resolve_url(&self, url: &str) -> ResultReturn<(XorUrlEncoder, bool)> {
+    // It also returns a second XorUrlEncoder if the URL was resolved as NRS-URL,
+    // this second XorUrlEncoder instance contains the information of the parsed NRS-URL.
+    pub fn parse_and_resolve_url(
+        &self,
+        url: &str,
+    ) -> ResultReturn<(XorUrlEncoder, Option<XorUrlEncoder>)> {
         let xorurl_encoder = Safe::parse_url(url)?;
         if xorurl_encoder.content_type() == SafeContentType::NrsMapContainer {
             let (_version, nrs_map) = self.nrs_map_container_get(&url).map_err(|_| {
@@ -67,9 +71,9 @@ impl Safe {
                 )
             })?;
             let xorurl = nrs_map.resolve_for_subnames(xorurl_encoder.sub_names())?;
-            Ok((XorUrlEncoder::from_url(&xorurl)?, true))
+            Ok((XorUrlEncoder::from_url(&xorurl)?, Some(xorurl_encoder)))
         } else {
-            Ok((xorurl_encoder, false))
+            Ok((xorurl_encoder, None))
         }
     }
 
