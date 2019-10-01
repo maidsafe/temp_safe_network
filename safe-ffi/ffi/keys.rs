@@ -1,7 +1,8 @@
 use super::ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
-use super::helpers::{from_c_str_to_str_option, to_c_str};
+use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
@@ -45,7 +46,7 @@ pub unsafe extern "C" fn keys_create(
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
-            to_c_str(xorurl.to_string())?.as_ptr(),
+            CString::new(xorurl.to_string())?.as_ptr(),
             &bls_key_pair_into_repr_c(&keypair.as_ref().unwrap())?,
         );
         Ok(())
@@ -71,7 +72,7 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
-            to_c_str(xorurl.to_string())?.as_ptr(),
+            CString::new(xorurl.to_string())?.as_ptr(),
             &bls_key_pair_into_repr_c(&keypair.as_ref().unwrap())?,
         );
         Ok(())
@@ -89,7 +90,7 @@ pub unsafe extern "C" fn keys_balance_from_sk(
         let user_data = OpaqueCtx(user_data);
         let secret_key = from_c_str(sk)?;
         let balance = (*app).keys_balance_from_sk(&secret_key)?;
-        let amount_result = to_c_str(balance)?;
+        let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
     })
@@ -108,7 +109,7 @@ pub unsafe extern "C" fn keys_balance_from_url(
         let key_url = from_c_str(url)?;
         let secret_key = from_c_str(sk)?;
         let balance = (*app).keys_balance_from_url(&key_url, &secret_key)?;
-        let amount_result = to_c_str(balance)?;
+        let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
     })
@@ -127,7 +128,7 @@ pub unsafe extern "C" fn validate_sk_for_url(
         let key_url = from_c_str(url)?;
         let secret_key = from_c_str(sk)?;
         let balance = (*app).validate_sk_for_url(&secret_key, &key_url)?;
-        let amount_result = to_c_str(balance)?;
+        let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
     })

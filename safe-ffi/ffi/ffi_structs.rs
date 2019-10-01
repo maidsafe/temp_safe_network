@@ -1,4 +1,4 @@
-use super::helpers::{from_c_str_to_str_option, to_c_str};
+use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{from_c_str, vec_into_raw_parts};
 use safe_api::files::{
     FileItem as NativeFileItem, FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles,
@@ -93,8 +93,8 @@ pub unsafe fn xorurl_encoder_into_repr_c(
         type_tag: xorurl_encoder.type_tag(),
         data_type: xorurl_encoder.data_type() as u64,
         content_type: xorurl_encoder.content_type().value()?,
-        path: to_c_str(xorurl_encoder.path().to_string())?.as_ptr(),
-        sub_names: to_c_str(sub_names)?.as_ptr(),
+        path: CString::new(xorurl_encoder.path().to_string())?.as_ptr(),
+        sub_names: CString::new(sub_names)?.as_ptr(),
         // sub_names: sub_names, // Todo: update to String Vec
         // sub_names_len: xorurl_encoder.sub_names().len(),
         content_version: xorurl_encoder.content_version().unwrap_or_else(|| 0),
@@ -200,9 +200,9 @@ pub unsafe fn processed_files_into_repr_c(
 
     for (file_name, (file_meta_data, file_xorurl)) in map {
         vec.push(ProcessedFile {
-            file_name: to_c_str(file_name.to_string())?.as_ptr(),
-            file_meta_data: to_c_str(file_meta_data.to_string())?.as_ptr(),
-            file_xorurl: to_c_str(file_xorurl.to_string())?.as_ptr(),
+            file_name: CString::new(file_name.to_string())?.as_ptr(),
+            file_meta_data: CString::new(file_meta_data.to_string())?.as_ptr(),
+            file_xorurl: CString::new(file_xorurl.to_string())?.as_ptr(),
         })
     }
 
@@ -267,14 +267,14 @@ pub unsafe fn file_item_into_repr_c(
 
     for (file_meta_data, xorurl) in file_item_map {
         vec.push(FileItem {
-            file_meta_data: to_c_str(file_meta_data.to_string())?.as_ptr(),
-            xorurl: to_c_str(xorurl.to_string())?.as_ptr(),
+            file_meta_data: CString::new(file_meta_data.to_string())?.as_ptr(),
+            xorurl: CString::new(xorurl.to_string())?.as_ptr(),
         })
     }
 
     let (file_items, file_items_len, file_items_cap) = vec_into_raw_parts(vec);
     Ok(FileInfo {
-        file_name: to_c_str(file_name.to_string())?.as_ptr(),
+        file_name: CString::new(file_name.to_string())?.as_ptr(),
         file_items,
         file_items_len,
         file_items_cap,
@@ -329,9 +329,9 @@ pub unsafe fn processed_entries_into_repr_c(
 
     for (name, (action, link)) in entries {
         vec.push(ProcessedEntry {
-            name: to_c_str(name.to_string())?.as_ptr(),
-            action: to_c_str(action.to_string())?.as_ptr(),
-            link: to_c_str(link.to_string())?.as_ptr(),
+            name: CString::new(name.to_string())?.as_ptr(),
+            action: CString::new(action.to_string())?.as_ptr(),
+            link: CString::new(link.to_string())?.as_ptr(),
         })
     }
 
@@ -359,12 +359,12 @@ pub unsafe fn nrs_map_container_info_into_repr_c(
 ) -> ResultReturn<NrsMapContainerInfo> {
     let nrs_map_json = serde_json::to_string(&nrs_container_info.nrs_map)?;
     Ok(NrsMapContainerInfo {
-        public_name: to_c_str(nrs_container_info.public_name.clone())?.as_ptr(),
-        xorurl: to_c_str(nrs_container_info.xorurl.clone())?.as_ptr(),
+        public_name: CString::new(nrs_container_info.public_name.clone())?.as_ptr(),
+        xorurl: CString::new(nrs_container_info.xorurl.clone())?.as_ptr(),
         xorname: nrs_container_info.xorname.0,
         type_tag: nrs_container_info.type_tag,
         version: nrs_container_info.version,
-        nrs_map: to_c_str(nrs_map_json)?.as_ptr(),
+        nrs_map: CString::new(nrs_map_json)?.as_ptr(),
         data_type: nrs_container_info.data_type.clone() as u64,
     })
 }

@@ -1,9 +1,10 @@
 use super::ffi_structs::{xorurl_encoder_into_repr_c, XorNameArray, XorUrlEncoder};
-use super::helpers::{from_c_str_to_str_option, to_c_str};
+use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder};
 use safe_api::ResultReturn;
 use safe_nd::XorName;
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 // todo: Can be convertered to a struct
@@ -41,7 +42,7 @@ pub unsafe extern "C" fn xorurl_encode(
             Some(content_version),
             &encoding_base,
         )?; //todo: update sub_names parameter
-        let encoded_string = to_c_str(encoded_xor_url)?;
+        let encoded_string = CString::new(encoded_xor_url)?;
         o_cb(user_data.0, FFI_RESULT_OK, encoded_string.as_ptr());
         Ok(())
     })

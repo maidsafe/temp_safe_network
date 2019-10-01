@@ -1,11 +1,12 @@
 use super::ffi_structs::{
     files_map_into_repr_c, processed_files_into_repr_c, FilesMap, ProcessedFiles,
 };
-use super::helpers::{from_c_str_to_str_option, to_c_str};
+use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{
     catch_unwind_cb, from_c_str, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, FFI_RESULT_OK,
 };
 use safe_api::{ResultReturn, Safe};
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
@@ -30,7 +31,7 @@ pub unsafe extern "C" fn files_container_create(
         let destination = from_c_str_to_str_option(dest);
         let (xorurl, processed_files, files_map) =
             (*app).files_container_create(&location_str, destination, recursive, dry_run)?;
-        let xorurl_string = to_c_str(xorurl)?;
+        let xorurl_string = CString::new(xorurl)?;
         let ffi_files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -196,7 +197,7 @@ pub unsafe extern "C" fn files_put_published_immutable(
         let media_type_str = from_c_str_to_str_option(media_type);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
         let xorurl = (*app).files_put_published_immutable(&data_vec, media_type_str)?;
-        let xorurl_string = to_c_str(xorurl)?;
+        let xorurl_string = CString::new(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, xorurl_string.as_ptr());
         Ok(())
     })

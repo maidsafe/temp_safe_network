@@ -2,9 +2,10 @@ use super::ffi_structs::{
     wallet_spendable_balance_into_repr_c, wallet_spendable_balances_into_repr_c,
     WalletSpendableBalance, WalletSpendableBalances,
 };
-use super::helpers::{from_c_str_to_str_option, to_c_str};
+use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
@@ -16,7 +17,7 @@ pub unsafe extern "C" fn wallet_create(
     catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_xorurl = (*app).wallet_create()?;
-        let wallet_xorurl_c_str = to_c_str(wallet_xorurl)?;
+        let wallet_xorurl_c_str = CString::new(wallet_xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, wallet_xorurl_c_str.as_ptr());
         Ok(())
     })
@@ -39,7 +40,7 @@ pub unsafe extern "C" fn wallet_insert(
         let name_str = from_c_str_to_str_option(name);
         let wallet_name =
             (*app).wallet_insert(&key_url_str, name_str, set_default, &secret_key_str)?;
-        let wallet_name_c_str = to_c_str(wallet_name)?;
+        let wallet_name_c_str = CString::new(wallet_name)?;
         o_cb(user_data.0, FFI_RESULT_OK, wallet_name_c_str.as_ptr());
         Ok(())
     })
@@ -56,7 +57,7 @@ pub unsafe extern "C" fn wallet_balance(
         let user_data = OpaqueCtx(user_data);
         let wallet_url = from_c_str(url)?;
         let balance = (*app).wallet_balance(&wallet_url)?;
-        let amount_result = to_c_str(balance)?;
+        let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
     })

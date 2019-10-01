@@ -2,9 +2,9 @@ use super::ffi_structs::{
     nrs_map_into_repr_c, processed_entries_into_repr_c, xorurl_encoder_into_repr_c, NrsMap,
     ProcessedEntries, XorUrlEncoder,
 };
-use super::helpers::to_c_str;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
 use safe_api::{ResultReturn, Safe};
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn nrs_map_container_create(
         let link_str = from_c_str(link)?;
         let (nrs_map_container_xorurl, processed_entries, nrs_map) = (*app)
             .nrs_map_container_create(&nrs_str, &link_str, set_default, direct_link, dry_run)?;
-        let xorurl_string = to_c_str(nrs_map_container_xorurl)?;
+        let xorurl_string = CString::new(nrs_map_container_xorurl)?;
         let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
         let ffi_processed_entries = processed_entries_into_repr_c(&processed_entries)?;
         o_cb(
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn nrs_map_container_add(
             direct_link,
             dry_run,
         )?;
-        let xorurl_string = to_c_str(xorurl)?;
+        let xorurl_string = CString::new(xorurl)?;
         let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
         o_cb(
             user_data.0,
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn nrs_map_container_remove(
         let name_str = from_c_str(name)?;
         let (version, xorurl, _processed_entries, nrs_map) =
             (*app).nrs_map_container_remove(&name_str, dry_run)?;
-        let xorurl_string = to_c_str(xorurl)?;
+        let xorurl_string = CString::new(xorurl)?;
         let ffi_nrs_map = nrs_map_into_repr_c(&nrs_map)?;
         o_cb(
             user_data.0,

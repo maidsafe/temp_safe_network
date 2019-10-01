@@ -26,12 +26,6 @@ pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static st
 }
 
 #[inline]
-pub unsafe fn to_c_str(native_string: String) -> Result<CString, Error> {
-    CString::new(native_string)
-        .map_err(|_| Error::StringError("Couldn't convert to string".to_string()))
-}
-
-#[inline]
 pub fn string_vec_to_c_str_str(argv: Vec<String>) -> Result<*const *const c_char, Error> {
     let cstr_argv: Vec<_> = argv
         .iter()

@@ -2,10 +2,10 @@ use super::ffi_structs::{
     files_map_into_repr_c, nrs_map_container_info_into_repr_c,
     wallet_spendable_balances_into_repr_c, FilesContainer, PublishedImmutableData, SafeKey, Wallet,
 };
-use super::helpers::to_c_str;
 use super::{ResultReturn, Safe};
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx};
 use safe_api::fetch::SafeData;
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn fetch(
                     resolved_from: nrs_map_container_info_into_repr_c(
                         &resolved_from.as_ref().unwrap(),
                     )?,
-                    media_type: to_c_str(media_type.clone().unwrap())?.as_ptr(),
+                    media_type: CString::new(media_type.clone().unwrap())?.as_ptr(),
                 };
                 o_published(user_data.0, &published_data);
             }
