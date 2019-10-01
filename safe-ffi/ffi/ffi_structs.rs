@@ -54,7 +54,7 @@ pub struct FilesContainer {
     pub xorname: XorNameArray,
     pub type_tag: u64,
     pub version: u64,
-    pub files_map: FilesMap,
+    pub files_map: *const c_char,
     pub data_type: u64,
     pub resolved_from: NrsMapContainerInfo,
 }
@@ -136,7 +136,7 @@ pub fn wallet_spendable_balance_into_repr_c(
 pub struct SpendableWalletBalance {
     pub wallet_name: *const c_char,
     pub is_default: bool,
-    pub spendable_wallet_balance: WalletSpendableBalance,
+    pub balance: WalletSpendableBalance,
 }
 
 #[repr(C)]
@@ -167,7 +167,7 @@ pub fn wallet_spendable_balances_into_repr_c(
         vec.push(SpendableWalletBalance {
             wallet_name: CString::new(name.to_string())?.into_raw(),
             is_default: *is_default,
-            spendable_wallet_balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
+            balance: wallet_spendable_balance_into_repr_c(&spendable_balance)?,
         })
     }
 
@@ -240,18 +240,11 @@ pub struct FileInfo {
     pub file_items_cap: usize,
 }
 
-#[repr(C)]
-pub struct FilesMap {
-    pub file_items: *const FileInfo,
-    pub file_items_len: usize,
-    pub file_items_cap: usize,
-}
-
-impl Drop for FilesMap {
+impl Drop for FileInfo {
     fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(
-                self.file_items as *mut FileInfo,
+                self.file_items as *mut FileItem,
                 self.file_items_len,
                 self.file_items_cap,
             );
@@ -259,7 +252,7 @@ impl Drop for FilesMap {
     }
 }
 
-pub unsafe fn file_item_into_repr_c(
+pub unsafe fn file_info_into_repr_c(
     file_name: &str,
     file_item_map: &NativeFileItem,
 ) -> ResultReturn<FileInfo> {
@@ -281,18 +274,34 @@ pub unsafe fn file_item_into_repr_c(
     })
 }
 
+#[repr(C)]
+pub struct FilesMap {
+    pub files: *const FileInfo,
+    pub files_len: usize,
+    pub files_cap: usize,
+}
+
+impl Drop for FilesMap {
+    fn drop(&mut self) {
+        unsafe {
+            let _ =
+                Vec::from_raw_parts(self.files as *mut FileInfo, self.files_len, self.files_cap);
+        }
+    }
+}
+
 pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> ResultReturn<FilesMap> {
     let mut vec = Vec::with_capacity(files_map.len());
 
     for (file_name, file_items) in files_map {
-        vec.push(file_item_into_repr_c(file_name, file_items)?);
+        vec.push(file_info_into_repr_c(file_name, file_items)?);
     }
 
-    let (file_items, file_items_len, file_items_cap) = vec_into_raw_parts(vec);
+    let (files, files_len, files_cap) = vec_into_raw_parts(vec);
     Ok(FilesMap {
-        file_items,
-        file_items_len,
-        file_items_cap,
+        files,
+        files_len,
+        files_cap,
     })
 }
 
@@ -352,6 +361,20 @@ pub struct NrsMapContainerInfo {
     pub version: u64,
     pub nrs_map: *const c_char,
     pub data_type: u64,
+}
+
+impl NrsMapContainerInfo {
+    pub fn new_nrs_map_containet_info() -> ResultReturn<NrsMapContainerInfo> {
+        Ok(NrsMapContainerInfo {
+            public_name: std::ptr::null(),
+            xorurl: std::ptr::null(),
+            xorname: [0; 32],
+            type_tag: 0,
+            version: 0,
+            nrs_map: std::ptr::null(),
+            data_type: 0,
+        })
+    }
 }
 
 pub unsafe fn nrs_map_container_info_into_repr_c(
