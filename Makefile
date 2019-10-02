@@ -307,7 +307,7 @@ endif
 	aws s3 cp \
 		--no-sign-request \
 		--region eu-west-2 \
-		s3://${S3_BUCKET}/safe-cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz .
+		s3://${S3_BUCKET}/safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz .
 	mkdir target
-	tar -C target -xvf safe-cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
-	rm safe-cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
+	tar -C target -xvf safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
+	rm safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
