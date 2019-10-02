@@ -194,8 +194,8 @@ stage("deployment") {
 
 stage("publishing") {
     node("safe_client_libs") {
+        checkout(scm)
         if (shouldPublish()) {
-            checkout(scm)
             def components = getComponentsWithVersionChanges()
             def dryRun = isNightlyBuild() ? "true" : "false"
             withEnv(["SCL_PUBLISH_DRY_RUN=${dryRun}"]) {
