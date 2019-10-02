@@ -21,6 +21,9 @@ log = "0.4.6"
 safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
 safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
 safe-nd = "~0.4.0"
+safe_authenticator = "~0.10.0"
+maidsafe_utilities = "~0.18.0"
+env_logger = "0.6.0"
 rand = "0.6.5"
 rand_core = "0.4.0"
 threshold_crypto = "~0.3.2"
