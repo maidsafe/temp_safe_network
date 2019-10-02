@@ -179,6 +179,63 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() {
 }
 
 #[test]
+fn calling_safe_wallet_unexisting_spendable_balances() {
+    let (wallet_from, _pk, _sk) =
+        create_wallet_with_balance("96.000000001", Some("one-spendable-balance")); // we need 1 nano to pay for the costs of creation
+    assert!(wallet_from.contains(SAFE_PROTOCOL));
+    let (wallet_to, _pk, _sk) = create_wallet_with_balance("5.100000001", Some("my-savings")); // we need 1 nano to pay for the costs of creation
+    assert!(wallet_to.contains(SAFE_PROTOCOL));
+
+    // Test failure when transferring from an unexisting source spendable balance
+    let from_unexisting_balance = format!("{}/from-unexisting-spendable-balance", wallet_from);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec![
+        "wallet",
+        "transfer",
+        "50",
+        "--from",
+        &from_unexisting_balance,
+        "--to",
+        &format!("{}/my-savings", wallet_to),
+    ])
+    .assert()
+    .stderr(predicate::str::contains(&format!(
+        "No spendable balance named 'from-unexisting-spendable-balance' found in Wallet: '{}'",
+        from_unexisting_balance
+    )))
+    .failure();
+
+    // Test failure when transferring to an unexisting destination spendable balance
+    let to_unexisting_balance = format!("{}/to-unexisting-spendable-balance", wallet_to);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec![
+        "wallet",
+        "transfer",
+        "50",
+        "--from",
+        &format!("{}/one-spendable-balance", wallet_from),
+        "--to",
+        &to_unexisting_balance,
+    ])
+    .assert()
+    .stderr(predicate::str::contains(&format!(
+        "No spendable balance named 'to-unexisting-spendable-balance' found in Wallet: '{}'",
+        to_unexisting_balance
+    )))
+    .failure();
+
+    // Test failure when checking balance of an unexisting spendable balance
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["wallet", "balance", &from_unexisting_balance])
+        .assert()
+        .stderr(predicate::str::contains(&format!(
+            "No spendable balance named 'from-unexisting-spendable-balance' found in Wallet: '{}'",
+            from_unexisting_balance
+        )))
+        .failure();
+}
+
+#[test]
 fn calling_safe_wallet_balance() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
