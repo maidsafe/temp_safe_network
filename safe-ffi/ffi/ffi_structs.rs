@@ -27,6 +27,20 @@ pub struct BlsKeyPair {
     pub sk: *const c_char,
 }
 
+impl Drop for BlsKeyPair {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.pk.is_null() {
+                let _ = CString::from_raw(self.pk as *mut _);
+            }
+
+            if !self.sk.is_null() {
+                let _ = CString::from_raw(self.sk as *mut _);
+            }
+        }
+    }
+}
+
 pub fn bls_key_pair_into_repr_c(key_pair: &NativeBlsKeyPair) -> ResultReturn<BlsKeyPair> {
     Ok(BlsKeyPair {
         pk: CString::new(key_pair.pk.clone())?.into_raw(),
@@ -59,6 +73,16 @@ pub struct FilesContainer {
     pub resolved_from: NrsMapContainerInfo,
 }
 
+impl Drop for FilesContainer {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.files_map.is_null() {
+                let _ = CString::from_raw(self.files_map as *mut _);
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub struct PublishedImmutableData {
     pub xorname: XorNameArray,
@@ -66,6 +90,16 @@ pub struct PublishedImmutableData {
     pub data_len: usize,
     pub resolved_from: NrsMapContainerInfo,
     pub media_type: *const c_char,
+}
+
+impl Drop for PublishedImmutableData {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.media_type.is_null() {
+                let _ = CString::from_raw(self.media_type as *mut _);
+            }
+        }
+    }
 }
 
 #[repr(C)]
@@ -80,6 +114,20 @@ pub struct XorUrlEncoder {
     // pub sub_names: *const *const c_char, // Todo: update to String Vec
     // pub sub_names_len: usize,
     pub content_version: u64,
+}
+
+impl Drop for XorUrlEncoder {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.path.is_null() {
+                let _ = CString::from_raw(self.path as *mut _);
+            }
+
+            if !self.sub_names.is_null() {
+                let _ = CString::from_raw(self.sub_names as *mut _);
+            }
+        }
+    }
 }
 
 pub unsafe fn xorurl_encoder_into_repr_c(
@@ -123,6 +171,20 @@ pub struct WalletSpendableBalance {
     pub sk: *const c_char,
 }
 
+impl Drop for WalletSpendableBalance {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.sk.is_null() {
+                let _ = CString::from_raw(self.sk as *mut _);
+            }
+        }
+    }
+}
+
 pub fn wallet_spendable_balance_into_repr_c(
     wallet_balance: &NativeWalletSpendableBalance,
 ) -> ResultReturn<WalletSpendableBalance> {
@@ -137,6 +199,16 @@ pub struct WalletSpendableBalanceInfo {
     pub wallet_name: *const c_char,
     pub is_default: bool,
     pub spendable_balance: WalletSpendableBalance,
+}
+
+impl Drop for WalletSpendableBalanceInfo {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.wallet_name.is_null() {
+                let _ = CString::from_raw(self.wallet_name as *mut _);
+            }
+        }
+    }
 }
 
 #[repr(C)]
@@ -186,11 +258,41 @@ pub struct ProcessedFile {
     pub file_xorurl: *const c_char,
 }
 
+impl Drop for ProcessedFile {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.file_name.is_null() {
+                let _ = CString::from_raw(self.file_name as *mut _);
+            }
+
+            if !self.file_meta_data.is_null() {
+                let _ = CString::from_raw(self.file_meta_data as *mut _);
+            }
+
+            if !self.file_xorurl.is_null() {
+                let _ = CString::from_raw(self.file_xorurl as *mut _);
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub struct ProcessedFiles {
-    pub processed_files: *const ProcessedFile,
-    pub processed_files_len: usize,
-    pub processed_files_cap: usize,
+    pub files: *const ProcessedFile,
+    pub files_len: usize,
+    pub files_cap: usize,
+}
+
+impl Drop for ProcessedFiles {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(
+                self.files as *mut ProcessedFile,
+                self.files_len,
+                self.files_cap,
+            );
+        }
+    }
 }
 
 pub unsafe fn processed_files_into_repr_c(
@@ -206,30 +308,32 @@ pub unsafe fn processed_files_into_repr_c(
         })
     }
 
-    let (processed_files, processed_files_len, processed_files_cap) = vec_into_raw_parts(vec);
+    let (files, files_len, files_cap) = vec_into_raw_parts(vec);
     Ok(ProcessedFiles {
-        processed_files,
-        processed_files_len,
-        processed_files_cap,
+        files,
+        files_len,
+        files_cap,
     })
-}
-
-impl Drop for ProcessedFiles {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = Vec::from_raw_parts(
-                self.processed_files as *mut ProcessedFile,
-                self.processed_files_len,
-                self.processed_files_cap,
-            );
-        }
-    }
 }
 
 #[repr(C)]
 pub struct FileItem {
     pub file_meta_data: *const c_char,
     pub xorurl: *const c_char,
+}
+
+impl Drop for FileItem {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.file_meta_data.is_null() {
+                let _ = CString::from_raw(self.file_meta_data as *mut _);
+            }
+
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+        }
+    }
 }
 
 #[repr(C)]
@@ -243,6 +347,10 @@ pub struct FileInfo {
 impl Drop for FileInfo {
     fn drop(&mut self) {
         unsafe {
+            if !self.file_name.is_null() {
+                let _ = CString::from_raw(self.file_name as *mut _);
+            }
+
             let _ = Vec::from_raw_parts(
                 self.file_items as *mut FileItem,
                 self.file_items_len,
@@ -312,6 +420,24 @@ pub struct ProcessedEntry {
     pub link: *const c_char,
 }
 
+impl Drop for ProcessedEntry {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.name.is_null() {
+                let _ = CString::from_raw(self.name as *mut _);
+            }
+
+            if !self.action.is_null() {
+                let _ = CString::from_raw(self.action as *mut _);
+            }
+
+            if !self.link.is_null() {
+                let _ = CString::from_raw(self.link as *mut _);
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub struct ProcessedEntries {
     pub processed_entries: *const ProcessedEntry,
@@ -361,6 +487,24 @@ pub struct NrsMapContainerInfo {
     pub version: u64,
     pub nrs_map: *const c_char,
     pub data_type: u64,
+}
+
+impl Drop for NrsMapContainerInfo {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.public_name.is_null() {
+                let _ = CString::from_raw(self.public_name as *mut _);
+            }
+
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.nrs_map.is_null() {
+                let _ = CString::from_raw(self.nrs_map as *mut _);
+            }
+        }
+    }
 }
 
 impl NrsMapContainerInfo {
