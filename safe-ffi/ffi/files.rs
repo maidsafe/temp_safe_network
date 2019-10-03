@@ -1,6 +1,4 @@
-use super::ffi_structs::{
-    files_map_into_repr_c, processed_files_into_repr_c, FilesMap, ProcessedFiles,
-};
+use super::ffi_structs::{processed_files_into_repr_c, ProcessedFiles};
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{
     catch_unwind_cb, from_c_str, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, FFI_RESULT_OK,
@@ -61,7 +59,7 @@ pub unsafe extern "C" fn files_container_get(
         let user_data = OpaqueCtx(user_data);
         let url_str = from_c_str(url)?;
         let (version, files_map) = (*app).files_container_get(&url_str)?;
-        let files_map_json = to_c_str(serde_json::to_string(&files_map)?)?;
+        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         o_cb(user_data.0, FFI_RESULT_OK, version, files_map_json.as_ptr());
         Ok(())
     })
@@ -97,7 +95,7 @@ pub unsafe extern "C" fn files_container_sync(
             update_nrs,
             dry_run,
         )?;
-        let files_map_json = to_c_str(serde_json::to_string(&files_map)?)?;
+        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
@@ -133,7 +131,7 @@ pub unsafe extern "C" fn files_container_add(
         let source_str = from_c_str(source_file)?;
         let (version, processed_files, files_map) =
             (*app).files_container_add(&source_str, &url_str, force, update_nrs, dry_run)?;
-        let files_map_json = to_c_str(serde_json::to_string(&files_map)?)?;
+        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
@@ -170,7 +168,7 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         let url_str = from_c_str(url)?;
         let (version, processed_files, files_map) =
             (*app).files_container_add_from_raw(&data_vec, &url_str, force, update_nrs, dry_run)?;
-        let files_map_json = to_c_str(serde_json::to_string(&files_map)?)?;
+        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
