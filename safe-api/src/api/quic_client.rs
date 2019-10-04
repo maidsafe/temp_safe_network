@@ -179,7 +179,13 @@ pub fn quic_send(
     let response_str = std::str::from_utf8(received_bytes.as_slice()).map_err(|err| {
         Error::AuthdClientError(format!("Failed to decode response data: {}", err))
     })?;
-    Ok(response_str.to_string())
+
+    // TODO: decode using JSON-RPC, authd temporarily uses a mark to signal error
+    if response_str.starts_with("[AUTHD_ERROR]:") {
+        Err(Error::AuthdClientError(response_str[14..].to_string()))
+    } else {
+        Ok(response_str.to_string())
+    }
 }
 
 fn duration_secs(x: &Duration) -> f32 {

@@ -87,7 +87,6 @@ impl SafeAuthenticator {
         match Authenticator::login(secret, password, || info!("Disconnected from network")) {
             Ok(auth) => {
                 debug!("Logged-in successfully");
-                println!("AUTHED!!!!");
                 self.safe_authenticator = Some(auth);
                 Ok(())
             }
@@ -149,6 +148,7 @@ impl SafeAuthenticator {
     pub fn create_acc(&mut self, sk: &str, secret: &str, password: &str) -> ResultReturn<()> {
         debug!("Attempting to create a SAFE account...");
         let secret_key = sk_from_hex(sk)?;
+
         match Authenticator::create_acc(secret, password, secret_key, || {
             // eprintln!("{}", "Disconnected from network");
         }) {

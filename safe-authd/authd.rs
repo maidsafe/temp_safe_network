@@ -16,13 +16,20 @@ use futures::{Future, Stream};
 use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
 use std::fs::File;
+use std::io::prelude::*;
+use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
-use std::{ascii, fmt, fs, io, str};
+use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
 
 type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
+
+const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
+const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
+const SAFE_AUTHD_STDERR_FILE: &str = "/tmp/safe-authd.err";
 
 pub struct PrettyErr<'a>(&'a dyn Fail);
 impl<'a> fmt::Display for PrettyErr<'a> {
@@ -76,7 +83,11 @@ enum CmdArgs {
     Stop {},
     /// Restart a running safe-authd
     #[structopt(name = "restart")]
-    Restart {},
+    Restart {
+        /// Address to listen on
+        #[structopt(long = "listen", default_value = "127.0.0.1:33000")]
+        listen: SocketAddr,
+    },
     /// Update the application to the latest available version
     #[structopt(name = "update")]
     Update {},
@@ -85,7 +96,7 @@ enum CmdArgs {
 pub fn run() -> Result<(), String> {
     // Let's first get all the arguments passed in
     let opt = CmdArgs::from_args();
-    debug!("Running with options: {:?}", opt);
+    debug!("Running authd with options: {:?}", opt);
 
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
     let drain = slog_term::FullFormat::new(decorator)
@@ -111,8 +122,8 @@ pub fn run() -> Result<(), String> {
                 Ok(())
             }
         }
-        CmdArgs::Restart {} => {
-            if let Err(e) = restart_authd(Logger::root(drain, o!())) {
+        CmdArgs::Restart { listen } => {
+            if let Err(e) = restart_authd(Logger::root(drain, o!()), listen) {
                 Err(format!("{}", e.pretty()))
             } else {
                 Ok(())
@@ -122,6 +133,7 @@ pub fn run() -> Result<(), String> {
 }
 
 fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
+    println!("Starting SAFE Authenticator daemon...");
     let server_config = quinn::ServerConfig {
         transport: Arc::new(quinn::TransportConfig {
             stream_window_uni: 0,
@@ -141,13 +153,13 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
     }*/
 
     /*if let (Some(ref key_path), Some(ref cert_path)) = (options.key, options.cert) {
-        let key = fs::read(key_path).context("failed to read private key")?;
+        let key = fs::read(key_path).context("Failed to read private key")?;
         let key = if key_path.extension().map_or(false, |x| x == "der") {
             quinn::PrivateKey::from_der(&key)?
         } else {
             quinn::PrivateKey::from_pem(&key)?
         };
-        let cert_chain = fs::read(cert_path).context("failed to read certificate chain")?;
+        let cert_chain = fs::read(cert_path).context("Failed to read certificate chain")?;
         let cert_chain = if cert_path.extension().map_or(false, |x| x == "der") {
             quinn::CertificateChain::from_certs(quinn::Certificate::from_der(&cert_chain))
         } else {
@@ -166,13 +178,13 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
             let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]);
             let key = cert.serialize_private_key_der();
             let cert = cert.serialize_der();
-            fs::create_dir_all(&path).context("failed to create certificate directory")?;
-            fs::write(&cert_path, &cert).context("failed to write certificate")?;
-            fs::write(&key_path, &key).context("failed to write private key")?;
+            fs::create_dir_all(&path).context("Failed to create certificate directory")?;
+            fs::write(&cert_path, &cert).context("Failed to write certificate")?;
+            fs::write(&key_path, &key).context("Failed to write private key")?;
             (cert, key)
         }
         Err(e) => {
-            bail!("failed to read certificate: {}", e);
+            bail!("Failed to read certificate: {}", e);
         }
     };
     let key = quinn::PrivateKey::from_der(&key)?;
@@ -184,11 +196,11 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
     endpoint.logger(log.clone());
     endpoint.listen(server_config.build());
 
-    let stdout = File::create("/tmp/safe-authd.out").unwrap();
-    let stderr = File::create("/tmp/safe-authd.err").unwrap();
+    let stdout = File::create(SAFE_AUTHD_STDOUT_FILE).unwrap();
+    let stderr = File::create(SAFE_AUTHD_STDERR_FILE).unwrap();
 
     let daemonize = Daemonize::new()
-        .pid_file("/tmp/safe-authd.pid") // Every method except `new` and `start`
+        .pid_file(SAFE_AUTHD_PID_FILE) // Every method except `new` and `start`
         //.chown_pid_file(true)      // is optional, see `Daemonize` documentation
         .working_directory("/tmp") // for default behaviour.
         //.user("nobody")
@@ -226,14 +238,26 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
 }
 
 fn stop_authd(_log: Logger) -> Result<(), Error> {
-    println!("Success, SAFE Authenticator daemon stopped!");
+    println!("Stopping SAFE Authenticator daemon...");
+    let mut file = File::open(SAFE_AUTHD_PID_FILE)?;
+    let mut pid = String::new();
+    file.read_to_string(&mut pid)?;
+    let output = Command::new("kill").arg("-9").arg(&pid).output()?;
 
-    Ok(())
+    if output.status.success() {
+        io::stdout().write_all(&output.stdout)?;
+        println!("Success, safe-authd stopped!");
+        Ok(())
+    } else {
+        io::stdout().write_all(&output.stderr)?;
+        bail!("Failed to stop safe-authd daemon");
+    }
 }
 
-fn restart_authd(_log: Logger) -> Result<(), Error> {
-    println!("Success, SAFE Authenticator daemon restarted!");
-
+fn restart_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
+    stop_authd(log.clone())?;
+    start_authd(log, listen)?;
+    println!("Success, safe-authd restarted!");
     Ok(())
 }
 
@@ -276,7 +300,7 @@ fn handle_request(
 ) {
     let (send, recv) = match stream {
         quinn::NewStream::Bi(send, recv) => (send, recv),
-        quinn::NewStream::Uni(_) => unreachable!("disabled by endpoint configuration"),
+        quinn::NewStream::Uni(_) => unreachable!("Disabled by endpoint configuration"),
     };
     let safe_auth_handle = safe_auth_handle.clone();
     let log = log.clone();
@@ -285,32 +309,36 @@ fn handle_request(
 
     tokio_current_thread::spawn(
         recv.read_to_end(64 * 1024) // Read the request, which must be at most 64KiB
-            .map_err(|e| format_err!("failed reading request: {}", e))
+            .map_err(|e| format_err!("Failed reading request: {}", e))
             .and_then(move |(_, req)| {
                 let mut escaped = String::new();
                 for &x in &req[..] {
                     let part = ascii::escape_default(x).collect::<Vec<_>>();
                     escaped.push_str(str::from_utf8(&part).unwrap());
                 }
-                info!(log, "got request");
+                info!(log, "Got request");
                 // Execute the request
                 let resp = process_get(&safe_auth_handle, &req).unwrap_or_else(move |e| {
-                    error!(log, "failed to process request"; "reason" => %e.pretty());
-                    format!("failed to process request: {}\n", e.pretty())
+                    error!(log, "Failed to process request"; "reason" => %e.pretty());
+                    // TODO: implement JSON-RPC rather.
+                    // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
+                    // once we have JSON-RPC we can adhere to its format for errors.
+                    format!("[AUTHD_ERROR]:SAFE Authenticator: {}", e.pretty())
                         .into_bytes()
                         .into()
                 });
+
                 // Write the response
                 tokio::io::write_all(send, resp)
-                    .map_err(|e| format_err!("failed to send response: {}", e))
+                    .map_err(|e| format_err!("Failed to send response: {}", e))
             })
             // Gracefully terminate the stream
             .and_then(|(send, _)| {
                 tokio::io::shutdown(send)
-                    .map_err(|e| format_err!("failed to shutdown stream: {}", e))
+                    .map_err(|e| format_err!("Failed to shutdown stream: {}", e))
             })
-            .map(move |_| info!(log3, "request complete"))
-            .map_err(move |e| error!(log2, "request failed"; "reason" => %e.pretty())),
+            .map(move |_| info!(log3, "Request complete"))
+            .map_err(move |e| error!(log2, "Request Failed"; "reason" => %e.pretty())),
     )
 }
 
@@ -347,7 +375,7 @@ fn process_get(
                     }
                     Err(err) => {
                         println!("Error occurred when trying to log in: {}", err);
-                        bail!(format!("Error occurred when trying to log in: {}", err))
+                        bail!(err)
                     }
                 }
             }
@@ -385,10 +413,7 @@ fn process_get(
                     }
                     Err(err) => {
                         println!("Error occurred when trying to create SAFE account: {}", err);
-                        bail!(format!(
-                            "Error occurred when trying to create SAFE account: {}",
-                            err
-                        ))
+                        bail!(err)
                     }
                 }
             }
@@ -409,7 +434,7 @@ fn process_get(
                     }
                     Err(err) => {
                         println!("Failed to authorise: {}", err);
-                        bail!(format!("Failed to authorise: {}", err))
+                        bail!(err)
                     }
                 }
             }
@@ -426,7 +451,7 @@ fn process_get(
                     }
                     Err(err) => {
                         println!("Failed to get list of authorised apps: {}", err);
-                        bail!(format!("Failed to get list of authorised apps: {}", err))
+                        bail!(err)
                     }
                 }
             }
@@ -445,10 +470,7 @@ fn process_get(
                     }
                     Err(err) => {
                         println!("Failed to revoke application '{}': {}", app_id, err);
-                        bail!(format!(
-                            "Failed to revoke application '{}': {}",
-                            app_id, err
-                        ))
+                        bail!(err)
                     }
                 }
             }

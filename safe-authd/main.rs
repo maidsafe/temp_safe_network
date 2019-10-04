@@ -10,7 +10,7 @@ mod authd;
 mod update;
 
 use env_logger;
-use log::{debug, error};
+use log::error;
 use std::process;
 
 #[macro_use]
@@ -30,7 +30,6 @@ use authd::run;
 fn main() {
     setup_panic!();
     env_logger::init();
-    debug!("Starting SAFE Authenticator daemon...");
 
     if let Err(e) = run() {
         error!("safe-authd error: {}", e);

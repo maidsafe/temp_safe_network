@@ -52,7 +52,7 @@ impl SafeAuthdClient {
         );
 
         info!("Sending login action to SAFE Authenticator...");
-        let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+        let authd_response = send_request(&authd_service_url)?;
 
         info!("SAFE login action was successful: {}", authd_response);
         // TODO: store the authd session token, replacing an existing one
@@ -71,7 +71,7 @@ impl SafeAuthdClient {
         );
 
         info!("Sending logout action to SAFE Authenticator...");
-        let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+        let authd_response = send_request(&authd_service_url)?;
 
         info!("SAFE logout action was successful: {}", authd_response);
 
@@ -90,7 +90,7 @@ impl SafeAuthdClient {
         );
 
         debug!("Sending account creation request to SAFE Authenticator...");
-        let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+        let authd_response = send_request(&authd_service_url)?;
 
         debug!(
             "SAFE account creation action was successful: {}",
@@ -108,7 +108,7 @@ impl SafeAuthdClient {
         );
 
         debug!("Sending request request to SAFE Authenticator...");
-        let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+        let authd_response = send_request(&authd_service_url)?;
 
         debug!(
             "List of applications authorised successfully received: {}",
@@ -131,7 +131,7 @@ impl SafeAuthdClient {
         );
 
         debug!("Sending revoke action request to SAFE Authenticator...");
-        let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+        let authd_response = send_request(&authd_service_url)?;
 
         debug!(
             "Application revocation action successful: {}",
@@ -139,4 +139,8 @@ impl SafeAuthdClient {
         );
         Ok(())
     }
+}
+
+fn send_request(url_str: &str) -> ResultReturn<String> {
+    quic_send(&url_str, false, None, None, false)
 }

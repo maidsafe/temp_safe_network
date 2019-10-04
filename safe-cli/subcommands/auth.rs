@@ -6,13 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::get_from_arg_or_stdin;
 use dirs;
 use log::debug;
 use prettytable::Table;
+use rpassword;
 use safe_api::{Safe, SafeAuthdClient};
 use std::fs::{DirBuilder, File};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
+use std::path::Path;
+use std::process::Command;
 use structopt::StructOpt;
 
 const APP_ID: &str = "net.maidsafe.cli";
@@ -34,9 +36,16 @@ pub enum AuthSubCommands {
     #[structopt(name = "logout")]
     /// Send request to a remote Authenticator daemon to logout from currently logged in SAFE account
     Logout {},
-    #[structopt(name = "create")]
+    #[structopt(name = "create-acc")]
     /// Send request to a remote Authenticator daemon to create a new SAFE account
-    Create {},
+    Create {
+        /// The SafeKey's secret key to pay for the account creation, and to be set as the default spendable balance in the newly created SAFE account
+        #[structopt(long = "sk")]
+        sk: Option<String>,
+        /// Request the creation of a SafeKey with test-coins automatically to use it to pay for the account creation
+        #[structopt(long = "test-coins")]
+        test_coins: bool,
+    },
     #[structopt(name = "apps")]
     /// Send request to a remote Authenticator daemon to retrieve the list of the authorised applications
     Apps {},
@@ -46,6 +55,15 @@ pub enum AuthSubCommands {
         /// The application ID
         app_id: String,
     },
+    #[structopt(name = "start-authd")]
+    /// Starts the Authenticator daemon if it's not running already
+    StartAuthd {},
+    #[structopt(name = "stop-authd")]
+    /// Stops the Authenticator daemon if it's running
+    StopAuthd {},
+    #[structopt(name = "restart-authd")]
+    /// Restarts the Authenticator daemon if it's running already
+    RestartAuthd {},
 }
 
 pub fn auth_commander(
@@ -58,20 +76,36 @@ pub fn auth_commander(
         .map_err(|_| format!("Unable to create credentials file at {}", file_path))?;
 
     match cmd {
-        Some(AuthSubCommands::Create {}) => {
+        Some(AuthSubCommands::Create { sk, test_coins }) => {
             let mut safe_authd = SafeAuthdClient::new(None);
-            let secret = get_from_arg_or_stdin(None, Some("Secret:"))?;
-            let password = get_from_arg_or_stdin(None, Some("Password:"))?;
-            let sk = get_from_arg_or_stdin(None, Some("Enter SafeKey's secret key to pay with:"))?;
-            println!("Sending account creation request to authd...");
-            safe_authd.create_acc(&sk, &secret, &password)?;
-            println!("Account created successfully");
+            let secret = prompt_sensitive(None, "Secret:")?;
+            let password = prompt_sensitive(None, "Password:")?;
+            if test_coins {
+                // We then generate a SafeKey with test-coins to use it for the account creation
+                println!("Creating a SafeKey with test-coins...");
+                let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11")?;
+                let kp = key_pair
+                    .ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
+                println!("Sending account creation request to authd...");
+                safe_authd.create_acc(&kp.sk, &secret, &password)?;
+                println!("Account was created successfully!");
+                println!(
+                    "SafeKey created and preloaded with test-coins. Owner key pair generated:"
+                );
+                println!("Public Key = {}", kp.pk);
+                println!("Secret Key = {}", kp.sk);
+            } else {
+                let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
+                println!("Sending account creation request to authd...");
+                safe_authd.create_acc(&sk, &secret, &password)?;
+                println!("Account was created successfully!");
+            };
             Ok(())
         }
         Some(AuthSubCommands::Login {}) => {
             let mut safe_authd = SafeAuthdClient::new(None);
-            let secret = get_from_arg_or_stdin(None, Some("Secret:"))?;
-            let password = get_from_arg_or_stdin(None, Some("Password:"))?;
+            let secret = prompt_sensitive(None, "Secret:")?;
+            let password = prompt_sensitive(None, "Password:")?;
             println!("Sending login action request to authd...");
             safe_authd.log_in(&secret, &password)?;
             println!("Logged in successfully");
@@ -107,6 +141,9 @@ pub fn auth_commander(
             println!("Application revoked successfully");
             Ok(())
         }
+        Some(AuthSubCommands::StartAuthd {}) => run_authd_cmd("start"),
+        Some(AuthSubCommands::StopAuthd {}) => run_authd_cmd("stop"),
+        Some(AuthSubCommands::RestartAuthd {}) => run_authd_cmd("restart"),
         None => {
             println!("Authorising CLI application...");
 
@@ -121,6 +158,49 @@ pub fn auth_commander(
             println!("Credentials were stored in {}", file_path);
             Ok(())
         }
+    }
+}
+
+// TODO: use a different crate than rpassword as it has problems with some Windows shells including PowerShell
+fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
+    if let Some(str) = arg {
+        Ok(str)
+    } else {
+        rpassword::read_password_from_tty(Some(msg))
+            .map_err(|err| format!("Failed reading string from input: {}", err))
+    }
+}
+
+fn run_authd_cmd(command: &str) -> Result<(), String> {
+    let authd_bin_path = get_authd_bin_path();
+    let output = Command::new(&authd_bin_path)
+        .arg(command)
+        .output()
+        .map_err(|err| format!("Failed to start authd from '{}': {}", authd_bin_path, err))?;
+
+    if output.status.success() {
+        io::stdout()
+            .write_all(&output.stdout)
+            .map_err(|err| format!("Failed to output stdout: {}", err))?;
+        Ok(())
+    } else {
+        io::stderr()
+            .write_all(&output.stderr)
+            .map_err(|err| format!("Failed to output stderr: {}", err))?;
+        Err("Failed to run safe-authd".to_string())
+    }
+}
+
+fn get_authd_bin_path() -> String {
+    let target_dir = match std::env::var("CARGO_TARGET_DIR") {
+        Ok(target_dir) => target_dir,
+        Err(_) => "target".to_string(),
+    };
+
+    if cfg!(debug_assertions) {
+        format!("{}{}", target_dir, "/debug/safe-authd")
+    } else {
+        format!("{}{}", target_dir, "/release/safe-authd")
     }
 }
 
@@ -176,9 +256,8 @@ fn credentials_file_path() -> Result<String, String> {
 pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
     let mut table = Table::new();
     table.add_row(row![bFg->"Authorised Applications"]);
-    table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
+    /*table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
     table.add_row(row![]);
-    /*
     let all_app_iterator = authed_apps.iter();
     for app_info in all_app_iterator {
         let mut row = String::from("");
