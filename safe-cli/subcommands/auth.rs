@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use directories::ProjectDirs;
+use super::helpers::get_from_arg_or_stdin;
+use dirs;
 use log::debug;
-use safe_api::Safe;
-use std::fs::{create_dir_all, File};
+use prettytable::Table;
+use safe_api::{Safe, SafeAuthdClient};
+use std::fs::{DirBuilder, File};
 use std::io::{Read, Write};
 use structopt::StructOpt;
 
@@ -26,6 +28,24 @@ pub enum AuthSubCommands {
     #[structopt(name = "clear")]
     /// Clear authorisation credentials from local file
     Clear {},
+    #[structopt(name = "login")]
+    /// Send request to a remote Authenticator daemon to login to a SAFE account
+    Login {},
+    #[structopt(name = "logout")]
+    /// Send request to a remote Authenticator daemon to logout from currently logged in SAFE account
+    Logout {},
+    #[structopt(name = "create")]
+    /// Send request to a remote Authenticator daemon to create a new SAFE account
+    Create {},
+    #[structopt(name = "apps")]
+    /// Send request to a remote Authenticator daemon to retrieve the list of the authorised applications
+    Apps {},
+    #[structopt(name = "revoke")]
+    /// Send request to a remote Authenticator daemon to revoke permissions from a previously authorised application
+    Revoke {
+        /// The application ID
+        app_id: String,
+    },
 }
 
 pub fn auth_commander(
@@ -38,12 +58,53 @@ pub fn auth_commander(
         .map_err(|_| format!("Unable to create credentials file at {}", file_path))?;
 
     match cmd {
+        Some(AuthSubCommands::Create {}) => {
+            let mut safe_authd = SafeAuthdClient::new(None);
+            let secret = get_from_arg_or_stdin(None, Some("Secret:"))?;
+            let password = get_from_arg_or_stdin(None, Some("Password:"))?;
+            let sk = get_from_arg_or_stdin(None, Some("Enter SafeKey's secret key to pay with:"))?;
+            println!("Sending account creation request to authd...");
+            safe_authd.create_acc(&sk, &secret, &password)?;
+            println!("Account created successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::Login {}) => {
+            let mut safe_authd = SafeAuthdClient::new(None);
+            let secret = get_from_arg_or_stdin(None, Some("Secret:"))?;
+            let password = get_from_arg_or_stdin(None, Some("Password:"))?;
+            println!("Sending login action request to authd...");
+            safe_authd.log_in(&secret, &password)?;
+            println!("Logged in successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::Logout {}) => {
+            let mut safe_authd = SafeAuthdClient::new(None);
+            println!("Sending logout action request to authd...");
+            safe_authd.log_out()?;
+            println!("Logged out successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::Apps {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Requesting list of authorised apps from authd...");
+            let authed_apps = safe_authd.authed_apps()?;
+            pretty_print_authed_apps(authed_apps);
+
+            Ok(())
+        }
         Some(AuthSubCommands::Clear {}) => {
             file.set_len(0).map_err(|err| {
                 format!("Unable to clear credentials from {}: {}", file_path, err)
             })?;
 
             println!("Credentials were succesfully cleared from {}", file_path);
+            Ok(())
+        }
+        Some(AuthSubCommands::Revoke { app_id }) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Sending application revocation request to authd...");
+            safe_authd.revoke_app(&app_id)?;
+            println!("Application revoked successfully");
             Ok(())
         }
         None => {
@@ -110,4 +171,28 @@ fn credentials_file_path() -> Result<String, String> {
 
     let path = data_local_path.join(AUTH_CREDENTIALS_FILENAME);
     Ok(path.display().to_string())
+}
+
+pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
+    let mut table = Table::new();
+    table.add_row(row![bFg->"Authorised Applications"]);
+    table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
+    table.add_row(row![]);
+    /*
+    let all_app_iterator = authed_apps.iter();
+    for app_info in all_app_iterator {
+        let mut row = String::from("");
+        for (cont, perms) in app_info.perms.iter() {
+            row += &format!("{}: {:?}\n", cont, perms);
+        }
+        table.add_row(row![
+            app_info.app.id,
+            app_info.app.name,
+            // app_info.app.scope || "",
+            app_info.app.vendor,
+            row,
+        ]);
+    }*/
+    table.printstd();
+    println!("{}", authed_apps);
 }

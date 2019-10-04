@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::helpers::decode_ipc_msg;
+use super::quic_client::quic_send;
 use super::{Error, Result, Safe, SafeApp};
 use log::{debug, info};
 #[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
@@ -14,14 +16,9 @@ use reqwest::get as httpget;
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
 use std::collections::HashMap;
-use std::io::Read;
 
-// Default host where to send a GET request to the authenticator webservice for authorising a SAFE app
-const SAFE_AUTH_ENDPOINT_HOST: &str = "http://localhost";
-// Default port number where to send a GET request for authorising the CLI app
-const SAFE_AUTH_ENDPOINT_PORT: u16 = 41805;
-// Path where the authenticator webservice endpoint
-const SAFE_AUTH_ENDPOINT_PATH: &str = "authorise/";
+// Path of authenticator endpoint for authorising applications
+const SAFE_AUTHD_ENDPOINT_AUTHORISE: &str = "authorise/";
 
 #[allow(dead_code)]
 impl Safe {
@@ -67,22 +64,8 @@ impl Safe {
             auth_req_str
         );
 
-        let port_number = port.unwrap_or(SAFE_AUTH_ENDPOINT_PORT);
-        let authenticator_webservice_url = format!(
-            "{}:{}/{}{}",
-            SAFE_AUTH_ENDPOINT_HOST, port_number, SAFE_AUTH_ENDPOINT_PATH, auth_req_str
-        );
-        let mut res = httpget(&authenticator_webservice_url).map_err(|err| {
-            Error::AuthError(format!("Failed to send request to Authenticator: {}", err))
-        })?;
-        let mut auth_res = String::new();
-        res.read_to_string(&mut auth_res).map_err(|err| {
-            Error::AuthError(format!(
-                "Failed read authorisation response received from Authenticator: {}",
-                err
-            ))
-        })?;
-        info!("SAFE authorisation response received!");
+        // Send he auth req to authd and obtain the response
+        let auth_res = send_app_auth_req(&auth_req_str, port)?;
 
         // Check if the app has been authorised
         match decode_ipc_msg(&auth_res) {
@@ -104,4 +87,20 @@ impl Safe {
     pub fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         self.safe_app.connect(app_id, auth_credentials)
     }
+}
+
+// Sends an authorisation request string to the SAFE Authenticator daemon endpoint.
+// It returns the credentials necessary to connect to the network, encoded in a single string.
+fn send_app_auth_req(auth_req_str: &str, port: Option<u16>) -> ResultReturn<String> {
+    let port_number = port.unwrap_or(SAFE_AUTHD_ENDPOINT_PORT);
+    let authd_service_url = format!(
+        "{}:{}/{}{}",
+        SAFE_AUTHD_ENDPOINT_HOST, port_number, SAFE_AUTHD_ENDPOINT_AUTHORISE, auth_req_str
+    );
+
+    info!("Sending authorisation request to SAFE Authenticator...");
+    let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+
+    info!("SAFE authorisation response received!");
+    Ok(authd_response)
 }

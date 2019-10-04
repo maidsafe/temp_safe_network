@@ -68,7 +68,7 @@ enum CmdArgs {
         #[structopt(long = "stateless-retry")]
         stateless_retry: bool,
         /// Address to listen on
-        #[structopt(long = "listen", default_value = "[::1]:10000")]
+        #[structopt(long = "listen", default_value = "127.0.0.1:33000")]
         listen: SocketAddr,
     },
     /// Stop a running safe-authd
@@ -341,10 +341,14 @@ fn process_get(
                 let password = req_args[3];
 
                 match safe_auth.log_in(secret, password) {
-                    Ok(_) => Ok("Logged in successfully!".as_bytes().into()),
-                    Err(err) => Ok(format!("Error occurred when trying to log in: {}", err)
-                        .as_bytes()
-                        .into()),
+                    Ok(_) => {
+                        println!("Logged in successfully");
+                        Ok("Logged in successfully!".as_bytes().into())
+                    }
+                    Err(err) => {
+                        println!("Error occurred when trying to log in: {}", err);
+                        bail!(format!("Error occurred when trying to log in: {}", err))
+                    }
                 }
             }
         }
@@ -358,7 +362,10 @@ fn process_get(
                         println!("Logged out successfully");
                         Ok("Logged out successfully".as_bytes().into())
                     }
-                    Err(err) => bail!(format!("Failed to log out: {}", err)),
+                    Err(err) => {
+                        println!("Failed to log out: {}", err);
+                        bail!(format!("Failed to log out: {}", err))
+                    }
                 }
             }
         }
@@ -372,13 +379,17 @@ fn process_get(
                 let sk = req_args[4];
 
                 match safe_auth.create_acc(sk, secret, password) {
-                    Ok(_) => Ok("Account created successfully!".as_bytes().into()),
-                    Err(err) => Ok(format!(
-                        "Error occurred when trying to create SAFE account: {}",
-                        err
-                    )
-                    .as_bytes()
-                    .into()),
+                    Ok(_) => {
+                        println!("Account created successfully");
+                        Ok("Account created successfully!".as_bytes().into())
+                    }
+                    Err(err) => {
+                        println!("Error occurred when trying to create SAFE account: {}", err);
+                        bail!(format!(
+                            "Error occurred when trying to create SAFE account: {}",
+                            err
+                        ))
+                    }
                 }
             }
         }
@@ -396,7 +407,10 @@ fn process_get(
                         println!("Authorisation response sent");
                         Ok(resp.as_bytes().into())
                     }
-                    Err(err) => bail!(format!("Failed to authorise: {}", err)),
+                    Err(err) => {
+                        println!("Failed to authorise: {}", err);
+                        bail!(format!("Failed to authorise: {}", err))
+                    }
                 }
             }
         }
@@ -410,7 +424,10 @@ fn process_get(
                         println!("List of authorised apps sent");
                         Ok(format!("{:?}", resp).as_bytes().into())
                     }
-                    Err(err) => bail!(format!("Failed to get list of authorised apps: {}", err)),
+                    Err(err) => {
+                        println!("Failed to get list of authorised apps: {}", err);
+                        bail!(format!("Failed to get list of authorised apps: {}", err))
+                    }
                 }
             }
         }
@@ -426,10 +443,13 @@ fn process_get(
                         println!("Application revoked successfully");
                         Ok("Application revoked successfully".as_bytes().into())
                     }
-                    Err(err) => bail!(format!(
-                        "Failed to revoke application '{}': {}",
-                        app_id, err
-                    )),
+                    Err(err) => {
+                        println!("Failed to revoke application '{}': {}", app_id, err);
+                        bail!(format!(
+                            "Failed to revoke application '{}': {}",
+                            app_id, err
+                        ))
+                    }
                 }
             }
         }

@@ -16,3 +16,8 @@ pub const FAKE_RDF_PREDICATE_TYPE: &str = "type";
 pub const FAKE_RDF_PREDICATE_SIZE: &str = "size";
 pub const FAKE_RDF_PREDICATE_MODIFIED: &str = "modified";
 pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
+
+// Default host of the authenticator endpoint to send the requests to
+pub const SAFE_AUTHD_ENDPOINT_HOST: &str = "http://localhost";
+// Default authenticator port number where to send requests to
+pub const SAFE_AUTHD_ENDPOINT_PORT: u16 = 33000;

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
+mod authd_client_api;
 mod authenticator;
 mod constants;
 pub mod errors;
@@ -18,6 +19,7 @@ mod helpers;
 pub mod keys;
 pub mod nrs;
 pub mod nrs_map;
+mod quic_client;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;
@@ -25,7 +27,9 @@ pub mod wallet;
 pub mod xorurl;
 mod xorurl_media_types;
 
-pub use errors::{Error, Result};
+pub use authd_client_api::SafeAuthdClient;
+pub use authenticator::SafeAuthenticator;
+pub use errors::{Error, Return};
 pub use fetch::{
     NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
 };
@@ -33,7 +37,6 @@ pub use files::ProcessedFiles;
 pub use keys::BlsKeyPair;
 pub use nrs::ProcessedEntries;
 pub use nrs_map::{NrsMap, SubNamesMap};
-use safe_authenticator::Authenticator;
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;
 pub use xorurl::{XorUrl, XorUrlEncoder};
@@ -54,20 +57,6 @@ impl Safe {
         Self {
             safe_app: SafeApp::new(),
             xorurl_base: xorurl_base.to_string(),
-        }
-    }
-}
-
-// Authenticator API
-pub struct SafeAuthenticator {
-    safe_authenticator: Option<Authenticator>,
-}
-
-#[allow(dead_code)]
-impl SafeAuthenticator {
-    pub fn new() -> Self {
-        Self {
-            safe_authenticator: None,
         }
     }
 }

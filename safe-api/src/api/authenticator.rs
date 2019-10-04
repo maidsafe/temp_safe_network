@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//use super::helpers::decode_ipc_msg;
 use super::helpers::sk_from_hex;
-use super::{Error, ResultReturn, SafeAuthenticator};
+use super::{Error, ResultReturn};
 use futures::{stream, Future, Stream};
 use log::{debug, info};
 use maidsafe_utilities::serialisation::deserialise;
@@ -34,15 +33,19 @@ pub struct AuthedAppsList {
     pub perms: Vec<(String, ContainerPermissions)>,
 }
 
-// Default host where to send a GET request to the authenticator webservice for authorising a SAFE app
-//const SAFE_AUTH_ENDPOINT_HOST: &str = "http://localhost";
-// Default port number where to send a GET request for authorising the CLI app
-//const SAFE_AUTH_ENDPOINT_PORT: u16 = 41805;
-// Path where the authenticator webservice endpoint
-//const SAFE_AUTH_ENDPOINT_PATH: &str = "authorise/";
+// Authenticator API
+pub struct SafeAuthenticator {
+    safe_authenticator: Option<Authenticator>,
+}
 
 #[allow(dead_code)]
 impl SafeAuthenticator {
+    pub fn new() -> Self {
+        Self {
+            safe_authenticator: None,
+        }
+    }
+
     /// # Log in
     ///
     /// Using an account already created, you can log in to
@@ -467,6 +470,7 @@ fn get_safe_authenticator(
 }
 
 // Helper function to generate an app authorisation response
+#[allow(dead_code)]
 fn gen_auth_denied_response(req_id: u32) -> ResultReturn<String> {
     debug!("Encoding auth denied response...");
     let resp = encode_msg(&IpcMsg::Resp {
