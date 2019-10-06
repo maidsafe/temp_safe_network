@@ -29,10 +29,12 @@ pub struct NrsMapContainerInfo {
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub enum SafeData {
     SafeKey {
+        xorurl: String,
         xorname: XorName,
         resolved_from: Option<NrsMapContainerInfo>,
     },
     Wallet {
+        xorurl: String,
         xorname: XorName,
         type_tag: u64,
         balances: WalletSpendableBalances,
@@ -40,6 +42,7 @@ pub enum SafeData {
         resolved_from: Option<NrsMapContainerInfo>,
     },
     FilesContainer {
+        xorurl: String,
         xorname: XorName,
         type_tag: u64,
         version: u64,
@@ -48,6 +51,7 @@ pub enum SafeData {
         resolved_from: Option<NrsMapContainerInfo>,
     },
     PublishedImmutableData {
+        xorurl: String,
         xorname: XorName,
         data: Vec<u8>,
         resolved_from: Option<NrsMapContainerInfo>,
@@ -96,12 +100,14 @@ impl Safe {
         match the_xor.content_type() {
             SafeContentType::Raw => match the_xor.data_type() {
                 SafeDataType::SafeKey => Ok(SafeData::SafeKey {
+                    xorurl,
                     xorname: the_xor.xorname(),
                     resolved_from: None,
                 }),
                 SafeDataType::PublishedImmutableData => {
                     let data = self.files_get_published_immutable(&url)?;
                     Ok(SafeData::PublishedImmutableData {
+                        xorurl,
                         xorname: the_xor.xorname(),
                         resolved_from: None,
                         data,
@@ -117,6 +123,7 @@ impl Safe {
                 SafeDataType::PublishedImmutableData => {
                     let data = self.files_get_published_immutable(&url)?;
                     Ok(SafeData::PublishedImmutableData {
+                        xorurl,
                         xorname: the_xor.xorname(),
                         resolved_from: None,
                         data,
@@ -131,6 +138,7 @@ impl Safe {
             SafeContentType::Wallet => {
                 let balances = self.wallet_get(&url)?;
                 Ok(SafeData::Wallet {
+                    xorurl,
                     xorname: the_xor.xorname(),
                     type_tag: the_xor.type_tag(),
                     balances,
@@ -183,6 +191,7 @@ impl Safe {
                                 )))
                             } else {
                                 Ok(SafeData::FilesContainer {
+                                    xorurl,
                                     xorname: the_xor.xorname(),
                                     type_tag: the_xor.type_tag(),
                                     version,
@@ -195,6 +204,7 @@ impl Safe {
                     }
                 } else {
                     Ok(SafeData::FilesContainer {
+                        xorurl,
                         xorname: the_xor.xorname(),
                         type_tag: the_xor.type_tag(),
                         version,
@@ -257,17 +267,22 @@ fn embed_resolved_from(
     nrs_map_container: NrsMapContainerInfo,
 ) -> ResultReturn<SafeData> {
     let safe_data = match content {
-        SafeData::SafeKey { xorname, .. } => SafeData::SafeKey {
+        SafeData::SafeKey {
+            xorurl, xorname, ..
+        } => SafeData::SafeKey {
+            xorurl,
             xorname,
             resolved_from: Some(nrs_map_container),
         },
         SafeData::Wallet {
+            xorurl,
             xorname,
             type_tag,
             balances,
             data_type,
             ..
         } => SafeData::Wallet {
+            xorurl,
             xorname,
             type_tag,
             balances,
@@ -275,6 +290,7 @@ fn embed_resolved_from(
             resolved_from: Some(nrs_map_container),
         },
         SafeData::FilesContainer {
+            xorurl,
             xorname,
             type_tag,
             version,
@@ -282,6 +298,7 @@ fn embed_resolved_from(
             data_type,
             ..
         } => SafeData::FilesContainer {
+            xorurl,
             xorname,
             type_tag,
             version,
@@ -290,11 +307,13 @@ fn embed_resolved_from(
             resolved_from: Some(nrs_map_container),
         },
         SafeData::PublishedImmutableData {
+            xorurl,
             xorname,
             data,
             media_type,
             ..
         } => SafeData::PublishedImmutableData {
+            xorurl,
             xorname,
             data,
             media_type,

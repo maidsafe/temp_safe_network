@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::dog::print_resolved_from;
 use super::helpers::{get_from_arg_or_stdin, xorname_to_hex};
 use super::OutputFmt;
 use crate::subcommands::auth::auth_connect;
 use log::debug;
 use prettytable::Table;
-use safe_api::{NrsMapContainerInfo, Safe, SafeData};
+use safe_api::{Safe, SafeData};
 use std::io::{self, Write};
 use structopt::StructOpt;
 
@@ -38,6 +39,7 @@ pub fn cat_commander(
     let content = safe.fetch(&url)?;
     match &content {
         SafeData::FilesContainer {
+            xorurl,
             version,
             files_map,
             type_tag,
@@ -51,6 +53,7 @@ pub fn cat_commander(
                     println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!("XOR-URL: {}", xorurl);
                     print_resolved_from(cmd.info, resolved_from);
                     println!();
                 }
@@ -81,9 +84,10 @@ pub fn cat_commander(
                 );
             } else if cmd.info > 0 {
                 println!(
-                        "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
+                        "[{}, {{ \"data_type\": \"{}\", \"version\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}, {:?}]",
                         url,
                         data_type,
+                        version,
                         type_tag,
                         xorname_to_hex(xorname),
                         files_map,
@@ -97,6 +101,7 @@ pub fn cat_commander(
             }
         }
         SafeData::PublishedImmutableData {
+            xorurl,
             data,
             xorname,
             resolved_from,
@@ -105,6 +110,7 @@ pub fn cat_commander(
             if cmd.info > 0 {
                 println!("Native data type: ImmutableData (published)");
                 println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                println!("XOR-URL: {}", xorurl);
                 println!(
                     "Media type: {}",
                     media_type.clone().unwrap_or_else(|| "Unknown".to_string())
@@ -119,6 +125,7 @@ pub fn cat_commander(
                 .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
         }
         SafeData::Wallet {
+            xorurl,
             xorname,
             type_tag,
             balances,
@@ -131,6 +138,7 @@ pub fn cat_commander(
                     println!("Native data type: {}", data_type);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!("XOR-URL: {}", xorurl);
                     print_resolved_from(cmd.info, resolved_from);
                     println!();
                 }
@@ -167,6 +175,7 @@ pub fn cat_commander(
             }
         }
         SafeData::SafeKey {
+            xorurl,
             xorname,
             resolved_from,
         } => {
@@ -174,6 +183,7 @@ pub fn cat_commander(
                 if cmd.info > 0 {
                     println!("Native data type: SafeKey");
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!("XOR-URL: {}", xorurl);
                     print_resolved_from(cmd.info, resolved_from);
                 } else {
                     println!("No content to show since the URL targets a SafeKey. Use -i / --info flag to obtain additional information about the targeted SafeKey.");
@@ -195,38 +205,4 @@ pub fn cat_commander(
     }
 
     Ok(())
-}
-
-fn print_resolved_from(info_level: u8, resolved_from: &Option<NrsMapContainerInfo>) {
-    if info_level > 1 {
-        if let Some(nrs_map_container) = resolved_from {
-            // print out the resolved_from info since it's --info level 2
-            println!();
-            println!("Resolved using NRS Map:");
-            println!("PublicName: \"{}\"", nrs_map_container.public_name);
-            println!("Container XOR-URL: {}", nrs_map_container.xorurl);
-            println!("Native data type: {}", nrs_map_container.data_type);
-            println!("Type tag: {}", nrs_map_container.type_tag);
-            println!("XOR name: 0x{}", xorname_to_hex(&nrs_map_container.xorname));
-            println!("Version: {}", nrs_map_container.version);
-
-            if info_level > 2 {
-                let mut table = Table::new();
-                table.add_row(
-                    row![bFg->"NRS name/subname", bFg->"Created", bFg->"Modified", bFg->"Link"],
-                );
-
-                let summary = nrs_map_container.nrs_map.get_map_summary();
-                summary.iter().for_each(|(name, rdf_info)| {
-                    table.add_row(row![
-                        format!("{}{}", name, nrs_map_container.public_name),
-                        rdf_info["created"],
-                        rdf_info["modified"],
-                        rdf_info["link"],
-                    ]);
-                });
-                table.printstd();
-            }
-        }
-    }
 }

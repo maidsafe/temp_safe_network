@@ -10,6 +10,7 @@
 pub mod auth;
 pub mod cat;
 pub mod container;
+pub mod dog;
 #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
 pub mod fake_auth;
 pub mod files;
@@ -55,6 +56,9 @@ pub enum SubCommands {
     #[structopt(name = "cat")]
     /// Read data on the SAFE Network.
     Cat(cat::CatCommands),
+    #[structopt(name = "dog")]
+    /// Inspect data on the SAFE Network providing only metadata information about the content
+    Dog(dog::DogCommands),
     #[structopt(name = "files")]
     /// Manage files on the SAFE Network
     Files {

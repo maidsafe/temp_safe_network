@@ -11,6 +11,7 @@ use structopt::StructOpt;
 
 use crate::subcommands::auth::{auth_commander, auth_connect};
 use crate::subcommands::cat::cat_commander;
+use crate::subcommands::dog::dog_commander;
 use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
 use crate::subcommands::nrs::nrs_commander;
@@ -76,6 +77,7 @@ pub fn run() -> Result<(), String> {
     match args.cmd {
         SubCommands::Auth { cmd, port } => auth_commander(cmd, port, &mut safe),
         SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe),
+        SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &mut safe),
         SubCommands::Keypair {} => {
             let key_pair = safe.keypair()?;
             if OutputFmt::Pretty == output_fmt {
