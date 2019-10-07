@@ -7,11 +7,39 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crossbeam_channel::TryRecvError;
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::{Rc, Weak};
+
+/// Consensus group reference
+pub type ConsensusGroupRef = Rc<RefCell<ConsensusGroup>>;
+type EventsRef = Rc<RefCell<VecDeque<Vec<u8>>>>;
+
+/// Consensus
+pub struct ConsensusGroup {
+    pub(crate) event_buckets: Vec<EventsRef>,
+}
+
+impl ConsensusGroup {
+    /// Creates a new consensus group.
+    pub fn new() -> ConsensusGroupRef {
+        Rc::new(RefCell::new(ConsensusGroup {
+            event_buckets: Vec::new(),
+        }))
+    }
+
+    fn vote_for(&self, event: Vec<u8>) {
+        for bucket in &self.event_buckets {
+            let mut events = bucket.borrow_mut();
+            events.push_back(event.clone());
+        }
+    }
+}
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full routing node.
 pub struct Node {
-    events: VecDeque<Vec<u8>>,
+    events: EventsRef,
+    consensus_group: Option<Weak<RefCell<ConsensusGroup>>>,
 }
 
 impl Node {
@@ -22,7 +50,13 @@ impl Node {
 
     /// Vote for an event.
     pub fn vote_for(&mut self, event: Vec<u8>) {
-        self.events.push_back(event);
+        if let Some(ref consensus_group) = self.consensus_group {
+            let _ = consensus_group
+                .upgrade()
+                .map(|group| group.borrow_mut().vote_for(event));
+        } else {
+            self.events.borrow_mut().push_back(event);
+        }
     }
 
     /// Try to read the next available event from the stream without blocking.
@@ -30,7 +64,7 @@ impl Node {
     /// Implementations should return an error if there are no items available, OR
     /// a real error occurs.
     pub fn try_next_ev(&mut self) -> Result<Event, TryRecvError> {
-        if let Some(event) = self.events.pop_front() {
+        if let Some(event) = self.events.borrow_mut().pop_front() {
             Ok(Event::Consensus(event))
         } else {
             Err(TryRecvError::Empty)
@@ -45,12 +79,32 @@ impl NodeBuilder {
     /// Creates new `Node`.
     pub fn create(self) -> Result<Node, RoutingError> {
         Ok(Node {
-            events: VecDeque::with_capacity(128),
+            events: Rc::new(RefCell::new(VecDeque::with_capacity(128))),
+            consensus_group: None,
+        })
+    }
+
+    /// Creates new `Node` within a section of nodes.
+    pub fn create_within_group(
+        self,
+        consensus_group: Rc<RefCell<ConsensusGroup>>,
+    ) -> Result<Node, RoutingError> {
+        let event_bucket = Rc::new(RefCell::new(VecDeque::with_capacity(128)));
+
+        consensus_group
+            .borrow_mut()
+            .event_buckets
+            .push(event_bucket.clone());
+
+        Ok(Node {
+            events: event_bucket.clone(),
+            consensus_group: Some(Rc::downgrade(&consensus_group)),
         })
     }
 }
 
 /// Routing event.
+#[derive(Debug)]
 pub enum Event {
     /// Event from PARSEC.
     Consensus(Vec<u8>),

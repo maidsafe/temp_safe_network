@@ -68,7 +68,11 @@ pub struct Vault {
 
 impl Vault {
     /// Construct a new vault instance.
-    pub fn new(config: Config, command_receiver: Receiver<Command>) -> Result<Self> {
+    pub fn new(
+        routing_node: Node,
+        config: Config,
+        command_receiver: Receiver<Command>,
+    ) -> Result<Self> {
         let mut init_mode = Init::Load;
         let (is_elder, id) = Self::read_state(&config)?.unwrap_or_else(|| {
             let mut rng = rand::thread_rng();
@@ -77,7 +81,6 @@ impl Vault {
             (true, id)
         });
 
-        let routing_node = Node::builder().create()?;
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
 
