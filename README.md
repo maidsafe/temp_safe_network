@@ -41,6 +41,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
     - [Add](#nrs-add)
     - [Remove](#nrs-remove)
   - [SAFE-URLs](#safe-urls)
+  - [Dog](#dog)
   - [Update](#update)
 4. [Further Help](#further-help)
 5. [License](#license)
@@ -483,10 +484,10 @@ FilesContainer updated (version 4): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyf
 
 The `cat` command is probably the most straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
 ```shell
-$ safe cat safe://<XOR-URL>
+$ safe cat safe://<NRS-URL or XOR-URL>
 ```
 
-If the XOR-URL targets a published `FilesContainer`, the `cat` command will fetch its contents render it showing the list of files contained (linked) from it, along with the corresponding XOR-URLs for each of the linked files.
+If the URL targets a published `FilesContainer`, the `cat` command will fetch its content, and render it showing the list of files contained (linked) in it, along with the corresponding XOR-URLs for each of the linked files.
 
 Let's see this in action, if we upload some folder using the `files put` command, e.g.:
 ```shell
@@ -550,40 +551,9 @@ Spendable balances of Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsji
 
 As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
-In order to get additional information about the native data type holding the data of a specific content, we can pass the `--info` flag to the `cat` command:
-```shell
-$ safe cat safe://hbyit4fq3pwk9yzcytrstcgbi68q7yr9o8j1mnrxh194m6jmjanear1j5w --info
-Native data type: PublishedSeqAppendOnlyData
-Type tag: 1100
-XOR name: 0x346b0335f55f3dbd4d89ecb792bc76460f6dcc8627b35c429a11d940cb15a492
-
-Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| Name                    | Size | Created              | Modified             | Link                                                              |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /another.md             | 6    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyynhci18zwrjmiwqgpf5ofukf3dtryrkeizk1yxda3a5zoew6mgeox |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /subfolder/subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /test.md                | 12   | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6 |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-```
-
-We've got some additional information about the content we are retrieving. In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (PublishedSeqAppendOnlyData).
-
-And of course this flag can be used also with other type of content like files (`ImmutableData`):
-```shell
-$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder/subexists.md --info
-Native data type: ImmutableData (published)
-XOR name: 0xc343e62e9127559583a336ffd2e5f9e658b11387646725eec3dbda3d3cf55da1
-
-Raw content of the file:
-hello from a subfolder!
-```
-
 #### Retrieving older versions of content
 
-As we've seen above, we can use `cat` command to retrieve the latest/current version of any type of content from the Network using their XOR-URL. But every change made to content that is uploaded to the Network as Published data is perpetual, and therefore a new version is generated when performing any amendments to it, keeping older versions also available forever.
+As we've seen above, we can use `cat` command to retrieve the latest/current version of any type of content from the Network using their URL. But every change made to content that is uploaded to the Network as Published data is perpetual, and therefore a new version is generated when performing any amendments to it, keeping older versions also available forever.
 
 We can use the `cat` command to also retrieve any version of content that was uploaded as Published data by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w`), which reached version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
 ```shell
@@ -720,13 +690,42 @@ E.g. we can retrieve the content of a website with the `cat` command using eithe
 - `$ safe cat safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1`
 - `$ safe cat safe://mywebsite?v=1`
 
-In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `cat` command.
+In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `dog` command.
 
-We've seen before that we can provide `--info` flag to the `cat` command to obtain more information about the content being retrieved, but it's also possible to request a higher level of information by passing `-ii` or `-iii` (which are equivalent to pass `--info` twice or thrice respectively) to the `cat` command:
+### Dog
+
+The SAFE Network relates information and content using links, as an example, just considering some of the type of content we've seen in this guide, `FilesContainer`s, `Wallet`s and `NRS Map Container`s, they are all containers with named links (SAFE-URLs) to other content on the network, and depending on the abstraction they provide, each of these links are resolved following a specific set of rules for each type of container, e.g. NRS subnames are resolved with a pre-defined set of rules, while a file's location is resolved from a FilesContainer with another set of pre-defined rules.
+
+Using the `cat` command is a very straight forward way of retrieving any type of data and see its content, but sometimes we may want to understand how the location of the content being retrieved is resolved using these set of pre-defined rules, and how links are resolved to eventually find the location of the content we are retrieving. This is when we need the `dog` command to sniff around and show the trace when resolving all these links from a URL.
+
+The most basic case for the `dog` command is to get information about the native data type holding a content found with a XOR-URL:
 ```shell
-$ safe cat safe://mywebsite/contact/form.html -iii
+$ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
+Native data type: PublishedSeqAppendOnlyData
+Version: 0
+Type tag: 1100
+XOR name: 0x231a809e8972e51e520e49187f1779f7dff3fb45036cd5546b22f1f22e459741
+XOR-URL: safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
+```
+
+In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (`PublishedSeqAppendOnlyData`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
+
+Of course the `safe dog` command can be used also with other type of content like files (`ImmutableData`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
+```shell
+$ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc/subfolder/index.html
 Native data type: ImmutableData (published)
-XOR name: 0x8fa90a8234747a9672d22d030984b94f1cd640136e8b659e23249a664eb70e71
+XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
+XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
+Media type: text/html
+```
+
+But how about using the `dog` command with an NRS URL, as we now know it's resolved using the NRS rules and following the links found in the NRS Map Container:
+```shell
+$ safe dog safe://mywebsite/contact/form.html
+Native data type: ImmutableData (published)
+XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
+XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
+Media type: text/html
 
 Resolved using NRS Map:
 PublicName: "mywebsite"
@@ -742,18 +741,9 @@ Version: 3
 +------------------+----------------------+----------------------+--------------------------------------------------------------------------+
 | blog.mywebsite   | 2019-07-24T16:52:30Z | 2019-07-24T16:52:30Z | safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0 |
 +------------------+----------------------+----------------------+--------------------------------------------------------------------------+
-
-Raw content of the file:
-<!DOCTYPE html>
-<html>
-<body>
-<h2>Contact Form</h2>
-<form>
-  ...
-</form>
-</body>
-</html>
 ```
+
+In this case we don't only get information about the content that the URL resolves to, but also about the NRS Map Container this NRS-URL was resolved with. E.g. we see the XOR-URL of the NRS Map Container, its version, and among other data we also see the list of all NRS names defined by it with their corresponding XOR-URL links.
 
 ### Update
 
