@@ -10,13 +10,13 @@ SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
 
-build-clean:
+build-cli-clean:
 	rm -rf artifacts
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:build \
+		maidsafe/safe-cli-build:cli \
 		bash -c "rm -rf /target/release && cargo build --release"
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
@@ -26,33 +26,18 @@ else
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
-build:
+build-cli:
 	rm -rf artifacts
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:build \
+		maidsafe/safe-cli-build:cli \
 		cargo build --release
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
 	cargo build --release
-endif
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-dev:
-	rm -rf artifacts
-	mkdir artifacts
-ifeq ($(UNAME_S),Linux)
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:build-dev \
-		cargo build --release --features=mock-network
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-else
-	cargo build --release --features=mock-network
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
@@ -65,23 +50,35 @@ else
 	find artifacts -name "safe" -exec strip '{}' \;
 endif
 
-build-container:
+build-cli-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:build
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:build \
-		--build-arg build_type="non-dev" .
+	docker rmi -f maidsafe/safe-cli-build:cli
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:cli \
+		--build-arg build_type="non-dev" \
+		--build-arg build_component="safe-cli" .
 
-build-dev-container:
+push-cli-container:
+	docker push maidsafe/safe-cli-build:cli
+
+build-cli-dev-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:build-dev
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:build-dev \
-		--build-arg build_type="dev" .
+	docker rmi -f maidsafe/safe-cli-build:cli
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:cli-dev \
+		--build-arg build_type="dev" \
+		--build-arg build_component="safe-cli" .
 
-push-container:
-	docker push maidsafe/safe-cli-build:build
+push-cli-dev-container:
+	docker push maidsafe/safe-cli-build:cli-dev
 
-push-dev-container:
-	docker push maidsafe/safe-cli-build:build-dev
+build-api-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-cli-build:api-dev
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:api \
+		--build-arg build_type="non-dev" \
+		--build-arg build_component="safe-api" .
+
+push-api-container:
+	docker push maidsafe/safe-cli-build:api
 
 clippy:
 ifeq ($(UNAME_S),Linux)
@@ -93,7 +90,8 @@ else
 	cargo clippy --all-targets --all-features -- -D warnings
 endif
 
-test:
+.ONESHELL:
+test-cli:
 ifndef SAFE_AUTH_PORT
 	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
 endif
@@ -102,14 +100,43 @@ endif
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:build-dev \
-		./resources/test-scripts/all-tests
+		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
+		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+		maidsafe/safe-cli-build:cli-dev \
+		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-tests"
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
 	$(eval MOCK_VAULT_PATH := ~/safe_auth-${SAFE_AUTH_PORT})
-	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
-		SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} ./resources/test-scripts/all-tests
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+	   ./resources/test-scripts/run-auth-daemon
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+	   ./resources/test-scripts/cli-tests
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+.ONESHELL:
+test-api:
+ifndef SAFE_AUTH_PORT
+	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
+endif
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
+		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+		maidsafe/safe-cli-build:api \
+		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/api-tests"
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+else
+	$(eval MOCK_VAULT_PATH := ~/safe_auth-${SAFE_AUTH_PORT})
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+		./resources/test-scripts/run-auth-daemon
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+		./resources/test-scripts/api-tests
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
@@ -185,7 +212,7 @@ ifndef SAFE_AUTH_PORT
 	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
 endif
 ifeq ($(OS),Windows_NT)
-	powershell.exe -File resources\test-scripts\cleanup.ps1 -port ${SAFE_AUTH_PORT}
+	powershell.exe -File resources/test-scripts/cleanup.ps1 -port ${SAFE_AUTH_PORT}
 else ifeq ($(UNAME_S),Darwin)
 	lsof -t -i tcp:${SAFE_AUTH_PORT} | xargs -n 1 -x kill
 endif

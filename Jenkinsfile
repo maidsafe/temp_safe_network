@@ -11,27 +11,45 @@ stage('build & test') {
     parallel test_linux: {
         node('safe_cli') {
             checkout(scm)
-            runTests()
+            runTests("cli")
             packageBuildArtifacts('linux', 'dev')
             uploadBuildArtifacts()
         }
     },
-    test_windows: {
+    test_cli_windows: {
         node('windows') {
             checkout(scm)
             retrieveCache('windows')
-            runTests()
+            runTests("cli")
             packageBuildArtifacts('windows', 'dev')
             uploadBuildArtifacts()
         }
     },
-    test_macos: {
+    test_cli_macos: {
         node('osx') {
             checkout(scm)
             retrieveCache('macos')
-            runTests()
+            runTests("cli")
             packageBuildArtifacts('macos', 'dev')
             uploadBuildArtifacts()
+        }
+    },
+    test_api_macos: {
+        node('osx') {
+            checkout(scm)
+            runTests("api")
+        }
+    },
+    test_api_windows: {
+        node('windows') {
+            checkout(scm)
+            runTests("api")
+        }
+    },
+    test_api_linux: {
+        node('safe_cli') {
+            checkout(scm)
+            runTests("api")
         }
     },
     clippy: {
@@ -40,28 +58,28 @@ stage('build & test') {
             sh("make clippy")
         }
     },
-    release_linux: {
+    release_cli_linux: {
         node('safe_cli') {
             checkout(scm)
-            runReleaseBuild()
+            runReleaseBuild("cli")
             stripArtifacts()
             packageBuildArtifacts('linux', 'release')
             uploadBuildArtifacts()
         }
     },
-    release_windows: {
+    release_cli_windows: {
         node('windows') {
             checkout(scm)
-            runReleaseBuild()
+            runReleaseBuild("cli")
             stripArtifacts()
             packageBuildArtifacts('windows', 'release')
             uploadBuildArtifacts()
         }
     },
-    release_macos: {
+    release_cli_macos: {
         node('osx') {
             checkout(scm)
-            runReleaseBuild()
+            runReleaseBuild("cli")
             stripArtifacts()
             packageBuildArtifacts('macos', 'release')
             uploadBuildArtifacts()
@@ -107,24 +125,34 @@ def retrieveCache(os) {
     }
 }
 
-def runReleaseBuild() {
-    if (env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}") {
-        sh("make build-clean")
-    } else {
-        sh("make build")
+def runReleaseBuild(component) {
+    cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}"
+    switch (component) {
+        case "api":
+            target = cleanBuild ? "build-api-clean" : "build-api"
+            break
+        case "cli":
+            target = cleanBuild ? "build-cli-clean" : "build-cli"
+            break
+        case "ffi":
+            target = cleanBuild ? "build-ffi-clean" : "build-ffi"
+            break
+        default:
+            error("${component} is not supported. Please extend for support.")
     }
+    sh("make ${target}")
 }
 
 def stripArtifacts() {
     sh("make strip-artifacts")
 }
 
-def runTests() {
-    port = new Random().nextInt() % 100 + 41800
+def runTests(component) {
+    def port = new Random().nextInt() % 100 + 41800
     echo("Generated ${port} at random to be used as SAFE_AUTH_PORT")
     withEnv(["SAFE_AUTH_PORT=${port}"]) {
         try {
-            sh("make test")
+            sh("make test-${component}")
         } finally {
             sh("make clean")
         }

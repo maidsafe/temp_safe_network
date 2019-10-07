@@ -1,7 +1,8 @@
 FROM rust:latest
 
-# This is only referenced in the build-cache script.
+# These are referenced in the build-cache script.
 ARG build_type
+ARG build_component
 
 RUN addgroup --gid 1001 maidsafe && \
     adduser --uid 1001 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \

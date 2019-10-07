@@ -1,0 +1,18 @@
+#!/bin/bash
+# This script will not work if called individually.
+# The integration tests require the auth daemon to be running.
+# It's better to either run the all-tests script or call Makefile targets.
+
+set -e -x
+
+cd safe-api
+rm -f fake_vault_data.json
+cargo test --lib --release --features=scl-mock -- --test-threads=1
+rm -f fake_vault_data.json
+cargo test --doc --release --features=scl-mock -- --test-threads=1
+
+rm -f fake_vault_data.json
+cargo test --lib --release --features=mock-network,fake-auth -- --test-threads=1
+rm -f fake_vault_data.json
+cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
+cd -
