@@ -339,6 +339,7 @@ fn test_fetch_key() {
     assert!(
         content
             == SafeData::SafeKey {
+                xorurl,
                 xorname: xorurl_encoder.xorname(),
                 resolved_from: None,
             }
@@ -358,6 +359,7 @@ fn test_fetch_wallet() {
     assert!(
         content
             == SafeData::Wallet {
+                xorurl,
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 1_000,
                 balances: WalletSpendableBalances::default(),
@@ -384,6 +386,7 @@ fn test_fetch_files_container() {
     assert!(
         content
             == SafeData::FilesContainer {
+                xorurl,
                 xorname: xorurl_encoder.xorname(),
                 type_tag: 1_100,
                 version: 0,
@@ -437,6 +440,7 @@ fn test_fetch_resolvable_container() {
     // this should resolve to a FilesContainer until we enable prevent resolution.
     match content {
         SafeData::FilesContainer {
+            xorurl,
             xorname,
             type_tag,
             version,
@@ -444,6 +448,7 @@ fn test_fetch_resolvable_container() {
             data_type,
             ..
         } => {
+            assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
             assert_eq!(xorname, xorurl_encoder.xorname());
             assert_eq!(type_tag, 1_100);
             assert_eq!(version, 0);
@@ -479,16 +484,18 @@ fn test_fetch_resolvable_map_data() {
         false
     ));
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
+    let nrs_xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
     let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
     // this should resolve to a FilesContainer until we enable prevent resolution.
     match content {
         SafeData::FilesContainer {
+            xorurl,
             resolved_from: Some(nrs_map_container),
             ..
         } => {
-            assert_eq!(nrs_map_container.xorname, xorurl_encoder.xorname());
+            assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
+            assert_eq!(nrs_map_container.xorname, nrs_xorurl_encoder.xorname());
             assert_eq!(nrs_map_container.type_tag, 1_500);
             assert_eq!(nrs_map_container.version, 0);
             assert_eq!(
@@ -517,6 +524,7 @@ fn test_fetch_published_immutable_data() {
     assert!(
         content
             == SafeData::PublishedImmutableData {
+                xorurl,
                 xorname: xorurl_encoder.xorname(),
                 data: data.to_vec(),
                 resolved_from: None,

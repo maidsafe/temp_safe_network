@@ -18,9 +18,6 @@ use structopt::StructOpt;
 pub struct DogCommands {
     /// The safe:// location to retrieve
     location: Option<String>,
-    /// Display additional information about the content being retrieved. Different levels of details can be obtained by passing this flag several times, i.e. `-i`, `-ii`, or `-iii`
-    #[structopt(short = "i", long = "info", parse(from_occurrences))]
-    info: u8,
 }
 
 pub fn dog_commander(
@@ -38,11 +35,11 @@ pub fn dog_commander(
         SafeData::FilesContainer {
             xorurl,
             version,
-            files_map: _,
             type_tag,
             xorname,
             data_type,
             resolved_from,
+            ..
         } => {
             // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
@@ -71,10 +68,10 @@ pub fn dog_commander(
         }
         SafeData::PublishedImmutableData {
             xorurl,
-            data: _,
             xorname,
             resolved_from,
             media_type,
+            ..
         } => {
             if OutputFmt::Pretty == output_fmt {
                 println!("Native data type: ImmutableData (published)");
@@ -104,9 +101,9 @@ pub fn dog_commander(
             xorurl,
             xorname,
             type_tag,
-            balances: _,
             data_type,
             resolved_from,
+            ..
         } => {
             // Render Wallet
             if OutputFmt::Pretty == output_fmt {

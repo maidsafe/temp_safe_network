@@ -14,6 +14,7 @@ use std::env;
 use std::str::FromStr;
 use unwrap::unwrap;
 
+#[allow(dead_code)]
 pub const CLI: &str = "safe";
 #[allow(dead_code)]
 pub const SAFE_PROTOCOL: &str = "safe://";

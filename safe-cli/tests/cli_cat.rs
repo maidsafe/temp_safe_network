@@ -17,7 +17,7 @@ use common::{
     parse_files_put_or_sync_output, CLI,
 };
 use predicates::prelude::*;
-use safe_api::{BlsKeyPair, SafeContentType, SafeData, SafeDataType, XorUrlEncoder};
+use safe_api::{BlsKeyPair, SafeContentType, SafeDataType, XorUrlEncoder};
 use std::process::Command;
 use unwrap::unwrap;
 
@@ -164,56 +164,6 @@ fn calling_safe_cat_nrsurl_with_version() {
 }
 
 #[test]
-fn calling_safe_cat_nrsurl_with_info_level_2() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
-    let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
-
-    let nrsurl = format!("safe://{}", get_random_nrs_string());
-    let _ = cmd!(
-        get_bin_location(),
-        "nrs",
-        "create",
-        &nrsurl,
-        "-l",
-        &container_xorurl,
-    )
-    .read()
-    .unwrap();
-
-    let cat_output = cmd!(
-        get_bin_location(),
-        "cat",
-        &nrsurl,
-        "--json",
-        "--info",
-        "--info"
-    )
-    .read()
-    .unwrap();
-
-    let content_info: (String, SafeData) = serde_json::from_str(&cat_output)
-        .expect("Failed to parse output of `safe cat` with -ii on file");
-    assert_eq!(content_info.0, nrsurl);
-    if let SafeData::FilesContainer { resolved_from, .. } = content_info.1 {
-        let unwrapped_resolved_from = resolved_from.unwrap();
-        assert_eq!(
-            unwrapped_resolved_from.public_name,
-            nrsurl.replace("safe://", "")
-        );
-        assert_eq!(unwrapped_resolved_from.type_tag, 1500);
-        assert_eq!(unwrapped_resolved_from.version, 0);
-        assert_eq!(
-            unwrapped_resolved_from.data_type,
-            SafeDataType::PublishedSeqAppendOnlyData
-        );
-    } else {
-        panic!("Content retrieved was unexpected: {:?}", content_info);
-    }
-}
-
-#[test]
 fn calling_safe_cat_wallet_xorurl() {
     let wallet_create = cmd!(
         get_bin_location(),
@@ -267,51 +217,5 @@ fn calling_safe_cat_safekey() {
         .read()
         .unwrap();
 
-    assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use -i / --info flag to obtain additional information about the targeted SafeKey.");
-}
-
-#[test]
-fn calling_safe_cat_safekey_nrsurl_with_info_level_3() {
-    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
-
-    let nrsurl = format!("safe://{}", get_random_nrs_string());
-    let _ = cmd!(
-        get_bin_location(),
-        "nrs",
-        "create",
-        &nrsurl,
-        "-l",
-        &safekey_xorurl,
-    )
-    .read()
-    .unwrap();
-
-    let cat_output = cmd!(
-        get_bin_location(),
-        "cat",
-        &nrsurl,
-        "--json",
-        "--info",
-        "--info",
-        "--info"
-    )
-    .read()
-    .unwrap();
-
-    let content_info: (String, SafeData) = serde_json::from_str(&cat_output)
-        .expect("Failed to parse output of `safe cat` with -ii on file");
-    assert_eq!(content_info.0, nrsurl);
-    if let SafeData::SafeKey { resolved_from, .. } = content_info.1 {
-        let unwrapped_resolved_from = resolved_from.unwrap();
-        assert_eq!(
-            unwrapped_resolved_from.public_name,
-            nrsurl.replace("safe://", "")
-        );
-        assert_eq!(
-            unwrapped_resolved_from.data_type,
-            SafeDataType::PublishedSeqAppendOnlyData
-        );
-    } else {
-        panic!("Content retrieved was unexpected: {:?}", content_info);
-    }
+    assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
 }
