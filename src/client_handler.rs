@@ -173,6 +173,7 @@ impl ClientHandler {
 
     pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
         use ConsensusAction::*;
+        trace!("{}: Consensused {:?}", self, action,);
         match action {
             PayAndForward {
                 request,
@@ -972,7 +973,11 @@ impl ClientHandler {
             .map(|key| key == &owner_key)
             .unwrap_or(false);
         if own_request {
-            return Some(action);
+            return Some(Action::ConsensusVote(ConsensusAction::Forward {
+                request,
+                client_public_id: requester.clone(),
+                message_id,
+            }));
         }
 
         self.pay(

@@ -39,6 +39,9 @@ use std::{
 use tempdir::TempDir;
 use unwrap::unwrap;
 
+/// Default number of vaults to run the tests with.
+const DEFAULT_NUM_VAULTS: usize = 5;
+
 macro_rules! unexpected {
     ($e:expr) => {
         panic!("Unexpected {:?}", $e)
@@ -54,6 +57,8 @@ pub struct Environment {
 
 impl Environment {
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
+        assert!(num_vaults > 0);
+
         let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
             let now = formatter.timestamp();
             writeln!(
@@ -79,10 +84,15 @@ impl Environment {
 
         let consensus_group = ConsensusGroup::new();
 
-        let mut vaults = Vec::with_capacity(num_vaults);
-        for _i in 0..num_vaults {
-            vaults.push(TestVault::in_group(Some(consensus_group.clone())));
-        }
+        let vaults = if num_vaults > 1 {
+            let mut vaults = Vec::with_capacity(num_vaults);
+            for _ in 0..num_vaults {
+                vaults.push(TestVault::new(Some(consensus_group.clone())));
+            }
+            vaults
+        } else {
+            vec![TestVault::new(None)]
+        };
 
         Self {
             rng,
@@ -93,7 +103,7 @@ impl Environment {
     }
 
     pub fn new() -> Self {
-        Self::with_multiple_vaults(4)
+        Self::with_multiple_vaults(DEFAULT_NUM_VAULTS)
     }
 
     pub fn rng(&mut self) -> &mut TestRng {
@@ -147,7 +157,7 @@ struct TestVault {
 
 impl TestVault {
     /// Create a test Vault within a group.
-    fn in_group(consensus_group: Option<ConsensusGroupRef>) -> Self {
+    fn new(consensus_group: Option<ConsensusGroupRef>) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
 
         let mut config = Config::default();
@@ -166,11 +176,6 @@ impl TestVault {
             inner,
             _root_dir: root_dir,
         }
-    }
-
-    #[allow(unused)]
-    fn new() -> Self {
-        Self::in_group(None)
     }
 
     fn connection_info(&mut self) -> NodeInfo {

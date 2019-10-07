@@ -11,19 +11,22 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
 
+/// Default events `VecDeque` pre-allocated capacity
+const DEFAULT_EVENTS_CAP: usize = 64;
+
 /// Consensus group reference
 pub type ConsensusGroupRef = Rc<RefCell<ConsensusGroup>>;
 type EventsRef = Rc<RefCell<VecDeque<Vec<u8>>>>;
 
 /// Consensus
 pub struct ConsensusGroup {
-    pub(crate) event_buckets: Vec<EventsRef>,
+    event_buckets: Vec<EventsRef>,
 }
 
 impl ConsensusGroup {
     /// Creates a new consensus group.
     pub fn new() -> ConsensusGroupRef {
-        Rc::new(RefCell::new(ConsensusGroup {
+        Rc::new(RefCell::new(Self {
             event_buckets: Vec::new(),
         }))
     }
@@ -79,7 +82,7 @@ impl NodeBuilder {
     /// Creates new `Node`.
     pub fn create(self) -> Result<Node, RoutingError> {
         Ok(Node {
-            events: Rc::new(RefCell::new(VecDeque::with_capacity(128))),
+            events: Rc::new(RefCell::new(VecDeque::with_capacity(DEFAULT_EVENTS_CAP))),
             consensus_group: None,
         })
     }
@@ -87,17 +90,17 @@ impl NodeBuilder {
     /// Creates new `Node` within a section of nodes.
     pub fn create_within_group(
         self,
-        consensus_group: Rc<RefCell<ConsensusGroup>>,
+        consensus_group: ConsensusGroupRef,
     ) -> Result<Node, RoutingError> {
-        let event_bucket = Rc::new(RefCell::new(VecDeque::with_capacity(128)));
+        let events = Rc::new(RefCell::new(VecDeque::with_capacity(DEFAULT_EVENTS_CAP)));
 
         consensus_group
             .borrow_mut()
             .event_buckets
-            .push(event_bucket.clone());
+            .push(events.clone());
 
         Ok(Node {
-            events: event_bucket.clone(),
+            events,
             consensus_group: Some(Rc::downgrade(&consensus_group)),
         })
     }
