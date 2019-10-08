@@ -16,7 +16,6 @@ fn main() {
 
 #[cfg(feature = "bindings")]
 mod bindings {
-    use rust_sodium::crypto::{box_, secretbox, sign};
     use safe_bindgen::{Bindgen, FilterMode, LangCSharp};
     use safe_nd::XOR_NAME_LEN;
     use std::collections::HashMap;
@@ -71,13 +70,6 @@ mod bindings {
             "BindingUtils",
         );
 
-        lang.add_const("ulong", "ASYM_PUBLIC_KEY_LEN", box_::PUBLICKEYBYTES);
-        lang.add_const("ulong", "ASYM_SECRET_KEY_LEN", box_::SECRETKEYBYTES);
-        lang.add_const("ulong", "ASYM_NONCE_LEN", box_::NONCEBYTES);
-        lang.add_const("ulong", "SYM_KEY_LEN", secretbox::KEYBYTES);
-        lang.add_const("ulong", "SYM_NONCE_LEN", secretbox::NONCEBYTES);
-        lang.add_const("ulong", "SIGN_PUBLIC_KEY_LEN", sign::PUBLICKEYBYTES);
-        lang.add_const("ulong", "SIGN_SECRET_KEY_LEN", sign::SECRETKEYBYTES);
         lang.add_const("ulong", "XOR_NAME_LEN", XOR_NAME_LEN);
         lang.add_const("ulong", "BLS_PUBLIC_KEY_LEN", BLS_PUBLIC_KEY_LEN);
         lang.add_opaque_type("Safe");
