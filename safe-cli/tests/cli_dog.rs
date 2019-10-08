@@ -38,11 +38,11 @@ fn calling_safe_dog_files_container_nrsurl() {
     .read()
     .unwrap();
 
-    let cat_output = cmd!(get_bin_location(), "dog", &nrsurl, "--json",)
+    let dog_output = cmd!(get_bin_location(), "dog", &nrsurl, "--json",)
         .read()
         .unwrap();
 
-    let content_info: (String, SafeData) = serde_json::from_str(&cat_output)
+    let content_info: (String, SafeData) = serde_json::from_str(&dog_output)
         .expect("Failed to parse output of `safe dog` with -ii on file");
     assert_eq!(content_info.0, nrsurl);
     if let SafeData::FilesContainer { resolved_from, .. } = content_info.1 {
@@ -78,11 +78,11 @@ fn calling_safe_dog_safekey_nrsurl() {
     .read()
     .unwrap();
 
-    let cat_output = cmd!(get_bin_location(), "dog", &nrsurl, "--json",)
+    let dog_output = cmd!(get_bin_location(), "dog", &nrsurl, "--json",)
         .read()
         .unwrap();
 
-    let content_info: (String, SafeData) = serde_json::from_str(&cat_output)
+    let content_info: (String, SafeData) = serde_json::from_str(&dog_output)
         .expect("Failed to parse output of `safe dog` with -ii on file");
     assert_eq!(content_info.0, nrsurl);
     if let SafeData::SafeKey { resolved_from, .. } = content_info.1 {
