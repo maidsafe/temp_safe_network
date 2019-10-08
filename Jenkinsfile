@@ -12,7 +12,7 @@ stage('build & test') {
         node('safe_cli') {
             checkout(scm)
             runTests("cli")
-            packageBuildArtifacts('linux', 'dev')
+            packageBuildArtifacts("safe-cli", "dev", "x86_64-unknown-linux-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -21,7 +21,7 @@ stage('build & test') {
             checkout(scm)
             retrieveCache('windows')
             runTests("cli")
-            packageBuildArtifacts('windows', 'dev')
+            packageBuildArtifacts("safe-cli", "dev", "x86_64-pc-windows-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -30,7 +30,7 @@ stage('build & test') {
             checkout(scm)
             retrieveCache('macos')
             runTests("cli")
-            packageBuildArtifacts('macos', 'dev')
+            packageBuildArtifacts("safe-cli", "dev", "x86_64-apple-darwin")
             uploadBuildArtifacts()
         }
     },
@@ -63,7 +63,7 @@ stage('build & test') {
             checkout(scm)
             runReleaseBuild("cli")
             stripArtifacts()
-            packageBuildArtifacts('linux', 'release')
+            packageBuildArtifacts("safe-cli", "non-dev", "x86_64-unknown-linux-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -72,7 +72,7 @@ stage('build & test') {
             checkout(scm)
             runReleaseBuild("cli")
             stripArtifacts()
-            packageBuildArtifacts('windows', 'release')
+            packageBuildArtifacts("safe-cli", "non-dev", "x86_64-pc-windows-gnu")
             uploadBuildArtifacts()
         }
     },
@@ -81,7 +81,49 @@ stage('build & test') {
             checkout(scm)
             runReleaseBuild("cli")
             stripArtifacts()
-            packageBuildArtifacts('macos', 'release')
+            packageBuildArtifacts("safe-cli", "non-dev", "x86_64-apple-darwin")
+            uploadBuildArtifacts()
+        }
+    },
+    release_ffi_macos: {
+        node('osx') {
+            checkout(scm)
+            runReleaseBuild("ffi")
+            stripArtifacts()
+            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-darwin")
+            uploadBuildArtifacts()
+        }
+    },
+    release_ffi_windows: {
+        node('windows') {
+            checkout(scm)
+            runReleaseBuild("ffi")
+            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-pc-windows-gnu")
+            uploadBuildArtifacts()
+        }
+    },
+    release_ffi_linux: {
+        node('safe_cli') {
+            checkout(scm)
+            runReleaseBuild("ffi")
+            stripArtifacts()
+            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-unknown-linux-gnu")
+            uploadBuildArtifacts()
+        }
+    },
+    release_ffi_android_x86_64: {
+        node('safe_cli') {
+            checkout(scm)
+            runReleaseBuild("ffi-android-x86_64")
+            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-linux-android")
+            uploadBuildArtifacts()
+        }
+    },
+    release_ffi_android_armv7: {
+        node('safe_cli') {
+            checkout(scm)
+            runReleaseBuild("ffi-android-armv7")
+            packageBuildArtifacts("safe-ffi", "non-dev", "armv7-linux-androideabi")
             uploadBuildArtifacts()
         }
     }
@@ -126,16 +168,23 @@ def retrieveCache(os) {
 }
 
 def runReleaseBuild(component) {
-    cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}"
+    def cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}"
+    def target = ""
     switch (component) {
         case "api":
-            target = cleanBuild ? "build-api-clean" : "build-api"
+            target = cleanBuild ? "build-clean-api" : "build-api"
             break
         case "cli":
-            target = cleanBuild ? "build-cli-clean" : "build-cli"
+            target = cleanBuild ? "build-clean-cli" : "build-cli"
             break
         case "ffi":
-            target = cleanBuild ? "build-ffi-clean" : "build-ffi"
+            target = cleanBuild ? "build-clean-ffi" : "build-ffi"
+            break
+        case "ffi-android-x86_64":
+            target = cleanBuild ? "build-clean-ffi-android-x86_64" : "build-ffi-android-x86_64"
+            break
+        case "ffi-android-armv7":
+            target = cleanBuild ? "build-clean-ffi-android-armv7" : "build-ffi-android-armv7"
             break
         default:
             error("${component} is not supported. Please extend for support.")
@@ -178,10 +227,11 @@ def packageArtifactsForDeploy(isVersionCommit) {
 }
 
 def createTag(version) {
-    withCredentials([usernamePassword(
-        credentialsId: "github_maidsafe_qa_user_credentials",
-        usernameVariable: "GIT_USER",
-        passwordVariable: "GIT_PASSWORD")]) {
+    withCredentials(
+        [usernamePassword(
+            credentialsId: "github_maidsafe_qa_user_credentials",
+            usernameVariable: "GIT_USER",
+            passwordVariable: "GIT_PASSWORD")]) {
         sh("git config --global user.name \$GIT_USER")
         sh("git config --global user.email qa@maidsafe.net")
         sh("git config credential.username \$GIT_USER")
@@ -192,10 +242,11 @@ def createTag(version) {
 }
 
 def createGithubRelease(version) {
-    withCredentials([usernamePassword(
-        credentialsId: "github_maidsafe_token_credentials",
-        usernameVariable: "GITHUB_USER",
-        passwordVariable: "GITHUB_TOKEN")]) {
+    withCredentials(
+        [usernamePassword(
+            credentialsId: "github_maidsafe_token_credentials",
+            usernameVariable: "GITHUB_USER",
+            passwordVariable: "GITHUB_TOKEN")]) {
         sh("make deploy-github-release")
     }
 }
@@ -208,12 +259,13 @@ def retrieveBuildArtifacts() {
     }
 }
 
-def packageBuildArtifacts(os, type) {
-    branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
+def packageBuildArtifacts(component, type, target) {
+    def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
     withEnv(["SAFE_CLI_BRANCH=${branch}",
              "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}",
              "SAFE_CLI_BUILD_TYPE=${type}",
-             "SAFE_CLI_BUILD_OS=${os}"]) {
+             "SAFE_CLI_BUILD_COMPONENT=${component}",
+             "SAFE_CLI_BUILD_TARGET=${target}"]) {
         sh("make package-build-artifacts")
     }
 }

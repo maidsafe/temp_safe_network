@@ -10,7 +10,7 @@ SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
 
-build-cli-clean:
+build-clean-cli:
 	rm -rf artifacts
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
@@ -22,7 +22,7 @@ ifeq ($(UNAME_S),Linux)
 	docker rm "safe-cli-build-${UUID}"
 else
 	rm -rf target
-	cargo build --release
+	cargo build --release --manifest-path=safe-cli/Cargo.toml
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
@@ -37,9 +37,89 @@ ifeq ($(UNAME_S),Linux)
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
-	cargo build --release
+	cargo build --release --manifest-path=safe-cli/Cargo.toml
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-clean-ffi:
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:ffi \
+		bash -c "rm -rf /target/release && cargo build --release"
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+else
+	rm -rf target
+	cargo build --release --manifest-path safe-ffi/Cargo.toml
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ffi:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:ffi \
+		cargo build --release --manifest-path safe-ffi/Cargo.toml
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+else
+	cargo build --release --manifest-path safe-ffi/Cargo.toml
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ffi-android-x86_64:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:ffi-android-x86_64 \
+		cargo build --release --manifest-path safe-ffi/Cargo.toml --target=x86_64-linux-android
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+	find target/x86_64-linux-android/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ffi-android-armv7:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:ffi-android-armv7 \
+		cargo build --release --manifest-path safe-ffi/Cargo.toml --target=armv7-linux-androideabi
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+	find target/armv7-linux-androideabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-clean-ffi-android-x86_64:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:ffi-android-x86_64 \
+		bash -c "rm -rf /target && cargo build --release --manifest-path safe-ffi/Cargo.toml --target=x86_64-linux-android"
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+	find target/x86_64-linux-android/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-clean-ffi-android-armv7:
+	rm -rf target
+	rm -rf artifacts
+	mkdir artifacts
+	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:ffi-android-armv7 \
+		bash -c "rm -rf /target && cargo build --release --manifest-path safe-ffi/Cargo.toml --target=armv7-linux-androideabi"
+	docker cp "safe-cli-build-${UUID}":/target .
+	docker rm "safe-cli-build-${UUID}"
+	find target/armv7-linux-androideabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
@@ -72,13 +152,81 @@ push-cli-dev-container:
 
 build-api-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:api-dev
+	docker rmi -f maidsafe/safe-cli-build:api
 	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:api \
 		--build-arg build_type="non-dev" \
 		--build-arg build_component="safe-api" .
 
 push-api-container:
 	docker push maidsafe/safe-cli-build:api
+
+build-ffi-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-cli-build:ffi
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:ffi \
+		--build-arg build_type="non-dev" \
+		--build-arg build_component="safe-ffi" .
+
+push-ffi-container:
+	docker push maidsafe/safe-cli-build:ffi
+
+build-ffi-dev-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-cli-build:ffi-dev
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:ffi-dev \
+		--build-arg build_type="non-dev" \
+		--build-arg build_component="safe-ffi" .
+
+push-ffi-dev-container:
+	docker push maidsafe/safe-cli-build:ffi-dev
+
+build-ffi-android-armv7-container:
+	rm -rf target/
+	docker system prune --force
+	docker rmi -f maidsafe/safe-cli-build:ffi-android-armv7
+	docker build -f Dockerfile.android.armv7.build \
+		-t maidsafe/safe-cli-build:ffi-android-armv7 \
+		--build-arg build_type="non-dev" \
+		--build-arg target="armv7-linux-androideabi" .
+
+push-ffi-android-armv7-container:
+	docker push maidsafe/safe-cli-build:ffi-android-armv7
+
+build-ffi-android-armv7-dev-container:
+	rm -rf target/
+	docker system prune --force
+	docker rmi -f maidsafe/safe-cli-build:ffi-android-armv7-dev
+	docker build -f Dockerfile.android.armv7.build \
+		-t maidsafe/safe-cli-build:ffi-android-armv7-dev \
+		--build-arg build_type="dev" \
+		--build-arg target="armv7-linux-androideabi" .
+
+push-ffi-android-armv7-dev-container:
+	docker push maidsafe/safe-cli-build:ffi-android-armv7-dev
+
+build-ffi-android-x86_64-container:
+	rm -rf target/
+	docker system prune --force
+	docker rmi -f maidsafe/safe-cli-build:ffi-android-x86_64
+	docker build -f Dockerfile.android.x86_64.build \
+		-t maidsafe/safe-cli-build:ffi-android-x86_64 \
+		--build-arg build_type="non-dev" \
+		--build-arg target="x86_64-linux-android" .
+
+push-ffi-android-x86_64-container:
+	docker push maidsafe/safe-cli-build:ffi-android-x86_64
+
+build-ffi-android-x86_64-dev-container:
+	rm -rf target/
+	docker system prune --force
+	docker rmi -f maidsafe/safe-cli-build:ffi-android-x86_64-dev
+	docker build -f Dockerfile.android.x86_64.build \
+		-t maidsafe/safe-cli-build:ffi-android-x86_64-dev \
+		--build-arg build_type="dev" \
+		--build-arg target="x86_64-linux-android" .
+
+push-ffi-android-x86_64-dev-container:
+	docker push maidsafe/safe-cli-build:ffi-android-x86_64-dev
 
 clippy:
 ifeq ($(UNAME_S),Linux)
@@ -151,20 +299,24 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_OS
-	@echo "A value must be supplied for SAFE_CLI_BUILD_OS."
-	@echo "Valid values are 'linux' or 'windows' or 'macos'."
-	@exit 1
-endif
 ifndef SAFE_CLI_BUILD_TYPE
 	@echo "A value must be supplied for SAFE_CLI_BUILD_TYPE."
 	@echo "Valid values are 'dev' or 'non-dev'."
 	@exit 1
 endif
+ifndef SAFE_CLI_BUILD_COMPONENT
+	@echo "A value must be supplied for SAFE_CLI_BUILD_COMPONENT."
+	@echo "Valid values are 'safe-cli', 'safe-api' or 'safe-ffi'."
+	@exit 1
+endif
+ifndef SAFE_CLI_BUILD_TARGET
+	@echo "A value must be supplied for SCL_BUILD_TARGET."
+	@exit 1
+endif
 ifeq ($(SAFE_CLI_BUILD_TYPE),dev)
-	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-${SAFE_CLI_BUILD_OS}-x86_64-${SAFE_CLI_BUILD_TYPE}.tar.gz)
+	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TARGET}-dev.tar.gz)
 else
-	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-${SAFE_CLI_BUILD_OS}-x86_64.tar.gz)
+	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TARGET}.tar.gz)
 endif
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
