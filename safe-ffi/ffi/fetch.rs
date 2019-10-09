@@ -3,7 +3,7 @@ use super::ffi_structs::{
     NrsMapContainerInfo, PublishedImmutableData, SafeKey, Wallet,
 };
 use super::{ResultReturn, Safe};
-use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx};
+use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, vec_into_raw_parts};
 use safe_api::fetch::SafeData;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
@@ -30,17 +30,19 @@ pub unsafe extern "C" fn fetch(
                 resolved_from,
                 media_type,
             } => {
+                let (data, data_len, data_cap) = vec_into_raw_parts(data.to_vec());
                 let published_data = PublishedImmutableData {
                     xorname: xorname.0,
-                    data: data.as_ptr(),
-                    data_len: data.len(),
+                    data: data,
+                    data_len: data_len,
+                    data_cap: data_cap,
                     resolved_from: match resolved_from {
                         Some(nrs_container_map) => {
                             nrs_map_container_info_into_repr_c(&nrs_container_map)?
                         }
                         None => NrsMapContainerInfo::new()?,
                     },
-                    media_type: CString::new(media_type.clone().unwrap())?.as_ptr(),
+                    media_type: CString::new(media_type.clone().unwrap())?.into_raw(),
                 };
                 o_published(user_data.0, &published_data);
             }

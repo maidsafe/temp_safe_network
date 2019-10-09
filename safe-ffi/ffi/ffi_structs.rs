@@ -88,6 +88,7 @@ pub struct PublishedImmutableData {
     pub xorname: XorNameArray,
     pub data: *const u8,
     pub data_len: usize,
+    pub data_cap: usize,
     pub resolved_from: NrsMapContainerInfo,
     pub media_type: *const c_char,
 }
@@ -98,6 +99,12 @@ impl Drop for PublishedImmutableData {
             if !self.media_type.is_null() {
                 let _ = CString::from_raw(self.media_type as *mut _);
             }
+
+            let _ = Vec::from_raw_parts(
+                self.data as *mut u8,
+                self.data_len,
+                self.data_cap,
+            );
         }
     }
 }
