@@ -13,19 +13,44 @@ use super::update::update_commander;
 use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
-use safe_api::SafeAuthenticator;
+use safe_api::{SafeAuthReq, SafeAuthenticator};
 use slog::{Drain, Logger};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, Write};
 use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
+use url::Url;
 
+const AUTH_REQ_ALLOW_TIMEOUT: u64 = 30000;
+
+const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
+
+#[derive(Debug)]
+struct AuthReq {
+    pub app_id: String,
+    pub tx: mpsc::Sender<bool>,
+}
+
+// List of authorisation requests indexed by their request id
+type AuthReqsList = BTreeMap<u32, AuthReq>;
+
+// A thread-safe queue to keep the list of authorisation requests
+type SharedAuthReqsHandle = Arc<Mutex<AuthReqsList>>;
+
+// A thread-safe handle to keep the SafeAuthenticator instance
 type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
+
+// A thread-safe handle to keep the list of notifications subscriptors' endpoints
+type SharedNotifEndpointsHandle = Arc<Mutex<Vec<String>>>;
 
 const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
@@ -75,8 +100,8 @@ enum CmdArgs {
         #[structopt(long = "stateless-retry")]
         stateless_retry: bool,
         /// Address to listen on
-        #[structopt(long = "listen", default_value = "127.0.0.1:33000")]
-        listen: SocketAddr,
+        #[structopt(long = "listen", default_value = "https://localhost:33000")]
+        listen: String,
     },
     /// Stop a running safe-authd
     #[structopt(name = "stop")]
@@ -85,8 +110,8 @@ enum CmdArgs {
     #[structopt(name = "restart")]
     Restart {
         /// Address to listen on
-        #[structopt(long = "listen", default_value = "127.0.0.1:33000")]
-        listen: SocketAddr,
+        #[structopt(long = "listen", default_value = "https://localhost:33000")]
+        listen: String,
     },
     /// Update the application to the latest available version
     #[structopt(name = "update")]
@@ -109,7 +134,13 @@ pub fn run() -> Result<(), String> {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
         CmdArgs::Start { listen, .. } => {
-            if let Err(e) = start_authd(Logger::root(drain, o!()), listen) {
+            let url = Url::parse(&listen).map_err(|_| "Invalid end point address".to_string())?;
+            let endpoint = url
+                .to_socket_addrs()
+                .map_err(|_| "Invalid end point address".to_string())?
+                .next()
+                .ok_or("The end point is an invalid address".to_string())?;
+            if let Err(e) = start_authd(Logger::root(drain, o!()), endpoint) {
                 Err(format!("{}", e.pretty()))
             } else {
                 Ok(())
@@ -123,7 +154,13 @@ pub fn run() -> Result<(), String> {
             }
         }
         CmdArgs::Restart { listen } => {
-            if let Err(e) = restart_authd(Logger::root(drain, o!()), listen) {
+            let url = Url::parse(&listen).map_err(|_| "Invalid end point address".to_string())?;
+            let endpoint = url
+                .to_socket_addrs()
+                .map_err(|_| "Invalid end point address".to_string())?
+                .next()
+                .ok_or("The end point is an invalid address".to_string())?;
+            if let Err(e) = restart_authd(Logger::root(drain, o!()), endpoint) {
                 Err(format!("{}", e.pretty()))
             } else {
                 Ok(())
@@ -174,7 +211,7 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
     let (cert, key) = match fs::read(&cert_path).and_then(|x| Ok((x, fs::read(&key_path)?))) {
         Ok(x) => x,
         Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
-            info!(log, "generating self-signed certificate");
+            info!(log, "Generating self-signed certificate...");
             let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]);
             let key = cert.serialize_private_key_der();
             let cert = cert.serialize_der();
@@ -217,16 +254,28 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
 
             let (endpoint_driver, incoming) = {
                 let (driver, endpoint, incoming) = endpoint.bind(listen)?;
-                info!(log, "listening on {}", endpoint.local_addr()?);
+                info!(log, "Listening on {}", endpoint.local_addr()?);
                 (driver, incoming)
             };
 
             let safe_auth_handle: SharedSafeAuthenticatorHandle =
                 Arc::new(Mutex::new(SafeAuthenticator::new()));
 
+            // We keep a queue for all the authorisation requests
+            let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
+
+            // We keep a list of the notifications subscriptors' endpoints
+            let notif_endpoints_handle = Arc::new(Mutex::new(Vec::new()));
+
             let mut runtime = Runtime::new()?;
             runtime.spawn(incoming.for_each(move |conn| {
-                handle_connection(safe_auth_handle.clone(), &log, conn);
+                handle_connection(
+                    safe_auth_handle.clone(),
+                    auth_reqs_handle.clone(),
+                    notif_endpoints_handle.clone(),
+                    &log,
+                    conn,
+                );
                 Ok(())
             }));
             runtime.block_on(endpoint_driver)?;
@@ -263,6 +312,8 @@ fn restart_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
 
 fn handle_connection(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
+    auth_reqs_handle: SharedAuthReqsHandle,
+    notif_endpoints_handle: SharedNotifEndpointsHandle,
     log: &Logger,
     conn: (
         quinn::ConnectionDriver,
@@ -278,6 +329,8 @@ fn handle_connection(
           "protocol" => conn.protocol().map_or_else(|| "<none>".into(), |x| String::from_utf8_lossy(&x).into_owned()));
     let log2 = log.clone();
     let safe_auth_handle = safe_auth_handle.clone();
+    let auth_reqs_handle = auth_reqs_handle.clone();
+    let notif_endpoints_handle = notif_endpoints_handle.clone();
 
     // We ignore errors from the driver because they'll be reported by the `incoming` handler anyway.
     tokio_current_thread::spawn(conn_driver.map_err(|_| ()));
@@ -285,9 +338,15 @@ fn handle_connection(
     // Each stream initiated by the client constitutes a new request.
     tokio_current_thread::spawn(
         incoming_streams
-            .map_err(move |e| info!(log2, "connection terminated"; "reason" => %e))
+            .map_err(move |e| info!(log2, "Connection terminated"; "reason" => %e))
             .for_each(move |stream| {
-                handle_request(&safe_auth_handle, &log, stream);
+                handle_request(
+                    &safe_auth_handle,
+                    &auth_reqs_handle,
+                    &notif_endpoints_handle,
+                    &log,
+                    stream,
+                );
                 Ok(())
             }),
     );
@@ -295,6 +354,8 @@ fn handle_connection(
 
 fn handle_request(
     safe_auth_handle: &SharedSafeAuthenticatorHandle,
+    auth_reqs_handle: &SharedAuthReqsHandle,
+    notif_endpoints_handle: &SharedNotifEndpointsHandle,
     log: &Logger,
     stream: quinn::NewStream,
 ) {
@@ -303,6 +364,8 @@ fn handle_request(
         quinn::NewStream::Uni(_) => unreachable!("Disabled by endpoint configuration"),
     };
     let safe_auth_handle = safe_auth_handle.clone();
+    let auth_reqs_handle = auth_reqs_handle.clone();
+    let notif_endpoints_handle = notif_endpoints_handle.clone();
     let log = log.clone();
     let log2 = log.clone();
     let log3 = log.clone();
@@ -318,7 +381,13 @@ fn handle_request(
                 }
                 info!(log, "Got request");
                 // Execute the request
-                let resp = process_get(&safe_auth_handle, &req).unwrap_or_else(move |e| {
+                let resp = process_get(
+                    &safe_auth_handle,
+                    &auth_reqs_handle,
+                    &notif_endpoints_handle,
+                    &req,
+                )
+                .unwrap_or_else(move |e| {
                     error!(log, "Failed to process request"; "reason" => %e.pretty());
                     // TODO: implement JSON-RPC rather.
                     // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
@@ -344,17 +413,19 @@ fn handle_request(
 
 fn process_get(
     safe_auth_handle: &SharedSafeAuthenticatorHandle,
+    auth_reqs_handle: &SharedAuthReqsHandle,
+    notif_endpoints_handle: &SharedNotifEndpointsHandle,
     x: &[u8],
 ) -> Result<Box<[u8]>, Error> {
     if x.len() < 4 || &x[0..4] != b"GET " {
-        bail!("missing GET");
+        bail!("Missing GET");
     }
     if x[4..].len() < 2 || &x[x.len() - 2..] != b"\r\n" {
-        bail!("missing \\r\\n");
+        bail!("Missing \\r\\n");
     }
     let x = &x[4..x.len() - 2];
     let end = x.iter().position(|&c| c == b' ').unwrap_or_else(|| x.len());
-    let path = str::from_utf8(&x[..end]).context("path is malformed UTF-8")?;
+    let path = str::from_utf8(&x[..end]).context("Path is malformed UTF-8")?;
     let req_args: Vec<&str> = path.split("/").collect();
 
     let safe_auth: &mut SafeAuthenticator = &mut *(safe_auth_handle.lock().unwrap());
@@ -370,8 +441,9 @@ fn process_get(
 
                 match safe_auth.log_in(secret, password) {
                     Ok(_) => {
-                        println!("Logged in successfully");
-                        Ok("Logged in successfully!".as_bytes().into())
+                        let msg = "Logged in successfully!";
+                        println!("{}", msg);
+                        Ok(msg.as_bytes().into())
                     }
                     Err(err) => {
                         println!("Error occurred when trying to log in: {}", err);
@@ -387,12 +459,14 @@ fn process_get(
                 println!("Logging out...");
                 match safe_auth.log_out() {
                     Ok(()) => {
-                        println!("Logged out successfully");
-                        Ok("Logged out successfully".as_bytes().into())
+                        let msg = "Logged out successfully";
+                        println!("{}", msg);
+                        Ok(msg.as_bytes().into())
                     }
                     Err(err) => {
-                        println!("Failed to log out: {}", err);
-                        bail!(format!("Failed to log out: {}", err))
+                        let msg = format!("Failed to log out: {}", err);
+                        println!("{}", msg);
+                        bail!(msg)
                     }
                 }
             }
@@ -408,8 +482,9 @@ fn process_get(
 
                 match safe_auth.create_acc(sk, secret, password) {
                     Ok(_) => {
-                        println!("Account created successfully");
-                        Ok("Account created successfully!".as_bytes().into())
+                        let msg = "Account created successfully";
+                        println!("{}", msg);
+                        Ok(msg.as_bytes().into())
                     }
                     Err(err) => {
                         println!("Error occurred when trying to create SAFE account: {}", err);
@@ -423,17 +498,30 @@ fn process_get(
                 bail!("Incorrect number of arguments for 'authorise' action")
             } else {
                 println!("Authorising application...");
-                let auth_req = req_args[2];
-
-                // TODO: send ntification to user to either allow or deny.
-                // TODO: If not end point was reigtered for allowing/denyig reqs then reject it.
-                match safe_auth.authorise_app(auth_req /*, allow_callback*/) {
-                    Ok(resp) => {
-                        println!("Authorisation response sent");
-                        Ok(resp.as_bytes().into())
+                // TODO: automatically reject if there are too many pending auth reqs
+                let auth_req_str = req_args[2];
+                match safe_auth.decode_req(auth_req_str) {
+                    Ok((req_id, safe_auth_req)) => {
+                        println!("Sending request to user to allow/deny request...");
+                        if request_to_allow_auth(req_id, safe_auth_req, &auth_reqs_handle) {
+                            match safe_auth.authorise_app(auth_req_str) {
+                                Ok(resp) => {
+                                    println!("Authorisation response sent back to application");
+                                    Ok(resp.as_bytes().into())
+                                }
+                                Err(err) => {
+                                    println!("Failed to authorise application: {}", err);
+                                    bail!(err)
+                                }
+                            }
+                        } else {
+                            let msg = format!("Authorisation request ({}) was denied", req_id);
+                            println!("{}", msg);
+                            bail!(msg)
+                        }
                     }
                     Err(err) => {
-                        println!("Failed to authorise: {}", err);
+                        println!("{}", err);
                         bail!(err)
                     }
                 }
@@ -465,13 +553,124 @@ fn process_get(
 
                 match safe_auth.revoke_app(app_id) {
                     Ok(()) => {
-                        println!("Application revoked successfully");
-                        Ok("Application revoked successfully".as_bytes().into())
+                        let msg = "Application revoked successfully";
+                        println!("{}", msg);
+                        Ok(msg.as_bytes().into())
                     }
                     Err(err) => {
                         println!("Failed to revoke application '{}': {}", app_id, err);
                         bail!(err)
                     }
+                }
+            }
+        }
+        "auth-reqs" => {
+            if req_args.len() != 2 {
+                bail!("Incorrect number of arguments for 'auth-reqs' action")
+            } else {
+                println!("Obtaining list of pending authorisation requests...");
+                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+                let resp: Vec<String> = auth_reqs_list
+                    .iter()
+                    .map(|(req_id, auth_req)| {
+                        format!("Req ID: {} - App ID: {}", req_id, auth_req.app_id)
+                    })
+                    .collect();
+
+                println!("List of pending authorisation requests sent");
+                Ok(format!("{:?}", resp).as_bytes().into())
+            }
+        }
+        "allow" => {
+            if req_args.len() != 3 {
+                bail!("Incorrect number of arguments for 'allow' action")
+            } else {
+                println!("Allowing authorisation request...");
+                let auth_req_id = req_args[2];
+                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+                let req_id = auth_req_id.parse::<u32>()?;
+                match auth_reqs_list.remove(&req_id) {
+                    Some(auth_req) => match auth_req.tx.send(true) {
+                        Ok(_) => {
+                            let msg = format!(
+                                "Authorisation request ({}) allowed successfully",
+                                auth_req_id
+                            );
+                            println!("{}", msg);
+                            Ok(msg.as_bytes().into())
+                        }
+                        Err(_) => {
+                            let msg = format!("Failed to allow authorisation request '{}' since the response couldn't be sent to the requesting application", auth_req_id);
+                            println!("{}", msg);
+                            bail!(msg)
+                        }
+                    },
+                    None => {
+                        let msg = format!(
+                            "No pending authorisation request found with id '{}'",
+                            auth_req_id
+                        );
+                        println!("{}", msg);
+                        bail!(msg)
+                    }
+                }
+            }
+        }
+        "deny" => {
+            if req_args.len() != 3 {
+                bail!("Incorrect number of arguments for 'deny' action")
+            } else {
+                println!("Denying authorisation request...");
+                let auth_req_id = req_args[2];
+                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+                let req_id = auth_req_id.parse::<u32>()?;
+                match auth_reqs_list.remove(&req_id) {
+                    Some(auth_req) => match auth_req.tx.send(false) {
+                        Ok(_) => {
+                            let msg = format!(
+                                "Authorisation request ({}) denied successfully",
+                                auth_req_id
+                            );
+                            println!("{}", msg);
+                            Ok(msg.as_bytes().into())
+                        }
+                        Err(_) => {
+                            let msg = format!("Authorisation request '{}' was already denied since the response couldn't be sent to the requesting application", auth_req_id);
+                            println!("{}", msg);
+                            bail!(msg)
+                        }
+                    },
+                    None => {
+                        let msg = format!(
+                            "No pending authorisation request found with id '{}'",
+                            auth_req_id
+                        );
+                        println!("{}", msg);
+                        bail!(msg)
+                    }
+                }
+            }
+        }
+        "subscribe" => {
+            if req_args.len() != 3 {
+                bail!("Incorrect number of arguments for 'subscribe' action")
+            } else {
+                println!("Subscribing to authorisation requests notifications...");
+                let notif_endpoint = req_args[2];
+                let notif_endpoints_list: &mut Vec<String> =
+                    &mut *(notif_endpoints_handle.lock().unwrap());
+                if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
+                    let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
+                    println!("{}", msg);
+                    bail!(msg)
+                } else {
+                    notif_endpoints_list.push(notif_endpoint.into());
+                    let msg = format!(
+                        "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
+                        notif_endpoint
+                    );
+                    println!("{}", msg);
+                    Ok(msg.as_bytes().into())
                 }
             }
         }
@@ -481,6 +680,61 @@ fn process_get(
                 other
             );
             bail!("Action not supported or unknown")
+        }
+    }
+}
+
+fn request_to_allow_auth(
+    req_id: u32,
+    req: SafeAuthReq,
+    auth_reqs_handle: &SharedAuthReqsHandle,
+) -> bool {
+    match req {
+        SafeAuthReq::Auth(app_auth_req) => {
+            println!("The following application authorisation request was received:");
+            println!("{:?}", app_auth_req);
+
+            let (tx, rx): (mpsc::Sender<bool>, mpsc::Receiver<bool>) = mpsc::channel();
+
+            // Let's create an scope here so we don't keep the
+            // mutex locked after updating the list of auth reqs
+            {
+                // Let's add it to the list of pending authorisation requests
+                let auth_req = AuthReq {
+                    app_id: app_auth_req.app.id,
+                    tx,
+                };
+                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+                auth_reqs_list.insert(req_id, auth_req);
+            }
+
+            let is_allowed = rx
+                .try_recv()
+                //.recv_timeout(Duration::from_millis(AUTH_REQ_ALLOW_TIMEOUT))
+                .unwrap_or_else(|_err| {
+                    // We didn't get a response in a timely manner, we cannot allow the list
+                    // to grow infinitelly, so let's remove the request from it
+                    /*let auth_reqs_list: &mut AuthReqsList =
+                        &mut *(auth_reqs_handle.lock().unwrap());
+                    auth_reqs_list.remove(&req_id);*/
+                    false
+                });
+
+            is_allowed
+        }
+        SafeAuthReq::Containers(cont_req) => {
+            println!("The following authorisation request for containers was received:");
+            println!("{:?}", cont_req);
+            true
+        }
+        SafeAuthReq::ShareMData(share_mdata_req) => {
+            println!("The following authorisation request to share a MutableData was received:");
+            println!("{:?}", share_mdata_req);
+            true
+        }
+        SafeAuthReq::Unregistered(_) => {
+            // we simply allow unregistered authorisation requests
+            true
         }
     }
 }

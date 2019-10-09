@@ -55,6 +55,23 @@ pub enum AuthSubCommands {
         /// The application ID
         app_id: String,
     },
+    #[structopt(name = "auth-reqs")]
+    /// Send request to a remote Authenticator daemon to retrieve the list of the pending authorisation requests
+    AuthReqs {},
+    #[structopt(name = "allow")]
+    /// Send request to a remote Authenticator daemon to allow an authorisation request
+    Allow {
+        /// The authorisation request ID. You can use the 'auth auth-reqs' command to obtain the list of pending authorisation requests and their corresponding IDs.
+        req_id: u32,
+    },
+    #[structopt(name = "deny")]
+    /// Send request to a remote Authenticator daemon to deny an authorisation request
+    Deny {
+        /// The authorisation request ID. You can use the 'auth auth-reqs' command to obtain the list of pending authorisation requests and their corresponding IDs.
+        req_id: u32,
+    },
+    #[structopt(name = "subscribe")]
+    Subscribe {},
     #[structopt(name = "start-authd")]
     /// Starts the Authenticator daemon if it's not running already
     StartAuthd {},
@@ -139,6 +156,35 @@ pub fn auth_commander(
             println!("Sending application revocation request to authd...");
             safe_authd.revoke_app(&app_id)?;
             println!("Application revoked successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::AuthReqs {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Requesting list of pending authorisation requests from authd...");
+            let auth_reqs = safe_authd.auth_reqs()?;
+            //pretty_print_authed_apps(auth_reqs);
+            println!("{}", auth_reqs);
+            Ok(())
+        }
+        Some(AuthSubCommands::Allow { req_id }) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Sending request to authd to allow an authorisation request...");
+            safe_authd.allow(req_id)?;
+            println!("Authorisation request was allowed successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::Deny { req_id }) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Sending request to authd to deny an authorisation request...");
+            safe_authd.deny(req_id)?;
+            println!("Authorisation request was denied successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::Subscribe {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Sending request to subscribe...");
+            safe_authd.subscribe()?;
+            println!("Subscribed successfully");
             Ok(())
         }
         Some(AuthSubCommands::StartAuthd {}) => run_authd_cmd("start"),

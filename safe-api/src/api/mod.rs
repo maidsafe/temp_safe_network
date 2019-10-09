@@ -28,8 +28,8 @@ pub mod xorurl;
 mod xorurl_media_types;
 
 pub use authd_client_api::SafeAuthdClient;
-pub use authenticator::SafeAuthenticator;
-pub use errors::{Error, Return};
+pub use authenticator::{SafeAuthReq, SafeAuthReqId, SafeAuthenticator};
+pub use errors::{Error, Result};
 pub use fetch::{
     NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
 };

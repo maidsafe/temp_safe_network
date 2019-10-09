@@ -8,7 +8,7 @@
 
 use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
-use super::ResultReturn;
+use super::{ResultReturn, SafeAuthReqId};
 use log::{debug, info};
 //use super::authenticator::AuthedAppsList;
 
@@ -26,6 +26,18 @@ const SAFE_AUTHD_ENDPOINT_AUTHED_APPS: &str = "authed-apps";
 
 // Path of authenticator endpoint for revoking applications and/or permissions
 const SAFE_AUTHD_ENDPOINT_REVOKE: &str = "revoke/";
+
+// Path of authenticator endpoint for retrieving the list of pending authorisation requests
+const SAFE_AUTHD_ENDPOINT_AUTH_REQS: &str = "auth-reqs";
+
+// Path of authenticator endpoint for allowing an authorisation request
+const SAFE_AUTHD_ENDPOINT_ALLOW: &str = "allow/";
+
+// Path of authenticator endpoint for denying an authorisation request
+const SAFE_AUTHD_ENDPOINT_DENY: &str = "deny/";
+
+// Path of authenticator endpoint for subscribing to authorisation requests notifications
+const SAFE_AUTHD_ENDPOINT_SUBSCRIBE: &str = "subscribe/";
 
 // Authd Client API
 pub struct SafeAuthdClient {
@@ -135,6 +147,82 @@ impl SafeAuthdClient {
 
         debug!(
             "Application revocation action successful: {}",
+            authd_response
+        );
+        Ok(())
+    }
+
+    // Get the list of pending authorisation requests from remote authd
+    pub fn auth_reqs(&self) -> ResultReturn</*Vec<AuthReqsList>*/ String> {
+        debug!("Attempting to fetch list of pending authorisation requests from remote authd...");
+        let authd_service_url = format!(
+            "{}:{}/{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_AUTH_REQS
+        );
+
+        debug!("Sending request request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "List of pending authorisation requests successfully received: {}",
+            authd_response
+        );
+
+        //let authed_apps = // TODO: deserialise string Ok(auth_reqs_list)
+        Ok(authd_response)
+    }
+
+    // Allow an authorisation request
+    pub fn allow(&self, req_id: SafeAuthReqId) -> ResultReturn<()> {
+        debug!("Requesting to allow authorisation request: {}", req_id);
+        let authd_service_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_ALLOW, req_id
+        );
+
+        debug!("Sending allow action request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "Action to allow authorisation request was successful: {}",
+            authd_response
+        );
+        Ok(())
+    }
+
+    // Deny an authorisation request
+    pub fn deny(&self, req_id: SafeAuthReqId) -> ResultReturn<()> {
+        debug!("Requesting to deny authorisation request: {}", req_id);
+        let authd_service_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_DENY, req_id
+        );
+
+        debug!("Sending deny action request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "Action to deny authorisation request was successful: {}",
+            authd_response
+        );
+        Ok(())
+    }
+
+    // Subscribe to receive notifications to allow/deny authorisation requests
+    pub fn subscribe(&self) -> ResultReturn<()> {
+        debug!("Subscribing to receive authorisation requests notifications...",);
+        let notif_endpoint = format!("{}", /*SAFE_AUTHD_ENDPOINT_HOST,*/ self.port);
+
+        let authd_service_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, notif_endpoint
+        );
+
+        debug!("Sending subscribe action request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "Successfully subscribed to receive authorisation requests notifications: {}",
             authd_response
         );
         Ok(())
