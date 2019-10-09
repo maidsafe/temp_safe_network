@@ -10,6 +10,7 @@ use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
 use super::{ResultReturn, SafeAuthReqId};
 use log::{debug, info};
+
 //use super::authenticator::AuthedAppsList;
 
 // Path of authenticator endpoint for login into a SAFE account
@@ -38,6 +39,9 @@ const SAFE_AUTHD_ENDPOINT_DENY: &str = "deny/";
 
 // Path of authenticator endpoint for subscribing to authorisation requests notifications
 const SAFE_AUTHD_ENDPOINT_SUBSCRIBE: &str = "subscribe/";
+
+// Path of authenticator endpoint for unsubscribing from authorisation requests notifications
+const SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE: &str = "unsubscribe/";
 
 // Authd Client API
 pub struct SafeAuthdClient {
@@ -209,13 +213,12 @@ impl SafeAuthdClient {
     }
 
     // Subscribe to receive notifications to allow/deny authorisation requests
-    pub fn subscribe(&self) -> ResultReturn<()> {
+    pub fn subscribe(&self, endpoint_url: &str) -> ResultReturn<()> {
         debug!("Subscribing to receive authorisation requests notifications...",);
-        let notif_endpoint = format!("{}", /*SAFE_AUTHD_ENDPOINT_HOST,*/ self.port);
-
+        let url_encoded = urlencoding::encode(endpoint_url);
         let authd_service_url = format!(
             "{}:{}/{}{}",
-            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, notif_endpoint
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, url_encoded
         );
 
         debug!("Sending subscribe action request to SAFE Authenticator...");
@@ -223,6 +226,25 @@ impl SafeAuthdClient {
 
         debug!(
             "Successfully subscribed to receive authorisation requests notifications: {}",
+            authd_response
+        );
+        Ok(())
+    }
+
+    // Unsubscribe from notifications to allow/deny authorisation requests
+    pub fn unsubscribe(&self, endpoint_url: &str) -> ResultReturn<()> {
+        debug!("Unsubscribing from authorisation requests notifications...",);
+        let url_encoded = urlencoding::encode(endpoint_url);
+        let authd_service_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE, url_encoded
+        );
+
+        debug!("Sending unsubscribe action request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "Successfully unsubscribed from authorisation requests notifications: {}",
             authd_response
         );
         Ok(())

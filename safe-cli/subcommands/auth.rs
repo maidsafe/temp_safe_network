@@ -71,7 +71,9 @@ pub enum AuthSubCommands {
         req_id: u32,
     },
     #[structopt(name = "subscribe")]
-    Subscribe {},
+    Subscribe { notifs_endpoint: String },
+    #[structopt(name = "unsubscribe")]
+    Unsubscribe { notifs_endpoint: String },
     #[structopt(name = "start-authd")]
     /// Starts the Authenticator daemon if it's not running already
     StartAuthd {},
@@ -180,11 +182,18 @@ pub fn auth_commander(
             println!("Authorisation request was denied successfully");
             Ok(())
         }
-        Some(AuthSubCommands::Subscribe {}) => {
+        Some(AuthSubCommands::Subscribe { notifs_endpoint }) => {
             let safe_authd = SafeAuthdClient::new(None);
             println!("Sending request to subscribe...");
-            safe_authd.subscribe()?;
+            safe_authd.subscribe(&notifs_endpoint)?;
             println!("Subscribed successfully");
+            Ok(())
+        }
+        Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            println!("Sending request to unsubscribe...");
+            safe_authd.unsubscribe(&notifs_endpoint)?;
+            println!("Unsubscribed successfully");
             Ok(())
         }
         Some(AuthSubCommands::StartAuthd {}) => run_authd_cmd("start"),

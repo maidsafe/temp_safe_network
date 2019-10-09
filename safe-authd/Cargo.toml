@@ -37,7 +37,9 @@ slog-term = "2"
 directories = "1.0.2"
 rcgen = "0.2"
 tokio-current-thread = "0.1"
+tokio-reactor = "0.1.1"
 url = "1.7.2"
+urlencoding = "1.0.0"
 
 [features]
 mock-network = ["safe-api/mock-network"]

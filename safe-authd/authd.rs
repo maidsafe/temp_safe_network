@@ -9,13 +9,14 @@
 use log::debug;
 use structopt::{self, StructOpt};
 
+use super::quic_client::quic_send;
 use super::update::update_commander;
 use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
 use safe_api::{SafeAuthReq, SafeAuthenticator};
 use slog::{Drain, Logger};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, Write};
@@ -25,13 +26,19 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 
+// Timeout when to give up waiting for an auth req to be allowed/denied
 const AUTH_REQ_ALLOW_TIMEOUT: u64 = 30000;
 
+// Frequency for checking pensing auth requests
+const AUTH_REQS_CHECK_FREQ: u64 = 5000;
+
+// Maximum number of allowed auth reqs notifs subscriptors
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
 
 #[derive(Debug)]
@@ -50,7 +57,7 @@ type SharedAuthReqsHandle = Arc<Mutex<AuthReqsList>>;
 type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
 
 // A thread-safe handle to keep the list of notifications subscriptors' endpoints
-type SharedNotifEndpointsHandle = Arc<Mutex<Vec<String>>>;
+type SharedNotifEndpointsHandle = Arc<Mutex<BTreeSet<String>>>;
 
 const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
@@ -265,7 +272,13 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
             let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
 
             // We keep a list of the notifications subscriptors' endpoints
-            let notif_endpoints_handle = Arc::new(Mutex::new(Vec::new()));
+            let notif_endpoints_handle = Arc::new(Mutex::new(BTreeSet::new()));
+
+            // Let's spawn the threads which will monitor pending auth reqs
+            // and get them allowed/denied by the user using any of the subcribed endpoints
+            let auth_reqs_handle2 = auth_reqs_handle.clone();
+            let notif_endpoints_handle2 = notif_endpoints_handle.clone();
+            spawn_auth_reqs_monitor_thread(auth_reqs_handle2, notif_endpoints_handle2);
 
             let mut runtime = Runtime::new()?;
             runtime.spawn(incoming.for_each(move |conn| {
@@ -284,6 +297,58 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn spawn_auth_reqs_monitor_thread(
+    auth_reqs_handle: SharedAuthReqsHandle,
+    notif_endpoints_handle: SharedNotifEndpointsHandle,
+) {
+    thread::spawn(move || loop {
+        {
+            let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+            let notif_endpoints_list: &mut BTreeSet<String> =
+                &mut *(notif_endpoints_handle.lock().unwrap());
+
+            println!("Checking AUTH REQS, pending: {}", auth_reqs_list.len());
+
+            // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
+            // and remove them if they don't respond or their response is positive. Also remove
+
+            // TODO: perhaps check only one auth req per loop to not lock the auth reqs handle too long,
+            // or clone it and release the mutex before iterating
+            for (req_id, auth_req) in auth_reqs_list.iter() {
+                let mut is_allow = false;
+                for endpoint in notif_endpoints_list.iter() {
+                    println!("ASKING SUBSCRIPTOR: {}", endpoint);
+                    match quic_send(&endpoint, false, None, None, false) {
+                        Ok(allow) => {
+                            is_allow = allow.starts_with("true");
+                            break;
+                        }
+                        Err(err) => {
+                            println!(
+                                "Skipping subscriptor '{}' since it didn't respond: {}",
+                                endpoint, err
+                            );
+                        }
+                    }
+                }
+                println!(
+                    "ALLOW FOR Req ID: {} - App ID: {} ??: {}",
+                    req_id, auth_req.app_id, is_allow
+                );
+                match auth_req.tx.send(is_allow) {
+                    Ok(_) => println!("Auth req decision sent successfully"),
+                    Err(_) => {
+                        println!("Auth req decision wasn't sent, and therefore already denied")
+                    }
+                }
+            }
+            auth_reqs_list.clear();
+        }
+
+        thread::sleep(Duration::from_millis(AUTH_REQS_CHECK_FREQ));
+    });
 }
 
 fn stop_authd(_log: Logger) -> Result<(), Error> {
@@ -570,7 +635,7 @@ fn process_get(
             } else {
                 println!("Obtaining list of pending authorisation requests...");
                 let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-                let resp: Vec<String> = auth_reqs_list
+                let resp: BTreeSet<String> = auth_reqs_list
                     .iter()
                     .map(|(req_id, auth_req)| {
                         format!("Req ID: {} - App ID: {}", req_id, auth_req.app_id)
@@ -656,21 +721,67 @@ fn process_get(
                 bail!("Incorrect number of arguments for 'subscribe' action")
             } else {
                 println!("Subscribing to authorisation requests notifications...");
-                let notif_endpoint = req_args[2];
-                let notif_endpoints_list: &mut Vec<String> =
+                let notif_endpoint = match urlencoding::decode(req_args[2]) {
+                    Ok(url) => url,
+                    Err(err) => {
+                        let msg = format!(
+                            "Subscription rejected, the endpoint URL ('{}') is invalid: {:?}",
+                            req_args[2], err
+                        );
+                        println!("{}", msg);
+                        bail!(msg)
+                    }
+                };
+                let notif_endpoints_list: &mut BTreeSet<String> =
                     &mut *(notif_endpoints_handle.lock().unwrap());
                 if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
                     let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
                     println!("{}", msg);
                     bail!(msg)
                 } else {
-                    notif_endpoints_list.push(notif_endpoint.into());
+                    notif_endpoints_list.insert(notif_endpoint.clone());
                     let msg = format!(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
                         notif_endpoint
                     );
                     println!("{}", msg);
                     Ok(msg.as_bytes().into())
+                }
+            }
+        }
+        "unsubscribe" => {
+            if req_args.len() != 3 {
+                bail!("Incorrect number of arguments for 'unsubscribe' action")
+            } else {
+                println!("Unsubscribing from authorisation requests notifications...");
+                let notif_endpoint = match urlencoding::decode(req_args[2]) {
+                    Ok(url) => url,
+                    Err(err) => {
+                        let msg = format!(
+                            "Unsubscription request rejected, the endpoint URL ('{}') is invalid: {:?}",
+                            req_args[2], err
+                        );
+                        println!("{}", msg);
+                        bail!(msg)
+                    }
+                };
+                let notif_endpoints_list: &mut BTreeSet<String> =
+                    &mut *(notif_endpoints_handle.lock().unwrap());
+
+                if notif_endpoints_list.remove(&notif_endpoint) {
+                    let msg = format!(
+                        "Unsubscription successful. Endpoint '{}' will no longer receive authorisation requests notifications",
+                        notif_endpoint
+                    );
+                    println!("{}", msg);
+                    Ok(msg.as_bytes().into())
+                } else {
+                    let msg = format!(
+                        "Unsubscription request ignored, no such the endpoint URL ('{}') was found to be subscribed",
+                        notif_endpoint
+                    );
+                    println!("{}", msg);
+                    bail!(msg)
                 }
             }
         }
@@ -709,17 +820,18 @@ fn request_to_allow_auth(
             }
 
             let is_allowed = rx
-                .try_recv()
-                //.recv_timeout(Duration::from_millis(AUTH_REQ_ALLOW_TIMEOUT))
+                .recv_timeout(Duration::from_millis(AUTH_REQ_ALLOW_TIMEOUT))
                 .unwrap_or_else(|_err| {
                     // We didn't get a response in a timely manner, we cannot allow the list
                     // to grow infinitelly, so let's remove the request from it
-                    /*let auth_reqs_list: &mut AuthReqsList =
+                    println!("GIVING UP...");
+                    let auth_reqs_list: &mut AuthReqsList =
                         &mut *(auth_reqs_handle.lock().unwrap());
-                    auth_reqs_list.remove(&req_id);*/
+                    auth_reqs_list.remove(&req_id);
                     false
                 });
 
+            println!("RECEIVED DECISION: {}", is_allowed);
             is_allowed
         }
         SafeAuthReq::Containers(cont_req) => {

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod authd;
+mod quic_client;
 mod update;
 
 use env_logger;
