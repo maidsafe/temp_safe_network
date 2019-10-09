@@ -100,11 +100,7 @@ impl Drop for PublishedImmutableData {
                 let _ = CString::from_raw(self.media_type as *mut _);
             }
 
-            let _ = Vec::from_raw_parts(
-                self.data as *mut u8,
-                self.data_len,
-                self.data_cap,
-            );
+            let _ = Vec::from_raw_parts(self.data as *mut u8, self.data_len, self.data_cap);
         }
     }
 }

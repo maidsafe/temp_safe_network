@@ -3,7 +3,7 @@ use super::ffi_structs::{
     NrsMapContainerInfo, PublishedImmutableData, SafeKey, Wallet,
 };
 use super::{ResultReturn, Safe};
-use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, vec_into_raw_parts};
+use ffi_utils::{catch_unwind_cb, from_c_str, vec_into_raw_parts, FfiResult, OpaqueCtx};
 use safe_api::fetch::SafeData;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
@@ -33,9 +33,9 @@ pub unsafe extern "C" fn fetch(
                 let (data, data_len, data_cap) = vec_into_raw_parts(data.to_vec());
                 let published_data = PublishedImmutableData {
                     xorname: xorname.0,
-                    data: data,
-                    data_len: data_len,
-                    data_cap: data_cap,
+                    data,
+                    data_len,
+                    data_cap,
                     resolved_from: match resolved_from {
                         Some(nrs_container_map) => {
                             nrs_map_container_info_into_repr_c(&nrs_container_map)?
