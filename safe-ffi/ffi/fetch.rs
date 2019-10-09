@@ -55,7 +55,7 @@ pub unsafe extern "C" fn fetch(
                 let files_map_json = serde_json::to_string(&files_map)?;
                 let container = FilesContainer {
                     version: *version,
-                    files_map: CString::new(files_map_json)?.as_ptr(),
+                    files_map: CString::new(files_map_json)?.into_raw(),
                     type_tag: *type_tag,
                     xorname: xorname.0,
                     data_type: (*data_type).clone() as u64,
