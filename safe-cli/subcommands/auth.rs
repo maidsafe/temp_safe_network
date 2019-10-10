@@ -15,6 +15,8 @@ use std::fs::{DirBuilder, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 use structopt::StructOpt;
 
 const APP_ID: &str = "net.maidsafe.cli";
@@ -71,9 +73,17 @@ pub enum AuthSubCommands {
         req_id: u32,
     },
     #[structopt(name = "subscribe")]
-    Subscribe { notifs_endpoint: String },
+    /// Send request to a remote Authenticator daemon to subscribe an endpoint URL to receive authorisation requests notifications
+    Subscribe {
+        /// The endpoint URL to subscribe
+        notifs_endpoint: String,
+    },
     #[structopt(name = "unsubscribe")]
-    Unsubscribe { notifs_endpoint: String },
+    /// Send request to a remote Authenticator daemon to unsubscribe an endpoint URL from authorisation requests notifications
+    Unsubscribe {
+        /// The endpoint URL to unsubscribe
+        notifs_endpoint: String,
+    },
     #[structopt(name = "start-authd")]
     /// Starts the Authenticator daemon if it's not running already
     StartAuthd {},
@@ -183,10 +193,15 @@ pub fn auth_commander(
             Ok(())
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let mut safe_authd = SafeAuthdClient::new(None);
             println!("Sending request to subscribe...");
-            safe_authd.subscribe(&notifs_endpoint)?;
+            //safe_authd.subscribe_url(&notifs_endpoint)?;
+            safe_authd.subscribe(&notifs_endpoint, &|app_id| {
+                println!("Allowing app {}", app_id);
+                true
+            })?;
             println!("Subscribed successfully");
+            thread::sleep(Duration::from_millis(20000));
             Ok(())
         }
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {

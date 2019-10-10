@@ -36,7 +36,7 @@ use url::Url;
 const AUTH_REQ_ALLOW_TIMEOUT: u64 = 30000;
 
 // Frequency for checking pensing auth requests
-const AUTH_REQS_CHECK_FREQ: u64 = 5000;
+const AUTH_REQS_CHECK_FREQ: u64 = 2000;
 
 // Maximum number of allowed auth reqs notifs subscriptors
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
@@ -63,7 +63,7 @@ const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
 const SAFE_AUTHD_STDERR_FILE: &str = "/tmp/safe-authd.err";
 
-pub struct PrettyErr<'a>(&'a dyn Fail);
+struct PrettyErr<'a>(&'a dyn Fail);
 impl<'a> fmt::Display for PrettyErr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, f)?;
@@ -77,7 +77,7 @@ impl<'a> fmt::Display for PrettyErr<'a> {
     }
 }
 
-pub trait ErrorExt {
+trait ErrorExt {
     fn pretty(&self) -> PrettyErr<'_>;
 }
 
@@ -320,7 +320,13 @@ fn spawn_auth_reqs_monitor_thread(
                 let mut is_allow = false;
                 for endpoint in notif_endpoints_list.iter() {
                     println!("ASKING SUBSCRIPTOR: {}", endpoint);
-                    match quic_send(&endpoint, false, None, None, false) {
+                    match quic_send(
+                        &format!("{}/{}", endpoint, auth_req.app_id),
+                        false,
+                        None,
+                        None,
+                        false,
+                    ) {
                         Ok(allow) => {
                             is_allow = allow.starts_with("true");
                             break;
@@ -721,7 +727,7 @@ fn process_get(
                 bail!("Incorrect number of arguments for 'subscribe' action")
             } else {
                 println!("Subscribing to authorisation requests notifications...");
-                let notif_endpoint = match urlencoding::decode(req_args[2]) {
+                let mut notif_endpoint = match urlencoding::decode(req_args[2]) {
                     Ok(url) => url,
                     Err(err) => {
                         let msg = format!(
@@ -739,6 +745,9 @@ fn process_get(
                     println!("{}", msg);
                     bail!(msg)
                 } else {
+                    if notif_endpoint.ends_with('/') {
+                        notif_endpoint.pop();
+                    }
                     notif_endpoints_list.insert(notif_endpoint.clone());
                     let msg = format!(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
@@ -819,6 +828,8 @@ fn request_to_allow_auth(
                 auth_reqs_list.insert(req_id, auth_req);
             }
 
+            // FIXME: this is blocking the main thread, so no other QUIC reqs can be received
+            // until this finishes. We need to create a future.
             let is_allowed = rx
                 .recv_timeout(Duration::from_millis(AUTH_REQ_ALLOW_TIMEOUT))
                 .unwrap_or_else(|_err| {

@@ -20,6 +20,7 @@ pub mod keys;
 pub mod nrs;
 pub mod nrs_map;
 mod quic_client;
+mod quic_endpoint;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;
@@ -27,7 +28,7 @@ pub mod wallet;
 pub mod xorurl;
 mod xorurl_media_types;
 
-pub use authd_client_api::SafeAuthdClient;
+pub use authd_client_api::{AuthAllowPrompt, SafeAuthdClient};
 pub use authenticator::{SafeAuthReq, SafeAuthReqId, SafeAuthenticator};
 pub use errors::{Error, Result};
 pub use fetch::{

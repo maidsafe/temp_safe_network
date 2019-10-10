@@ -8,8 +8,11 @@
 
 use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
+use super::quic_endpoint::quic_listen;
+pub use super::quic_endpoint::AuthAllowPrompt;
 use super::{ResultReturn, SafeAuthReqId};
-use log::{debug, info};
+use log::{debug, error, info};
+use std::thread;
 
 //use super::authenticator::AuthedAppsList;
 
@@ -46,7 +49,15 @@ const SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE: &str = "unsubscribe/";
 // Authd Client API
 pub struct SafeAuthdClient {
     port: u16,
+    endpoint_thread_handle: Option<thread::JoinHandle<()>>,
     //session_token: String, // TODO: keep the authd session token obtained after logging in a SAFE account
+}
+
+impl Drop for SafeAuthdClient {
+    fn drop(&mut self) {
+        // TODO: send message to terminate thread
+        //let _ = self.endpoint_thread_handle.take().unwrap().join();
+    }
 }
 
 #[allow(dead_code)]
@@ -56,6 +67,7 @@ impl SafeAuthdClient {
         let port_number = port.unwrap_or(SAFE_AUTHD_ENDPOINT_PORT);
         Self {
             port: port_number, /*, session_token: "".to_string()*/
+            endpoint_thread_handle: None,
         }
     }
 
@@ -212,9 +224,36 @@ impl SafeAuthdClient {
         Ok(())
     }
 
-    // Subscribe to receive notifications to allow/deny authorisation requests
-    pub fn subscribe(&self, endpoint_url: &str) -> ResultReturn<()> {
+    // Subscribe an endpoint URL where notifications to allow/deny authorisation requests shall be sent
+    pub fn subscribe_url(&self, endpoint_url: &str) -> ResultReturn<()> {
+        debug!(
+            "Subscribing '{}' as endpoint for authorisation requests notifications...",
+            endpoint_url
+        );
+        let url_encoded = urlencoding::encode(endpoint_url);
+        let authd_service_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, url_encoded
+        );
+
+        debug!("Sending subscribe action request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "Successfully subscribed a URL for authorisation requests notifications: {}",
+            authd_response
+        );
+        Ok(())
+    }
+
+    // Subscribe a callback to receive notifications to allow/deny authorisation requests
+    pub fn subscribe(
+        &mut self,
+        endpoint_url: &str,
+        allow_cb: &'static AuthAllowPrompt,
+    ) -> ResultReturn<()> {
         debug!("Subscribing to receive authorisation requests notifications...",);
+
         let url_encoded = urlencoding::encode(endpoint_url);
         let authd_service_url = format!(
             "{}:{}/{}{}",
@@ -228,6 +267,23 @@ impl SafeAuthdClient {
             "Successfully subscribed to receive authorisation requests notifications: {}",
             authd_response
         );
+
+        // Start listening first
+        let listen = endpoint_url.to_string();
+        let thread_join_handle = thread::spawn(move || match quic_listen(&listen, allow_cb) {
+            Ok(_) => {
+                info!("Endpoint successfully launched for receiving auth req notifications");
+            }
+            Err(err) => {
+                error!(
+                    "Failed to launc endpoint for receiving auth req notifications: {}",
+                    err
+                );
+            }
+        });
+
+        self.endpoint_thread_handle = Some(thread_join_handle);
+
         Ok(())
     }
 
@@ -247,6 +303,9 @@ impl SafeAuthdClient {
             "Successfully unsubscribed from authorisation requests notifications: {}",
             authd_response
         );
+
+        // TODO: terminate endpoint_thread_handle thread
+
         Ok(())
     }
 }
