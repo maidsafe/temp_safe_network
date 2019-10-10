@@ -55,6 +55,16 @@ pub struct SafeKey {
     pub resolved_from: NrsMapContainerInfo,
 }
 
+impl Drop for SafeKey {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub struct Wallet {
     pub xorurl: *const c_char,
@@ -63,6 +73,16 @@ pub struct Wallet {
     pub balances: WalletSpendableBalances,
     pub data_type: u64,
     pub resolved_from: NrsMapContainerInfo,
+}
+
+impl Drop for Wallet {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+        }
+    }
 }
 
 #[repr(C)]
@@ -79,6 +99,10 @@ pub struct FilesContainer {
 impl Drop for FilesContainer {
     fn drop(&mut self) {
         unsafe {
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
             if !self.files_map.is_null() {
                 let _ = CString::from_raw(self.files_map as *mut _);
             }
@@ -100,6 +124,10 @@ pub struct PublishedImmutableData {
 impl Drop for PublishedImmutableData {
     fn drop(&mut self) {
         unsafe {
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
             if !self.media_type.is_null() {
                 let _ = CString::from_raw(self.media_type as *mut _);
             }
