@@ -271,311 +271,318 @@ impl Safe {
     }
 }
 
-// Unit Tests
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_keys_create_preload_test_coins() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
-    assert!(xorurl.starts_with("safe://"));
-    assert!(key_pair.is_some());
-}
+    #[test]
+    fn test_keys_create_preload_test_coins() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
+        assert!(xorurl.starts_with("safe://"));
+        assert!(key_pair.is_some());
+    }
 
-#[test]
-fn test_keys_create() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.23"));
+    #[test]
+    fn test_keys_create() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.23"));
 
-    let (xorurl, key_pair) =
-        unwrap!(safe.keys_create(Some(&unwrap!(from_key_pair).sk), None, None));
-    assert!(xorurl.starts_with("safe://"));
-    assert!(key_pair.is_some());
-}
+        let (xorurl, key_pair) =
+            unwrap!(safe.keys_create(Some(&unwrap!(from_key_pair).sk), None, None));
+        assert!(xorurl.starts_with("safe://"));
+        assert!(key_pair.is_some());
+    }
 
-#[test]
-fn test_keys_create_preload() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("543.2312"));
+    #[test]
+    fn test_keys_create_preload() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("543.2312"));
 
-    let preload_amount = "1.800000000";
-    let (xorurl, key_pair) =
-        unwrap!(safe.keys_create(Some(&unwrap!(from_key_pair).sk), Some(preload_amount), None,));
-    assert!(xorurl.starts_with("safe://"));
-    match key_pair {
-        None => panic!("Key pair was not generated as it was expected"),
-        Some(kp) => {
-            let balance = unwrap!(safe.keys_balance_from_sk(&kp.sk));
-            assert_eq!(balance, preload_amount);
-        }
-    };
-}
+        let preload_amount = "1.800000000";
+        let (xorurl, key_pair) = unwrap!(safe.keys_create(
+            Some(&unwrap!(from_key_pair).sk),
+            Some(preload_amount),
+            None,
+        ));
+        assert!(xorurl.starts_with("safe://"));
+        match key_pair {
+            None => panic!("Key pair was not generated as it was expected"),
+            Some(kp) => {
+                let balance = unwrap!(safe.keys_balance_from_sk(&kp.sk));
+                assert_eq!(balance, preload_amount);
+            }
+        };
+    }
 
-#[test]
-fn test_keys_create_preload_invalid_amounts() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    match safe.keys_create_preload_test_coins(".45") {
-        Err(err) => assert_eq!(
-            err,
-            Error::InvalidAmount(
-                "Invalid safecoins amount '.45' (Can\'t parse coin units)".to_string()
-            )
-        ),
-        Ok(_) => panic!("Key with test-coins was created unexpectedly"),
-    };
+    #[test]
+    fn test_keys_create_preload_invalid_amounts() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        match safe.keys_create_preload_test_coins(".45") {
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidAmount(
+                    "Invalid safecoins amount '.45' (Can\'t parse coin units)".to_string()
+                )
+            ),
+            Ok(_) => panic!("Key with test-coins was created unexpectedly"),
+        };
 
-    let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12"));
-    let mut unwrapped_key_pair = unwrap!(key_pair.clone());
-    match safe.keys_create(Some(&unwrapped_key_pair.sk), Some(".003"), None) {
-        Err(err) => assert_eq!(
-            err,
-            Error::InvalidAmount(
-                "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
-            )
-        ),
-        Ok(_) => panic!("Key was created unexpectedly"),
-    };
+        let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12"));
+        let mut unwrapped_key_pair = unwrap!(key_pair.clone());
+        match safe.keys_create(Some(&unwrapped_key_pair.sk), Some(".003"), None) {
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidAmount(
+                    "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
+                )
+            ),
+            Ok(_) => panic!("Key was created unexpectedly"),
+        };
 
-    // test it fails with corrupted secret key
-    unwrapped_key_pair.sk.replace_range(..6, "ababab");
-    match safe.keys_create(Some(&unwrapped_key_pair.sk), Some(".003"), None) {
-        Err(err) => assert_eq!(
-            err,
-            Error::InvalidAmount(
-                "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
-            )
-        ),
-        Ok(_) => panic!("Key was created unexpectedly"),
-    };
+        // test it fails with corrupted secret key
+        unwrapped_key_pair.sk.replace_range(..6, "ababab");
+        match safe.keys_create(Some(&unwrapped_key_pair.sk), Some(".003"), None) {
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidAmount(
+                    "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
+                )
+            ),
+            Ok(_) => panic!("Key was created unexpectedly"),
+        };
 
-    // test it fails to preload with more than available balance in source (which has only 12 coins)
-    match safe.keys_create(Some(&unwrap!(key_pair).sk), Some("12.000000001"), None) {
-        Err(err) => assert_eq!(
-            err,
-            Error::NotEnoughBalance("Not enough balance at 'source' for the operation".to_string())
-        ),
-        Ok(_) => panic!("Key was created unexpectedly"),
-    };
-}
+        // test it fails to preload with more than available balance in source (which has only 12 coins)
+        match safe.keys_create(Some(&unwrap!(key_pair).sk), Some("12.000000001"), None) {
+            Err(err) => assert_eq!(
+                err,
+                Error::NotEnoughBalance(
+                    "Not enough balance at 'source' for the operation".to_string()
+                )
+            ),
+            Ok(_) => panic!("Key was created unexpectedly"),
+        };
+    }
 
-#[test]
-fn test_keys_create_pk() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1"));
-    let pk = pk_to_hex(&SecretKey::random().public_key());
-    let (xorurl, key_pair) =
-        unwrap!(safe.keys_create(Some(&unwrap!(from_key_pair).sk), None, Some(&pk)));
-    assert!(xorurl.starts_with("safe://"));
-    assert!(key_pair.is_none());
-}
+    #[test]
+    fn test_keys_create_pk() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1"));
+        let pk = pk_to_hex(&SecretKey::random().public_key());
+        let (xorurl, key_pair) =
+            unwrap!(safe.keys_create(Some(&unwrap!(from_key_pair).sk), None, Some(&pk)));
+        assert!(xorurl.starts_with("safe://"));
+        assert!(key_pair.is_none());
+    }
 
-#[test]
-fn test_keys_test_coins_balance_pk() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let preload_amount = "1.154200000";
-    let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
-    let current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair).sk));
-    assert_eq!(preload_amount, current_balance);
-}
+    #[test]
+    fn test_keys_test_coins_balance_pk() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let preload_amount = "1.154200000";
+        let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
+        let current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair).sk));
+        assert_eq!(preload_amount, current_balance);
+    }
 
-#[test]
-fn test_keys_test_coins_balance_xorurl() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let preload_amount = "0.243000000";
-    let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
-    let current_balance = unwrap!(safe.keys_balance_from_url(&xorurl, &unwrap!(key_pair).sk));
-    assert_eq!(preload_amount, current_balance);
-}
+    #[test]
+    fn test_keys_test_coins_balance_xorurl() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let preload_amount = "0.243000000";
+        let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
+        let current_balance = unwrap!(safe.keys_balance_from_url(&xorurl, &unwrap!(key_pair).sk));
+        assert_eq!(preload_amount, current_balance);
+    }
 
-#[test]
-fn test_keys_test_coins_balance_wrong_url() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0"));
+    #[test]
+    fn test_keys_test_coins_balance_wrong_url() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0"));
 
-    let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
-    let current_balance = safe.keys_balance_from_url(&invalid_xorurl, &unwrap!(key_pair).sk);
-    match current_balance {
-        Err(Error::InvalidInput(msg)) => {
-            assert!(msg.contains("The location couldn't be resolved from the NRS URL provided"))
-        }
-        Err(err) => panic!("Error returned is not the expected: {:?}", err),
-        Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
-    };
-}
+        let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
+        let current_balance = safe.keys_balance_from_url(&invalid_xorurl, &unwrap!(key_pair).sk);
+        match current_balance {
+            Err(Error::InvalidInput(msg)) => {
+                assert!(msg.contains("The location couldn't be resolved from the NRS URL provided"))
+            }
+            Err(err) => panic!("Error returned is not the expected: {:?}", err),
+            Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
+        };
+    }
 
-#[test]
-fn test_keys_test_coins_balance_wrong_location() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let amount = "35312.000000000";
-    let (mut xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(amount));
-    let unwrapped_key_pair = unwrap!(key_pair);
+    #[test]
+    fn test_keys_test_coins_balance_wrong_location() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let amount = "35312.000000000";
+        let (mut xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(amount));
+        let unwrapped_key_pair = unwrap!(key_pair);
 
-    let current_balance = unwrap!(safe.keys_balance_from_url(&xorurl, &unwrapped_key_pair.sk));
-    assert_eq!(amount, current_balance);
+        let current_balance = unwrap!(safe.keys_balance_from_url(&xorurl, &unwrapped_key_pair.sk));
+        assert_eq!(amount, current_balance);
 
-    // let's corrupt the XOR-URL right where the encoded xorname bytes are in the string
-    xorurl.replace_range(13..18, "ccccc");
-    let current_balance = safe.keys_balance_from_url(&xorurl, &unwrapped_key_pair.sk);
-    match current_balance {
-        Err(Error::InvalidInput(msg)) => assert!(msg.contains(
-            "The URL doesn't correspond to the public key derived from the provided secret key"
-        )),
-        Err(err) => panic!("Error returned is not the expected: {:?}", err),
-        Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
-    };
-}
+        // let's corrupt the XOR-URL right where the encoded xorname bytes are in the string
+        xorurl.replace_range(13..18, "ccccc");
+        let current_balance = safe.keys_balance_from_url(&xorurl, &unwrapped_key_pair.sk);
+        match current_balance {
+            Err(Error::InvalidInput(msg)) => assert!(msg.contains(
+                "The URL doesn't correspond to the public key derived from the provided secret key"
+            )),
+            Err(err) => panic!("Error returned is not the expected: {:?}", err),
+            Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
+        };
+    }
 
-#[test]
-fn test_keys_test_coins_balance_wrong_sk() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0"));
-    let mut unwrapped_sk = unwrap!(key_pair).sk;
-    unwrapped_sk.replace_range(..6, "ababab");
-    let current_balance = safe.keys_balance_from_sk(&unwrapped_sk);
-    match current_balance {
-        Err(Error::ContentNotFound(msg)) => {
-            assert!(msg.contains("No SafeKey found at specified location"))
-        }
-        Err(err) => panic!("Error returned is not the expected: {:?}", err),
-        Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
-    };
-}
+    #[test]
+    fn test_keys_test_coins_balance_wrong_sk() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0"));
+        let mut unwrapped_sk = unwrap!(key_pair).sk;
+        unwrapped_sk.replace_range(..6, "ababab");
+        let current_balance = safe.keys_balance_from_sk(&unwrapped_sk);
+        match current_balance {
+            Err(Error::ContentNotFound(msg)) => {
+                assert!(msg.contains("No SafeKey found at specified location"))
+            }
+            Err(err) => panic!("Error returned is not the expected: {:?}", err),
+            Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
+        };
+    }
 
-#[test]
-fn test_keys_balance_pk() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let preload_amount = "1743.234";
-    let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
-    let from_key_pair_unwrapped = unwrap!(from_key_pair);
+    #[test]
+    fn test_keys_balance_pk() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let preload_amount = "1743.234";
+        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
+        let from_key_pair_unwrapped = unwrap!(from_key_pair);
 
-    let amount = "1740.000000000";
-    let (_, to_key_pair) =
-        unwrap!(safe.keys_create(Some(&from_key_pair_unwrapped.sk), Some(amount), None,));
+        let amount = "1740.000000000";
+        let (_, to_key_pair) =
+            unwrap!(safe.keys_create(Some(&from_key_pair_unwrapped.sk), Some(amount), None,));
 
-    let from_current_balance = unwrap!(safe.keys_balance_from_sk(&from_key_pair_unwrapped.sk));
-    assert_eq!(
-        "3.233999999", /*== 1743.234 - 1740 - 0.000000001 (creation cost) */
-        from_current_balance
-    );
+        let from_current_balance = unwrap!(safe.keys_balance_from_sk(&from_key_pair_unwrapped.sk));
+        assert_eq!(
+            "3.233999999", /*== 1743.234 - 1740 - 0.000000001 (creation cost) */
+            from_current_balance
+        );
 
-    let to_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(to_key_pair).sk));
-    assert_eq!(amount, to_current_balance);
-}
+        let to_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(to_key_pair).sk));
+        assert_eq!(amount, to_current_balance);
+    }
 
-#[test]
-fn test_keys_balance_xorname() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let preload_amount = "435.34";
-    let (from_xorname, from_key_pair) =
-        unwrap!(safe.keys_create_preload_test_coins(preload_amount));
-    let from_key_pair_unwrapped = unwrap!(from_key_pair);
+    #[test]
+    fn test_keys_balance_xorname() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let preload_amount = "435.34";
+        let (from_xorname, from_key_pair) =
+            unwrap!(safe.keys_create_preload_test_coins(preload_amount));
+        let from_key_pair_unwrapped = unwrap!(from_key_pair);
 
-    let amount = "35.300000000";
-    let (to_xorname, to_key_pair) =
-        unwrap!(safe.keys_create(Some(&from_key_pair_unwrapped.sk), Some(amount), None,));
+        let amount = "35.300000000";
+        let (to_xorname, to_key_pair) =
+            unwrap!(safe.keys_create(Some(&from_key_pair_unwrapped.sk), Some(amount), None,));
 
-    let from_current_balance =
-        unwrap!(safe.keys_balance_from_url(&from_xorname, &from_key_pair_unwrapped.sk));
-    assert_eq!(
-        "400.039999999", /*== 435.34 - 35.3 - 0.000000001 (creation cost)*/
-        from_current_balance
-    );
+        let from_current_balance =
+            unwrap!(safe.keys_balance_from_url(&from_xorname, &from_key_pair_unwrapped.sk));
+        assert_eq!(
+            "400.039999999", /*== 435.34 - 35.3 - 0.000000001 (creation cost)*/
+            from_current_balance
+        );
 
-    let to_current_balance =
-        unwrap!(safe.keys_balance_from_url(&to_xorname, &unwrap!(to_key_pair).sk));
-    assert_eq!(amount, to_current_balance);
-}
+        let to_current_balance =
+            unwrap!(safe.keys_balance_from_url(&to_xorname, &unwrap!(to_key_pair).sk));
+        assert_eq!(amount, to_current_balance);
+    }
 
-#[test]
-fn test_validate_sk_for_url() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.22"));
-    let key_pair_unwrapped = unwrap!(key_pair);
-    let pk = unwrap!(safe.validate_sk_for_url(&key_pair_unwrapped.sk, &xorurl));
-    assert_eq!(pk, key_pair_unwrapped.pk);
-}
+    #[test]
+    fn test_validate_sk_for_url() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.22"));
+        let key_pair_unwrapped = unwrap!(key_pair);
+        let pk = unwrap!(safe.validate_sk_for_url(&key_pair_unwrapped.sk, &xorurl));
+        assert_eq!(pk, key_pair_unwrapped.pk);
+    }
 
-#[test]
-fn test_keys_transfer_from_zero_balance() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
-    let (to_safekey_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
+    #[test]
+    fn test_keys_transfer_from_zero_balance() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
+        let (to_safekey_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
 
-    // test it fails to transfer with 0 balance at SafeKey in <from> argument
-    match safe.keys_transfer("0", Some(&unwrap!(key_pair1).sk), &to_safekey_xorurl, None) {
-        Err(Error::InvalidAmount(msg)) => assert_eq!(
-            msg,
-            "The amount '0' specified for the transfer is invalid".to_string()
-        ),
-        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-        Ok(_) => panic!("Transfer succeeded unexpectedly"),
-    };
-}
+        // test it fails to transfer with 0 balance at SafeKey in <from> argument
+        match safe.keys_transfer("0", Some(&unwrap!(key_pair1).sk), &to_safekey_xorurl, None) {
+            Err(Error::InvalidAmount(msg)) => assert_eq!(
+                msg,
+                "The amount '0' specified for the transfer is invalid".to_string()
+            ),
+            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+        };
+    }
 
-#[test]
-fn test_keys_transfer_diff_amounts() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (safekey1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
-    let (safekey2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
+    #[test]
+    fn test_keys_transfer_diff_amounts() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (safekey1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
+        let (safekey2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
 
-    // test it fails to transfer more than current balance at SafeKey in <from> argument
-    let unwrapped_key_pair1 = unwrap!(key_pair1);
-    match safe.keys_transfer(
-        "100.6",
-        Some(&unwrapped_key_pair1.sk),
-        &safekey2_xorurl,
-        None,
-    ) {
-        Err(Error::NotEnoughBalance(msg)) => assert_eq!(
-            msg,
-            "Not enough balance for the transfer at provided source SafeKey".to_string()
-        ),
-        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-        Ok(_) => panic!("Transfer succeeded unexpectedly"),
-    };
+        // test it fails to transfer more than current balance at SafeKey in <from> argument
+        let unwrapped_key_pair1 = unwrap!(key_pair1);
+        match safe.keys_transfer(
+            "100.6",
+            Some(&unwrapped_key_pair1.sk),
+            &safekey2_xorurl,
+            None,
+        ) {
+            Err(Error::NotEnoughBalance(msg)) => assert_eq!(
+                msg,
+                "Not enough balance for the transfer at provided source SafeKey".to_string()
+            ),
+            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+        };
 
-    // test it fails to transfer as it's a invalid/non-numeric amount
-    match safe.keys_transfer(".06", Some(&unwrapped_key_pair1.sk), &safekey2_xorurl, None) {
-        Err(Error::InvalidAmount(msg)) => assert_eq!(
-            msg,
-            "Invalid safecoins amount '.06' (Can\'t parse coin units)"
-        ),
-        Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-        Ok(_) => panic!("Transfer succeeded unexpectedly"),
-    };
+        // test it fails to transfer as it's a invalid/non-numeric amount
+        match safe.keys_transfer(".06", Some(&unwrapped_key_pair1.sk), &safekey2_xorurl, None) {
+            Err(Error::InvalidAmount(msg)) => assert_eq!(
+                msg,
+                "Invalid safecoins amount '.06' (Can\'t parse coin units)"
+            ),
+            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+        };
 
-    // test it fails to transfer less than 1 nano coin
-    let unwrapped_key_pair2 = unwrap!(key_pair2);
-    match safe.keys_transfer(
+        // test it fails to transfer less than 1 nano coin
+        let unwrapped_key_pair2 = unwrap!(key_pair2);
+        match safe.keys_transfer(
         "0.0000000009",
         Some(&unwrapped_key_pair2.sk),
         &safekey2_xorurl,
@@ -586,87 +593,98 @@ fn test_keys_transfer_diff_amounts() {
         Ok(_) => panic!("Transfer succeeded unexpectedly"),
     };
 
-    // test successful transfer
-    match safe.keys_transfer(
-        "100.4",
-        Some(&unwrapped_key_pair2.sk),
-        &safekey1_xorurl,
-        None,
-    ) {
-        Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
-        Ok(_) => {
-            let from_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk));
-            assert_eq!("0.100000000", from_current_balance);
-            let to_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair1.sk));
-            assert_eq!("100.900000000", to_current_balance);
-        }
-    };
-}
+        // test successful transfer
+        match safe.keys_transfer(
+            "100.4",
+            Some(&unwrapped_key_pair2.sk),
+            &safekey1_xorurl,
+            None,
+        ) {
+            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Ok(_) => {
+                let from_current_balance =
+                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk));
+                assert_eq!("0.100000000", from_current_balance);
+                let to_current_balance =
+                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair1.sk));
+                assert_eq!("100.900000000", to_current_balance);
+            }
+        };
+    }
 
-#[test]
-fn test_keys_transfer_to_wallet() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
+    #[test]
+    fn test_keys_transfer_to_wallet() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
 
-    let to_wallet_xorurl = unwrap!(safe.wallet_create());
-    let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("10.0"));
-    let unwrapped_key_pair1 = unwrap!(key_pair1);
-    unwrap!(safe.wallet_insert(
-        &to_wallet_xorurl,
-        Some("my-first-balance"),
-        true, // set --default
-        &unwrapped_key_pair1.sk,
-    ));
+        let to_wallet_xorurl = unwrap!(safe.wallet_create());
+        let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("10.0"));
+        let unwrapped_key_pair1 = unwrap!(key_pair1);
+        unwrap!(safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrapped_key_pair1.sk,
+        ));
 
-    let (_safekey_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("4621.45"));
+        let (_safekey_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("4621.45"));
 
-    // test successful transfer
-    let unwrapped_key_pair2 = unwrap!(key_pair2);
-    match safe.keys_transfer(
-        "523.87",
-        Some(&unwrapped_key_pair2.sk),
-        &to_wallet_xorurl.clone(),
-        None,
-    ) {
-        Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
-        Ok(_) => {
-            let from_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk));
-            assert_eq!(
-                "4097.580000000", /* 4621.45 - 523.87 */
-                from_current_balance
-            );
-            let wallet_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl));
-            assert_eq!("533.870000000", wallet_current_balance);
-        }
-    };
-}
+        // test successful transfer
+        let unwrapped_key_pair2 = unwrap!(key_pair2);
+        match safe.keys_transfer(
+            "523.87",
+            Some(&unwrapped_key_pair2.sk),
+            &to_wallet_xorurl.clone(),
+            None,
+        ) {
+            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Ok(_) => {
+                let from_current_balance =
+                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk));
+                assert_eq!(
+                    "4097.580000000", /* 4621.45 - 523.87 */
+                    from_current_balance
+                );
+                let wallet_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl));
+                assert_eq!("533.870000000", wallet_current_balance);
+            }
+        };
+    }
 
-#[test]
-fn test_keys_transfer_to_nrs_urls() {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
+    #[test]
+    fn test_keys_transfer_to_nrs_urls() {
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
 
-    let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2"));
-    let (to_safekey_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.1"));
-    let unwrapped_key_pair1 = unwrap!(key_pair1);
-    let unwrapped_key_pair2 = unwrap!(key_pair2);
+        let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2"));
+        let (to_safekey_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.1"));
+        let unwrapped_key_pair1 = unwrap!(key_pair1);
+        let unwrapped_key_pair2 = unwrap!(key_pair2);
 
-    let to_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    let _ =
-        unwrap!(safe.nrs_map_container_create(&to_nrsurl, &to_safekey_xorurl, false, true, false));
+        let to_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let _ = unwrap!(safe.nrs_map_container_create(
+            &to_nrsurl,
+            &to_safekey_xorurl,
+            false,
+            true,
+            false
+        ));
 
-    // test successful transfer
-    match safe.keys_transfer("0.2", Some(&unwrapped_key_pair1.sk), &to_nrsurl, None) {
-        Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
-        Ok(_) => {
-            let from_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair1.sk));
-            assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-            let to_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk));
-            assert_eq!("0.300000000" /* 0.1 + 0.2 */, to_current_balance);
-        }
-    };
+        // test successful transfer
+        match safe.keys_transfer("0.2", Some(&unwrapped_key_pair1.sk), &to_nrsurl, None) {
+            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Ok(_) => {
+                let from_current_balance =
+                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair1.sk));
+                assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
+                let to_current_balance =
+                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk));
+                assert_eq!("0.300000000" /* 0.1 + 0.2 */, to_current_balance);
+            }
+        };
+    }
 }

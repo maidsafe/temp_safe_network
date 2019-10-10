@@ -1096,530 +1096,536 @@ fn files_map_create(
     Ok(files_map)
 }
 
-// Unit Tests
-
-#[test]
-fn test_files_map_create() {
-    use unwrap::unwrap;
-    let mut processed_files = ProcessedFiles::new();
-    processed_files.insert(
-        "../testdata/test.md".to_string(),
-        (
-            CONTENT_ADDED_SIGN.to_string(),
-            "safe://top_xorurl".to_string(),
-        ),
-    );
-    processed_files.insert(
-        "../testdata/subfolder/subexists.md".to_string(),
-        (
-            CONTENT_ADDED_SIGN.to_string(),
-            "safe://second_xorurl".to_string(),
-        ),
-    );
-    let files_map = unwrap!(files_map_create(&processed_files, "../testdata", Some("")));
-    assert_eq!(files_map.len(), 2);
-    let file_item1 = &files_map["/testdata/test.md"];
-    assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
-    assert_eq!(file_item1[FAKE_RDF_PREDICATE_TYPE], "text/x-markdown");
-    assert_eq!(file_item1[FAKE_RDF_PREDICATE_SIZE], "12");
-
-    let file_item2 = &files_map["/testdata/subfolder/subexists.md"];
-    assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
-    assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "text/x-markdown");
-    assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
-}
-
-#[test]
-fn test_files_container_create_file() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let filename = "../testdata/test.md";
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create(filename, None, false, false));
-
-    assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 1);
-    assert_eq!(files_map.len(), 1);
-    let file_path = "/test.md";
-    assert_eq!(processed_files[filename].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename].1,
-        files_map[file_path][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_create_dry_run() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let filename = "../testdata/";
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create(filename, None, true, true));
-
-    assert!(xorurl.is_empty());
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert!(processed_files[filename1].1.is_empty());
-    assert_eq!(
-        processed_files[filename1].1,
-        files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert!(processed_files[filename2].1.is_empty());
-    assert_eq!(
-        processed_files[filename2].1,
-        files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert!(processed_files[filename3].1.is_empty());
-    assert_eq!(
-        processed_files[filename3].1,
-        files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert!(processed_files[filename4].1.is_empty());
-    assert_eq!(
-        processed_files[filename4].1,
-        files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_create_folder_without_trailing_slash() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata", None, true, false));
-
-    assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        files_map["/testdata/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        files_map["/testdata/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        files_map["/testdata/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        files_map["/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_create_folder_with_trailing_slash() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_create_dest_path_without_trailing_slash() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata", Some("/myroot"), true, false));
-
-    assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        files_map["/myroot/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        files_map["/myroot/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        files_map["/myroot/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        files_map["/myroot/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_create_dest_path_with_trailing_slash() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata", Some("/myroot/"), true, false));
-
-    assert!(xorurl.starts_with("safe://"));
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        files_map["/myroot/testdata/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        files_map["/myroot/testdata/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        files_map["/myroot/testdata/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        files_map["/myroot/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_sync() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        true,
-        false,
-        false,
-        false
-    ));
-
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 2);
-    assert_eq!(new_files_map.len(), 7);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename5 = "../testdata/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[filename5].1,
-        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename6 = "../testdata/subfolder/sub2.md";
-    assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[filename6].1,
-        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_sync_dry_run() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        true,
-        false,
-        false,
-        true // set dry_run flag on
-    ));
-
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 2);
-    assert_eq!(new_files_map.len(), 7);
-
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename5 = "../testdata/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-    assert!(new_processed_files[filename5].1.is_empty());
-    assert_eq!(
-        new_processed_files[filename5].1,
-        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let filename6 = "../testdata/subfolder/sub2.md";
-    assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
-    assert!(new_processed_files[filename6].1.is_empty());
-    assert_eq!(
-        new_processed_files[filename6].1,
-        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_sync_with_versioned_target() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-
-    let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    let versioned_xorurl = format!("{}?v=5", xorurl);
-    match safe.files_container_sync(
-        "../testdata/subfolder/",
-        &versioned_xorurl,
-        false,
-        false,
-        true, // this flag requests the update-nrs
-        false,
-    ) {
-        Ok(_) => panic!("Sync was unexpectdly successful"),
-        Err(err) => assert_eq!(
-            err,
-            Error::InvalidInput(format!(
-                "The target URL cannot cannot contain a version: {}",
-                versioned_xorurl
-            ))
-        ),
-    };
-}
-
-#[test]
-fn test_files_container_sync_with_delete() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        true,
-        true, // this sets the delete flag
-        false,
-        false
-    ));
-
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 7);
-    assert_eq!(new_files_map.len(), 2);
-
-    // first check all previous files were removed
-    let file_path1 = "/test.md";
-    assert_eq!(new_processed_files[file_path1].0, CONTENT_DELETED_SIGN);
-    assert_eq!(
-        new_processed_files[file_path1].1,
-        files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let file_path2 = "/another.md";
-    assert_eq!(new_processed_files[file_path2].0, CONTENT_DELETED_SIGN);
-    assert_eq!(
-        new_processed_files[file_path2].1,
-        files_map[file_path2][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let file_path3 = "/subfolder/subexists.md";
-    assert_eq!(new_processed_files[file_path3].0, CONTENT_DELETED_SIGN);
-    assert_eq!(
-        new_processed_files[file_path3].1,
-        files_map[file_path3][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    let file_path4 = "/noextension";
-    assert_eq!(new_processed_files[file_path4].0, CONTENT_DELETED_SIGN);
-    assert_eq!(
-        new_processed_files[file_path4].1,
-        files_map[file_path4][FAKE_RDF_PREDICATE_LINK]
-    );
-
-    // and finally check the synced file was added
-    let filename5 = "../testdata/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[filename5].1,
-        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
-
-#[test]
-fn test_files_container_sync_delete_without_recursive() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    match safe.files_container_sync(
-        "../testdata/subfolder/",
-        "some-url",
-        false, // this sets the recursive flag to off
-        true,  // this sets the delete flag
-        false,
-        false,
-    ) {
-        Ok(_) => panic!("Sync was unexpectdly successful"),
-        Err(err) => assert_eq!(
-            err,
-            Error::InvalidInput("'delete' is not allowed if --recursive is not set".to_string())
-        ),
-    };
-}
-
-#[test]
-fn test_files_container_sync_update_nrs_unversioned_link() {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(None);
-    let unversioned_link = unwrap!(xorurl_encoder.to_string());
-    match safe.nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false) {
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_files_map_create() {
+        use unwrap::unwrap;
+        let mut processed_files = ProcessedFiles::new();
+        processed_files.insert(
+            "../testdata/test.md".to_string(),
+            (
+                CONTENT_ADDED_SIGN.to_string(),
+                "safe://top_xorurl".to_string(),
+            ),
+        );
+        processed_files.insert(
+            "../testdata/subfolder/subexists.md".to_string(),
+            (
+                CONTENT_ADDED_SIGN.to_string(),
+                "safe://second_xorurl".to_string(),
+            ),
+        );
+        let files_map = unwrap!(files_map_create(&processed_files, "../testdata", Some("")));
+        assert_eq!(files_map.len(), 2);
+        let file_item1 = &files_map["/testdata/test.md"];
+        assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
+        assert_eq!(file_item1[FAKE_RDF_PREDICATE_TYPE], "text/x-markdown");
+        assert_eq!(file_item1[FAKE_RDF_PREDICATE_SIZE], "12");
+
+        let file_item2 = &files_map["/testdata/subfolder/subexists.md"];
+        assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
+        assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "text/x-markdown");
+        assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
+    }
+
+    #[test]
+    fn test_files_container_create_file() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let filename = "../testdata/test.md";
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create(filename, None, false, false));
+
+        assert!(xorurl.starts_with("safe://"));
+        assert_eq!(processed_files.len(), 1);
+        assert_eq!(files_map.len(), 1);
+        let file_path = "/test.md";
+        assert_eq!(processed_files[filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename].1,
+            files_map[file_path][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_create_dry_run() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let filename = "../testdata/";
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create(filename, None, true, true));
+
+        assert!(xorurl.is_empty());
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert!(processed_files[filename1].1.is_empty());
+        assert_eq!(
+            processed_files[filename1].1,
+            files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert!(processed_files[filename2].1.is_empty());
+        assert_eq!(
+            processed_files[filename2].1,
+            files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert!(processed_files[filename3].1.is_empty());
+        assert_eq!(
+            processed_files[filename3].1,
+            files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert!(processed_files[filename4].1.is_empty());
+        assert_eq!(
+            processed_files[filename4].1,
+            files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_create_folder_without_trailing_slash() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata", None, true, false));
+
+        assert!(xorurl.starts_with("safe://"));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            files_map["/testdata/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            files_map["/testdata/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            files_map["/testdata/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            files_map["/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_create_folder_with_trailing_slash() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        assert!(xorurl.starts_with("safe://"));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_create_dest_path_without_trailing_slash() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata", Some("/myroot"), true, false));
+
+        assert!(xorurl.starts_with("safe://"));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            files_map["/myroot/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            files_map["/myroot/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            files_map["/myroot/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            files_map["/myroot/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_create_dest_path_with_trailing_slash() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata", Some("/myroot/"), true, false));
+
+        assert!(xorurl.starts_with("safe://"));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            files_map["/myroot/testdata/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            files_map["/myroot/testdata/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            files_map["/myroot/testdata/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            files_map["/myroot/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_sync() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            true,
+            false,
+            false,
+            false
+        ));
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename6 = "../testdata/subfolder/sub2.md";
+        assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename6].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_sync_dry_run() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            true,
+            false,
+            false,
+            true // set dry_run flag on
+        ));
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert!(new_processed_files[filename5].1.is_empty());
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename6 = "../testdata/subfolder/sub2.md";
+        assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
+        assert!(new_processed_files[filename6].1.is_empty());
+        assert_eq!(
+            new_processed_files[filename6].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_sync_with_versioned_target() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+
+        let (xorurl, _, _) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        let versioned_xorurl = format!("{}?v=5", xorurl);
+        match safe.files_container_sync(
+            "../testdata/subfolder/",
+            &versioned_xorurl,
+            false,
+            false,
+            true, // this flag requests the update-nrs
+            false,
+        ) {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(format!(
+                    "The target URL cannot cannot contain a version: {}",
+                    versioned_xorurl
+                ))
+            ),
+        };
+    }
+
+    #[test]
+    fn test_files_container_sync_with_delete() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            true,
+            true, // this sets the delete flag
+            false,
+            false
+        ));
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 7);
+        assert_eq!(new_files_map.len(), 2);
+
+        // first check all previous files were removed
+        let file_path1 = "/test.md";
+        assert_eq!(new_processed_files[file_path1].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path1].1,
+            files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let file_path2 = "/another.md";
+        assert_eq!(new_processed_files[file_path2].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path2].1,
+            files_map[file_path2][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let file_path3 = "/subfolder/subexists.md";
+        assert_eq!(new_processed_files[file_path3].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path3].1,
+            files_map[file_path3][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let file_path4 = "/noextension";
+        assert_eq!(new_processed_files[file_path4].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path4].1,
+            files_map[file_path4][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // and finally check the synced file was added
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_sync_delete_without_recursive() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        match safe.files_container_sync(
+            "../testdata/subfolder/",
+            "some-url",
+            false, // this sets the recursive flag to off
+            true,  // this sets the delete flag
+            false,
+            false,
+        ) {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(
+                    "'delete' is not allowed if --recursive is not set".to_string()
+                )
+            ),
+        };
+    }
+
+    #[test]
+    fn test_files_container_sync_update_nrs_unversioned_link() {
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, _, _) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(None);
+        let unversioned_link = unwrap!(xorurl_encoder.to_string());
+        match safe.nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false) {
         Ok(_) => panic!("NRS create was unexpectdly successful"),
         Err(err) => assert_eq!(
             err,
@@ -1629,413 +1635,417 @@ fn test_files_container_sync_update_nrs_unversioned_link() {
             ))
         ),
     };
-}
+    }
 
-#[test]
-fn test_files_container_sync_update_nrs_with_xorurl() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
+    #[test]
+    fn test_files_container_sync_update_nrs_with_xorurl() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
 
-    let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
+        let (xorurl, _, _) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    match safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        false,
-        false,
-        true, // this flag requests the update-nrs
-        false,
-    ) {
-        Ok(_) => panic!("Sync was unexpectdly successful"),
-        Err(err) => assert_eq!(
-            err,
-            Error::InvalidInput(
-                "'update-nrs' is not allowed since the URL provided is not an NRS URL".to_string()
-            )
-        ),
-    };
-}
+        match safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            false,
+            false,
+            true, // this flag requests the update-nrs
+            false,
+        ) {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(
+                    "'update-nrs' is not allowed since the URL provided is not an NRS URL"
+                        .to_string()
+                )
+            ),
+        };
+    }
 
-#[test]
-fn test_files_container_sync_update_nrs_versioned_link() {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
+    #[test]
+    fn test_files_container_sync_update_nrs_versioned_link() {
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, _, _) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(Some(0));
-    let _ = unwrap!(safe.nrs_map_container_create(
-        &nrsurl,
-        &unwrap!(xorurl_encoder.to_string()),
-        false,
-        true,
-        false
-    ));
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let _ = unwrap!(safe.nrs_map_container_create(
+            &nrsurl,
+            &unwrap!(xorurl_encoder.to_string()),
+            false,
+            true,
+            false
+        ));
 
-    let _ = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &nrsurl,
-        false,
-        false,
-        true, // this flag requests the update-nrs
-        false,
-    ));
+        let _ = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &nrsurl,
+            false,
+            false,
+            true, // this flag requests the update-nrs
+            false,
+        ));
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(Some(1));
-    let (new_link, _) = unwrap!(safe.parse_and_resolve_url(&nrsurl));
-    assert_eq!(
-        unwrap!(new_link.to_string()),
-        unwrap!(xorurl_encoder.to_string())
-    );
-}
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(1));
+        let (new_link, _) = unwrap!(safe.parse_and_resolve_url(&nrsurl));
+        assert_eq!(
+            unwrap!(new_link.to_string()),
+            unwrap!(xorurl_encoder.to_string())
+        );
+    }
 
-#[test]
-fn test_files_container_sync_target_path_without_trailing_slash() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
+    #[test]
+    fn test_files_container_sync_target_path_without_trailing_slash() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_path("path/when/sync");
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder",
-        &unwrap!(xorurl_encoder.to_string()),
-        true,
-        false,
-        false,
-        false
-    ));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_path("path/when/sync");
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder",
+            &unwrap!(xorurl_encoder.to_string()),
+            true,
+            false,
+            false,
+            false
+        ));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 2);
-    assert_eq!(new_files_map.len(), 7);
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
 
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    // and finally check the synced file is there
-    let filename5 = "../testdata/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[filename5].1,
-        new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
+        // and finally check the synced file is there
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
 
-#[test]
-fn test_files_container_sync_target_path_with_trailing_slash() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
+    #[test]
+    fn test_files_container_sync_target_path_with_trailing_slash() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    assert_eq!(processed_files.len(), 5);
-    assert_eq!(files_map.len(), 5);
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    //let xorurl_with_path = format!("{}/path/when/sync/", xorurl);
-    xorurl_encoder.set_path("/path/when/sync/");
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder",
-        &unwrap!(xorurl_encoder.to_string()),
-        true,
-        false,
-        false,
-        false,
-    ));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        //let xorurl_with_path = format!("{}/path/when/sync/", xorurl);
+        xorurl_encoder.set_path("/path/when/sync/");
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder",
+            &unwrap!(xorurl_encoder.to_string()),
+            true,
+            false,
+            false,
+            false,
+        ));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 2);
-    assert_eq!(new_files_map.len(), 7);
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
 
-    let filename1 = "../testdata/test.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename2 = "../testdata/another.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename3 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename3].1,
-        new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename4 = "../testdata/noextension";
-    assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename4].1,
-        new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    // and finally check the synced file is there
-    let filename5 = "../testdata/subfolder/subexists.md";
-    assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[filename5].1,
-        new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
+        // and finally check the synced file is there
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
 
-#[test]
-fn test_files_container_get() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
+    #[test]
+    fn test_files_container_get() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, _processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
+        let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
 
-    assert_eq!(version, 0);
-    assert_eq!(fetched_files_map.len(), 5);
-    assert_eq!(files_map.len(), fetched_files_map.len());
-    assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
-    assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
-    assert_eq!(
-        files_map["/subfolder/subexists.md"],
-        fetched_files_map["/subfolder/subexists.md"]
-    );
-    assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
-}
+        assert_eq!(version, 0);
+        assert_eq!(fetched_files_map.len(), 5);
+        assert_eq!(files_map.len(), fetched_files_map.len());
+        assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
+        assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
+        assert_eq!(
+            files_map["/subfolder/subexists.md"],
+            fetched_files_map["/subfolder/subexists.md"]
+        );
+        assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
+    }
 
-#[test]
-fn test_files_container_version() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
+    #[test]
+    fn test_files_container_version() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, _, _) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    let (version, _) = unwrap!(safe.files_container_get(&xorurl));
-    assert_eq!(version, 0);
+        let (version, _) = unwrap!(safe.files_container_get(&xorurl));
+        assert_eq!(version, 0);
 
-    let (version, _, _) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        true,
-        true, // this sets the delete flag,
-        false,
-        false,
-    ));
-    assert_eq!(version, 1);
+        let (version, _, _) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            true,
+            true, // this sets the delete flag,
+            false,
+            false,
+        ));
+        assert_eq!(version, 1);
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(None);
-    let (version, _) = unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string())));
-    assert_eq!(version, 1);
-}
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(None);
+        let (version, _) = unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string())));
+        assert_eq!(version, 1);
+    }
 
-#[test]
-fn test_files_container_get_with_version() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
+    #[test]
+    fn test_files_container_get_with_version() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, _processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    // let's create a new version of the files container
-    let (_version, _new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        true,
-        true, // this sets the delete flag
-        false,
-        false
-    ));
+        // let's create a new version of the files container
+        let (_version, _new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            true,
+            true, // this sets the delete flag
+            false,
+            false
+        ));
 
-    // let's fetch version 0
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(Some(0));
-    let (version, v0_files_map) =
-        unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string())));
+        // let's fetch version 0
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let (version, v0_files_map) =
+            unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string())));
 
-    assert_eq!(version, 0);
-    assert_eq!(files_map, v0_files_map);
-    // let's check that one of the files in v1 is still there
-    let file_path1 = "/test.md";
-    assert_eq!(
-        files_map[file_path1][FAKE_RDF_PREDICATE_LINK],
-        v0_files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
-    );
+        assert_eq!(version, 0);
+        assert_eq!(files_map, v0_files_map);
+        // let's check that one of the files in v1 is still there
+        let file_path1 = "/test.md";
+        assert_eq!(
+            files_map[file_path1][FAKE_RDF_PREDICATE_LINK],
+            v0_files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    // let's fetch version 1
-    xorurl_encoder.set_content_version(Some(1));
-    let (version, v1_files_map) =
-        unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string())));
+        // let's fetch version 1
+        xorurl_encoder.set_content_version(Some(1));
+        let (version, v1_files_map) =
+            unwrap!(safe.files_container_get(&unwrap!(xorurl_encoder.to_string())));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_files_map, v1_files_map);
-    // let's check that some of the files are no in v2 anymore
-    let file_path2 = "/another.md";
-    let file_path3 = "/subfolder/subexists.md";
-    let file_path4 = "/noextension";
-    assert!(v1_files_map.get(file_path1).is_none());
-    assert!(v1_files_map.get(file_path2).is_none());
-    assert!(v1_files_map.get(file_path3).is_none());
-    assert!(v1_files_map.get(file_path4).is_none());
+        assert_eq!(version, 1);
+        assert_eq!(new_files_map, v1_files_map);
+        // let's check that some of the files are no in v2 anymore
+        let file_path2 = "/another.md";
+        let file_path3 = "/subfolder/subexists.md";
+        let file_path4 = "/noextension";
+        assert!(v1_files_map.get(file_path1).is_none());
+        assert!(v1_files_map.get(file_path2).is_none());
+        assert!(v1_files_map.get(file_path3).is_none());
+        assert!(v1_files_map.get(file_path4).is_none());
 
-    // let's fetch version 2 (invalid)
-    xorurl_encoder.set_content_version(Some(2));
-    match safe.files_container_get(&unwrap!(xorurl_encoder.to_string())) {
-        Ok(_) => panic!("unexpectdly retrieved verion 3 of container"),
-        Err(Error::VersionNotFound(msg)) => assert_eq!(
-            msg,
-            format!(
-                "Version '2' is invalid for FilesContainer found at \"{}\"",
-                xorurl_encoder
-            )
-        ),
-        other => panic!(format!(
-            "error returned is not the expected one: {:?}",
-            other
-        )),
-    };
-}
+        // let's fetch version 2 (invalid)
+        xorurl_encoder.set_content_version(Some(2));
+        match safe.files_container_get(&unwrap!(xorurl_encoder.to_string())) {
+            Ok(_) => panic!("unexpectdly retrieved verion 3 of container"),
+            Err(Error::VersionNotFound(msg)) => assert_eq!(
+                msg,
+                format!(
+                    "Version '2' is invalid for FilesContainer found at \"{}\"",
+                    xorurl_encoder
+                )
+            ),
+            other => panic!(format!(
+                "error returned is not the expected one: {:?}",
+                other
+            )),
+        };
+    }
 
-#[test]
-fn test_files_container_sync_with_nrs_url() {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, _, _) =
-        unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
+    #[test]
+    fn test_files_container_sync_with_nrs_url() {
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, _, _) =
+            unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
 
-    let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(Some(0));
-    let _ = unwrap!(safe.nrs_map_container_create(
-        &nrsurl,
-        &unwrap!(xorurl_encoder.to_string()),
-        false,
-        true,
-        false
-    ));
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let _ = unwrap!(safe.nrs_map_container_create(
+            &nrsurl,
+            &unwrap!(xorurl_encoder.to_string()),
+            false,
+            true,
+            false
+        ));
 
-    let _ = unwrap!(safe.files_container_sync(
-        "../testdata/subfolder/",
-        &xorurl,
-        false,
-        false,
-        false,
-        false,
-    ));
+        let _ = unwrap!(safe.files_container_sync(
+            "../testdata/subfolder/",
+            &xorurl,
+            false,
+            false,
+            false,
+            false,
+        ));
 
-    let _ = unwrap!(safe.files_container_sync(
-        "../testdata/",
-        &nrsurl,
-        false,
-        false,
-        true, // this flag requests the update-nrs
-        false,
-    ));
+        let _ = unwrap!(safe.files_container_sync(
+            "../testdata/",
+            &nrsurl,
+            false,
+            false,
+            true, // this flag requests the update-nrs
+            false,
+        ));
 
-    let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
-    assert_eq!(version, 2);
-    assert_eq!(fetched_files_map.len(), 5);
-}
+        let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl));
+        assert_eq!(version, 2);
+        assert_eq!(fetched_files_map.len(), 5);
+    }
 
-#[test]
-fn test_files_container_add() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
-    assert_eq!(processed_files.len(), 2);
-    assert_eq!(files_map.len(), 2);
+    #[test]
+    fn test_files_container_add() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
-        "../testdata/test.md",
-        &format!("{}/new_filename_test.md", xorurl),
-        false,
-        false,
-        false,
-    ));
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/new_filename_test.md", xorurl),
+            false,
+            false,
+            false,
+        ));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 3);
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
 
-    let filename1 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename1 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename2 = "../testdata/subfolder/sub2.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename2 = "../testdata/subfolder/sub2.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename3 = "../testdata/test.md";
-    assert_eq!(new_processed_files[filename3].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[filename3].1,
-        new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
-    );
-}
+        let filename3 = "../testdata/test.md";
+        assert_eq!(new_processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename3].1,
+            new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
 
-#[test]
-fn test_files_container_add_dir() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
-    assert_eq!(processed_files.len(), 2);
-    assert_eq!(files_map.len(), 2);
+    #[test]
+    fn test_files_container_add_dir() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-    match safe.files_container_add(
+        match safe.files_container_add(
         "../testdata",
         &xorurl,
         false,
@@ -2052,217 +2062,222 @@ fn test_files_container_add_dir() {
             other
         )),
     }
-}
+    }
 
-#[test]
-fn test_files_container_add_existing_name() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
-    assert_eq!(processed_files.len(), 2);
-    assert_eq!(files_map.len(), 2);
+    #[test]
+    fn test_files_container_add_existing_name() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
-        "../testdata/test.md",
-        &format!("{}/sub2.md", xorurl),
-        false,
-        false,
-        false
-    ));
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/sub2.md", xorurl),
+            false,
+            false,
+            false
+        ));
 
-    assert_eq!(version, 0);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 2);
-    assert_eq!(
+        assert_eq!(version, 0);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
         new_processed_files["../testdata/test.md"].1,
         "File named \"/sub2.md\" already exists on target. Use the \'force\' flag to replace it"
     );
-    assert_eq!(files_map, new_files_map);
+        assert_eq!(files_map, new_files_map);
 
-    // let's now force it
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
-        "../testdata/test.md",
-        &format!("{}/sub2.md", xorurl),
-        true, //force it
-        false,
-        false
-    ));
+        // let's now force it
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/sub2.md", xorurl),
+            true, //force it
+            false,
+            false
+        ));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 2);
-    assert_eq!(
-        new_processed_files["../testdata/test.md"].0,
-        CONTENT_UPDATED_SIGN
-    );
-    assert_eq!(
-        new_processed_files["../testdata/test.md"].1,
-        new_files_map["/sub2.md"]["link"]
-    );
-}
-
-#[test]
-fn test_files_container_fail_add_or_sync_invalid_path() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
-    assert_eq!(processed_files.len(), 1);
-    assert_eq!(files_map.len(), 1);
-
-    match safe.files_container_sync("/non-existing-path", &xorurl, false, false, false, false) {
-        Ok(_) => panic!("unexpectdly added a folder to files container"),
-        Err(Error::FilesSystemError(msg)) => assert!(
-            msg.starts_with("Couldn't read metadata from source path ('/non-existing-path')")
-        ),
-        other => panic!(format!(
-            "error returned is not the expected one: {:?}",
-            other
-        )),
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_processed_files["../testdata/test.md"].0,
+            CONTENT_UPDATED_SIGN
+        );
+        assert_eq!(
+            new_processed_files["../testdata/test.md"].1,
+            new_files_map["/sub2.md"]["link"]
+        );
     }
 
-    match safe.files_container_add(
-        "/non-existing-path",
-        &format!("{}/test.md", xorurl),
-        true, // force it
-        false,
-        false,
-    ) {
-        Ok(_) => panic!("unexpectdly added a folder to files container"),
-        Err(Error::FilesSystemError(msg)) => assert!(
-            msg.starts_with("Couldn't read metadata from source path ('/non-existing-path')")
-        ),
-        other => panic!(format!(
-            "error returned is not the expected one: {:?}",
-            other
-        )),
+    #[test]
+    fn test_files_container_fail_add_or_sync_invalid_path() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
+        assert_eq!(processed_files.len(), 1);
+        assert_eq!(files_map.len(), 1);
+
+        match safe.files_container_sync("/non-existing-path", &xorurl, false, false, false, false) {
+            Ok(_) => panic!("unexpectdly added a folder to files container"),
+            Err(Error::FilesSystemError(msg)) => {
+                assert!(msg
+                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
+            }
+            other => panic!(format!(
+                "error returned is not the expected one: {:?}",
+                other
+            )),
+        }
+
+        match safe.files_container_add(
+            "/non-existing-path",
+            &format!("{}/test.md", xorurl),
+            true, // force it
+            false,
+            false,
+        ) {
+            Ok(_) => panic!("unexpectdly added a folder to files container"),
+            Err(Error::FilesSystemError(msg)) => {
+                assert!(msg
+                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
+            }
+            other => panic!(format!(
+                "error returned is not the expected one: {:?}",
+                other
+            )),
+        }
     }
-}
 
-#[test]
-fn test_files_container_add_a_url() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
-    assert_eq!(processed_files.len(), 2);
-    assert_eq!(files_map.len(), 2);
-    let data = b"0123456789";
-    let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
-    let new_filename = "/new_filename_test.md";
+    #[test]
+    fn test_files_container_add_a_url() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
+        let data = b"0123456789";
+        let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
+        let new_filename = "/new_filename_test.md";
 
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
-        &file_xorurl,
-        &format!("{}{}", xorurl, new_filename),
-        false,
-        false,
-        false
-    ));
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            &file_xorurl,
+            &format!("{}{}", xorurl, new_filename),
+            false,
+            false,
+            false
+        ));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 3);
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
 
-    let filename1 = "../testdata/subfolder/subexists.md";
-    assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename1].1,
-        new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename1 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    let filename2 = "../testdata/subfolder/sub2.md";
-    assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        processed_files[filename2].1,
-        new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-    );
+        let filename2 = "../testdata/subfolder/sub2.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[new_filename].1,
-        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-    );
-    assert_eq!(
-        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
-        file_xorurl
-    );
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+        assert_eq!(
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
+            file_xorurl
+        );
 
-    // let's add another file but with the same name
-    let data = b"9876543210";
-    let other_file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
-        &other_file_xorurl,
-        &format!("{}{}", xorurl, new_filename),
-        true, // force to overwrite it with new link
-        false,
-        false
-    ));
+        // let's add another file but with the same name
+        let data = b"9876543210";
+        let other_file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            &other_file_xorurl,
+            &format!("{}{}", xorurl, new_filename),
+            true, // force to overwrite it with new link
+            false,
+            false
+        ));
 
-    assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 3);
-    assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
-    assert_eq!(
-        new_processed_files[new_filename].1,
-        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-    );
-    assert_eq!(
-        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
-        other_file_xorurl
-    );
-}
+        assert_eq!(version, 2);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+        assert_eq!(
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
+            other_file_xorurl
+        );
+    }
 
-#[test]
-fn test_files_container_add_from_raw() {
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let (xorurl, processed_files, files_map) =
-        unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
-    assert_eq!(processed_files.len(), 2);
-    assert_eq!(files_map.len(), 2);
+    #[test]
+    fn test_files_container_add_from_raw() {
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-    let data = b"0123456789";
-    let new_filename = "/new_filename_test.md";
+        let data = b"0123456789";
+        let new_filename = "/new_filename_test.md";
 
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add_from_raw(
-        data,
-        &format!("{}{}", xorurl, new_filename),
-        false,
-        false,
-        false
-    ));
+        let (version, new_processed_files, new_files_map) = unwrap!(safe
+            .files_container_add_from_raw(
+                data,
+                &format!("{}{}", xorurl, new_filename),
+                false,
+                false,
+                false
+            ));
 
-    assert_eq!(version, 1);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 3);
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
 
-    assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
-    assert_eq!(
-        new_processed_files[new_filename].1,
-        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-    );
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
 
-    // let's add another file but with the same name
-    let data = b"9876543210";
-    let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add_from_raw(
-        data,
-        &format!("{}{}", xorurl, new_filename),
-        true, // force to overwrite it with new link
-        false,
-        false
-    ));
+        // let's add another file but with the same name
+        let data = b"9876543210";
+        let (version, new_processed_files, new_files_map) = unwrap!(safe
+            .files_container_add_from_raw(
+                data,
+                &format!("{}{}", xorurl, new_filename),
+                true, // force to overwrite it with new link
+                false,
+                false
+            ));
 
-    assert_eq!(version, 2);
-    assert_eq!(new_processed_files.len(), 1);
-    assert_eq!(new_files_map.len(), 3);
-    assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
-    assert_eq!(
-        new_processed_files[new_filename].1,
-        new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-    );
+        assert_eq!(version, 2);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
 }

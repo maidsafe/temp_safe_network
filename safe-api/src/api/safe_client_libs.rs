@@ -600,161 +600,164 @@ fn get_public_bls_key(safe_app: &App) -> ResultReturn<PublicKey> {
     })
 }
 
-// Unit tests
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_put_and_get_immutable_data() {
-    use super::Safe;
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("fake-credentials")).unwrap();
+    #[test]
+    fn test_put_and_get_immutable_data() {
+        use super::Safe;
+        let mut safe = Safe::new("base32z");
+        safe.connect("", Some("fake-credentials")).unwrap();
 
-    let id1 = b"HELLLOOOOOOO".to_vec();
+        let id1 = b"HELLLOOOOOOO".to_vec();
 
-    let xorname = safe.safe_app.files_put_published_immutable(&id1).unwrap();
-    let data = safe
-        .safe_app
-        .files_get_published_immutable(xorname)
-        .unwrap();
-    let text = std::str::from_utf8(data.as_slice()).unwrap();
-    assert_eq!(text.to_string(), "HELLLOOOOOOO");
-}
-
-#[test]
-fn test_put_get_update_seq_append_only_data() {
-    use super::Safe;
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("fake-credentials")).unwrap();
-
-    let key1 = b"KEY1".to_vec();
-    let val1 = b"VALUE1".to_vec();
-    let data1 = [(key1, val1)].to_vec();
-
-    let type_tag = 12322;
-    let xorname = safe
-        .safe_app
-        .put_seq_append_only_data(data1, None, type_tag, None)
-        .unwrap();
-
-    let (this_version, data) = safe
-        .safe_app
-        .get_latest_seq_append_only_data(xorname, type_tag)
-        .unwrap();
-
-    assert_eq!(this_version, 0);
-
-    //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
-    assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
-    assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
-
-    let key2 = b"KEY2".to_vec();
-    let val2 = b"VALUE2".to_vec();
-    let data2 = [(key2, val2)].to_vec();
-    let new_version = 1;
-
-    let updated_version = safe
-        .safe_app
-        .append_seq_append_only_data(data2, new_version, xorname, type_tag)
-        .unwrap();
-    let (the_latest_version, data_updated) = safe
-        .safe_app
-        .get_latest_seq_append_only_data(xorname, type_tag)
-        .unwrap();
-
-    assert_eq!(updated_version, the_latest_version);
-
-    assert_eq!(
-        std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
-        "KEY2"
-    );
-    assert_eq!(
-        std::str::from_utf8(data_updated.1.as_slice()).unwrap(),
-        "VALUE2"
-    );
-
-    let first_version = 0;
-
-    let first_data = safe
-        .safe_app
-        .get_seq_append_only_data(xorname, type_tag, first_version)
-        .unwrap();
-
-    assert_eq!(
-        std::str::from_utf8(first_data.0.as_slice()).unwrap(),
-        "KEY1"
-    );
-    assert_eq!(
-        std::str::from_utf8(first_data.1.as_slice()).unwrap(),
-        "VALUE1"
-    );
-
-    let second_version = 1;
-    let second_data = safe
-        .safe_app
-        .get_seq_append_only_data(xorname, type_tag, second_version)
-        .unwrap();
-
-    assert_eq!(
-        std::str::from_utf8(second_data.0.as_slice()).unwrap(),
-        "KEY2"
-    );
-    assert_eq!(
-        std::str::from_utf8(second_data.1.as_slice()).unwrap(),
-        "VALUE2"
-    );
-
-    // test checking for versions that dont exist
-    let nonexistant_version = 2;
-    match safe
-        .safe_app
-        .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
-    {
-        Ok(_) => panic!("No error thrown when passing an outdated new version"),
-        Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
-            "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
-            nonexistant_version, xorname
-        ))),
-        err => panic!(format!("Error returned is not the expected one: {:?}", err)),
+        let xorname = safe.safe_app.files_put_published_immutable(&id1).unwrap();
+        let data = safe
+            .safe_app
+            .files_get_published_immutable(xorname)
+            .unwrap();
+        let text = std::str::from_utf8(data.as_slice()).unwrap();
+        assert_eq!(text.to_string(), "HELLLOOOOOOO");
     }
-}
 
-#[test]
-fn test_update_seq_append_only_data_error() {
-    use super::Safe;
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("fake-credentials")).unwrap();
+    #[test]
+    fn test_put_get_update_seq_append_only_data() {
+        use super::Safe;
+        let mut safe = Safe::new("base32z");
+        safe.connect("", Some("fake-credentials")).unwrap();
 
-    let key1 = b"KEY1".to_vec();
-    let val1 = b"VALUE1".to_vec();
-    let data1 = [(key1, val1)].to_vec();
+        let key1 = b"KEY1".to_vec();
+        let val1 = b"VALUE1".to_vec();
+        let data1 = [(key1, val1)].to_vec();
 
-    let type_tag = 12322;
-    let xorname = safe
-        .safe_app
-        .put_seq_append_only_data(data1, None, type_tag, None)
-        .unwrap();
+        let type_tag = 12322;
+        let xorname = safe
+            .safe_app
+            .put_seq_append_only_data(data1, None, type_tag, None)
+            .unwrap();
 
-    let (this_version, data) = safe
-        .safe_app
-        .get_latest_seq_append_only_data(xorname, type_tag)
-        .unwrap();
+        let (this_version, data) = safe
+            .safe_app
+            .get_latest_seq_append_only_data(xorname, type_tag)
+            .unwrap();
 
-    assert_eq!(this_version, 0);
+        assert_eq!(this_version, 0);
 
-    //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
-    assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
-    assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
+        //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
+        assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
+        assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
 
-    let key2 = b"KEY2".to_vec();
-    let val2 = b"VALUE2".to_vec();
-    let data2 = [(key2, val2)].to_vec();
-    let wrong_new_version = 0;
+        let key2 = b"KEY2".to_vec();
+        let val2 = b"VALUE2".to_vec();
+        let data2 = [(key2, val2)].to_vec();
+        let new_version = 1;
 
-    match safe
-        .safe_app
-        .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
-    {
-        Ok(_) => panic!("No error thrown when passing an outdated new version"),
-        Err(Error::NetDataError(msg)) => assert!(msg.contains("Invalid data successor")),
-        _ => panic!("Error returned is not the expected one"),
+        let updated_version = safe
+            .safe_app
+            .append_seq_append_only_data(data2, new_version, xorname, type_tag)
+            .unwrap();
+        let (the_latest_version, data_updated) = safe
+            .safe_app
+            .get_latest_seq_append_only_data(xorname, type_tag)
+            .unwrap();
+
+        assert_eq!(updated_version, the_latest_version);
+
+        assert_eq!(
+            std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
+            "KEY2"
+        );
+        assert_eq!(
+            std::str::from_utf8(data_updated.1.as_slice()).unwrap(),
+            "VALUE2"
+        );
+
+        let first_version = 0;
+
+        let first_data = safe
+            .safe_app
+            .get_seq_append_only_data(xorname, type_tag, first_version)
+            .unwrap();
+
+        assert_eq!(
+            std::str::from_utf8(first_data.0.as_slice()).unwrap(),
+            "KEY1"
+        );
+        assert_eq!(
+            std::str::from_utf8(first_data.1.as_slice()).unwrap(),
+            "VALUE1"
+        );
+
+        let second_version = 1;
+        let second_data = safe
+            .safe_app
+            .get_seq_append_only_data(xorname, type_tag, second_version)
+            .unwrap();
+
+        assert_eq!(
+            std::str::from_utf8(second_data.0.as_slice()).unwrap(),
+            "KEY2"
+        );
+        assert_eq!(
+            std::str::from_utf8(second_data.1.as_slice()).unwrap(),
+            "VALUE2"
+        );
+
+        // test checking for versions that dont exist
+        let nonexistant_version = 2;
+        match safe
+            .safe_app
+            .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
+        {
+            Ok(_) => panic!("No error thrown when passing an outdated new version"),
+            Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
+                "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+                nonexistant_version, xorname
+            ))),
+            err => panic!(format!("Error returned is not the expected one: {:?}", err)),
+        }
+    }
+
+    #[test]
+    fn test_update_seq_append_only_data_error() {
+        use super::Safe;
+        let mut safe = Safe::new("base32z");
+        safe.connect("", Some("fake-credentials")).unwrap();
+
+        let key1 = b"KEY1".to_vec();
+        let val1 = b"VALUE1".to_vec();
+        let data1 = [(key1, val1)].to_vec();
+
+        let type_tag = 12322;
+        let xorname = safe
+            .safe_app
+            .put_seq_append_only_data(data1, None, type_tag, None)
+            .unwrap();
+
+        let (this_version, data) = safe
+            .safe_app
+            .get_latest_seq_append_only_data(xorname, type_tag)
+            .unwrap();
+
+        assert_eq!(this_version, 0);
+
+        //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
+        assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
+        assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
+
+        let key2 = b"KEY2".to_vec();
+        let val2 = b"VALUE2".to_vec();
+        let data2 = [(key2, val2)].to_vec();
+        let wrong_new_version = 0;
+
+        match safe
+            .safe_app
+            .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
+        {
+            Ok(_) => panic!("No error thrown when passing an outdated new version"),
+            Err(Error::NetDataError(msg)) => assert!(msg.contains("Invalid data successor")),
+            _ => panic!("Error returned is not the expected one"),
+        }
     }
 }

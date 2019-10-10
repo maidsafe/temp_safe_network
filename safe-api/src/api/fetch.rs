@@ -323,272 +323,275 @@ fn embed_resolved_from(
     Ok(safe_data)
 }
 
-// Unit Tests
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_fetch_key() {
-    use super::xorurl::XorUrlEncoder;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let preload_amount = "1324.12";
-    let (xorurl, _key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
+    #[test]
+    fn test_fetch_key() {
+        use super::xorurl::XorUrlEncoder;
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let preload_amount = "1324.12";
+        let (xorurl, _key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    let content = unwrap!(safe.fetch(&xorurl));
-    assert!(
-        content
-            == SafeData::SafeKey {
+        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let content = unwrap!(safe.fetch(&xorurl));
+        assert!(
+            content
+                == SafeData::SafeKey {
+                    xorurl,
+                    xorname: xorurl_encoder.xorname(),
+                    resolved_from: None,
+                }
+        );
+    }
+
+    #[test]
+    fn test_fetch_wallet() {
+        use super::xorurl::XorUrlEncoder;
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let xorurl = unwrap!(safe.wallet_create());
+
+        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let content = unwrap!(safe.fetch(&xorurl));
+        assert!(
+            content
+                == SafeData::Wallet {
+                    xorurl,
+                    xorname: xorurl_encoder.xorname(),
+                    type_tag: 1_000,
+                    balances: WalletSpendableBalances::default(),
+                    data_type: SafeDataType::SeqMutableData,
+                    resolved_from: None,
+                }
+        );
+    }
+
+    #[test]
+    fn test_fetch_files_container() {
+        use super::xorurl::XorUrlEncoder;
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        safe.connect("", Some("")).unwrap();
+
+        let (xorurl, _, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let content = unwrap!(safe.fetch(&xorurl));
+
+        assert!(
+            content
+                == SafeData::FilesContainer {
+                    xorurl,
+                    xorname: xorurl_encoder.xorname(),
+                    type_tag: 1_100,
+                    version: 0,
+                    files_map,
+                    data_type: SafeDataType::PublishedSeqAppendOnlyData,
+                    resolved_from: None,
+                }
+        );
+
+        let mut xorurl_encoder_with_path = xorurl_encoder.clone();
+        xorurl_encoder_with_path.set_path("/subfolder/subexists.md");
+        assert_eq!(xorurl_encoder_with_path.path(), "/subfolder/subexists.md");
+        assert_eq!(xorurl_encoder_with_path.xorname(), xorurl_encoder.xorname());
+        assert_eq!(
+            xorurl_encoder_with_path.type_tag(),
+            xorurl_encoder.type_tag()
+        );
+        assert_eq!(
+            xorurl_encoder_with_path.content_type(),
+            xorurl_encoder.content_type()
+        );
+    }
+
+    #[test]
+    fn test_fetch_resolvable_container() {
+        use super::xorurl::XorUrlEncoder;
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use unwrap::unwrap;
+
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+        let mut safe = Safe::new("base32z");
+        safe.connect("", Some("")).unwrap();
+
+        let (xorurl, _, the_files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let (_nrs_map_xorurl, _, _nrs_map) = unwrap!(safe.nrs_map_container_create(
+            &site_name,
+            &unwrap!(xorurl_encoder.to_string()),
+            true,
+            true,
+            false
+        ));
+
+        let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
+
+        // this should resolve to a FilesContainer until we enable prevent resolution.
+        match content {
+            SafeData::FilesContainer {
                 xorurl,
-                xorname: xorurl_encoder.xorname(),
-                resolved_from: None,
-            }
-    );
-}
-
-#[test]
-fn test_fetch_wallet() {
-    use super::xorurl::XorUrlEncoder;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let xorurl = unwrap!(safe.wallet_create());
-
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    let content = unwrap!(safe.fetch(&xorurl));
-    assert!(
-        content
-            == SafeData::Wallet {
-                xorurl,
-                xorname: xorurl_encoder.xorname(),
-                type_tag: 1_000,
-                balances: WalletSpendableBalances::default(),
-                data_type: SafeDataType::SeqMutableData,
-                resolved_from: None,
-            }
-    );
-}
-
-#[test]
-fn test_fetch_files_container() {
-    use super::xorurl::XorUrlEncoder;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    safe.connect("", Some("")).unwrap();
-
-    let (xorurl, _, files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    let content = unwrap!(safe.fetch(&xorurl));
-
-    assert!(
-        content
-            == SafeData::FilesContainer {
-                xorurl,
-                xorname: xorurl_encoder.xorname(),
-                type_tag: 1_100,
-                version: 0,
+                xorname,
+                type_tag,
+                version,
                 files_map,
-                data_type: SafeDataType::PublishedSeqAppendOnlyData,
-                resolved_from: None,
+                data_type,
+                ..
+            } => {
+                assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
+                assert_eq!(xorname, xorurl_encoder.xorname());
+                assert_eq!(type_tag, 1_100);
+                assert_eq!(version, 0);
+                assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
+                assert_eq!(files_map, the_files_map);
             }
-    );
+            _ => panic!("Nrs map container was not returned."),
+        }
+    }
 
-    let mut xorurl_encoder_with_path = xorurl_encoder.clone();
-    xorurl_encoder_with_path.set_path("/subfolder/subexists.md");
-    assert_eq!(xorurl_encoder_with_path.path(), "/subfolder/subexists.md");
-    assert_eq!(xorurl_encoder_with_path.xorname(), xorurl_encoder.xorname());
-    assert_eq!(
-        xorurl_encoder_with_path.type_tag(),
-        xorurl_encoder.type_tag()
-    );
-    assert_eq!(
-        xorurl_encoder_with_path.content_type(),
-        xorurl_encoder.content_type()
-    );
-}
+    #[test]
+    fn test_fetch_resolvable_map_data() {
+        use super::xorurl::XorUrlEncoder;
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use unwrap::unwrap;
 
-#[test]
-fn test_fetch_resolvable_container() {
-    use super::xorurl::XorUrlEncoder;
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let mut safe = Safe::new("base32z");
+        safe.connect("", Some("")).unwrap();
 
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("")).unwrap();
+        let (xorurl, _, _the_files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
 
-    let (xorurl, _, the_files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let (nrs_map_xorurl, _, the_nrs_map) = unwrap!(safe.nrs_map_container_create(
+            &site_name,
+            &unwrap!(xorurl_encoder.to_string()),
+            true,
+            true,
+            false
+        ));
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(Some(0));
-    let (_nrs_map_xorurl, _, _nrs_map) = unwrap!(safe.nrs_map_container_create(
-        &site_name,
-        &unwrap!(xorurl_encoder.to_string()),
-        true,
-        true,
-        false
-    ));
+        let nrs_xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
+        let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
 
-    let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
+        // this should resolve to a FilesContainer until we enable prevent resolution.
+        match content {
+            SafeData::FilesContainer {
+                xorurl,
+                resolved_from: Some(nrs_map_container),
+                ..
+            } => {
+                assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
+                assert_eq!(nrs_map_container.xorname, nrs_xorurl_encoder.xorname());
+                assert_eq!(nrs_map_container.type_tag, 1_500);
+                assert_eq!(nrs_map_container.version, 0);
+                assert_eq!(
+                    nrs_map_container.data_type,
+                    SafeDataType::PublishedSeqAppendOnlyData
+                );
+                assert_eq!(nrs_map_container.nrs_map, the_nrs_map);
+            }
+            _ => panic!("Nrs map container was not returned."),
+        }
+    }
 
-    // this should resolve to a FilesContainer until we enable prevent resolution.
-    match content {
-        SafeData::FilesContainer {
-            xorurl,
+    #[test]
+    fn test_fetch_published_immutable_data() {
+        use super::xorurl::XorUrlEncoder;
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let data = b"Something super immutable";
+        let xorurl = safe
+            .files_put_published_immutable(data, Some("text/plain"))
+            .unwrap();
+
+        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let content = unwrap!(safe.fetch(&xorurl));
+        assert!(
+            content
+                == SafeData::PublishedImmutableData {
+                    xorurl,
+                    xorname: xorurl_encoder.xorname(),
+                    data: data.to_vec(),
+                    resolved_from: None,
+                    media_type: Some("text/plain".to_string())
+                }
+        );
+    }
+
+    #[test]
+    fn test_fetch_unsupported() {
+        use super::helpers::create_random_xorname;
+        use super::xorurl::XorUrlEncoder;
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let xorname = create_random_xorname();
+        let type_tag = 575_756_443;
+        let xorurl = unwrap!(XorUrlEncoder::encode(
             xorname,
             type_tag,
-            version,
-            files_map,
-            data_type,
-            ..
-        } => {
-            assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
-            assert_eq!(xorname, xorurl_encoder.xorname());
-            assert_eq!(type_tag, 1_100);
-            assert_eq!(version, 0);
-            assert_eq!(data_type, SafeDataType::PublishedSeqAppendOnlyData);
-            assert_eq!(files_map, the_files_map);
-        }
-        _ => panic!("Nrs map container was not returned."),
+            SafeDataType::UnpublishedImmutableData,
+            SafeContentType::Raw,
+            None,
+            None,
+            None,
+            "base32z"
+        ));
+        match safe.fetch(&xorurl) {
+            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+            Err(msg) => assert_eq!(
+                msg,
+                Error::ContentError(
+                    "Data type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
+                )
+            ),
+        };
     }
-}
 
-#[test]
-fn test_fetch_resolvable_map_data() {
-    use super::xorurl::XorUrlEncoder;
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    use unwrap::unwrap;
-
-    let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("")).unwrap();
-
-    let (xorurl, _, _the_files_map) =
-        unwrap!(safe.files_container_create("../testdata/", None, true, false));
-
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    xorurl_encoder.set_content_version(Some(0));
-    let (nrs_map_xorurl, _, the_nrs_map) = unwrap!(safe.nrs_map_container_create(
-        &site_name,
-        &unwrap!(xorurl_encoder.to_string()),
-        true,
-        true,
-        false
-    ));
-
-    let nrs_xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
-    let content = unwrap!(safe.fetch(&format!("safe://{}", site_name)));
-
-    // this should resolve to a FilesContainer until we enable prevent resolution.
-    match content {
-        SafeData::FilesContainer {
-            xorurl,
-            resolved_from: Some(nrs_map_container),
-            ..
-        } => {
-            assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
-            assert_eq!(nrs_map_container.xorname, nrs_xorurl_encoder.xorname());
-            assert_eq!(nrs_map_container.type_tag, 1_500);
-            assert_eq!(nrs_map_container.version, 0);
-            assert_eq!(
-                nrs_map_container.data_type,
-                SafeDataType::PublishedSeqAppendOnlyData
-            );
-            assert_eq!(nrs_map_container.nrs_map, the_nrs_map);
-        }
-        _ => panic!("Nrs map container was not returned."),
+    #[test]
+    fn test_fetch_unsupported_with_media_type() {
+        use super::helpers::create_random_xorname;
+        use super::xorurl::XorUrlEncoder;
+        use unwrap::unwrap;
+        let mut safe = Safe::new("base32z");
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let xorname = create_random_xorname();
+        let type_tag = 575_756_443;
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::UnpublishedImmutableData,
+            SafeContentType::MediaType("text/html".to_string()),
+            None,
+            None,
+            None,
+            "base32z"
+        ));
+        match safe.fetch(&xorurl) {
+            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+            Err(msg) => assert_eq!(
+                msg,
+                Error::ContentError(
+                    "Data type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
+                )
+            ),
+        };
     }
-}
-
-#[test]
-fn test_fetch_published_immutable_data() {
-    use super::xorurl::XorUrlEncoder;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let data = b"Something super immutable";
-    let xorurl = safe
-        .files_put_published_immutable(data, Some("text/plain"))
-        .unwrap();
-
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    let content = unwrap!(safe.fetch(&xorurl));
-    assert!(
-        content
-            == SafeData::PublishedImmutableData {
-                xorurl,
-                xorname: xorurl_encoder.xorname(),
-                data: data.to_vec(),
-                resolved_from: None,
-                media_type: Some("text/plain".to_string())
-            }
-    );
-}
-
-#[test]
-fn test_fetch_unsupported() {
-    use super::helpers::create_random_xorname;
-    use super::xorurl::XorUrlEncoder;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let xorname = create_random_xorname();
-    let type_tag = 575_756_443;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeDataType::UnpublishedImmutableData,
-        SafeContentType::Raw,
-        None,
-        None,
-        None,
-        "base32z"
-    ));
-    match safe.fetch(&xorurl) {
-        Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
-        Err(msg) => assert_eq!(
-            msg,
-            Error::ContentError(
-                "Data type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
-            )
-        ),
-    };
-}
-
-#[test]
-fn test_fetch_unsupported_with_media_type() {
-    use super::helpers::create_random_xorname;
-    use super::xorurl::XorUrlEncoder;
-    use unwrap::unwrap;
-    let mut safe = Safe::new("base32z");
-    unwrap!(safe.connect("", Some("fake-credentials")));
-    let xorname = create_random_xorname();
-    let type_tag = 575_756_443;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeDataType::UnpublishedImmutableData,
-        SafeContentType::MediaType("text/html".to_string()),
-        None,
-        None,
-        None,
-        "base32z"
-    ));
-    match safe.fetch(&xorurl) {
-        Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
-        Err(msg) => assert_eq!(
-            msg,
-            Error::ContentError(
-                "Data type 'UnpublishedImmutableData' not supported yet by fetch".to_string()
-            )
-        ),
-    };
 }

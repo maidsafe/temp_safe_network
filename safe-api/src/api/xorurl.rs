@@ -155,7 +155,7 @@ impl XorUrlEncoder {
         MEDIA_TYPE_CODES.get(media_type).is_some()
     }
 
-    // A non-member encoder function for convinience in some cases
+    // A non-member encoder function for convenience in some cases
     #[allow(clippy::too_many_arguments)]
     pub fn encode(
         xorname: XorName,
@@ -397,210 +397,215 @@ impl fmt::Display for XorUrlEncoder {
     }
 }
 
-#[test]
-fn test_xorurl_base32_encoding() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        0xa632_3c4d_4a32,
-        SafeDataType::PublishedImmutableData,
-        SafeContentType::Raw,
-        None,
-        None,
-        None,
-        "base32"
-    ));
-    let base32_xorurl =
-        "safe://biaaaatcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
-    assert_eq!(xorurl, base32_xorurl);
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_xorurl_base32z_encoding() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        0,
-        SafeDataType::PublishedImmutableData,
-        SafeContentType::Raw,
-        None,
-        None,
-        None,
-        "base32z"
-    ));
-    let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
-    assert_eq!(xorurl, base32z_xorurl);
-}
+    #[test]
+    fn test_xorurl_base32_encoding() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            0xa632_3c4d_4a32,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::Raw,
+            None,
+            None,
+            None,
+            "base32"
+        ));
+        let base32_xorurl =
+            "safe://biaaaatcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
+        assert_eq!(xorurl, base32_xorurl);
+    }
 
-#[test]
-fn test_xorurl_base64_encoding() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        4_584_545,
-        SafeDataType::PublishedSeqAppendOnlyData,
-        SafeContentType::FilesContainer,
-        None,
-        None,
-        None,
-        "base64"
-    ));
-    let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
-    assert_eq!(xorurl, base64_xorurl);
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&base64_xorurl));
-    assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_base("base64")));
-    assert_eq!("", xorurl_encoder.path());
-    assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
-    assert_eq!(xorname, xorurl_encoder.xorname());
-    assert_eq!(4_584_545, xorurl_encoder.type_tag());
-    assert_eq!(
-        SafeDataType::PublishedSeqAppendOnlyData,
-        xorurl_encoder.data_type()
-    );
-    assert_eq!(
-        SafeContentType::FilesContainer,
-        xorurl_encoder.content_type()
-    );
-}
+    #[test]
+    fn test_xorurl_base32z_encoding() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::Raw,
+            None,
+            None,
+            None,
+            "base32z"
+        ));
+        let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+        assert_eq!(xorurl, base32z_xorurl);
+    }
 
-#[test]
-fn test_xorurl_default_base_encoding() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        0,
-        SafeDataType::PublishedImmutableData,
-        SafeContentType::Raw,
-        None,
-        None,
-        None,
-        "" // forces it to use the default
-    ));
-    assert_eq!(xorurl, base32z_xorurl);
-}
+    #[test]
+    fn test_xorurl_base64_encoding() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            4_584_545,
+            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeContentType::FilesContainer,
+            None,
+            None,
+            None,
+            "base64"
+        ));
+        let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+        assert_eq!(xorurl, base64_xorurl);
+        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&base64_xorurl));
+        assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_base("base64")));
+        assert_eq!("", xorurl_encoder.path());
+        assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
+        assert_eq!(xorname, xorurl_encoder.xorname());
+        assert_eq!(4_584_545, xorurl_encoder.type_tag());
+        assert_eq!(
+            SafeDataType::PublishedSeqAppendOnlyData,
+            xorurl_encoder.data_type()
+        );
+        assert_eq!(
+            SafeContentType::FilesContainer,
+            xorurl_encoder.content_type()
+        );
+    }
 
-#[test]
-fn test_xorurl_decoding() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let type_tag: u64 = 0x0eef;
-    let xorurl_encoder = unwrap!(XorUrlEncoder::new(
-        xorname,
-        type_tag,
-        SafeDataType::PublishedImmutableData,
-        SafeContentType::Raw,
-        None,
-        None,
-        None,
-    ));
-    assert_eq!("", xorurl_encoder.path());
-    assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
-    assert_eq!(xorname, xorurl_encoder.xorname());
-    assert_eq!(type_tag, xorurl_encoder.type_tag());
-    assert_eq!(
-        SafeDataType::PublishedImmutableData,
-        xorurl_encoder.data_type()
-    );
-    assert_eq!(SafeContentType::Raw, xorurl_encoder.content_type());
-}
+    #[test]
+    fn test_xorurl_default_base_encoding() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::Raw,
+            None,
+            None,
+            None,
+            "" // forces it to use the default
+        ));
+        assert_eq!(xorurl, base32z_xorurl);
+    }
 
-#[test]
-fn test_xorurl_decoding_with_path() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let type_tag: u64 = 0x0eef;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeDataType::PublishedSeqAppendOnlyData,
-        SafeContentType::Wallet,
-        None,
-        None,
-        None,
-        "base32z"
-    ));
+    #[test]
+    fn test_xorurl_decoding() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let type_tag: u64 = 0x0eef;
+        let xorurl_encoder = unwrap!(XorUrlEncoder::new(
+            xorname,
+            type_tag,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::Raw,
+            None,
+            None,
+            None,
+        ));
+        assert_eq!("", xorurl_encoder.path());
+        assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
+        assert_eq!(xorname, xorurl_encoder.xorname());
+        assert_eq!(type_tag, xorurl_encoder.type_tag());
+        assert_eq!(
+            SafeDataType::PublishedImmutableData,
+            xorurl_encoder.data_type()
+        );
+        assert_eq!(SafeContentType::Raw, xorurl_encoder.content_type());
+    }
 
-    let xorurl_with_path = format!("{}/subfolder/file", xorurl);
-    let xorurl_encoder_with_path = unwrap!(XorUrlEncoder::from_url(&xorurl_with_path));
-    assert_eq!(
-        xorurl_with_path,
-        unwrap!(xorurl_encoder_with_path.to_base("base32z"))
-    );
-    assert_eq!("/subfolder/file", xorurl_encoder_with_path.path());
-    assert_eq!(
-        XOR_URL_VERSION_1,
-        xorurl_encoder_with_path.encoding_version()
-    );
-    assert_eq!(xorname, xorurl_encoder_with_path.xorname());
-    assert_eq!(type_tag, xorurl_encoder_with_path.type_tag());
-    assert_eq!(
-        SafeDataType::PublishedSeqAppendOnlyData,
-        xorurl_encoder_with_path.data_type()
-    );
-    assert_eq!(
-        SafeContentType::Wallet,
-        xorurl_encoder_with_path.content_type()
-    );
-}
+    #[test]
+    fn test_xorurl_decoding_with_path() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let type_tag: u64 = 0x0eef;
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeContentType::Wallet,
+            None,
+            None,
+            None,
+            "base32z"
+        ));
 
-#[test]
-fn test_xorurl_decoding_with_subname() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let type_tag: u64 = 0x0eef;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeDataType::PublishedImmutableData,
-        SafeContentType::NrsMapContainer,
-        None,
-        Some(vec!("sub".to_string())),
-        None,
-        "base32z"
-    ));
+        let xorurl_with_path = format!("{}/subfolder/file", xorurl);
+        let xorurl_encoder_with_path = unwrap!(XorUrlEncoder::from_url(&xorurl_with_path));
+        assert_eq!(
+            xorurl_with_path,
+            unwrap!(xorurl_encoder_with_path.to_base("base32z"))
+        );
+        assert_eq!("/subfolder/file", xorurl_encoder_with_path.path());
+        assert_eq!(
+            XOR_URL_VERSION_1,
+            xorurl_encoder_with_path.encoding_version()
+        );
+        assert_eq!(xorname, xorurl_encoder_with_path.xorname());
+        assert_eq!(type_tag, xorurl_encoder_with_path.type_tag());
+        assert_eq!(
+            SafeDataType::PublishedSeqAppendOnlyData,
+            xorurl_encoder_with_path.data_type()
+        );
+        assert_eq!(
+            SafeContentType::Wallet,
+            xorurl_encoder_with_path.content_type()
+        );
+    }
 
-    let xorurl_with_subname = xorurl.to_string();
-    assert!(xorurl_with_subname.contains("safe://sub."));
-    let xorurl_encoder_with_subname = unwrap!(XorUrlEncoder::from_url(&xorurl_with_subname));
-    assert_eq!(
-        xorurl_with_subname,
-        unwrap!(xorurl_encoder_with_subname.to_base("base32z"))
-    );
-    assert_eq!("", xorurl_encoder_with_subname.path());
-    assert_eq!(1, xorurl_encoder_with_subname.encoding_version());
-    assert_eq!(xorname, xorurl_encoder_with_subname.xorname());
-    assert_eq!(type_tag, xorurl_encoder_with_subname.type_tag());
-    assert_eq!(vec!("sub"), xorurl_encoder_with_subname.sub_names());
-    assert_eq!(
-        SafeContentType::NrsMapContainer,
-        xorurl_encoder_with_subname.content_type()
-    );
-}
+    #[test]
+    fn test_xorurl_decoding_with_subname() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let type_tag: u64 = 0x0eef;
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::NrsMapContainer,
+            None,
+            Some(vec!("sub".to_string())),
+            None,
+            "base32z"
+        ));
 
-#[test]
-fn test_xorurl_encoding_decoding_with_media_type() {
-    use unwrap::unwrap;
-    let xorname = XorName(*b"12345678901234567890123456789012");
-    let type_tag: u64 = 0x4c2f;
-    let xorurl = unwrap!(XorUrlEncoder::encode(
-        xorname,
-        type_tag,
-        SafeDataType::PublishedImmutableData,
-        SafeContentType::MediaType("text/html".to_string()),
-        None,
-        None,
-        None,
-        "base32z"
-    ));
+        let xorurl_with_subname = xorurl.to_string();
+        assert!(xorurl_with_subname.contains("safe://sub."));
+        let xorurl_encoder_with_subname = unwrap!(XorUrlEncoder::from_url(&xorurl_with_subname));
+        assert_eq!(
+            xorurl_with_subname,
+            unwrap!(xorurl_encoder_with_subname.to_base("base32z"))
+        );
+        assert_eq!("", xorurl_encoder_with_subname.path());
+        assert_eq!(1, xorurl_encoder_with_subname.encoding_version());
+        assert_eq!(xorname, xorurl_encoder_with_subname.xorname());
+        assert_eq!(type_tag, xorurl_encoder_with_subname.type_tag());
+        assert_eq!(vec!("sub"), xorurl_encoder_with_subname.sub_names());
+        assert_eq!(
+            SafeContentType::NrsMapContainer,
+            xorurl_encoder_with_subname.content_type()
+        );
+    }
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-    assert_eq!(
-        SafeContentType::MediaType("text/html".to_string()),
-        xorurl_encoder.content_type()
-    );
+    #[test]
+    fn test_xorurl_encoding_decoding_with_media_type() {
+        use unwrap::unwrap;
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let type_tag: u64 = 0x4c2f;
+        let xorurl = unwrap!(XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::MediaType("text/html".to_string()),
+            None,
+            None,
+            None,
+            "base32z"
+        ));
+
+        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        assert_eq!(
+            SafeContentType::MediaType("text/html".to_string()),
+            xorurl_encoder.content_type()
+        );
+    }
 }

@@ -511,116 +511,119 @@ impl SafeApp for SafeAppFake {
     }
 }
 
-// Unit tests
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_allocate_test_coins() {
-    use self::SafeApp;
-    use std::str::FromStr;
-    use threshold_crypto::SecretKey;
-    use unwrap::unwrap;
+    #[test]
+    fn test_allocate_test_coins() {
+        use self::SafeApp;
+        use std::str::FromStr;
+        use threshold_crypto::SecretKey;
+        use unwrap::unwrap;
 
-    let mut mock = SafeAppFake::new();
+        let mut mock = SafeAppFake::new();
 
-    let sk_to = SecretKey::random();
+        let sk_to = SecretKey::random();
 
-    let balance = unwrap!(Coins::from_str("2.345678912"));
-    unwrap!(mock.allocate_test_coins(sk_to.clone(), balance));
-    let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
-    assert_eq!(balance, current_balance);
-}
+        let balance = unwrap!(Coins::from_str("2.345678912"));
+        unwrap!(mock.allocate_test_coins(sk_to.clone(), balance));
+        let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
+        assert_eq!(balance, current_balance);
+    }
 
-#[test]
-fn test_create_balance() {
-    use self::SafeApp;
-    use std::str::FromStr;
-    use threshold_crypto::SecretKey;
-    use unwrap::unwrap;
+    #[test]
+    fn test_create_balance() {
+        use self::SafeApp;
+        use std::str::FromStr;
+        use threshold_crypto::SecretKey;
+        use unwrap::unwrap;
 
-    let mut mock = SafeAppFake::new();
+        let mut mock = SafeAppFake::new();
 
-    let sk = SecretKey::random();
+        let sk = SecretKey::random();
 
-    let balance = unwrap!(Coins::from_str("2.345678912"));
-    unwrap!(mock.allocate_test_coins(sk.clone(), balance));
+        let balance = unwrap!(Coins::from_str("2.345678912"));
+        unwrap!(mock.allocate_test_coins(sk.clone(), balance));
 
-    let sk_to = SecretKey::random();
-    let pk_to = sk_to.public_key();
-    assert!(mock
-        .create_balance(Some(sk), pk_to, unwrap!(Coins::from_str("1.234567891")))
-        .is_ok());
-}
+        let sk_to = SecretKey::random();
+        let pk_to = sk_to.public_key();
+        assert!(mock
+            .create_balance(Some(sk), pk_to, unwrap!(Coins::from_str("1.234567891")))
+            .is_ok());
+    }
 
-#[test]
-fn test_check_balance() {
-    use self::SafeApp;
-    use std::str::FromStr;
-    use threshold_crypto::SecretKey;
-    use unwrap::unwrap;
+    #[test]
+    fn test_check_balance() {
+        use self::SafeApp;
+        use std::str::FromStr;
+        use threshold_crypto::SecretKey;
+        use unwrap::unwrap;
 
-    let mut mock = SafeAppFake::new();
+        let mut mock = SafeAppFake::new();
 
-    let sk = SecretKey::random();
+        let sk = SecretKey::random();
 
-    let balance = unwrap!(Coins::from_str("2.3"));
-    unwrap!(mock.allocate_test_coins(sk.clone(), balance));
-    let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
-    assert_eq!(balance, current_balance);
+        let balance = unwrap!(Coins::from_str("2.3"));
+        unwrap!(mock.allocate_test_coins(sk.clone(), balance));
+        let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
+        assert_eq!(balance, current_balance);
 
-    let sk_to = SecretKey::random();
-    let pk_to = sk_to.public_key();
-    let preload = unwrap!(Coins::from_str("1.234567891"));
-    unwrap!(mock.create_balance(Some(sk.clone()), pk_to, preload));
-    let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
-    assert_eq!(preload, current_balance);
+        let sk_to = SecretKey::random();
+        let pk_to = sk_to.public_key();
+        let preload = unwrap!(Coins::from_str("1.234567891"));
+        unwrap!(mock.create_balance(Some(sk.clone()), pk_to, preload));
+        let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
+        assert_eq!(preload, current_balance);
 
-    let current_balance = unwrap!(mock.get_balance_from_sk(sk));
-    assert_eq!(
-        unwrap!(Coins::from_str("1.065432108")), /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
-        current_balance
-    );
-}
+        let current_balance = unwrap!(mock.get_balance_from_sk(sk));
+        assert_eq!(
+            unwrap!(Coins::from_str("1.065432108")), /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
+            current_balance
+        );
+    }
 
-#[test]
-fn test_safecoin_transfer() {
-    use self::SafeApp;
-    use rand_core::RngCore;
-    use std::str::FromStr;
-    use threshold_crypto::SecretKey;
-    use unwrap::unwrap;
+    #[test]
+    fn test_safecoin_transfer() {
+        use self::SafeApp;
+        use rand_core::RngCore;
+        use std::str::FromStr;
+        use threshold_crypto::SecretKey;
+        use unwrap::unwrap;
 
-    let mut mock = SafeAppFake::new();
+        let mut mock = SafeAppFake::new();
 
-    let sk1 = SecretKey::random();
+        let sk1 = SecretKey::random();
 
-    let sk2 = SecretKey::random();
-    let pk2 = sk2.public_key();
+        let sk2 = SecretKey::random();
+        let pk2 = sk2.public_key();
 
-    let balance1 = unwrap!(Coins::from_str("2.5"));
-    let balance2 = unwrap!(Coins::from_str("5.7"));
-    unwrap!(mock.allocate_test_coins(sk1.clone(), balance1));
-    unwrap!(mock.allocate_test_coins(sk2.clone(), balance2));
+        let balance1 = unwrap!(Coins::from_str("2.5"));
+        let balance2 = unwrap!(Coins::from_str("5.7"));
+        unwrap!(mock.allocate_test_coins(sk1.clone(), balance1));
+        unwrap!(mock.allocate_test_coins(sk2.clone(), balance2));
 
-    let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()));
-    let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()));
+        let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()));
+        let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()));
 
-    assert_eq!(balance1, curr_balance1);
-    assert_eq!(balance2, curr_balance2);
+        assert_eq!(balance1, curr_balance1);
+        assert_eq!(balance2, curr_balance2);
 
-    let mut rng = rand::thread_rng();
-    let tx_id = rng.next_u64();
+        let mut rng = rand::thread_rng();
+        let tx_id = rng.next_u64();
 
-    let _ = unwrap!(mock.safecoin_transfer_to_xorname(
-        Some(sk1.clone()),
-        xorname_from_pk(pk2),
-        tx_id,
-        unwrap!(Coins::from_str("1.4"))
-    ));
-    unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()));
+        let _ = unwrap!(mock.safecoin_transfer_to_xorname(
+            Some(sk1.clone()),
+            xorname_from_pk(pk2),
+            tx_id,
+            unwrap!(Coins::from_str("1.4"))
+        ));
+        unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()));
 
-    let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1));
-    let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2));
+        let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1));
+        let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2));
 
-    assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
-    assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
+        assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
+        assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
+    }
 }
