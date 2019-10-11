@@ -270,6 +270,7 @@ impl SafeAuthdClient {
 
         // Start listening first
         let listen = endpoint_url.to_string();
+        // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
         let thread_join_handle = thread::spawn(move || match quic_listen(&listen, allow_cb) {
             Ok(_) => {
                 info!("Endpoint successfully launched for receiving auth req notifications");

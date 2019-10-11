@@ -100,10 +100,6 @@ pub fn auth_commander(
     port: Option<u16>,
     safe: &mut Safe,
 ) -> Result<(), String> {
-    let file_path = credentials_file_path()?;
-    let mut file = File::create(&file_path)
-        .map_err(|_| format!("Unable to create credentials file at {}", file_path))?;
-
     match cmd {
         Some(AuthSubCommands::Create { sk, test_coins }) => {
             let mut safe_authd = SafeAuthdClient::new(None);
@@ -156,9 +152,8 @@ pub fn auth_commander(
             Ok(())
         }
         Some(AuthSubCommands::Clear {}) => {
-            file.set_len(0).map_err(|err| {
-                format!("Unable to clear credentials from {}: {}", file_path, err)
-            })?;
+            let (_file, file_path) = get_credentials_file()
+                .map_err(|err| format!("Failed to clear credentials. {}", err))?;
 
             println!("Credentials were succesfully cleared from {}", file_path);
             Ok(())
@@ -213,7 +208,7 @@ pub fn auth_commander(
         Some(AuthSubCommands::RestartAuthd {}) => run_authd_cmd("restart"),
         None => {
             println!("Authorising CLI application...");
-
+            let (mut file, file_path) = get_credentials_file()?;
             let auth_credentials = safe
                 .auth_app(APP_ID, APP_NAME, APP_VENDOR, port)
                 .map_err(|err| format!("Application authorisation failed: {}", err))?;
@@ -318,6 +313,14 @@ fn credentials_file_path() -> Result<String, String> {
 
     let path = data_local_path.join(AUTH_CREDENTIALS_FILENAME);
     Ok(path.display().to_string())
+}
+
+fn get_credentials_file() -> Result<(File, String), String> {
+    let file_path = credentials_file_path()?;
+    let file = File::create(&file_path)
+        .map_err(|_| format!("Unable to open credentials file at {}", file_path))?;
+
+    Ok((file, file_path))
 }
 
 pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
