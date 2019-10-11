@@ -126,6 +126,35 @@ stage('build & test') {
             packageBuildArtifacts("safe-ffi", "non-dev", "armv7-linux-androideabi")
             uploadBuildArtifacts()
         }
+    },
+    release_ffi_ios_aarch64: {
+        node("osx") {
+            checkout(scm)
+            sh("make build-ios-aarch64")
+            packageBuildArtifacts("safe-ffi", "non-dev", "aarch64-apple-ios")
+            uploadBuildArtifacts()
+        }
+    },
+    release_ffi_ios_x86_64: {
+        node("osx") {
+            checkout(scm)
+            sh("make build-ios-x86_64")
+            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-ios")
+            uploadBuildArtifacts()
+        }
+    }
+}
+
+stage("build universal iOS lib") {
+    node("osx") {
+        checkout(scm)
+        def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
+        withEnv(["SAFE_CLI_BUILD_BRANCH=${branch}",
+                 "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+            sh("make universal-ios-lib")
+            sh("make package-universal-ios-lib")
+            uploadBuildArtifacts()
+        }
     }
 }
 

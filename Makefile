@@ -121,6 +121,52 @@ build-clean-ffi-android-armv7:
 	docker rm "safe-cli-build-${UUID}"
 	find target/armv7-linux-androideabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+build-ios-aarch64:
+	rm -rf artifacts
+	mkdir artifacts
+	cargo build --release --manifest-path=safe-ffi/Cargo.toml --target=aarch64-apple-ios
+	find target/aarch64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-ios-x86_64:
+	rm -rf artifacts
+	mkdir artifacts
+	cargo build --release --manifest-path=safe-ffi/Cargo.toml --target=x86_64-apple-ios
+	find target/x86_64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+retrieve-ios-build-artifacts:
+ifndef SAFE_CLI_BUILD_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SAFE_CLI_BUILD_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SAFE_CLI_BUILD_NUMBER
+	@echo "A valid build number must be supplied for the artifacts to be retrieved."
+	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	./scripts/retrieve-build-artifacts.sh "x86_64-apple-ios" "aarch64-apple-ios"
+
+universal-ios-lib: retrieve-ios-build-artifacts
+ifneq ($(UNAME_S),Darwin)
+	@echo "This target can only be run on macOS"
+	@exit 1
+endif
+ifndef SAFE_CLI_BUILD_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SAFE_CLI_BUILD_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SAFE_CLI_BUILD_NUMBER
+	@echo "A valid build number must be supplied for the artifacts to be retrieved."
+	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	mkdir -p artifacts/real/universal
+	mkdir -p artifacts/mock/universal
+	lipo -create -output artifacts/real/universal/libsafe_ffi.a \
+		artifacts/real/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/real/aarch64-apple-ios/release/libsafe_ffi.a
+
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
 	find artifacts -name "safe.exe" -exec strip -x '{}' \;
@@ -310,7 +356,7 @@ ifndef SAFE_CLI_BUILD_COMPONENT
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_TARGET
-	@echo "A value must be supplied for SCL_BUILD_TARGET."
+	@echo "A value must be supplied for SAFE_CLI_BUILD_TARGET."
 	@exit 1
 endif
 ifeq ($(SAFE_CLI_BUILD_TYPE),dev)
@@ -333,31 +379,28 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-	rm -rf artifacts
-	mkdir -p artifacts/linux/release
-	mkdir -p artifacts/win/release
-	mkdir -p artifacts/macos/release
-	mkdir -p artifacts/linux/dev
-	mkdir -p artifacts/win/dev
-	mkdir -p artifacts/macos/dev
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-linux-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-windows-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-macos-x86_64.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-linux-x86_64-dev.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-windows-x86_64-dev.tar.gz .
-	aws s3 cp --no-sign-request --region eu-west-2 s3://${S3_BUCKET}/${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-macos-x86_64-dev.tar.gz .
-	tar -C artifacts/linux/release -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-linux-x86_64.tar.gz
-	tar -C artifacts/win/release -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-windows-x86_64.tar.gz
-	tar -C artifacts/macos/release -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-macos-x86_64.tar.gz
-	tar -C artifacts/linux/dev -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-linux-x86_64-dev.tar.gz
-	tar -C artifacts/win/dev -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-windows-x86_64-dev.tar.gz
-	tar -C artifacts/macos/dev -xvf ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-macos-x86_64-dev.tar.gz
-	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-linux-x86_64.tar.gz
-	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-windows-x86_64.tar.gz
-	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-macos-x86_64.tar.gz
-	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-linux-x86_64-dev.tar.gz
-	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-windows-x86_64-dev.tar.gz
-	rm ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-cli-macos-x86_64-dev.tar.gz
+	./scripts/retrieve-build-artifacts \
+		"x86_64-unknown-linux-gnu" "x86_64-pc-windows-gnu" "x86_64-apple-darwin" \
+		"armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
+		"aarch64-apple-ios" "apple-ios"
+
+package-universal-ios-lib:
+ifndef SAFE_CLI_BUILD_BRANCH
+	@echo "A branch or PR reference must be provided."
+	@echo "Please set SAFE_CLI_BUILD_BRANCH to a valid branch or PR reference."
+	@exit 1
+endif
+ifndef SAFE_CLI_BUILD_NUMBER
+	@echo "A valid build number must be supplied for the artifacts to be retrieved."
+	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@exit 1
+endif
+	( \
+		cd artifacts; \
+		tar -C real/universal -zcvf \
+			${SAFE_CLI_BUILD_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios.tar.gz .; \
+	)
+	rm -rf artifacts/real
 
 clean:
 ifndef SAFE_AUTH_PORT
