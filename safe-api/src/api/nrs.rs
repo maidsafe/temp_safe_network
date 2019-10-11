@@ -346,8 +346,8 @@ mod tests {
 
     #[test]
     fn test_nrs_map_container_create() {
-        use super::constants::FAKE_RDF_PREDICATE_LINK;
-        use super::nrs_map::DefaultRdf;
+        use crate::api::constants::FAKE_RDF_PREDICATE_LINK;
+        use crate::nrs_map::DefaultRdf;
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;

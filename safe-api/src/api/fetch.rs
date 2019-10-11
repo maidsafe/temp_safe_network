@@ -326,11 +326,14 @@ fn embed_resolved_from(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::helpers::create_random_xorname;
+    use crate::api::xorurl::XorUrlEncoder;
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    use unwrap::unwrap;
 
     #[test]
     fn test_fetch_key() {
-        use super::xorurl::XorUrlEncoder;
-        use unwrap::unwrap;
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
         let preload_amount = "1324.12";
@@ -350,8 +353,6 @@ mod tests {
 
     #[test]
     fn test_fetch_wallet() {
-        use super::xorurl::XorUrlEncoder;
-        use unwrap::unwrap;
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorurl = unwrap!(safe.wallet_create());
@@ -373,8 +374,6 @@ mod tests {
 
     #[test]
     fn test_fetch_files_container() {
-        use super::xorurl::XorUrlEncoder;
-        use unwrap::unwrap;
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
         safe.connect("", Some("")).unwrap();
@@ -414,11 +413,6 @@ mod tests {
 
     #[test]
     fn test_fetch_resolvable_container() {
-        use super::xorurl::XorUrlEncoder;
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
         let mut safe = Safe::new("base32z");
@@ -463,11 +457,6 @@ mod tests {
 
     #[test]
     fn test_fetch_resolvable_map_data() {
-        use super::xorurl::XorUrlEncoder;
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
         let mut safe = Safe::new("base32z");
@@ -512,8 +501,6 @@ mod tests {
 
     #[test]
     fn test_fetch_published_immutable_data() {
-        use super::xorurl::XorUrlEncoder;
-        use unwrap::unwrap;
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
         let data = b"Something super immutable";
@@ -537,9 +524,6 @@ mod tests {
 
     #[test]
     fn test_fetch_unsupported() {
-        use super::helpers::create_random_xorname;
-        use super::xorurl::XorUrlEncoder;
-        use unwrap::unwrap;
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorname = create_random_xorname();
@@ -567,9 +551,6 @@ mod tests {
 
     #[test]
     fn test_fetch_unsupported_with_media_type() {
-        use super::helpers::create_random_xorname;
-        use super::xorurl::XorUrlEncoder;
-        use unwrap::unwrap;
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorname = create_random_xorname();

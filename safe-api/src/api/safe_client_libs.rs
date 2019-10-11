@@ -603,10 +603,10 @@ fn get_public_bls_key(safe_app: &App) -> ResultReturn<PublicKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Safe;
 
     #[test]
     fn test_put_and_get_immutable_data() {
-        use super::Safe;
         let mut safe = Safe::new("base32z");
         safe.connect("", Some("fake-credentials")).unwrap();
 
@@ -623,7 +623,6 @@ mod tests {
 
     #[test]
     fn test_put_get_update_seq_append_only_data() {
-        use super::Safe;
         let mut safe = Safe::new("base32z");
         safe.connect("", Some("fake-credentials")).unwrap();
 
@@ -721,7 +720,6 @@ mod tests {
 
     #[test]
     fn test_update_seq_append_only_data_error() {
-        use super::Safe;
         let mut safe = Safe::new("base32z");
         safe.connect("", Some("fake-credentials")).unwrap();
 
