@@ -12,7 +12,7 @@ use prettytable::Table;
 use rpassword;
 use safe_api::{Safe, SafeAuthdClient};
 use std::fs::{DirBuilder, File};
-use std::io::{self, Read, Write};
+use std::io::{self, stdin, stdout, Read, Write};
 use std::path::Path;
 use std::process::Command;
 use std::thread;
@@ -196,12 +196,9 @@ pub fn auth_commander(
             let mut safe_authd = SafeAuthdClient::new(None);
             println!("Sending request to subscribe...");
             //safe_authd.subscribe_url(&notifs_endpoint)?;
-            safe_authd.subscribe(&notifs_endpoint, &|app_id| {
-                println!("Allowing app {}", app_id);
-                true
-            })?;
+            safe_authd.subscribe(&notifs_endpoint, &prompt_to_allow_auth)?;
             println!("Subscribed successfully");
-            thread::sleep(Duration::from_millis(20000));
+            thread::sleep(Duration::from_millis(120000));
             Ok(())
         }
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
@@ -257,7 +254,7 @@ fn run_authd_cmd(command: &str) -> Result<(), String> {
         io::stderr()
             .write_all(&output.stderr)
             .map_err(|err| format!("Failed to output stderr: {}", err))?;
-        Err("Failed to run safe-authd".to_string())
+        Err("Failed to invoke safe-authd executable".to_string())
     }
 }
 
@@ -344,4 +341,115 @@ pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
     }*/
     table.printstd();
     println!("{}", authed_apps);
+}
+
+pub fn prompt_to_allow_auth(app_id: &str) -> bool {
+    /*    match req {
+            IpcReq::Auth(app_auth_req) => {
+                println!("The following application authorisation request was received:");
+                let mut table = Table::new();
+                table
+                    .add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"]);
+                table.add_row(row![
+                    app_auth_req.app.id,
+                    app_auth_req.app.name,
+                    // app_auth_req.app.scope || "",
+                    app_auth_req.app.vendor,
+                    format!(
+                        "Own container: {}\nDefault containers: {:?}",
+                        app_auth_req.app_container, app_auth_req.containers
+                    ),
+                ]);
+                table.printstd();
+            }
+            IpcReq::Containers(cont_req) => {
+                println!("The following authorisation request for containers was received:");
+                println!("{:?}", cont_req);
+                let mut table = Table::new();
+                table
+                    .add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"]);
+                table.add_row(row![
+                    cont_req.app.id,
+                    cont_req.app.name,
+                    // cont_req.app.scope || "",
+                    cont_req.app.vendor,
+                    format!("{:?}", cont_req.containers)
+                ]);
+                table.printstd();
+            }
+            IpcReq::ShareMData(share_mdata_req) => {
+                println!("The following authorisation request to share a MutableData was received:");
+                let mut row = String::from("");
+                for mdata in share_mdata_req.mdata.iter() {
+                    row += &format!("Type tag: {}\nXoR name: {:?}", mdata.type_tag, mdata.name);
+                    let insert_perm = if mdata.perms.is_allowed(MDataAction::Insert) {
+                        " Insert"
+                    } else {
+                        ""
+                    };
+                    let update_perm = if mdata.perms.is_allowed(MDataAction::Update) {
+                        " Update"
+                    } else {
+                        ""
+                    };
+                    let delete_perm = if mdata.perms.is_allowed(MDataAction::Delete) {
+                        " Delete"
+                    } else {
+                        ""
+                    };
+                    let manage_perm = if mdata.perms.is_allowed(MDataAction::ManagePermissions) {
+                        " ManagePermissions"
+                    } else {
+                        ""
+                    };
+                    row += &format!(
+                        "\nPermissions:{}{}{}{}\n\n",
+                        insert_perm, update_perm, delete_perm, manage_perm
+                    );
+                }
+                let mut table = Table::new();
+                table.add_row(row![
+                    bFg->"Id",
+                    bFg->"Name",
+                    bFg->"Vendor",
+                    bFg->"MutableData's requested to share"
+                ]);
+                table.add_row(row![
+                    share_mdata_req.app.id,
+                    share_mdata_req.app.name,
+                    // share_mdata_req.app.scope || "",
+                    share_mdata_req.app.vendor,
+                    row
+                ]);
+                table.printstd();
+            }
+            IpcReq::Unregistered(_) => {
+                // we simply allow unregistered authorisation requests
+                return true;
+            }
+        };
+    */
+    println!("The following application authorisation request was received:");
+    println!("App ID: {}", app_id);
+
+    let mut prompt = String::new();
+    print!("Allow authorisation? [y/N]: ");
+    let _ = stdout().flush();
+    stdin()
+        .read_line(&mut prompt)
+        .expect("Did not enter a correct string. Authorisation will be denied.");
+    if let Some('\n') = prompt.chars().next_back() {
+        prompt.pop();
+    }
+    if let Some('\r') = prompt.chars().next_back() {
+        prompt.pop();
+    }
+
+    if prompt.to_lowercase() == "y" {
+        println!("Authorisation will be allowed...");
+        true
+    } else {
+        println!("Authorisation will be denied...");
+        false
+    }
 }

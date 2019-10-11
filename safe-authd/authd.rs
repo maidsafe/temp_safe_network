@@ -13,7 +13,7 @@ use super::quic_client::quic_send;
 use super::update::update_commander;
 use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
-use futures::{Future, Stream};
+use futures::{Async, Future, Poll, Stream};
 use safe_api::{SafeAuthReq, SafeAuthenticator};
 use slog::{Drain, Logger};
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,16 +24,13 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
+use tokio::sync::mpsc;
 use url::Url;
-
-// Timeout when to give up waiting for an auth req to be allowed/denied
-const AUTH_REQ_ALLOW_TIMEOUT: u64 = 30000;
 
 // Frequency for checking pensing auth requests
 const AUTH_REQS_CHECK_FREQ: u64 = 2000;
@@ -41,7 +38,7 @@ const AUTH_REQS_CHECK_FREQ: u64 = 2000;
 // Maximum number of allowed auth reqs notifs subscriptors
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct AuthReq {
     pub app_id: String,
     pub tx: mpsc::Sender<bool>,
@@ -274,12 +271,12 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
             // We keep a list of the notifications subscriptors' endpoints
             let notif_endpoints_handle = Arc::new(Mutex::new(BTreeSet::new()));
 
-            // Let's spawn the threads which will monitor pending auth reqs
+            // Let's spawn a thread which will monitor pending auth reqs
             // and get them allowed/denied by the user using any of the subcribed endpoints
-            let auth_reqs_handle2 = auth_reqs_handle.clone();
-            let notif_endpoints_handle2 = notif_endpoints_handle.clone();
-            spawn_auth_reqs_monitor_thread(auth_reqs_handle2, notif_endpoints_handle2);
+            // TODO: this can also be a Future with a Stream and schudule it as a task rather than having a thread
+            monitor_pending_auth_reqs(auth_reqs_handle.clone(), notif_endpoints_handle.clone());
 
+            // Finally let's spawn the task to handle the incoming connections
             let mut runtime = Runtime::new()?;
             runtime.spawn(incoming.for_each(move |conn| {
                 handle_connection(
@@ -291,70 +288,13 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
                 );
                 Ok(())
             }));
+
             runtime.block_on(endpoint_driver)?;
         }
         Err(e) => eprintln!("Error, {}", e),
     }
 
     Ok(())
-}
-
-fn spawn_auth_reqs_monitor_thread(
-    auth_reqs_handle: SharedAuthReqsHandle,
-    notif_endpoints_handle: SharedNotifEndpointsHandle,
-) {
-    thread::spawn(move || loop {
-        {
-            let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-            let notif_endpoints_list: &mut BTreeSet<String> =
-                &mut *(notif_endpoints_handle.lock().unwrap());
-
-            println!("Checking AUTH REQS, pending: {}", auth_reqs_list.len());
-
-            // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
-            // and remove them if they don't respond or their response is positive. Also remove
-
-            // TODO: perhaps check only one auth req per loop to not lock the auth reqs handle too long,
-            // or clone it and release the mutex before iterating
-            for (req_id, auth_req) in auth_reqs_list.iter() {
-                let mut is_allow = false;
-                for endpoint in notif_endpoints_list.iter() {
-                    println!("ASKING SUBSCRIPTOR: {}", endpoint);
-                    match quic_send(
-                        &format!("{}/{}", endpoint, auth_req.app_id),
-                        false,
-                        None,
-                        None,
-                        false,
-                    ) {
-                        Ok(allow) => {
-                            is_allow = allow.starts_with("true");
-                            break;
-                        }
-                        Err(err) => {
-                            println!(
-                                "Skipping subscriptor '{}' since it didn't respond: {}",
-                                endpoint, err
-                            );
-                        }
-                    }
-                }
-                println!(
-                    "ALLOW FOR Req ID: {} - App ID: {} ??: {}",
-                    req_id, auth_req.app_id, is_allow
-                );
-                match auth_req.tx.send(is_allow) {
-                    Ok(_) => println!("Auth req decision sent successfully"),
-                    Err(_) => {
-                        println!("Auth req decision wasn't sent, and therefore already denied")
-                    }
-                }
-            }
-            auth_reqs_list.clear();
-        }
-
-        thread::sleep(Duration::from_millis(AUTH_REQS_CHECK_FREQ));
-    });
 }
 
 fn stop_authd(_log: Logger) -> Result<(), Error> {
@@ -399,9 +339,6 @@ fn handle_connection(
           "address" => %conn.remote_address(),
           "protocol" => conn.protocol().map_or_else(|| "<none>".into(), |x| String::from_utf8_lossy(&x).into_owned()));
     let log2 = log.clone();
-    let safe_auth_handle = safe_auth_handle.clone();
-    let auth_reqs_handle = auth_reqs_handle.clone();
-    let notif_endpoints_handle = notif_endpoints_handle.clone();
 
     // We ignore errors from the driver because they'll be reported by the `incoming` handler anyway.
     tokio_current_thread::spawn(conn_driver.map_err(|_| ()));
@@ -412,9 +349,9 @@ fn handle_connection(
             .map_err(move |e| info!(log2, "Connection terminated"; "reason" => %e))
             .for_each(move |stream| {
                 handle_request(
-                    &safe_auth_handle,
-                    &auth_reqs_handle,
-                    &notif_endpoints_handle,
+                    safe_auth_handle.clone(),
+                    auth_reqs_handle.clone(),
+                    notif_endpoints_handle.clone(),
                     &log,
                     stream,
                 );
@@ -424,9 +361,9 @@ fn handle_connection(
 }
 
 fn handle_request(
-    safe_auth_handle: &SharedSafeAuthenticatorHandle,
-    auth_reqs_handle: &SharedAuthReqsHandle,
-    notif_endpoints_handle: &SharedNotifEndpointsHandle,
+    safe_auth_handle: SharedSafeAuthenticatorHandle,
+    auth_reqs_handle: SharedAuthReqsHandle,
+    notif_endpoints_handle: SharedNotifEndpointsHandle,
     log: &Logger,
     stream: quinn::NewStream,
 ) {
@@ -452,25 +389,17 @@ fn handle_request(
                 }
                 info!(log, "Got request");
                 // Execute the request
-                let resp = process_get(
-                    &safe_auth_handle,
-                    &auth_reqs_handle,
-                    &notif_endpoints_handle,
+                process_request(
+                    safe_auth_handle,
+                    auth_reqs_handle,
+                    notif_endpoints_handle,
                     &req,
                 )
-                .unwrap_or_else(move |e| {
-                    error!(log, "Failed to process request"; "reason" => %e.pretty());
-                    // TODO: implement JSON-RPC rather.
-                    // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
-                    // once we have JSON-RPC we can adhere to its format for errors.
-                    format!("[AUTHD_ERROR]:SAFE Authenticator: {}", e.pretty())
-                        .into_bytes()
-                        .into()
-                });
-
-                // Write the response
-                tokio::io::write_all(send, resp)
-                    .map_err(|e| format_err!("Failed to send response: {}", e))
+                .and_then(|resp| {
+                    // Write the response
+                    tokio::io::write_all(send, resp)
+                        .map_err(|e| format_err!("Failed to send response: {}", e))
+                })
             })
             // Gracefully terminate the stream
             .and_then(|(send, _)| {
@@ -482,382 +411,582 @@ fn handle_request(
     )
 }
 
-fn process_get(
-    safe_auth_handle: &SharedSafeAuthenticatorHandle,
-    auth_reqs_handle: &SharedAuthReqsHandle,
-    notif_endpoints_handle: &SharedNotifEndpointsHandle,
-    x: &[u8],
-) -> Result<Box<[u8]>, Error> {
-    if x.len() < 4 || &x[0..4] != b"GET " {
-        bail!("Missing GET");
+fn process_request(
+    safe_auth_handle: SharedSafeAuthenticatorHandle,
+    auth_reqs_handle: SharedAuthReqsHandle,
+    notif_endpoints_handle: SharedNotifEndpointsHandle,
+    req: &[u8],
+) -> ProcessRequest {
+    ProcessRequest::HandleRequest {
+        safe_auth_handle,
+        auth_reqs_handle,
+        notif_endpoints_handle,
+        req: req.to_vec(),
     }
-    if x[4..].len() < 2 || &x[x.len() - 2..] != b"\r\n" {
-        bail!("Missing \\r\\n");
-    }
-    let x = &x[4..x.len() - 2];
-    let end = x.iter().position(|&c| c == b' ').unwrap_or_else(|| x.len());
-    let path = str::from_utf8(&x[..end]).context("Path is malformed UTF-8")?;
-    let req_args: Vec<&str> = path.split("/").collect();
+}
 
-    let safe_auth: &mut SafeAuthenticator = &mut *(safe_auth_handle.lock().unwrap());
+enum ProcessRequest {
+    HandleRequest {
+        safe_auth_handle: SharedSafeAuthenticatorHandle,
+        auth_reqs_handle: SharedAuthReqsHandle,
+        notif_endpoints_handle: SharedNotifEndpointsHandle,
+        req: Vec<u8>,
+    },
+    ProcessingResponse {
+        safe_auth_handle: SharedSafeAuthenticatorHandle,
+        auth_reqs_handle: SharedAuthReqsHandle,
+        rx: mpsc::Receiver<bool>,
+        req_id: u32,
+        auth_req_str: String,
+    },
+}
 
-    match req_args[1] {
-        "login" => {
-            if req_args.len() != 4 {
-                bail!("Incorrect number of arguments for 'login' action")
-            } else {
-                println!("Logging in to SAFE account...");
-                let secret = req_args[2];
-                let password = req_args[3];
+impl Future for ProcessRequest {
+    type Item = Box<[u8]>;
+    type Error = Error;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        use self::ProcessRequest::*;
 
-                match safe_auth.log_in(secret, password) {
-                    Ok(_) => {
-                        let msg = "Logged in successfully!";
-                        println!("{}", msg);
-                        Ok(msg.as_bytes().into())
-                    }
-                    Err(err) => {
-                        println!("Error occurred when trying to log in: {}", err);
-                        bail!(err)
-                    }
-                }
-            }
-        }
-        "logout" => {
-            if req_args.len() != 2 {
-                bail!("Incorrect number of arguments for 'logout' action")
-            } else {
-                println!("Logging out...");
-                match safe_auth.log_out() {
-                    Ok(()) => {
-                        let msg = "Logged out successfully";
-                        println!("{}", msg);
-                        Ok(msg.as_bytes().into())
-                    }
-                    Err(err) => {
-                        let msg = format!("Failed to log out: {}", err);
-                        println!("{}", msg);
-                        bail!(msg)
-                    }
-                }
-            }
-        }
-        "create" => {
-            if req_args.len() != 5 {
-                bail!("Incorrect number of arguments for 'create' action")
-            } else {
-                println!("Creating an account in SAFE...");
-                let secret = req_args[2];
-                let password = req_args[3];
-                let sk = req_args[4];
+        // TODO: implement JSON-RPC rather.
+        // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
+        // once we have JSON-RPC we can adhere to its format for errors.
+        let future_err = |str: String| -> Poll<Self::Item, Self::Error> {
+            Ok(Async::Ready(
+                format!("[AUTHD_ERROR]:SAFE Authenticator: {}", str)
+                    .into_bytes()
+                    .into(),
+            ))
+        };
 
-                match safe_auth.create_acc(sk, secret, password) {
-                    Ok(_) => {
-                        let msg = "Account created successfully";
-                        println!("{}", msg);
-                        Ok(msg.as_bytes().into())
-                    }
-                    Err(err) => {
-                        println!("Error occurred when trying to create SAFE account: {}", err);
-                        bail!(err)
-                    }
-                }
-            }
-        }
-        "authorise" => {
-            if req_args.len() != 3 {
-                bail!("Incorrect number of arguments for 'authorise' action")
-            } else {
-                println!("Authorising application...");
-                // TODO: automatically reject if there are too many pending auth reqs
-                let auth_req_str = req_args[2];
-                match safe_auth.decode_req(auth_req_str) {
-                    Ok((req_id, safe_auth_req)) => {
-                        println!("Sending request to user to allow/deny request...");
-                        if request_to_allow_auth(req_id, safe_auth_req, &auth_reqs_handle) {
-                            match safe_auth.authorise_app(auth_req_str) {
-                                Ok(resp) => {
-                                    println!("Authorisation response sent back to application");
-                                    Ok(resp.as_bytes().into())
+        let future_ok = |str: String| -> Poll<Self::Item, Self::Error> {
+            Ok(Async::Ready(str.into_bytes().into()))
+        };
+
+        loop {
+            match self {
+                ProcessingResponse {
+                    safe_auth_handle,
+                    auth_reqs_handle,
+                    rx,
+                    req_id,
+                    auth_req_str,
+                } => {
+                    match rx.poll() {
+                        Ok(Async::Ready(Some(is_allowed))) => {
+                            rx.close();
+                            if is_allowed {
+                                let safe_auth: &mut SafeAuthenticator =
+                                    &mut *(safe_auth_handle.lock().unwrap());
+                                match safe_auth.authorise_app(auth_req_str) {
+                                    Ok(resp) => {
+                                        println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
+                                        return future_ok(resp);
+                                    }
+                                    Err(err) => {
+                                        println!("Failed to authorise application: {}", err);
+                                        return future_err(err.to_string());
+                                    }
                                 }
-                                Err(err) => {
-                                    println!("Failed to authorise application: {}", err);
-                                    bail!(err)
+                            } else {
+                                let msg = format!("Authorisation request ({}) was denied", req_id);
+                                println!("{}", msg);
+                                return future_err(msg);
+                            }
+                        }
+                        Ok(Async::NotReady) => {
+                            return Ok(Async::NotReady);
+                        }
+                        Ok(Async::Ready(None)) | Err(_) => {
+                            rx.close();
+                            // We didn't get a response in a timely manner, we cannot allow the list
+                            // to grow infinitelly, so let's remove the request from it
+                            let auth_reqs_list: &mut AuthReqsList =
+                                &mut *(auth_reqs_handle.lock().unwrap());
+                            auth_reqs_list.remove(&req_id);
+                            let msg = "Failed to get authorision response";
+                            println!("{}", msg);
+                            return future_err(msg.to_string());
+                        }
+                    }
+                }
+                HandleRequest {
+                    safe_auth_handle,
+                    auth_reqs_handle,
+                    notif_endpoints_handle,
+                    req,
+                } => {
+                    if req.len() < 4 || &req[0..4] != b"GET " {
+                        return future_err("Missing GET".to_string());
+                    }
+                    if req[4..].len() < 2 || &req[req.len() - 2..] != b"\r\n" {
+                        return future_err("Missing \\r\\n".to_string());
+                    }
+                    let req = &req[4..req.len() - 2];
+                    let end = req
+                        .iter()
+                        .position(|&c| c == b' ')
+                        .unwrap_or_else(|| req.len());
+                    let path = match str::from_utf8(&req[..end]).context("Path is malformed UTF-8")
+                    {
+                        Ok(path) => path,
+                        Err(err) => return future_err(err.to_string()),
+                    };
+                    let req_args: Vec<&str> = path.split("/").collect();
+
+                    let safe_auth_handle = safe_auth_handle.clone();
+                    let safe_auth: &mut SafeAuthenticator =
+                        &mut *(safe_auth_handle.lock().unwrap());
+
+                    println!("Processing new incoming request: '{}'", req_args[1]);
+                    match req_args[1] {
+                        "login" => {
+                            if req_args.len() != 4 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'login' action".to_string(),
+                                );
+                            } else {
+                                println!("Logging in to SAFE account...");
+                                let secret = req_args[2];
+                                let password = req_args[3];
+
+                                match safe_auth.log_in(secret, password) {
+                                    Ok(_) => {
+                                        let msg = "Logged in successfully!";
+                                        println!("{}", msg);
+                                        return future_ok(msg.to_string());
+                                    }
+                                    Err(err) => {
+                                        let msg = format!(
+                                            "Error occurred when trying to log in: {}",
+                                            err
+                                        );
+                                        println!("{}", msg);
+                                        return future_err(err.to_string());
+                                    }
                                 }
                             }
-                        } else {
-                            let msg = format!("Authorisation request ({}) was denied", req_id);
-                            println!("{}", msg);
-                            bail!(msg)
                         }
-                    }
-                    Err(err) => {
-                        println!("{}", err);
-                        bail!(err)
-                    }
-                }
-            }
-        }
-        "authed-apps" => {
-            if req_args.len() != 2 {
-                bail!("Incorrect number of arguments for 'authed-apps' action")
-            } else {
-                println!("Obtaining list of authorised applications...");
-                match safe_auth.authed_apps() {
-                    Ok(resp) => {
-                        println!("List of authorised apps sent");
-                        Ok(format!("{:?}", resp).as_bytes().into())
-                    }
-                    Err(err) => {
-                        println!("Failed to get list of authorised apps: {}", err);
-                        bail!(err)
-                    }
-                }
-            }
-        }
-        "revoke" => {
-            if req_args.len() != 3 {
-                bail!("Incorrect number of arguments for 'revoke' action")
-            } else {
-                println!("Revoking application...");
-                let app_id = req_args[2];
+                        "logout" => {
+                            if req_args.len() != 2 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'logout' action".to_string(),
+                                );
+                            } else {
+                                println!("Logging out...");
+                                match safe_auth.log_out() {
+                                    Ok(()) => {
+                                        let msg = "Logged out successfully";
+                                        println!("{}", msg);
+                                        return future_ok(msg.to_string());
+                                    }
+                                    Err(err) => {
+                                        let msg = format!("Failed to log out: {}", err);
+                                        println!("{}", msg);
+                                        return future_err(msg);
+                                    }
+                                }
+                            }
+                        }
+                        "create" => {
+                            if req_args.len() != 5 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'create' action".to_string(),
+                                );
+                            } else {
+                                println!("Creating an account in SAFE...");
+                                let secret = req_args[2];
+                                let password = req_args[3];
+                                let sk = req_args[4];
 
-                match safe_auth.revoke_app(app_id) {
-                    Ok(()) => {
-                        let msg = "Application revoked successfully";
-                        println!("{}", msg);
-                        Ok(msg.as_bytes().into())
-                    }
-                    Err(err) => {
-                        println!("Failed to revoke application '{}': {}", app_id, err);
-                        bail!(err)
-                    }
-                }
-            }
-        }
-        "auth-reqs" => {
-            if req_args.len() != 2 {
-                bail!("Incorrect number of arguments for 'auth-reqs' action")
-            } else {
-                println!("Obtaining list of pending authorisation requests...");
-                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-                let resp: BTreeSet<String> = auth_reqs_list
-                    .iter()
-                    .map(|(req_id, auth_req)| {
-                        format!("Req ID: {} - App ID: {}", req_id, auth_req.app_id)
-                    })
-                    .collect();
+                                match safe_auth.create_acc(sk, secret, password) {
+                                    Ok(_) => {
+                                        let msg = "Account created successfully";
+                                        println!("{}", msg);
+                                        return future_ok(msg.to_string());
+                                    }
+                                    Err(err) => {
+                                        println!(
+                                            "Error occurred when trying to create SAFE account: {}",
+                                            err
+                                        );
+                                        return future_err(err.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        "authorise" => {
+                            if req_args.len() != 3 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'authorise' action"
+                                        .to_string(),
+                                );
+                            } else {
+                                println!("Authorising application...");
+                                // TODO: automatically reject if there are too many pending auth reqs
+                                let auth_req_str = req_args[2];
+                                match safe_auth.decode_req(auth_req_str) {
+                                    Ok((req_id, safe_auth_req)) => {
+                                        println!(
+                                            "Sending request to user to allow/deny request..."
+                                        );
 
-                println!("List of pending authorisation requests sent");
-                Ok(format!("{:?}", resp).as_bytes().into())
-            }
-        }
-        "allow" => {
-            if req_args.len() != 3 {
-                bail!("Incorrect number of arguments for 'allow' action")
-            } else {
-                println!("Allowing authorisation request...");
-                let auth_req_id = req_args[2];
-                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-                let req_id = auth_req_id.parse::<u32>()?;
-                match auth_reqs_list.remove(&req_id) {
-                    Some(auth_req) => match auth_req.tx.send(true) {
-                        Ok(_) => {
-                            let msg = format!(
-                                "Authorisation request ({}) allowed successfully",
-                                auth_req_id
+                                        let rx = enqueue_auth_req(
+                                            req_id,
+                                            safe_auth_req,
+                                            auth_reqs_handle,
+                                        );
+
+                                        *self = ProcessingResponse {
+                                            safe_auth_handle: safe_auth_handle.clone(),
+                                            auth_reqs_handle: auth_reqs_handle.clone(),
+                                            rx,
+                                            req_id,
+                                            auth_req_str: auth_req_str.to_string(),
+                                        };
+                                    }
+                                    Err(err) => {
+                                        println!("{}", err);
+                                        return future_err(err.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        "authed-apps" => {
+                            if req_args.len() != 2 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'authed-apps' action"
+                                        .to_string(),
+                                );
+                            } else {
+                                println!("Obtaining list of authorised applications...");
+                                match safe_auth.authed_apps() {
+                                    Ok(resp) => {
+                                        println!("List of authorised apps sent");
+                                        return future_ok(format!("{:?}", resp));
+                                    }
+                                    Err(err) => {
+                                        println!("Failed to get list of authorised apps: {}", err);
+                                        return future_err(err.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        "revoke" => {
+                            if req_args.len() != 3 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'revoke' action".to_string(),
+                                );
+                            } else {
+                                println!("Revoking application...");
+                                let app_id = req_args[2];
+
+                                match safe_auth.revoke_app(app_id) {
+                                    Ok(()) => {
+                                        let msg = "Application revoked successfully";
+                                        println!("{}", msg);
+                                        return future_ok(msg.to_string());
+                                    }
+                                    Err(err) => {
+                                        println!(
+                                            "Failed to revoke application '{}': {}",
+                                            app_id, err
+                                        );
+                                        return future_err(err.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        "auth-reqs" => {
+                            if req_args.len() != 2 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'auth-reqs' action"
+                                        .to_string(),
+                                );
+                            } else {
+                                println!("Obtaining list of pending authorisation requests...");
+                                let auth_reqs_list: &mut AuthReqsList =
+                                    &mut *(auth_reqs_handle.lock().unwrap());
+                                let resp: BTreeSet<String> = auth_reqs_list
+                                    .iter()
+                                    .map(|(req_id, auth_req)| {
+                                        format!("Req ID: {} - App ID: {}", req_id, auth_req.app_id)
+                                    })
+                                    .collect();
+
+                                println!("List of pending authorisation requests sent");
+                                return future_ok(format!("{:?}", resp));
+                            }
+                        }
+                        "allow" => {
+                            if req_args.len() != 3 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'allow' action".to_string(),
+                                );
+                            } else {
+                                println!("Allowing authorisation request...");
+                                let auth_req_id = req_args[2];
+                                let auth_reqs_list: &mut AuthReqsList =
+                                    &mut *(auth_reqs_handle.lock().unwrap());
+                                let req_id = match auth_req_id.parse::<u32>() {
+                                    Ok(id) => id,
+                                    Err(err) => return future_err(err.to_string()),
+                                };
+                                match auth_reqs_list.remove(&req_id) {
+                                    Some(mut auth_req) => match auth_req.tx.try_send(true) {
+                                        Ok(_) => {
+                                            let msg = format!(
+                                                "Authorisation request ({}) allowed successfully",
+                                                auth_req_id
+                                            );
+                                            println!("{}", msg);
+                                            return future_ok(msg);
+                                        }
+                                        Err(_) => {
+                                            let msg = format!("Failed to allow authorisation request '{}' since the response couldn't be sent to the requesting application", auth_req_id);
+                                            println!("{}", msg);
+                                            return future_err(msg);
+                                        }
+                                    },
+                                    None => {
+                                        let msg = format!(
+                                            "No pending authorisation request found with id '{}'",
+                                            auth_req_id
+                                        );
+                                        println!("{}", msg);
+                                        return future_err(msg);
+                                    }
+                                }
+                            }
+                        }
+                        "deny" => {
+                            if req_args.len() != 3 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'deny' action".to_string(),
+                                );
+                            } else {
+                                println!("Denying authorisation request...");
+                                let auth_req_id = req_args[2];
+                                let auth_reqs_list: &mut AuthReqsList =
+                                    &mut *(auth_reqs_handle.lock().unwrap());
+                                let req_id = match auth_req_id.parse::<u32>() {
+                                    Ok(id) => id,
+                                    Err(err) => return future_err(err.to_string()),
+                                };
+                                match auth_reqs_list.remove(&req_id) {
+                                    Some(mut auth_req) => match auth_req.tx.try_send(false) {
+                                        Ok(_) => {
+                                            let msg = format!(
+                                                "Authorisation request ({}) denied successfully",
+                                                auth_req_id
+                                            );
+                                            println!("{}", msg);
+                                            return future_ok(msg);
+                                        }
+                                        Err(_) => {
+                                            let msg = format!("Authorisation request '{}' was already denied since the response couldn't be sent to the requesting application", auth_req_id);
+                                            println!("{}", msg);
+                                            return future_err(msg);
+                                        }
+                                    },
+                                    None => {
+                                        let msg = format!(
+                                            "No pending authorisation request found with id '{}'",
+                                            auth_req_id
+                                        );
+                                        println!("{}", msg);
+                                        return future_err(msg);
+                                    }
+                                }
+                            }
+                        }
+                        "subscribe" => {
+                            if req_args.len() != 3 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'subscribe' action"
+                                        .to_string(),
+                                );
+                            } else {
+                                println!("Subscribing to authorisation requests notifications...");
+                                let mut notif_endpoint = match urlencoding::decode(req_args[2]) {
+                                    Ok(url) => url,
+                                    Err(err) => {
+                                        let msg = format!(
+                                        "Subscription rejected, the endpoint URL ('{}') is invalid: {:?}",
+                                        req_args[2], err
+                                    );
+                                        println!("{}", msg);
+                                        return future_err(msg);
+                                    }
+                                };
+                                let notif_endpoints_list: &mut BTreeSet<String> =
+                                    &mut *(notif_endpoints_handle.lock().unwrap());
+                                if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
+                                    let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
+                                    println!("{}", msg);
+                                    return future_err(msg);
+                                } else {
+                                    if notif_endpoint.ends_with('/') {
+                                        notif_endpoint.pop();
+                                    }
+                                    notif_endpoints_list.insert(notif_endpoint.clone());
+                                    let msg = format!(
+                                    "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
+                                    notif_endpoint
+                                );
+                                    println!("{}", msg);
+                                    return future_ok(msg);
+                                }
+                            }
+                        }
+                        "unsubscribe" => {
+                            if req_args.len() != 3 {
+                                return future_err(
+                                    "Incorrect number of arguments for 'unsubscribe' action"
+                                        .to_string(),
+                                );
+                            } else {
+                                println!(
+                                    "Unsubscribing from authorisation requests notifications..."
+                                );
+                                let notif_endpoint = match urlencoding::decode(req_args[2]) {
+                                    Ok(url) => url,
+                                    Err(err) => {
+                                        let msg = format!(
+                                        "Unsubscription request rejected, the endpoint URL ('{}') is invalid: {:?}",
+                                        req_args[2], err
+                                    );
+                                        println!("{}", msg);
+                                        return future_err(msg);
+                                    }
+                                };
+                                let notif_endpoints_list: &mut BTreeSet<String> =
+                                    &mut *(notif_endpoints_handle.lock().unwrap());
+
+                                if notif_endpoints_list.remove(&notif_endpoint) {
+                                    let msg = format!(
+                                    "Unsubscription successful. Endpoint '{}' will no longer receive authorisation requests notifications",
+                                    notif_endpoint
+                                );
+                                    println!("{}", msg);
+                                    return future_ok(msg);
+                                } else {
+                                    let msg = format!(
+                                    "Unsubscription request ignored, no such the endpoint URL ('{}') was found to be subscribed",
+                                    notif_endpoint
+                                );
+                                    println!("{}", msg);
+                                    return future_err(msg);
+                                }
+                            }
+                        }
+                        other => {
+                            println!(
+                                "Action '{}' not supported or unknown by the Authenticator daemon",
+                                other
                             );
-                            println!("{}", msg);
-                            Ok(msg.as_bytes().into())
+                            return future_err("Action not supported or unknown".to_string());
                         }
-                        Err(_) => {
-                            let msg = format!("Failed to allow authorisation request '{}' since the response couldn't be sent to the requesting application", auth_req_id);
-                            println!("{}", msg);
-                            bail!(msg)
-                        }
-                    },
-                    None => {
-                        let msg = format!(
-                            "No pending authorisation request found with id '{}'",
-                            auth_req_id
-                        );
-                        println!("{}", msg);
-                        bail!(msg)
                     }
                 }
             }
-        }
-        "deny" => {
-            if req_args.len() != 3 {
-                bail!("Incorrect number of arguments for 'deny' action")
-            } else {
-                println!("Denying authorisation request...");
-                let auth_req_id = req_args[2];
-                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-                let req_id = auth_req_id.parse::<u32>()?;
-                match auth_reqs_list.remove(&req_id) {
-                    Some(auth_req) => match auth_req.tx.send(false) {
-                        Ok(_) => {
-                            let msg = format!(
-                                "Authorisation request ({}) denied successfully",
-                                auth_req_id
-                            );
-                            println!("{}", msg);
-                            Ok(msg.as_bytes().into())
-                        }
-                        Err(_) => {
-                            let msg = format!("Authorisation request '{}' was already denied since the response couldn't be sent to the requesting application", auth_req_id);
-                            println!("{}", msg);
-                            bail!(msg)
-                        }
-                    },
-                    None => {
-                        let msg = format!(
-                            "No pending authorisation request found with id '{}'",
-                            auth_req_id
-                        );
-                        println!("{}", msg);
-                        bail!(msg)
-                    }
-                }
-            }
-        }
-        "subscribe" => {
-            if req_args.len() != 3 {
-                bail!("Incorrect number of arguments for 'subscribe' action")
-            } else {
-                println!("Subscribing to authorisation requests notifications...");
-                let mut notif_endpoint = match urlencoding::decode(req_args[2]) {
-                    Ok(url) => url,
-                    Err(err) => {
-                        let msg = format!(
-                            "Subscription rejected, the endpoint URL ('{}') is invalid: {:?}",
-                            req_args[2], err
-                        );
-                        println!("{}", msg);
-                        bail!(msg)
-                    }
-                };
-                let notif_endpoints_list: &mut BTreeSet<String> =
-                    &mut *(notif_endpoints_handle.lock().unwrap());
-                if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
-                    let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
-                    println!("{}", msg);
-                    bail!(msg)
-                } else {
-                    if notif_endpoint.ends_with('/') {
-                        notif_endpoint.pop();
-                    }
-                    notif_endpoints_list.insert(notif_endpoint.clone());
-                    let msg = format!(
-                        "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
-                        notif_endpoint
-                    );
-                    println!("{}", msg);
-                    Ok(msg.as_bytes().into())
-                }
-            }
-        }
-        "unsubscribe" => {
-            if req_args.len() != 3 {
-                bail!("Incorrect number of arguments for 'unsubscribe' action")
-            } else {
-                println!("Unsubscribing from authorisation requests notifications...");
-                let notif_endpoint = match urlencoding::decode(req_args[2]) {
-                    Ok(url) => url,
-                    Err(err) => {
-                        let msg = format!(
-                            "Unsubscription request rejected, the endpoint URL ('{}') is invalid: {:?}",
-                            req_args[2], err
-                        );
-                        println!("{}", msg);
-                        bail!(msg)
-                    }
-                };
-                let notif_endpoints_list: &mut BTreeSet<String> =
-                    &mut *(notif_endpoints_handle.lock().unwrap());
-
-                if notif_endpoints_list.remove(&notif_endpoint) {
-                    let msg = format!(
-                        "Unsubscription successful. Endpoint '{}' will no longer receive authorisation requests notifications",
-                        notif_endpoint
-                    );
-                    println!("{}", msg);
-                    Ok(msg.as_bytes().into())
-                } else {
-                    let msg = format!(
-                        "Unsubscription request ignored, no such the endpoint URL ('{}') was found to be subscribed",
-                        notif_endpoint
-                    );
-                    println!("{}", msg);
-                    bail!(msg)
-                }
-            }
-        }
-        other => {
-            println!(
-                "Action '{}' not supported or unknown by the Authenticator daemon",
-                other
-            );
-            bail!("Action not supported or unknown")
         }
     }
 }
 
-fn request_to_allow_auth(
+fn enqueue_auth_req(
     req_id: u32,
     req: SafeAuthReq,
     auth_reqs_handle: &SharedAuthReqsHandle,
-) -> bool {
+) -> mpsc::Receiver<bool> {
+    let (tx, rx): (mpsc::Sender<bool>, mpsc::Receiver<bool>) = mpsc::channel(32);
     match req {
         SafeAuthReq::Auth(app_auth_req) => {
             println!("The following application authorisation request was received:");
             println!("{:?}", app_auth_req);
 
-            let (tx, rx): (mpsc::Sender<bool>, mpsc::Receiver<bool>) = mpsc::channel();
-
-            // Let's create an scope here so we don't keep the
-            // mutex locked after updating the list of auth reqs
-            {
-                // Let's add it to the list of pending authorisation requests
-                let auth_req = AuthReq {
-                    app_id: app_auth_req.app.id,
-                    tx,
-                };
-                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-                auth_reqs_list.insert(req_id, auth_req);
-            }
-
-            // FIXME: this is blocking the main thread, so no other QUIC reqs can be received
-            // until this finishes. We need to create a future.
-            let is_allowed = rx
-                .recv_timeout(Duration::from_millis(AUTH_REQ_ALLOW_TIMEOUT))
-                .unwrap_or_else(|_err| {
-                    // We didn't get a response in a timely manner, we cannot allow the list
-                    // to grow infinitelly, so let's remove the request from it
-                    println!("GIVING UP...");
-                    let auth_reqs_list: &mut AuthReqsList =
-                        &mut *(auth_reqs_handle.lock().unwrap());
-                    auth_reqs_list.remove(&req_id);
-                    false
-                });
-
-            println!("RECEIVED DECISION: {}", is_allowed);
-            is_allowed
+            // Let's add it to the list of pending authorisation requests
+            let auth_req = AuthReq {
+                app_id: app_auth_req.app.id,
+                tx,
+            };
+            let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+            auth_reqs_list.insert(req_id, auth_req);
         }
         SafeAuthReq::Containers(cont_req) => {
             println!("The following authorisation request for containers was received:");
             println!("{:?}", cont_req);
-            true
         }
         SafeAuthReq::ShareMData(share_mdata_req) => {
             println!("The following authorisation request to share a MutableData was received:");
             println!("{:?}", share_mdata_req);
-            true
         }
         SafeAuthReq::Unregistered(_) => {
             // we simply allow unregistered authorisation requests
-            true
         }
     }
+    rx
+}
+
+fn monitor_pending_auth_reqs(
+    auth_reqs_handle: SharedAuthReqsHandle,
+    notif_endpoints_handle: SharedNotifEndpointsHandle,
+) {
+    thread::spawn(move || loop {
+        {
+            let mut reqs_to_process: Option<AuthReqsList> = None;
+            {
+                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
+                if !auth_reqs_list.is_empty() {
+                    reqs_to_process = Some(auth_reqs_list.clone());
+                    auth_reqs_list.clear();
+                };
+            }
+
+            // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
+            // and remove them if they don't respond or their response is positive.
+            match reqs_to_process {
+                None => {}
+                Some(mut reqs) => {
+                    let notif_endpoints_list: &mut BTreeSet<String> =
+                        &mut *(notif_endpoints_handle.lock().unwrap());
+                    for (req_id, auth_req) in reqs.iter_mut() {
+                        let mut is_allow = false;
+                        for endpoint in notif_endpoints_list.iter() {
+                            println!("ASKING SUBSCRIPTOR: {}", endpoint);
+                            match quic_send(
+                                &format!("{}/{}", endpoint, auth_req.app_id),
+                                false,
+                                None,
+                                None,
+                                false,
+                            ) {
+                                Ok(allow) => {
+                                    is_allow = allow.starts_with("true");
+                                    break;
+                                }
+                                Err(err) => {
+                                    println!(
+                                        "Skipping subscriptor '{}' since it didn't respond: {}",
+                                        endpoint, err
+                                    );
+                                }
+                            }
+                        }
+                        println!(
+                            "ALLOW FOR Req ID: {} - App ID: {} ??: {}",
+                            req_id, auth_req.app_id, is_allow
+                        );
+                        match auth_req.tx.try_send(is_allow) {
+                            Ok(_) => println!("Auth req decision ready to be sent to application"),
+                            Err(_) => println!(
+                                "Auth req decision couldn't be sent, and therefore already denied"
+                            ),
+                        }
+                    }
+                }
+            }
+        }
+
+        thread::sleep(Duration::from_millis(AUTH_REQS_CHECK_FREQ));
+    });
 }
