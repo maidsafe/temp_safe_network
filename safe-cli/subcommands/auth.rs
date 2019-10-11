@@ -6,31 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use dirs;
-use log::debug;
-use prettytable::Table;
-use rpassword;
+use crate::operations::auth::{
+    authd_allow, authd_apps, authd_auth_reqs, authd_create, authd_deny, authd_login, authd_logout,
+    authd_revoke, authd_run_cmd, authd_subscribe_url, authd_unsubscribe, authorise_cli,
+    clear_credentials,
+};
 use safe_api::{Safe, SafeAuthdClient};
-use std::fs::{DirBuilder, File};
-use std::io::{self, stdin, stdout, Read, Write};
-use std::path::Path;
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
 use structopt::StructOpt;
-
-const APP_ID: &str = "net.maidsafe.cli";
-const APP_NAME: &str = "SAFE CLI";
-const APP_VENDOR: &str = "MaidSafe.net Ltd";
-const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
-const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
-const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
-const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
     #[structopt(name = "clear")]
-    /// Clear authorisation credentials from local file
+    /// Clear SAFE CLI authorisation credentials from local file
     Clear {},
     #[structopt(name = "login")]
     /// Send request to a remote Authenticator daemon to login to a SAFE account
@@ -102,357 +89,49 @@ pub fn auth_commander(
 ) -> Result<(), String> {
     match cmd {
         Some(AuthSubCommands::Create { sk, test_coins }) => {
-            let mut safe_authd = SafeAuthdClient::new(None);
-            let secret = prompt_sensitive(None, "Secret:")?;
-            let password = prompt_sensitive(None, "Password:")?;
-            if test_coins {
-                // We then generate a SafeKey with test-coins to use it for the account creation
-                println!("Creating a SafeKey with test-coins...");
-                let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11")?;
-                let kp = key_pair
-                    .ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
-                println!("Sending account creation request to authd...");
-                safe_authd.create_acc(&kp.sk, &secret, &password)?;
-                println!("Account was created successfully!");
-                println!(
-                    "SafeKey created and preloaded with test-coins. Owner key pair generated:"
-                );
-                println!("Public Key = {}", kp.pk);
-                println!("Secret Key = {}", kp.sk);
-            } else {
-                let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
-                println!("Sending account creation request to authd...");
-                safe_authd.create_acc(&sk, &secret, &password)?;
-                println!("Account was created successfully!");
-            };
-            Ok(())
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_create(safe, &safe_authd, sk, test_coins)
         }
         Some(AuthSubCommands::Login {}) => {
             let mut safe_authd = SafeAuthdClient::new(None);
-            let secret = prompt_sensitive(None, "Secret:")?;
-            let password = prompt_sensitive(None, "Password:")?;
-            println!("Sending login action request to authd...");
-            safe_authd.log_in(&secret, &password)?;
-            println!("Logged in successfully");
-            Ok(())
+            authd_login(&mut safe_authd)
         }
         Some(AuthSubCommands::Logout {}) => {
             let mut safe_authd = SafeAuthdClient::new(None);
-            println!("Sending logout action request to authd...");
-            safe_authd.log_out()?;
-            println!("Logged out successfully");
-            Ok(())
+            authd_logout(&mut safe_authd)
         }
         Some(AuthSubCommands::Apps {}) => {
             let safe_authd = SafeAuthdClient::new(None);
-            println!("Requesting list of authorised apps from authd...");
-            let authed_apps = safe_authd.authed_apps()?;
-            pretty_print_authed_apps(authed_apps);
-
-            Ok(())
+            authd_apps(&safe_authd)
         }
-        Some(AuthSubCommands::Clear {}) => {
-            let (_file, file_path) = get_credentials_file()
-                .map_err(|err| format!("Failed to clear credentials. {}", err))?;
-
-            println!("Credentials were succesfully cleared from {}", file_path);
-            Ok(())
-        }
+        Some(AuthSubCommands::Clear {}) => clear_credentials(),
         Some(AuthSubCommands::Revoke { app_id }) => {
             let safe_authd = SafeAuthdClient::new(None);
-            println!("Sending application revocation request to authd...");
-            safe_authd.revoke_app(&app_id)?;
-            println!("Application revoked successfully");
-            Ok(())
+            authd_revoke(&safe_authd, app_id)
         }
         Some(AuthSubCommands::AuthReqs {}) => {
             let safe_authd = SafeAuthdClient::new(None);
-            println!("Requesting list of pending authorisation requests from authd...");
-            let auth_reqs = safe_authd.auth_reqs()?;
-            //pretty_print_authed_apps(auth_reqs);
-            println!("{}", auth_reqs);
-            Ok(())
+            authd_auth_reqs(&safe_authd)
         }
         Some(AuthSubCommands::Allow { req_id }) => {
             let safe_authd = SafeAuthdClient::new(None);
-            println!("Sending request to authd to allow an authorisation request...");
-            safe_authd.allow(req_id)?;
-            println!("Authorisation request was allowed successfully");
-            Ok(())
+            authd_allow(&safe_authd, req_id)
         }
         Some(AuthSubCommands::Deny { req_id }) => {
             let safe_authd = SafeAuthdClient::new(None);
-            println!("Sending request to authd to deny an authorisation request...");
-            safe_authd.deny(req_id)?;
-            println!("Authorisation request was denied successfully");
-            Ok(())
+            authd_deny(&safe_authd, req_id)
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => {
-            let mut safe_authd = SafeAuthdClient::new(None);
-            println!("Sending request to subscribe...");
-            //safe_authd.subscribe_url(&notifs_endpoint)?;
-            safe_authd.subscribe(&notifs_endpoint, &prompt_to_allow_auth)?;
-            println!("Subscribed successfully");
-            thread::sleep(Duration::from_millis(120000));
-            Ok(())
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_subscribe_url(&safe_authd, notifs_endpoint)
         }
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
             let safe_authd = SafeAuthdClient::new(None);
-            println!("Sending request to unsubscribe...");
-            safe_authd.unsubscribe(&notifs_endpoint)?;
-            println!("Unsubscribed successfully");
-            Ok(())
+            authd_unsubscribe(&safe_authd, notifs_endpoint)
         }
-        Some(AuthSubCommands::StartAuthd {}) => run_authd_cmd("start"),
-        Some(AuthSubCommands::StopAuthd {}) => run_authd_cmd("stop"),
-        Some(AuthSubCommands::RestartAuthd {}) => run_authd_cmd("restart"),
-        None => {
-            println!("Authorising CLI application...");
-            let (mut file, file_path) = get_credentials_file()?;
-            let auth_credentials = safe
-                .auth_app(APP_ID, APP_NAME, APP_VENDOR, port)
-                .map_err(|err| format!("Application authorisation failed: {}", err))?;
-
-            file.write_all(auth_credentials.as_bytes())
-                .map_err(|err| format!("Unable to write credentials in {}: {}", file_path, err))?;
-
-            println!("SAFE CLI app was successfully authorised");
-            println!("Credentials were stored in {}", file_path);
-            Ok(())
-        }
-    }
-}
-
-// TODO: use a different crate than rpassword as it has problems with some Windows shells including PowerShell
-fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
-    if let Some(str) = arg {
-        Ok(str)
-    } else {
-        rpassword::read_password_from_tty(Some(msg))
-            .map_err(|err| format!("Failed reading string from input: {}", err))
-    }
-}
-
-fn run_authd_cmd(command: &str) -> Result<(), String> {
-    let authd_bin_path = get_authd_bin_path();
-    let output = Command::new(&authd_bin_path)
-        .arg(command)
-        .output()
-        .map_err(|err| format!("Failed to start authd from '{}': {}", authd_bin_path, err))?;
-
-    if output.status.success() {
-        io::stdout()
-            .write_all(&output.stdout)
-            .map_err(|err| format!("Failed to output stdout: {}", err))?;
-        Ok(())
-    } else {
-        io::stderr()
-            .write_all(&output.stderr)
-            .map_err(|err| format!("Failed to output stderr: {}", err))?;
-        Err("Failed to invoke safe-authd executable".to_string())
-    }
-}
-
-fn get_authd_bin_path() -> String {
-    let target_dir = match std::env::var("CARGO_TARGET_DIR") {
-        Ok(target_dir) => target_dir,
-        Err(_) => "target".to_string(),
-    };
-
-    if cfg!(debug_assertions) {
-        format!("{}{}", target_dir, "/debug/safe-authd")
-    } else {
-        format!("{}{}", target_dir, "/release/safe-authd")
-    }
-}
-
-pub fn auth_connect(safe: &mut Safe) -> Result<(), String> {
-    debug!("Connecting...");
-
-    let file_path = credentials_file_path()?;
-    let mut file = File::open(&file_path)
-        .map_err(|_| "You need to authorise the safe CLI first with 'auth' command")?;
-
-    let mut auth_credentials = String::new();
-    file.read_to_string(&mut auth_credentials)
-        .map_err(|_| format!("Unable to read credentials from {}", file_path))?;
-
-    safe.connect(APP_ID, Some(&auth_credentials))
-        .map_err(|err| {
-            format!(
-                "You need to authorise the safe CLI first with 'auth' command: {}",
-                err
-            )
-        })
-}
-
-#[allow(dead_code)]
-pub fn connect_without_auth(safe: &mut Safe) -> Result<(), String> {
-    debug!("Connecting...");
-
-    safe.connect(APP_ID, None)?;
-
-    Ok(())
-}
-
-fn credentials_file_path() -> Result<String, String> {
-    let project_data_path = ProjectDirs::from(
-        PROJECT_DATA_DIR_QUALIFIER,
-        PROJECT_DATA_DIR_ORGANISATION,
-        PROJECT_DATA_DIR_APPLICATION,
-    )
-    .ok_or_else(|| "Couldn't find user's home directory".to_string())?;
-
-    let data_local_path = project_data_path.data_local_dir();
-
-    if !data_local_path.exists() {
-        println!("Creating '{}' folder", data_local_path.display());
-        create_dir_all(data_local_path)
-            .map_err(|err| format!("Couldn't create project's local data folder: {}", err))?;
-    }
-
-    let path = data_local_path.join(AUTH_CREDENTIALS_FILENAME);
-    Ok(path.display().to_string())
-}
-
-fn get_credentials_file() -> Result<(File, String), String> {
-    let file_path = credentials_file_path()?;
-    let file = File::create(&file_path)
-        .map_err(|_| format!("Unable to open credentials file at {}", file_path))?;
-
-    Ok((file, file_path))
-}
-
-pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
-    let mut table = Table::new();
-    table.add_row(row![bFg->"Authorised Applications"]);
-    /*table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
-    table.add_row(row![]);
-    let all_app_iterator = authed_apps.iter();
-    for app_info in all_app_iterator {
-        let mut row = String::from("");
-        for (cont, perms) in app_info.perms.iter() {
-            row += &format!("{}: {:?}\n", cont, perms);
-        }
-        table.add_row(row![
-            app_info.app.id,
-            app_info.app.name,
-            // app_info.app.scope || "",
-            app_info.app.vendor,
-            row,
-        ]);
-    }*/
-    table.printstd();
-    println!("{}", authed_apps);
-}
-
-pub fn prompt_to_allow_auth(app_id: &str) -> bool {
-    /*    match req {
-            IpcReq::Auth(app_auth_req) => {
-                println!("The following application authorisation request was received:");
-                let mut table = Table::new();
-                table
-                    .add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"]);
-                table.add_row(row![
-                    app_auth_req.app.id,
-                    app_auth_req.app.name,
-                    // app_auth_req.app.scope || "",
-                    app_auth_req.app.vendor,
-                    format!(
-                        "Own container: {}\nDefault containers: {:?}",
-                        app_auth_req.app_container, app_auth_req.containers
-                    ),
-                ]);
-                table.printstd();
-            }
-            IpcReq::Containers(cont_req) => {
-                println!("The following authorisation request for containers was received:");
-                println!("{:?}", cont_req);
-                let mut table = Table::new();
-                table
-                    .add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"]);
-                table.add_row(row![
-                    cont_req.app.id,
-                    cont_req.app.name,
-                    // cont_req.app.scope || "",
-                    cont_req.app.vendor,
-                    format!("{:?}", cont_req.containers)
-                ]);
-                table.printstd();
-            }
-            IpcReq::ShareMData(share_mdata_req) => {
-                println!("The following authorisation request to share a MutableData was received:");
-                let mut row = String::from("");
-                for mdata in share_mdata_req.mdata.iter() {
-                    row += &format!("Type tag: {}\nXoR name: {:?}", mdata.type_tag, mdata.name);
-                    let insert_perm = if mdata.perms.is_allowed(MDataAction::Insert) {
-                        " Insert"
-                    } else {
-                        ""
-                    };
-                    let update_perm = if mdata.perms.is_allowed(MDataAction::Update) {
-                        " Update"
-                    } else {
-                        ""
-                    };
-                    let delete_perm = if mdata.perms.is_allowed(MDataAction::Delete) {
-                        " Delete"
-                    } else {
-                        ""
-                    };
-                    let manage_perm = if mdata.perms.is_allowed(MDataAction::ManagePermissions) {
-                        " ManagePermissions"
-                    } else {
-                        ""
-                    };
-                    row += &format!(
-                        "\nPermissions:{}{}{}{}\n\n",
-                        insert_perm, update_perm, delete_perm, manage_perm
-                    );
-                }
-                let mut table = Table::new();
-                table.add_row(row![
-                    bFg->"Id",
-                    bFg->"Name",
-                    bFg->"Vendor",
-                    bFg->"MutableData's requested to share"
-                ]);
-                table.add_row(row![
-                    share_mdata_req.app.id,
-                    share_mdata_req.app.name,
-                    // share_mdata_req.app.scope || "",
-                    share_mdata_req.app.vendor,
-                    row
-                ]);
-                table.printstd();
-            }
-            IpcReq::Unregistered(_) => {
-                // we simply allow unregistered authorisation requests
-                return true;
-            }
-        };
-    */
-    println!("The following application authorisation request was received:");
-    println!("App ID: {}", app_id);
-
-    let mut prompt = String::new();
-    print!("Allow authorisation? [y/N]: ");
-    let _ = stdout().flush();
-    stdin()
-        .read_line(&mut prompt)
-        .expect("Did not enter a correct string. Authorisation will be denied.");
-    if let Some('\n') = prompt.chars().next_back() {
-        prompt.pop();
-    }
-    if let Some('\r') = prompt.chars().next_back() {
-        prompt.pop();
-    }
-
-    if prompt.to_lowercase() == "y" {
-        println!("Authorisation will be allowed...");
-        true
-    } else {
-        println!("Authorisation will be denied...");
-        false
+        Some(AuthSubCommands::StartAuthd {}) => authd_run_cmd("start"),
+        Some(AuthSubCommands::StopAuthd {}) => authd_run_cmd("stop"),
+        Some(AuthSubCommands::RestartAuthd {}) => authd_run_cmd("restart"),
+        None => authorise_cli(safe, port),
     }
 }

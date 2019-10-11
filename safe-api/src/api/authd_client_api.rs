@@ -110,7 +110,7 @@ impl SafeAuthdClient {
     }
 
     // Sends an account creation request to the SAFE Authenticator
-    pub fn create_acc(&mut self, sk: &str, secret: &str, password: &str) -> ResultReturn<()> {
+    pub fn create_acc(&self, sk: &str, secret: &str, password: &str) -> ResultReturn<()> {
         debug!("Attempting to create a SAFE account on remote authd...");
         let authd_service_url = format!(
             "{}:{}/{}{}/{}/{}",
@@ -224,28 +224,6 @@ impl SafeAuthdClient {
         Ok(())
     }
 
-    // Subscribe an endpoint URL where notifications to allow/deny authorisation requests shall be sent
-    pub fn subscribe_url(&self, endpoint_url: &str) -> ResultReturn<()> {
-        debug!(
-            "Subscribing '{}' as endpoint for authorisation requests notifications...",
-            endpoint_url
-        );
-        let url_encoded = urlencoding::encode(endpoint_url);
-        let authd_service_url = format!(
-            "{}:{}/{}{}",
-            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, url_encoded
-        );
-
-        debug!("Sending subscribe action request to SAFE Authenticator...");
-        let authd_response = send_request(&authd_service_url)?;
-
-        debug!(
-            "Successfully subscribed a URL for authorisation requests notifications: {}",
-            authd_response
-        );
-        Ok(())
-    }
-
     // Subscribe a callback to receive notifications to allow/deny authorisation requests
     pub fn subscribe(
         &mut self,
@@ -285,6 +263,28 @@ impl SafeAuthdClient {
 
         self.endpoint_thread_handle = Some(thread_join_handle);
 
+        Ok(())
+    }
+
+    // Subscribe an endpoint URL where notifications to allow/deny authorisation requests shall be sent
+    pub fn subscribe_url(&self, endpoint_url: &str) -> ResultReturn<()> {
+        debug!(
+            "Subscribing '{}' as endpoint for authorisation requests notifications...",
+            endpoint_url
+        );
+        let url_encoded = urlencoding::encode(endpoint_url);
+        let authd_service_url = format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, url_encoded
+        );
+
+        debug!("Sending subscribe action request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        debug!(
+            "Successfully subscribed a URL for authorisation requests notifications: {}",
+            authd_response
+        );
         Ok(())
     }
 

@@ -114,7 +114,7 @@ fn start_quic_endpoint(
     let (cert, key) = match fs::read(&cert_path).and_then(|x| Ok((x, fs::read(&key_path)?))) {
         Ok(x) => x,
         Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
-            info!(log, "Generating self-signed certificate...");
+            // info!(log, "Generating self-signed certificate...");
             let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]);
             let key = cert.serialize_private_key_der();
             let cert = cert.serialize_der();
@@ -137,8 +137,8 @@ fn start_quic_endpoint(
     endpoint.listen(server_config.build());
 
     let (endpoint_driver, incoming) = {
-        let (driver, endpoint, incoming) = endpoint.bind(listen)?;
-        info!(log, "Listening on {}", endpoint.local_addr()?);
+        let (driver, _endpoint, incoming) = endpoint.bind(listen)?;
+        // info!(log, "Listening on {}", endpoint.local_addr()?);
         (driver, incoming)
     };
 
@@ -161,13 +161,13 @@ fn handle_connection(
     ),
     allow_cb: &'static AuthAllowPrompt,
 ) {
-    let (conn_driver, conn, incoming_streams) = conn;
+    let (conn_driver, _conn, incoming_streams) = conn;
     let log = log.clone();
-    info!(log, "got connection";
-          "remote_id" => %conn.remote_id(),
-          "address" => %conn.remote_address(),
-          "protocol" => conn.protocol().map_or_else(|| "<none>".into(), |x| String::from_utf8_lossy(&x).into_owned()));
-    let log2 = log.clone();
+    // info!(log, "got connection";
+    //      "remote_id" => %conn.remote_id(),
+    //      "address" => %conn.remote_address(),
+    //      "protocol" => conn.protocol().map_or_else(|| "<none>".into(), |x| String::from_utf8_lossy(&x).into_owned()));
+    //let log2 = log.clone();
 
     // We ignore errors from the driver because they'll be reported by the `incoming` handler anyway.
     tokio_current_thread::spawn(conn_driver.map_err(|_| ()));
@@ -175,7 +175,7 @@ fn handle_connection(
     // Each stream initiated by the client constitutes a new request.
     tokio_current_thread::spawn(
         incoming_streams
-            .map_err(move |e| info!(log2, "Connection terminated"; "reason" => %e))
+            .map_err(move |_e| ()) // info!(log2, "Connection terminated"; "reason" => %e))
             .for_each(move |stream| {
                 handle_request(&log, stream, allow_cb);
                 Ok(())
@@ -183,14 +183,14 @@ fn handle_connection(
     );
 }
 
-fn handle_request(log: &Logger, stream: quinn::NewStream, allow_cb: &'static AuthAllowPrompt) {
+fn handle_request(_log: &Logger, stream: quinn::NewStream, allow_cb: &'static AuthAllowPrompt) {
     let (send, recv) = match stream {
         quinn::NewStream::Bi(send, recv) => (send, recv),
         quinn::NewStream::Uni(_) => unreachable!("Disabled by endpoint configuration"),
     };
-    let log = log.clone();
-    let log2 = log.clone();
-    let log3 = log.clone();
+    //let log = log.clone();
+    //let log2 = log.clone();
+    //let log3 = log.clone();
 
     tokio_current_thread::spawn(
         recv.read_to_end(64 * 1024) // Read the request, which must be at most 64KiB
@@ -201,10 +201,10 @@ fn handle_request(log: &Logger, stream: quinn::NewStream, allow_cb: &'static Aut
                     let part = ascii::escape_default(x).collect::<Vec<_>>();
                     escaped.push_str(str::from_utf8(&part).unwrap());
                 }
-                info!(log, "Got request");
+                // info!(log, "Got request");
                 // Execute the request
                 let resp = process_get(&req, allow_cb).unwrap_or_else(move |e| {
-                    error!(log, "Failed to process request"; "reason" => %e.pretty());
+                    // error!(log, "Failed to process request"; "reason" => %e.pretty());
                     // TODO: implement JSON-RPC rather.
                     // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
                     // once we have JSON-RPC we can adhere to its format for errors.
@@ -220,8 +220,8 @@ fn handle_request(log: &Logger, stream: quinn::NewStream, allow_cb: &'static Aut
                 tokio::io::shutdown(send)
                     .map_err(|e| format_err!("Failed to shutdown stream: {}", e))
             })
-            .map(move |_| info!(log3, "Request complete"))
-            .map_err(move |e| error!(log2, "Request Failed"; "reason" => %e.pretty())),
+            .map(move |_| ()) // info!(log3, "Request complete"))
+            .map_err(move |_e| ()), // error!(log2, "Request Failed"; "reason" => %e.pretty())),
     )
 }
 
@@ -245,11 +245,9 @@ fn process_get(x: &[u8], allow_cb: &'static AuthAllowPrompt) -> Result<Box<[u8]>
         let app_id = req_args[1];
         if allow_cb(app_id) {
             let msg = format!("true - Allow auth req from app ID: {}", app_id);
-            println!("{}", msg);
             Ok(msg.as_bytes().into())
         } else {
             let msg = format!("false - Deny auth req from app ID: {}", app_id);
-            println!("{}", msg);
             Ok(msg.as_bytes().into())
         }
     }

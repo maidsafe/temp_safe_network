@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::auth::auth_connect;
 use super::helpers::{get_from_arg_or_stdin, get_secret_key};
 use super::OutputFmt;
+use crate::operations::auth::safe_connect;
 use log::{debug, warn};
 use safe_api::{BlsKeyPair, Safe};
 use structopt::StructOpt;
@@ -78,7 +78,7 @@ pub fn key_commander(
                 return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
             } else if !test_coins {
                 // We need to connect with an authorised app since we are not creating a SafeKey with test-coins
-                auth_connect(safe)?;
+                safe_connect(safe)?;
             }
 
             let (xorurl, key_pair, amount) =
@@ -87,7 +87,7 @@ pub fn key_commander(
             Ok(())
         }
         Some(KeysSubCommands::Balance { keyurl, secret }) => {
-            auth_connect(safe)?;
+            safe_connect(safe)?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
             let current_balance = if target.is_empty() {
@@ -110,7 +110,7 @@ pub fn key_commander(
             tx_id,
         }) => {
             // TODO: don't connect if --from sk was passed
-            auth_connect(safe)?;
+            safe_connect(safe)?;
 
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(

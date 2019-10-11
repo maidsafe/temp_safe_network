@@ -6,33 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod cli;
-mod operations;
-mod shell;
-mod subcommands;
-
-use cli::run;
-use env_logger;
-use log::{debug, error};
-use std::process;
-
-#[macro_use]
-extern crate prettytable;
-
-#[macro_use]
-extern crate human_panic;
-
-#[cfg(not(feature = "mock-network"))]
-#[macro_use]
-extern crate self_update;
-
-fn main() {
-    setup_panic!();
-    env_logger::init();
-    debug!("Starting SAFE CLI...");
-
-    if let Err(e) = run() {
-        error!("safe-cli error: {}", e);
-        process::exit(1);
-    }
-}
+// #[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
+pub mod auth;
+// #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
+// pub mod fake_auth;

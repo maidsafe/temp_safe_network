@@ -9,7 +9,9 @@
 use log::debug;
 use structopt::StructOpt;
 
-use crate::subcommands::auth::{auth_commander, auth_connect};
+use crate::operations::auth::safe_connect;
+use crate::shell;
+use crate::subcommands::auth::auth_commander;
 use crate::subcommands::cat::cat_commander;
 use crate::subcommands::dog::dog_commander;
 use crate::subcommands::files::files_commander;
@@ -26,7 +28,7 @@ use safe_api::Safe;
 struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
-    cmd: SubCommands,
+    cmd: Option<SubCommands>,
     // /// The account's Root Container address
     // #[structopt(long = "root", raw(global = "true"))]
     // root: bool,
@@ -75,10 +77,10 @@ pub fn run() -> Result<(), String> {
     debug!("Processing command: {:?}", args);
 
     match args.cmd {
-        SubCommands::Auth { cmd, port } => auth_commander(cmd, port, &mut safe),
-        SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe),
-        SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &mut safe),
-        SubCommands::Keypair {} => {
+        Some(SubCommands::Auth { cmd, port }) => auth_commander(cmd, port, &mut safe),
+        Some(SubCommands::Cat(cmd)) => cat_commander(cmd, output_fmt, &mut safe),
+        Some(SubCommands::Dog(cmd)) => dog_commander(cmd, output_fmt, &mut safe),
+        Some(SubCommands::Keypair {}) => {
             let key_pair = safe.keypair()?;
             if OutputFmt::Pretty == output_fmt {
                 println!("Key pair generated:");
@@ -87,20 +89,21 @@ pub fn run() -> Result<(), String> {
             println!("Secret Key = {}", key_pair.sk);
             Ok(())
         }
-        SubCommands::Update {} => {
+        Some(SubCommands::Update {}) => {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
-        SubCommands::Keys { cmd } => key_commander(cmd, output_fmt, &mut safe),
-        _ => {
+        Some(SubCommands::Keys { cmd }) => key_commander(cmd, output_fmt, &mut safe),
+        Some(other) => {
             // We treat these separatelly since we need to connect before
             // handling any of these commands
-            auth_connect(&mut safe)?;
-            match args.cmd {
+            safe_connect(&mut safe)?;
+            match other {
                 SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),
                 SubCommands::Nrs { cmd } => nrs_commander(cmd, output_fmt, args.dry, &mut safe),
-                _ => Err("Command not supported yet".to_string()),
+                _ => Err("Unknown safe subcommand".to_string()),
             }
         }
+        None => shell::shell_run(), // then enter in SAFE interactive shell
     }
 }

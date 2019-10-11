@@ -937,8 +937,12 @@ fn monitor_pending_auth_reqs(
             {
                 let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
                 if !auth_reqs_list.is_empty() {
-                    reqs_to_process = Some(auth_reqs_list.clone());
-                    auth_reqs_list.clear();
+                    let notif_endpoints_list: &mut BTreeSet<String> =
+                        &mut *(notif_endpoints_handle.lock().unwrap());
+                    if !notif_endpoints_list.is_empty() {
+                        reqs_to_process = Some(auth_reqs_list.clone());
+                        auth_reqs_list.clear();
+                    }
                 };
             }
 

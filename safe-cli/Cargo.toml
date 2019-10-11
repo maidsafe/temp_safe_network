@@ -35,6 +35,7 @@ relative-path = "0.4.0"
 self_update = "0.5.1"
 directories = "~2.0.1"
 rpassword = "4.0.1"
+shrust = "0.0.7"
 
 [features]
 mock-network = ["safe-api/mock-network"]
