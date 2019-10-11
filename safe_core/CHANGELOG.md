@@ -1,5 +1,11 @@
 # Safe Core - Change Log
 
+## [0.35.0]
+- Remove unused `routing` module and fix errors
+- Rework MDataKey and MDataValue to use FFI conventions
+- Make miscellaneous doc fixes
+- Clean up FFI documentation
+
 ## [0.34.0]
 - Technical release to solve some issues in our automated publishing process
 
