@@ -26,7 +26,8 @@ for component in "${components[@]}"; do
                 if [[ "$type" == "mock" ]]; then
                     key="$SAFE_CLI_BUILD_BRANCH-$SAFE_CLI_BUILD_NUMBER-$component-$target-dev.tar.gz"
                 fi
-                aws s3api head-object --bucket "$S3_BUCKET" --key "$key"
+                aws s3api head-object \
+                    --no-sign-request --region eu-west-2 --bucket "$S3_BUCKET" --key "$key"
                 rc=$?
                 if [[ $rc == 0 ]]; then
                     echo "Retrieving $key"

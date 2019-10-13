@@ -27,9 +27,12 @@ clean_build=$4
 [[ -z "$clean_build" ]] && clean_build="false"
 
 features=$5
-[[ -z "$features" ]] && features="mock-network,fake-auth"
+if [[ -z "$features" ]]; then
+    [[ "$component" == "safe-ffi" ]] && features="mock-network"
+    [[ "$component" == "safe-cli" ]] && features="fake-auth,mock-network"
+fi
 
-function get_build_command() {
+function get_docker_build_command() {
     local build_command
     if [[ "$clean_build" == "true" ]]; then
         if [[ "$target" == *"linux"* ]]; then
@@ -39,6 +42,7 @@ function get_build_command() {
         fi
     fi
     build_command="$build_command cargo build"
+    [[ "$component" != "safe-cli" ]] && build_command="$build_command --lib"
     build_command="$build_command --release --manifest-path=$component/Cargo.toml --target=$target"
     echo $build_command
 }
@@ -51,7 +55,7 @@ function build_on_linux() {
     container_tag=$(sed 's/safe-//g' <<< "$component")
     container_tag="$container_tag-$target"
     [[ $build_type == "dev" ]] && container_tag="$container_tag-dev"
-    build_command=$(get_build_command)
+    build_command=$(get_docker_build_command)
     docker run --name "$component-build-${uuid}" -v "$(pwd)":/usr/src/safe-cli:Z \
         -u "$(id -u)":"$(id -g)" \
         maidsafe/safe-cli-build:"$container_tag" \
@@ -60,13 +64,42 @@ function build_on_linux() {
     docker rm "$component-build-${uuid}"
 }
 
-function build_on_windows() {
+function build_bin() {
+    [[ "$clean_build" == "true" ]] && rm -rf target
+    if [[ "$build_type" == "dev" ]]; then
+        cargo build --features="$features" \
+            --release --manifest-path="$component/Cargo.toml" --target="$target"
+    else
+        cargo build --release --manifest-path="$component/Cargo.toml" --target="$target"
+    fi
+}
+
+function build_lib() {
+    [[ "$clean_build" == "true" ]] && rm -rf target
     if [[ "$build_type" == "dev" ]]; then
         cargo build --features="$features" \
             --release --lib --manifest-path="$component/Cargo.toml" --target="$target"
     else
         cargo build --release --lib --manifest-path="$component/Cargo.toml" --target="$target"
     fi
+}
+
+function build_on_windows() {
+    case $component in
+        safe-cli)
+            build_bin
+            ;;
+        safe-ffi)
+            build_lib
+            ;;
+        safe-api)
+            build_lib
+            ;;
+        *)
+            echo "$component is not supported. Please extend to support this component."
+            exit 1
+            ;;
+    esac
 }
 
 function build_on_macos() {

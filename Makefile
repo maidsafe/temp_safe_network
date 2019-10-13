@@ -152,6 +152,9 @@ endif
 	lipo -create -output artifacts/real/universal/libsafe_ffi.a \
 		artifacts/real/x86_64-apple-ios/release/libsafe_ffi.a \
 		artifacts/real/aarch64-apple-ios/release/libsafe_ffi.a
+	lipo -create -output artifacts/mock/universal/libsafe_ffi.a \
+		artifacts/mock/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/mock/aarch64-apple-ios/release/libsafe_ffi.a
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
@@ -288,7 +291,13 @@ endif
 		tar -C real/universal -zcvf \
 			${SAFE_CLI_BUILD_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios.tar.gz .; \
 	)
+	( \
+		cd artifacts; \
+		tar -C mock/universal -zcvf \
+			${SAFE_CLI_BUILD_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios-dev.tar.gz .; \
+	)
 	rm -rf artifacts/real
+	rm -rf artifacts/mock
 
 clean:
 ifndef SAFE_AUTH_PORT

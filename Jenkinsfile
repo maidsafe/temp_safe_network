@@ -142,6 +142,64 @@ stage('build & test') {
             packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-ios")
             uploadBuildArtifacts()
         }
+    },
+    dev_ffi_macos: {
+        node('osx') {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "x86_64-apple-darwin")
+            stripArtifacts()
+            packageBuildArtifacts("safe-ffi", "dev", "x86_64-apple-darwin")
+            uploadBuildArtifacts()
+        }
+    },
+    dev_ffi_windows: {
+        node('windows') {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "x86_64-pc-windows-gnu")
+            packageBuildArtifacts("safe-ffi", "dev", "x86_64-pc-windows-gnu")
+            uploadBuildArtifacts()
+        }
+    },
+    dev_ffi_linux: {
+        node('safe_cli') {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "x86_64-unknown-linux-gnu")
+            stripArtifacts()
+            packageBuildArtifacts("safe-ffi", "dev", "x86_64-unknown-linux-gnu")
+            uploadBuildArtifacts()
+        }
+    },
+    dev_ffi_android_armv7: {
+        node('safe_cli') {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "armv7-linux-androideabi")
+            packageBuildArtifacts("safe-ffi", "dev", "armv7-linux-androideabi")
+            uploadBuildArtifacts()
+        }
+    },
+    dev_ffi_android_x86_64: {
+        node('safe_cli') {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "x86_64-linux-android")
+            packageBuildArtifacts("safe-ffi", "dev", "x86_64-linux-android")
+            uploadBuildArtifacts()
+        }
+    },
+    dev_ffi_ios_aarch64: {
+        node("osx") {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "aarch64-apple-ios")
+            packageBuildArtifacts("safe-ffi", "dev", "aarch64-apple-ios")
+            uploadBuildArtifacts()
+        }
+    },
+    dev_ffi_ios_x86_64: {
+        node("osx") {
+            checkout(scm)
+            runReleaseBuild("safe-ffi", "dev", "x86_64-apple-ios")
+            packageBuildArtifacts("safe-ffi", "dev", "x86_64-apple-ios")
+            uploadBuildArtifacts()
+        }
     }
 }
 
@@ -284,7 +342,7 @@ def packageBuildArtifacts(component, type, target) {
     }
 }
 
-def uploadBuildArtifacts() {
+def uploadBuildArtifacts(type='') {
     withAWS(credentials: 'aws_jenkins_build_artifacts_user', region: 'eu-west-2') {
         def artifacts = sh(returnStdout: true, script: 'ls -1 artifacts').trim().split("\\r?\\n")
         for (artifact in artifacts) {
