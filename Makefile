@@ -35,6 +35,90 @@ endif
 		"${SAFE_CLI_BUILD_TYPE}" \
 		"${SAFE_CLI_BUILD_CLEAN}"
 
+build-all-containers:
+	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	SAFE_CLI_CONTAINER_TYPE=dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	SAFE_CLI_CONTAINER_TYPE=dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-api \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	SAFE_CLI_CONTAINER_TYPE=dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
+	SAFE_CLI_CONTAINER_TYPE=dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
+	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
+	SAFE_CLI_CONTAINER_TYPE=dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+		make build-container
+	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
+	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+		make build-container
+
+build-container:
+ifndef SAFE_CLI_CONTAINER_COMPONENT
+	@echo "A component to build must be specified."
+	@echo "Please set SAFE_CLI_CONTAINER_COMPONENT to 'safe-api', 'safe-ffi' or 'safe-cli'."
+	@exit 1
+endif
+ifndef SAFE_CLI_CONTAINER_TYPE
+	@echo "A container type must be specified."
+	@echo "Please set SAFE_CLI_CONTAINER_TYPE to 'dev' or 'non-dev'."
+	@exit 1
+endif
+ifndef SAFE_CLI_CONTAINER_TARGET
+	@echo "A build target must be specified."
+	@echo "Please set SAFE_CLI_CONTAINER_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@exit 1
+endif
+	./resources/build-container.sh \
+		"${SAFE_CLI_CONTAINER_COMPONENT}" \
+		"${SAFE_CLI_CONTAINER_TARGET}" \
+		"${SAFE_CLI_CONTAINER_TYPE}"
+
+push-container:
+ifndef SAFE_CLI_CONTAINER_COMPONENT
+	@echo "A component to build must be specified."
+	@echo "Please set SAFE_CLI_CONTAINER_COMPONENT to 'safe-api', 'safe-ffi' or 'safe-cli'."
+	@exit 1
+endif
+ifndef SAFE_CLI_CONTAINER_TYPE
+	@echo "A container type must be specified."
+	@echo "Please set SAFE_CLI_CONTAINER_TYPE to 'dev' or 'non-dev'."
+	@exit 1
+endif
+ifndef SAFE_CLI_CONTAINER_TARGET
+	@echo "A build target must be specified."
+	@echo "Please set SAFE_CLI_CONTAINER_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@exit 1
+endif
+	$(eval COMPONENT_NAME := $(shell echo ${SAFE_CLI_CONTAINER_COMPONENT} | sed 's/safe-//g'))
+ifeq ($(SAFE_CLI_CONTAINER_TYPE), dev)
+	docker push \
+		maidsafe/safe-cli-build:${COMPONENT_NAME}-${SAFE_CLI_CONTAINER_TARGET}-dev
+else
+	docker push \
+		maidsafe/safe-cli-build:${COMPONENT_NAME}-${SAFE_CLI_CONTAINER_TARGET}
+endif
+
 retrieve-ios-build-artifacts:
 ifndef SAFE_CLI_BUILD_BRANCH
 	@echo "A branch or PR reference must be provided."
@@ -77,105 +161,6 @@ else ifeq ($(UNAME_S),Darwin)
 else
 	find artifacts -name "safe" -exec strip '{}' \;
 endif
-
-build-cli-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu \
-		--build-arg build_target="x86_64-unknown-linux-gnu" \
-		--build-arg build_type="non-dev" \
-		--build-arg build_component="safe-cli" .
-
-push-cli-container:
-	docker push maidsafe/safe-cli-build:cli
-
-build-cli-dev-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:cli
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:cli-dev \
-		--build-arg build_type="dev" \
-		--build-arg build_component="safe-cli" .
-
-push-cli-dev-container:
-	docker push maidsafe/safe-cli-build:cli-dev
-
-build-api-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:api
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:api \
-		--build-arg build_type="non-dev" \
-		--build-arg build_component="safe-api" .
-
-push-api-container:
-	docker push maidsafe/safe-cli-build:api
-
-build-ffi-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:ffi
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:ffi \
-		--build-arg build_type="non-dev" \
-		--build-arg build_component="safe-ffi" .
-
-push-ffi-container:
-	docker push maidsafe/safe-cli-build:ffi
-
-build-ffi-dev-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:ffi-dev
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:ffi-dev \
-		--build-arg build_type="non-dev" \
-		--build-arg build_component="safe-ffi" .
-
-push-ffi-dev-container:
-	docker push maidsafe/safe-cli-build:ffi-dev
-
-build-ffi-android-armv7-container:
-	rm -rf target/
-	docker system prune --force
-	docker rmi -f maidsafe/safe-cli-build:ffi-android-armv7
-	docker build -f Dockerfile.android.armv7.build \
-		-t maidsafe/safe-cli-build:ffi-android-armv7 \
-		--build-arg build_type="non-dev" \
-		--build-arg target="armv7-linux-androideabi" .
-
-push-ffi-android-armv7-container:
-	docker push maidsafe/safe-cli-build:ffi-android-armv7
-
-build-ffi-android-armv7-dev-container:
-	rm -rf target/
-	docker system prune --force
-	docker rmi -f maidsafe/safe-cli-build:ffi-android-armv7-dev
-	docker build -f Dockerfile.android.armv7.build \
-		-t maidsafe/safe-cli-build:ffi-android-armv7-dev \
-		--build-arg build_type="dev" \
-		--build-arg target="armv7-linux-androideabi" .
-
-push-ffi-android-armv7-dev-container:
-	docker push maidsafe/safe-cli-build:ffi-android-armv7-dev
-
-build-ffi-android-x86_64-container:
-	rm -rf target/
-	docker system prune --force
-	docker rmi -f maidsafe/safe-cli-build:ffi-android-x86_64
-	docker build -f Dockerfile.android.x86_64.build \
-		-t maidsafe/safe-cli-build:ffi-android-x86_64 \
-		--build-arg build_type="non-dev" \
-		--build-arg target="x86_64-linux-android" .
-
-push-ffi-android-x86_64-container:
-	docker push maidsafe/safe-cli-build:ffi-android-x86_64
-
-build-ffi-android-x86_64-dev-container:
-	rm -rf target/
-	docker system prune --force
-	docker rmi -f maidsafe/safe-cli-build:ffi-android-x86_64-dev
-	docker build -f Dockerfile.android.x86_64.build \
-		-t maidsafe/safe-cli-build:ffi-android-x86_64-dev \
-		--build-arg build_type="dev" \
-		--build-arg target="x86_64-linux-android" .
-
-push-ffi-android-x86_64-dev-container:
-	docker push maidsafe/safe-cli-build:ffi-android-x86_64-dev
 
 clippy:
 ifeq ($(UNAME_S),Linux)
