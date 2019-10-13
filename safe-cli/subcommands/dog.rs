@@ -16,7 +16,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub struct DogCommands {
-    /// The safe:// location to retrieve
+    /// The safe:// location to inspect
     location: Option<String>,
 }
 
@@ -30,7 +30,7 @@ pub fn dog_commander(
 
     // TODO: switch to connect_without_auth(safe)?;
     auth_connect(safe)?;
-    let content = safe.fetch(&url)?;
+    let content = safe.inspect(&url)?;
     match &content {
         SafeData::FilesContainer {
             xorurl,
@@ -41,7 +41,6 @@ pub fn dog_commander(
             resolved_from,
             ..
         } => {
-            // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
                 println!("Native data type: {}", data_type);
                 println!("Version: {}", version);
@@ -105,7 +104,6 @@ pub fn dog_commander(
             resolved_from,
             ..
         } => {
-            // Render Wallet
             if OutputFmt::Pretty == output_fmt {
                 println!("Native data type: {}", data_type);
                 println!("Type tag: {}", type_tag);
