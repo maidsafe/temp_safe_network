@@ -10,9 +10,14 @@ if [[ -z "$build_component" ]]; then
     exit 1
 fi
 
+if [[ -z "$build_target" ]]; then
+    echo "build_target must be set to a valid Rust 'target triple'"
+    exit 1
+fi
+
 cd "$build_component"
 if [[ "$build_type" == "dev" ]]; then
-    cargo build --release --tests --features=mock-network,fake-auth
+    cargo build --release --tests --features=mock-network,fake-auth --target="$build_target"
 else
-    cargo build --release
+    cargo build --release --target="$build_target"
 fi

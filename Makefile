@@ -10,128 +10,30 @@ SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-cli
 
-build-clean-cli:
-	rm -rf artifacts
-	mkdir artifacts
-ifeq ($(UNAME_S),Linux)
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:cli \
-		bash -c "rm -rf /target/release && cargo build --release"
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-else
-	rm -rf target
-	cargo build --release --manifest-path=safe-cli/Cargo.toml
+build-component:
+ifndef SAFE_CLI_BUILD_COMPONENT
+	@echo "A build component must be specified."
+	@echo "Please set SAFE_CLI_BUILD_COMPONENT to 'safe-api', 'safe-ffi' or 'safe-cli'."
+	@exit 1
 endif
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-cli:
-	rm -rf artifacts
-	mkdir artifacts
-ifeq ($(UNAME_S),Linux)
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:cli \
-		cargo build --release
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-else
-	cargo build --release --manifest-path=safe-cli/Cargo.toml
+ifndef SAFE_CLI_BUILD_TYPE
+	@echo "A build type must be specified."
+	@echo "Please set SAFE_CLI_BUILD_TYPE to 'dev' or 'non-dev'."
+	@exit 1
 endif
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-clean-ffi:
-	rm -rf artifacts
-	mkdir artifacts
-ifeq ($(UNAME_S),Linux)
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:ffi \
-		bash -c "rm -rf /target/release && cargo build --release"
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-else
-	rm -rf target
-	cargo build --release --manifest-path safe-ffi/Cargo.toml
+ifndef SAFE_CLI_BUILD_TARGET
+	@echo "A build target must be specified."
+	@echo "Please set SAFE_CLI_BUILD_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@exit 1
 endif
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-ffi:
-	rm -rf target
-	rm -rf artifacts
-	mkdir artifacts
-ifeq ($(UNAME_S),Linux)
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:ffi \
-		cargo build --release --manifest-path safe-ffi/Cargo.toml
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-else
-	cargo build --release --manifest-path safe-ffi/Cargo.toml
+ifndef SAFE_CLI_BUILD_CLEAN
+	$(eval SAFE_CLI_BUILD_CLEAN := false)
 endif
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-ffi-android-x86_64:
-	rm -rf target
-	rm -rf artifacts
-	mkdir artifacts
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:ffi-android-x86_64 \
-		cargo build --release --manifest-path safe-ffi/Cargo.toml --target=x86_64-linux-android
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-	find target/x86_64-linux-android/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-ffi-android-armv7:
-	rm -rf target
-	rm -rf artifacts
-	mkdir artifacts
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:ffi-android-armv7 \
-		cargo build --release --manifest-path safe-ffi/Cargo.toml --target=armv7-linux-androideabi
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-	find target/armv7-linux-androideabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-clean-ffi-android-x86_64:
-	rm -rf target
-	rm -rf artifacts
-	mkdir artifacts
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:ffi-android-x86_64 \
-		bash -c "rm -rf /target && cargo build --release --manifest-path safe-ffi/Cargo.toml --target=x86_64-linux-android"
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-	find target/x86_64-linux-android/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-clean-ffi-android-armv7:
-	rm -rf target
-	rm -rf artifacts
-	mkdir artifacts
-	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:ffi-android-armv7 \
-		bash -c "rm -rf /target && cargo build --release --manifest-path safe-ffi/Cargo.toml --target=armv7-linux-androideabi"
-	docker cp "safe-cli-build-${UUID}":/target .
-	docker rm "safe-cli-build-${UUID}"
-	find target/armv7-linux-androideabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-ios-aarch64:
-	rm -rf artifacts
-	mkdir artifacts
-	cargo build --release --manifest-path=safe-ffi/Cargo.toml --target=aarch64-apple-ios
-	find target/aarch64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-
-build-ios-x86_64:
-	rm -rf artifacts
-	mkdir artifacts
-	cargo build --release --manifest-path=safe-ffi/Cargo.toml --target=x86_64-apple-ios
-	find target/x86_64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+	./resources/build-component.sh \
+		"${SAFE_CLI_BUILD_COMPONENT}" \
+		"${SAFE_CLI_BUILD_TARGET}" \
+		"${SAFE_CLI_BUILD_TYPE}" \
+		"${SAFE_CLI_BUILD_CLEAN}"
 
 retrieve-ios-build-artifacts:
 ifndef SAFE_CLI_BUILD_BRANCH
@@ -144,7 +46,7 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-	./scripts/retrieve-build-artifacts.sh "x86_64-apple-ios" "aarch64-apple-ios"
+	./resources/retrieve-build-artifacts.sh "x86_64-apple-ios" "aarch64-apple-ios"
 
 universal-ios-lib: retrieve-ios-build-artifacts
 ifneq ($(UNAME_S),Darwin)
@@ -178,8 +80,9 @@ endif
 
 build-cli-container:
 	rm -rf target/
-	docker rmi -f maidsafe/safe-cli-build:cli
-	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:cli \
+	docker rmi -f maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu
+	docker build -f Dockerfile.build -t maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu \
+		--build-arg build_target="x86_64-unknown-linux-gnu" \
 		--build-arg build_type="non-dev" \
 		--build-arg build_component="safe-cli" .
 
@@ -379,7 +282,7 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-	./scripts/retrieve-build-artifacts \
+	./resources/retrieve-build-artifacts.sh \
 		"x86_64-unknown-linux-gnu" "x86_64-pc-windows-gnu" "x86_64-apple-darwin" \
 		"armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
 		"aarch64-apple-ios" "apple-ios"

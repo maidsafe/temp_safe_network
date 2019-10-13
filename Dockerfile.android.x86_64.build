@@ -1,8 +1,9 @@
 FROM rust:latest
 
-# These are only referenced in the build-android-cache script.
+# These are only referenced in the build-cache script.
 ARG build_type
-ARG target
+ARG build_target
+ARG build_component
 
 RUN addgroup --gid 1001 maidsafe && \
     adduser --uid 1001 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
@@ -54,5 +55,5 @@ ENV CARGO_TARGET_DIR=/target \
     CC_x86_64_linux_android=x86_64-linux-android-gcc \
     PATH=$PATH:/usr/local/bin/android-toolchains/bin
 RUN rustup target add x86_64-linux-android && \
-    ./resources/build-android-cache.sh
+    ./resources/build-cache.sh
 ENTRYPOINT ["fixuid"]

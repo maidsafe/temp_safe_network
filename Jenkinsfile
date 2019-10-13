@@ -61,7 +61,7 @@ stage('build & test') {
     release_cli_linux: {
         node('safe_cli') {
             checkout(scm)
-            runReleaseBuild("cli")
+            runReleaseBuild("safe-cli", "non-dev", "x86_64-unknown-linux-gnu")
             stripArtifacts()
             packageBuildArtifacts("safe-cli", "non-dev", "x86_64-unknown-linux-gnu")
             uploadBuildArtifacts()
@@ -70,7 +70,7 @@ stage('build & test') {
     release_cli_windows: {
         node('windows') {
             checkout(scm)
-            runReleaseBuild("cli")
+            runReleaseBuild("safe-cli", "non-dev", "x86_64-pc-windows-gnu")
             stripArtifacts()
             packageBuildArtifacts("safe-cli", "non-dev", "x86_64-pc-windows-gnu")
             uploadBuildArtifacts()
@@ -79,7 +79,7 @@ stage('build & test') {
     release_cli_macos: {
         node('osx') {
             checkout(scm)
-            runReleaseBuild("cli")
+            runReleaseBuild("safe-cli", "non-dev", "x86_64-apple-darwin")
             stripArtifacts()
             packageBuildArtifacts("safe-cli", "non-dev", "x86_64-apple-darwin")
             uploadBuildArtifacts()
@@ -88,7 +88,7 @@ stage('build & test') {
     release_ffi_macos: {
         node('osx') {
             checkout(scm)
-            runReleaseBuild("ffi")
+            runReleaseBuild("safe-ffi", "non-dev", "x86_64-apple-darwin")
             stripArtifacts()
             packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-darwin")
             uploadBuildArtifacts()
@@ -97,7 +97,7 @@ stage('build & test') {
     release_ffi_windows: {
         node('windows') {
             checkout(scm)
-            runReleaseBuild("ffi")
+            runReleaseBuild("safe-ffi", "non-dev", "x86_64-pc-windows-gnu")
             packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-pc-windows-gnu")
             uploadBuildArtifacts()
         }
@@ -105,7 +105,7 @@ stage('build & test') {
     release_ffi_linux: {
         node('safe_cli') {
             checkout(scm)
-            runReleaseBuild("ffi")
+            runReleaseBuild("safe-ffi", "non-dev", "x86_64-unknown-linux-gnu")
             stripArtifacts()
             packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-unknown-linux-gnu")
             uploadBuildArtifacts()
@@ -114,7 +114,7 @@ stage('build & test') {
     release_ffi_android_x86_64: {
         node('safe_cli') {
             checkout(scm)
-            runReleaseBuild("ffi-android-x86_64")
+            runReleaseBuild("safe-ffi", "non-dev", "x86_64-linux-android")
             packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-linux-android")
             uploadBuildArtifacts()
         }
@@ -122,7 +122,7 @@ stage('build & test') {
     release_ffi_android_armv7: {
         node('safe_cli') {
             checkout(scm)
-            runReleaseBuild("ffi-android-armv7")
+            runReleaseBuild("safe-ffi", "non-dev", "armv7-linux-androideabi")
             packageBuildArtifacts("safe-ffi", "non-dev", "armv7-linux-androideabi")
             uploadBuildArtifacts()
         }
@@ -130,7 +130,7 @@ stage('build & test') {
     release_ffi_ios_aarch64: {
         node("osx") {
             checkout(scm)
-            sh("make build-ios-aarch64")
+            runReleaseBuild("safe-ffi", "non-dev", "aarch64-apple-ios")
             packageBuildArtifacts("safe-ffi", "non-dev", "aarch64-apple-ios")
             uploadBuildArtifacts()
         }
@@ -138,7 +138,7 @@ stage('build & test') {
     release_ffi_ios_x86_64: {
         node("osx") {
             checkout(scm)
-            sh("make build-ios-x86_64")
+            runReleaseBuild("safe-ffi", "non-dev", "x86_64-apple-ios")
             packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-ios")
             uploadBuildArtifacts()
         }
@@ -196,29 +196,14 @@ def retrieveCache(os) {
     }
 }
 
-def runReleaseBuild(component) {
+def runReleaseBuild(component, type, target) {
     def cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}"
-    def target = ""
-    switch (component) {
-        case "api":
-            target = cleanBuild ? "build-clean-api" : "build-api"
-            break
-        case "cli":
-            target = cleanBuild ? "build-clean-cli" : "build-cli"
-            break
-        case "ffi":
-            target = cleanBuild ? "build-clean-ffi" : "build-ffi"
-            break
-        case "ffi-android-x86_64":
-            target = cleanBuild ? "build-clean-ffi-android-x86_64" : "build-ffi-android-x86_64"
-            break
-        case "ffi-android-armv7":
-            target = cleanBuild ? "build-clean-ffi-android-armv7" : "build-ffi-android-armv7"
-            break
-        default:
-            error("${component} is not supported. Please extend for support.")
+    withEnv(["SAFE_CLI_BUILD_COMPONENT=${component}",
+             "SAFE_CLI_BUILD_TYPE=${type}",
+             "SAFE_CLI_BUILD_CLEAN=${cleanBuild}",
+             "SAFE_CLI_BUILD_TARGET=${target}"]) {
+        sh("make build-component")
     }
-    sh("make ${target}")
 }
 
 def stripArtifacts() {
