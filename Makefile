@@ -1,5 +1,6 @@
 SHELL := /bin/bash
-SAFE_CLI_VERSION := $(shell grep "^version" < Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SAFE_CLI_VERSION := $(shell grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SAFE_FFI_VERSION := $(shell grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
@@ -120,9 +121,9 @@ else
 endif
 
 retrieve-ios-build-artifacts:
-ifndef SAFE_CLI_BUILD_BRANCH
+ifndef SAFE_CLI_BRANCH
 	@echo "A branch or PR reference must be provided."
-	@echo "Please set SAFE_CLI_BUILD_BRANCH to a valid branch or PR reference."
+	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_NUMBER
@@ -130,6 +131,7 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
+	rm -rf artifacts
 	./resources/retrieve-build-artifacts.sh "x86_64-apple-ios" "aarch64-apple-ios"
 
 universal-ios-lib: retrieve-ios-build-artifacts
@@ -137,9 +139,9 @@ ifneq ($(UNAME_S),Darwin)
 	@echo "This target can only be run on macOS"
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_BRANCH
+ifndef SAFE_CLI_BRANCH
 	@echo "A branch or PR reference must be provided."
-	@echo "Please set SAFE_CLI_BUILD_BRANCH to a valid branch or PR reference."
+	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_NUMBER
@@ -147,14 +149,14 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-	mkdir -p artifacts/real/universal
-	mkdir -p artifacts/mock/universal
-	lipo -create -output artifacts/real/universal/libsafe_ffi.a \
-		artifacts/real/x86_64-apple-ios/release/libsafe_ffi.a \
-		artifacts/real/aarch64-apple-ios/release/libsafe_ffi.a
-	lipo -create -output artifacts/mock/universal/libsafe_ffi.a \
-		artifacts/mock/x86_64-apple-ios/release/libsafe_ffi.a \
-		artifacts/mock/aarch64-apple-ios/release/libsafe_ffi.a
+	mkdir -p artifacts/safe-ffi/real/universal
+	mkdir -p artifacts/safe-ffi/mock/universal
+	lipo -create -output artifacts/safe-ffi/real/universal/libsafe_ffi.a \
+		artifacts/safe-ffi/real/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/safe-ffi/real/aarch64-apple-ios/release/libsafe_ffi.a
+	lipo -create -output artifacts/safe-ffi/mock/universal/libsafe_ffi.a \
+		artifacts/safe-ffi/mock/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/safe-ffi/mock/aarch64-apple-ios/release/libsafe_ffi.a
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
@@ -243,7 +245,7 @@ ifndef SAFE_CLI_BUILD_TYPE
 endif
 ifndef SAFE_CLI_BUILD_COMPONENT
 	@echo "A value must be supplied for SAFE_CLI_BUILD_COMPONENT."
-	@echo "Valid values are 'safe-cli', 'safe-api' or 'safe-ffi'."
+	@echo "Valid values are 'safe-li', 'safe-api' or 'safe-ffi'."
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_TARGET
@@ -270,15 +272,21 @@ ifndef SAFE_CLI_BUILD_NUMBER
 	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
+	rm -rf artifacts
 	./resources/retrieve-build-artifacts.sh \
 		"x86_64-unknown-linux-gnu" "x86_64-pc-windows-gnu" "x86_64-apple-darwin" \
 		"armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
 		"aarch64-apple-ios" "apple-ios"
+	find artifacts -type d -empty -delete
+	rm -rf artifacts/safe-ffi/real/aarch64-apple-ios
+	rm -rf artifacts/safe-ffi/mock/aarch64-apple-ios
+	rm -rf artifacts/safe-ffi/real/x86_64-apple-ios
+	rm -rf artifacts/safe-ffi/mock/x86_64-apple-ios
 
 package-universal-ios-lib:
-ifndef SAFE_CLI_BUILD_BRANCH
+ifndef SAFE_CLI_BRANCH
 	@echo "A branch or PR reference must be provided."
-	@echo "Please set SAFE_CLI_BUILD_BRANCH to a valid branch or PR reference."
+	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_NUMBER
@@ -288,16 +296,15 @@ ifndef SAFE_CLI_BUILD_NUMBER
 endif
 	( \
 		cd artifacts; \
-		tar -C real/universal -zcvf \
-			${SAFE_CLI_BUILD_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios.tar.gz .; \
+		tar -C safe-ffi/real/universal -zcvf \
+			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios.tar.gz .; \
 	)
 	( \
 		cd artifacts; \
-		tar -C mock/universal -zcvf \
-			${SAFE_CLI_BUILD_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios-dev.tar.gz .; \
+		tar -C safe-ffi/mock/universal -zcvf \
+			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios-dev.tar.gz .; \
 	)
-	rm -rf artifacts/real
-	rm -rf artifacts/mock
+	rm -rf artifacts/safe-ffi
 
 clean:
 ifndef SAFE_AUTH_PORT
@@ -312,51 +319,19 @@ endif
 	rm -rf ${MOCK_VAULT_PATH}
 
 package-commit_hash-artifacts-for-deploy:
-	rm -f *.zip
 	rm -rf deploy
-	mkdir -p deploy/dev
-	mkdir -p deploy/release
-	zip safe-cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.zip artifacts/linux/release/safe
-	zip safe-cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.zip artifacts/win/release/safe.exe
-	zip safe-cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.zip artifacts/macos/release/safe
-	zip safe-cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu-dev.zip artifacts/linux/dev/safe
-	zip safe-cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu-dev.zip artifacts/win/dev/safe.exe
-	zip safe-cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin-dev.zip artifacts/macos/dev/safe
-	mv safe-cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu.zip deploy/release
-	mv safe-cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.zip deploy/release
-	mv safe-cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.zip deploy/release
-	mv safe-cli-$$(git rev-parse --short HEAD)-x86_64-unknown-linux-gnu-dev.zip deploy/dev
-	mv safe-cli-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu-dev.zip deploy/dev
-	mv safe-cli-$$(git rev-parse --short HEAD)-x86_64-apple-darwin-dev.zip deploy/dev
+	mkdir -p deploy/mock
+	mkdir -p deploy/real
+	./resources/package-deploy-artifacts.sh "safe-cli" $$(git rev-parse --short HEAD)
+	./resources/package-deploy-artifacts.sh "safe-ffi" $$(git rev-parse --short HEAD)
+	find deploy -name "*.tar.gz" -exec rm '{}' \;
 
 package-version-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/dev
-	mkdir -p deploy/release
-	( \
-		cd deploy/release; \
-		zip -j safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip \
-			../../artifacts/linux/release/safe; \
-		zip -j safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip \
-			../../artifacts/win/release/safe.exe; \
-		zip -j safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip \
-			../../artifacts/macos/release/safe; \
-		tar -C ../../artifacts/linux/release \
-			-zcvf safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz safe; \
-		tar -C ../../artifacts/win/release \
-			-zcvf safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz safe.exe; \
-		tar -C ../../artifacts/macos/release \
-			-zcvf safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz safe; \
-	)
-	( \
-		cd deploy/dev; \
-		zip -j safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu-dev.zip \
-			../../artifacts/linux/dev/safe; \
-		zip -j safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu-dev.zip \
-			../../artifacts/win/dev/safe.exe; \
-		zip -j safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin-dev.zip \
-			../../artifacts/macos/dev/safe; \
-	)
+	mkdir -p deploy/mock
+	mkdir -p deploy/real
+	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"
+	./resources/package-deploy-artifacts.sh "safe-ffi" "${SAFE_FFI_VERSION}"
 
 deploy-github-release:
 ifndef GITHUB_TOKEN
@@ -374,37 +349,37 @@ endif
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip" \
-		--file deploy/release/safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip;
+		--file deploy/real/safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.zip;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip" \
-		--file deploy/release/safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip;
+		--file deploy/real/safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.zip;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip" \
-		--file deploy/release/safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip;
+		--file deploy/real/safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.zip;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
-		--file deploy/release/safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz;
+		--file deploy/real/safe-cli-${SAFE_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
-		--file deploy/release/safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz;
+		--file deploy/real/safe-cli-${SAFE_CLI_VERSION}-x86_64-pc-windows-gnu.tar.gz;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz" \
-		--file deploy/release/safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz;
+		--file deploy/real/safe-cli-${SAFE_CLI_VERSION}-x86_64-apple-darwin.tar.gz;
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
@@ -430,3 +405,14 @@ endif
 	mkdir target
 	tar -C target -xvf safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
 	rm safe_cli-${SAFE_CLI_BRANCH}-${SAFE_CLI_OS}-cache.tar.gz
+
+publish-api:
+ifndef CRATES_IO_TOKEN
+	@echo "A login token for crates.io must be provided."
+	@exit 1
+endif
+	rm -rf artifacts deploy
+	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu \
+		/bin/bash -c "cd safe-api && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"

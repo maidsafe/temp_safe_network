@@ -2,6 +2,8 @@ properties([
     parameters([
         string(name: 'ARTIFACTS_BUCKET', defaultValue: 'safe-jenkins-build-artifacts'),
         string(name: 'CACHE_BRANCH', defaultValue: 'master'),
+        string(name: 'DEPLOY_BRANCH', defaultValue: 'master'),
+        string(name: 'PUBLISH_BRANCH', defaultValue: 'master'),
         string(name: 'DEPLOY_BUCKET', defaultValue: 'safe-cli'),
         string(name: 'CLEAN_BUILD_BRANCH', defaultValue: 'master')
     ])
@@ -207,7 +209,7 @@ stage("build universal iOS lib") {
     node("osx") {
         checkout(scm)
         def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
-        withEnv(["SAFE_CLI_BUILD_BRANCH=${branch}",
+        withEnv(["SAFE_CLI_BRANCH=${branch}",
                  "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
             sh("make universal-ios-lib")
             sh("make package-universal-ios-lib")
@@ -218,22 +220,22 @@ stage("build universal iOS lib") {
 
 stage('deploy') {
     node('safe_cli') {
-        if (env.BRANCH_NAME == "master") {
+        if (env.BRANCH_NAME == "${params.DEPLOY_BRANCH}") {
             checkout(scm)
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
             if (isVersionChangeCommit()) {
                 version = sh(
                     returnStdout: true,
-                    script: "grep '^version' < Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
+                    script: "grep '^version' < safe-cli/Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
                 packageArtifactsForDeploy(true)
                 createTag(version)
                 createGithubRelease(version)
-                uploadDeployArtifacts("dev")
+                uploadDeployArtifacts("mock")
             } else {
                 packageArtifactsForDeploy(false)
-                uploadDeployArtifacts("dev")
-                uploadDeployArtifacts("release")
+                uploadDeployArtifacts("mock")
+                uploadDeployArtifacts("real")
             }
         } else {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
@@ -243,6 +245,26 @@ stage('deploy') {
         build(job: "../rust_cache_build-safe-cli", wait: false)
         build(job: "../docker_build-safe-cli_build_container", wait: false)
     }
+}
+
+stage("publishing") {
+    node("safe_cli") {
+        checkout(scm)
+        if (shouldPublish()) {
+            withCredentials(
+                [string(
+                    credentialsId: "crates_io_token", variable: "CRATES_IO_TOKEN")]) {
+                sh("make publish-api")
+            }
+        } else {
+            echo("Not publishing.")
+            echo("Not a version change commit or the publish branch doesn't match.")
+        }
+    }
+}
+
+def shouldPublish() {
+    return isVersionChangeCommit() && env.BRANCH_NAME == "${params.PUBLISH_BRANCH}"
 }
 
 def retrieveCache(os) {
