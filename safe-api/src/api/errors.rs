@@ -38,39 +38,14 @@ pub enum Error {
 
 impl From<Error> for String {
     fn from(error: Error) -> String {
-        get_error_info(&error)
+        error.description()
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", get_error_info(self))
+        write!(f, "{}", self.description())
     }
-}
-
-fn get_error_info(error: &Error) -> String {
-    let (error_type, error_msg) = match error {
-        Error::AuthError(info) => ("AuthError".to_string(), info.to_string()),
-        Error::ConnectionError(info) => ("ConnectionError".to_string(), info.to_string()),
-        Error::NetDataError(info) => ("NetDataError".to_string(), info.to_string()),
-        Error::ContentNotFound(info) => ("ContentNotFound".to_string(), info.to_string()),
-        Error::VersionNotFound(info) => ("VersionNotFound".to_string(), info.to_string()),
-        Error::ContentError(info) => ("ContentError".to_string(), info.to_string()),
-        Error::EmptyContent(info) => ("EmptyContent".to_string(), info.to_string()),
-        Error::AccessDenied(info) => ("AccessDenied".to_string(), info.to_string()),
-        Error::EntryNotFound(info) => ("EntryNotFound".to_string(), info.to_string()),
-        Error::EntryExists(info) => ("EntryExists".to_string(), info.to_string()),
-        Error::InvalidInput(info) => ("InvalidInput".to_string(), info.to_string()),
-        Error::InvalidAmount(info) => ("InvalidAmount".to_string(), info.to_string()),
-        Error::InvalidXorUrl(info) => ("InvalidXorUrl".to_string(), info.to_string()),
-        Error::InvalidMediaType(info) => ("InvalidMediaType".to_string(), info.to_string()),
-        Error::NotEnoughBalance(info) => ("NotEnoughBalance".to_string(), info.to_string()),
-        Error::FilesSystemError(info) => ("FilesSystemError".to_string(), info.to_string()),
-        Error::Unexpected(info) => ("Unexpected".to_string(), info.to_string()),
-        Error::Unknown(info) => ("Unknown".to_string(), info.to_string()),
-        Error::StringError(info) => ("StringError".to_string(), info.to_string()),
-    };
-    format!("[Error] {} - {}", error_type, error_msg)
 }
 
 #[allow(missing_docs)]
@@ -103,8 +78,8 @@ mod codes {
     pub const ERR_STRING_ERROR: i32 = -502;
 }
 
-impl ErrorCode for Error {
-    fn error_code(&self) -> i32 {
+impl Error {
+    pub fn error_code(&self) -> i32 {
         match *self {
             Error::AuthError(ref _error) => ERR_AUTH_ERROR,
             Error::ConnectionError(ref _error) => ERR_CONNECTION_ERROR,
@@ -126,6 +101,37 @@ impl ErrorCode for Error {
             Error::Unknown(ref _error) => ERR_UNKNOWN_ERROR,
             Error::StringError(ref _error) => ERR_STRING_ERROR,
         }
+    }
+
+    pub fn description(&self) -> String {
+        let (error_type, error_msg) = match self {
+            Error::AuthError(info) => ("AuthError".to_string(), info.to_string()),
+            Error::ConnectionError(info) => ("ConnectionError".to_string(), info.to_string()),
+            Error::NetDataError(info) => ("NetDataError".to_string(), info.to_string()),
+            Error::ContentNotFound(info) => ("ContentNotFound".to_string(), info.to_string()),
+            Error::VersionNotFound(info) => ("VersionNotFound".to_string(), info.to_string()),
+            Error::ContentError(info) => ("ContentError".to_string(), info.to_string()),
+            Error::EmptyContent(info) => ("EmptyContent".to_string(), info.to_string()),
+            Error::AccessDenied(info) => ("AccessDenied".to_string(), info.to_string()),
+            Error::EntryNotFound(info) => ("EntryNotFound".to_string(), info.to_string()),
+            Error::EntryExists(info) => ("EntryExists".to_string(), info.to_string()),
+            Error::InvalidInput(info) => ("InvalidInput".to_string(), info.to_string()),
+            Error::InvalidAmount(info) => ("InvalidAmount".to_string(), info.to_string()),
+            Error::InvalidXorUrl(info) => ("InvalidXorUrl".to_string(), info.to_string()),
+            Error::InvalidMediaType(info) => ("InvalidMediaType".to_string(), info.to_string()),
+            Error::NotEnoughBalance(info) => ("NotEnoughBalance".to_string(), info.to_string()),
+            Error::FilesSystemError(info) => ("FilesSystemError".to_string(), info.to_string()),
+            Error::Unexpected(info) => ("Unexpected".to_string(), info.to_string()),
+            Error::Unknown(info) => ("Unknown".to_string(), info.to_string()),
+            Error::StringError(info) => ("StringError".to_string(), info.to_string()),
+        };
+        format!("[Error] {} - {}", error_type, error_msg)
+    }
+}
+
+impl ErrorCode for Error {
+    fn error_code(&self) -> i32 {
+        self.error_code()
     }
 }
 
