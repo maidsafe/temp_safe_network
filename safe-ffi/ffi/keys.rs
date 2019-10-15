@@ -1,7 +1,7 @@
 use super::ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
-use safe_api::{ResultReturn, Safe};
+use safe_api::{BlsKeyPair as NativeBlsKeyPair, ResultReturn, Safe};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -55,11 +55,10 @@ pub unsafe extern "C" fn keys_create(
                 user_data.0,
                 FFI_RESULT_OK,
                 xorurl_c_str.as_ptr(),
-                &BlsKeyPair {
-                    pk: CString::new(from_c_str(pk)?)?.into_raw(),
-                    // null because we only have the pk, todo: maybe expose another callback to manage this in future
-                    sk: std::ptr::null(),
-                },
+                &bls_key_pair_into_repr_c(&NativeBlsKeyPair {
+                    pk: from_c_str(pk)?,
+                    sk: String::new(),
+                })?,
             ),
         };
         Ok(())
