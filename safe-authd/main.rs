@@ -8,6 +8,7 @@
 
 mod authd;
 mod quic_client;
+mod requests;
 mod update;
 
 use env_logger;
