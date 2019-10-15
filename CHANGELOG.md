@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+### [0.5.0] (15-10-2019)
+
+### Bug Fixes
+
+    **ffi:** keys_create to return new BlsKeyPair instance when None returned from native API
+    **ffi:** adapt FFI return type for parse_and_resolve_url function
+    **files:** check local file path before trying to attempt a files add operation
+    **api:** change args which expected Option<String> for some args to receive Option<&str>
+
+### Features
+
+    **safe-api:** publishing for safe-api on crates.io
+    **safe-ffi:** automatically build and publish safe-ffi libraries
+    **user-guide:** add details about the new dog command
+    **cli:** new `dog` command to inspect content retrieving only metadata
+    **ffi:** create FFI for new `inspect` API
+    **api:** add a new (`inspect`) API which allows to inspect a safe URL without retrieving the actual content
+    **user-guide:** add information about using spendable balances names in Wallet operations
+    **wallet:** allow to specify a specific speandable balance (as source or destination) for wallet operations
+    **bindings:** add NRS, SafeKeys, XorUrlEncoder, fetch and auth API bindings
+
 ### [0.4.0] (19-09-2019)
 
 ### Bug Fixes
