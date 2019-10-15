@@ -44,12 +44,24 @@ pub unsafe extern "C" fn keys_create(
         let pk_option = from_c_str_to_str_option(pk);
         let (xorurl, keypair) = (*app).keys_create(from_option, preload_option, pk_option)?;
         let xorurl_c_str = CString::new(xorurl.to_string())?;
-        o_cb(
-            user_data.0,
-            FFI_RESULT_OK,
-            xorurl_c_str.as_ptr(),
-            &bls_key_pair_into_repr_c(&keypair.as_ref().unwrap())?,
-        );
+        match keypair {
+            Some(keypair) => o_cb(
+                user_data.0,
+                FFI_RESULT_OK,
+                xorurl_c_str.as_ptr(),
+                &bls_key_pair_into_repr_c(&keypair)?,
+            ),
+            None => o_cb(
+                user_data.0,
+                FFI_RESULT_OK,
+                xorurl_c_str.as_ptr(),
+                &BlsKeyPair {
+                    pk: CString::new(from_c_str(pk)?)?.into_raw(),
+                    // null because we only have the pk, todo: maybe expose another callback to manage this in future
+                    sk: std::ptr::null(),
+                },
+            ),
+        };
         Ok(())
     })
 }
