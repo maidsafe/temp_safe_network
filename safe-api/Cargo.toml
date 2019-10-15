@@ -46,7 +46,7 @@ lazy_static = "1.2.0"
 reqwest = "0.9.5"
 
 [features]
-mock-network = ["safe_app/mock-network"]
+mock-network = ["safe_app/mock-network", "safe_authenticator/mock-network"]
 fake-auth = ["safe_app/testing"]
 scl-mock = ["fake-auth"]
 

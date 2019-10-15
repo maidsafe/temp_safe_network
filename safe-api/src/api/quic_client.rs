@@ -35,9 +35,9 @@ pub fn quic_send(
         .to_socket_addrs()
         .map_err(|_| Error::AuthdClientError("Invalid end point address".to_string()))?
         .next()
-        .ok_or(Error::AuthdClientError(
-            "The end point is an invalid address".to_string(),
-        ))?;
+        .ok_or_else(|| {
+            Error::AuthdClientError("The end point is an invalid address".to_string())
+        })?;
 
     let mut endpoint = quinn::Endpoint::builder();
     let mut client_config = quinn::ClientConfigBuilder::default();
@@ -95,7 +95,7 @@ pub fn quic_send(
     let host = cert_host
         .as_ref()
         .map_or_else(|| url.host_str(), |x| Some(&x))
-        .ok_or(Error::AuthdClientError("No hostname specified".to_string()))?;
+        .ok_or_else(|| Error::AuthdClientError("No hostname specified".to_string()))?;
 
     let (tx, rx) = mpsc::channel();
     runtime.block_on(

@@ -9,7 +9,7 @@
 use log::debug;
 use structopt::StructOpt;
 
-use crate::operations::auth::safe_connect;
+use crate::operations::safe_net::connect;
 use crate::shell;
 use crate::subcommands::auth::auth_commander;
 use crate::subcommands::cat::cat_commander;
@@ -96,7 +96,7 @@ pub fn run() -> Result<(), String> {
         Some(other) => {
             // We treat these separatelly since we need to connect before
             // handling any of these commands
-            safe_connect(&mut safe)?;
+            connect(&mut safe)?;
             match other {
                 SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),

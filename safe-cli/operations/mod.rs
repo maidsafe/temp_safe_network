@@ -6,7 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// #[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
-pub mod auth;
-// #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
-// pub mod fake_auth;
+#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
+mod auth_and_connect;
+pub mod auth_daemon;
+#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
+mod fake_auth;
+
+#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
+pub mod safe_net {
+    pub use super::auth_and_connect::*;
+}
+#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
+pub mod safe_net {
+    pub use super::fake_auth::*;
+}

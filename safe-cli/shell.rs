@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::operations::auth::*;
+use crate::operations::{auth_daemon::*, safe_net::*};
 use safe_api::{Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
 use std::io::{stdin, stdout, Write};
@@ -211,7 +211,11 @@ pub fn shell_run() -> Result<(), String> {
     println!("Type 'help' for a list of supported commands");
     println!("Type 'quit' to exit this shell. Enjoy it!");
     println!();
-    Ok(shell.run_loop(&mut ShellIO::default()))
+
+    // Run the shell loop to process user commands
+    shell.run_loop(&mut ShellIO::default());
+
+    Ok(())
 }
 
 fn prompt_to_allow_auth(app_id: &str) -> bool {

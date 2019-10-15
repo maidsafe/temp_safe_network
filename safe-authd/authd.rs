@@ -143,7 +143,7 @@ pub fn run() -> Result<(), String> {
                 .to_socket_addrs()
                 .map_err(|_| "Invalid end point address".to_string())?
                 .next()
-                .ok_or("The end point is an invalid address".to_string())?;
+                .ok_or_else(|| "The end point is an invalid address".to_string())?;
             if let Err(e) = start_authd(Logger::root(drain, o!()), endpoint) {
                 Err(format!("{}", e.pretty()))
             } else {
@@ -163,7 +163,7 @@ pub fn run() -> Result<(), String> {
                 .to_socket_addrs()
                 .map_err(|_| "Invalid end point address".to_string())?
                 .next()
-                .ok_or("The end point is an invalid address".to_string())?;
+                .ok_or_else(|| "The end point is an invalid address".to_string())?;
             if let Err(e) = restart_authd(Logger::root(drain, o!()), endpoint) {
                 Err(format!("{}", e.pretty()))
             } else {
@@ -531,7 +531,7 @@ impl Future for ProcessRequest {
                         Ok(path) => path,
                         Err(err) => return future_err(err.to_string()),
                     };
-                    let req_args: Vec<&str> = path.split("/").collect();
+                    let req_args: Vec<&str> = path.split('/').collect();
 
                     let safe_auth_handle = safe_auth_handle.clone();
                     let safe_auth: &mut SafeAuthenticator =

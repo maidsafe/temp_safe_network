@@ -60,7 +60,7 @@ pub fn quic_listen(url_str: &str, allow_cb: &'static AuthAllowPrompt) -> Result<
         .to_socket_addrs()
         .map_err(|err| format!("Invalid end point address: {}", err))?
         .next()
-        .ok_or("The end point is an invalid address".to_string())?;
+        .ok_or_else(|| "The end point is an invalid address".to_string())?;
 
     if let Err(e) = start_quic_endpoint(Logger::root(drain, o!()), endpoint, allow_cb) {
         Err(format!("{}", e.pretty()))
@@ -235,7 +235,7 @@ fn process_get(x: &[u8], allow_cb: &'static AuthAllowPrompt) -> Result<Box<[u8]>
     let x = &x[4..x.len() - 2];
     let end = x.iter().position(|&c| c == b' ').unwrap_or_else(|| x.len());
     let path = str::from_utf8(&x[..end]).context("Path is malformed UTF-8")?;
-    let req_args: Vec<&str> = path.split("/").collect();
+    let req_args: Vec<&str> = path.split('/').collect();
 
     if req_args.len() != 2 {
         bail!(

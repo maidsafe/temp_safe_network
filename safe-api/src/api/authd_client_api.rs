@@ -50,7 +50,9 @@ const SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE: &str = "unsubscribe/";
 pub struct SafeAuthdClient {
     port: u16,
     endpoint_thread_handle: Option<thread::JoinHandle<()>>,
-    //session_token: String, // TODO: keep the authd session token obtained after logging in a SAFE account
+    // TODO: add a session_token field to use for communicating with authd for restricted operations,
+    // we should restrict operations like subscribe, or allow/deny, to only be accepted with a valid token
+    // session_token: String,
 }
 
 impl Drop for SafeAuthdClient {
@@ -61,12 +63,11 @@ impl Drop for SafeAuthdClient {
 }
 
 #[allow(dead_code)]
-// TODO: we need to recognise erroneous response and return an Error
 impl SafeAuthdClient {
     pub fn new(port: Option<u16>) -> Self {
         let port_number = port.unwrap_or(SAFE_AUTHD_ENDPOINT_PORT);
         Self {
-            port: port_number, /*, session_token: "".to_string()*/
+            port: port_number,
             endpoint_thread_handle: None,
         }
     }

@@ -8,39 +8,25 @@
 
 use log::debug;
 use safe_api::Safe;
-use structopt::StructOpt;
 
 const APP_ID: &str = "net.maidsafe.cli";
 
-#[derive(StructOpt, Debug)]
-pub enum AuthSubCommands {
-    #[structopt(name = "clear")]
-    /// Clear authorisation credentials from local file
-    Clear {},
+pub fn authorise_cli(_safe: &mut Safe, _port: Option<u16>) -> Result<(), String> {
+    debug!("Fake-auth is enabled so we don't try to read the credentials file or send authorisation request");
+    Ok(())
 }
 
-pub fn auth_commander(
-    cmd: Option<AuthSubCommands>,
-    _port: Option<u16>,
-    _safe: &mut Safe,
-) -> Result<(), String> {
-    match cmd {
-        Some(AuthSubCommands::Clear {}) => {
-            debug!("Fake-auth is enabled so we don't try to clear the credentials file");
-            Ok(())
-        }
-        None => {
-            debug!("Fake-auth is enabled so we don't try to read the credentials file or send auth request");
-            Ok(())
-        }
-    }
+pub fn clear_credentials() -> Result<(), String> {
+    debug!("Fake-auth is enabled so we don't try to clear the credentials file");
+    Ok(())
 }
 
-pub fn auth_connect(safe: &mut Safe) -> Result<(), String> {
+pub fn connect(safe: &mut Safe) -> Result<(), String> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file");
+
     safe.connect(APP_ID, Some("fake-app-id")).map_err(|err| {
         format!(
-            "You need to authorise the safe CLI first with 'auth' command: {}",
+            "Unexpected error when trying to connect with fake auth/network: {}",
             err
         )
     })

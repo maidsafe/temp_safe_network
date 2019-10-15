@@ -41,6 +41,7 @@ pub struct AuthedAppsList {
 }
 
 // Authenticator API
+#[derive(Default)]
 pub struct SafeAuthenticator {
     safe_authenticator: Option<Authenticator>,
 }
@@ -59,9 +60,9 @@ impl SafeAuthenticator {
     /// the SAFE Network using the `Authenticator` daemon.
     ///
     /// ## Example
-    /// ```
-    /// # use safe_auth::create_acc;
-    /// use safe_auth::log_in;
+    /// ```ignore
+    /// use safe_api::SafeAuthenticator;
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -69,10 +70,10 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
-    /// let logged_in = log_in(my_secret, my_password);
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// let logged_in = safe_auth.log_in(my_secret, my_password);
     /// match logged_in {
-    ///    Ok(_) => assert!(true), // This should pass
+    ///    Ok(()) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
     ///```
@@ -80,13 +81,15 @@ impl SafeAuthenticator {
     /// ## Error Example
     /// If the account does not exist, the function will return an appropriate error:
     ///```
-    /// # use safe_auth::log_in;
-    /// let not_logged_in = log_in("non", "existant");
+    /// use safe_api::{SafeAuthenticator, Error};
+    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let not_logged_in = safe_auth.log_in("non", "existant");
     /// match not_logged_in {
-    ///    Ok(_) => assert!(false), // This should not pass
-    ///    Err(message) => {
+    ///    Ok(()) => assert!(false), // This should not pass
+    ///    Err(Error::AuthError(message)) => {
     ///         assert!(message.contains("Failed to log in"));
     ///    }
+    ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
     pub fn log_in(&mut self, secret: &str, password: &str) -> ResultReturn<()> {
@@ -111,31 +114,34 @@ impl SafeAuthenticator {
     /// Creates a new account on the SAFE Network.
     /// Returns an error if an account exists or if there was some
     /// problem during the account creation process.
-    /// If the account is successfully create it keeps the logged in session (discarding a previous session)
+    /// If the account is successfully created it keeps the logged in session (discarding a previous session)
     ///
     /// Note: This does _not_ perform any strength checks on the
     /// strings used to create the account.
     ///
     /// ## Example
-    /// ```
-    /// use safe_auth::create_acc;
+    /// ```ignore
+    /// use safe_api::SafeAuthenticator;
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// # fn main() -> Result<(), String> {
-    ///     let my_secret = "mysecretstring";
-    ///     let my_password = "mypassword";
-    /// #   let my_secret = &(random_str());
-    /// #   let my_password = &(random_str());
-    /// #   let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    ///     let auth = create_acc(sk, my_secret, my_password)?;
-    /// #   Ok(())
-    /// # }
+    /// let my_secret = "mysecretstring";
+    /// let my_password = "mypassword";
+    /// # let my_secret = &(random_str());
+    /// # let my_password = &(random_str());
+    /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
+    /// let acc_created = safe_auth.create_acc(sk, my_secret, my_password);
+    /// match acc_created {
+    ///    Ok(()) => assert!(true), // This should pass
+    ///    Err(_) => assert!(false)
+    /// }
     ///```
     ///
     /// ## Error Example
     /// If an account with same secret already exists,
     /// the function will return an error:
-    /// ```
-    /// use safe_auth::create_acc;
+    /// ```ignore
+    /// use safe_api::{SafeAuthenticator, Error};
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -143,13 +149,14 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
-    /// let acc_not_created = create_acc(sk, my_secret, my_password);
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// let acc_not_created = safe_auth.create_acc(sk, my_secret, my_password);
     /// match acc_not_created {
     ///    Ok(_) => assert!(false), // This should not pass
-    ///    Err(message) => {
+    ///    Err(Error::AuthError(message)) => {
     ///         assert!(message.contains("Failed to create an account"));
-    ///     }
+    ///    }
+    ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
     pub fn create_acc(&mut self, sk: &str, secret: &str, password: &str) -> ResultReturn<()> {
@@ -157,6 +164,7 @@ impl SafeAuthenticator {
         let secret_key = sk_from_hex(sk)?;
 
         match Authenticator::create_acc(secret, password, secret_key, || {
+            // TODO: allow the caller to provide the callback function
             // eprintln!("{}", "Disconnected from network");
         }) {
             Ok(auth) => {
@@ -208,9 +216,9 @@ impl SafeAuthenticator {
     /// the SAFE Network and authorise an application.
     ///
     /// ## Example
-    /// ```
-    /// # use safe_auth::create_acc;
-    /// use safe_auth::{log_in, authorise_app};
+    /// ```ignore
+    /// use safe_api::SafeAuthenticator;
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -218,19 +226,19 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
     /// let auth_req = "bAAAAAAEXVK4SGAAAAAABAAAAAAAAAAAANZSXILTNMFUWI43BMZSS4Y3MNEAAQAAAAAAAAAAAKNAUMRJAINGESEAAAAAAAAAAABGWC2LEKNQWMZJONZSXIICMORSAAAIBAAAAAAAAAAAAOAAAAAAAAAAAL5YHKYTMNFRQCAAAAAAAAAAAAAAAAAAB";
-    /// let authenticator = log_in(my_secret, my_password).unwrap();
-    /// let auth_response = authorise_app(&authenticator, auth_req, &|_| true);
+    /// safe_auth.log_in(my_secret, my_password).unwrap();
+    /// let auth_response = safe_auth.authorise_app(auth_req/*, &|_| true*/);
     /// match auth_response {
     ///    Ok(_) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
     ///```
     /// ## Error Example
-    /// ```
-    /// # use safe_auth::create_acc;
-    /// use safe_auth::{log_in, authorise_app};
+    /// ```ignore
+    /// use safe_api::{SafeAuthenticator, Error};
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -238,14 +246,17 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
     /// /// Using an invalid auth request string
     /// let auth_req = "invalid-auth-req-string";
-    /// let authenticator = log_in(my_secret, my_password).unwrap();
-    /// let auth_response = authorise_app(&authenticator, auth_req, &|_| true);
+    /// safe_auth.log_in(my_secret, my_password).unwrap();
+    /// let auth_response = safe_auth.authorise_app(auth_req/*, &|_| true*/);
     /// match auth_response {
     ///    Ok(_) => assert!(false), // This should not pass
-    ///    Err(message) => assert!(message.contains("EncodeDecodeError"))
+    ///    Err(Error::AuthError(message)) => {
+    ///         assert!(message.contains("EncodeDecodeError"));
+    ///    }
+    ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
     pub fn authorise_app(
@@ -357,9 +368,9 @@ impl SafeAuthenticator {
     /// been authorised so far.
     ///
     /// ## Example
-    /// ```
-    /// # use safe_auth::{create_acc, authorise_app};
-    /// use safe_auth::{log_in, authed_apps};
+    /// ```ignore
+    /// use safe_api::SafeAuthenticator;
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account which has been used
     /// /// to authorise some application already:
@@ -368,12 +379,12 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
-    /// let authenticator = log_in(my_secret, my_password).unwrap();
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// safe_auth.log_in(my_secret, my_password).unwrap();
     /// # let auth_req = "bAAAAAAEXVK4SGAAAAAABAAAAAAAAAAAANZSXILTNMFUWI43BMZSS4Y3MNEAAQAAAAAAAAAAAKNAUMRJAINGESEAAAAAAAAAAABGWC2LEKNQWMZJONZSXIICMORSAAAIBAAAAAAAAAAAAOAAAAAAAAAAAL5YHKYTMNFRQCAAAAAAAAAAAAAAAAAAB";
-    /// # authorise_app(&authenticator, auth_req, &|_| true).unwrap();
+    /// # safe_auth.authorise_app(auth_req/*, &|_| true*/).unwrap();
     /// /// Get the list of authorised apps
-    /// let authed_apps = authed_apps(&authenticator);
+    /// let authed_apps = safe_auth.authed_apps();
     /// match authed_apps {
     ///    Ok(_) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
@@ -441,9 +452,9 @@ impl SafeAuthenticator {
     /// application by providing its ID.
     ///
     /// ## Example
-    /// ```
-    /// # use safe_auth::{create_acc, authorise_app};
-    /// use safe_auth::{log_in, revoke_app};
+    /// ```ignore
+    /// use safe_api::SafeAuthenticator;
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account which has been used
     /// /// to authorise some application already:
@@ -452,12 +463,12 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
-    /// let authenticator = log_in(my_secret, my_password).unwrap();
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// safe_auth.log_in(my_secret, my_password).unwrap();
     /// # let auth_req = "bAAAAAAEXVK4SGAAAAAABAAAAAAAAAAAANZSXILTNMFUWI43BMZSS4Y3MNEAAQAAAAAAAAAAAKNAUMRJAINGESEAAAAAAAAAAABGWC2LEKNQWMZJONZSXIICMORSAAAIBAAAAAAAAAAAAOAAAAAAAAAAAL5YHKYTMNFRQCAAAAAAAAAAAAAAAAAAB";
-    /// # authorise_app(&authenticator, auth_req, &|_| true).unwrap();
+    /// # safe_auth.authorise_app(auth_req/*, &|_| true*/).unwrap();
     /// /// Revoke all permissions from app with ID `net.maidsafe.cli`
-    /// let revoked = revoke_app(&authenticator, String::from("net.maidsafe.cli"));
+    /// let revoked = safe_auth.revoke_app("net.maidsafe.cli");
     /// match revoked {
     ///    Ok(_) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
@@ -465,9 +476,9 @@ impl SafeAuthenticator {
     /// ```
     ///
     /// ## Error Example
-    /// ```
-    /// # use safe_auth::{create_acc, authorise_app};
-    /// use safe_auth::{log_in, revoke_app};
+    /// ```ignore
+    /// use safe_api::{SafeAuthenticator, Error};
+    /// let mut safe_auth = SafeAuthenticator::new();
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account which has been used
     /// /// to authorise some application already:
@@ -476,13 +487,16 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # create_acc(sk, my_secret, my_password).unwrap();
-    /// let authenticator = log_in(my_secret, my_password).unwrap();
+    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// safe_auth.log_in(my_secret, my_password).unwrap();
     /// /// Try to revoke permissions with an incorrect app ID
-    /// let revoked = revoke_app(&authenticator, String::from("invalid-app-id"));
+    /// let revoked = safe_auth.revoke_app("invalid-app-id");
     /// match revoked {
     ///    Ok(_) => assert!(false), // This should not pass
-    ///    Err(message) => assert!(message.contains("UnknownApp"))
+    ///    Err(Error::AuthError(message)) => {
+    ///         assert!(message.contains("UnknownApp"));
+    ///    }
+    ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
     pub fn revoke_app(&self, app_id: &str) -> ResultReturn<()> {
@@ -502,9 +516,9 @@ impl SafeAuthenticator {
 fn get_safe_authenticator(
     safe_authenticator: &Option<Authenticator>,
 ) -> ResultReturn<&Authenticator> {
-    safe_authenticator.as_ref().ok_or(Error::AuthError(
-        "You need to log in to a SAFE Network account first".to_string(),
-    ))
+    safe_authenticator.as_ref().ok_or_else(|| {
+        Error::AuthError("You need to log in to a SAFE Network account first".to_string())
+    })
 }
 
 // Helper function to generate an app authorisation response

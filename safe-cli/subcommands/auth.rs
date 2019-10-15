@@ -6,11 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::operations::auth::{
-    authd_allow, authd_apps, authd_auth_reqs, authd_create, authd_deny, authd_login, authd_logout,
-    authd_revoke, authd_run_cmd, authd_subscribe_url, authd_unsubscribe, authorise_cli,
-    clear_credentials,
-};
+use crate::operations::auth_daemon::*;
+use crate::operations::safe_net::*;
 use safe_api::{Safe, SafeAuthdClient};
 use structopt::StructOpt;
 
