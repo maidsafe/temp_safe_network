@@ -243,8 +243,8 @@ stage('deploy') {
         }
     }
     if (env.BRANCH_NAME == "master") {
-        build(job: "../rust_cache_build-safe-cli", wait: false)
-        build(job: "../docker_build-safe-cli_build_container", wait: false)
+        build(job: "../rust_cache_build-safe_cli", wait: false)
+        build(job: "../docker_build-safe_cli_build_container", wait: false)
     }
 }
 
