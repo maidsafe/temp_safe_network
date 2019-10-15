@@ -332,6 +332,7 @@ package-version-artifacts-for-deploy:
 	mkdir -p deploy/real
 	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-ffi" "${SAFE_FFI_VERSION}"
+	find deploy -name "safe-ffi-*.tar.gz" -exec rm '{}' \;
 
 deploy-github-release:
 ifndef GITHUB_TOKEN

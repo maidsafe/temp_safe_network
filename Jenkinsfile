@@ -232,6 +232,7 @@ stage('deploy') {
                 createTag(version)
                 createGithubRelease(version)
                 uploadDeployArtifacts("mock")
+                uploadDeployArtifacts("real")
             } else {
                 packageArtifactsForDeploy(false)
                 uploadDeployArtifacts("mock")
