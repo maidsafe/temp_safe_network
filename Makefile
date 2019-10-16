@@ -171,7 +171,7 @@ clippy:
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-cli-build-${UUID}" -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-cli-build:build \
+		maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu \
 		/bin/bash -c "cargo clippy --all-targets --all-features -- -D warnings"
 else
 	cargo clippy --all-targets --all-features -- -D warnings
