@@ -10,8 +10,10 @@ use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
 use super::quic_endpoint::quic_listen;
 pub use super::quic_endpoint::AuthAllowPrompt;
-use super::{ResultReturn, SafeAuthReqId};
+use super::{Error, ResultReturn, SafeAuthReqId};
 use log::{debug, error, info};
+use std::io::{self, Write};
+use std::process::Command;
 use std::thread;
 
 //use super::authenticator::AuthedAppsList;
@@ -46,6 +48,15 @@ const SAFE_AUTHD_ENDPOINT_SUBSCRIBE: &str = "subscribe/";
 // Path of authenticator endpoint for unsubscribing from authorisation requests notifications
 const SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE: &str = "unsubscribe/";
 
+// authd subcommand to start the daemon
+const SAFE_AUTHD_CMD_START: &str = "start";
+
+// authd subcommand to stop the daemon
+const SAFE_AUTHD_CMD_STOP: &str = "stop";
+
+// authd subcommand to restart the daemon
+const SAFE_AUTHD_CMD_RESTART: &str = "restart";
+
 // Authd Client API
 pub struct SafeAuthdClient {
     port: u16,
@@ -70,6 +81,27 @@ impl SafeAuthdClient {
             port: port_number,
             endpoint_thread_handle: None,
         }
+    }
+
+    // Start the Authenticator daemon
+    pub fn start(&self, authd_path: Option<&str>) -> ResultReturn<()> {
+        let path = authd_path.unwrap_or_else(|| "");
+        debug!("Attempting to start authd from '{}' ...", path);
+        authd_run_cmd(path, SAFE_AUTHD_CMD_START)
+    }
+
+    // Stop the Authenticator daemon
+    pub fn stop(&self, authd_path: Option<&str>) -> ResultReturn<()> {
+        let path = authd_path.unwrap_or_else(|| "");
+        debug!("Attempting to stop authd from '{}' ...", path);
+        authd_run_cmd(path, SAFE_AUTHD_CMD_STOP)
+    }
+
+    // Restart the Authenticator daemon
+    pub fn restart(&self, authd_path: Option<&str>) -> ResultReturn<()> {
+        let path = authd_path.unwrap_or_else(|| "");
+        debug!("Attempting to restart authd from '{}' ...", path);
+        authd_run_cmd(path, SAFE_AUTHD_CMD_RESTART)
     }
 
     // Send a login action request to remote authd endpoint
@@ -314,4 +346,30 @@ impl SafeAuthdClient {
 
 fn send_request(url_str: &str) -> ResultReturn<String> {
     quic_send(&url_str, false, None, None, false)
+}
+
+pub fn authd_run_cmd(authd_path: &str, command: &str) -> ResultReturn<()> {
+    let output = Command::new(&authd_path)
+        .arg(command)
+        .output()
+        .map_err(|err| {
+            Error::AuthdClientError(format!(
+                "Failed to start authd from '{}': {}",
+                authd_path, err
+            ))
+        })?;
+
+    if output.status.success() {
+        io::stdout()
+            .write_all(&output.stdout)
+            .map_err(|err| Error::AuthdClientError(format!("Failed to output stdout: {}", err)))?;
+        Ok(())
+    } else {
+        io::stderr()
+            .write_all(&output.stderr)
+            .map_err(|err| Error::AuthdClientError(format!("Failed to output stderr: {}", err)))?;
+        Err(Error::AuthdClientError(
+            "Failed to invoke safe-authd executable".to_string(),
+        ))
+    }
 }

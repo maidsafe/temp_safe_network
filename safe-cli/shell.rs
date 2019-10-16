@@ -173,9 +173,9 @@ pub fn shell_run() -> Result<(), String> {
         },
     );
     shell.new_command_noargs(
-        "start-authd",
+        "auth-start",
         "Starts the Authenticator daemon if it's not running already",
-        |io, (_, _)| match authd_run_cmd("start") {
+        |io, (_, safe_authd_client)| match authd_start(safe_authd_client) {
             Ok(()) => Ok(()),
             Err(err) => {
                 writeln!(io, "{}", err)?;
@@ -184,9 +184,9 @@ pub fn shell_run() -> Result<(), String> {
         },
     );
     shell.new_command_noargs(
-        "stop-authd",
+        "auth-stop",
         "Stops the Authenticator daemon if it's running",
-        |io, (_, _)| match authd_run_cmd("stop") {
+        |io, (_, safe_authd_client)| match authd_stop(safe_authd_client) {
             Ok(()) => Ok(()),
             Err(err) => {
                 writeln!(io, "{}", err)?;
@@ -195,9 +195,9 @@ pub fn shell_run() -> Result<(), String> {
         },
     );
     shell.new_command_noargs(
-        "restart-authd",
+        "auth-restart",
         "Restarts the Authenticator daemon if it's running already",
-        |io, (_, _)| match authd_run_cmd("restart") {
+        |io, (_, safe_authd_client)| match authd_restart(safe_authd_client) {
             Ok(()) => Ok(()),
             Err(err) => {
                 writeln!(io, "{}", err)?;

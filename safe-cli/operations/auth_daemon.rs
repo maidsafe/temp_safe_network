@@ -9,27 +9,26 @@
 use prettytable::Table;
 use rpassword;
 use safe_api::{AuthAllowPrompt, Safe, SafeAuthdClient};
-use std::io::{self, Write};
-use std::process::Command;
 
-pub fn authd_run_cmd(command: &str) -> Result<(), String> {
-    let authd_bin_path = get_authd_bin_path();
-    let output = Command::new(&authd_bin_path)
-        .arg(command)
-        .output()
-        .map_err(|err| format!("Failed to start authd from '{}': {}", authd_bin_path, err))?;
+pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+    let authd_path = get_authd_bin_path();
+    safe_authd
+        .start(Some(&authd_path))
+        .map_err(|err| err.to_string())
+}
 
-    if output.status.success() {
-        io::stdout()
-            .write_all(&output.stdout)
-            .map_err(|err| format!("Failed to output stdout: {}", err))?;
-        Ok(())
-    } else {
-        io::stderr()
-            .write_all(&output.stderr)
-            .map_err(|err| format!("Failed to output stderr: {}", err))?;
-        Err("Failed to invoke safe-authd executable".to_string())
-    }
+pub fn authd_stop(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+    let authd_path = get_authd_bin_path();
+    safe_authd
+        .stop(Some(&authd_path))
+        .map_err(|err| err.to_string())
+}
+
+pub fn authd_restart(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+    let authd_path = get_authd_bin_path();
+    safe_authd
+        .restart(Some(&authd_path))
+        .map_err(|err| err.to_string())
 }
 
 pub fn authd_create(

@@ -68,15 +68,15 @@ pub enum AuthSubCommands {
         /// The endpoint URL to unsubscribe
         notifs_endpoint: String,
     },
-    #[structopt(name = "start-authd")]
+    #[structopt(name = "start")]
     /// Starts the Authenticator daemon if it's not running already
-    StartAuthd {},
-    #[structopt(name = "stop-authd")]
+    Start {},
+    #[structopt(name = "stop")]
     /// Stops the Authenticator daemon if it's running
-    StopAuthd {},
-    #[structopt(name = "restart-authd")]
+    Stop {},
+    #[structopt(name = "restart")]
     /// Restarts the Authenticator daemon if it's running already
-    RestartAuthd {},
+    Restart {},
 }
 
 pub fn auth_commander(
@@ -126,9 +126,18 @@ pub fn auth_commander(
             let safe_authd = SafeAuthdClient::new(None);
             authd_unsubscribe(&safe_authd, notifs_endpoint)
         }
-        Some(AuthSubCommands::StartAuthd {}) => authd_run_cmd("start"),
-        Some(AuthSubCommands::StopAuthd {}) => authd_run_cmd("stop"),
-        Some(AuthSubCommands::RestartAuthd {}) => authd_run_cmd("restart"),
+        Some(AuthSubCommands::Start {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_start(&safe_authd)
+        }
+        Some(AuthSubCommands::Stop {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_stop(&safe_authd)
+        }
+        Some(AuthSubCommands::Restart {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_restart(&safe_authd)
+        }
         None => authorise_cli(safe, port),
     }
 }
