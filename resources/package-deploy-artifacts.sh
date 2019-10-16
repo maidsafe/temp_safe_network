@@ -35,6 +35,8 @@ function get_distributable_for_component() {
                 distributable="libsafe_ffi.dylib"
             elif [[ "$target" == *"windows"* ]]; then
                 distributable="safe_ffi.dll"
+            elif [[ "$target" == *"linux"* ]]; then
+                distributable="libsafe_ffi.so"
             else
                 distributable="libsafe_ffi.a"
             fi
