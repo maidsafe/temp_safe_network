@@ -189,7 +189,7 @@ ifeq ($(UNAME_S),Linux)
 		-u ${USER_ID}:${GROUP_ID} \
 		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
 		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
-		maidsafe/safe-cli-build:cli-dev \
+		maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu-dev \
 		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-tests"
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
@@ -214,7 +214,7 @@ ifeq ($(UNAME_S),Linux)
 		-u ${USER_ID}:${GROUP_ID} \
 		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
 		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
-		maidsafe/safe-cli-build:api \
+		maidsafe/safe-cli-build:api-x86_64-unknown-linux-gnu-dev \
 		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/api-tests"
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
@@ -413,7 +413,7 @@ ifndef CRATES_IO_TOKEN
 	@exit 1
 endif
 	rm -rf artifacts deploy
-	docker run --rm -v "${PWD}":/usr/src/safe_vault:Z \
+	docker run --rm -v "${PWD}":/usr/src/safe-cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu \
 		/bin/bash -c "cd safe-api && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
