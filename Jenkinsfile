@@ -10,7 +10,7 @@ properties([
 ])
 
 stage('build & test') {
-    parallel test_linux: {
+    parallel(test_linux: {
         node('safe_cli') {
             checkout(scm)
             runTests("cli")
@@ -60,6 +60,47 @@ stage('build & test') {
             sh("make clippy")
         }
     },
+    ffi_ios_aarch64: {
+        node('osx') {
+            checkout(scm)
+            ["non-dev", "dev"].each({
+                runReleaseBuild("safe-ffi", "${it}", "aarch64-apple-ios")
+                packageBuildArtifacts("safe-ffi", "${it}", "aarch64-apple-ios")
+                uploadBuildArtifacts()
+            })
+        }
+    },
+    ffi_ios_x86_64: {
+        node('osx') {
+            checkout(scm)
+            ["non-dev", "dev"].each({
+                runReleaseBuild("safe-ffi", "${it}", "x86_64-apple-ios")
+                packageBuildArtifacts("safe-ffi", "${it}", "x86_64-apple-ios")
+                uploadBuildArtifacts()
+            })
+        }
+    },
+    ffi_macos: {
+        node('osx') {
+            checkout(scm)
+            ["non-dev", "dev"].each({
+                runReleaseBuild("safe-ffi", "${it}", "x86_64-apple-darwin")
+                stripArtifacts()
+                packageBuildArtifacts("safe-ffi", "${it}", "x86_64-apple-darwin")
+                uploadBuildArtifacts()  
+            })
+        }
+    },
+    ffi_windows: {
+        node('windows') {
+            checkout(scm)
+            ["non-dev", "dev"].each({
+                runReleaseBuild("safe-ffi", "${it}", "x86_64-pc-windows-gnu")
+                packageBuildArtifacts("safe-ffi", "${it}", "x86_64-pc-windows-gnu")
+                uploadBuildArtifacts()
+            })
+        }
+    },
     release_cli_linux: {
         node('safe_cli') {
             checkout(scm)
@@ -69,39 +110,26 @@ stage('build & test') {
             uploadBuildArtifacts()
         }
     },
-    release_cli_windows: {
+    cli_windows: {
         node('windows') {
             checkout(scm)
-            runReleaseBuild("safe-cli", "non-dev", "x86_64-pc-windows-gnu")
-            stripArtifacts()
-            packageBuildArtifacts("safe-cli", "non-dev", "x86_64-pc-windows-gnu")
-            uploadBuildArtifacts()
+            ["non-dev", "dev"].each({
+                runReleaseBuild("safe-cli", "${it}", "x86_64-pc-windows-gnu")
+                stripArtifacts()
+                packageBuildArtifacts("safe-cli", "${it}", "x86_64-pc-windows-gnu")
+                uploadBuildArtifacts()
+            })
         }
     },
-    release_cli_macos: {
+    cli_macos: {
         node('osx') {
             checkout(scm)
-            runReleaseBuild("safe-cli", "non-dev", "x86_64-apple-darwin")
-            stripArtifacts()
-            packageBuildArtifacts("safe-cli", "non-dev", "x86_64-apple-darwin")
-            uploadBuildArtifacts()
-        }
-    },
-    release_ffi_macos: {
-        node('osx') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "x86_64-apple-darwin")
-            stripArtifacts()
-            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-darwin")
-            uploadBuildArtifacts()
-        }
-    },
-    release_ffi_windows: {
-        node('windows') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "x86_64-pc-windows-gnu")
-            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-pc-windows-gnu")
-            uploadBuildArtifacts()
+            ["non-dev", "dev"].each({
+                runReleaseBuild("safe-cli", "${it}", "x86_64-apple-darwin")
+                stripArtifacts()
+                packageBuildArtifacts("safe-cli", "${it}", "x86_64-apple-darwin")
+                uploadBuildArtifacts()
+            })
         }
     },
     release_ffi_linux: {
@@ -129,39 +157,6 @@ stage('build & test') {
             uploadBuildArtifacts()
         }
     },
-    release_ffi_ios_aarch64: {
-        node("osx") {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "aarch64-apple-ios")
-            packageBuildArtifacts("safe-ffi", "non-dev", "aarch64-apple-ios")
-            uploadBuildArtifacts()
-        }
-    },
-    release_ffi_ios_x86_64: {
-        node("osx") {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "x86_64-apple-ios")
-            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-apple-ios")
-            uploadBuildArtifacts()
-        }
-    },
-    dev_ffi_macos: {
-        node('osx') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "x86_64-apple-darwin")
-            stripArtifacts()
-            packageBuildArtifacts("safe-ffi", "dev", "x86_64-apple-darwin")
-            uploadBuildArtifacts()
-        }
-    },
-    dev_ffi_windows: {
-        node('windows') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "x86_64-pc-windows-gnu")
-            packageBuildArtifacts("safe-ffi", "dev", "x86_64-pc-windows-gnu")
-            uploadBuildArtifacts()
-        }
-    },
     dev_ffi_linux: {
         node('safe_cli') {
             checkout(scm)
@@ -186,23 +181,7 @@ stage('build & test') {
             packageBuildArtifacts("safe-ffi", "dev", "x86_64-linux-android")
             uploadBuildArtifacts()
         }
-    },
-    dev_ffi_ios_aarch64: {
-        node("osx") {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "aarch64-apple-ios")
-            packageBuildArtifacts("safe-ffi", "dev", "aarch64-apple-ios")
-            uploadBuildArtifacts()
-        }
-    },
-    dev_ffi_ios_x86_64: {
-        node("osx") {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "x86_64-apple-ios")
-            packageBuildArtifacts("safe-ffi", "dev", "x86_64-apple-ios")
-            uploadBuildArtifacts()
-        }
-    }
+    })
 }
 
 stage("build universal iOS lib") {
