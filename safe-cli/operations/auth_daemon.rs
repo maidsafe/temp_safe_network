@@ -8,7 +8,7 @@
 
 use prettytable::Table;
 use rpassword;
-use safe_api::{AuthAllowPrompt, Safe, SafeAuthdClient};
+use safe_api::{AuthAllowPrompt, PendingAuthReqs, Safe, SafeAuthdClient};
 
 pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     let authd_path = get_authd_bin_path();
@@ -93,8 +93,7 @@ pub fn authd_revoke(safe_authd: &SafeAuthdClient, app_id: String) -> Result<(), 
 pub fn authd_auth_reqs(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     println!("Requesting list of pending authorisation requests from authd...");
     let auth_reqs = safe_authd.auth_reqs()?;
-    //pretty_print_authed_apps(auth_reqs);
-    println!("{}", auth_reqs);
+    pretty_print_auth_reqs(auth_reqs);
     Ok(())
 }
 
@@ -144,7 +143,7 @@ pub fn authd_unsubscribe(
     Ok(())
 }
 
-pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
+pub fn pretty_print_authed_apps(authed_apps: /*AuthedAppsList*/ String) {
     let mut table = Table::new();
     table.add_row(row![bFg->"Authorised Applications"]);
     /*table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
@@ -165,6 +164,31 @@ pub fn pretty_print_authed_apps(authed_apps: /*Vec<AuthedAppsList>*/ String) {
     }*/
     table.printstd();
     println!("{}", authed_apps);
+}
+
+pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs) {
+    if auth_reqs.is_empty() {
+        println!("There are no pending authorisation requests");
+    } else {
+        let mut table = Table::new();
+        table.add_row(row![bFg->"Pending Authorisation requests"]);
+        table.add_row(row![bFg->"Request Id", bFg->"App Id", bFg->"Name", bFg->"Vendor"/*, bFg->"Permissions"*/]);
+        for auth_req in auth_reqs.iter() {
+            /*let mut row = String::from("");
+            for (cont, perms) in auth_req.perms.iter() {
+                row += &format!("{}: {:?}\n", cont, perms);
+            }*/
+            table.add_row(row![
+                auth_req.req_id,
+                auth_req.app_id,
+                auth_req.app_name,
+                auth_req.app_vendor,
+                // auth_req.app.scope || "",
+                // row,
+            ]);
+        }
+        table.printstd();
+    }
 }
 
 // Private helpers

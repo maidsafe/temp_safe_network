@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::{AuthReq, SharedAuthReqsHandle, SharedSafeAuthenticatorHandle};
-use safe_api::SafeAuthReq;
+use crate::authd::{IncomingAuthReq, SharedAuthReqsHandle, SharedSafeAuthenticatorHandle};
+use safe_api::{AuthReq, SafeAuthReq};
 use tokio::sync::mpsc;
 
 pub fn process_req(
@@ -50,8 +50,13 @@ fn enqueue_auth_req(
             println!("{:?}", app_auth_req);
 
             // Let's add it to the list of pending authorisation requests
-            let auth_req = AuthReq {
-                app_id: app_auth_req.app.id,
+            let auth_req = IncomingAuthReq {
+                auth_req: AuthReq {
+                    req_id,
+                    app_id: app_auth_req.app.id,
+                    app_name: app_auth_req.app.name,
+                    app_vendor: app_auth_req.app.vendor,
+                },
                 tx,
             };
             let auth_reqs_list = &mut *(auth_reqs_handle.lock().unwrap());

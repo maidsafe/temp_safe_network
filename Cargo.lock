@@ -2359,6 +2359,7 @@ dependencies = [
  "rcgen 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-api 0.5.0",
  "self_update 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",

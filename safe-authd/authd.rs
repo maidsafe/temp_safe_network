@@ -15,7 +15,7 @@ use super::update::update_commander;
 use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
-use safe_api::SafeAuthenticator;
+use safe_api::{AuthReq, SafeAuthenticator};
 use slog::{Drain, Logger};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
@@ -36,14 +36,14 @@ use url::Url;
 // Frequency for checking pensing auth requests
 const AUTH_REQS_CHECK_FREQ: u64 = 2000;
 
-#[derive(Debug, Clone)]
-pub struct AuthReq {
-    pub app_id: String,
+#[derive(Clone, Debug)]
+pub struct IncomingAuthReq {
+    pub auth_req: AuthReq,
     pub tx: mpsc::Sender<bool>,
 }
 
 // List of authorisation requests indexed by their request id
-pub type AuthReqsList = BTreeMap<u32, AuthReq>;
+pub type AuthReqsList = BTreeMap<u32, IncomingAuthReq>;
 
 // A thread-safe queue to keep the list of authorisation requests
 pub type SharedAuthReqsHandle = Arc<Mutex<AuthReqsList>>;
@@ -435,19 +435,20 @@ fn monitor_pending_auth_reqs(
                 Some(mut reqs) => {
                     let notif_endpoints_list: &mut BTreeSet<String> =
                         &mut *(notif_endpoints_handle.lock().unwrap());
-                    for (req_id, auth_req) in reqs.iter_mut() {
-                        let mut is_allow = false;
+                    for (req_id, incoming_auth_req) in reqs.iter_mut() {
+                        let mut is_allowed = false;
                         for endpoint in notif_endpoints_list.iter() {
-                            println!("ASKING SUBSCRIPTOR: {}", endpoint);
+                            println!("Asking subscriptor: {}", endpoint);
                             match quic_send(
-                                &format!("{}/{}", endpoint, auth_req.app_id),
+                                &format!("{}/{}", endpoint, incoming_auth_req.auth_req.app_id),
                                 false,
                                 None,
                                 None,
                                 false,
                             ) {
                                 Ok(allow) => {
-                                    is_allow = allow.starts_with("true");
+                                    is_allowed = allow.starts_with("true");
+                                    println!("Subscriptor's response: {}", is_allowed);
                                     break;
                                 }
                                 Err(err) => {
@@ -460,9 +461,9 @@ fn monitor_pending_auth_reqs(
                         }
                         println!(
                             "ALLOW FOR Req ID: {} - App ID: {} ??: {}",
-                            req_id, auth_req.app_id, is_allow
+                            req_id, incoming_auth_req.auth_req.app_id, is_allowed
                         );
-                        match auth_req.tx.try_send(is_allow) {
+                        match incoming_auth_req.tx.try_send(is_allowed) {
                             Ok(_) => println!("Auth req decision ready to be sent to application"),
                             Err(_) => println!(
                                 "Auth req decision couldn't be sent, and therefore already denied"

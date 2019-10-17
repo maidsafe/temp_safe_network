@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::authd::SharedAuthReqsHandle;
-use std::collections::BTreeSet;
+use safe_api::PendingAuthReqs;
 
 pub fn process_req(
     args: &[&str],
@@ -18,12 +18,18 @@ pub fn process_req(
     } else {
         println!("Obtaining list of pending authorisation requests...");
         let auth_reqs_list = &mut *(auth_reqs_handle.lock().unwrap());
-        let resp: BTreeSet<String> = auth_reqs_list
+        let pending_auth_reqs: PendingAuthReqs = auth_reqs_list
             .iter()
-            .map(|(req_id, auth_req)| format!("Req ID: {} - App ID: {}", req_id, auth_req.app_id))
+            .map(|(_req_id, pending_req)| pending_req.auth_req.clone())
             .collect();
 
-        println!("List of pending authorisation requests sent");
-        Ok(format!("{:?}", resp))
+        println!(
+            "List of pending authorisation requests sent: {:?}",
+            pending_auth_reqs
+        );
+        let auth_reqs_serialised = serde_json::to_string(&pending_auth_reqs)
+            .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
+
+        Ok(auth_reqs_serialised)
     }
 }

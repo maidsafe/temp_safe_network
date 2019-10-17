@@ -12,11 +12,21 @@ use super::quic_endpoint::quic_listen;
 pub use super::quic_endpoint::AuthAllowPrompt;
 use super::{Error, ResultReturn, SafeAuthReqId};
 use log::{debug, error, info};
+use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 use std::process::Command;
 use std::thread;
 
-//use super::authenticator::AuthedAppsList;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AuthReq {
+    pub req_id: SafeAuthReqId,
+    pub app_id: String,
+    pub app_name: String,
+    pub app_vendor: String,
+}
+
+// Type of the list of pending authorisation requests
+pub type PendingAuthReqs = Vec<AuthReq>;
 
 // Path of authenticator endpoint for login into a SAFE account
 const SAFE_AUTHD_ENDPOINT_LOGIN: &str = "login/";
@@ -161,7 +171,7 @@ impl SafeAuthdClient {
     }
 
     // Get the list of applications authorised from remote authd
-    pub fn authed_apps(&self) -> ResultReturn</*Vec<AuthedAppsList>*/ String> {
+    pub fn authed_apps(&self) -> ResultReturn</*AuthedAppsList*/ String> {
         debug!("Attempting to fetch list of authorised apps from remote authd...");
         let authd_service_url = format!(
             "{}:{}/{}",
@@ -202,7 +212,7 @@ impl SafeAuthdClient {
     }
 
     // Get the list of pending authorisation requests from remote authd
-    pub fn auth_reqs(&self) -> ResultReturn</*Vec<AuthReqsList>*/ String> {
+    pub fn auth_reqs(&self) -> ResultReturn<PendingAuthReqs> {
         debug!("Attempting to fetch list of pending authorisation requests from remote authd...");
         let authd_service_url = format!(
             "{}:{}/{}",
@@ -217,8 +227,10 @@ impl SafeAuthdClient {
             authd_response
         );
 
-        //let authed_apps = // TODO: deserialise string Ok(auth_reqs_list)
-        Ok(authd_response)
+        let auth_reqs_list: PendingAuthReqs = serde_json::from_str(&authd_response)
+            .map_err(|err| format!("Failed to parse list of auth reqs: {}", err))?;
+
+        Ok(auth_reqs_list)
     }
 
     // Allow an authorisation request

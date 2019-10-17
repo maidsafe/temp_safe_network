@@ -28,7 +28,7 @@ pub mod wallet;
 pub mod xorurl;
 mod xorurl_media_types;
 
-pub use authd_client_api::{AuthAllowPrompt, SafeAuthdClient};
+pub use authd_client_api::{AuthAllowPrompt, AuthReq, PendingAuthReqs, SafeAuthdClient};
 pub use authenticator::{SafeAuthReq, SafeAuthReqId, SafeAuthenticator};
 pub use errors::{Error, Result};
 pub use fetch::{
