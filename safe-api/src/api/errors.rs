@@ -14,6 +14,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     AuthError(String),
     AuthdClientError(String),
+    AuthenticatorError(String),
     ConnectionError(String),
     NetDataError(String),
     ContentNotFound(String),
@@ -46,6 +47,7 @@ impl fmt::Display for Error {
         let (error_type, error_msg) = match self {
             AuthError(info) => ("AuthError", info),
             AuthdClientError(info) => ("AuthdClientError", info),
+            AuthenticatorError(info) => ("AuthenticatorError", info),
             ConnectionError(info) => ("ConnectionError", info),
             NetDataError(info) => ("NetDataError", info),
             ContentNotFound(info) => ("ContentNotFound", info),

@@ -18,9 +18,12 @@ pub fn process_req(
         println!("Obtaining list of authorised applications...");
         let safe_authenticator = &mut *(safe_auth_handle.lock().unwrap());
         match safe_authenticator.authed_apps() {
-            Ok(resp) => {
-                println!("List of authorised apps sent");
-                Ok(format!("{:?}", resp))
+            Ok(authed_apps_list) => {
+                println!("List of authorised apps sent: {:?}", authed_apps_list);
+                let auth_apps_serialised = serde_json::to_string(&authed_apps_list)
+                    .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
+
+                Ok(auth_apps_serialised)
             }
             Err(err) => {
                 println!("Failed to get list of authorised apps: {}", err);

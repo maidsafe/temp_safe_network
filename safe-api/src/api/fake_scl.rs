@@ -10,7 +10,8 @@ use super::helpers::create_random_xorname;
 use super::safe_net::AppendOnlyDataRawData;
 use super::{Error, Result, SafeApp};
 use crate::api::helpers::{
-    parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
+    parse_coins_amount, parse_hex, unwrap_or_gen_random, vec_to_hex, xorname_from_pk,
+    xorname_to_hex,
 };
 use log::{debug, trace};
 use safe_nd::{
@@ -242,7 +243,7 @@ impl SafeApp for SafeAppFake {
     }
 
     fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName> {
-        let xorname = create_random_xorname();
+        let xorname = create_random_xorname()?;
         // TODO: hash to get xorname.
         self.fake_vault
             .published_immutable_data
@@ -275,7 +276,7 @@ impl SafeApp for SafeAppFake {
         _tag: u64,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let xorname = name.unwrap_or_else(create_random_xorname);
+        let xorname = unwrap_or_gen_random(name)?;
 
         self.fake_vault
             .published_seq_append_only
@@ -395,7 +396,7 @@ impl SafeApp for SafeAppFake {
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let xorname = name.unwrap_or_else(create_random_xorname);
+        let xorname = unwrap_or_gen_random(name)?;
         let seq_md = match self.fake_vault.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(uao) => uao.clone(),
             None => BTreeMap::new(),

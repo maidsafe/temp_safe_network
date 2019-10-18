@@ -8,7 +8,7 @@
 
 use prettytable::Table;
 use rpassword;
-use safe_api::{AuthAllowPrompt, PendingAuthReqs, Safe, SafeAuthdClient};
+use safe_api::{AuthAllowPrompt, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient};
 
 pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     let authd_path = get_authd_bin_path();
@@ -143,27 +143,39 @@ pub fn authd_unsubscribe(
     Ok(())
 }
 
-pub fn pretty_print_authed_apps(authed_apps: /*AuthedAppsList*/ String) {
+pub fn pretty_print_authed_apps(authed_apps: AuthedAppsList) {
     let mut table = Table::new();
     table.add_row(row![bFg->"Authorised Applications"]);
-    /*table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
-    table.add_row(row![]);
+    table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
     let all_app_iterator = authed_apps.iter();
-    for app_info in all_app_iterator {
-        let mut row = String::from("");
-        for (cont, perms) in app_info.perms.iter() {
-            row += &format!("{}: {:?}\n", cont, perms);
+    for authed_app in all_app_iterator {
+        let mut containers_perms = String::default();
+        for (cont, perms) in authed_app.containers.iter() {
+            containers_perms += &format!("{}: {:?}\n", cont, perms);
         }
+        if containers_perms.is_empty() {
+            containers_perms = "None".to_string();
+        }
+
+        let app_permissions = format!(
+            "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
+            authed_app.app_permissions.transfer_coins,
+            true, // authed_app.app_permissions.perform_mutations,
+            true, // authed_app.app_permissions.get_balance
+        );
+        let permissions_report = format!(
+            "Own container: {}\n{}\nContainers: {}",
+            authed_app.own_container, app_permissions, containers_perms
+        );
+
         table.add_row(row![
-            app_info.app.id,
-            app_info.app.name,
-            // app_info.app.scope || "",
-            app_info.app.vendor,
-            row,
+            authed_app.id,
+            authed_app.name,
+            authed_app.vendor,
+            permissions_report
         ]);
-    }*/
+    }
     table.printstd();
-    println!("{}", authed_apps);
 }
 
 pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs) {
@@ -172,19 +184,35 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs) {
     } else {
         let mut table = Table::new();
         table.add_row(row![bFg->"Pending Authorisation requests"]);
-        table.add_row(row![bFg->"Request Id", bFg->"App Id", bFg->"Name", bFg->"Vendor"/*, bFg->"Permissions"*/]);
+        table.add_row(
+            row![bFg->"Request Id", bFg->"App Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"],
+        );
         for auth_req in auth_reqs.iter() {
-            /*let mut row = String::from("");
-            for (cont, perms) in auth_req.perms.iter() {
-                row += &format!("{}: {:?}\n", cont, perms);
-            }*/
+            let mut containers_perms = String::default();
+            for (cont, perms) in auth_req.containers.iter() {
+                containers_perms += &format!("{}: {:?}\n", cont, perms);
+            }
+            if containers_perms.is_empty() {
+                containers_perms = "None".to_string();
+            }
+
+            let app_permissions = format!(
+                "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
+                auth_req.app_permissions.transfer_coins,
+                true, // auth_req.app_permissions.perform_mutations,
+                true, // auth_req.app_permissions.get_balance
+            );
+            let permissions_report = format!(
+                "Own container: {}\n{}\nContainers: {}",
+                auth_req.own_container, app_permissions, containers_perms
+            );
+
             table.add_row(row![
                 auth_req.req_id,
                 auth_req.app_id,
                 auth_req.app_name,
                 auth_req.app_vendor,
-                // auth_req.app.scope || "",
-                // row,
+                permissions_report,
             ]);
         }
         table.printstd();

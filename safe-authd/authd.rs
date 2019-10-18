@@ -332,7 +332,7 @@ fn handle_connection(
 ) {
     let (conn_driver, conn, incoming_streams) = conn;
     let log = log.clone();
-    info!(log, "got connection";
+    info!(log, "Got connection";
           "remote_id" => %conn.remote_id(),
           "address" => %conn.remote_address(),
           "protocol" => conn.protocol().map_or_else(|| "<none>".into(), |x| String::from_utf8_lossy(&x).into_owned()));

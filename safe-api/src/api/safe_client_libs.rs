@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{create_random_xorname, xorname_from_pk, xorname_to_hex};
+use super::helpers::{unwrap_or_gen_random, xorname_from_pk, xorname_to_hex};
 use super::safe_net::AppendOnlyDataRawData;
 use super::{Error, Result, SafeApp};
 use futures::future::Future;
@@ -256,7 +256,7 @@ impl SafeApp for SafeAppScl {
         );
 
         let safe_app: &App = self.get_safe_app()?;
-        let xorname = name.unwrap_or_else(create_random_xorname);
+        let xorname = unwrap_or_gen_random(name)?;
         info!("Xorname for storage: {:?}", &xorname);
 
         let append_only_data_address = ADataAddress::PubSeq { name: xorname, tag };

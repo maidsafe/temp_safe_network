@@ -613,7 +613,7 @@ mod tests {
     fn test_fetch_unsupported() {
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let xorname = create_random_xorname();
+        let xorname = create_random_xorname().unwrap();
         let type_tag = 575_756_443;
         let xorurl = unwrap!(XorUrlEncoder::encode(
             xorname,
@@ -649,7 +649,7 @@ mod tests {
     fn test_fetch_unsupported_with_media_type() {
         let mut safe = Safe::new("base32z");
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let xorname = create_random_xorname();
+        let xorname = create_random_xorname().unwrap();
         let type_tag = 575_756_443;
         let xorurl = unwrap!(XorUrlEncoder::encode(
             xorname,

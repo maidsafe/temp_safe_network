@@ -32,8 +32,8 @@ impl Safe {
         app_vendor: &str,
         port: Option<u16>,
     ) -> Result<String> {
+        // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
-
         let req = IpcReq::Auth(AuthReq {
             app: AppExchangeInfo {
                 id: app_id.to_string(),
@@ -47,7 +47,6 @@ impl Safe {
                 perform_mutations: true,
                 transfer_coins: true,
             },
-            // TODO: allow list of required containers permissions to be passed in as param
             containers: HashMap::new(),
         });
 

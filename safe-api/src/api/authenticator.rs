@@ -18,14 +18,14 @@ use safe_authenticator::{
     Authenticator,
 };
 use safe_core::client::Client;
-use safe_core::ipc::req::{
-    AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq, IpcReq, ShareMDataReq,
-};
+use safe_core::ipc::req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, ShareMDataReq};
 use safe_core::ipc::resp::{AccessContainerEntry, IpcResp};
 use safe_core::ipc::{access_container_enc_key, decode_msg, encode_msg, IpcError, IpcMsg};
 use safe_core::utils::symmetric_decrypt;
 use safe_core::{client as safe_core_client, CoreError};
-use safe_nd::{MDataAddress, PublicKey};
+use safe_nd::{AppPermissions, MDataAddress, PublicKey};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // Type of the function/callback invoked for querying if an authorisation request shall be allowed.
 // All the relevant information about the authorisation request is passed as args to the callback.
@@ -34,11 +34,25 @@ use safe_nd::{MDataAddress, PublicKey};
 pub type SafeAuthReq = IpcReq;
 pub type SafeAuthReqId = u32;
 
-#[derive(Debug)]
-pub struct AuthedAppsList {
-    pub app: AppExchangeInfo,
-    pub perms: Vec<(String, ContainerPermissions)>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthedApp {
+    /// The App ID. It must be unique.
+    pub id: String,
+    /// The application friendly-name.
+    pub name: String,
+    /// The application provider/vendor (e.g. MaidSafe)
+    pub vendor: String,
+    /// Permissions granted, e.g. allowing to work with the user's coin balance.
+    pub app_permissions: AppPermissions,
+    /// Permissions granted to the app for named containers
+    // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
+    pub containers: HashMap<String, ContainerPermissions>,
+    /// If the app was given a dedicated named container for itself
+    pub own_container: bool,
 }
+
+// Type of the list of authorised applications in a SAFE account
+pub type AuthedAppsList = Vec<AuthedApp>;
 
 // Authenticator API
 #[derive(Default)]
@@ -196,7 +210,7 @@ impl SafeAuthenticator {
         let ipc_req = auth_run_helper(safe_authenticator, move |client| {
             decode_ipc_msg(client, req_msg)
         })
-        .unwrap();
+        .map_err(|err| Error::AuthenticatorError(format!("Failed to decode request: {}", err)))?;
 
         match ipc_req {
             Ok(IpcMsg::Req {
@@ -259,11 +273,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn authorise_app(
-        &self,
-        req: &str,
-        //allow: &'static AuthAllowPrompt,
-    ) -> ResultReturn<String> {
+    pub fn authorise_app(&self, req: &str) -> ResultReturn<String> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
 
         let req_msg = match decode_msg(req) {
@@ -280,7 +290,8 @@ impl SafeAuthenticator {
         let ipc_req = auth_run_helper(safe_authenticator, move |client| {
             decode_ipc_msg(client, req_msg)
         })
-        .unwrap();
+        .map_err(|err| Error::AuthenticatorError(format!("Failed to decode request: {}", err)))?;
+
         match ipc_req {
             Ok(IpcMsg::Req {
                 req: IpcReq::Auth(app_auth_req),
@@ -288,14 +299,6 @@ impl SafeAuthenticator {
             }) => {
                 info!("Request was recognised as a general app auth request");
                 debug!("Decoded request (req_id={:?}): {:?}", req_id, app_auth_req);
-
-                /*debug!("Checking if the authorisation shall be allowed...");
-                if !allow(req_id, IpcReq::Auth(app_auth_req.clone())) {
-                    debug!("Authorisation request was denied!");
-                    return gen_auth_denied_response(req_id);
-                }*/
-
-                debug!("Allowed!. Attempting to authorise application...");
                 gen_auth_response(safe_authenticator, req_id, app_auth_req)
             }
             Ok(IpcMsg::Req {
@@ -304,14 +307,6 @@ impl SafeAuthenticator {
             }) => {
                 info!("Request was recognised as a containers auth request");
                 debug!("Decoded request (req_id={:?}): {:?}", req_id, cont_req);
-
-                /*debug!("Checking if the containers authorisation shall be allowed...");
-                if !allow(req_id, IpcReq::Containers(cont_req.clone())) {
-                    debug!("Authorisation request was denied!");
-                    return gen_auth_denied_response(req_id);
-                }*/
-
-                debug!("Allowed!. Attempting to grant permissions to the containers...");
                 gen_cont_auth_response(safe_authenticator, req_id, cont_req)
             }
             Ok(IpcMsg::Req {
@@ -320,14 +315,6 @@ impl SafeAuthenticator {
             }) => {
                 info!("Request was recognised as an unregistered auth request");
                 debug!("Decoded request (req_id={:?}): {:?}", req_id, user_data);
-
-                /*debug!("Checking if the authorisation shall be allowed...");
-                if !allow(req_id, IpcReq::Unregistered(user_data)) {
-                    debug!("Authorisation request was denied!");
-                    return gen_auth_denied_response(req_id);
-                }*/
-
-                debug!("Allowed!");
                 gen_unreg_auth_response(req_id)
             }
             Ok(IpcMsg::Req {
@@ -339,14 +326,6 @@ impl SafeAuthenticator {
                     "Decoded request (req_id={:?}): {:?}",
                     req_id, share_mdata_req
                 );
-
-                /*debug!("Checking if the authorisation to share a MD shall be allowed...");
-                if !allow(req_id, IpcReq::ShareMData(share_mdata_req.clone())) {
-                    debug!("Authorisation request was denied!");
-                    return gen_auth_denied_response(req_id);
-                }*/
-
-                debug!("Allowed!. Attempting to grant permissions to the MD...");
                 gen_shared_md_auth_response(safe_authenticator, req_id, share_mdata_req)
             }
             Err((error_code, description, _err)) => Err(Error::AuthError(format!(
@@ -390,7 +369,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false)
     /// }
     ///```
-    pub fn authed_apps(&self) -> ResultReturn<Vec<AuthedAppsList>> {
+    pub fn authed_apps(&self) -> ResultReturn<AuthedAppsList> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
 
         debug!("Attempting to fetch list of authorised apps...");
@@ -409,7 +388,7 @@ impl SafeAuthenticator {
                         AuthError::from("No nonce on access container's MDataInfo")
                     })?;
 
-                    let mut apps = Vec::new();
+                    let mut authed_apps_list = AuthedAppsList::new();
                     for app in auth_cfg.values() {
                         let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
@@ -419,28 +398,44 @@ impl SafeAuthenticator {
                             _ => None,
                         };
 
-                        let mut cont_perms = Vec::new();
                         if let Some(entry) = entry {
                             let plaintext = symmetric_decrypt(&entry.data, &app.keys.enc_key)?;
                             let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
 
-                            for (key, (_mdata_info, perms)) in app_access.into_iter() {
-                                cont_perms.push((key, perms));
+                            let mut containers = HashMap::new();
+                            for (container_name, (_mdata_info, permission_set)) in app_access {
+                                let _ = containers.insert(container_name, permission_set);
                             }
 
-                            apps.push(AuthedAppsList {
-                                app: app.info.clone(),
-                                perms: cont_perms,
+                            authed_apps_list.push(AuthedApp {
+                                id: app.info.id.clone(),
+                                name: app.info.name.clone(),
+                                vendor: app.info.vendor.clone(),
+                                app_permissions: AppPermissions {
+                                    transfer_coins: true, //TODO: retrieve the app permissions
+                                                          // perform_mutations: true,
+                                                          // get_balance: true,
+                                },
+                                containers,
+                                own_container: false, //TODO: retrieve the own container flag
                             });
                         }
                     }
 
-                    debug!("Returning list of authorised applications: {:?}", apps);
-                    Ok(apps)
+                    debug!(
+                        "Returning list of authorised applications: {:?}",
+                        authed_apps_list
+                    );
+                    Ok(authed_apps_list)
                 })
                 .map_err(AuthError::from)
         })
-        .unwrap();
+        .map_err(|err| {
+            Error::AuthenticatorError(format!(
+                "Failed to obtain list of authorised applications: {}",
+                err
+            ))
+        })?;
 
         Ok(authed_apps)
     }
@@ -512,7 +507,7 @@ impl SafeAuthenticator {
     }
 }
 
-// Helper to unwrap the Authenticator is it's logged in
+// Helper to unwrap the Authenticator if it's logged in
 fn get_safe_authenticator(
     safe_authenticator: &Option<Authenticator>,
 ) -> ResultReturn<&Authenticator> {
@@ -529,7 +524,8 @@ fn gen_auth_denied_response(req_id: SafeAuthReqId) -> ResultReturn<String> {
         req_id,
         resp: IpcResp::Auth(Err(IpcError::AuthDenied)),
     })
-    .unwrap();
+    .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
+
     debug!("Returning auth response generated: {:?}", resp);
 
     Ok(resp)
@@ -541,15 +537,21 @@ fn gen_auth_response(
     req_id: SafeAuthReqId,
     auth_req: AuthReq,
 ) -> ResultReturn<String> {
-    let auth_granted =
-        auth_run_helper(authenticator, move |client| authenticate(client, auth_req)).unwrap();
+    let auth_granted = auth_run_helper(authenticator, move |client| authenticate(client, auth_req))
+        .map_err(|err| {
+            Error::AuthenticatorError(format!(
+                "Failed to authorise application on the network: {}",
+                err
+            ))
+        })?;
 
     debug!("Encoding response... {:?}", auth_granted);
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
         resp: IpcResp::Auth(Ok(auth_granted)),
     })
-    .unwrap();
+    .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
+
     debug!("Returning auth response generated: {:?}", resp);
 
     Ok(resp)
@@ -620,14 +622,19 @@ fn gen_cont_auth_response(
 
 // Helper function to generate an unregistered authorisation response
 fn gen_unreg_auth_response(req_id: SafeAuthReqId) -> ResultReturn<String> {
-    let bootstrap_cfg = safe_core_client::bootstrap_config().unwrap();
+    let bootstrap_cfg = safe_core_client::bootstrap_config().map_err(|err| {
+        Error::AuthenticatorError(format!(
+            "Failed to obtain bootstrap info for response: {}",
+            err
+        ))
+    })?;
 
     debug!("Encoding response... {:?}", bootstrap_cfg);
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
         resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
     })
-    .unwrap();
+    .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
 
     debug!("Returning unregistered auth response generated: {:?}", resp);
     Ok(resp)

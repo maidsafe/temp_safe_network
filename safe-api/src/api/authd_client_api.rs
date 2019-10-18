@@ -10,19 +10,33 @@ use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
 use super::quic_endpoint::quic_listen;
 pub use super::quic_endpoint::AuthAllowPrompt;
-use super::{Error, ResultReturn, SafeAuthReqId};
+use super::{AuthedAppsList, Error, ResultReturn, SafeAuthReqId};
 use log::{debug, error, info};
+use safe_core::ipc::req::ContainerPermissions;
+use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::process::Command;
 use std::thread;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthReq {
+    /// The authorisation request ID
     pub req_id: SafeAuthReqId,
+    /// The App ID. It must be unique.
     pub app_id: String,
+    /// The application friendly-name.
     pub app_name: String,
+    /// The application provider/vendor (e.g. MaidSafe)
     pub app_vendor: String,
+    /// Permissions requested, e.g. allowing to work with the user's coin balance.
+    pub app_permissions: AppPermissions,
+    /// The permissions requested by the app for named containers
+    // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
+    pub containers: HashMap<String, ContainerPermissions>,
+    /// If the app requested a dedicated named container for itself
+    pub own_container: bool,
 }
 
 // Type of the list of pending authorisation requests
@@ -171,7 +185,7 @@ impl SafeAuthdClient {
     }
 
     // Get the list of applications authorised from remote authd
-    pub fn authed_apps(&self) -> ResultReturn</*AuthedAppsList*/ String> {
+    pub fn authed_apps(&self) -> ResultReturn<AuthedAppsList> {
         debug!("Attempting to fetch list of authorised apps from remote authd...");
         let authd_service_url = format!(
             "{}:{}/{}",
@@ -186,8 +200,10 @@ impl SafeAuthdClient {
             authd_response
         );
 
-        //let authed_apps = // TODO: deserialise string Ok(authed_apps)
-        Ok(authd_response)
+        let authed_apps_list: AuthedAppsList = serde_json::from_str(&authd_response)
+            .map_err(|err| format!("Failed to parse list of authorised apps: {}", err))?;
+
+        Ok(authed_apps_list)
     }
 
     // Revoke all permissions from an application

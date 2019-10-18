@@ -185,13 +185,20 @@ fn process_authenticator_req(
         "login" => log_in::process_req(action_args, safe_auth_handle),
         "logout" => log_out::process_req(action_args, safe_auth_handle),
         "create" => create_acc::process_req(action_args, safe_auth_handle),
+        "authed-apps" => authed_apps::process_req(action_args, safe_auth_handle),
+        "revoke" => revoke::process_req(action_args, safe_auth_handle),
+        "auth-reqs" => auth_reqs::process_req(action_args, auth_reqs_handle),
+        "allow" => allow::process_req(action_args, auth_reqs_handle),
+        "deny" => deny::process_req(action_args, auth_reqs_handle),
+        "subscribe" => subscribe::process_req(action_args, notif_endpoints_handle),
+        "unsubscribe" => unsubscribe::process_req(action_args, notif_endpoints_handle),
         "authorise" => {
             match authorise::process_req(
                 action_args,
                 safe_auth_handle.clone(),
                 auth_reqs_handle.clone(),
             ) {
-                Ok((rx, req_id, auth_req_str)) => {
+                Ok(authorise::AuthorisationResponse::NotReady((rx, req_id, auth_req_str))) => {
                     let processing_resp = ProcessRequest::ProcessingResponse {
                         safe_auth_handle: safe_auth_handle.clone(),
                         auth_reqs_handle: auth_reqs_handle.clone(),
@@ -201,16 +208,10 @@ fn process_authenticator_req(
                     };
                     return Ok(AuthdResponse::NotReady(processing_resp));
                 }
+                Ok(authorise::AuthorisationResponse::Ready(resp)) => Ok(resp),
                 Err(err) => Err(err),
             }
         }
-        "authed-apps" => authed_apps::process_req(action_args, safe_auth_handle),
-        "revoke" => revoke::process_req(action_args, safe_auth_handle),
-        "auth-reqs" => auth_reqs::process_req(action_args, auth_reqs_handle),
-        "allow" => allow::process_req(action_args, auth_reqs_handle),
-        "deny" => deny::process_req(action_args, auth_reqs_handle),
-        "subscribe" => subscribe::process_req(action_args, notif_endpoints_handle),
-        "unsubscribe" => unsubscribe::process_req(action_args, notif_endpoints_handle),
         other => {
             println!(
                 "Action '{}' not supported or unknown by the Authenticator daemon",
