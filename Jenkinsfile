@@ -257,7 +257,9 @@ def retrieveCache(os) {
 }
 
 def runReleaseBuild(component, type, target) {
-    def cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}"
+    // Running a dev build as a clean build is very slow if we're trying to do
+    // both the prod and dev builds as part of the same job.
+    def cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}" && type != "dev"
     withEnv(["SAFE_CLI_BUILD_COMPONENT=${component}",
              "SAFE_CLI_BUILD_TYPE=${type}",
              "SAFE_CLI_BUILD_CLEAN=${cleanBuild}",
