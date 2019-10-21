@@ -9,6 +9,7 @@
 use super::helpers::decode_ipc_msg;
 use super::{Error, ResultReturn, Safe, SafeApp};
 use log::{debug, info};
+#[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
 use reqwest::get as httpget;
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
@@ -26,6 +27,7 @@ const SAFE_AUTH_ENDPOINT_PATH: &str = "authorise/";
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
     // Ir returns the credentials necessary to connect to the network, encoded in a single string.
+    #[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
     pub fn auth_app(
         &mut self,
         app_id: &str,

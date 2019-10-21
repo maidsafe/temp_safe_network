@@ -29,7 +29,6 @@ serde_json = "1.0.39"
 bincode = "1.1.4"
 multibase = "0.6.0"
 relative-path = "0.4.0"
-reqwest = "0.9.5"
 tiny-keccak = "~1.5.0"
 futures = "~0.1.17"
 walkdir = "~2.0.1" #ffi utils needs this version
@@ -40,6 +39,9 @@ validator_derive = "0.8.0"
 mime_guess = "2.0.1"
 lazy_static = "1.2.0"
 ffi_utils = "~0.12.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))'.dependencies]
+reqwest = "0.9.5"
 
 [features]
 mock-network = ["safe_app/mock-network"]
