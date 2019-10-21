@@ -46,8 +46,8 @@ impl Safe {
             },
             app_container: false,
             app_permissions: AppPermissions {
-                /*get_balance: true,
-                perform_mutations: true,*/
+                get_balance: true,
+                perform_mutations: true,
                 transfer_coins: true,
             },
             // TODO: allow list of required containers permissions to be passed in as param
