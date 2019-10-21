@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedSafeAuthenticatorHandle;
+use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 
 pub fn process_req(
     args: &[&str],
@@ -16,18 +16,20 @@ pub fn process_req(
         Err("Incorrect number of arguments for 'logout' action".to_string())
     } else {
         println!("Logging out...");
-        let safe_authenticator = &mut *(safe_auth_handle.lock().unwrap());
-        match safe_authenticator.log_out() {
-            Ok(()) => {
-                let msg = "Logged out successfully";
-                println!("{}", msg);
-                Ok(msg.to_string())
-            }
-            Err(err) => {
-                let msg = format!("Failed to log out: {}", err);
-                println!("{}", msg);
-                Err(msg)
-            }
-        }
+        lock_safe_authenticator(
+            safe_auth_handle,
+            |safe_authenticator| match safe_authenticator.log_out() {
+                Ok(()) => {
+                    let msg = "Logged out successfully";
+                    println!("{}", msg);
+                    Ok(msg.to_string())
+                }
+                Err(err) => {
+                    let msg = format!("Failed to log out: {}", err);
+                    println!("{}", msg);
+                    Err(msg)
+                }
+            },
+        )
     }
 }

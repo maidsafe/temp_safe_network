@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedSafeAuthenticatorHandle;
+use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 
 pub fn process_req(
     args: &[&str],
@@ -16,19 +16,21 @@ pub fn process_req(
         Err("Incorrect number of arguments for 'authed-apps' action".to_string())
     } else {
         println!("Obtaining list of authorised applications...");
-        let safe_authenticator = &mut *(safe_auth_handle.lock().unwrap());
-        match safe_authenticator.authed_apps() {
-            Ok(authed_apps_list) => {
-                println!("List of authorised apps sent: {:?}", authed_apps_list);
-                let auth_apps_serialised = serde_json::to_string(&authed_apps_list)
-                    .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
+        lock_safe_authenticator(
+            safe_auth_handle,
+            |safe_authenticator| match safe_authenticator.authed_apps() {
+                Ok(authed_apps_list) => {
+                    println!("List of authorised apps sent: {:?}", authed_apps_list);
+                    let auth_apps_serialised = serde_json::to_string(&authed_apps_list)
+                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
 
-                Ok(auth_apps_serialised)
-            }
-            Err(err) => {
-                println!("Failed to get list of authorised apps: {}", err);
-                Err(err.to_string())
-            }
-        }
+                    Ok(auth_apps_serialised)
+                }
+                Err(err) => {
+                    println!("Failed to get list of authorised apps: {}", err);
+                    Err(err.to_string())
+                }
+            },
+        )
     }
 }

@@ -71,7 +71,10 @@ fn credentials_file_path() -> Result<String, String> {
     let path = Path::new(&home_path).join(AUTH_CREDENTIALS_FOLDER);
     if !Path::new(&path).exists() {
         println!("Creating ~/{} folder", AUTH_CREDENTIALS_FOLDER);
-        DirBuilder::new().recursive(false).create(&path).unwrap();
+        DirBuilder::new()
+            .recursive(false)
+            .create(&path)
+            .map_err(|err| format!("Failed to create folder to store credentials: {}", err))?
     }
 
     let path = Path::new(&path).join(AUTH_CREDENTIALS_FILENAME);

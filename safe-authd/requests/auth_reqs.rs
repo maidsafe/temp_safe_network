@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedAuthReqsHandle;
+use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
 use safe_api::PendingAuthReqs;
 
 pub fn process_req(
@@ -17,11 +17,13 @@ pub fn process_req(
         Err("Incorrect number of arguments for 'auth-reqs' action".to_string())
     } else {
         println!("Obtaining list of pending authorisation requests...");
-        let auth_reqs_list = &mut *(auth_reqs_handle.lock().unwrap());
-        let pending_auth_reqs: PendingAuthReqs = auth_reqs_list
-            .iter()
-            .map(|(_req_id, pending_req)| pending_req.auth_req.clone())
-            .collect();
+        let pending_auth_reqs: PendingAuthReqs =
+            lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
+                Ok(auth_reqs_list
+                    .iter()
+                    .map(|(_req_id, pending_req)| pending_req.auth_req.clone())
+                    .collect())
+            })?;
 
         println!(
             "List of pending authorisation requests sent: {:?}",

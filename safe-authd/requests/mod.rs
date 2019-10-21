@@ -18,12 +18,12 @@ mod revoke;
 mod subscribe;
 mod unsubscribe;
 
-use crate::authd::{
-    AuthReqsList, SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
+use crate::shared::{
+    lock_auth_reqs_list, lock_safe_authenticator, SharedAuthReqsHandle, SharedNotifEndpointsHandle,
+    SharedSafeAuthenticatorHandle,
 };
 use failure::{Error, ResultExt};
 use futures::{Async, Future, Poll, Stream};
-use safe_api::SafeAuthenticator;
 use std::str;
 use tokio::sync::mpsc;
 
@@ -92,17 +92,23 @@ impl Future for ProcessRequest {
                         Ok(Async::Ready(Some(is_allowed))) => {
                             rx.close();
                             if is_allowed {
-                                let safe_auth: &mut SafeAuthenticator =
-                                    &mut *(safe_auth_handle.lock().unwrap());
-                                match safe_auth.authorise_app(auth_req_str) {
-                                    Ok(resp) => {
-                                        println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
-                                        return Ok(Async::Ready(successful_response(resp)));
-                                    }
-                                    Err(err) => {
-                                        println!("Failed to authorise application: {}", err);
-                                        return Ok(Async::Ready(err_response(err.to_string())));
-                                    }
+                                match lock_safe_authenticator(
+                                    safe_auth_handle.clone(),
+                                    |safe_authenticator| match safe_authenticator
+                                        .authorise_app(auth_req_str)
+                                    {
+                                        Ok(resp) => {
+                                            println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
+                                            Ok(resp)
+                                        }
+                                        Err(err) => {
+                                            println!("Failed to authorise application: {}", err);
+                                            Ok(err.to_string())
+                                        }
+                                    },
+                                ) {
+                                    Ok(resp) => return Ok(Async::Ready(successful_response(resp))),
+                                    Err(err) => return Ok(Async::Ready(err_response(err))),
                                 }
                             } else {
                                 let msg = format!("Authorisation request ({}) was denied", req_id);
@@ -117,9 +123,11 @@ impl Future for ProcessRequest {
                             rx.close();
                             // We didn't get a response in a timely manner, we cannot allow the list
                             // to grow infinitelly, so let's remove the request from it
-                            let auth_reqs_list: &mut AuthReqsList =
-                                &mut *(auth_reqs_handle.lock().unwrap());
-                            auth_reqs_list.remove(&req_id);
+                            let _ =
+                                lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
+                                    auth_reqs_list.remove(&req_id);
+                                    Ok(())
+                                });
                             let msg = "Failed to get authorision response";
                             println!("{}", msg);
                             return Ok(Async::Ready(err_response(msg.to_string())));

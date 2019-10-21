@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedAuthReqsHandle;
+use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
 
 pub fn process_req(
     args: &[&str],
@@ -17,35 +17,37 @@ pub fn process_req(
     } else {
         println!("Allowing authorisation request...");
         let auth_req_id = args[0];
-        let auth_reqs_list = &mut *(auth_reqs_handle.lock().unwrap());
         let req_id = match auth_req_id.parse::<u32>() {
             Ok(id) => id,
             Err(err) => return Err(err.to_string()),
         };
-        match auth_reqs_list.remove(&req_id) {
-            Some(mut auth_req) => match auth_req.tx.try_send(true) {
-                Ok(_) => {
+
+        lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
+            match auth_reqs_list.remove(&req_id) {
+                Some(mut auth_req) => match auth_req.tx.try_send(true) {
+                    Ok(_) => {
+                        let msg = format!(
+                            "Authorisation request ({}) allowed successfully",
+                            auth_req_id
+                        );
+                        println!("{}", msg);
+                        Ok(msg)
+                    }
+                    Err(_) => {
+                        let msg = format!("Failed to allow authorisation request '{}' since the response couldn't be sent to the requesting application", auth_req_id);
+                        println!("{}", msg);
+                        Err(msg)
+                    }
+                },
+                None => {
                     let msg = format!(
-                        "Authorisation request ({}) allowed successfully",
+                        "No pending authorisation request found with id '{}'",
                         auth_req_id
                     );
                     println!("{}", msg);
-                    Ok(msg)
-                }
-                Err(_) => {
-                    let msg = format!("Failed to allow authorisation request '{}' since the response couldn't be sent to the requesting application", auth_req_id);
-                    println!("{}", msg);
                     Err(msg)
                 }
-            },
-            None => {
-                let msg = format!(
-                    "No pending authorisation request found with id '{}'",
-                    auth_req_id
-                );
-                println!("{}", msg);
-                Err(msg)
             }
-        }
+        })
     }
 }

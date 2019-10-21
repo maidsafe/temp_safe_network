@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedSafeAuthenticatorHandle;
+use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 
 pub fn process_req(
     args: &[&str],
@@ -18,17 +18,19 @@ pub fn process_req(
         println!("Revoking application...");
         let app_id = args[0];
 
-        let safe_authenticator = &mut *(safe_auth_handle.lock().unwrap());
-        match safe_authenticator.revoke_app(app_id) {
-            Ok(()) => {
-                let msg = "Application revoked successfully";
-                println!("{}", msg);
-                Ok(msg.to_string())
-            }
-            Err(err) => {
-                println!("Failed to revoke application '{}': {}", app_id, err);
-                Err(err.to_string())
-            }
-        }
+        lock_safe_authenticator(
+            safe_auth_handle,
+            |safe_authenticator| match safe_authenticator.revoke_app(app_id) {
+                Ok(()) => {
+                    let msg = "Application revoked successfully";
+                    println!("{}", msg);
+                    Ok(msg.to_string())
+                }
+                Err(err) => {
+                    println!("Failed to revoke application '{}': {}", app_id, err);
+                    Err(err.to_string())
+                }
+            },
+        )
     }
 }

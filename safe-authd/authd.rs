@@ -11,13 +11,14 @@ use structopt::{self, StructOpt};
 
 use super::quic_client::quic_send;
 use super::requests::process_request;
+use super::shared::*;
 use super::update::update_commander;
 use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
-use safe_api::{AuthReq, SafeAuthenticator};
+use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, Write};
@@ -30,29 +31,10 @@ use std::thread;
 use std::time::Duration;
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
-use tokio::sync::mpsc;
 use url::Url;
 
-// Frequency for checking pensing auth requests
+// Frequency for checking pending auth requests
 const AUTH_REQS_CHECK_FREQ: u64 = 2000;
-
-#[derive(Clone, Debug)]
-pub struct IncomingAuthReq {
-    pub auth_req: AuthReq,
-    pub tx: mpsc::Sender<bool>,
-}
-
-// List of authorisation requests indexed by their request id
-pub type AuthReqsList = BTreeMap<u32, IncomingAuthReq>;
-
-// A thread-safe queue to keep the list of authorisation requests
-pub type SharedAuthReqsHandle = Arc<Mutex<AuthReqsList>>;
-
-// A thread-safe handle to keep the SafeAuthenticator instance
-pub type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
-
-// A thread-safe handle to keep the list of notifications subscriptors' endpoints
-pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeSet<String>>>;
 
 const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
@@ -206,7 +188,10 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
         };
         server_config.certificate(cert_chain, key)?;
     } else {*/
-    let dirs = directories::ProjectDirs::from("org", "quinn", "quinn-examples").unwrap();
+    let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+        Some(dirs) => dirs,
+        None => bail!("Failed to obtain local home directory where to read certificate from"),
+    };
     let path = dirs.data_local_dir();
     let cert_path = path.join("cert.der");
     let key_path = path.join("key.der");
@@ -235,8 +220,10 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
     endpoint.logger(log.clone());
     endpoint.listen(server_config.build());
 
-    let stdout = File::create(SAFE_AUTHD_STDOUT_FILE).unwrap();
-    let stderr = File::create(SAFE_AUTHD_STDERR_FILE).unwrap();
+    let stdout = File::create(SAFE_AUTHD_STDOUT_FILE)
+        .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;
+    let stderr = File::create(SAFE_AUTHD_STDERR_FILE)
+        .map_err(|err| format_err!("Failed to open/create file for stderr: {}", err))?;
 
     let daemonize = Daemonize::new()
         .pid_file(SAFE_AUTHD_PID_FILE) // Every method except `new` and `start`
@@ -415,61 +402,76 @@ fn monitor_pending_auth_reqs(
 ) {
     thread::spawn(move || loop {
         {
-            let mut reqs_to_process: Option<AuthReqsList> = None;
-            {
-                let auth_reqs_list: &mut AuthReqsList = &mut *(auth_reqs_handle.lock().unwrap());
-                if !auth_reqs_list.is_empty() {
-                    let notif_endpoints_list: &mut BTreeSet<String> =
-                        &mut *(notif_endpoints_handle.lock().unwrap());
-                    if !notif_endpoints_list.is_empty() {
-                        reqs_to_process = Some(auth_reqs_list.clone());
-                        auth_reqs_list.clear();
+            let reqs_to_process: Option<AuthReqsList> =
+                lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
+                    if auth_reqs_list.is_empty() {
+                        Ok(None)
+                    } else {
+                        lock_notif_endpoints_list(
+                            notif_endpoints_handle.clone(),
+                            |notif_endpoints_list| {
+                                if notif_endpoints_list.is_empty() {
+                                    Ok(None)
+                                } else {
+                                    let reqs_to_process = auth_reqs_list.clone();
+                                    auth_reqs_list.clear();
+                                    Ok(Some(reqs_to_process))
+                                }
+                            },
+                        )
                     }
-                };
-            }
+                })
+                .unwrap_or_else(|_| None);
 
             // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
             // and remove them if they don't respond or their response is positive.
             match reqs_to_process {
                 None => {}
                 Some(mut reqs) => {
-                    let notif_endpoints_list: &mut BTreeSet<String> =
-                        &mut *(notif_endpoints_handle.lock().unwrap());
-                    for (req_id, incoming_auth_req) in reqs.iter_mut() {
-                        let mut is_allowed = false;
-                        for endpoint in notif_endpoints_list.iter() {
-                            println!("Asking subscriptor: {}", endpoint);
-                            match quic_send(
-                                &format!("{}/{}", endpoint, incoming_auth_req.auth_req.app_id),
-                                false,
-                                None,
-                                None,
-                                false,
-                            ) {
-                                Ok(allow) => {
-                                    is_allowed = allow.starts_with("true");
-                                    println!("Subscriptor's response: {}", is_allowed);
-                                    break;
+                    let _ = lock_notif_endpoints_list(
+                        notif_endpoints_handle.clone(),
+                        |notif_endpoints_list| {
+                            for (req_id, incoming_auth_req) in reqs.iter_mut() {
+                                let mut is_allowed = false;
+                                for endpoint in notif_endpoints_list.iter() {
+                                    println!("Asking subscriptor: {}", endpoint);
+                                    match quic_send(
+                                        &format!(
+                                            "{}/{}",
+                                            endpoint, incoming_auth_req.auth_req.app_id
+                                        ),
+                                        false,
+                                        None,
+                                        None,
+                                        false,
+                                    ) {
+                                        Ok(allow) => {
+                                            is_allowed = allow.starts_with("true");
+                                            println!("Subscriptor's response: {}", is_allowed);
+                                            break;
+                                        }
+                                        Err(err) => {
+                                            println!(
+                                            "Skipping subscriptor '{}' since it didn't respond: {}",
+                                            endpoint, err
+                                        );
+                                        }
+                                    }
                                 }
-                                Err(err) => {
-                                    println!(
-                                        "Skipping subscriptor '{}' since it didn't respond: {}",
-                                        endpoint, err
-                                    );
-                                }
+                                println!(
+                                    "Decision for Req ID: {} - App ID: {} ??: {}",
+                                    req_id, incoming_auth_req.auth_req.app_id, is_allowed
+                                );
+                                match incoming_auth_req.tx.try_send(is_allowed) {
+                                    Ok(_) => println!("Auth req decision ready to be sent to application"),
+                                    Err(_) => println!(
+                                        "Auth req decision couldn't be sent, and therefore already denied"
+                                    ),
+                                };
                             }
-                        }
-                        println!(
-                            "ALLOW FOR Req ID: {} - App ID: {} ??: {}",
-                            req_id, incoming_auth_req.auth_req.app_id, is_allowed
-                        );
-                        match incoming_auth_req.tx.try_send(is_allowed) {
-                            Ok(_) => println!("Auth req decision ready to be sent to application"),
-                            Err(_) => println!(
-                                "Auth req decision couldn't be sent, and therefore already denied"
-                            ),
-                        }
-                    }
+                            Ok(())
+                        },
+                    );
                 }
             }
         }

@@ -9,6 +9,7 @@
 mod authd;
 mod quic_client;
 mod requests;
+mod shared;
 mod update;
 
 use env_logger;

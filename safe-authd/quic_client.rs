@@ -48,7 +48,15 @@ pub fn quic_send(
     let ca_path = if let Some(ca_path) = cert_ca {
         ca_path
     } else {
-        let dirs = directories::ProjectDirs::from("org", "quinn", "quinn-examples").unwrap();
+        let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+            Some(dirs) => dirs,
+            None => {
+                return Err(
+                    "Failed to obtain local home directory where to read certificate from"
+                        .to_string(),
+                )
+            }
+        };
         dirs.data_local_dir().join("cert.der")
     };
 

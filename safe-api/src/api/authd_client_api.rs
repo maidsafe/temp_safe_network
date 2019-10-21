@@ -200,8 +200,10 @@ impl SafeAuthdClient {
             authd_response
         );
 
-        let authed_apps_list: AuthedAppsList = serde_json::from_str(&authd_response)
-            .map_err(|err| format!("Failed to parse list of authorised apps: {}", err))?;
+        let authed_apps_list: AuthedAppsList =
+            serde_json::from_str(&authd_response).map_err(|err| {
+                Error::AuthdClientError(format!("Failed to parse list of authorised apps: {}", err))
+            })?;
 
         Ok(authed_apps_list)
     }
@@ -243,8 +245,10 @@ impl SafeAuthdClient {
             authd_response
         );
 
-        let auth_reqs_list: PendingAuthReqs = serde_json::from_str(&authd_response)
-            .map_err(|err| format!("Failed to parse list of auth reqs: {}", err))?;
+        let auth_reqs_list: PendingAuthReqs =
+            serde_json::from_str(&authd_response).map_err(|err| {
+                Error::AuthdClientError(format!("Failed to parse list of auth reqs: {}", err))
+            })?;
 
         Ok(auth_reqs_list)
     }

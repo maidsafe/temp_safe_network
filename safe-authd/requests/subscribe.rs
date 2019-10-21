@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedNotifEndpointsHandle;
-use std::collections::BTreeSet;
+use crate::shared::{lock_notif_endpoints_list, SharedNotifEndpointsHandle};
 
 // Maximum number of allowed auth reqs notifs subscriptors
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
@@ -32,24 +31,24 @@ pub fn process_req(
             }
         };
 
-        let notif_endpoints_list: &mut BTreeSet<String> =
-            &mut *(notif_endpoints_handle.lock().unwrap());
-        if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
-            let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
-            println!("{}", msg);
-            Err(msg)
-        } else {
-            if notif_endpoint.ends_with('/') {
-                notif_endpoint.pop();
-            }
-            notif_endpoints_list.insert(notif_endpoint.clone());
+        lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
+            if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
+                let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
+                println!("{}", msg);
+                Err(msg)
+            } else {
+                if notif_endpoint.ends_with('/') {
+                    notif_endpoint.pop();
+                }
+                notif_endpoints_list.insert(notif_endpoint.clone());
 
-            let msg = format!(
-                "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
-                notif_endpoint
-            );
-            println!("{}", msg);
-            Ok(msg)
-        }
+                let msg = format!(
+                        "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
+                        notif_endpoint
+                    );
+                println!("{}", msg);
+                Ok(msg)
+            }
+        })
     }
 }

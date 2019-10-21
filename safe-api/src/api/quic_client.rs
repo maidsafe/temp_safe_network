@@ -50,7 +50,15 @@ pub fn quic_send(
     let ca_path = if let Some(ca_path) = cert_ca {
         ca_path
     } else {
-        let dirs = directories::ProjectDirs::from("org", "quinn", "quinn-examples").unwrap();
+        let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+            Some(dirs) => dirs,
+            None => {
+                return Err(Error::AuthdClientError(
+                    "Failed to obtain local home directory where to read certificate from"
+                        .to_string(),
+                ))
+            }
+        };
         dirs.data_local_dir().join("cert.der")
     };
 
@@ -101,7 +109,7 @@ pub fn quic_send(
     runtime.block_on(
         endpoint
             .connect(&remote, &host)
-            .map_err(|err| format!("{}", err))?
+            .map_err(|err| Error::AuthdClientError(format!("{}", err)))?
             .map_err(|err| {
                 Error::AuthdClientError(format!(
                     "Failed to establish connection with authd: {}",

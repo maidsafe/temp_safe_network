@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::authd::SharedSafeAuthenticatorHandle;
+use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 
 pub fn process_req(
     args: &[&str],
@@ -19,18 +19,20 @@ pub fn process_req(
         let secret = args[0];
         let password = args[1];
 
-        let safe_authenticator = &mut *(safe_auth_handle.lock().unwrap());
-        match safe_authenticator.log_in(secret, password) {
-            Ok(_) => {
-                let msg = "Logged in successfully!";
-                println!("{}", msg);
-                Ok(msg.to_string())
-            }
-            Err(err) => {
-                let msg = format!("Error occurred when trying to log in: {}", err);
-                println!("{}", msg);
-                Err(err.to_string())
-            }
-        }
+        lock_safe_authenticator(
+            safe_auth_handle,
+            |safe_authenticator| match safe_authenticator.log_in(secret, password) {
+                Ok(_) => {
+                    let msg = "Logged in successfully!";
+                    println!("{}", msg);
+                    Ok(msg.to_string())
+                }
+                Err(err) => {
+                    let msg = format!("Error occurred when trying to log in: {}", err);
+                    println!("{}", msg);
+                    Err(err.to_string())
+                }
+            },
+        )
     }
 }
