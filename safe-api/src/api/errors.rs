@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use self::codes::*;
-use ffi_utils::{ErrorCode, StringError};
-use std::ffi::NulError;
+use self::codes::*;
 use std::fmt;
 
 pub type ResultReturn<T> = Result<T, Error>;
@@ -48,7 +46,6 @@ impl fmt::Display for Error {
     }
 }
 
-#[allow(missing_docs)]
 mod codes {
     // Auth Errors
     pub const ERR_AUTH_ERROR: i32 = -100;
@@ -126,41 +123,5 @@ impl Error {
             Error::StringError(info) => ("StringError".to_string(), info.to_string()),
         };
         format!("[Error] {} - {}", error_type, error_msg)
-    }
-}
-
-impl ErrorCode for Error {
-    fn error_code(&self) -> i32 {
-        self.error_code()
-    }
-}
-
-impl From<StringError> for Error {
-    fn from(_error: StringError) -> Self {
-        Error::StringError("string conversion error".to_string())
-    }
-}
-
-impl<'a> From<&'a str> for Error {
-    fn from(s: &'a str) -> Self {
-        Error::Unexpected(s.to_string())
-    }
-}
-
-impl From<String> for Error {
-    fn from(error: String) -> Self {
-        Error::Unexpected(error)
-    }
-}
-
-impl From<NulError> for Error {
-    fn from(_error: NulError) -> Self {
-        Error::Unexpected("Null error".to_string())
-    }
-}
-
-impl From<serde_json::error::Error> for Error {
-    fn from(_error: serde_json::error::Error) -> Self {
-        Error::StringError("Failed to serialize or deserialize to json".to_string())
     }
 }

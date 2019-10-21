@@ -123,6 +123,7 @@ mod bindings {
         }
     }
 
+    #[allow(dead_code)]
     fn apply_patches_testing(outputs: &mut HashMap<String, String>) {
         insert_using_utilities(fetch_mut(
             outputs,
@@ -152,6 +153,7 @@ mod bindings {
         content.insert_str(0, "#if __IOS__\nusing ObjCRuntime;\n#endif\n");
     }
 
+    #[allow(dead_code)]
     fn insert_internals_visible_to(content: &mut String) {
         content.insert_str(0, "using System.Runtime.CompilerServices;\n");
 

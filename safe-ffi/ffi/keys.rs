@@ -1,7 +1,8 @@
+use super::errors::Result;
 use super::ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
-use safe_api::{BlsKeyPair as NativeBlsKeyPair, ResultReturn, Safe};
+use safe_api::{BlsKeyPair as NativeBlsKeyPair, Safe};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -15,7 +16,7 @@ pub unsafe extern "C" fn generate_keypair(
         safe_key: *const BlsKeyPair,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let keypair = bls_key_pair_into_repr_c(&(*app).keypair()?)?;
         o_cb(user_data.0, FFI_RESULT_OK, &keypair);
@@ -37,7 +38,7 @@ pub unsafe extern "C" fn keys_create(
         safe_key: *const BlsKeyPair,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let from_option = from_c_str_to_str_option(from);
         let preload_option = from_c_str_to_str_option(preload);
@@ -73,7 +74,7 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
         safe_key: *const BlsKeyPair,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let preload_option = from_c_str(preload)?;
         let (xorurl, keypair) = (*app).keys_create_preload_test_coins(&preload_option)?;
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn keys_balance_from_sk(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, balance: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let secret_key = from_c_str(sk)?;
         let balance = (*app).keys_balance_from_sk(&secret_key)?;
@@ -113,7 +114,7 @@ pub unsafe extern "C" fn keys_balance_from_url(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, balance: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let key_url = from_c_str(url)?;
         let secret_key = from_c_str(sk)?;
@@ -132,7 +133,7 @@ pub unsafe extern "C" fn validate_sk_for_url(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, balance: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let key_url = from_c_str(url)?;
         let secret_key = from_c_str(sk)?;
@@ -153,7 +154,7 @@ pub unsafe extern "C" fn keys_transfer(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, tx_id: u64),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let from_key = from_c_str_to_str_option(from);
         let to_key = from_c_str(to)?;

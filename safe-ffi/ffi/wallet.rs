@@ -1,10 +1,11 @@
+use super::errors::Result;
 use super::ffi_structs::{
     wallet_spendable_balance_into_repr_c, wallet_spendable_balances_into_repr_c,
     WalletSpendableBalance, WalletSpendableBalances,
 };
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
-use safe_api::{ResultReturn, Safe};
+use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -14,7 +15,7 @@ pub unsafe extern "C" fn wallet_create(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, xorurl: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_xorurl = (*app).wallet_create()?;
         let wallet_xorurl_c_str = CString::new(wallet_xorurl)?;
@@ -33,7 +34,7 @@ pub unsafe extern "C" fn wallet_insert(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, name: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let key_url_str = from_c_str(key_url)?;
         let secret_key_str = from_c_str(secret_key)?;
@@ -53,7 +54,7 @@ pub unsafe extern "C" fn wallet_balance(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, balance: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_url = from_c_str(url)?;
         let balance = (*app).wallet_balance(&wallet_url)?;
@@ -75,7 +76,7 @@ pub unsafe extern "C" fn wallet_get_default_balance(
         version: u64,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_url = from_c_str(url)?;
         let (spendable, version) = (*app).wallet_get_default_balance(&wallet_url)?;
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn wallet_transfer(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, tx_id: u64),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let from_key = from_c_str_to_str_option(from);
         let to_key = from_c_str(to)?;
@@ -117,7 +118,7 @@ pub unsafe extern "C" fn wallet_get(
         spendable_wallet_balance: *const WalletSpendableBalances,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_url = from_c_str(url)?;
         let spendables = (*app).wallet_get(&wallet_url)?;

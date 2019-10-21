@@ -1,8 +1,9 @@
+use super::errors::Result;
 use super::ffi_structs::{
     processed_entries_into_repr_c, xorurl_encoder_into_repr_c, ProcessedEntries, XorUrlEncoder,
 };
 use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
-use safe_api::{ResultReturn, Safe};
+use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -16,7 +17,7 @@ pub unsafe extern "C" fn parse_url(
         xorurl_encoder: *const XorUrlEncoder,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = from_c_str(url)?;
         let encoder = Safe::parse_url(&url_string)?;
@@ -38,7 +39,7 @@ pub unsafe extern "C" fn parse_and_resolve_url(
         resolved_from: *const XorUrlEncoder,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = from_c_str(url)?;
         let (encoder, resolved_from) = (*app).parse_and_resolve_url(&url_string)?;
@@ -75,7 +76,7 @@ pub unsafe extern "C" fn nrs_map_container_create(
         xorurl: *const c_char,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let nrs_str = from_c_str(name)?;
         let link_str = from_c_str(link)?;
@@ -112,7 +113,7 @@ pub unsafe extern "C" fn nrs_map_container_add(
         version: u64, // todo: add processed entries
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let name_str = from_c_str(name)?;
         let link_str = from_c_str(link)?;
@@ -150,7 +151,7 @@ pub unsafe extern "C" fn nrs_map_container_remove(
         version: u64, // todo: add processed entries
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let name_str = from_c_str(name)?;
         let (version, xorurl, _processed_entries, nrs_map) =
@@ -180,7 +181,7 @@ pub unsafe extern "C" fn nrs_map_container_get(
         version: u64,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = from_c_str(url)?;
         let (version, nrs_map) = (*app).nrs_map_container_get(&url_string)?;
