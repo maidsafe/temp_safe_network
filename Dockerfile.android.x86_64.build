@@ -35,12 +35,6 @@ RUN apt-get update -y && \
         --api 21 \
         --install-dir /usr/local/bin/android-toolchains \
         --force && \
-    ln -s \
-        /usr/include/x86_64-linux-gnu/openssl/opensslconf.h \
-        /usr/include/openssl && \
-    ln -s \
-        /usr/include/openssl \
-        /usr/local/bin/android-toolchains/sysroot/usr/include && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
@@ -49,8 +43,6 @@ COPY . .
 
 USER maidsafe:maidsafe
 ENV CARGO_TARGET_DIR=/target \
-    OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-    OPENSSL_INCLUDE_DIR=/usr/include/openssl \
     CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER=x86_64-linux-android-gcc \
     CC_x86_64_linux_android=x86_64-linux-android-gcc \
     PATH=$PATH:/usr/local/bin/android-toolchains/bin
