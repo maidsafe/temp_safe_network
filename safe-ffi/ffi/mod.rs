@@ -10,7 +10,7 @@ pub mod wallet;
 pub mod xorurl;
 
 use errors::Result;
-use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
+use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use helpers::from_c_str_to_str_option;
 use safe_api::Safe;
 use std::os::raw::{c_char, c_void};
@@ -24,7 +24,7 @@ pub unsafe extern "C" fn connect(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let app_id = from_c_str(app_id)?;
+        let app_id = String::clone_from_repr_c(app_id)?;
         let auth_cred = from_c_str_to_str_option(auth_credentials);
         let mut safe = Safe::new("");
         safe.connect(&app_id, auth_cred)?;

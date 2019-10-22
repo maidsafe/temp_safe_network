@@ -3,9 +3,7 @@ use super::ffi_structs::{
     nrs_map_container_info_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
     NrsMapContainerInfo, PublishedImmutableData, SafeKey, Wallet,
 };
-use ffi_utils::{
-    catch_unwind_cb, from_c_str, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx,
-};
+use ffi_utils::{catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC};
 use safe_api::fetch::SafeData;
 use safe_api::{ResultReturn, Safe};
 use std::ffi::CString;
@@ -23,7 +21,7 @@ pub unsafe extern "C" fn fetch(
     o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<()> {
-        let url = from_c_str(url)?;
+        let url = String::clone_from_repr_c(url)?;
         let content = (*app).fetch(&url);
         invoke_callback(
             content,
@@ -49,7 +47,7 @@ pub unsafe extern "C" fn inspect(
     o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<()> {
-        let url = from_c_str(url)?;
+        let url = String::clone_from_repr_c(url)?;
         let content = (*app).inspect(&url);
         invoke_callback(
             content,
@@ -81,13 +79,12 @@ unsafe fn invoke_callback(
             resolved_from,
             media_type,
         }) => {
-            let (data, data_len, data_cap) = vec_into_raw_parts(data.to_vec());
+            let (data, data_len) = vec_into_raw_parts(data.to_vec());
             let published_data = PublishedImmutableData {
                 xorurl: CString::new(xorurl.clone())?.into_raw(),
                 xorname: xorname.0,
                 data,
                 data_len,
-                data_cap,
                 resolved_from: match resolved_from {
                     Some(nrs_container_map) => {
                         nrs_map_container_info_into_repr_c(&nrs_container_map)?

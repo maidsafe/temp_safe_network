@@ -2,7 +2,7 @@ use super::errors::Result;
 use super::ffi_structs::{processed_files_into_repr_c, ProcessedFiles};
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{
-    catch_unwind_cb, from_c_str, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, FFI_RESULT_OK,
+    catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
 use safe_api::Safe;
 use std::ffi::CString;
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn files_container_create(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let location_str = from_c_str(location)?;
+        let location_str = String::clone_from_repr_c(location)?;
         let destination = from_c_str_to_str_option(dest);
         let (xorurl, processed_files, files_map) =
             (*app).files_container_create(&location_str, destination, recursive, dry_run)?;
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn files_container_get(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let url_str = from_c_str(url)?;
+        let url_str = String::clone_from_repr_c(url)?;
         let (version, files_map) = (*app).files_container_get(&url_str)?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         o_cb(user_data.0, FFI_RESULT_OK, version, files_map_json.as_ptr());
@@ -86,8 +86,8 @@ pub unsafe extern "C" fn files_container_sync(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let location_str = from_c_str(location)?;
-        let url_str = from_c_str(url)?;
+        let location_str = String::clone_from_repr_c(location)?;
+        let url_str = String::clone_from_repr_c(url)?;
         let (version, processed_files, files_map) = (*app).files_container_sync(
             &location_str,
             &url_str,
@@ -128,8 +128,8 @@ pub unsafe extern "C" fn files_container_add(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let url_str = from_c_str(url)?;
-        let source_str = from_c_str(source_file)?;
+        let url_str = String::clone_from_repr_c(url)?;
+        let source_str = String::clone_from_repr_c(source_file)?;
         let (version, processed_files, files_map) =
             (*app).files_container_add(&source_str, &url_str, force, update_nrs, dry_run)?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn files_container_add_from_raw(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        let url_str = from_c_str(url)?;
+        let url_str = String::clone_from_repr_c(url)?;
         let (version, processed_files, files_map) =
             (*app).files_container_add_from_raw(&data_vec, &url_str, force, update_nrs, dry_run)?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
@@ -216,7 +216,7 @@ pub unsafe extern "C" fn files_get_published_immutable(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let url_str = from_c_str(url)?;
+        let url_str = String::clone_from_repr_c(url)?;
         let data = (*app).files_get_published_immutable(&url_str)?;
         o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
         Ok(())

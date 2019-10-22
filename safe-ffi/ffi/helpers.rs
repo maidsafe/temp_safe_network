@@ -1,5 +1,5 @@
 use super::errors::Result;
-use ffi_utils::from_c_str;
+use ffi_utils::ReprC;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::slice;
@@ -34,7 +34,7 @@ pub unsafe fn c_str_str_to_string_vec(
     let data_vec = slice::from_raw_parts(argv, len).to_vec();
     let string_vec = data_vec
         .iter()
-        .map(|s| from_c_str(*s))
+        .map(|s| String::clone_from_repr_c(*s))
         .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(string_vec)
 }
