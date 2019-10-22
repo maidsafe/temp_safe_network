@@ -1,3 +1,4 @@
+use super::errors::Result;
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{from_c_str, vec_into_raw_parts};
 use safe_api::files::{
@@ -11,7 +12,7 @@ use safe_api::wallet::{
 use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder};
 use safe_api::{
     BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo,
-    ProcessedEntries as NativeProcessedEntries, ResultReturn,
+    ProcessedEntries as NativeProcessedEntries,
 };
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::ffi::CString;
@@ -41,7 +42,7 @@ impl Drop for BlsKeyPair {
     }
 }
 
-pub fn bls_key_pair_into_repr_c(key_pair: &NativeBlsKeyPair) -> ResultReturn<BlsKeyPair> {
+pub fn bls_key_pair_into_repr_c(key_pair: &NativeBlsKeyPair) -> Result<BlsKeyPair> {
     Ok(BlsKeyPair {
         pk: CString::new(key_pair.pk.clone())?.into_raw(),
         sk: CString::new(key_pair.sk.clone())?.into_raw(),
@@ -167,7 +168,7 @@ impl Drop for XorUrlEncoder {
 
 pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
-) -> ResultReturn<XorUrlEncoder> {
+) -> Result<XorUrlEncoder> {
     // let sub_names = string_vec_to_c_str_str(xorurl_encoder.sub_names())?; // Todo: update to String Vec
     let sub_names = serde_json::to_string(&xorurl_encoder.sub_names())?;
     Ok(XorUrlEncoder {
@@ -186,7 +187,7 @@ pub unsafe fn xorurl_encoder_into_repr_c(
 
 pub unsafe fn native_xorurl_encoder_from_repr_c(
     encoder: &XorUrlEncoder,
-) -> ResultReturn<NativeXorUrlEncoder> {
+) -> Result<NativeXorUrlEncoder> {
     let sub_names: Vec<String> = serde_json::from_str(&from_c_str(encoder.sub_names)?)?;
     Ok(NativeXorUrlEncoder::new(
         XorName(encoder.xorname),
@@ -222,7 +223,7 @@ impl Drop for WalletSpendableBalance {
 
 pub fn wallet_spendable_balance_into_repr_c(
     wallet_balance: &NativeWalletSpendableBalance,
-) -> ResultReturn<WalletSpendableBalance> {
+) -> Result<WalletSpendableBalance> {
     Ok(WalletSpendableBalance {
         xorurl: CString::new(wallet_balance.xorurl.clone())?.into_raw(),
         sk: CString::new(wallet_balance.sk.clone())?.into_raw(),
@@ -267,7 +268,7 @@ impl Drop for WalletSpendableBalances {
 
 pub fn wallet_spendable_balances_into_repr_c(
     wallet_balances: &NativeWalletSpendableBalances,
-) -> ResultReturn<WalletSpendableBalances> {
+) -> Result<WalletSpendableBalances> {
     let mut vec = Vec::with_capacity(wallet_balances.len());
 
     for (name, (is_default, spendable_balance)) in wallet_balances {
@@ -330,9 +331,7 @@ impl Drop for ProcessedFiles {
     }
 }
 
-pub unsafe fn processed_files_into_repr_c(
-    map: &NativeProcessedFiles,
-) -> ResultReturn<ProcessedFiles> {
+pub unsafe fn processed_files_into_repr_c(map: &NativeProcessedFiles) -> Result<ProcessedFiles> {
     let mut vec = Vec::with_capacity(map.len());
 
     for (file_name, (file_meta_data, file_xorurl)) in map {
@@ -398,7 +397,7 @@ impl Drop for FileInfo {
 pub unsafe fn file_info_into_repr_c(
     file_name: &str,
     file_item_map: &NativeFileItem,
-) -> ResultReturn<FileInfo> {
+) -> Result<FileInfo> {
     let mut vec = Vec::with_capacity(file_item_map.len());
 
     for (file_meta_data, xorurl) in file_item_map {
@@ -433,7 +432,7 @@ impl Drop for FilesMap {
     }
 }
 
-pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> ResultReturn<FilesMap> {
+pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> Result<FilesMap> {
     let mut vec = Vec::with_capacity(files_map.len());
 
     for (file_name, file_items) in files_map {
@@ -494,7 +493,7 @@ impl Drop for ProcessedEntries {
 
 pub unsafe fn processed_entries_into_repr_c(
     entries: &NativeProcessedEntries,
-) -> ResultReturn<ProcessedEntries> {
+) -> Result<ProcessedEntries> {
     let mut vec = Vec::with_capacity(entries.len());
 
     for (name, (action, link)) in entries {
@@ -543,7 +542,7 @@ impl Drop for NrsMapContainerInfo {
 }
 
 impl NrsMapContainerInfo {
-    pub fn new() -> ResultReturn<Self> {
+    pub fn new() -> Result<Self> {
         Ok(Self {
             public_name: std::ptr::null(),
             xorurl: std::ptr::null(),
@@ -558,7 +557,7 @@ impl NrsMapContainerInfo {
 
 pub unsafe fn nrs_map_container_info_into_repr_c(
     nrs_container_info: &NativeNrsMapContainerInfo,
-) -> ResultReturn<NrsMapContainerInfo> {
+) -> Result<NrsMapContainerInfo> {
     let nrs_map_json = serde_json::to_string(&nrs_container_info.nrs_map)?;
     Ok(NrsMapContainerInfo {
         public_name: CString::new(nrs_container_info.public_name.clone())?.into_raw(),
@@ -577,7 +576,7 @@ pub struct NrsMap {
     pub default: *const c_char,
 }
 
-pub fn nrs_map_into_repr_c(nrs_map: &NativeNrsMap) -> ResultReturn<NrsMap> {
+pub fn nrs_map_into_repr_c(nrs_map: &NativeNrsMap) -> Result<NrsMap> {
     Ok(NrsMap {
         sub_names_map: sub_names_map_into_repr_c(nrs_map.sub_names_map.clone())?,
         default: std::ptr::null(), // todo: update to return correct format
@@ -597,7 +596,7 @@ pub struct SubNamesMap {
     pub sub_name_cap: usize,
 }
 
-pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> ResultReturn<SubNamesMap> {
+pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> Result<SubNamesMap> {
     let mut vec = Vec::with_capacity(map.len());
 
     for (sub_name, _sub_name_rdf) in map {

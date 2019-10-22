@@ -1,9 +1,10 @@
+use super::errors::Result;
 use super::ffi_structs::{processed_files_into_repr_c, ProcessedFiles};
 use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{
     catch_unwind_cb, from_c_str, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, FFI_RESULT_OK,
 };
-use safe_api::{ResultReturn, Safe};
+use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -23,7 +24,7 @@ pub unsafe extern "C" fn files_container_create(
         files_map: *const c_char,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let location_str = from_c_str(location)?;
         let destination = from_c_str_to_str_option(dest);
@@ -55,7 +56,7 @@ pub unsafe extern "C" fn files_container_get(
         files_map: *const c_char,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = from_c_str(url)?;
         let (version, files_map) = (*app).files_container_get(&url_str)?;
@@ -83,7 +84,7 @@ pub unsafe extern "C" fn files_container_sync(
         files_map: *const c_char,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let location_str = from_c_str(location)?;
         let url_str = from_c_str(url)?;
@@ -125,7 +126,7 @@ pub unsafe extern "C" fn files_container_add(
         files_map: *const c_char,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = from_c_str(url)?;
         let source_str = from_c_str(source_file)?;
@@ -162,7 +163,7 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         files_map: *const c_char,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
         let url_str = from_c_str(url)?;
@@ -190,7 +191,7 @@ pub unsafe extern "C" fn files_put_published_immutable(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, xorurl: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let media_type_str = from_c_str_to_str_option(media_type);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
@@ -213,7 +214,7 @@ pub unsafe extern "C" fn files_get_published_immutable(
         im_data_len: usize,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> ResultReturn<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = from_c_str(url)?;
         let data = (*app).files_get_published_immutable(&url_str)?;
