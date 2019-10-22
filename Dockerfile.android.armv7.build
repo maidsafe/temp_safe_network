@@ -1,6 +1,6 @@
 FROM rust:latest
 
-# These are only referenced in the build-cache script.
+# These are only referenced in the build-cache script. 
 ARG build_type
 ARG build_target
 ARG build_component
