@@ -6,16 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, ResultReturn};
+use super::{Error, Result};
 use futures::Future;
 use log::{debug, error, info};
 use std::fs;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
+
+// Number of milliseconds to allow an idle connection before closing it
+const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
 
 // HTTP/0.9 over QUIC client
 // keylog: Perform NSS-compatible TLS key logging to the file specified in `SSLKEYLOGFILE`
@@ -28,7 +31,7 @@ pub fn quic_send(
     cert_host: Option<&str>,
     cert_ca: Option<PathBuf>,
     rebind: bool,
-) -> ResultReturn<String> {
+) -> Result<String> {
     let url = Url::parse(url_str)
         .map_err(|_| Error::AuthdClientError("Invalid end point address".to_string()))?;
     let remote = url
@@ -85,7 +88,12 @@ pub fn quic_send(
             ))
         })?;
 
-    endpoint.default_client_config(client_config.build());
+    let mut client_config_instance = client_config.build();
+    client_config_instance.transport = Arc::new(quinn::TransportConfig {
+        idle_timeout: CONNECTION_IDLE_TIMEOUT,
+        ..Default::default()
+    });
+    endpoint.default_client_config(client_config_instance);
 
     let (endpoint_driver, endpoint, _) = endpoint.bind("[::]:0").map_err(|err| {
         Error::AuthdClientError(format!("Failed to bind client endpoint: {}", err))

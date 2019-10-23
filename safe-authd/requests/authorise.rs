@@ -68,6 +68,7 @@ pub fn process_req(
                                             own_container: app_auth_req.app_container,
                                         },
                                         tx,
+                                        notified: false,
                                     };
                                     auth_reqs_list.insert(req_id, auth_req);
 

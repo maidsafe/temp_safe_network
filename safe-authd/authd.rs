@@ -6,13 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use log::debug;
-use structopt::{self, StructOpt};
-
-use super::quic_client::quic_send;
+use super::notifs::monitor_pending_auth_reqs;
 use super::requests::process_request;
 use super::shared::*;
-use super::update::update_commander;
 use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
@@ -23,24 +19,19 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, Write};
 use std::net::SocketAddr;
-use std::net::ToSocketAddrs;
-use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
-use url::Url;
-
-// Frequency for checking pending auth requests
-const AUTH_REQS_CHECK_FREQ: u64 = 2000;
 
 const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
 const SAFE_AUTHD_STDERR_FILE: &str = "/tmp/safe-authd.err";
 
-struct PrettyErr<'a>(&'a dyn Fail);
+// Number of milliseconds to allow an idle connection before closing it
+const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
+
+pub struct PrettyErr<'a>(&'a dyn Fail);
 impl<'a> fmt::Display for PrettyErr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, f)?;
@@ -54,7 +45,7 @@ impl<'a> fmt::Display for PrettyErr<'a> {
     }
 }
 
-trait ErrorExt {
+pub trait ErrorExt {
     fn pretty(&self) -> PrettyErr<'_>;
 }
 
@@ -64,97 +55,15 @@ impl ErrorExt for Error {
     }
 }
 
-#[derive(StructOpt, Debug)]
-/// SAFE Authenticator daemon
-#[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
-enum CmdArgs {
-    /// Start the safe-authd daemon
-    #[structopt(name = "start")]
-    Start {
-        /// File to log TLS keys to for debugging
-        #[structopt(long = "keylog")]
-        keylog: bool,
-        /// TLS private key in PEM format
-        #[structopt(parse(from_os_str), short = "k", long = "key", requires = "cert")]
-        key: Option<PathBuf>,
-        /// TLS certificate in PEM format
-        #[structopt(parse(from_os_str), short = "c", long = "cert", requires = "key")]
-        cert: Option<PathBuf>,
-        /// Enable stateless retries
-        #[structopt(long = "stateless-retry")]
-        stateless_retry: bool,
-        /// Address to listen on
-        #[structopt(long = "listen", default_value = "https://localhost:33000")]
-        listen: String,
-    },
-    /// Stop a running safe-authd
-    #[structopt(name = "stop")]
-    Stop {},
-    /// Restart a running safe-authd
-    #[structopt(name = "restart")]
-    Restart {
-        /// Address to listen on
-        #[structopt(long = "listen", default_value = "https://localhost:33000")]
-        listen: String,
-    },
-    /// Update the application to the latest available version
-    #[structopt(name = "update")]
-    Update {},
-}
-
-pub fn run() -> Result<(), String> {
-    // Let's first get all the arguments passed in
-    let opt = CmdArgs::from_args();
-    debug!("Running authd with options: {:?}", opt);
-
+pub fn start_authd(listen: SocketAddr) -> Result<(), Error> {
+    println!("Starting SAFE Authenticator daemon...");
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
     let drain = slog_term::FullFormat::new(decorator)
         .use_original_order()
         .build()
         .fuse();
+    let log = Logger::root(drain, o!());
 
-    match opt {
-        CmdArgs::Update {} => {
-            update_commander().map_err(|err| format!("Error performing update: {}", err))
-        }
-        CmdArgs::Start { listen, .. } => {
-            let url = Url::parse(&listen).map_err(|_| "Invalid end point address".to_string())?;
-            let endpoint = url
-                .to_socket_addrs()
-                .map_err(|_| "Invalid end point address".to_string())?
-                .next()
-                .ok_or_else(|| "The end point is an invalid address".to_string())?;
-            if let Err(e) = start_authd(Logger::root(drain, o!()), endpoint) {
-                Err(format!("{}", e.pretty()))
-            } else {
-                Ok(())
-            }
-        }
-        CmdArgs::Stop {} => {
-            if let Err(e) = stop_authd(Logger::root(drain, o!())) {
-                Err(format!("{}", e.pretty()))
-            } else {
-                Ok(())
-            }
-        }
-        CmdArgs::Restart { listen } => {
-            let url = Url::parse(&listen).map_err(|_| "Invalid end point address".to_string())?;
-            let endpoint = url
-                .to_socket_addrs()
-                .map_err(|_| "Invalid end point address".to_string())?
-                .next()
-                .ok_or_else(|| "The end point is an invalid address".to_string())?;
-            if let Err(e) = restart_authd(Logger::root(drain, o!()), endpoint) {
-                Err(format!("{}", e.pretty()))
-            } else {
-                Ok(())
-            }
-        }
-    }
-}
-
-fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
-    println!("Starting SAFE Authenticator daemon...");
     let server_config = quinn::ServerConfig {
         transport: Arc::new(quinn::TransportConfig {
             stream_window_uni: 0,
@@ -218,7 +127,14 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
 
     let mut endpoint = quinn::Endpoint::builder();
     endpoint.logger(log.clone());
-    endpoint.listen(server_config.build());
+
+    let mut server_config_instance = server_config.build();
+    server_config_instance.transport = Arc::new(quinn::TransportConfig {
+        idle_timeout: CONNECTION_IDLE_TIMEOUT,
+        ..Default::default()
+    });
+
+    endpoint.listen(server_config_instance);
 
     let stdout = File::create(SAFE_AUTHD_STDOUT_FILE)
         .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;
@@ -282,7 +198,7 @@ fn start_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
     Ok(())
 }
 
-fn stop_authd(_log: Logger) -> Result<(), Error> {
+pub fn stop_authd() -> Result<(), Error> {
     println!("Stopping SAFE Authenticator daemon...");
     let mut file = File::open(SAFE_AUTHD_PID_FILE)?;
     let mut pid = String::new();
@@ -299,9 +215,9 @@ fn stop_authd(_log: Logger) -> Result<(), Error> {
     }
 }
 
-fn restart_authd(log: Logger, listen: SocketAddr) -> Result<(), Error> {
-    stop_authd(log.clone())?;
-    start_authd(log, listen)?;
+pub fn restart_authd(listen: SocketAddr) -> Result<(), Error> {
+    stop_authd()?;
+    start_authd(listen)?;
     println!("Success, safe-authd restarted!");
     Ok(())
 }
@@ -394,88 +310,4 @@ fn handle_request(
             .map(move |_| info!(log3, "Request complete"))
             .map_err(move |e| error!(log2, "Request Failed"; "reason" => %e.pretty())),
     )
-}
-
-fn monitor_pending_auth_reqs(
-    auth_reqs_handle: SharedAuthReqsHandle,
-    notif_endpoints_handle: SharedNotifEndpointsHandle,
-) {
-    thread::spawn(move || loop {
-        {
-            let reqs_to_process: Option<AuthReqsList> =
-                lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
-                    if auth_reqs_list.is_empty() {
-                        Ok(None)
-                    } else {
-                        lock_notif_endpoints_list(
-                            notif_endpoints_handle.clone(),
-                            |notif_endpoints_list| {
-                                if notif_endpoints_list.is_empty() {
-                                    Ok(None)
-                                } else {
-                                    let reqs_to_process = auth_reqs_list.clone();
-                                    auth_reqs_list.clear();
-                                    Ok(Some(reqs_to_process))
-                                }
-                            },
-                        )
-                    }
-                })
-                .unwrap_or_else(|_| None);
-
-            // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
-            // and remove them if they don't respond or their response is positive.
-            match reqs_to_process {
-                None => {}
-                Some(mut reqs) => {
-                    let _ = lock_notif_endpoints_list(
-                        notif_endpoints_handle.clone(),
-                        |notif_endpoints_list| {
-                            for (req_id, incoming_auth_req) in reqs.iter_mut() {
-                                let mut is_allowed = false;
-                                for endpoint in notif_endpoints_list.iter() {
-                                    println!("Asking subscriptor: {}", endpoint);
-                                    match quic_send(
-                                        &format!(
-                                            "{}/{}",
-                                            endpoint, incoming_auth_req.auth_req.app_id
-                                        ),
-                                        false,
-                                        None,
-                                        None,
-                                        false,
-                                    ) {
-                                        Ok(allow) => {
-                                            is_allowed = allow.starts_with("true");
-                                            println!("Subscriptor's response: {}", is_allowed);
-                                            break;
-                                        }
-                                        Err(err) => {
-                                            println!(
-                                            "Skipping subscriptor '{}' since it didn't respond: {}",
-                                            endpoint, err
-                                        );
-                                        }
-                                    }
-                                }
-                                println!(
-                                    "Decision for Req ID: {} - App ID: {} ??: {}",
-                                    req_id, incoming_auth_req.auth_req.app_id, is_allowed
-                                );
-                                match incoming_auth_req.tx.try_send(is_allowed) {
-                                    Ok(_) => println!("Auth req decision ready to be sent to application"),
-                                    Err(_) => println!(
-                                        "Auth req decision couldn't be sent, and therefore already denied"
-                                    ),
-                                };
-                            }
-                            Ok(())
-                        },
-                    );
-                }
-            }
-        }
-
-        thread::sleep(Duration::from_millis(AUTH_REQS_CHECK_FREQ));
-    });
 }

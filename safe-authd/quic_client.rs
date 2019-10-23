@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 
-type ResultReturn<T> = Result<T, String>;
+type Result<T> = std::result::Result<T, String>;
 
 // HTTP/0.9 over QUIC client
 // keylog: Perform NSS-compatible TLS key logging to the file specified in `SSLKEYLOGFILE`
@@ -29,7 +29,7 @@ pub fn quic_send(
     cert_host: Option<&str>,
     cert_ca: Option<PathBuf>,
     rebind: bool,
-) -> ResultReturn<String> {
+) -> Result<String> {
     let url = Url::parse(url_str).map_err(|_| "Invalid end point address".to_string())?;
     let remote = url
         .to_socket_addrs()

@@ -76,7 +76,7 @@ pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-pub fn create_random_xorname() -> ResultReturn<XorName> {
+pub fn create_random_xorname() -> Result<XorName> {
     let mut os_rng = OsRng::new().map_err(|err| {
         Error::Unexpected(format!("Failed to generate a random xorname: {}", err))
     })?;
@@ -85,7 +85,7 @@ pub fn create_random_xorname() -> ResultReturn<XorName> {
     Ok(xorname)
 }
 
-pub fn unwrap_or_gen_random(name: Option<XorName>) -> ResultReturn<XorName> {
+pub fn unwrap_or_gen_random(name: Option<XorName>) -> Result<XorName> {
     match name {
         Some(xorname) => Ok(xorname),
         None => create_random_xorname(),

@@ -90,7 +90,6 @@ impl Future for ProcessRequest {
                 } => {
                     match rx.poll() {
                         Ok(Async::Ready(Some(is_allowed))) => {
-                            rx.close();
                             if is_allowed {
                                 match lock_safe_authenticator(
                                     safe_auth_handle.clone(),
@@ -116,11 +115,10 @@ impl Future for ProcessRequest {
                                 return Ok(Async::Ready(err_response(msg)));
                             }
                         }
-                        Ok(Async::NotReady) => {
+                        Ok(Async::Ready(None)) | Ok(Async::NotReady) => {
                             return Ok(Async::NotReady);
                         }
-                        Ok(Async::Ready(None)) | Err(_) => {
-                            rx.close();
+                        Err(_) => {
                             // We didn't get a response in a timely manner, we cannot allow the list
                             // to grow infinitelly, so let's remove the request from it
                             let _ =
@@ -128,7 +126,7 @@ impl Future for ProcessRequest {
                                     auth_reqs_list.remove(&req_id);
                                     Ok(())
                                 });
-                            let msg = "Failed to get authorision response";
+                            let msg = "Failed to get authorisation response";
                             println!("{}", msg);
                             return Ok(Async::Ready(err_response(msg.to_string())));
                         }

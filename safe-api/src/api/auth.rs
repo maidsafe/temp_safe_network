@@ -11,8 +11,6 @@ use super::helpers::decode_ipc_msg;
 use super::quic_client::quic_send;
 use super::{Error, Result, Safe, SafeApp};
 use log::{debug, info};
-#[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
-use reqwest::get as httpget;
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
 use std::collections::HashMap;
@@ -90,7 +88,7 @@ impl Safe {
 
 // Sends an authorisation request string to the SAFE Authenticator daemon endpoint.
 // It returns the credentials necessary to connect to the network, encoded in a single string.
-fn send_app_auth_req(auth_req_str: &str, port: Option<u16>) -> ResultReturn<String> {
+fn send_app_auth_req(auth_req_str: &str, port: Option<u16>) -> Result<String> {
     let port_number = port.unwrap_or(SAFE_AUTHD_ENDPOINT_PORT);
     let authd_service_url = format!(
         "{}:{}/{}{}",

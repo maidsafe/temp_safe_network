@@ -21,7 +21,7 @@ log = "0.4.6"
 safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
 safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
 safe-nd = "~0.4.0"
-safe_authenticator = "~0.10.0"
+safe_authenticator = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
 maidsafe_utilities = "~0.18.0"
 env_logger = "0.6.0"
 rand = "0.6.5"
@@ -41,9 +41,16 @@ validator = "0.8.0"
 validator_derive = "0.8.0"
 mime_guess = "2.0.1"
 lazy_static = "1.2.0"
-
-[target.'cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))'.dependencies]
-reqwest = "0.9.5"
+quinn = "~0.3.0"
+tokio = "0.1.6"
+tokio-current-thread = "0.1"
+tokio-reactor = "0.1.1"
+directories = "1.0.2"
+urlencoding = "1.0.0"
+slog-term = "2"
+slog = "2.1"
+failure = "0.1"
+rcgen = "0.2"
 
 [features]
 mock-network = ["safe_app/mock-network", "safe_authenticator/mock-network"]

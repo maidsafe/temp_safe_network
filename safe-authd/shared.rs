@@ -15,6 +15,7 @@ use tokio::sync::mpsc;
 pub struct IncomingAuthReq {
     pub auth_req: AuthReq,
     pub tx: mpsc::Sender<bool>,
+    pub notified: bool,
 }
 
 // List of authorisation requests indexed by their request id

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::sk_from_hex;
-use super::{Error, ResultReturn};
+use super::{Error, Result};
 use futures::{stream, Future, Stream};
 use log::{debug, info};
 use maidsafe_utilities::serialisation::deserialise;
@@ -106,7 +106,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn log_in(&mut self, secret: &str, password: &str) -> ResultReturn<()> {
+    pub fn log_in(&mut self, secret: &str, password: &str) -> Result<()> {
         debug!("Attempting to log in...");
         match Authenticator::login(secret, password, || info!("Disconnected from network")) {
             Ok(auth) => {
@@ -118,7 +118,7 @@ impl SafeAuthenticator {
         }
     }
 
-    pub fn log_out(&mut self) -> ResultReturn<()> {
+    pub fn log_out(&mut self) -> Result<()> {
         debug!("Dropping logged in session...");
         self.safe_authenticator = None;
         Ok(())
@@ -173,7 +173,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn create_acc(&mut self, sk: &str, secret: &str, password: &str) -> ResultReturn<()> {
+    pub fn create_acc(&mut self, sk: &str, secret: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a SAFE account...");
         let secret_key = sk_from_hex(sk)?;
 
@@ -193,7 +193,7 @@ impl SafeAuthenticator {
         }
     }
 
-    pub fn decode_req(&self, req: &str) -> ResultReturn<(SafeAuthReqId, SafeAuthReq)> {
+    pub fn decode_req(&self, req: &str) -> Result<(SafeAuthReqId, SafeAuthReq)> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
 
         let req_msg = match decode_msg(req) {
@@ -273,7 +273,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn authorise_app(&self, req: &str) -> ResultReturn<String> {
+    pub fn authorise_app(&self, req: &str) -> Result<String> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
 
         let req_msg = match decode_msg(req) {
@@ -369,7 +369,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false)
     /// }
     ///```
-    pub fn authed_apps(&self) -> ResultReturn<AuthedAppsList> {
+    pub fn authed_apps(&self) -> Result<AuthedAppsList> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
 
         debug!("Attempting to fetch list of authorised apps...");
@@ -412,9 +412,10 @@ impl SafeAuthenticator {
                                 name: app.info.name.clone(),
                                 vendor: app.info.vendor.clone(),
                                 app_permissions: AppPermissions {
-                                    transfer_coins: true, //TODO: retrieve the app permissions
-                                                          // perform_mutations: true,
-                                                          // get_balance: true,
+                                    //TODO: retrieve the app permissions
+                                    transfer_coins: true,
+                                    perform_mutations: true,
+                                    get_balance: true,
                                 },
                                 containers,
                                 own_container: false, //TODO: retrieve the own container flag
@@ -494,7 +495,7 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn revoke_app(&self, app_id: &str) -> ResultReturn<()> {
+    pub fn revoke_app(&self, app_id: &str) -> Result<()> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
         let id = app_id.to_string();
         auth_run_helper(safe_authenticator, |client| {
@@ -508,9 +509,7 @@ impl SafeAuthenticator {
 }
 
 // Helper to unwrap the Authenticator if it's logged in
-fn get_safe_authenticator(
-    safe_authenticator: &Option<Authenticator>,
-) -> ResultReturn<&Authenticator> {
+fn get_safe_authenticator(safe_authenticator: &Option<Authenticator>) -> Result<&Authenticator> {
     safe_authenticator.as_ref().ok_or_else(|| {
         Error::AuthError("You need to log in to a SAFE Network account first".to_string())
     })
@@ -518,7 +517,7 @@ fn get_safe_authenticator(
 
 // Helper function to generate an app authorisation response
 #[allow(dead_code)]
-fn gen_auth_denied_response(req_id: SafeAuthReqId) -> ResultReturn<String> {
+fn gen_auth_denied_response(req_id: SafeAuthReqId) -> Result<String> {
     debug!("Encoding auth denied response...");
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
@@ -536,7 +535,7 @@ fn gen_auth_response(
     authenticator: &Authenticator,
     req_id: SafeAuthReqId,
     auth_req: AuthReq,
-) -> ResultReturn<String> {
+) -> Result<String> {
     let auth_granted = auth_run_helper(authenticator, move |client| authenticate(client, auth_req))
         .map_err(|err| {
             Error::AuthenticatorError(format!(
@@ -562,7 +561,7 @@ fn gen_cont_auth_response(
     authenticator: &Authenticator,
     req_id: SafeAuthReqId,
     cont_req: ContainersReq,
-) -> ResultReturn<String> {
+) -> Result<String> {
     let permissions = cont_req.containers.clone();
     let app_id = cont_req.app.id.clone();
 
@@ -621,7 +620,7 @@ fn gen_cont_auth_response(
 }
 
 // Helper function to generate an unregistered authorisation response
-fn gen_unreg_auth_response(req_id: SafeAuthReqId) -> ResultReturn<String> {
+fn gen_unreg_auth_response(req_id: SafeAuthReqId) -> Result<String> {
     let bootstrap_cfg = safe_core_client::bootstrap_config().map_err(|err| {
         Error::AuthenticatorError(format!(
             "Failed to obtain bootstrap info for response: {}",
@@ -645,7 +644,7 @@ fn gen_shared_md_auth_response(
     authenticator: &Authenticator,
     req_id: SafeAuthReqId,
     share_mdata_req: ShareMDataReq,
-) -> ResultReturn<String> {
+) -> Result<String> {
     auth_run_helper(authenticator, move |client| {
         let client_cloned0 = client.clone();
         let client_cloned1 = client.clone();

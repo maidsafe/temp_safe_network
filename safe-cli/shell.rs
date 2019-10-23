@@ -218,7 +218,7 @@ pub fn shell_run() -> Result<(), String> {
     Ok(())
 }
 
-fn prompt_to_allow_auth(app_id: &str) -> bool {
+fn prompt_to_allow_auth(app_id: String, req_id: String) -> Option<bool> {
     /*    match req {
             IpcReq::Auth(app_auth_req) => {
                 println!("The following application authorisation request was received:");
@@ -306,6 +306,7 @@ fn prompt_to_allow_auth(app_id: &str) -> bool {
     */
     println!("The following application authorisation request was received:");
     println!("App ID: {}", app_id);
+    println!("Request ID: {}", req_id);
 
     let mut prompt = String::new();
     print!("Allow authorisation? [y/N]: ");
@@ -322,9 +323,9 @@ fn prompt_to_allow_auth(app_id: &str) -> bool {
 
     if prompt.to_lowercase() == "y" {
         println!("Authorisation will be allowed...");
-        true
+        Some(true)
     } else {
         println!("Authorisation will be denied...");
-        false
+        Some(false)
     }
 }

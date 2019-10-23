@@ -13,14 +13,11 @@ use slog::{Drain, Logger};
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
-
-// Type of the function/callback invoked for querying if an authorisation request shall be allowed.
-// All the relevant information about the authorisation request is passed as args to the callback.
-pub type AuthAllowPrompt = dyn Fn(&str) -> bool + std::marker::Send + std::marker::Sync;
 
 struct PrettyErr<'a>(&'a dyn Fail);
 impl<'a> fmt::Display for PrettyErr<'a> {
@@ -46,7 +43,12 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn quic_listen(url_str: &str, allow_cb: &'static AuthAllowPrompt) -> Result<(), String> {
+pub type NotifChannelDataType = (String, String);
+
+pub fn quic_listen(
+    url_str: &str,
+    notif_channel: mpsc::Sender<NotifChannelDataType>,
+) -> Result<(), String> {
     debug!("Launching new QUIC endpoint on '{}'", url_str);
 
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
@@ -62,7 +64,7 @@ pub fn quic_listen(url_str: &str, allow_cb: &'static AuthAllowPrompt) -> Result<
         .next()
         .ok_or_else(|| "The end point is an invalid address".to_string())?;
 
-    if let Err(e) = start_quic_endpoint(Logger::root(drain, o!()), endpoint, allow_cb) {
+    if let Err(e) = start_quic_endpoint(Logger::root(drain, o!()), endpoint, notif_channel) {
         Err(format!("{}", e.pretty()))
     } else {
         Ok(())
@@ -72,7 +74,7 @@ pub fn quic_listen(url_str: &str, allow_cb: &'static AuthAllowPrompt) -> Result<
 fn start_quic_endpoint(
     log: Logger,
     listen: SocketAddr,
-    allow_cb: &'static AuthAllowPrompt,
+    notif_channel: mpsc::Sender<NotifChannelDataType>,
 ) -> Result<(), Error> {
     let server_config = quinn::ServerConfig {
         transport: Arc::new(quinn::TransportConfig {
@@ -147,7 +149,7 @@ fn start_quic_endpoint(
 
     let mut runtime = Runtime::new()?;
     runtime.spawn(incoming.for_each(move |conn| {
-        handle_connection(&log, conn, allow_cb);
+        handle_connection(&log, conn, notif_channel.clone());
         Ok(())
     }));
     runtime.block_on(endpoint_driver)?;
@@ -162,7 +164,7 @@ fn handle_connection(
         quinn::Connection,
         quinn::IncomingStreams,
     ),
-    allow_cb: &'static AuthAllowPrompt,
+    notif_channel: mpsc::Sender<NotifChannelDataType>,
 ) {
     let (conn_driver, _conn, incoming_streams) = conn;
     let log = log.clone();
@@ -180,13 +182,17 @@ fn handle_connection(
         incoming_streams
             .map_err(move |_e| ()) // info!(log2, "Connection terminated"; "reason" => %e))
             .for_each(move |stream| {
-                handle_request(&log, stream, allow_cb);
+                handle_request(&log, stream, notif_channel.clone());
                 Ok(())
             }),
     );
 }
 
-fn handle_request(_log: &Logger, stream: quinn::NewStream, allow_cb: &'static AuthAllowPrompt) {
+fn handle_request(
+    _log: &Logger,
+    stream: quinn::NewStream,
+    notif_channel: mpsc::Sender<NotifChannelDataType>,
+) {
     let (send, recv) = match stream {
         quinn::NewStream::Bi(send, recv) => (send, recv),
         quinn::NewStream::Uni(_) => unreachable!("Disabled by endpoint configuration"),
@@ -206,7 +212,7 @@ fn handle_request(_log: &Logger, stream: quinn::NewStream, allow_cb: &'static Au
                 }
                 // info!(log, "Got request");
                 // Execute the request
-                let resp = process_get(&req, allow_cb).unwrap_or_else(move |e| {
+                let resp = process_get(&req, notif_channel).unwrap_or_else(move |e| {
                     // error!(log, "Failed to process request"; "reason" => %e.pretty());
                     // TODO: implement JSON-RPC rather.
                     // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
@@ -228,7 +234,10 @@ fn handle_request(_log: &Logger, stream: quinn::NewStream, allow_cb: &'static Au
     )
 }
 
-fn process_get(x: &[u8], allow_cb: &'static AuthAllowPrompt) -> Result<Box<[u8]>, Error> {
+fn process_get(
+    x: &[u8],
+    notif_channel: mpsc::Sender<NotifChannelDataType>,
+) -> Result<Box<[u8]>, Error> {
     if x.len() < 4 || &x[0..4] != b"GET " {
         bail!("Missing GET");
     }
@@ -240,18 +249,23 @@ fn process_get(x: &[u8], allow_cb: &'static AuthAllowPrompt) -> Result<Box<[u8]>
     let path = str::from_utf8(&x[..end]).context("Path is malformed UTF-8")?;
     let req_args: Vec<&str> = path.split('/').collect();
 
-    if req_args.len() != 2 {
+    if req_args.len() != 3 {
         bail!(
             "Incorrect number of arguments for authorisation request notification, missing app ID"
         )
     } else {
         let app_id = req_args[1];
-        if allow_cb(app_id) {
-            let msg = format!("true - Allow auth req from app ID: {}", app_id);
-            Ok(msg.as_bytes().into())
-        } else {
-            let msg = format!("false - Deny auth req from app ID: {}", app_id);
-            Ok(msg.as_bytes().into())
-        }
+        let req_id = req_args[2];
+
+        // New notification for auth req to be sent to user
+        let msg = match notif_channel.send((app_id.to_string(), req_id.to_string())) {
+            Ok(_) => format!(
+                "Ok - auth req from app ID: {} ready to be notified to user",
+                app_id
+            ),
+            Err(err) => format!("Auth req notification couldn't be sent to user: {}", err),
+        };
+
+        Ok(msg.as_bytes().into())
     }
 }
