@@ -4,7 +4,7 @@ use super::ffi_structs::{
     WalletSpendableBalance, WalletSpendableBalances,
 };
 use super::helpers::from_c_str_to_str_option;
-use ffi_utils::{catch_unwind_cb, from_c_str, FfiResult, OpaqueCtx, FFI_RESULT_OK};
+use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
@@ -36,8 +36,8 @@ pub unsafe extern "C" fn wallet_insert(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let key_url_str = from_c_str(key_url)?;
-        let secret_key_str = from_c_str(secret_key)?;
+        let key_url_str = String::clone_from_repr_c(key_url)?;
+        let secret_key_str = String::clone_from_repr_c(secret_key)?;
         let name_str = from_c_str_to_str_option(name);
         let wallet_name =
             (*app).wallet_insert(&key_url_str, name_str, set_default, &secret_key_str)?;
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn wallet_balance(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let wallet_url = from_c_str(url)?;
+        let wallet_url = String::clone_from_repr_c(url)?;
         let balance = (*app).wallet_balance(&wallet_url)?;
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn wallet_get_default_balance(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let wallet_url = from_c_str(url)?;
+        let wallet_url = String::clone_from_repr_c(url)?;
         let (spendable, version) = (*app).wallet_get_default_balance(&wallet_url)?;
         let wallet_spendable = wallet_spendable_balance_into_repr_c(&spendable)?;
         o_cb(user_data.0, FFI_RESULT_OK, &wallet_spendable, version);
@@ -99,8 +99,8 @@ pub unsafe extern "C" fn wallet_transfer(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let from_key = from_c_str_to_str_option(from);
-        let to_key = from_c_str(to)?;
-        let amount_tranfer = from_c_str(amount)?;
+        let to_key = String::clone_from_repr_c(to)?;
+        let amount_tranfer = String::clone_from_repr_c(amount)?;
         let tx_id = (*app).wallet_transfer(&amount_tranfer, from_key, &to_key, Some(id))?;
         o_cb(user_data.0, FFI_RESULT_OK, tx_id);
         Ok(())
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn wallet_get(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let wallet_url = from_c_str(url)?;
+        let wallet_url = String::clone_from_repr_c(url)?;
         let spendables = (*app).wallet_get(&wallet_url)?;
         let wallet_spendable = wallet_spendable_balances_into_repr_c(&spendables)?;
         o_cb(user_data.0, FFI_RESULT_OK, &wallet_spendable);

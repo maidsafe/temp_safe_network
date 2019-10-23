@@ -38,7 +38,6 @@ validator = "0.8.0"
 validator_derive = "0.8.0"
 mime_guess = "2.0.1"
 lazy_static = "1.2.0"
-ffi_utils = "~0.12.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))'.dependencies]
 reqwest = "0.9.5"

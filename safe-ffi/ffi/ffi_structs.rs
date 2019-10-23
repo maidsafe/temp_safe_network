@@ -1,6 +1,6 @@
 use super::errors::Result;
 use super::helpers::from_c_str_to_str_option;
-use ffi_utils::{from_c_str, vec_into_raw_parts};
+use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts, ReprC};
 use safe_api::files::{
     FileItem as NativeFileItem, FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles,
 };
@@ -117,7 +117,6 @@ pub struct PublishedImmutableData {
     pub xorname: XorNameArray,
     pub data: *const u8,
     pub data_len: usize,
-    pub data_cap: usize,
     pub resolved_from: NrsMapContainerInfo,
     pub media_type: *const c_char,
 }
@@ -133,7 +132,7 @@ impl Drop for PublishedImmutableData {
                 let _ = CString::from_raw(self.media_type as *mut _);
             }
 
-            let _ = Vec::from_raw_parts(self.data as *mut u8, self.data_len, self.data_cap);
+            let _ = vec_from_raw_parts(self.data as *mut u8, self.data_len);
         }
     }
 }
@@ -188,7 +187,8 @@ pub unsafe fn xorurl_encoder_into_repr_c(
 pub unsafe fn native_xorurl_encoder_from_repr_c(
     encoder: &XorUrlEncoder,
 ) -> Result<NativeXorUrlEncoder> {
-    let sub_names: Vec<String> = serde_json::from_str(&from_c_str(encoder.sub_names)?)?;
+    let sub_names: Vec<String> =
+        serde_json::from_str(&String::clone_from_repr_c(encoder.sub_names)?)?;
     Ok(NativeXorUrlEncoder::new(
         XorName(encoder.xorname),
         encoder.type_tag,
@@ -251,16 +251,14 @@ impl Drop for WalletSpendableBalanceInfo {
 pub struct WalletSpendableBalances {
     pub wallet_balances: *const WalletSpendableBalanceInfo,
     pub wallet_balances_len: usize,
-    pub wallet_balances_cap: usize,
 }
 
 impl Drop for WalletSpendableBalances {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(
+            let _ = vec_from_raw_parts(
                 self.wallet_balances as *mut WalletSpendableBalanceInfo,
                 self.wallet_balances_len,
-                self.wallet_balances_cap,
             );
         }
     }
@@ -279,11 +277,10 @@ pub fn wallet_spendable_balances_into_repr_c(
         })
     }
 
-    let (balance, balance_len, balance_cap) = vec_into_raw_parts(vec);
+    let (balance, balance_len) = vec_into_raw_parts(vec);
     Ok(WalletSpendableBalances {
         wallet_balances: balance,
         wallet_balances_len: balance_len,
-        wallet_balances_cap: balance_cap,
     })
 }
 
@@ -316,17 +313,12 @@ impl Drop for ProcessedFile {
 pub struct ProcessedFiles {
     pub files: *const ProcessedFile,
     pub files_len: usize,
-    pub files_cap: usize,
 }
 
 impl Drop for ProcessedFiles {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(
-                self.files as *mut ProcessedFile,
-                self.files_len,
-                self.files_cap,
-            );
+            let _ = vec_from_raw_parts(self.files as *mut ProcessedFile, self.files_len);
         }
     }
 }
@@ -342,12 +334,8 @@ pub unsafe fn processed_files_into_repr_c(map: &NativeProcessedFiles) -> Result<
         })
     }
 
-    let (files, files_len, files_cap) = vec_into_raw_parts(vec);
-    Ok(ProcessedFiles {
-        files,
-        files_len,
-        files_cap,
-    })
+    let (files, files_len) = vec_into_raw_parts(vec);
+    Ok(ProcessedFiles { files, files_len })
 }
 
 #[repr(C)]
@@ -375,7 +363,6 @@ pub struct FileInfo {
     pub file_name: *const c_char,
     pub file_items: *const FileItem,
     pub file_items_len: usize,
-    pub file_items_cap: usize,
 }
 
 impl Drop for FileInfo {
@@ -385,11 +372,7 @@ impl Drop for FileInfo {
                 let _ = CString::from_raw(self.file_name as *mut _);
             }
 
-            let _ = Vec::from_raw_parts(
-                self.file_items as *mut FileItem,
-                self.file_items_len,
-                self.file_items_cap,
-            );
+            let _ = vec_from_raw_parts(self.file_items as *mut FileItem, self.file_items_len);
         }
     }
 }
@@ -407,12 +390,11 @@ pub unsafe fn file_info_into_repr_c(
         })
     }
 
-    let (file_items, file_items_len, file_items_cap) = vec_into_raw_parts(vec);
+    let (file_items, file_items_len) = vec_into_raw_parts(vec);
     Ok(FileInfo {
         file_name: CString::new(file_name.to_string())?.into_raw(),
         file_items,
         file_items_len,
-        file_items_cap,
     })
 }
 
@@ -420,14 +402,12 @@ pub unsafe fn file_info_into_repr_c(
 pub struct FilesMap {
     pub files: *const FileInfo,
     pub files_len: usize,
-    pub files_cap: usize,
 }
 
 impl Drop for FilesMap {
     fn drop(&mut self) {
         unsafe {
-            let _ =
-                Vec::from_raw_parts(self.files as *mut FileInfo, self.files_len, self.files_cap);
+            let _ = vec_from_raw_parts(self.files as *mut FileInfo, self.files_len);
         }
     }
 }
@@ -439,12 +419,8 @@ pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> Result<FilesM
         vec.push(file_info_into_repr_c(file_name, file_items)?);
     }
 
-    let (files, files_len, files_cap) = vec_into_raw_parts(vec);
-    Ok(FilesMap {
-        files,
-        files_len,
-        files_cap,
-    })
+    let (files, files_len) = vec_into_raw_parts(vec);
+    Ok(FilesMap { files, files_len })
 }
 
 #[repr(C)]
@@ -476,16 +452,14 @@ impl Drop for ProcessedEntry {
 pub struct ProcessedEntries {
     pub processed_entries: *const ProcessedEntry,
     pub processed_entries_len: usize,
-    pub processed_entries_cap: usize,
 }
 
 impl Drop for ProcessedEntries {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(
+            let _ = vec_from_raw_parts(
                 self.processed_entries as *mut ProcessedEntry,
                 self.processed_entries_len,
-                self.processed_entries_cap,
             );
         }
     }
@@ -504,11 +478,10 @@ pub unsafe fn processed_entries_into_repr_c(
         })
     }
 
-    let (processed_entries, processed_entries_len, processed_entries_cap) = vec_into_raw_parts(vec);
+    let (processed_entries, processed_entries_len) = vec_into_raw_parts(vec);
     Ok(ProcessedEntries {
         processed_entries,
         processed_entries_len,
-        processed_entries_cap,
     })
 }
 
@@ -593,7 +566,6 @@ pub struct SubNamesMapEntry {
 pub struct SubNamesMap {
     pub sub_names: *const SubNamesMapEntry,
     pub sub_name_len: usize,
-    pub sub_name_cap: usize,
 }
 
 pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> Result<SubNamesMap> {
@@ -606,22 +578,17 @@ pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> Result<SubNamesMap> 
         })
     }
 
-    let (sub_names, sub_name_len, sub_name_cap) = vec_into_raw_parts(vec);
+    let (sub_names, sub_name_len) = vec_into_raw_parts(vec);
     Ok(SubNamesMap {
         sub_names,
         sub_name_len,
-        sub_name_cap,
     })
 }
 
 impl Drop for SubNamesMap {
     fn drop(&mut self) {
         unsafe {
-            let _ = Vec::from_raw_parts(
-                self.sub_names as *mut SubNamesMapEntry,
-                self.sub_name_len,
-                self.sub_name_cap,
-            );
+            let _ = vec_from_raw_parts(self.sub_names as *mut SubNamesMapEntry, self.sub_name_len);
         }
     }
 }
