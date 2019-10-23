@@ -10,7 +10,7 @@ use super::helpers::{
     parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, xorname_from_pk, KeyPair,
 };
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
+use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;
@@ -29,7 +29,7 @@ pub struct BlsKeyPair {
 }
 
 #[allow(dead_code)]
-pub fn validate_key_pair(key_pair: &BlsKeyPair) -> ResultReturn<()> {
+pub fn validate_key_pair(key_pair: &BlsKeyPair) -> Result<()> {
     let validation = key_pair.validate();
 
     if ValidationErrors::has_error(&validation, "sk") {
@@ -61,7 +61,7 @@ pub fn validate_key_pair(key_pair: &BlsKeyPair) -> ResultReturn<()> {
 #[allow(dead_code)]
 impl Safe {
     // Generate a key pair without creating and/or storing a SafeKey on the network
-    pub fn keypair(&self) -> ResultReturn<BlsKeyPair> {
+    pub fn keypair(&self) -> Result<BlsKeyPair> {
         let key_pair = KeyPair::random();
         let (pk, sk) = key_pair.to_hex_key_pair()?;
         Ok(BlsKeyPair { pk, sk })
@@ -73,7 +73,7 @@ impl Safe {
         from: Option<&str>,
         preload_amount: Option<&str>,
         pk: Option<&str>,
-    ) -> ResultReturn<(XorUrl, Option<BlsKeyPair>)> {
+    ) -> Result<(XorUrl, Option<BlsKeyPair>)> {
         let from_sk = match from {
             Some(sk) => match sk_from_hex(&sk) {
                 Ok(sk) => Some(sk),
@@ -131,7 +131,7 @@ impl Safe {
     pub fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: &str,
-    ) -> ResultReturn<(XorUrl, Option<BlsKeyPair>)> {
+    ) -> Result<(XorUrl, Option<BlsKeyPair>)> {
         let amount = parse_coins_amount(preload_amount)?;
         let key_pair = KeyPair::random();
         let xorname = self
@@ -154,7 +154,7 @@ impl Safe {
     }
 
     // Check SafeKey's balance from the network from a given SecretKey string
-    pub fn keys_balance_from_sk(&self, sk: &str) -> ResultReturn<String> {
+    pub fn keys_balance_from_sk(&self, sk: &str) -> Result<String> {
         let secret_key = sk_from_hex(sk)?;
         let coins = self.safe_app.get_balance_from_sk(secret_key).map_err(|_| {
             Error::ContentNotFound("No SafeKey found at specified location".to_string())
@@ -165,13 +165,13 @@ impl Safe {
     // Check SafeKey's balance from the network from a given XOR/NRS-URL and secret key string.
     // The difference between this and 'keys_balance_from_sk' function is that this will additionally
     // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
-    pub fn keys_balance_from_url(&self, url: &str, sk: &str) -> ResultReturn<String> {
+    pub fn keys_balance_from_url(&self, url: &str, sk: &str) -> Result<String> {
         self.validate_sk_for_url(sk, url)?;
         self.keys_balance_from_sk(sk)
     }
 
     // Check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
-    pub fn validate_sk_for_url(&self, sk: &str, url: &str) -> ResultReturn<String> {
+    pub fn validate_sk_for_url(&self, sk: &str, url: &str) -> Result<String> {
         let secret_key: SecretKey = sk_from_hex(sk)
             .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
@@ -214,7 +214,7 @@ impl Safe {
         from_sk: Option<&str>,
         to_url: &str,
         tx_id: Option<u64>,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         // Parse and validate the amount is a valid
         let amount_coins = parse_coins_amount(amount)?;
 

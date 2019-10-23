@@ -8,7 +8,7 @@
 
 use super::helpers::{create_random_xorname, xorname_from_pk, xorname_to_hex};
 use super::safe_net::AppendOnlyDataRawData;
-use super::{Error, ResultReturn, SafeApp};
+use super::{Error, Result, SafeApp};
 use futures::future::Future;
 use log::{debug, info, warn};
 use rand::rngs::OsRng;
@@ -42,7 +42,7 @@ pub struct SafeAppScl {
 
 impl SafeAppScl {
     // Private helper to obtain the App instance
-    fn get_safe_app(&self) -> ResultReturn<&App> {
+    fn get_safe_app(&self) -> Result<&App> {
         match &self.safe_conn {
             Some(app) => Ok(app),
             None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
@@ -55,7 +55,7 @@ impl SafeAppScl {
         tag: u64,
         entry_actions: MDataSeqEntryActions,
         error_msg: &str,
-    ) -> ResultReturn<()> {
+    ) -> Result<()> {
         let safe_app = self.get_safe_app()?;
         let message = error_msg.to_string();
         run(safe_app, move |client, _app_context| {
@@ -81,7 +81,7 @@ impl SafeApp for SafeAppScl {
 
     #[allow(dead_code)]
     #[cfg(feature = "fake-auth")]
-    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
+    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
         warn!("Using fake authorisation for testing...");
         self.safe_conn = Some(create_app());
         Ok(())
@@ -89,7 +89,7 @@ impl SafeApp for SafeAppScl {
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     #[cfg(not(feature = "fake-auth"))]
-    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()> {
+    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
         let disconnect_cb = || {
@@ -117,7 +117,7 @@ impl SafeApp for SafeAppScl {
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
         amount: Coins,
-    ) -> ResultReturn<XorName> {
+    ) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client
@@ -141,7 +141,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&owner_sk, amount)
@@ -150,7 +150,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins> {
+    fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
         let safe_app: &App = self.get_safe_app()?;
         let coins = run(safe_app, move |client, _app_context| {
             client.get_balance(Some(&sk)).map_err(SafeAppError)
@@ -166,7 +166,7 @@ impl SafeApp for SafeAppScl {
         to_xorname: XorName,
         tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<Transaction> {
+    ) -> Result<Transaction> {
         let safe_app: &App = self.get_safe_app()?;
         let tx = run(safe_app, move |client, _app_context| {
             client
@@ -193,17 +193,17 @@ impl SafeApp for SafeAppScl {
         to_pk: PublicKey,
         tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<Transaction> {
+    ) -> Result<Transaction> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
 
     // TODO: Replace with SCL calling code
-    fn get_transaction(&self, _tx_id: u64, _pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
+    fn get_transaction(&self, _tx_id: u64, _pk: PublicKey, _sk: SecretKey) -> Result<String> {
         Ok("Success(0)".to_string())
     }
 
-    fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
+    fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
 
         let the_idata = PubImmutableData::new(data.to_vec());
@@ -218,7 +218,7 @@ impl SafeApp for SafeAppScl {
         Ok(*return_idata.name())
     }
 
-    fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
+    fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let safe_app: &App = self.get_safe_app()?;
@@ -240,7 +240,7 @@ impl SafeApp for SafeAppScl {
         name: Option<XorName>,
         tag: u64,
         _permissions: Option<String>,
-    ) -> ResultReturn<XorName> {
+    ) -> Result<XorName> {
         debug!(
             "Putting appendable data w/ type: {:?}, xorname: {:?}",
             tag, name
@@ -314,7 +314,7 @@ impl SafeApp for SafeAppScl {
         new_version: u64,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             let append_only_data_address = ADataAddress::PubSeq { name, tag };
@@ -345,7 +345,7 @@ impl SafeApp for SafeAppScl {
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
+    ) -> Result<(u64, AppendOnlyDataRawData)> {
         debug!("Getting latest seq_append_only_data for: {:?}", &name);
 
         let safe_app: &App = self.get_safe_app()?;
@@ -376,7 +376,7 @@ impl SafeApp for SafeAppScl {
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
         let safe_app: &App = self.get_safe_app()?;
@@ -401,7 +401,7 @@ impl SafeApp for SafeAppScl {
         name: XorName,
         tag: u64,
         version: u64,
-    ) -> ResultReturn<AppendOnlyDataRawData> {
+    ) -> Result<AppendOnlyDataRawData> {
         debug!(
             "Getting seq appendable data, version: {:?}, from: {:?}",
             version, name
@@ -441,7 +441,7 @@ impl SafeApp for SafeAppScl {
         tag: u64,
         // _data: Option<String>,
         _permissions: Option<String>,
-    ) -> ResultReturn<XorName> {
+    ) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
         let owner_key_option = get_owner_pk(safe_app)?;
         let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
@@ -493,7 +493,7 @@ impl SafeApp for SafeAppScl {
         .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
     }
 
-    fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
+    fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client.get_seq_mdata(name, tag).map_err(SafeAppError)
@@ -507,7 +507,7 @@ impl SafeApp for SafeAppScl {
         tag: u64,
         key: &[u8],
         value: &[u8],
-    ) -> ResultReturn<()> {
+    ) -> Result<()> {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
@@ -518,7 +518,7 @@ impl SafeApp for SafeAppScl {
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> ResultReturn<MDataSeqValue> {
+    ) -> Result<MDataSeqValue> {
         let safe_app: &App = self.get_safe_app()?;
         let key_vec = key.to_vec();
         run(safe_app, move |client, _app_context| {
@@ -550,7 +550,7 @@ impl SafeApp for SafeAppScl {
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>> {
+    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client
@@ -573,7 +573,7 @@ impl SafeApp for SafeAppScl {
         key: &[u8],
         value: &[u8],
         version: u64,
-    ) -> ResultReturn<()> {
+    ) -> Result<()> {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
@@ -582,13 +582,13 @@ impl SafeApp for SafeAppScl {
 
 // Helpers
 
-fn get_owner_pk(safe_app: &App) -> ResultReturn<SafeNdPublicKey> {
+fn get_owner_pk(safe_app: &App) -> Result<SafeNdPublicKey> {
     run(safe_app, move |client, _app_context| Ok(client.owner_key())).map_err(|err| {
         Error::Unexpected(format!("Failed to retrieve account's public key: {}", err))
     })
 }
 
-fn get_public_bls_key(safe_app: &App) -> ResultReturn<PublicKey> {
+fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
     run(safe_app, move |client, _app_context| {
         Ok(client.public_bls_key())
     })

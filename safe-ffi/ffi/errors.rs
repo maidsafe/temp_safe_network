@@ -13,7 +13,7 @@ use std::fmt;
 
 pub type Result<T> = std::result::Result<T, FfiError>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FfiError(Error);
 
 impl FfiError {

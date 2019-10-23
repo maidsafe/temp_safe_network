@@ -5,7 +5,7 @@ use super::ffi_structs::{
 };
 use ffi_utils::{catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC};
 use safe_api::fetch::SafeData;
-use safe_api::{ResultReturn, Safe};
+use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
@@ -62,7 +62,7 @@ pub unsafe extern "C" fn inspect(
 }
 
 unsafe fn invoke_callback(
-    content: ResultReturn<SafeData>,
+    content: safe_api::Result<SafeData>,
     user_data: *mut c_void,
     o_published: extern "C" fn(user_data: *mut c_void, *const PublishedImmutableData),
     o_wallet: extern "C" fn(user_data: *mut c_void, *const Wallet),

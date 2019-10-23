@@ -11,7 +11,7 @@ use super::helpers::get_subnames_host_path_and_version;
 use super::nrs_map::NrsMap;
 pub use super::wallet::WalletSpendableBalances;
 pub use super::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder};
-use super::{Error, ResultReturn, Safe, XorName};
+use super::{Error, Result, Safe, XorName};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
@@ -90,7 +90,7 @@ impl Safe {
     ///
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
-    pub fn fetch(&self, url: &str) -> ResultReturn<SafeData> {
+    pub fn fetch(&self, url: &str) -> Result<SafeData> {
         fetch_from_url(self, url, true)
     }
 
@@ -127,12 +127,12 @@ impl Safe {
     ///
     /// assert!(data_string.starts_with("hello tests!"));
     /// ```
-    pub fn inspect(&self, url: &str) -> ResultReturn<SafeData> {
+    pub fn inspect(&self, url: &str) -> Result<SafeData> {
         fetch_from_url(self, url, false)
     }
 }
 
-pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> ResultReturn<SafeData> {
+pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> Result<SafeData> {
     let mut the_xor = Safe::parse_url(url)?;
     let xorurl = the_xor.to_string()?;
     info!("URL parsed successfully, fetching: {}", xorurl);
@@ -317,7 +317,7 @@ pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> ResultRetu
 fn embed_resolved_from(
     content: SafeData,
     nrs_map_container: NrsMapContainerInfo,
-) -> ResultReturn<SafeData> {
+) -> Result<SafeData> {
     let safe_data = match content {
         SafeData::SafeKey {
             xorurl, xorname, ..

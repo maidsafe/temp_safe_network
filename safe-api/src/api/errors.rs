@@ -9,9 +9,9 @@
 use self::codes::*;
 use std::fmt;
 
-pub type ResultReturn<T> = Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     AuthError(String),
     ConnectionError(String),

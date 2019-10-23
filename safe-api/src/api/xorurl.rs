@@ -8,7 +8,7 @@
 
 use super::helpers::get_subnames_host_path_and_version;
 use super::xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
-use super::{Error, ResultReturn};
+use super::{Error, Result};
 use log::debug;
 use multibase::{decode, encode, Base};
 use safe_nd::{XorName, XOR_NAME_LEN};
@@ -42,7 +42,7 @@ impl std::fmt::Display for SafeContentType {
 
 impl SafeContentType {
     #[allow(dead_code)]
-    pub fn from_u16(value: u16) -> ResultReturn<SafeContentType> {
+    pub fn from_u16(value: u16) -> Result<SafeContentType> {
         match value {
             0 => Ok(SafeContentType::Raw),
             1 => Ok(SafeContentType::Wallet),
@@ -53,7 +53,7 @@ impl SafeContentType {
     }
 
     #[allow(dead_code)]
-    pub fn value(&self) -> ResultReturn<u16> {
+    pub fn value(&self) -> Result<u16> {
         match &*self {
             SafeContentType::Raw => Ok(0),
             SafeContentType::Wallet => Ok(1),
@@ -91,7 +91,7 @@ impl std::fmt::Display for SafeDataType {
 
 impl SafeDataType {
     #[allow(dead_code)]
-    pub fn from_u64(value: u64) -> ResultReturn<SafeDataType> {
+    pub fn from_u64(value: u64) -> Result<SafeDataType> {
         match value {
             0 => Ok(SafeDataType::SafeKey),
             1 => Ok(SafeDataType::PublishedImmutableData),
@@ -128,7 +128,7 @@ impl XorUrlEncoder {
         path: Option<&str>,
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
-    ) -> ResultReturn<Self> {
+    ) -> Result<Self> {
         if let SafeContentType::MediaType(ref media_type) = content_type {
             if !XorUrlEncoder::is_media_type_supported(media_type) {
                 return Err(Error::InvalidMediaType(format!(
@@ -166,7 +166,7 @@ impl XorUrlEncoder {
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
         base: &str,
-    ) -> ResultReturn<String> {
+    ) -> Result<String> {
         let xorurl_encoder = XorUrlEncoder::new(
             xorname,
             type_tag,
@@ -179,7 +179,7 @@ impl XorUrlEncoder {
         xorurl_encoder.to_base(base)
     }
 
-    pub fn from_url(xorurl: &str) -> ResultReturn<Self> {
+    pub fn from_url(xorurl: &str) -> Result<Self> {
         let (sub_names, cid_str, path, content_version) =
             get_subnames_host_path_and_version(&xorurl)?;
 
@@ -323,11 +323,11 @@ impl XorUrlEncoder {
     // 32 bytes for XoR Name
     // and up to 8 bytes for type_tag
     // query param "v=" is treated as the content version
-    pub fn to_string(&self) -> ResultReturn<String> {
+    pub fn to_string(&self) -> Result<String> {
         self.to_base("")
     }
 
-    pub fn to_base(&self, base: &str) -> ResultReturn<String> {
+    pub fn to_base(&self, base: &str) -> Result<String> {
         // let's set the first byte with the XOR-URL format version
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
 

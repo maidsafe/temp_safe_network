@@ -10,7 +10,7 @@ use super::constants::{
     FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
 };
 use super::helpers::gen_timestamp_secs;
-use super::{Error, ResultReturn, Safe, SafeContentType, XorUrl};
+use super::{Error, Result, Safe, SafeContentType, XorUrl};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -70,11 +70,11 @@ pub struct NrsMap {
 }
 
 impl NrsMap {
-    pub fn get_default(&self) -> ResultReturn<&DefaultRdf> {
+    pub fn get_default(&self) -> Result<&DefaultRdf> {
         Ok(&self.default)
     }
 
-    pub fn resolve_for_subnames(&self, mut sub_names: Vec<SubName>) -> ResultReturn<XorUrl> {
+    pub fn resolve_for_subnames(&self, mut sub_names: Vec<SubName>) -> Result<XorUrl> {
         debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
         let mut nrs_map = self;
         let dereferenced_link: String;
@@ -153,7 +153,7 @@ impl NrsMap {
     }
 
     #[allow(dead_code)]
-    pub fn get_default_link(&self) -> ResultReturn<XorUrl> {
+    pub fn get_default_link(&self) -> Result<XorUrl> {
         debug!("Attempting to get default link vis NRS....");
         let dereferenced_link: String;
         let link = match &self.default {
@@ -184,7 +184,7 @@ impl NrsMap {
         Ok(link.to_string())
     }
 
-    pub fn nrs_map_remove_subname(&mut self, name: &str) -> ResultReturn<String> {
+    pub fn nrs_map_remove_subname(&mut self, name: &str) -> Result<String> {
         info!("Removing sub name \"{}\" from NRS map", name);
         let sub_names = parse_nrs_name(name)?;
 
@@ -202,7 +202,7 @@ impl NrsMap {
         link: &str,
         default: bool,
         hard_link: bool,
-    ) -> ResultReturn<String> {
+    ) -> Result<String> {
         info!("Updating NRS map for: {}", name);
 
         // NRS resolver doesn't allow unversioned links
@@ -231,7 +231,7 @@ impl NrsMap {
     }
 
     #[allow(dead_code)]
-    pub fn get_link_for(&self, sub_name: &str) -> ResultReturn<XorUrl> {
+    pub fn get_link_for(&self, sub_name: &str) -> Result<XorUrl> {
         let the_entry = self.sub_names_map.get(sub_name);
 
         let link = match the_entry {
@@ -260,7 +260,7 @@ impl NrsMap {
     }
 }
 
-fn create_public_name_description(link: &str) -> ResultReturn<DefinitionData> {
+fn create_public_name_description(link: &str) -> Result<DefinitionData> {
     let now = gen_timestamp_secs();
     let mut public_name = DefinitionData::new();
     public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
@@ -288,7 +288,7 @@ fn sub_names_vec_to_str(sub_names: &[SubName]) -> String {
     }
 }
 
-fn parse_nrs_name(name: &str) -> ResultReturn<Vec<String>> {
+fn parse_nrs_name(name: &str) -> Result<Vec<String>> {
     // santize to a simple string
     let sanitized_name = str::replace(&name, "safe://", "").to_string();
 
@@ -301,7 +301,7 @@ fn parse_nrs_name(name: &str) -> ResultReturn<Vec<String>> {
     Ok(sub_names)
 }
 
-fn validate_nrs_link(link: &str) -> ResultReturn<()> {
+fn validate_nrs_link(link: &str) -> Result<()> {
     let link_encoder = Safe::parse_url(link)?;
     if link_encoder.content_version().is_none() {
         // We could try to automatically set the latest/current version,
@@ -324,7 +324,7 @@ fn setup_nrs_tree(
     nrs_map: &NrsMap,
     mut sub_names: Vec<String>,
     link: &str,
-) -> ResultReturn<NrsMap> {
+) -> Result<NrsMap> {
     let mut updated_nrs_map = nrs_map.clone();
     let curr_sub_name = if sub_names.is_empty() {
         let definition_data = create_public_name_description(link)?;
@@ -370,7 +370,7 @@ fn setup_nrs_tree(
 fn remove_nrs_sub_tree(
     nrs_map: &NrsMap,
     mut sub_names: Vec<String>,
-) -> ResultReturn<(NrsMap, String)> {
+) -> Result<(NrsMap, String)> {
     let mut updated_nrs_map = nrs_map.clone();
     let curr_sub_name = if sub_names.is_empty() {
         match nrs_map.get_default()? {

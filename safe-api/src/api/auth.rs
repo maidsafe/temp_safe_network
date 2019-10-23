@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::decode_ipc_msg;
-use super::{Error, ResultReturn, Safe, SafeApp};
+use super::{Error, Result, Safe, SafeApp};
 use log::{debug, info};
 #[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
 use reqwest::get as httpget;
@@ -34,7 +34,7 @@ impl Safe {
         app_name: &str,
         app_vendor: &str,
         port: Option<u16>,
-    ) -> ResultReturn<String> {
+    ) -> Result<String> {
         info!("Sending authorisation request to SAFE Authenticator...");
 
         let req = IpcReq::Auth(AuthReq {
@@ -101,7 +101,7 @@ impl Safe {
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
-    pub fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()> {
+    pub fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         self.safe_app.connect(app_id, auth_credentials)
     }
 }

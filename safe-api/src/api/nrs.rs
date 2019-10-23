@@ -10,7 +10,7 @@ use super::constants::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN};
 use super::helpers::{gen_timestamp_nanos, get_subnames_host_path_and_version};
 use super::nrs_map::NrsMap;
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
+use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::{debug, info, warn};
 use safe_nd::XorName;
 use std::collections::BTreeMap;
@@ -29,7 +29,7 @@ pub type ProcessedEntries = BTreeMap<String, (String, String)>;
 
 #[allow(dead_code)]
 impl Safe {
-    pub fn parse_url(url: &str) -> ResultReturn<XorUrlEncoder> {
+    pub fn parse_url(url: &str) -> Result<XorUrlEncoder> {
         let sanitised_url = sanitised_url(url);
         debug!("Attempting to decode url: {}", sanitised_url);
         XorUrlEncoder::from_url(&sanitised_url).or_else(|err| {
@@ -62,7 +62,7 @@ impl Safe {
     pub fn parse_and_resolve_url(
         &self,
         url: &str,
-    ) -> ResultReturn<(XorUrlEncoder, Option<XorUrlEncoder>)> {
+    ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {
         let xorurl_encoder = Safe::parse_url(url)?;
         if xorurl_encoder.content_type() == SafeContentType::NrsMapContainer {
             let (_version, nrs_map) = self.nrs_map_container_get(&url).map_err(|_| {
@@ -84,7 +84,7 @@ impl Safe {
         default: bool,
         hard_link: bool,
         dry_run: bool,
-    ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
+    ) -> Result<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
         // GET current NRS map from name's TLD
         let (xorurl_encoder, _) = validate_nrs_name(name)?;
@@ -137,7 +137,7 @@ impl Safe {
         default: bool,
         hard_link: bool,
         dry_run: bool,
-    ) -> ResultReturn<(XorUrl, ProcessedEntries, NrsMap)> {
+    ) -> Result<(XorUrl, ProcessedEntries, NrsMap)> {
         info!("Creating an NRS map");
         let (_, nrs_url) = validate_nrs_name(name)?;
         if self.nrs_map_container_get(&nrs_url).is_ok() {
@@ -194,7 +194,7 @@ impl Safe {
         &mut self,
         name: &str,
         dry_run: bool,
-    ) -> ResultReturn<(u64, XorUrl, ProcessedEntries, NrsMap)> {
+    ) -> Result<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Removing from NRS map...");
         // GET current NRS map from &name TLD
         let (xorurl_encoder, _) = validate_nrs_name(name)?;
@@ -241,7 +241,7 @@ impl Safe {
     /// assert_eq!(version, 0);
     /// assert_eq!(nrs_map_container.get_default_link().unwrap(), file_xorurl);
     /// ```
-    pub fn nrs_map_container_get(&self, url: &str) -> ResultReturn<(u64, NrsMap)> {
+    pub fn nrs_map_container_get(&self, url: &str) -> Result<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
         let xorurl_encoder = Safe::parse_url(url)?;
 
@@ -298,7 +298,7 @@ impl Safe {
     }
 }
 
-fn validate_nrs_name(name: &str) -> ResultReturn<(XorUrlEncoder, String)> {
+fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
     let sanitised_url = sanitised_url(name);
     let xorurl_encoder = Safe::parse_url(&sanitised_url)?;
     if xorurl_encoder.content_version().is_some() {
@@ -310,7 +310,7 @@ fn validate_nrs_name(name: &str) -> ResultReturn<(XorUrlEncoder, String)> {
     Ok((xorurl_encoder, sanitised_url))
 }
 
-fn xorname_from_nrs_string(name: &str) -> ResultReturn<XorName> {
+fn xorname_from_nrs_string(name: &str) -> Result<XorName> {
     let vec_hash = sha3_256(&name.to_string().into_bytes());
     let xorname = XorName(vec_hash);
     debug!("Resulting XorName for NRS \"{}\" is: {}", name, xorname);
@@ -322,7 +322,7 @@ fn sanitised_url(name: &str) -> String {
     format!("safe://{}", name.replace("safe://", ""))
 }
 
-fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> ResultReturn<NrsMapRawData> {
+fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<NrsMapRawData> {
     // The NrsMapContainer is an AppendOnlyData where each NRS Map version is an entry containing
     // the timestamp as the entry's key, and the serialised NrsMap as the entry's value
     // TODO: use RDF format

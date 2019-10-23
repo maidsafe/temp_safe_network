@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, ResultReturn};
+use super::{Error, Result};
 use chrono::{SecondsFormat, Utc};
 
 use log::debug;
@@ -39,7 +39,7 @@ impl KeyPair {
     }
 
     #[allow(dead_code)]
-    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> ResultReturn<Self> {
+    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> Result<Self> {
         let pk = pk_from_hex(pk_hex_str)?;
         let sk = sk_from_hex(sk_hex_str)?;
         if pk != sk.public_key() {
@@ -51,13 +51,13 @@ impl KeyPair {
         }
     }
 
-    pub fn from_hex_sk(sk_hex_str: &str) -> ResultReturn<Self> {
+    pub fn from_hex_sk(sk_hex_str: &str) -> Result<Self> {
         let sk = sk_from_hex(sk_hex_str)?;
         let pk = sk.public_key();
         Ok(KeyPair { pk, sk })
     }
 
-    pub fn to_hex_key_pair(&self) -> ResultReturn<(String, String)> {
+    pub fn to_hex_key_pair(&self) -> Result<(String, String)> {
         let pk: String = pk_to_hex(&self.pk);
 
         let sk_serialised = bincode::serialize(&SerdeSecret(&self.sk))
@@ -112,7 +112,7 @@ pub fn pk_to_hex(pk: &PublicKey) -> String {
     vec_to_hex(pk_as_bytes.to_vec())
 }
 
-pub fn pk_from_hex(hex_str: &str) -> ResultReturn<PublicKey> {
+pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     let pk_bytes = parse_hex(&hex_str);
     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
@@ -120,13 +120,13 @@ pub fn pk_from_hex(hex_str: &str) -> ResultReturn<PublicKey> {
         .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
 }
 
-pub fn sk_from_hex(hex_str: &str) -> ResultReturn<SecretKey> {
+pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey> {
     let sk_bytes = parse_hex(&hex_str);
     bincode::deserialize(&sk_bytes)
         .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))
 }
 
-pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<Coins> {
+pub fn parse_coins_amount(amount_str: &str) -> Result<Coins> {
     Coins::from_str(amount_str).map_err(|err| {
         match err {
             SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
@@ -144,7 +144,7 @@ pub fn parse_coins_amount(amount_str: &str) -> ResultReturn<Coins> {
     })
 }
 
-pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
+pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted> {
     let msg = decode_msg(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
@@ -159,7 +159,7 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> ResultReturn<AuthGranted> {
 
 pub fn get_subnames_host_path_and_version(
     xorurl: &str,
-) -> ResultReturn<(Vec<String>, String, String, Option<u64>)> {
+) -> Result<(Vec<String>, String, String, Option<u64>)> {
     let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
         Error::InvalidXorUrl(format!(
             "Problem parsing the safe:// URL \"{}\": {}",

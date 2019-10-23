@@ -8,7 +8,7 @@
 
 use super::helpers::create_random_xorname;
 use super::safe_net::AppendOnlyDataRawData;
-use super::{Error, ResultReturn, SafeApp};
+use super::{Error, Result, SafeApp};
 use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
@@ -67,21 +67,21 @@ impl Drop for SafeAppFake {
 
 impl SafeAppFake {
     // private helper
-    fn get_balance_from_xorname(&self, xorname: &XorName) -> ResultReturn<Coins> {
+    fn get_balance_from_xorname(&self, xorname: &XorName) -> Result<Coins> {
         match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
             None => Err(Error::ContentNotFound("SafeKey data not found".to_string())),
             Some(coin_balance) => parse_coins_amount(&coin_balance.value),
         }
     }
 
-    fn fetch_pk_from_xorname(&self, xorname: &XorName) -> ResultReturn<PublicKey> {
+    fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKey> {
         match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
             None => Err(Error::ContentNotFound("SafeKey data not found".to_string())),
             Some(coin_balance) => Ok(coin_balance.owner),
         }
     }
 
-    fn substract_coins(&mut self, sk: SecretKey, amount: Coins) -> ResultReturn<()> {
+    fn substract_coins(&mut self, sk: SecretKey, amount: Coins) -> Result<()> {
         let from_balance = self.get_balance_from_sk(sk.clone())?;
         match from_balance.checked_sub(amount) {
             None => Err(Error::NotEnoughBalance(from_balance.to_string())),
@@ -117,7 +117,7 @@ impl SafeApp for SafeAppFake {
         SafeAppFake { fake_vault }
     }
 
-    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> ResultReturn<()> {
+    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
         debug!("Using mock so there is no connection to network");
         Ok(())
     }
@@ -127,7 +127,7 @@ impl SafeApp for SafeAppFake {
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
         amount: Coins,
-    ) -> ResultReturn<XorName> {
+    ) -> Result<XorName> {
         if let Some(sk) = from_sk {
             let amount_with_cost = Coins::from_nano(amount.as_nano() + 1).map_err(|err| {
                 Error::Unexpected(format!(
@@ -150,7 +150,7 @@ impl SafeApp for SafeAppFake {
         Ok(to_xorname)
     }
 
-    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName> {
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         let to_pk = owner_sk.public_key();
         let xorname = xorname_from_pk(to_pk);
         self.fake_vault.coin_balances.insert(
@@ -164,7 +164,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins> {
+    fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
         let pk = sk.public_key();
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname)
@@ -176,7 +176,7 @@ impl SafeApp for SafeAppFake {
         to_xorname: XorName,
         tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<Transaction> {
+    ) -> Result<Transaction> {
         if amount.as_nano() == 0 {
             return Err(Error::InvalidAmount(amount.to_string()));
         }
@@ -227,12 +227,12 @@ impl SafeApp for SafeAppFake {
         to_pk: PublicKey,
         tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<Transaction> {
+    ) -> Result<Transaction> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
     }
 
-    fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> ResultReturn<String> {
+    fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> Result<String> {
         let xorname = xorname_from_pk(pk);
         let txs_for_xorname = &self.fake_vault.txs[&xorname_to_hex(&xorname)];
         let tx_state = txs_for_xorname.get(&tx_id.to_string()).ok_or_else(|| {
@@ -241,7 +241,7 @@ impl SafeApp for SafeAppFake {
         Ok(tx_state.to_string())
     }
 
-    fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName> {
+    fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName> {
         let xorname = create_random_xorname();
         // TODO: hash to get xorname.
         self.fake_vault
@@ -251,7 +251,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>> {
+    fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>> {
         let data = match self
             .fake_vault
             .published_immutable_data
@@ -274,7 +274,7 @@ impl SafeApp for SafeAppFake {
         name: Option<XorName>,
         _tag: u64,
         _permissions: Option<String>,
-    ) -> ResultReturn<XorName> {
+    ) -> Result<XorName> {
         let xorname = name.unwrap_or_else(create_random_xorname);
 
         self.fake_vault
@@ -290,7 +290,7 @@ impl SafeApp for SafeAppFake {
         _new_version: u64,
         name: XorName,
         _tag: u64,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         let xorname_hex = xorname_to_hex(&name);
         let mut seq_append_only = match self.fake_vault.published_seq_append_only.get(&xorname_hex)
         {
@@ -315,7 +315,7 @@ impl SafeApp for SafeAppFake {
         &self,
         name: XorName,
         _tag: u64,
-    ) -> ResultReturn<(u64, AppendOnlyDataRawData)> {
+    ) -> Result<(u64, AppendOnlyDataRawData)> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate scl mock mdata: {}", xorname_hex);
 
@@ -342,7 +342,7 @@ impl SafeApp for SafeAppFake {
         &self,
         name: XorName,
         _tag: u64,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
         let xorname_hex = xorname_to_hex(&name);
         let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
@@ -364,7 +364,7 @@ impl SafeApp for SafeAppFake {
         name: XorName,
         _tag: u64,
         version: u64,
-    ) -> ResultReturn<AppendOnlyDataRawData> {
+    ) -> Result<AppendOnlyDataRawData> {
         let xorname_hex = xorname_to_hex(&name);
         match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
             Some(seq_append_only) => {
@@ -398,7 +398,7 @@ impl SafeApp for SafeAppFake {
         _tag: u64,
         // _data: Option<String>,
         _permissions: Option<String>,
-    ) -> ResultReturn<XorName> {
+    ) -> Result<XorName> {
         let xorname = name.unwrap_or_else(create_random_xorname);
         let seq_md = match self.fake_vault.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(uao) => uao.clone(),
@@ -412,7 +412,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData> {
+    fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
 
@@ -444,7 +444,7 @@ impl SafeApp for SafeAppFake {
         tag: u64,
         key: &[u8],
         value: &[u8],
-    ) -> ResultReturn<()> {
+    ) -> Result<()> {
         let seq_md = self.get_seq_mdata(name, tag)?;
         let mut data = seq_md.entries().clone();
 
@@ -472,7 +472,7 @@ impl SafeApp for SafeAppFake {
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> ResultReturn<MDataSeqValue> {
+    ) -> Result<MDataSeqValue> {
         let seq_md = self.get_seq_mdata(name, tag)?;
         match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
@@ -487,7 +487,7 @@ impl SafeApp for SafeAppFake {
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>> {
+    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
         debug!("Listing seq_mdata_entries for: {}", name);
         let seq_md = self.get_seq_mdata(name, tag)?;
         let mut res = BTreeMap::new();
@@ -505,7 +505,7 @@ impl SafeApp for SafeAppFake {
         key: &[u8],
         value: &[u8],
         _version: u64,
-    ) -> ResultReturn<()> {
+    ) -> Result<()> {
         self.seq_mutable_data_get_value(name, tag, key)
             .and_then(|_| self.seq_mutable_data_insert(name, tag, key, value))
     }

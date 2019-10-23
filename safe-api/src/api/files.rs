@@ -13,7 +13,7 @@ use super::constants::{
 };
 use super::helpers::{gen_timestamp_nanos, gen_timestamp_secs};
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
+use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::{debug, info, warn};
 use mime_guess;
 use relative_path::RelativePath;
@@ -57,7 +57,7 @@ impl Safe {
         dest: Option<&str>,
         recursive: bool,
         dry_run: bool,
-    ) -> ResultReturn<(XorUrl, ProcessedFiles, FilesMap)> {
+    ) -> Result<(XorUrl, ProcessedFiles, FilesMap)> {
         // TODO: Enable source for funds / ownership
         // Warn about ownership?
 
@@ -121,7 +121,7 @@ impl Safe {
     /// println!("FilesContainer fetched is at version: {}", version);
     /// println!("FilesMap of fetched version is: {:?}", files_map);
     /// ```
-    pub fn files_container_get(&self, url: &str) -> ResultReturn<(u64, FilesMap)> {
+    pub fn files_container_get(&self, url: &str) -> Result<(u64, FilesMap)> {
         debug!("Getting files container from: {:?}", url);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
 
@@ -201,7 +201,7 @@ impl Safe {
         delete: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
                 "'delete' is not allowed if --recursive is not set".to_string(),
@@ -285,7 +285,7 @@ impl Safe {
         force: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
         let (xorurl_encoder, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs)?;
 
@@ -347,7 +347,7 @@ impl Safe {
         force: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> ResultReturn<(u64, ProcessedFiles, FilesMap)> {
+    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
         let (xorurl_encoder, current_version, current_files_map) =
             validate_files_add_params(self, "", url, update_nrs)?;
 
@@ -381,7 +381,7 @@ impl Safe {
         mut xorurl_encoder: XorUrlEncoder,
         dry_run: bool,
         update_nrs: bool,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         let version = if success_count == 0 {
             current_version
         } else if dry_run {
@@ -442,7 +442,7 @@ impl Safe {
         &mut self,
         data: &[u8],
         media_type: Option<&str>,
-    ) -> ResultReturn<XorUrl> {
+    ) -> Result<XorUrl> {
         let content_type = media_type.map_or_else(
             || Ok(SafeContentType::Raw),
             |media_type_str| {
@@ -485,7 +485,7 @@ impl Safe {
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_get_published_immutable(&self, url: &str) -> ResultReturn<Vec<u8>> {
+    pub fn files_get_published_immutable(&self, url: &str) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         self.safe_app
@@ -501,7 +501,7 @@ fn validate_files_add_params(
     source_file: &str,
     url: &str,
     update_nrs: bool,
-) -> ResultReturn<(XorUrlEncoder, u64, FilesMap)> {
+) -> Result<(XorUrlEncoder, u64, FilesMap)> {
     let xorurl_encoder = Safe::parse_url(url)?;
     if xorurl_encoder.content_version().is_some() {
         return Err(Error::InvalidInput(format!(
@@ -556,7 +556,7 @@ fn normalise_path_separator(from: &str) -> String {
 
 // From the location path and the destination path chosen by the user, calculate
 // the destination path considering ending '/' in both the  location and dest path
-fn get_base_paths(location: &str, dest_path: Option<&str>) -> ResultReturn<(String, String)> {
+fn get_base_paths(location: &str, dest_path: Option<&str>) -> Result<(String, String)> {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
     let location_base_path = if location == "." {
         "./".to_string()
@@ -602,7 +602,7 @@ fn gen_new_file_item(
     file_size: &str,
     file_created: Option<&str>,
     link: Option<&str>,
-) -> Result<FileItem, String> {
+) -> Result<FileItem> {
     let now = gen_timestamp_secs();
     let mut file_item = FileItem::new();
     let xorurl = match link {
@@ -693,7 +693,7 @@ fn files_map_sync(
     upload_files: bool,
     force: bool,
     compare_file_content: bool,
-) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
+) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     let mut updated_files_map = FilesMap::new();
     let mut processed_files = ProcessedFiles::new();
@@ -810,7 +810,7 @@ fn files_map_add_link(
     file_link: &str,
     file_name: &str,
     force: bool,
-) -> ResultReturn<(ProcessedFiles, FilesMap, u64)> {
+) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
     match XorUrlEncoder::from_url(file_link) {
@@ -893,7 +893,7 @@ fn files_map_add_link(
 }
 
 // Upload a files to the Network as a Published-ImmutableData
-fn upload_file_to_net(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
+fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
@@ -911,7 +911,7 @@ fn upload_file_to_net(safe: &mut Safe, path: &Path) -> ResultReturn<XorUrl> {
 }
 
 // Get file metadata from local filesystem
-fn get_metadata(path: &Path) -> ResultReturn<(fs::Metadata, String)> {
+fn get_metadata(path: &Path) -> Result<(fs::Metadata, String)> {
     let metadata = fs::metadata(path).map_err(|err| {
         Error::FilesSystemError(format!(
             "Couldn't read metadata from source path ('{}'): {}",
@@ -934,7 +934,7 @@ fn file_system_dir_walk(
     location: &str,
     recursive: bool,
     upload_files: bool,
-) -> ResultReturn<ProcessedFiles> {
+) -> Result<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading files from {}", file_path.display());
     let (metadata, _) = get_metadata(&file_path)?;
@@ -1011,7 +1011,7 @@ fn file_system_single_file(
     safe: &mut Safe,
     location: &str,
     upload_files: bool,
-) -> ResultReturn<ProcessedFiles> {
+) -> Result<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading file {}", file_path.display());
     let (metadata, _) = get_metadata(&file_path)?;
@@ -1053,7 +1053,7 @@ fn files_map_create(
     content: &ProcessedFiles,
     location: &str,
     dest_path: Option<&str>,
-) -> ResultReturn<FilesMap> {
+) -> Result<FilesMap> {
     let mut files_map = FilesMap::default();
     let now = gen_timestamp_secs();
 

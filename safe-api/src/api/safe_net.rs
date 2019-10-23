@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::errors::ResultReturn;
+use super::errors::Result;
 use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId, XorName};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
@@ -16,18 +16,18 @@ pub type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
 pub trait SafeApp {
     fn new() -> Self;
 
-    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> ResultReturn<()>;
+    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
 
     fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
         amount: Coins,
-    ) -> ResultReturn<XorName>;
+    ) -> Result<XorName>;
 
-    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> ResultReturn<XorName>;
+    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName>;
 
-    fn get_balance_from_sk(&self, sk: SecretKey) -> ResultReturn<Coins>;
+    fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins>;
 
     fn safecoin_transfer_to_xorname(
         &mut self,
@@ -35,7 +35,7 @@ pub trait SafeApp {
         to_xorname: XorName,
         tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<Transaction>;
+    ) -> Result<Transaction>;
 
     fn safecoin_transfer_to_pk(
         &mut self,
@@ -43,13 +43,13 @@ pub trait SafeApp {
         to_pk: PublicKey,
         tx_id: TransactionId,
         amount: Coins,
-    ) -> ResultReturn<Transaction>;
+    ) -> Result<Transaction>;
 
-    fn get_transaction(&self, tx_id: u64, pk: PublicKey, sk: SecretKey) -> ResultReturn<String>;
+    fn get_transaction(&self, tx_id: u64, pk: PublicKey, sk: SecretKey) -> Result<String>;
 
-    fn files_put_published_immutable(&mut self, data: &[u8]) -> ResultReturn<XorName>;
+    fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName>;
 
-    fn files_get_published_immutable(&self, xorname: XorName) -> ResultReturn<Vec<u8>>;
+    fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>>;
 
     fn put_seq_append_only_data(
         &mut self,
@@ -57,7 +57,7 @@ pub trait SafeApp {
         name: Option<XorName>,
         tag: u64,
         permissions: Option<String>,
-    ) -> ResultReturn<XorName>;
+    ) -> Result<XorName>;
 
     fn append_seq_append_only_data(
         &mut self,
@@ -65,26 +65,26 @@ pub trait SafeApp {
         new_version: u64,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<u64>;
+    ) -> Result<u64>;
 
     fn get_latest_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<(u64, AppendOnlyDataRawData)>;
+    ) -> Result<(u64, AppendOnlyDataRawData)>;
 
     fn get_current_seq_append_only_data_version(
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<u64>;
+    ) -> Result<u64>;
 
     fn get_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
         version: u64,
-    ) -> ResultReturn<AppendOnlyDataRawData>;
+    ) -> Result<AppendOnlyDataRawData>;
 
     fn put_seq_mutable_data(
         &mut self,
@@ -92,9 +92,9 @@ pub trait SafeApp {
         tag: u64,
         // data: Option<String>,
         permissions: Option<String>,
-    ) -> ResultReturn<XorName>;
+    ) -> Result<XorName>;
 
-    fn get_seq_mdata(&self, name: XorName, tag: u64) -> ResultReturn<SeqMutableData>;
+    fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData>;
 
     fn seq_mutable_data_insert(
         &mut self,
@@ -102,20 +102,20 @@ pub trait SafeApp {
         tag: u64,
         key: &[u8],
         value: &[u8],
-    ) -> ResultReturn<()>;
+    ) -> Result<()>;
 
     fn seq_mutable_data_get_value(
         &self,
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> ResultReturn<MDataSeqValue>;
+    ) -> Result<MDataSeqValue>;
 
     fn list_seq_mdata_entries(
         &self,
         name: XorName,
         tag: u64,
-    ) -> ResultReturn<BTreeMap<Vec<u8>, MDataSeqValue>>;
+    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>>;
 
     fn seq_mutable_data_update(
         &mut self,
@@ -124,5 +124,5 @@ pub trait SafeApp {
         key: &[u8],
         value: &[u8],
         version: u64,
-    ) -> ResultReturn<()>;
+    ) -> Result<()>;
 }

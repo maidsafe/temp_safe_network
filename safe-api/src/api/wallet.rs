@@ -8,7 +8,7 @@
 
 use super::helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, xorname_to_hex, KeyPair};
 use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, ResultReturn, Safe, SafeApp, XorUrl, XorUrlEncoder};
+use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::debug;
 use rand_core::RngCore;
 use safe_nd::{Coins, XorName};
@@ -32,7 +32,7 @@ pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalanc
 #[allow(dead_code)]
 impl Safe {
     // Create an empty Wallet and return its XOR-URL
-    pub fn wallet_create(&mut self) -> ResultReturn<XorUrl> {
+    pub fn wallet_create(&mut self) -> Result<XorUrl> {
         let xorname = self
             .safe_app
             .put_seq_mutable_data(None, WALLET_TYPE_TAG, None)?;
@@ -56,7 +56,7 @@ impl Safe {
         name: Option<&str>,
         default: bool,
         sk: &str,
-    ) -> ResultReturn<String> {
+    ) -> Result<String> {
         let key_pair = KeyPair::from_hex_sk(sk)?;
         let xorname = xorname_from_pk(key_pair.pk);
         let xorurl = XorUrlEncoder::encode(
@@ -130,7 +130,7 @@ impl Safe {
     }
 
     // Check the total balance of a Wallet found at a given XOR-URL
-    pub fn wallet_balance(&mut self, url: &str) -> ResultReturn<String> {
+    pub fn wallet_balance(&mut self, url: &str) -> Result<String> {
         debug!("Finding total wallet balance for: {:?}", url);
         let mut total_balance = Coins::from_nano(0).map_err(|err| {
             Error::Unexpected(format!(
@@ -204,7 +204,7 @@ impl Safe {
     pub fn wallet_get_default_balance(
         &self,
         url: &str,
-    ) -> ResultReturn<(WalletSpendableBalance, u64)> {
+    ) -> Result<(WalletSpendableBalance, u64)> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let default = self
             .safe_app
@@ -272,7 +272,7 @@ impl Safe {
         from_url: Option<&str>,
         to_url: &str,
         tx_id: Option<u64>,
-    ) -> ResultReturn<u64> {
+    ) -> Result<u64> {
         // Parse and validate the amount is a valid
         let amount_coins = parse_coins_amount(amount)?;
 
@@ -356,7 +356,7 @@ impl Safe {
         }
     }
 
-    pub fn wallet_get(&self, url: &str) -> ResultReturn<WalletSpendableBalances> {
+    pub fn wallet_get(&self, url: &str) -> Result<WalletSpendableBalances> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         gen_wallet_spendable_balances_list(&self, xorurl_encoder.xorname(), url)
     }
@@ -367,7 +367,7 @@ fn gen_wallet_spendable_balances_list(
     safe: &Safe,
     xorname: XorName,
     url: &str,
-) -> ResultReturn<WalletSpendableBalances> {
+) -> Result<WalletSpendableBalances> {
     let entries = match safe
         .safe_app
         .list_seq_mdata_entries(xorname, WALLET_TYPE_TAG)
@@ -429,7 +429,7 @@ fn wallet_get_spendable_balance(
     safe: &Safe,
     xorname: XorName,
     balance_name: &[u8],
-) -> ResultReturn<(WalletSpendableBalance, u64)> {
+) -> Result<(WalletSpendableBalance, u64)> {
     let the_balance: (WalletSpendableBalance, u64) = {
         let default_balance_vec = safe
             .safe_app
@@ -458,7 +458,7 @@ fn resolve_wallet_url(
     wallet_url: &str,
     xorurl_encoder: XorUrlEncoder,
     nrs_xorurl_encoder: Option<XorUrlEncoder>,
-) -> ResultReturn<WalletSpendableBalance> {
+) -> Result<WalletSpendableBalance> {
     let url_path = if let Some(nrs_url) = nrs_xorurl_encoder {
         nrs_url.path().to_string()
     } else {
