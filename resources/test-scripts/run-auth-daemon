@@ -44,5 +44,8 @@ function run_safe_auth() {
     cd -
 }
 
-download_safe_auth_nightly
-run_safe_auth
+# TEMPORARILY disabling integration tests with auth cli
+#download_safe_auth_nightly
+#run_safe_auth
+rm -rf $SAFE_MOCK_VAULT_PATH
+mkdir $SAFE_MOCK_VAULT_PATH

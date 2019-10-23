@@ -39,4 +39,5 @@ function run_cli_tests_with_auth_daemon() {
 }
 
 run_cli_tests
-run_cli_tests_with_auth_daemon
+# TEMPORAILY disabling integration test with auth cli
+# run_cli_tests_with_auth_daemon
