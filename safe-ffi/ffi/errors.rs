@@ -40,73 +40,72 @@ mod codes {
     pub const ERR_STRING_ERROR: i32 = -502;
 }
 
-pub type Result<T> = std::result::Result<T, FfiError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FfiError(NativeError);
+pub struct Error(NativeError);
 
-impl fmt::Display for FfiError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl ErrorCode for FfiError {
+impl ErrorCode for Error {
     fn error_code(&self) -> i32 {
         use codes::*;
+        use NativeError::*;
 
         match (*self).0 {
-            NativeError::AuthError(ref _error) => ERR_AUTH_ERROR,
-            NativeError::ConnectionError(ref _error) => ERR_CONNECTION_ERROR,
-            NativeError::NetDataError(ref _error) => ERR_NET_DATA_ERROR,
-            NativeError::ContentNotFound(ref _error) => ERR_CONTENT_NOT_FOUND_ERROR,
-            NativeError::VersionNotFound(ref _error) => ERR_VERSION_NOT_FOUND_ERROR,
-            NativeError::ContentError(ref _error) => ERR_CONTENT_ERROR,
-            NativeError::EmptyContent(ref _error) => ERR_EMPTY_CONTENT_ERROR,
-            NativeError::AccessDenied(ref _error) => ERR_ACCESS_DENIED_ERROR,
-            NativeError::EntryNotFound(ref _error) => ERR_ENTRY_NOT_FOUND_ERROR,
-            NativeError::EntryExists(ref _error) => ERR_ENTRY_EXISTS_ERROR,
-            NativeError::InvalidInput(ref _error) => ERR_INVALID_INPUT_ERROR,
-            NativeError::InvalidAmount(ref _error) => ERR_INVALID_AMOUNT_ERROR,
-            NativeError::InvalidXorUrl(ref _error) => ERR_INVALID_XOR_URL_ERROR,
-            NativeError::NotEnoughBalance(ref _error) => ERR_NOT_ENOUGH_BALANCE_ERROR,
-            NativeError::FilesSystemError(ref _error) => ERR_FILE_SYSTEM_ERROR,
-            NativeError::InvalidMediaType(ref _error) => ERR_INVALID_MEDIA_TYPE_ERROR,
-            NativeError::Unexpected(ref _error) => ERR_UNEXPECTED_ERROR,
-            NativeError::Unknown(ref _error) => ERR_UNKNOWN_ERROR,
-            NativeError::StringError(ref _error) => ERR_STRING_ERROR,
+            AuthError(ref _error) => ERR_AUTH_ERROR,
+            ConnectionError(ref _error) => ERR_CONNECTION_ERROR,
+            NetDataError(ref _error) => ERR_NET_DATA_ERROR,
+            ContentNotFound(ref _error) => ERR_CONTENT_NOT_FOUND_ERROR,
+            VersionNotFound(ref _error) => ERR_VERSION_NOT_FOUND_ERROR,
+            ContentError(ref _error) => ERR_CONTENT_ERROR,
+            EmptyContent(ref _error) => ERR_EMPTY_CONTENT_ERROR,
+            AccessDenied(ref _error) => ERR_ACCESS_DENIED_ERROR,
+            EntryNotFound(ref _error) => ERR_ENTRY_NOT_FOUND_ERROR,
+            EntryExists(ref _error) => ERR_ENTRY_EXISTS_ERROR,
+            InvalidInput(ref _error) => ERR_INVALID_INPUT_ERROR,
+            InvalidAmount(ref _error) => ERR_INVALID_AMOUNT_ERROR,
+            InvalidXorUrl(ref _error) => ERR_INVALID_XOR_URL_ERROR,
+            NotEnoughBalance(ref _error) => ERR_NOT_ENOUGH_BALANCE_ERROR,
+            FilesSystemError(ref _error) => ERR_FILE_SYSTEM_ERROR,
+            InvalidMediaType(ref _error) => ERR_INVALID_MEDIA_TYPE_ERROR,
+            Unexpected(ref _error) => ERR_UNEXPECTED_ERROR,
+            Unknown(ref _error) => ERR_UNKNOWN_ERROR,
+            StringError(ref _error) => ERR_STRING_ERROR,
         }
     }
 }
 
-impl From<NativeError> for FfiError {
+impl From<NativeError> for Error {
     fn from(error: NativeError) -> Self {
         Self(error)
     }
 }
 
-impl From<StringError> for FfiError {
+impl From<StringError> for Error {
     fn from(_error: StringError) -> Self {
-        NativeError::StringError("string conversion error".to_string()).into()
+        NativeError::StringError("string conversion error".into()).into()
     }
 }
 
-impl<'a> From<&'a str> for FfiError {
+impl<'a> From<&'a str> for Error {
     fn from(s: &'a str) -> Self {
-        NativeError::Unexpected(s.to_string()).into()
+        NativeError::Unexpected(s.into()).into()
     }
 }
 
-impl From<NulError> for FfiError {
+impl From<NulError> for Error {
     fn from(_error: NulError) -> Self {
-        NativeError::Unexpected("Null error".to_string()).into()
+        NativeError::Unexpected("Null error".into()).into()
     }
 }
 
-impl From<serde_json::error::Error> for FfiError {
+impl From<serde_json::error::Error> for Error {
     fn from(_error: serde_json::error::Error) -> Self {
-        NativeError::StringError(
-            "Failed to serialize or deserialize to json".to_string(),
-        ).into()
+        NativeError::StringError("Failed to serialize or deserialize to json".into()).into()
     }
 }

@@ -41,26 +41,28 @@ impl From<Error> for String {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Error::*;
+
         let (error_type, error_msg) = match self {
-            Error::AuthError(info) => ("AuthError", info),
-            Error::ConnectionError(info) => ("ConnectionError", info),
-            Error::NetDataError(info) => ("NetDataError", info),
-            Error::ContentNotFound(info) => ("ContentNotFound", info),
-            Error::VersionNotFound(info) => ("VersionNotFound", info),
-            Error::ContentError(info) => ("ContentError", info),
-            Error::EmptyContent(info) => ("EmptyContent", info),
-            Error::AccessDenied(info) => ("AccessDenied", info),
-            Error::EntryNotFound(info) => ("EntryNotFound", info),
-            Error::EntryExists(info) => ("EntryExists", info),
-            Error::InvalidInput(info) => ("InvalidInput", info),
-            Error::InvalidAmount(info) => ("InvalidAmount", info),
-            Error::InvalidXorUrl(info) => ("InvalidXorUrl", info),
-            Error::InvalidMediaType(info) => ("InvalidMediaType", info),
-            Error::NotEnoughBalance(info) => ("NotEnoughBalance", info),
-            Error::FilesSystemError(info) => ("FilesSystemError", info),
-            Error::Unexpected(info) => ("Unexpected", info),
-            Error::Unknown(info) => ("Unknown", info),
-            Error::StringError(info) => ("StringError", info),
+            AuthError(info) => ("AuthError", info),
+            ConnectionError(info) => ("ConnectionError", info),
+            NetDataError(info) => ("NetDataError", info),
+            ContentNotFound(info) => ("ContentNotFound", info),
+            VersionNotFound(info) => ("VersionNotFound", info),
+            ContentError(info) => ("ContentError", info),
+            EmptyContent(info) => ("EmptyContent", info),
+            AccessDenied(info) => ("AccessDenied", info),
+            EntryNotFound(info) => ("EntryNotFound", info),
+            EntryExists(info) => ("EntryExists", info),
+            InvalidInput(info) => ("InvalidInput", info),
+            InvalidAmount(info) => ("InvalidAmount", info),
+            InvalidXorUrl(info) => ("InvalidXorUrl", info),
+            InvalidMediaType(info) => ("InvalidMediaType", info),
+            NotEnoughBalance(info) => ("NotEnoughBalance", info),
+            FilesSystemError(info) => ("FilesSystemError", info),
+            Unexpected(info) => ("Unexpected", info),
+            Unknown(info) => ("Unknown", info),
+            StringError(info) => ("StringError", info),
         };
         let description = format!("[Error] {} - {}", error_type, error_msg);
 
