@@ -44,6 +44,9 @@ function get_docker_build_command() {
     build_command="$build_command cargo build"
     [[ "$component" != "safe-cli" ]] && build_command="$build_command --lib"
     build_command="$build_command --release --manifest-path=$component/Cargo.toml --target=$target"
+    if [[ "$build_type" == "dev" ]]; then
+        build_command="$build_command --features=$features"
+    fi
     echo $build_command
 }
 
