@@ -1,4 +1,4 @@
-use super::errors::Result;
+use super::errors::{FfiError, Result};
 use super::ffi_structs::{
     nrs_map_container_info_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
     NrsMapContainerInfo, PublishedImmutableData, SafeKey, Wallet,
@@ -162,9 +162,10 @@ unsafe fn invoke_callback(
             o_keys(user_data.0, &keys);
         }
         Err(err) => {
+            let (error_code, description) = ffi_error!(FfiError::from(err.clone()));
             let ffi_result = NativeResult {
-                error_code: err.error_code(),
-                description: Some(err.description()),
+                error_code,
+                description: Some(description),
             };
             o_err(user_data.0, &ffi_result.into_repr_c()?);
         }
