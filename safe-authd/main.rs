@@ -13,6 +13,11 @@ mod requests;
 mod shared;
 mod update;
 
+#[cfg(not(target_os = "windows"))]
+mod operations;
+#[cfg(target_os = "windows")]
+mod operations_win;
+
 use env_logger;
 use log::debug;
 use log::error;
@@ -35,7 +40,12 @@ extern crate slog;
 #[macro_use]
 extern crate self_update;
 
-use authd::{restart_authd, start_authd, stop_authd, ErrorExt};
+#[cfg(not(target_os = "windows"))]
+use operations::{restart_authd, start_authd, stop_authd};
+#[cfg(target_os = "windows")]
+use operations_win::{restart_authd, start_authd, stop_authd};
+
+use authd::ErrorExt;
 
 #[derive(StructOpt, Debug)]
 /// SAFE Authenticator daemon

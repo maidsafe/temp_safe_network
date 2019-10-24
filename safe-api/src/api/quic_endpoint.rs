@@ -107,7 +107,7 @@ fn start_quic_endpoint(
         };
         server_config.certificate(cert_chain, key)?;
     } else {*/
-    let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+    let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
         Some(dirs) => dirs,
         None => bail!("Failed to obtain local home directory where to read certificate from"),
     };

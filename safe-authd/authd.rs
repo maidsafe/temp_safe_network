@@ -9,24 +9,16 @@
 use super::notifs::monitor_pending_auth_reqs;
 use super::requests::process_request;
 use super::shared::*;
-use daemonize::Daemonize;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
 use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
 use std::collections::BTreeSet;
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::{self, Write};
+use std::io;
 use std::net::SocketAddr;
-use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
-
-const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
-const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
-const SAFE_AUTHD_STDERR_FILE: &str = "/tmp/safe-authd.err";
 
 // Number of milliseconds to allow an idle connection before closing it
 const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
@@ -55,8 +47,7 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn start_authd(listen: SocketAddr) -> Result<(), Error> {
-    println!("Starting SAFE Authenticator daemon...");
+pub fn run(listen: SocketAddr) -> Result<(), Error> {
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
     let drain = slog_term::FullFormat::new(decorator)
         .use_original_order()
@@ -66,6 +57,7 @@ pub fn start_authd(listen: SocketAddr) -> Result<(), Error> {
 
     let server_config = quinn::ServerConfig {
         transport: Arc::new(quinn::TransportConfig {
+            idle_timeout: CONNECTION_IDLE_TIMEOUT,
             stream_window_uni: 0,
             ..Default::default()
         }),
@@ -97,7 +89,7 @@ pub fn start_authd(listen: SocketAddr) -> Result<(), Error> {
         };
         server_config.certificate(cert_chain, key)?;
     } else {*/
-    let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+    let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
         Some(dirs) => dirs,
         None => bail!("Failed to obtain local home directory where to read certificate from"),
     };
@@ -128,97 +120,43 @@ pub fn start_authd(listen: SocketAddr) -> Result<(), Error> {
     let mut endpoint = quinn::Endpoint::builder();
     endpoint.logger(log.clone());
 
-    let mut server_config_instance = server_config.build();
-    server_config_instance.transport = Arc::new(quinn::TransportConfig {
-        idle_timeout: CONNECTION_IDLE_TIMEOUT,
-        ..Default::default()
-    });
+    endpoint.listen(server_config.build());
 
-    endpoint.listen(server_config_instance);
+    let (endpoint_driver, incoming) = {
+        let (driver, endpoint, incoming) = endpoint.bind(listen)?;
+        info!(log, "Listening on {}", endpoint.local_addr()?);
+        (driver, incoming)
+    };
 
-    let stdout = File::create(SAFE_AUTHD_STDOUT_FILE)
-        .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;
-    let stderr = File::create(SAFE_AUTHD_STDERR_FILE)
-        .map_err(|err| format_err!("Failed to open/create file for stderr: {}", err))?;
+    let safe_auth_handle: SharedSafeAuthenticatorHandle =
+        Arc::new(Mutex::new(SafeAuthenticator::new()));
 
-    let daemonize = Daemonize::new()
-        .pid_file(SAFE_AUTHD_PID_FILE) // Every method except `new` and `start`
-        //.chown_pid_file(true)      // is optional, see `Daemonize` documentation
-        .working_directory("/tmp") // for default behaviour.
-        //.user("nobody")
-        //.group("daemon") // Group name
-        //.group(2)        // or group id.
-        .umask(0o777) // Set umask, `0o027` by default.
-        .stdout(stdout) // Redirect stdout to `/tmp/safe-authd.out`.
-        .stderr(stderr) // Redirect stderr to `/tmp/safe-authd.err`.
-        .privileged_action(|| "Executed before drop privileges");
+    // We keep a queue for all the authorisation requests
+    let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
 
-    match daemonize.start() {
-        Ok(_) => {
-            println!("Success, SAFE Authenticator daemonised!");
+    // We keep a list of the notifications subscriptors' endpoints
+    let notif_endpoints_handle = Arc::new(Mutex::new(BTreeSet::new()));
 
-            let (endpoint_driver, incoming) = {
-                let (driver, endpoint, incoming) = endpoint.bind(listen)?;
-                info!(log, "Listening on {}", endpoint.local_addr()?);
-                (driver, incoming)
-            };
+    // Let's spawn a thread which will monitor pending auth reqs
+    // and get them allowed/denied by the user using any of the subcribed endpoints
+    // TODO: this can also be a Future with a Stream and schudule it as a task rather than having a thread
+    monitor_pending_auth_reqs(auth_reqs_handle.clone(), notif_endpoints_handle.clone());
 
-            let safe_auth_handle: SharedSafeAuthenticatorHandle =
-                Arc::new(Mutex::new(SafeAuthenticator::new()));
-
-            // We keep a queue for all the authorisation requests
-            let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
-
-            // We keep a list of the notifications subscriptors' endpoints
-            let notif_endpoints_handle = Arc::new(Mutex::new(BTreeSet::new()));
-
-            // Let's spawn a thread which will monitor pending auth reqs
-            // and get them allowed/denied by the user using any of the subcribed endpoints
-            // TODO: this can also be a Future with a Stream and schudule it as a task rather than having a thread
-            monitor_pending_auth_reqs(auth_reqs_handle.clone(), notif_endpoints_handle.clone());
-
-            // Finally let's spawn the task to handle the incoming connections
-            let mut runtime = Runtime::new()?;
-            runtime.spawn(incoming.for_each(move |conn| {
-                handle_connection(
-                    safe_auth_handle.clone(),
-                    auth_reqs_handle.clone(),
-                    notif_endpoints_handle.clone(),
-                    &log,
-                    conn,
-                );
-                Ok(())
-            }));
-
-            runtime.block_on(endpoint_driver)?;
-        }
-        Err(e) => eprintln!("Error, {}", e),
-    }
-
-    Ok(())
-}
-
-pub fn stop_authd() -> Result<(), Error> {
-    println!("Stopping SAFE Authenticator daemon...");
-    let mut file = File::open(SAFE_AUTHD_PID_FILE)?;
-    let mut pid = String::new();
-    file.read_to_string(&mut pid)?;
-    let output = Command::new("kill").arg("-9").arg(&pid).output()?;
-
-    if output.status.success() {
-        io::stdout().write_all(&output.stdout)?;
-        println!("Success, safe-authd stopped!");
+    // Finally let's spawn the task to handle the incoming connections
+    let mut runtime = Runtime::new()?;
+    runtime.spawn(incoming.for_each(move |conn| {
+        handle_connection(
+            safe_auth_handle.clone(),
+            auth_reqs_handle.clone(),
+            notif_endpoints_handle.clone(),
+            &log,
+            conn,
+        );
         Ok(())
-    } else {
-        io::stdout().write_all(&output.stderr)?;
-        bail!("Failed to stop safe-authd daemon");
-    }
-}
+    }));
+    println!("SAFE Authenticator services initialised sucessfully");
+    runtime.block_on(endpoint_driver)?;
 
-pub fn restart_authd(listen: SocketAddr) -> Result<(), Error> {
-    stop_authd()?;
-    start_authd(listen)?;
-    println!("Success, safe-authd restarted!");
     Ok(())
 }
 

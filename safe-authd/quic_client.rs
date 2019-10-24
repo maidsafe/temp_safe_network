@@ -48,7 +48,7 @@ pub fn quic_send(
     let ca_path = if let Some(ca_path) = cert_ca {
         ca_path
     } else {
-        let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
             Some(dirs) => dirs,
             None => {
                 return Err(

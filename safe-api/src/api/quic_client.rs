@@ -43,7 +43,14 @@ pub fn quic_send(
         })?;
 
     let mut endpoint = quinn::Endpoint::builder();
-    let mut client_config = quinn::ClientConfigBuilder::default();
+    let client_config = quinn::ClientConfig {
+        transport: Arc::new(quinn::TransportConfig {
+            idle_timeout: CONNECTION_IDLE_TIMEOUT,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut client_config = quinn::ClientConfigBuilder::new(client_config);
     client_config.protocols(&[quinn::ALPN_QUIC_HTTP]);
 
     if keylog {
@@ -53,7 +60,7 @@ pub fn quic_send(
     let ca_path = if let Some(ca_path) = cert_ca {
         ca_path
     } else {
-        let dirs = match directories::ProjectDirs::from("org", "quinn", "quinn-examples") {
+        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
             Some(dirs) => dirs,
             None => {
                 return Err(Error::AuthdClientError(
@@ -88,12 +95,7 @@ pub fn quic_send(
             ))
         })?;
 
-    let mut client_config_instance = client_config.build();
-    client_config_instance.transport = Arc::new(quinn::TransportConfig {
-        idle_timeout: CONNECTION_IDLE_TIMEOUT,
-        ..Default::default()
-    });
-    endpoint.default_client_config(client_config_instance);
+    endpoint.default_client_config(client_config.build());
 
     let (endpoint_driver, endpoint, _) = endpoint.bind("[::]:0").map_err(|err| {
         Error::AuthdClientError(format!("Failed to bind client endpoint: {}", err))
