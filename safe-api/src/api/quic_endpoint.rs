@@ -6,10 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{AuthReq, SafeAuthReqId};
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
 use log::debug;
+use safe_nd::AppPermissions;
 use slog::{Drain, Logger};
+use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
@@ -43,12 +46,7 @@ impl ErrorExt for Error {
     }
 }
 
-pub type NotifChannelDataType = (String, String);
-
-pub fn quic_listen(
-    url_str: &str,
-    notif_channel: mpsc::Sender<NotifChannelDataType>,
-) -> Result<(), String> {
+pub fn quic_listen(url_str: &str, notif_channel: mpsc::Sender<AuthReq>) -> Result<(), String> {
     debug!("Launching new QUIC endpoint on '{}'", url_str);
 
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
@@ -74,7 +72,7 @@ pub fn quic_listen(
 fn start_quic_endpoint(
     log: Logger,
     listen: SocketAddr,
-    notif_channel: mpsc::Sender<NotifChannelDataType>,
+    notif_channel: mpsc::Sender<AuthReq>,
 ) -> Result<(), Error> {
     let server_config = quinn::ServerConfig {
         transport: Arc::new(quinn::TransportConfig {
@@ -164,7 +162,7 @@ fn handle_connection(
         quinn::Connection,
         quinn::IncomingStreams,
     ),
-    notif_channel: mpsc::Sender<NotifChannelDataType>,
+    notif_channel: mpsc::Sender<AuthReq>,
 ) {
     let (conn_driver, _conn, incoming_streams) = conn;
     let log = log.clone();
@@ -188,11 +186,7 @@ fn handle_connection(
     );
 }
 
-fn handle_request(
-    _log: &Logger,
-    stream: quinn::NewStream,
-    notif_channel: mpsc::Sender<NotifChannelDataType>,
-) {
+fn handle_request(_log: &Logger, stream: quinn::NewStream, notif_channel: mpsc::Sender<AuthReq>) {
     let (send, recv) = match stream {
         quinn::NewStream::Bi(send, recv) => (send, recv),
         quinn::NewStream::Uni(_) => unreachable!("Disabled by endpoint configuration"),
@@ -234,10 +228,7 @@ fn handle_request(
     )
 }
 
-fn process_get(
-    x: &[u8],
-    notif_channel: mpsc::Sender<NotifChannelDataType>,
-) -> Result<Box<[u8]>, Error> {
+fn process_get(x: &[u8], notif_channel: mpsc::Sender<AuthReq>) -> Result<Box<[u8]>, Error> {
     if x.len() < 4 || &x[0..4] != b"GET " {
         bail!("Missing GET");
     }
@@ -255,10 +246,25 @@ fn process_get(
         )
     } else {
         let app_id = req_args[1];
-        let req_id = req_args[2];
+        let req_id = req_args[2].parse::<SafeAuthReqId>()?;
+
+        // TODO: get the rest of auth req info from the request
+        let auth_req = AuthReq {
+            req_id,
+            app_id: app_id.to_string(),
+            app_name: String::from("Unknown"),
+            app_vendor: String::from("Unknown"),
+            app_permissions: AppPermissions {
+                get_balance: true,
+                perform_mutations: true,
+                transfer_coins: true,
+            },
+            own_container: false,
+            containers: HashMap::default(),
+        };
 
         // New notification for auth req to be sent to user
-        let msg = match notif_channel.send((app_id.to_string(), req_id.to_string())) {
+        let msg = match notif_channel.send(auth_req) {
             Ok(_) => format!(
                 "Ok - auth req from app ID: {} ready to be notified to user",
                 app_id

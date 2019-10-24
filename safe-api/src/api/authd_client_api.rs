@@ -8,7 +8,7 @@
 
 use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
-use super::quic_endpoint::{quic_listen, NotifChannelDataType};
+use super::quic_endpoint::quic_listen;
 use super::{AuthedAppsList, Error, Result, SafeAuthReqId};
 use log::{debug, error, info};
 use safe_core::ipc::req::ContainerPermissions;
@@ -44,8 +44,7 @@ pub type PendingAuthReqs = Vec<AuthReq>;
 
 // Type of the function/callback invoked for notifying and querying if an authorisation request
 // shall be allowed. All the relevant information about the authorisation request is passed as args to the callback.
-pub type AuthAllowPrompt =
-    dyn Fn(String, String) -> Option<bool> + std::marker::Send + std::marker::Sync;
+pub type AuthAllowPrompt = dyn Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync;
 
 // Path of authenticator endpoint for login into a SAFE account
 const SAFE_AUTHD_ENDPOINT_LOGIN: &str = "login/";
@@ -298,7 +297,7 @@ impl SafeAuthdClient {
 
     // Subscribe a callback to receive notifications to allow/deny authorisation requests
     pub fn subscribe<
-        CB: 'static + Fn(String, String) -> Option<bool> + std::marker::Send + std::marker::Sync,
+        CB: 'static + Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync,
     >(
         &mut self,
         endpoint_url: &str,
@@ -324,10 +323,7 @@ impl SafeAuthdClient {
         let listen = endpoint_url.to_string();
 
         // We need a channel to receive auth req notifications from the thread running the QUIC endpoint
-        let (tx, rx): (
-            mpsc::Sender<NotifChannelDataType>,
-            mpsc::Receiver<NotifChannelDataType>,
-        ) = mpsc::channel();
+        let (tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
 
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
         let endpoint_thread_join_handle = thread::spawn(move || match quic_listen(&listen, tx) {
@@ -348,12 +344,12 @@ impl SafeAuthdClient {
         // TODO: we may be also able to merge this logic into the endpoint thread
         let cb_thread_join_handle = thread::spawn(move || loop {
             match rx.recv() {
-                Ok((app_id, req_id)) => {
+                Ok(auth_req) => {
                     debug!(
-                        "Notification for authorisation request from app ID '{}' received",
-                        app_id
+                        "Notification for authorisation request ({}) from app ID '{}' received",
+                        auth_req.req_id, auth_req.app_id
                     );
-                    cb(app_id.clone(), req_id.clone());
+                    cb(auth_req);
                 }
                 Err(err) => {
                     debug!("Failed to receive message: {}", err);

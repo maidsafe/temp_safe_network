@@ -93,7 +93,7 @@ pub fn authd_revoke(safe_authd: &SafeAuthdClient, app_id: String) -> Result<(), 
 pub fn authd_auth_reqs(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     println!("Requesting list of pending authorisation requests from authd...");
     let auth_reqs = safe_authd.auth_reqs()?;
-    pretty_print_auth_reqs(auth_reqs);
+    pretty_print_auth_reqs(auth_reqs, "Pending Authorisation requests");
     Ok(())
 }
 
@@ -178,12 +178,12 @@ pub fn pretty_print_authed_apps(authed_apps: AuthedAppsList) {
     table.printstd();
 }
 
-pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs) {
+pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: &str) {
     if auth_reqs.is_empty() {
         println!("There are no pending authorisation requests");
     } else {
         let mut table = Table::new();
-        table.add_row(row![bFg->"Pending Authorisation requests"]);
+        table.add_row(row![bFg->title_msg]);
         table.add_row(
             row![bFg->"Request Id", bFg->"App Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"],
         );
