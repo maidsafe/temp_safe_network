@@ -22,20 +22,20 @@ name = "safe"
 path = "main.rs"
 
 [dependencies]
-safe-api = { path = "../safe-api" }
-log = "0.4.6"
-structopt = "0.2.15"
+dirs = "2.0.1"
 env_logger = "0.6.0"
-rand = "0.6.5"
+human-panic = "1.0.1"
+log = "0.4.6"
 prettytable-rs = "^0.8"
+rand = "0.6.5"
+relative-path = "0.4.0"
+rpassword = "4.0.1"
+safe-api = { path = "../safe-api" }
+self_update = "0.5.1"
 serde = "1.0.91"
 serde_json = "1.0.39"
-human-panic = "1.0.1"
-relative-path = "0.4.0"
-self_update = "0.5.1"
-directories = "~2.0.1"
-rpassword = "4.0.1"
 shrust = "0.0.7"
+structopt = "0.2.15"
 
 [features]
 mock-network = ["safe-api/mock-network"]
@@ -43,11 +43,11 @@ fake-auth = ["safe-api/fake-auth"]
 scl-mock = ["safe-api/scl-mock"]
 
 [dev-dependencies]
-safe-nd = "~0.4.0"
-pretty_assertions = "0.6.1"
-predicates = "1.0.0"
 assert_cmd = "0.11.1"
 duct = "0.12.0"
+predicates = "1.0.0"
+pretty_assertions = "0.6.1"
+safe-nd = "~0.4.0"
 unwrap = "~1.2.1"
 
 [dev-dependencies.cargo-husky]

@@ -17,40 +17,40 @@ include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 
 [dependencies]
-log = "0.4.6"
-safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
-safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
-safe-nd = "~0.4.0"
-safe_authenticator = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
-maidsafe_utilities = "~0.18.0"
+bincode = "1.1.4"
+chrono = "0.4.6"
+directories = "1.0.2"
 env_logger = "0.6.0"
+failure = "0.1"
+futures = "~0.1.17"
+lazy_static = "1.2.0"
+log = "0.4.6"
+maidsafe_utilities = "~0.18.0"
+mime_guess = "2.0.1"
+multibase = "0.6.0"
+quinn = "~0.3.0"
 rand = "0.6.5"
 rand_core = "0.4.0"
-threshold_crypto = "~0.3.2"
+rcgen = "0.2"
+relative-path = "0.4.0"
+safe-nd = "~0.4.0"
+safe_app = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
+safe_authenticator = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master"}
 serde = "1.0.91"
 serde_json = "1.0.39"
-bincode = "1.1.4"
-multibase = "0.6.0"
-relative-path = "0.4.0"
+slog = "2.1"
+slog-term = "2"
+threshold_crypto = "~0.3.2"
 tiny-keccak = "~1.5.0"
-futures = "~0.1.17"
-walkdir = "~2.0.1" #ffi utils needs this version
-chrono = "0.4.6"
-url = "1.7.2"
-validator = "0.8.0"
-validator_derive = "0.8.0"
-mime_guess = "2.0.1"
-lazy_static = "1.2.0"
-quinn = "~0.3.0"
 tokio = "0.1.6"
 tokio-current-thread = "0.1"
 tokio-reactor = "0.1.1"
-directories = "1.0.2"
+url = "1.7.2"
 urlencoding = "1.0.0"
-slog-term = "2"
-slog = "2.1"
-failure = "0.1"
-rcgen = "0.2"
+validator = "0.8.0"
+validator_derive = "0.8.0"
+walkdir = "~2.0.1" #ffi utils needs this version
 
 [features]
 mock-network = ["safe_app/mock-network", "safe_authenticator/mock-network"]
