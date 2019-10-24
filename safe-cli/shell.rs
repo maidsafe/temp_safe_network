@@ -47,6 +47,17 @@ pub fn shell_run() -> Result<(), String> {
         },
     );
     shell.new_command_noargs(
+        "auth-status",
+        "Send request to a remote Authenticator daemon to obtain an status report",
+        |io, (_, safe_authd_client)| match authd_status(safe_authd_client) {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                writeln!(io, "{}", err)?;
+                Ok(())
+            }
+        },
+    );
+    shell.new_command_noargs(
         "auth-login",
         "Send request to a remote Authenticator daemon to login to a SAFE account",
         |io, (_, safe_authd_client)| match authd_login(safe_authd_client) {

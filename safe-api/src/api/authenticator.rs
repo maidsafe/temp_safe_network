@@ -124,6 +124,12 @@ impl SafeAuthenticator {
         Ok(())
     }
 
+    pub fn is_logged_in(&self) -> bool {
+        let is_logged_in = self.safe_authenticator.is_some();
+        debug!("Is logged in? {}", is_logged_in);
+        is_logged_in
+    }
+
     /// # Create Account
     /// Creates a new account on the SAFE Network.
     /// Returns an error if an account exists or if there was some

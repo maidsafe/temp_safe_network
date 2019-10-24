@@ -15,6 +15,7 @@ mod deny;
 mod log_in;
 mod log_out;
 mod revoke;
+mod status;
 mod subscribe;
 mod unsubscribe;
 
@@ -188,6 +189,12 @@ fn process_authenticator_req(
     println!("Processing new incoming request: '{}'", action);
 
     let outcome = match action {
+        "status" => status::process_req(
+            action_args,
+            safe_auth_handle,
+            auth_reqs_handle,
+            notif_endpoints_handle,
+        ),
         "login" => log_in::process_req(action_args, safe_auth_handle),
         "logout" => log_out::process_req(action_args, safe_auth_handle),
         "create" => create_acc::process_req(action_args, safe_auth_handle),

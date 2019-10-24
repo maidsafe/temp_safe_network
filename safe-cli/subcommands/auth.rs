@@ -22,6 +22,9 @@ pub enum AuthSubCommands {
     #[structopt(name = "logout")]
     /// Send request to a remote Authenticator daemon to logout from currently logged in SAFE account
     Logout {},
+    #[structopt(name = "status")]
+    /// Send request to a remote Authenticator daemon to obtain an status report
+    Status {},
     #[structopt(name = "create-acc")]
     /// Send request to a remote Authenticator daemon to create a new SAFE account
     Create {
@@ -41,9 +44,9 @@ pub enum AuthSubCommands {
         /// The application ID
         app_id: String,
     },
-    #[structopt(name = "auth-reqs")]
+    #[structopt(name = "reqs")]
     /// Send request to a remote Authenticator daemon to retrieve the list of the pending authorisation requests
-    AuthReqs {},
+    Reqs {},
     #[structopt(name = "allow")]
     /// Send request to a remote Authenticator daemon to allow an authorisation request
     Allow {
@@ -97,6 +100,10 @@ pub fn auth_commander(
             let mut safe_authd = SafeAuthdClient::new(None);
             authd_logout(&mut safe_authd)
         }
+        Some(AuthSubCommands::Status {}) => {
+            let mut safe_authd = SafeAuthdClient::new(None);
+            authd_status(&mut safe_authd)
+        }
         Some(AuthSubCommands::Apps {}) => {
             let safe_authd = SafeAuthdClient::new(None);
             authd_apps(&safe_authd)
@@ -106,7 +113,7 @@ pub fn auth_commander(
             let safe_authd = SafeAuthdClient::new(None);
             authd_revoke(&safe_authd, app_id)
         }
-        Some(AuthSubCommands::AuthReqs {}) => {
+        Some(AuthSubCommands::Reqs {}) => {
             let safe_authd = SafeAuthdClient::new(None);
             authd_auth_reqs(&safe_authd)
         }

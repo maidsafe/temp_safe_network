@@ -8,7 +8,9 @@
 
 use prettytable::Table;
 use rpassword;
-use safe_api::{AuthAllowPrompt, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient};
+use safe_api::{
+    AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
+};
 
 pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     let authd_path = get_authd_bin_path();
@@ -72,6 +74,14 @@ pub fn authd_logout(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
     println!("Sending logout action request to authd...");
     safe_authd.log_out()?;
     println!("Logged out successfully");
+    Ok(())
+}
+
+pub fn authd_status(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
+    println!("Sending request to authd to obtain an status report...");
+    let status_report = safe_authd.status()?;
+    pretty_print_status_report(status_report);
+
     Ok(())
 }
 
@@ -217,6 +227,24 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: &str) {
         }
         table.printstd();
     }
+}
+
+pub fn pretty_print_status_report(status_report: AuthdStatus) {
+    let mut table = Table::new();
+    table.add_row(row![bFg->"SAFE Authenticator status"]);
+    table.add_row(row![
+        "Logged in to a SAFE account?",
+        status_report.logged_in,
+    ]);
+    table.add_row(row![
+        "Number of pending authorisation requests",
+        status_report.num_auth_reqs,
+    ]);
+    table.add_row(row![
+        "Number of notifications subscriptors",
+        status_report.num_notif_subs,
+    ]);
+    table.printstd();
 }
 
 // Private helpers

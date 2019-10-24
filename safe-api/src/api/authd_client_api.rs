@@ -39,12 +39,22 @@ pub struct AuthReq {
     pub own_container: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AuthdStatus {
+    pub logged_in: bool,
+    pub num_auth_reqs: u32,
+    pub num_notif_subs: u32,
+}
+
 // Type of the list of pending authorisation requests
 pub type PendingAuthReqs = Vec<AuthReq>;
 
 // Type of the function/callback invoked for notifying and querying if an authorisation request
 // shall be allowed. All the relevant information about the authorisation request is passed as args to the callback.
 pub type AuthAllowPrompt = dyn Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync;
+
+// Path of authenticator endpoint for getting an status report of the safe-authd
+const SAFE_AUTHD_ENDPOINT_STATUS: &str = "status";
 
 // Path of authenticator endpoint for login into a SAFE account
 const SAFE_AUTHD_ENDPOINT_LOGIN: &str = "login/";
@@ -132,6 +142,29 @@ impl SafeAuthdClient {
         let path = authd_path.unwrap_or_else(|| "");
         debug!("Attempting to restart authd from '{}' ...", path);
         authd_run_cmd(path, SAFE_AUTHD_CMD_RESTART)
+    }
+
+    // Send a request to remote authd endpoint to obtain an status report
+    pub fn status(&mut self) -> Result<AuthdStatus> {
+        debug!("Attempting to retrieve status report from remote authd...");
+        let authd_service_url = format!(
+            "{}:{}/{}",
+            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_STATUS
+        );
+
+        info!("Sending status report request to SAFE Authenticator...");
+        let authd_response = send_request(&authd_service_url)?;
+
+        info!(
+            "SAFE status report retrieved successfully: {}",
+            authd_response
+        );
+
+        let status_report: AuthdStatus = serde_json::from_str(&authd_response).map_err(|err| {
+            Error::AuthdClientError(format!("Failed to parse status report: {}", err))
+        })?;
+
+        Ok(status_report)
     }
 
     // Send a login action request to remote authd endpoint

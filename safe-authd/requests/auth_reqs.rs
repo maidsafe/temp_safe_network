@@ -25,12 +25,13 @@ pub fn process_req(
                     .collect())
             })?;
 
+        let auth_reqs_serialised = serde_json::to_string(&pending_auth_reqs)
+            .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
+
         println!(
             "List of pending authorisation requests sent: {:?}",
             pending_auth_reqs
         );
-        let auth_reqs_serialised = serde_json::to_string(&pending_auth_reqs)
-            .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
 
         Ok(auth_reqs_serialised)
     }
