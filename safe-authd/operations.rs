@@ -12,7 +12,6 @@ use failure::{Error, Fail};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, Write};
-use std::net::SocketAddr;
 use std::process::Command;
 use std::{fmt, str};
 
@@ -44,7 +43,7 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn start_authd(listen: SocketAddr) -> Result<(), Error> {
+pub fn start_authd(listen: &str) -> Result<(), Error> {
     let stdout = File::create(SAFE_AUTHD_STDOUT_FILE)
         .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;
     let stderr = File::create(SAFE_AUTHD_STDERR_FILE)
@@ -91,7 +90,7 @@ pub fn stop_authd() -> Result<(), Error> {
     }
 }
 
-pub fn restart_authd(listen: SocketAddr) -> Result<(), Error> {
+pub fn restart_authd(listen: &str) -> Result<(), Error> {
     stop_authd()?;
     start_authd(listen)?;
     println!("Success, safe-authd restarted!");

@@ -21,7 +21,6 @@ name = "safe-authd"
 path = "main.rs"
 
 [dependencies]
-daemonize = "~0.4.1"
 directories = "1.0.2"
 env_logger = "0.6.0"
 failure = "0.1"
@@ -41,6 +40,9 @@ tokio-current-thread = "0.1"
 tokio-reactor = "0.1.1"
 url = "1.7.2"
 urlencoding = "1.0.0"
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+daemonize = "~0.4.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-service = "0.2.0"

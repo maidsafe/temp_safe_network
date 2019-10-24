@@ -21,12 +21,10 @@ mod operations_win;
 use env_logger;
 use log::debug;
 use log::error;
-use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process;
 use structopt::{self, StructOpt};
 use update::update_commander;
-use url::Url;
 
 #[macro_use]
 extern crate human_panic;
@@ -44,6 +42,9 @@ extern crate self_update;
 use operations::{restart_authd, start_authd, stop_authd};
 #[cfg(target_os = "windows")]
 use operations_win::{restart_authd, start_authd, stop_authd};
+#[cfg(target_os = "windows")]
+#[macro_use]
+extern crate windows_service;
 
 use authd::ErrorExt;
 
@@ -105,13 +106,7 @@ fn process_command(opt: CmdArgs) -> Result<(), String> {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
         CmdArgs::Start { listen, .. } => {
-            let url = Url::parse(&listen).map_err(|_| "Invalid end point address".to_string())?;
-            let endpoint = url
-                .to_socket_addrs()
-                .map_err(|_| "Invalid end point address".to_string())?
-                .next()
-                .ok_or_else(|| "The end point is an invalid address".to_string())?;
-            if let Err(e) = start_authd(endpoint) {
+            if let Err(e) = start_authd(&listen) {
                 Err(format!("{}", e.pretty()))
             } else {
                 Ok(())
@@ -125,13 +120,7 @@ fn process_command(opt: CmdArgs) -> Result<(), String> {
             }
         }
         CmdArgs::Restart { listen } => {
-            let url = Url::parse(&listen).map_err(|_| "Invalid end point address".to_string())?;
-            let endpoint = url
-                .to_socket_addrs()
-                .map_err(|_| "Invalid end point address".to_string())?
-                .next()
-                .ok_or_else(|| "The end point is an invalid address".to_string())?;
-            if let Err(e) = restart_authd(endpoint) {
+            if let Err(e) = restart_authd(&listen) {
                 Err(format!("{}", e.pretty()))
             } else {
                 Ok(())

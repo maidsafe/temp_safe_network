@@ -15,10 +15,11 @@ use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
 use std::collections::BTreeSet;
 use std::io;
-use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
 use std::{ascii, fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
+use url::Url;
 
 // Number of milliseconds to allow an idle connection before closing it
 const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
@@ -47,7 +48,14 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn run(listen: SocketAddr) -> Result<(), Error> {
+pub fn run(listen: &str) -> Result<(), Error> {
+    let url = Url::parse(&listen).map_err(|_| format_err!("Invalid endpoint address"))?;
+    let endpoint_socket_addr = url
+        .to_socket_addrs()
+        .map_err(|_| format_err!("Invalid endpoint address"))?
+        .next()
+        .ok_or_else(|| format_err!("The endpoint is an invalid address"))?;
+
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
     let drain = slog_term::FullFormat::new(decorator)
         .use_original_order()
@@ -123,7 +131,7 @@ pub fn run(listen: SocketAddr) -> Result<(), Error> {
     endpoint.listen(server_config.build());
 
     let (endpoint_driver, incoming) = {
-        let (driver, endpoint, incoming) = endpoint.bind(listen)?;
+        let (driver, endpoint, incoming) = endpoint.bind(endpoint_socket_addr)?;
         info!(log, "Listening on {}", endpoint.local_addr()?);
         (driver, incoming)
     };

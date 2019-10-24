@@ -13,10 +13,6 @@ extern crate failure;
 #[macro_use]
 extern crate slog;
 
-#[cfg(target_os = "windows")]
-#[macro_use]
-extern crate windows_service;
-
 mod api;
 
 pub use api::*;
