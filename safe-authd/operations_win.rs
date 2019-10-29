@@ -29,6 +29,13 @@ const SERVICE_LAUNCH_ARGUMENT: &str = "start";
 
 define_windows_service!(ffi_authd_service, authd_service);
 
+// On Windows since it runs as a service the current user's name and home is unknown
+// we therefore use ProgramsData folder to share the certificate with all users
+pub fn get_certificate_base_path() -> Result<String, Error> {
+    let program_data_path = std::path::Path::new("C:\\ProgramData");
+    Ok(program_data_path.join("safe-authd").display().to_string())
+}
+
 pub fn install_authd() -> Result<(), Error> {
     println!("Installing SAFE Authenticator (safe-authd) as a Windows service...");
     install_authd_service()

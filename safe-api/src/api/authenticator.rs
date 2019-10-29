@@ -62,7 +62,11 @@ pub struct SafeAuthenticator {
 
 #[allow(dead_code)]
 impl SafeAuthenticator {
-    pub fn new() -> Self {
+    pub fn new(config_dir_path: Option<&str>) -> Self {
+        if let Some(path) = config_dir_path {
+            safe_core::config_handler::set_config_dir_path(path);
+        }
+
         Self {
             safe_authenticator: None,
         }

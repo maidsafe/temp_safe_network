@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::get_certificate_base_path;
 use super::notifs::monitor_pending_auth_reqs;
 use super::requests::process_request;
 use super::shared::*;
@@ -135,8 +136,14 @@ pub fn run(listen: &str) -> Result<(), Error> {
         (driver, incoming)
     };
 
+    let config_dir_path = if cfg!(target_os = "windows") {
+        Some("C:\\ProgramData\\safe-vault")
+    } else {
+        None // just use the default
+    };
+
     let safe_auth_handle: SharedSafeAuthenticatorHandle =
-        Arc::new(Mutex::new(SafeAuthenticator::new()));
+        Arc::new(Mutex::new(SafeAuthenticator::new(config_dir_path)));
 
     // We keep a queue for all the authorisation requests
     let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
@@ -168,23 +175,6 @@ pub fn run(listen: &str) -> Result<(), Error> {
 }
 
 // Private helpers
-
-// FIXME: we shouldn't need this, but temporarily we do this on Windows since it runs as a
-// service and therefore this is the user profile path where it stores the certificates
-#[cfg(target_os = "windows")]
-fn get_certificate_base_path() -> Result<String, Error> {
-    Ok("C:\\Users\\bochaco\\AppData\\Local\\MaidSafe\\authd\\data".to_string())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn get_certificate_base_path() -> Result<String, Error> {
-    match directories::ProjectDirs::from("net", "maidsafe", "authd") {
-        Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
-        None => Err(format_err!(
-            "Failed to obtain local project directory where to write certificate from"
-        )),
-    }
-}
 
 fn handle_connection(
     safe_auth_handle: SharedSafeAuthenticatorHandle,

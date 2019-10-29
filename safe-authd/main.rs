@@ -43,6 +43,11 @@ use operations::{install_authd, restart_authd, start_authd, stop_authd, uninstal
 #[cfg(target_os = "windows")]
 use operations_win::{install_authd, restart_authd, start_authd, stop_authd, uninstall_authd};
 
+#[cfg(not(target_os = "windows"))]
+pub use operations::get_certificate_base_path;
+#[cfg(target_os = "windows")]
+pub use operations_win::get_certificate_base_path;
+
 use authd::ErrorExt;
 
 #[derive(StructOpt, Debug)]

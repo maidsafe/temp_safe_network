@@ -202,6 +202,15 @@ fn duration_secs(x: &Duration) -> f32 {
     x.as_secs() as f32 + x.subsec_nanos() as f32 * 1e-9
 }
 
+// On Windows since authd runs as a service the current user's name and home is unknown
+// we therefore use ProgramsData folder to share the certificate with all users
+#[cfg(target_os = "windows")]
+fn get_certificate_base_path() -> Result<String> {
+    let program_data_path = std::path::Path::new("C:\\ProgramData");
+    Ok(program_data_path.join("safe-authd").display().to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
 fn get_certificate_base_path() -> Result<String> {
     match directories::ProjectDirs::from("net", "maidsafe", "authd") {
         Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
