@@ -12,18 +12,17 @@ use crate::{
     client_handler::ClientHandler,
     coins_handler::CoinsHandler,
     data_handler::DataHandler,
-    quic_p2p::{Event, NodeInfo},
-    routing::{Event as RoutingEvent, Node},
+    routing::{ClientEvent, ConnectionInfo, Event as RoutingEvent, Node},
     rpc::Rpc,
-    utils, Config, Error, Result,
+    utils, Config, Result,
 };
 use bincode;
-use crossbeam_channel::{select, Receiver};
+use crossbeam_channel::{Receiver, Select};
 use log::{error, info, trace};
 use safe_nd::{NodeFullId, Request, XorName};
 use std::borrow::Cow;
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     fs,
     path::PathBuf,
@@ -52,6 +51,7 @@ pub(crate) enum Init {
 }
 
 /// Command that the user can send to a running vault to control its execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     /// Shutdown the vault
     Shutdown,
@@ -62,15 +62,16 @@ pub struct Vault {
     id: NodeFullId,
     root_dir: PathBuf,
     state: State,
-    event_receiver: Receiver<Event>,
+    event_receiver: Receiver<RoutingEvent>,
     command_receiver: Receiver<Command>,
-    routing_node: Node,
+    routing_node: Rc<RefCell<Node>>,
 }
 
 impl Vault {
-    /// Construct a new vault instance.
+    /// Create and start vault. This will block unitl a `Command` to free it is fired.
     pub fn new(
         routing_node: Node,
+        event_receiver: Receiver<RoutingEvent>,
         config: Config,
         command_receiver: Receiver<Command>,
     ) -> Result<Self> {
@@ -85,13 +86,16 @@ impl Vault {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
 
-        let (state, event_receiver) = if is_elder {
+        let routing_node = Rc::new(RefCell::new(routing_node));
+
+        let state = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
-            let (client_handler, event_receiver) = ClientHandler::new(
+            let client_handler = ClientHandler::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
                 init_mode,
+                routing_node.clone(),
             )?;
             let data_handler = DataHandler::new(
                 id.public_id().clone(),
@@ -100,14 +104,11 @@ impl Vault {
                 init_mode,
             )?;
             let coins_handler = CoinsHandler::new(id.public_id().clone(), root_dir, init_mode)?;
-            (
-                State::Elder {
-                    client_handler,
-                    data_handler,
-                    coins_handler,
-                },
-                event_receiver,
-            )
+            State::Elder {
+                client_handler,
+                data_handler,
+                coins_handler,
+            }
         } else {
             let _adult = Adult::new(
                 id.public_id().clone(),
@@ -131,14 +132,11 @@ impl Vault {
     }
 
     /// Returns our connection info.
-    pub fn our_connection_info(&mut self) -> Result<NodeInfo> {
-        match self.state {
-            State::Elder {
-                ref mut client_handler,
-                ..
-            } => client_handler.our_connection_info(),
-            State::Adult { .. } => unimplemented!(),
-        }
+    pub fn our_connection_info(&mut self) -> Result<ConnectionInfo> {
+        self.routing_node
+            .borrow_mut()
+            .our_connection_info()
+            .map_err(From::from)
     }
 
     /// Runs the main event loop. Blocks until the vault is terminated.
@@ -146,19 +144,37 @@ impl Vault {
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
     pub fn run(&mut self) {
         loop {
-            select! {
-                recv(self.event_receiver) -> event => {
-                    if let Ok(event) = event {
-                        self.step_quic_p2p(event)
-                    } else {
-                        break
+            let mut sel = Select::new();
+
+            let mut r_node = self.routing_node.borrow_mut();
+            r_node.register(&mut sel);
+            let routing_event_rx_idx = sel.recv(&self.event_receiver);
+            let command_rx_idx = sel.recv(&self.command_receiver);
+
+            let selected_operation = sel.ready();
+            drop(r_node);
+
+            match selected_operation {
+                idx if idx == routing_event_rx_idx => {
+                    let event = match self.event_receiver.recv() {
+                        Ok(ev) => ev,
+                        Err(e) => panic!("FIXME: {:?}", e),
+                    };
+                    self.step_routing(event);
+                }
+                idx if idx == command_rx_idx => {
+                    let command = match self.command_receiver.recv() {
+                        Ok(ev) => ev,
+                        Err(e) => panic!("FIXME: {:?}", e),
+                    };
+                    match command {
+                        Command::Shutdown => break,
                     }
                 }
-                recv(self.command_receiver) -> command => {
-                    if let Ok(Command::Shutdown) = command {
-                        trace!("{}: Shutdown command received", self);
-                        break
-                    }
+                idx => {
+                    self.routing_node
+                        .borrow_mut()
+                        .handle_selected_operation(idx);
                 }
             }
         }
@@ -169,14 +185,44 @@ impl Vault {
     pub fn poll(&mut self) -> bool {
         let mut processed = false;
 
-        while let Ok(event) = self.event_receiver.try_recv() {
-            self.step_quic_p2p(event);
-            processed = true;
-        }
+        loop {
+            let mut sel = Select::new();
+            let mut r_node = self.routing_node.borrow_mut();
+            r_node.register(&mut sel);
+            let routing_event_rx_idx = sel.recv(&self.event_receiver);
+            let command_rx_idx = sel.recv(&self.command_receiver);
 
-        while let Ok(event) = self.routing_node.try_next_ev() {
-            self.step_routing(event);
-            processed = true;
+            if let Ok(selected_operation) = sel.try_ready() {
+                drop(r_node);
+
+                match selected_operation {
+                    idx if idx == routing_event_rx_idx => {
+                        let event = match self.event_receiver.recv() {
+                            Ok(ev) => ev,
+                            Err(e) => panic!("FIXME: {:?}", e),
+                        };
+                        self.step_routing(event);
+                        processed = true;
+                    }
+                    idx if idx == command_rx_idx => {
+                        let command = match self.command_receiver.recv() {
+                            Ok(ev) => ev,
+                            Err(e) => panic!("FIXME: {:?}", e),
+                        };
+                        match command {
+                            Command::Shutdown => (),
+                        }
+                        processed = true;
+                    }
+                    idx => {
+                        self.routing_node
+                            .borrow_mut()
+                            .handle_selected_operation(idx);
+                    }
+                }
+            } else {
+                break;
+            }
         }
 
         processed
@@ -189,19 +235,20 @@ impl Vault {
         }
     }
 
-    fn step_quic_p2p(&mut self, event: Event) {
-        let mut maybe_action = self.handle_quic_p2p_event(event);
+    fn step_client_event(&mut self, event: ClientEvent) {
+        let mut maybe_action = self.handle_client_event(event);
         while let Some(action) = maybe_action {
             maybe_action = self.handle_action(action);
         }
     }
 
     fn handle_routing_event(&mut self, event: RoutingEvent) -> Option<Action> {
-        let client_handler = self.client_handler_mut()?;
         match event {
+            RoutingEvent::ClientEvent(ev) => self.handle_client_event(ev),
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<ConsensusAction>(&custom_event) {
                     Ok(consensus_action) => {
+                        let client_handler = self.client_handler_mut()?;
                         client_handler.handle_consensused_action(consensus_action)
                     }
                     Err(e) => {
@@ -210,34 +257,37 @@ impl Vault {
                     }
                 }
             }
+            // Ignore all other events
+            _ => None,
         }
     }
 
-    fn handle_quic_p2p_event(&mut self, event: Event) -> Option<Action> {
+    fn handle_client_event(&mut self, event: ClientEvent) -> Option<Action> {
+        use ClientEvent::*;
+
         let client_handler = self.client_handler_mut()?;
         match event {
-            Event::ConnectedTo { peer } => client_handler.handle_new_connection(peer),
-            Event::ConnectionFailure { peer_addr, err } => {
-                client_handler.handle_connection_failure(peer_addr, Error::from(err));
+            ConnectedToClient { peer_addr } => client_handler.handle_new_connection(peer_addr),
+            ConnectionFailureToClient { peer_addr } => {
+                client_handler.handle_connection_failure(peer_addr);
             }
-            Event::NewMessage { peer_addr, msg } => {
+            NewMessageFromClient { peer_addr, msg } => {
                 return client_handler.handle_client_message(peer_addr, msg);
             }
-            Event::SentUserMessage { peer_addr, .. } => {
+            SentUserMsgToClient { peer_addr, .. } => {
                 trace!("{}: Succesfully sent message to: {}", self, peer_addr);
             }
-            Event::UnsentUserMessage { peer_addr, .. } => {
+            UnsentUserMsgToClient { peer_addr, .. } => {
                 info!("{}: Not sent message to: {}", self, peer_addr);
-            }
-            Event::BootstrapFailure | Event::BootstrappedTo { .. } | Event::Finish => {
-                info!("{}: Unexpected event: {}", self, event);
             }
         }
         None
     }
 
     fn vote_for_action(&mut self, action: ConsensusAction) -> Option<Action> {
-        self.routing_node.vote_for(utils::serialise(&action));
+        self.routing_node
+            .borrow_mut()
+            .vote_for(utils::serialise(&action));
         None
     }
 

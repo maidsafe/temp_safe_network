@@ -41,11 +41,12 @@ mod detail {
     use self_update::Status;
     use std::{io::Write, process};
     use structopt::StructOpt;
+    use unwrap::unwrap;
 
     /// Runs a SAFE Network vault.
     pub fn main() {
         let mut config = Config::new();
-        if config.quic_p2p_config().ip.is_none() {
+        if config.network_config().ip.is_none() {
             config.listen_on_loopback();
         }
 
@@ -98,7 +99,11 @@ mod detail {
             log::error!("Failed to set interrupt handler: {:?}", error)
         }
 
-        let routing_node = match Node::builder().create() {
+        let (routing_node, routing_rx) = match Node::builder()
+            .first(config.is_first())
+            .network_config(config.network_config().clone())
+            .create()
+        {
             Ok(node) => node,
             Err(e) => {
                 eprintln!("Could not start a Routing node: {:?}", e);
@@ -106,8 +111,14 @@ mod detail {
             }
         };
 
-        match Vault::new(routing_node, config, command_rx) {
-            Ok(mut vault) => vault.run(),
+        match Vault::new(routing_node, routing_rx, config, command_rx) {
+            Ok(mut vault) => {
+                println!(
+                    "Vault connection info:\n{}",
+                    unwrap!(serde_json::to_string(&unwrap!(vault.our_connection_info())))
+                );
+                vault.run();
+            }
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);
             }

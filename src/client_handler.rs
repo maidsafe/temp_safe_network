@@ -16,15 +16,13 @@ use self::{
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
-    config_handler::write_connection_info,
-    quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
+    routing::Node,
     rpc::Rpc,
     utils::{self, AuthorisationKind},
     vault::Init,
-    Config, Error, Result,
+    Config, Result,
 };
 use bytes::Bytes;
-use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
@@ -35,7 +33,7 @@ use safe_nd::{
 };
 use serde::Serialize;
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -61,8 +59,8 @@ pub(crate) struct ClientHandler {
     pending_msg_ids: HashMap<MessageId, SocketAddr>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
-    quic_p2p: QuicP2p,
     login_packets: LoginPacketChunkStore,
+    routing_node: Rc<RefCell<Node>>,
 }
 
 impl ClientHandler {
@@ -71,12 +69,12 @@ impl ClientHandler {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
-    ) -> Result<(Self, Receiver<Event>)> {
+        routing_node: Rc<RefCell<Node>>,
+    ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys = AuthKeysDb::new(root_dir, init_mode)?;
         let balances = BalancesDb::new(root_dir, init_mode)?;
-        let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config.quic_p2p_config())?;
         let login_packets = LoginPacketChunkStore::new(
             root_dir,
             config.max_capacity(),
@@ -90,75 +88,29 @@ impl ClientHandler {
             clients: Default::default(),
             pending_msg_ids: Default::default(),
             client_candidates: Default::default(),
-            quic_p2p,
             login_packets,
+            routing_node,
         };
-
-        Ok((client_handler, event_receiver))
+        Ok(client_handler)
     }
 
-    fn setup_quic_p2p(config: &QuicP2pConfig) -> Result<(QuicP2p, Receiver<Event>)> {
-        let (event_sender, event_receiver) = crossbeam_channel::unbounded();
-        let mut quic_p2p = quic_p2p::Builder::new(event_sender)
-            .with_config(config.clone())
-            .build()?;
-        let our_conn_info = quic_p2p.our_connection_info()?;
-        info!(
-            "QuicP2p started on {}\nwith certificate {:?}",
-            our_conn_info.peer_addr, our_conn_info.peer_cert_der
-        );
-        println!(
-            "Our connection info:\n{}\n",
-            unwrap!(serde_json::to_string(&our_conn_info))
-        );
-        if !cfg!(feature = "mock") {
-            if let Ok(connection_info_file) = write_connection_info(&our_conn_info) {
-                println!(
-                    "Writing connection info to: {}",
-                    connection_info_file.display()
-                );
-            }
-        }
-        println!("Waiting for connections ...");
-
-        Ok((quic_p2p, event_receiver))
-    }
-
-    pub fn our_connection_info(&mut self) -> Result<NodeInfo> {
-        Ok(self.quic_p2p.our_connection_info()?)
-    }
-
-    pub fn handle_new_connection(&mut self, peer: Peer) {
+    pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
         // If we already know the peer, drop the connection attempt.
-        if self.clients.contains_key(&peer.peer_addr())
-            || self.client_candidates.contains_key(&peer.peer_addr())
+        if self.clients.contains_key(&peer_addr) || self.client_candidates.contains_key(&peer_addr)
         {
             return;
         }
 
-        let peer_addr = match peer {
-            Peer::Node { node_info } => {
-                info!(
-                    "{}: Rejecting connection attempt by node on {}",
-                    self, node_info.peer_addr
-                );
-                self.quic_p2p.disconnect_from(node_info.peer_addr);
-                return;
-            }
-            Peer::Client { peer_addr } => peer_addr,
-        };
-
         let challenge = utils::random_vec(8);
         self.send(
-            peer.clone(),
+            peer_addr,
             &Challenge::Request(PublicId::Node(self.id.clone()), challenge.clone()),
         );
-        let _ = self.client_candidates.insert(peer.peer_addr(), challenge);
+        let _ = self.client_candidates.insert(peer_addr, challenge);
         info!("{}: Connected to new client on {}", self, peer_addr);
     }
 
-    pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr, error: Error) {
-        info!("{}: {}", self, error);
+    pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
         if let Some(client) = self.clients.remove(&peer_addr) {
             info!(
                 "{}: Disconnected from {:?} on {}",
@@ -275,7 +227,9 @@ impl ClientHandler {
                         "{}: Received unexpected challenge request from {}",
                         self, peer_addr
                     );
-                    self.quic_p2p.disconnect_from(peer_addr);
+                    self.routing_node
+                        .borrow_mut()
+                        .disconnect_from_client(peer_addr);
                 }
                 Err(err) => {
                     info!(
@@ -705,7 +659,9 @@ impl ClientHandler {
                     "{}: Client on {} identifies as a node: {}",
                     self, peer_addr, public_id
                 );
-                self.quic_p2p.disconnect_from(peer_addr);
+                self.routing_node
+                    .borrow_mut()
+                    .disconnect_from_client(peer_addr);
                 return;
             }
         };
@@ -720,7 +676,9 @@ impl ClientHandler {
                         "{}: Challenge failed for {} on {}: {}",
                         self, public_id, peer_addr, err
                     );
-                    self.quic_p2p.disconnect_from(peer_addr);
+                    self.routing_node
+                        .borrow_mut()
+                        .disconnect_from_client(peer_addr);
                 }
             }
         } else {
@@ -728,7 +686,9 @@ impl ClientHandler {
                 "{}: {} on {} supplied challenge response without us providing it.",
                 self, public_id, peer_addr
             );
-            self.quic_p2p.disconnect_from(peer_addr);
+            self.routing_node
+                .borrow_mut()
+                .disconnect_from_client(peer_addr);
         }
     }
 
@@ -1114,10 +1074,12 @@ impl ClientHandler {
         }
     }
 
-    fn send<T: Serialize>(&mut self, recipient: Peer, msg: &T) {
+    fn send<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) {
         let msg = utils::serialise(msg);
         let msg = Bytes::from(msg);
-        self.quic_p2p.send(recipient, msg, 0)
+        self.routing_node
+            .borrow_mut()
+            .send_message_to_client(recipient, msg, 0);
     }
 
     fn send_notification_to_client(&mut self, client_id: PublicId, notification: Notification) {
@@ -1151,7 +1113,7 @@ impl ClientHandler {
         };
 
         self.send(
-            Peer::Client { peer_addr },
+            peer_addr,
             &Message::Response {
                 response,
                 message_id,

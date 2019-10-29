@@ -508,9 +508,9 @@ impl Agent {
 
     // Expect `Event::UnsentUserMessage` with the given recipient address and content.
     fn expect_unsent_message(&self, dst_addr: &SocketAddr, expected_msg: &Bytes) {
-        let (actual_addr, actual_msg) = assert_match!(
+        let (actual_addr, actual_msg, _token) = assert_match!(
             self.rx.try_recv(),
-            Ok(Event::UnsentUserMessage { peer_addr, msg }) => (peer_addr, msg)
+            Ok(Event::UnsentUserMessage { peer_addr, msg, token }) => (peer_addr, msg, token)
         );
 
         assert_eq!(actual_addr, *dst_addr);

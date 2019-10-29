@@ -13,7 +13,7 @@ mod rng;
 pub use self::rng::TestRng;
 
 use bytes::Bytes;
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
 use log::Record;
 use safe_nd::{
@@ -22,10 +22,9 @@ use safe_nd::{
     TransactionId,
 };
 use safe_vault::{
-    mock::Network,
-    quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
+    mock_routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p},
     routing::{ConsensusGroup, ConsensusGroupRef, Node},
-    Config, Vault,
+    Command, Config, Vault,
 };
 use serde::Serialize;
 use std::{
@@ -153,6 +152,7 @@ trait AsMutSlice<T> {
 struct TestVault {
     inner: Vault,
     _root_dir: TempDir,
+    _command_tx: Sender<Command>,
 }
 
 impl TestVault {
@@ -163,18 +163,19 @@ impl TestVault {
         let mut config = Config::default();
         config.set_root_dir(root_dir.path());
 
-        let (_, command_rx) = crossbeam_channel::bounded(0);
+        let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
-        let routing_node = if let Some(group) = consensus_group {
+        let (routing_node, routing_rx) = if let Some(group) = consensus_group {
             unwrap!(Node::builder().create_within_group(group))
         } else {
             unwrap!(Node::builder().create())
         };
-        let inner = unwrap!(Vault::new(routing_node, config, command_rx));
+        let inner = unwrap!(Vault::new(routing_node, routing_rx, config, command_rx));
 
         Self {
             inner,
             _root_dir: root_dir,
+            _command_tx: command_tx,
         }
     }
 

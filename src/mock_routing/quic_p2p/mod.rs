@@ -14,6 +14,7 @@ mod tests;
 pub use self::network::Network;
 
 use self::node::Node;
+use super::Token;
 use bytes::Bytes;
 use crossbeam_channel::Sender;
 use hex_fmt::HexFmt;
@@ -247,6 +248,8 @@ pub enum Event {
         peer_addr: SocketAddr,
         /// Sent message.
         msg: Bytes,
+        /// Token
+        token: Token,
     },
     /// Message sent by us but not delivered due to connection drop.
     UnsentUserMessage {
@@ -254,6 +257,8 @@ pub enum Event {
         peer_addr: SocketAddr,
         /// Message content.
         msg: Bytes,
+        /// Token
+        token: Token,
     },
     /// Connection successfully established.
     ConnectedTo {
@@ -295,17 +300,27 @@ impl Display for Event {
                 peer_addr,
                 HexFmt(msg)
             ),
-            SentUserMessage { peer_addr, msg } => write!(
-                f,
-                "SentUserMessage {{ peer_addr: {}, msg: {:<8} }}",
+            SentUserMessage {
                 peer_addr,
-                HexFmt(msg)
+                msg,
+                token,
+            } => write!(
+                f,
+                "SentUserMessage {{ peer_addr: {}, msg: {:<8}, token: {} }}",
+                peer_addr,
+                HexFmt(msg),
+                token
             ),
-            UnsentUserMessage { peer_addr, msg } => write!(
-                f,
-                "UnsentUserMessage {{ peer_addr: {}, msg: {:<8} }}",
+            UnsentUserMessage {
                 peer_addr,
-                HexFmt(msg)
+                msg,
+                token,
+            } => write!(
+                f,
+                "UnsentUserMessage {{ peer_addr: {}, msg: {:<8}, token: {} }}",
+                peer_addr,
+                HexFmt(msg),
+                token
             ),
             Finish => write!(f, "Finish"),
         }
