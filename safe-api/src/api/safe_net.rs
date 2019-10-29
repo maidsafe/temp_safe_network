@@ -73,11 +73,7 @@ pub trait SafeApp {
         tag: u64,
     ) -> Result<(u64, AppendOnlyDataRawData)>;
 
-    fn get_current_seq_append_only_data_version(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<u64>;
+    fn get_current_seq_append_only_data_version(&self, name: XorName, tag: u64) -> Result<u64>;
 
     fn get_seq_append_only_data(
         &self,

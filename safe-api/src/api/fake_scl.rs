@@ -338,11 +338,7 @@ impl SafeApp for SafeAppFake {
     }
 
     #[allow(dead_code)]
-    fn get_current_seq_append_only_data_version(
-        &self,
-        name: XorName,
-        _tag: u64,
-    ) -> Result<u64> {
+    fn get_current_seq_append_only_data_version(&self, name: XorName, _tag: u64) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
         let xorname_hex = xorname_to_hex(&name);
         let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {

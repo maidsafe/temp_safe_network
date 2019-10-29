@@ -320,11 +320,7 @@ fn validate_nrs_link(link: &str) -> Result<()> {
     }
 }
 
-fn setup_nrs_tree(
-    nrs_map: &NrsMap,
-    mut sub_names: Vec<String>,
-    link: &str,
-) -> Result<NrsMap> {
+fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> Result<NrsMap> {
     let mut updated_nrs_map = nrs_map.clone();
     let curr_sub_name = if sub_names.is_empty() {
         let definition_data = create_public_name_description(link)?;
@@ -367,10 +363,7 @@ fn setup_nrs_tree(
     }
 }
 
-fn remove_nrs_sub_tree(
-    nrs_map: &NrsMap,
-    mut sub_names: Vec<String>,
-) -> Result<(NrsMap, String)> {
+fn remove_nrs_sub_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>) -> Result<(NrsMap, String)> {
     let mut updated_nrs_map = nrs_map.clone();
     let curr_sub_name = if sub_names.is_empty() {
         match nrs_map.get_default()? {

@@ -372,11 +372,7 @@ impl SafeApp for SafeAppScl {
         Ok((data_length, data))
     }
 
-    fn get_current_seq_append_only_data_version(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<u64> {
+    fn get_current_seq_append_only_data_version(&self, name: XorName, tag: u64) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
         let safe_app: &App = self.get_safe_app()?;

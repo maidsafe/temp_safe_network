@@ -35,7 +35,7 @@ pub enum Error {
 
 impl From<Error> for String {
     fn from(error: Error) -> String {
-        error.into()
+        error.to_string()
     }
 }
 
@@ -67,5 +67,17 @@ impl fmt::Display for Error {
         let description = format!("[Error] {} - {}", error_type, error_msg);
 
         write!(f, "{}", description)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_display() {
+        let err = Error::Unknown("test error".to_string());
+        let s: String = err.into();
+        assert_eq!(s, "[Error] Unknown - test error");
     }
 }

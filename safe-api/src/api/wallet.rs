@@ -201,10 +201,7 @@ impl Safe {
         Ok(total_balance.to_string())
     }
 
-    pub fn wallet_get_default_balance(
-        &self,
-        url: &str,
-    ) -> Result<(WalletSpendableBalance, u64)> {
+    pub fn wallet_get_default_balance(&self, url: &str) -> Result<(WalletSpendableBalance, u64)> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         let default = self
             .safe_app
