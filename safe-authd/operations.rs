@@ -9,15 +9,18 @@
 use super::authd::run as authd_run;
 use daemonize::Daemonize;
 use failure::{Error, Fail};
+use log::debug;
+use std::env::temp_dir;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::process::Command;
 use std::{fmt, str};
 
-const SAFE_AUTHD_PID_FILE: &str = "/tmp/safe-authd.pid";
-const SAFE_AUTHD_STDOUT_FILE: &str = "/tmp/safe-authd.out";
-const SAFE_AUTHD_STDERR_FILE: &str = "/tmp/safe-authd.err";
+const SAFE_AUTHD_PID_FILE: &str = "safe-authd.pid";
+const SAFE_AUTHD_STDOUT_FILE: &str = "safe-authd.out";
+const SAFE_AUTHD_STDERR_FILE: &str = "safe-authd.err";
 
 pub struct PrettyErr<'a>(&'a dyn Fail);
 impl<'a> fmt::Display for PrettyErr<'a> {
@@ -52,19 +55,27 @@ pub fn uninstall_authd() -> Result<(), Error> {
 }
 
 pub fn start_authd(listen: &str) -> Result<(), Error> {
-    let stdout = File::create(SAFE_AUTHD_STDOUT_FILE)
+    let mut stout_file: PathBuf = temp_dir();
+    stout_file.push(SAFE_AUTHD_STDOUT_FILE);
+    let mut stderr_file: PathBuf = temp_dir();
+    stderr_file.push(SAFE_AUTHD_STDERR_FILE);
+    let mut pid_file: PathBuf = temp_dir();
+    pid_file.push(SAFE_AUTHD_PID_FILE);
+    let stdout = File::create(stout_file)
         .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;
-    let stderr = File::create(SAFE_AUTHD_STDERR_FILE)
+    let stderr = File::create(stderr_file)
         .map_err(|err| format_err!("Failed to open/create file for stderr: {}", err))?;
 
+    debug!("PID file to be created at: {:?}", &pid_file);
+
     let daemonize = Daemonize::new()
-        .pid_file(SAFE_AUTHD_PID_FILE) // Every method except `new` and `start`
+        .pid_file(pid_file) // Every method except `new` and `start`
         //.chown_pid_file(true)      // is optional, see `Daemonize` documentation
-        .working_directory("/tmp") // for default behaviour.
+        .working_directory(temp_dir()) // for default behaviour.
         //.user("nobody")
         //.group("daemon") // Group name
         //.group(2)        // or group id.
-        .umask(0o777) // Set umask, `0o027` by default.
+        // .umask(0o777) // Set umask, `0o027` by default.
         .stdout(stdout) // Redirect stdout to `/tmp/safe-authd.out`.
         .stderr(stderr) // Redirect stderr to `/tmp/safe-authd.err`.
         .privileged_action(|| "Executed before drop privileges");
@@ -72,7 +83,7 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
     println!("Starting SAFE Authenticator daemon (safe-authd)...");
     match daemonize.start() {
         Ok(_) => {
-            println!("Initialising SAFE Authenticator services...");
+            println!("Initialising SAFE Authenticator services... xxx");
             authd_run(listen)?;
         }
         Err(err) => eprintln!("Failed to start safe-authd daemon: {}", err),
@@ -82,8 +93,12 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
 }
 
 pub fn stop_authd() -> Result<(), Error> {
+    let mut pid_file: PathBuf = temp_dir();
+    pid_file.push(SAFE_AUTHD_PID_FILE);
+
+    debug!("PID should be: {:?}", &pid_file);
     println!("Stopping SAFE Authenticator daemon (safe-authd)...");
-    let mut file = File::open(SAFE_AUTHD_PID_FILE)?;
+    let mut file = File::open(&pid_file)?;
     let mut pid = String::new();
     file.read_to_string(&mut pid)?;
     let output = Command::new("kill").arg("-9").arg(&pid).output()?;
