@@ -97,13 +97,11 @@ pub fn run(listen: &str) -> Result<(), Error> {
         };
         server_config.certificate(cert_chain, key)?;
     } else {*/
-    let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
-        Some(dirs) => dirs,
-        None => bail!("Failed to obtain local home directory where to read certificate from"),
-    };
-    let path = dirs.data_local_dir();
-    let cert_path = path.join("cert.der");
-    let key_path = path.join("key.der");
+
+    let base_path = get_certificate_base_path().map_err(|err| format_err!("{}", err))?;
+    let cert_path = std::path::Path::new(&base_path).join("cert.der");
+    let key_path = std::path::Path::new(&base_path).join("key.der");
+
     let (cert, key) = match fs::read(&cert_path).and_then(|x| Ok((x, fs::read(&key_path)?))) {
         Ok(x) => x,
         Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
@@ -111,7 +109,8 @@ pub fn run(listen: &str) -> Result<(), Error> {
             let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]);
             let key = cert.serialize_private_key_der();
             let cert = cert.serialize_der();
-            fs::create_dir_all(&path).context("Failed to create certificate directory")?;
+            fs::create_dir_all(&std::path::Path::new(&base_path))
+                .context("Failed to create certificate directory")?;
             fs::write(&cert_path, &cert).context("Failed to write certificate")?;
             fs::write(&key_path, &key).context("Failed to write private key")?;
             (cert, key)
@@ -166,6 +165,25 @@ pub fn run(listen: &str) -> Result<(), Error> {
     runtime.block_on(endpoint_driver)?;
 
     Ok(())
+}
+
+// Private helpers
+
+// FIXME: we shouldn't need this, but temporarily we do this on Windows since it runs as a
+// service and therefore this is the user profile path where it stores the certificates
+#[cfg(target_os = "windows")]
+fn get_certificate_base_path() -> Result<String, Error> {
+    Ok("C:\\Users\\bochaco\\AppData\\Local\\MaidSafe\\authd\\data".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_certificate_base_path() -> Result<String, Error> {
+    match directories::ProjectDirs::from("net", "maidsafe", "authd") {
+        Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
+        None => Err(format_err!(
+            "Failed to obtain local project directory where to write certificate from"
+        )),
+    }
 }
 
 fn handle_connection(

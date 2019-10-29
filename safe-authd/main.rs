@@ -41,17 +41,20 @@ extern crate self_update;
 #[cfg(not(target_os = "windows"))]
 use operations::{restart_authd, start_authd, stop_authd};
 #[cfg(target_os = "windows")]
-use operations_win::{restart_authd, start_authd, stop_authd};
-#[cfg(target_os = "windows")]
-#[macro_use]
-extern crate windows_service;
+use operations_win::{install_authd, restart_authd, start_authd, stop_authd, uninstall_authd};
 
 use authd::ErrorExt;
 
 #[derive(StructOpt, Debug)]
-/// SAFE Authenticator daemon
+/// SAFE Authenticator daemon subcommands
 #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
 enum CmdArgs {
+    /// Install safe-authd as a service. Only for Windows platforms
+    #[structopt(name = "install")]
+    Install {},
+    /// Uninstall safe-authd as a service. Only for Windows platforms
+    #[structopt(name = "uninstall")]
+    Uninstall {},
     /// Start the safe-authd daemon
     #[structopt(name = "start")]
     Start {
@@ -94,8 +97,8 @@ fn main() {
     let opt = CmdArgs::from_args();
     debug!("Running authd with options: {:?}", opt);
 
-    if let Err(e) = process_command(opt) {
-        error!("safe-authd error: {}", e);
+    if let Err(err) = process_command(opt) {
+        error!("safe-authd error: {}", err);
         process::exit(1);
     }
 }
@@ -105,23 +108,41 @@ fn process_command(opt: CmdArgs) -> Result<(), String> {
         CmdArgs::Update {} => {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
+        CmdArgs::Install {} => {
+            if !cfg!(windows) {
+                Err("This command is only supported on Windows. You don't need to run this command in other platforms before starting safe-authd".to_string())
+            } else if let Err(err) = install_authd() {
+                Err(format!("{}", err.pretty()))
+            } else {
+                Ok(())
+            }
+        }
+        CmdArgs::Uninstall {} => {
+            if !cfg!(windows) {
+                Err("This command is only supported on Windows".to_string())
+            } else if let Err(err) = uninstall_authd() {
+                Err(format!("{}", err.pretty()))
+            } else {
+                Ok(())
+            }
+        }
         CmdArgs::Start { listen, .. } => {
-            if let Err(e) = start_authd(&listen) {
-                Err(format!("{}", e.pretty()))
+            if let Err(err) = start_authd(&listen) {
+                Err(format!("{}", err.pretty()))
             } else {
                 Ok(())
             }
         }
         CmdArgs::Stop {} => {
-            if let Err(e) = stop_authd() {
-                Err(format!("{}", e.pretty()))
+            if let Err(err) = stop_authd() {
+                Err(format!("{}", err.pretty()))
             } else {
                 Ok(())
             }
         }
         CmdArgs::Restart { listen } => {
-            if let Err(e) = restart_authd(&listen) {
-                Err(format!("{}", e.pretty()))
+            if let Err(err) = restart_authd(&listen) {
+                Err(format!("{}", err.pretty()))
             } else {
                 Ok(())
             }

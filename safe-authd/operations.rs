@@ -67,7 +67,7 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
             println!("Initialising SAFE Authenticator services...");
             authd_run(listen)?;
         }
-        Err(e) => eprintln!("Error, {}", e),
+        Err(err) => eprintln!("Failed to start safe-authd daemon: {}", err),
     }
 
     Ok(())

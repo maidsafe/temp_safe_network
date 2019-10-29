@@ -60,16 +60,8 @@ pub fn quic_send(
     let ca_path = if let Some(ca_path) = cert_ca {
         ca_path
     } else {
-        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
-            Some(dirs) => dirs,
-            None => {
-                return Err(Error::AuthdClientError(
-                    "Failed to obtain local home directory where to read certificate from"
-                        .to_string(),
-                ))
-            }
-        };
-        dirs.data_local_dir().join("cert.der")
+        let base_dir = get_certificate_base_path()?;
+        std::path::Path::new(&base_dir).join("cert.der")
     };
 
     let ca_certificate = fs::read(&ca_path).map_err(|err| {
@@ -208,4 +200,13 @@ pub fn quic_send(
 
 fn duration_secs(x: &Duration) -> f32 {
     x.as_secs() as f32 + x.subsec_nanos() as f32 * 1e-9
+}
+
+fn get_certificate_base_path() -> Result<String> {
+    match directories::ProjectDirs::from("net", "maidsafe", "authd") {
+        Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
+        None => Err(Error::AuthdClientError(
+            "Failed to obtain local project directory where to read certificate from".to_string(),
+        )),
+    }
 }
