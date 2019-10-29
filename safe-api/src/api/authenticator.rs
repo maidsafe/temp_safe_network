@@ -80,7 +80,7 @@ impl SafeAuthenticator {
     /// ## Example
     /// ```ignore
     /// use safe_api::SafeAuthenticator;
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -100,7 +100,7 @@ impl SafeAuthenticator {
     /// If the account does not exist, the function will return an appropriate error:
     ///```
     /// use safe_api::{SafeAuthenticator, Error};
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// let not_logged_in = safe_auth.log_in("non", "existant");
     /// match not_logged_in {
     ///    Ok(()) => assert!(false), // This should not pass
@@ -146,7 +146,7 @@ impl SafeAuthenticator {
     /// ## Example
     /// ```ignore
     /// use safe_api::SafeAuthenticator;
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
@@ -165,7 +165,7 @@ impl SafeAuthenticator {
     /// the function will return an error:
     /// ```ignore
     /// use safe_api::{SafeAuthenticator, Error};
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -242,7 +242,7 @@ impl SafeAuthenticator {
     /// ## Example
     /// ```ignore
     /// use safe_api::SafeAuthenticator;
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -262,7 +262,7 @@ impl SafeAuthenticator {
     /// ## Error Example
     /// ```ignore
     /// use safe_api::{SafeAuthenticator, Error};
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account's secret and password:
     /// let my_secret = "mysecretstring";
@@ -359,7 +359,7 @@ impl SafeAuthenticator {
     /// ## Example
     /// ```ignore
     /// use safe_api::SafeAuthenticator;
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account which has been used
     /// /// to authorise some application already:
@@ -460,7 +460,7 @@ impl SafeAuthenticator {
     /// ## Example
     /// ```ignore
     /// use safe_api::SafeAuthenticator;
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account which has been used
     /// /// to authorise some application already:
@@ -484,7 +484,7 @@ impl SafeAuthenticator {
     /// ## Error Example
     /// ```ignore
     /// use safe_api::{SafeAuthenticator, Error};
-    /// let mut safe_auth = SafeAuthenticator::new();
+    /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
     /// /// Using an already existing account which has been used
     /// /// to authorise some application already:
