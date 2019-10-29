@@ -6,19 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use dirs;
+use directories::ProjectDirs;
 use log::debug;
 use safe_api::Safe;
-use std::fs::{DirBuilder, File};
+use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
-use std::path::Path;
 use structopt::StructOpt;
 
 const APP_ID: &str = "net.maidsafe.cli";
 const APP_NAME: &str = "SAFE CLI";
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
-const AUTH_CREDENTIALS_FOLDER: &str = ".safe";
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
+const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
+const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
+const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
@@ -92,15 +93,21 @@ pub fn connect_without_auth(safe: &mut Safe) -> Result<(), String> {
 }
 
 fn credentials_file_path() -> Result<String, String> {
-    let home_path =
-        dirs::home_dir().ok_or_else(|| "Couldn't find user's home directory".to_string())?;
+    let project_data_path = ProjectDirs::from(
+        PROJECT_DATA_DIR_QUALIFIER,
+        PROJECT_DATA_DIR_ORGANISATION,
+        PROJECT_DATA_DIR_APPLICATION,
+    )
+    .ok_or_else(|| "Couldn't find user's home directory".to_string())?;
 
-    let path = Path::new(&home_path).join(AUTH_CREDENTIALS_FOLDER);
-    if !Path::new(&path).exists() {
-        println!("Creating ~/{} folder", AUTH_CREDENTIALS_FOLDER);
-        DirBuilder::new().recursive(false).create(&path).unwrap();
+    let data_local_path = project_data_path.data_local_dir();
+
+    if !data_local_path.exists() {
+        println!("Creating '{}' folder", data_local_path.display());
+        create_dir_all(data_local_path)
+            .map_err(|err| format!("Couldn't create project's local data folder: {}", err))?;
     }
 
-    let path = Path::new(&path).join(AUTH_CREDENTIALS_FILENAME);
+    let path = data_local_path.join(AUTH_CREDENTIALS_FILENAME);
     Ok(path.display().to_string())
 }
