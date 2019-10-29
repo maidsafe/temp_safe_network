@@ -43,6 +43,14 @@ impl ErrorExt for Error {
     }
 }
 
+pub fn install_authd() -> Result<(), Error> {
+    Err(format_err!("This command is only supported on Windows. You don't need to run this command in other platforms before starting safe-authd"))
+}
+
+pub fn uninstall_authd() -> Result<(), Error> {
+    Err(format_err!("This command is only supported on Windows"))
+}
+
 pub fn start_authd(listen: &str) -> Result<(), Error> {
     let stdout = File::create(SAFE_AUTHD_STDOUT_FILE)
         .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;

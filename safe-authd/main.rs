@@ -39,7 +39,7 @@ extern crate slog;
 extern crate self_update;
 
 #[cfg(not(target_os = "windows"))]
-use operations::{restart_authd, start_authd, stop_authd};
+use operations::{install_authd, restart_authd, start_authd, stop_authd, uninstall_authd};
 #[cfg(target_os = "windows")]
 use operations_win::{install_authd, restart_authd, start_authd, stop_authd, uninstall_authd};
 
@@ -108,44 +108,14 @@ fn process_command(opt: CmdArgs) -> Result<(), String> {
         CmdArgs::Update {} => {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
-        CmdArgs::Install {} => {
-            if !cfg!(windows) {
-                Err("This command is only supported on Windows. You don't need to run this command in other platforms before starting safe-authd".to_string())
-            } else if let Err(err) = install_authd() {
-                Err(format!("{}", err.pretty()))
-            } else {
-                Ok(())
-            }
-        }
-        CmdArgs::Uninstall {} => {
-            if !cfg!(windows) {
-                Err("This command is only supported on Windows".to_string())
-            } else if let Err(err) = uninstall_authd() {
-                Err(format!("{}", err.pretty()))
-            } else {
-                Ok(())
-            }
-        }
+        CmdArgs::Install {} => install_authd().map_err(|err| format!("{}", err.pretty())),
+        CmdArgs::Uninstall {} => uninstall_authd().map_err(|err| format!("{}", err.pretty())),
         CmdArgs::Start { listen, .. } => {
-            if let Err(err) = start_authd(&listen) {
-                Err(format!("{}", err.pretty()))
-            } else {
-                Ok(())
-            }
+            start_authd(&listen).map_err(|err| format!("{}", err.pretty()))
         }
-        CmdArgs::Stop {} => {
-            if let Err(err) = stop_authd() {
-                Err(format!("{}", err.pretty()))
-            } else {
-                Ok(())
-            }
-        }
+        CmdArgs::Stop {} => stop_authd().map_err(|err| format!("{}", err.pretty())),
         CmdArgs::Restart { listen } => {
-            if let Err(err) = restart_authd(&listen) {
-                Err(format!("{}", err.pretty()))
-            } else {
-                Ok(())
-            }
+            restart_authd(&listen).map_err(|err| format!("{}", err.pretty()))
         }
     }
 }
