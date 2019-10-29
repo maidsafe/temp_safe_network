@@ -144,7 +144,7 @@ pub fn authd_subscribe_url(
 }
 
 pub fn authd_unsubscribe(
-    safe_authd: &SafeAuthdClient,
+    safe_authd: &mut SafeAuthdClient,
     notifs_endpoint: String,
 ) -> Result<(), String> {
     println!("Sending request to unsubscribe...");

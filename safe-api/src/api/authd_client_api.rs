@@ -97,9 +97,10 @@ const SAFE_AUTHD_CMD_RESTART: &str = "restart";
 
 // Authd Client API
 pub struct SafeAuthdClient {
+    // authd port number
     port: u16,
-    endpoint_thread_handle: Option<thread::JoinHandle<()>>,
-    callback_thread_handle: Option<thread::JoinHandle<()>>,
+    // keep track of (endpoint URL, join handle for the listening thread, join handle of callback thread)
+    subscribed_endpoint: Option<(String, thread::JoinHandle<()>, thread::JoinHandle<()>)>,
     // TODO: add a session_token field to use for communicating with authd for restricted operations,
     // we should restrict operations like subscribe, or allow/deny, to only be accepted with a valid token
     // session_token: String,
@@ -107,8 +108,14 @@ pub struct SafeAuthdClient {
 
 impl Drop for SafeAuthdClient {
     fn drop(&mut self) {
-        // TODO: send message to terminate thread
-        //let _ = self.endpoint_thread_handle.take().unwrap().join();
+        // Let's try to unsubscribe if we had a subscribed endpoint
+        match &self.subscribed_endpoint {
+            None => {}
+            Some((url, _, _)) => {
+                send_unsubscribe(url, self.port)
+                    .expect("Failed to unsubscribe endpoint from authd");
+            }
+        }
     }
 }
 
@@ -118,8 +125,7 @@ impl SafeAuthdClient {
         let port_number = port.unwrap_or(SAFE_AUTHD_ENDPOINT_PORT);
         Self {
             port: port_number,
-            endpoint_thread_handle: None,
-            callback_thread_handle: None,
+            subscribed_endpoint: None,
         }
     }
 
@@ -353,11 +359,10 @@ impl SafeAuthdClient {
         );
 
         // Start listening first
-        let listen = endpoint_url.to_string();
-
         // We need a channel to receive auth req notifications from the thread running the QUIC endpoint
         let (tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
 
+        let listen = endpoint_url.to_string();
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
         let endpoint_thread_join_handle = thread::spawn(move || match quic_listen(&listen, tx) {
             Ok(_) => {
@@ -370,7 +375,6 @@ impl SafeAuthdClient {
                 );
             }
         });
-        self.endpoint_thread_handle = Some(endpoint_thread_join_handle);
 
         let cb = Box::new(allow_cb);
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
@@ -389,7 +393,11 @@ impl SafeAuthdClient {
                 }
             }
         });
-        self.callback_thread_handle = Some(cb_thread_join_handle);
+        self.subscribed_endpoint = Some((
+            endpoint_url.to_string(),
+            endpoint_thread_join_handle,
+            cb_thread_join_handle,
+        ));
 
         Ok(())
     }
@@ -417,26 +425,35 @@ impl SafeAuthdClient {
     }
 
     // Unsubscribe from notifications to allow/deny authorisation requests
-    pub fn unsubscribe(&self, endpoint_url: &str) -> Result<()> {
+    pub fn unsubscribe(&mut self, endpoint_url: &str) -> Result<()> {
         debug!("Unsubscribing from authorisation requests notifications...",);
-        let url_encoded = urlencoding::encode(endpoint_url);
-        let authd_service_url = format!(
-            "{}:{}/{}{}",
-            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE, url_encoded
-        );
-
-        debug!("Sending unsubscribe action request to SAFE Authenticator...");
-        let authd_response = send_request(&authd_service_url)?;
-
+        let authd_response = send_unsubscribe(endpoint_url, self.port)?;
         debug!(
             "Successfully unsubscribed from authorisation requests notifications: {}",
             authd_response
         );
 
-        // TODO: terminate endpoint_thread_handle thread
+        // If the URL is the same as the endpoint locally launched, terminate the thread
+        if let Some((url, _, _)) = &self.subscribed_endpoint {
+            if endpoint_url == url {
+                // TODO: send signal to stop/kill threads
+                self.subscribed_endpoint = None;
+            }
+        }
 
         Ok(())
     }
+}
+
+fn send_unsubscribe(endpoint_url: &str, port: u16) -> Result<String> {
+    let url_encoded = urlencoding::encode(endpoint_url);
+    let authd_service_url = format!(
+        "{}:{}/{}{}",
+        SAFE_AUTHD_ENDPOINT_HOST, port, SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE, url_encoded
+    );
+
+    debug!("Sending unsubscribe action request to SAFE Authenticator...");
+    send_request(&authd_service_url)
 }
 
 fn send_request(url_str: &str) -> Result<String> {

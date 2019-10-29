@@ -130,8 +130,8 @@ pub fn auth_commander(
             authd_subscribe_url(&safe_authd, notifs_endpoint)
         }
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
-            let safe_authd = SafeAuthdClient::new(None);
-            authd_unsubscribe(&safe_authd, notifs_endpoint)
+            let mut safe_authd = SafeAuthdClient::new(None);
+            authd_unsubscribe(&mut safe_authd, notifs_endpoint)
         }
         Some(AuthSubCommands::Start {}) => {
             let safe_authd = SafeAuthdClient::new(None);
