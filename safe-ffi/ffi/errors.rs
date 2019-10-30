@@ -37,6 +37,13 @@ mod codes {
     // Misc Errors
     pub const ERR_UNEXPECTED_ERROR: i32 = -500;
     pub const ERR_UNKNOWN_ERROR: i32 = -501;
+    pub const ERR_STRING_ERROR: i32 = -502;
+
+    // Authd Client Errors
+    pub const ERR_AUTHD_CLIENT_ERROR: i32 = -600;
+
+    // Authenticator Errors
+    pub const ERR_AUTHENTICATOR_ERROR: i32 = -700;
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -57,6 +64,8 @@ impl ErrorCode for Error {
 
         match (*self).0 {
             AuthError(ref _error) => ERR_AUTH_ERROR,
+            AuthdClientError(ref _error) => ERR_AUTHD_CLIENT_ERROR,
+            AuthenticatorError(ref _error) => ERR_AUTHENTICATOR_ERROR,
             ConnectionError(ref _error) => ERR_CONNECTION_ERROR,
             NetDataError(ref _error) => ERR_NET_DATA_ERROR,
             ContentNotFound(ref _error) => ERR_CONTENT_NOT_FOUND_ERROR,
