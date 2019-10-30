@@ -11,9 +11,11 @@ use crate::shared::{
     SharedSafeAuthenticatorHandle,
 };
 use safe_api::{AuthReq, SafeAuthReq};
+use std::time::SystemTime;
 use tokio::sync::mpsc;
 
-// Authorisation requests wil be rejected if the numbre of pending auth reqs reaches this number
+// Authorisation requests wil be automatically rejected if the number of pending auth reqs reaches this number
+// This should never happen and it's just for the containment to keep authd healthy in such an unexpected scenario
 const MAX_NUMBER_QUEUED_AUTH_REQS: usize = 64;
 
 pub enum AuthorisationResponse {
@@ -58,6 +60,7 @@ pub fn process_req(
 
                                     // Let's add it to the list of pending authorisation requests
                                     let auth_req = IncomingAuthReq {
+                                        timestamp: SystemTime::now(),
                                         auth_req: AuthReq {
                                             req_id,
                                             app_id: app_auth_req.app.id.clone(),

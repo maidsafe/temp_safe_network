@@ -9,10 +9,12 @@
 use safe_api::{AuthReq, SafeAuthenticator};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use tokio::sync::mpsc;
 
 #[derive(Clone, Debug)]
 pub struct IncomingAuthReq {
+    pub timestamp: SystemTime,
     pub auth_req: AuthReq,
     pub tx: mpsc::Sender<bool>,
     pub notified: bool,
@@ -85,4 +87,21 @@ where
             f(notif_endpoints_list)
         }
     }
+}
+
+pub fn remove_auth_req_from_list(auth_reqs_handle: SharedAuthReqsHandle, req_id: u32) {
+    let _ = lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
+        auth_reqs_list.remove(&req_id);
+        Ok(())
+    });
+}
+
+pub fn remove_notif_endpoint_from_list(
+    notif_endpoints_handle: SharedNotifEndpointsHandle,
+    endpoint: &str,
+) {
+    let _ = lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
+        notif_endpoints_list.remove(endpoint);
+        Ok(())
+    });
 }

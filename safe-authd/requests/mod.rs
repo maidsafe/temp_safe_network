@@ -20,8 +20,8 @@ mod subscribe;
 mod unsubscribe;
 
 use crate::shared::{
-    lock_auth_reqs_list, lock_safe_authenticator, SharedAuthReqsHandle, SharedNotifEndpointsHandle,
-    SharedSafeAuthenticatorHandle,
+    lock_safe_authenticator, remove_auth_req_from_list, SharedAuthReqsHandle,
+    SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
 use failure::{Error, ResultExt};
 use futures::{Async, Future, Poll, Stream};
@@ -121,12 +121,9 @@ impl Future for ProcessRequest {
                         }
                         Ok(Async::Ready(None)) | Err(_) => {
                             // We didn't get a response in a timely manner, we cannot allow the list
-                            // to grow infinitelly, so let's remove the request from it
-                            let _ =
-                                lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
-                                    auth_reqs_list.remove(&req_id);
-                                    Ok(())
-                                });
+                            // to grow infinitelly, so let's remove the request from it,
+                            // even that the notifs thread may have removed it already
+                            remove_auth_req_from_list(auth_reqs_handle.clone(), *req_id);
                             let msg = "Failed to get authorisation response";
                             println!("{}", msg);
                             return Ok(Async::Ready(err_response(msg.to_string())));
