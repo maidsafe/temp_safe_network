@@ -12,6 +12,20 @@ use safe_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
 
+pub fn authd_install(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+    let authd_path = get_authd_bin_path();
+    safe_authd
+        .install(Some(&authd_path))
+        .map_err(|err| err.to_string())
+}
+
+pub fn authd_uninstall(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+    let authd_path = get_authd_bin_path();
+    safe_authd
+        .uninstall(Some(&authd_path))
+        .map_err(|err| err.to_string())
+}
+
 pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     let authd_path = get_authd_bin_path();
     safe_authd
@@ -262,14 +276,23 @@ fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
 }
 
 fn get_authd_bin_path() -> String {
-    let target_dir = match std::env::var("CARGO_TARGET_DIR") {
-        Ok(target_dir) => target_dir,
-        Err(_) => "target".to_string(),
+    let mut path = std::path::PathBuf::new();
+    match std::env::var("CARGO_TARGET_DIR") {
+        Ok(target_dir) => path.push(target_dir),
+        Err(_) => path.push("target"),
     };
 
     if cfg!(debug_assertions) {
-        format!("{}{}", target_dir, "/debug/safe-authd")
+        path.push("debug");
     } else {
-        format!("{}{}", target_dir, "/release/safe-authd")
+        path.push("release");
+    };
+
+    if cfg!(windows) {
+        path.push("safe-authd.exe");
+    } else {
+        path.push("safe-authd");
     }
+
+    path.display().to_string()
 }

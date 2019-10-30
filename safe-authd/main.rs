@@ -39,14 +39,13 @@ extern crate slog;
 extern crate self_update;
 
 #[cfg(not(target_os = "windows"))]
-use operations::{install_authd, restart_authd, start_authd, stop_authd, uninstall_authd};
+use operations::{
+    install_authd, restart_authd, start_authd, start_authd_from_sc, stop_authd, uninstall_authd,
+};
 #[cfg(target_os = "windows")]
-use operations_win::{install_authd, restart_authd, start_authd, stop_authd, uninstall_authd};
-
-#[cfg(not(target_os = "windows"))]
-pub use operations::get_certificate_base_path;
-#[cfg(target_os = "windows")]
-pub use operations_win::get_certificate_base_path;
+use operations_win::{
+    install_authd, restart_authd, start_authd, start_authd_from_sc, stop_authd, uninstall_authd,
+};
 
 use authd::ErrorExt;
 
@@ -57,7 +56,7 @@ enum CmdArgs {
     /// Install safe-authd as a service. Only for Windows platforms
     #[structopt(name = "install")]
     Install {},
-    /// Uninstall safe-authd as a service. Only for Windows platforms
+    /// Uninstall safe-authd service. Only for Windows platforms
     #[structopt(name = "uninstall")]
     Uninstall {},
     /// Start the safe-authd daemon
@@ -79,6 +78,9 @@ enum CmdArgs {
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
     },
+    /// To be invoked by Windows Service Control Manager to start the authd service. Only for Windows platforms
+    #[structopt(name = "sc-start")]
+    ScStart {},
     /// Stop a running safe-authd
     #[structopt(name = "stop")]
     Stop {},
@@ -118,6 +120,7 @@ fn process_command(opt: CmdArgs) -> Result<(), String> {
         CmdArgs::Start { listen, .. } => {
             start_authd(&listen).map_err(|err| format!("{}", err.pretty()))
         }
+        CmdArgs::ScStart {} => start_authd_from_sc().map_err(|err| format!("{}", err.pretty())),
         CmdArgs::Stop {} => stop_authd().map_err(|err| format!("{}", err.pretty())),
         CmdArgs::Restart { listen } => {
             restart_authd(&listen).map_err(|err| format!("{}", err.pretty()))

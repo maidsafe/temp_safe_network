@@ -46,20 +46,15 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn get_certificate_base_path() -> Result<String, Error> {
-    match directories::ProjectDirs::from("net", "maidsafe", "authd") {
-        Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
-        None => Err(format_err!(
-            "Failed to obtain local project directory where to write certificate from"
-        )),
-    }
-}
-
 pub fn install_authd() -> Result<(), Error> {
     Err(format_err!("This command is only supported on Windows. You don't need to run this command in other platforms before starting safe-authd"))
 }
 
 pub fn uninstall_authd() -> Result<(), Error> {
+    Err(format_err!("This command is only supported on Windows"))
+}
+
+pub fn start_authd_from_sc() -> Result<(), Error> {
     Err(format_err!("This command is only supported on Windows"))
 }
 
@@ -93,7 +88,7 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
     match daemonize.start() {
         Ok(_) => {
             println!("Initialising SAFE Authenticator services...");
-            authd_run(listen)?;
+            authd_run(listen, None, None)?;
         }
         Err(err) => eprintln!("Failed to start safe-authd daemon: {}", err),
     }

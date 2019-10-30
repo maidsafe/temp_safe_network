@@ -25,16 +25,9 @@ const SERVICE_NAME: &str = "safe-authd";
 const SERVICE_DISPLAY_NAME: &str = "AAASAFE Authenticator";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const SERVICE_START_TYPE: ServiceStartType = ServiceStartType::OnDemand;
-const SERVICE_LAUNCH_ARGUMENT: &str = "start";
+const SERVICE_LAUNCH_ARGUMENT: &str = "sc-start";
 
 define_windows_service!(ffi_authd_service, authd_service);
-
-// On Windows since it runs as a service the current user's name and home is unknown
-// we therefore use ProgramsData folder to share the certificate with all users
-pub fn get_certificate_base_path() -> Result<String, Error> {
-    let program_data_path = std::path::Path::new("C:\\ProgramData");
-    Ok(program_data_path.join("safe-authd").display().to_string())
-}
 
 pub fn install_authd() -> Result<(), Error> {
     println!("Installing SAFE Authenticator (safe-authd) as a Windows service...");
@@ -46,9 +39,57 @@ pub fn uninstall_authd() -> Result<(), Error> {
     uninstall_authd_service()
 }
 
-pub fn start_authd(_listen: &str) -> Result<(), Error> {
-    println!("Starting SAFE Authenticator service (safe-authd)...");
+pub fn start_authd(listen: &str) -> Result<(), Error> {
+    println!("Starting SAFE Authenticator service (safe-authd) from command line...");
 
+    // Since the authd service runs as a system process, we need to provide
+    // the user's local project directory path which is where certificates are shared through
+    let cert_base_path = match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
+        Some(dirs) => dirs.config_dir().display().to_string(),
+        None => {
+            return Err(format_err!(
+                "Failed to obtain local project directory path where to write authd certificate to"
+            ))
+        }
+    };
+
+    // The safe_vault also stores the certificate in the user's local project directory, thus let's
+    // get the path so we pass it down to the SafeAuthenticator API so it can connect to vault
+    let config_dir_path = match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
+        Some(dirs) => {
+            // FIXME: safe_Core is appending '\config' to the path provided,
+            // so we remove it from the path. It seems to be a bug in safe_core lib
+            let components = dirs.config_dir().components().collect::<Vec<_>>();
+            let path: std::path::PathBuf = components[..components.len()-1].iter().collect();
+            path.display().to_string()
+        },
+        None => return Err(format_err!("Failed to obtain local project directory path where to read safe_vault certificate from"))
+    };
+
+    let output = process::Command::new("sc")
+        .args(&[
+            "start",
+            SERVICE_NAME,
+            listen,
+            &cert_base_path,
+            &config_dir_path,
+        ])
+        .output()
+        .map_err(|err| format_err!("Failed to execute service control manager: {}", err))?;
+
+    if output.status.success() {
+        println!("safe-authd service started successfully!");
+        Ok(())
+    } else {
+        Err(format_err!(
+            "Failed to start safe-authd service: {}",
+            String::from_utf8_lossy(&output.stdout)
+        ))
+    }
+}
+
+pub fn start_authd_from_sc() -> Result<(), Error> {
+    println!("Starting SAFE Authenticator service (safe-authd) from Service Control Manager...");
     // Register generated `ffi_authd_service` with the system and start the service, blocking
     // this thread until the service is stopped.
     service_dispatcher::start(SERVICE_NAME, ffi_authd_service)
@@ -62,7 +103,7 @@ pub fn stop_authd() -> Result<(), Error> {
     let output = process::Command::new("taskkill")
         .args(&["/F", "/IM", SERVICE_BINARY_FILE_NAME])
         .output()
-        .map_err(|err| format_err!("Failed to stop safe-authd process: {}", err))?;
+        .map_err(|err| format_err!("Failed to stop safe-authd service: {}", err))?;
 
     if output.status.success() {
         io::stdout()
@@ -71,10 +112,10 @@ pub fn stop_authd() -> Result<(), Error> {
         println!("safe-authd service stopped successfully!");
         Ok(())
     } else {
-        io::stderr()
-            .write_all(&output.stderr)
-            .map_err(|err| format_err!("Failed to output stderr: {}", err))?;
-        Err(format_err!("Failed to stop safe-authd process"))
+        Err(format_err!(
+            "Failed to stop safe-authd service: {}",
+            String::from_utf8_lossy(&output.stdout)
+        ))
     }
 }
 
@@ -95,7 +136,7 @@ fn authd_service(arguments: Vec<OsString>) {
     }
 }
 
-fn run_service(_arguments: Vec<OsString>) -> windows_service::Result<()> {
+fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
     // Define system service event handler that will be receiving service events.
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
@@ -130,12 +171,35 @@ fn run_service(_arguments: Vec<OsString>) -> windows_service::Result<()> {
         wait_hint: Duration::default(),
     })?;
 
-    // FIXME: receive endpoint listen address from arguments
-    let exit_code = match authd_run("https://localhost:33000") {
-        Ok(()) => ServiceExitCode::Win32(0),
-        Err(err) => {
-            println!("{}", err.pretty());
-            ServiceExitCode::ServiceSpecific(100)
+    // First argument should be the endpoint listening address
+    let exit_code = if arguments.len() < 2 {
+        println!("Listening address not provided as first argument");
+        ServiceExitCode::ServiceSpecific(100)
+    } else {
+        match arguments[1].clone().into_string() {
+            Err(_err) => {
+                println!("Invalid listening address found as first argument");
+                ServiceExitCode::ServiceSpecific(101)
+            }
+            Ok(listen) => {
+                // The second optional argument is the cert base path where to write authd certificates
+                let cert_base_path = arguments[2].clone().into_string().ok();
+
+                // The thrid optional argument is the config dir path to pass to SafeAuthenticator
+                let config_dir_path = arguments[3].clone().into_string().ok();
+
+                match authd_run(
+                    &listen,
+                    cert_base_path.as_ref().map(String::as_str),
+                    config_dir_path.as_ref().map(String::as_str),
+                ) {
+                    Ok(()) => ServiceExitCode::Win32(0),
+                    Err(err) => {
+                        println!("{}", err.pretty());
+                        ServiceExitCode::ServiceSpecific(102)
+                    }
+                }
+            }
         }
     };
 

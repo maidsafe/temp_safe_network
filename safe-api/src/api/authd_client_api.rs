@@ -86,6 +86,12 @@ const SAFE_AUTHD_ENDPOINT_SUBSCRIBE: &str = "subscribe/";
 // Path of authenticator endpoint for unsubscribing from authorisation requests notifications
 const SAFE_AUTHD_ENDPOINT_UNSUBSCRIBE: &str = "unsubscribe/";
 
+// authd subcommand to install the daemon
+const SAFE_AUTHD_CMD_INSTALL: &str = "install";
+
+// authd subcommand to uninstall the daemon
+const SAFE_AUTHD_CMD_UNINSTALL: &str = "uninstall";
+
 // authd subcommand to start the daemon
 const SAFE_AUTHD_CMD_START: &str = "start";
 
@@ -127,6 +133,20 @@ impl SafeAuthdClient {
             port: port_number,
             subscribed_endpoint: None,
         }
+    }
+
+    // Install the Authenticator daemon/service
+    pub fn install(&self, authd_path: Option<&str>) -> Result<()> {
+        let path = authd_path.unwrap_or_else(|| "");
+        debug!("Attempting to install authd '{}' ...", path);
+        authd_run_cmd(path, SAFE_AUTHD_CMD_INSTALL)
+    }
+
+    // Uninstall the Authenticator daemon/service
+    pub fn uninstall(&self, authd_path: Option<&str>) -> Result<()> {
+        let path = authd_path.unwrap_or_else(|| "");
+        debug!("Attempting to uninstall authd '{}' ...", path);
+        authd_run_cmd(path, SAFE_AUTHD_CMD_UNINSTALL)
     }
 
     // Start the Authenticator daemon
@@ -460,13 +480,13 @@ fn send_request(url_str: &str) -> Result<String> {
     quic_send(&url_str, false, None, None, false)
 }
 
-pub fn authd_run_cmd(authd_path: &str, command: &str) -> Result<()> {
+fn authd_run_cmd(authd_path: &str, command: &str) -> Result<()> {
     let output = Command::new(&authd_path)
         .arg(command)
         .output()
         .map_err(|err| {
             Error::AuthdClientError(format!(
-                "Failed to start authd from '{}': {}",
+                "Failed to execute authd from '{}': {}",
                 authd_path, err
             ))
         })?;
@@ -477,11 +497,10 @@ pub fn authd_run_cmd(authd_path: &str, command: &str) -> Result<()> {
             .map_err(|err| Error::AuthdClientError(format!("Failed to output stdout: {}", err)))?;
         Ok(())
     } else {
-        io::stderr()
-            .write_all(&output.stderr)
-            .map_err(|err| Error::AuthdClientError(format!("Failed to output stderr: {}", err)))?;
-        Err(Error::AuthdClientError(
-            "Failed to invoke safe-authd executable".to_string(),
-        ))
+        Err(Error::AuthdClientError(format!(
+            "Failed when invoking safe-authd executable from '{}': {}",
+            authd_path,
+            String::from_utf8_lossy(&output.stderr)
+        )))
     }
 }

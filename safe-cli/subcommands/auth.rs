@@ -71,6 +71,12 @@ pub enum AuthSubCommands {
         /// The endpoint URL to unsubscribe
         notifs_endpoint: String,
     },
+    #[structopt(name = "install")]
+    /// Install safe-authd as a service. Only for Windows platforms
+    Install {},
+    #[structopt(name = "uninstall")]
+    /// Uninstall safe-authd service. Only for Windows platforms
+    Uninstall {},
     #[structopt(name = "start")]
     /// Starts the Authenticator daemon if it's not running already
     Start {},
@@ -132,6 +138,14 @@ pub fn auth_commander(
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
             let mut safe_authd = SafeAuthdClient::new(None);
             authd_unsubscribe(&mut safe_authd, notifs_endpoint)
+        }
+        Some(AuthSubCommands::Install {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_install(&safe_authd)
+        }
+        Some(AuthSubCommands::Uninstall {}) => {
+            let safe_authd = SafeAuthdClient::new(None);
+            authd_uninstall(&safe_authd)
         }
         Some(AuthSubCommands::Start {}) => {
             let safe_authd = SafeAuthdClient::new(None);

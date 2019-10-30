@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::get_certificate_base_path;
 use super::notifs::monitor_pending_auth_reqs;
 use super::requests::process_request;
 use super::shared::*;
@@ -49,7 +48,11 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn run(listen: &str) -> Result<(), Error> {
+pub fn run(
+    listen: &str,
+    cert_base_path: Option<&str>,
+    config_dir_path: Option<&str>,
+) -> Result<(), Error> {
     let url = Url::parse(&listen).map_err(|_| format_err!("Invalid endpoint address"))?;
     let endpoint_socket_addr = url
         .to_socket_addrs()
@@ -99,7 +102,10 @@ pub fn run(listen: &str) -> Result<(), Error> {
         server_config.certificate(cert_chain, key)?;
     } else {*/
 
-    let base_path = get_certificate_base_path().map_err(|err| format_err!("{}", err))?;
+    let base_path = match cert_base_path {
+        Some(path) => path.to_string(),
+        None => get_certificate_base_path().map_err(|err| format_err!("{}", err))?,
+    };
     let cert_path = std::path::Path::new(&base_path).join("cert.der");
     let key_path = std::path::Path::new(&base_path).join("key.der");
 
@@ -136,12 +142,6 @@ pub fn run(listen: &str) -> Result<(), Error> {
         (driver, incoming)
     };
 
-    let config_dir_path = if cfg!(target_os = "windows") {
-        Some("C:\\ProgramData\\safe-vault")
-    } else {
-        None // just use the default
-    };
-
     let safe_auth_handle: SharedSafeAuthenticatorHandle =
         Arc::new(Mutex::new(SafeAuthenticator::new(config_dir_path)));
 
@@ -175,6 +175,15 @@ pub fn run(listen: &str) -> Result<(), Error> {
 }
 
 // Private helpers
+
+pub fn get_certificate_base_path() -> Result<String, Error> {
+    match directories::ProjectDirs::from("net", "maidsafe", "authd") {
+        Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
+        None => Err(format_err!(
+            "Failed to obtain local project directory where to write certificate from"
+        )),
+    }
+}
 
 fn handle_connection(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
