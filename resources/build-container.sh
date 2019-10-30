@@ -41,8 +41,7 @@ function get_dockerfile_name() {
     esac
 }
 
-tag="$(sed 's/safe-//g' <<< $component)-$target"
-[[ "$build_type" == "dev" ]] && tag="$tag-dev"
+tag="$component-$target-$build_type"
 rm -rf target/
 docker rmi -f maidsafe/safe-cli-build:"$tag"
 docker build -f $(get_dockerfile_name) -t maidsafe/safe-cli-build:"$tag" \

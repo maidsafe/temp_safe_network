@@ -68,22 +68,22 @@ s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64
 s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-apple-darwin-dev.zip"
 
 zip_linux_checksum=$(sha256sum \
-    "./deploy/real/safe-cli-$version-x86_64-unknown-linux-gnu.zip" | \
+    "./deploy/prod/safe-cli-$version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
 zip_macos_checksum=$(sha256sum \
-    "./deploy/real/safe-cli-$version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/safe-cli-$version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum=$(sha256sum \
-    "./deploy/real/safe-cli-$version-x86_64-pc-windows-gnu.zip" | \
+    "./deploy/prod/safe-cli-$version-x86_64-pc-windows-gnu.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
-    "./deploy/real/safe-cli-$version-x86_64-unknown-linux-gnu.tar.gz" | \
+    "./deploy/prod/safe-cli-$version-x86_64-unknown-linux-gnu.tar.gz" | \
     awk '{ print $1 }')
 tar_macos_checksum=$(sha256sum \
-    "./deploy/real/safe-cli-$version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/prod/safe-cli-$version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 tar_win_checksum=$(sha256sum \
-    "./deploy/real/safe-cli-$version-x86_64-pc-windows-gnu.tar.gz" | \
+    "./deploy/prod/safe-cli-$version-x86_64-pc-windows-gnu.tar.gz" | \
     awk '{ print $1 }')
 
 s3_ffi_dev_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-unknown-linux-gnu-dev.zip"

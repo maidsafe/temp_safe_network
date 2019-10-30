@@ -11,7 +11,7 @@ if [[ -z "$SAFE_CLI_BRANCH" ]]; then
 fi
 
 S3_BUCKET=safe-jenkins-build-artifacts
-declare -a types=("mock" "real")
+declare -a types=("dev" "prod")
 declare -a components=("safe-cli" "safe-ffi")
 
 for component in "${components[@]}"; do
