@@ -116,10 +116,10 @@ impl Future for ProcessRequest {
                                 return Ok(Async::Ready(err_response(msg)));
                             }
                         }
-                        Ok(Async::Ready(None)) | Ok(Async::NotReady) => {
+                        Ok(Async::NotReady) => {
                             return Ok(Async::NotReady);
                         }
-                        Err(_) => {
+                        Ok(Async::Ready(None)) | Err(_) => {
                             // We didn't get a response in a timely manner, we cannot allow the list
                             // to grow infinitelly, so let's remove the request from it
                             let _ =

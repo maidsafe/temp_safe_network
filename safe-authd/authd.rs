@@ -244,6 +244,7 @@ fn handle_request(
                 }
                 info!(log, "Got request");
                 // Execute the request
+                // TODO: remove auth req from the list if client closes the session
                 process_request(
                     safe_auth_handle,
                     auth_reqs_handle,

@@ -9,7 +9,7 @@
 use crate::operations::{auth_daemon::*, safe_net::*};
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
-use std::io::{stdin, stdout, Write};
+use std::io::{stdout, Write};
 
 pub fn shell_run() -> Result<(), String> {
     let safe = Safe::new("");
@@ -161,7 +161,10 @@ pub fn shell_run() -> Result<(), String> {
         |io, (_, safe_authd_client)| {
             let endpoint = "https://localhost:33001".to_string(); // args[0].to_string();
             match authd_subscribe(safe_authd_client, endpoint, &prompt_to_allow_auth) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    writeln!(io, "Keep this shell session open to receive the notifications")?;
+                    Ok(())
+                },
                 Err(err) => {
                     writeln!(io, "{}", err)?;
                     Ok(())
@@ -231,26 +234,11 @@ pub fn shell_run() -> Result<(), String> {
 
 fn prompt_to_allow_auth(auth_req: AuthReq) -> Option<bool> {
     println!();
-    pretty_print_auth_reqs(vec![auth_req], "Application authorisation request received");
+    println!("A new application authorisation request was received:");
+    pretty_print_auth_reqs(vec![auth_req], None);
 
-    let mut prompt = String::new();
-    print!("Allow authorisation? [y/N]: ");
+    println!("To allow/deny the request, use the auth-allow/auth-deny commands respectively, e.g.: auth-allow <requst id>");
+    println!("Press Enter to continue");
     let _ = stdout().flush();
-    stdin()
-        .read_line(&mut prompt)
-        .expect("Did not enter a correct string. Authorisation will be denied.");
-    if let Some('\n') = prompt.chars().next_back() {
-        prompt.pop();
-    }
-    if let Some('\r') = prompt.chars().next_back() {
-        prompt.pop();
-    }
-
-    if prompt.to_lowercase() == "y" {
-        println!("Authorisation will be allowed...");
-        Some(true)
-    } else {
-        println!("Authorisation will be denied...");
-        Some(false)
-    }
+    None
 }
