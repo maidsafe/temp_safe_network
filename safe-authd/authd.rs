@@ -78,34 +78,11 @@ pub fn run(
     let mut server_config = quinn::ServerConfigBuilder::new(server_config);
     server_config.protocols(&[quinn::ALPN_QUIC_HTTP]);
 
-    /*if options.keylog {
-        server_config.enable_keylog();
-    }
-
-    if options.stateless_retry {
-        server_config.use_stateless_retry(true);
-    }*/
-
-    /*if let (Some(ref key_path), Some(ref cert_path)) = (options.key, options.cert) {
-        let key = fs::read(key_path).context("Failed to read private key")?;
-        let key = if key_path.extension().map_or(false, |x| x == "der") {
-            quinn::PrivateKey::from_der(&key)?
-        } else {
-            quinn::PrivateKey::from_pem(&key)?
-        };
-        let cert_chain = fs::read(cert_path).context("Failed to read certificate chain")?;
-        let cert_chain = if cert_path.extension().map_or(false, |x| x == "der") {
-            quinn::CertificateChain::from_certs(quinn::Certificate::from_der(&cert_chain))
-        } else {
-            quinn::CertificateChain::from_pem(&cert_chain)?
-        };
-        server_config.certificate(cert_chain, key)?;
-    } else {*/
-
     let base_path = match cert_base_path {
         Some(path) => path.to_string(),
         None => get_certificate_base_path().map_err(|err| format_err!("{}", err))?,
     };
+
     let cert_path = std::path::Path::new(&base_path).join("cert.der");
     let key_path = std::path::Path::new(&base_path).join("key.der");
 
@@ -129,7 +106,6 @@ pub fn run(
     let key = quinn::PrivateKey::from_der(&key)?;
     let cert = quinn::Certificate::from_der(&cert)?;
     server_config.certificate(quinn::CertificateChain::from_certs(vec![cert]), key)?;
-    //}
 
     let mut endpoint = quinn::Endpoint::builder();
     endpoint.logger(log.clone());
@@ -177,8 +153,8 @@ pub fn run(
 // Private helpers
 
 pub fn get_certificate_base_path() -> Result<String, Error> {
-    match directories::ProjectDirs::from("net", "maidsafe", "authd") {
-        Some(dirs) => Ok(dirs.data_local_dir().display().to_string()),
+    match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
+        Some(dirs) => Ok(dirs.config_dir().display().to_string()),
         None => Err(format_err!(
             "Failed to obtain local project directory where to write certificate from"
         )),

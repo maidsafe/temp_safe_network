@@ -44,14 +44,13 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
 
     // Since the authd service runs as a system process, we need to provide
     // the user's local project directory path which is where certificates are shared through
-    let cert_base_path = match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
-        Some(dirs) => dirs.config_dir().display().to_string(),
-        None => {
-            return Err(format_err!(
+    let cert_base_path =
+        match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
+            Some(dirs) => dirs.config_dir().display().to_string(),
+            None => return Err(format_err!(
                 "Failed to obtain local project directory path where to write authd certificate to"
-            ))
-        }
-    };
+            )),
+        };
 
     // The safe_vault also stores the certificate in the user's local project directory, thus let's
     // get the path so we pass it down to the SafeAuthenticator API so it can connect to vault
