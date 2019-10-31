@@ -16,6 +16,8 @@ use std::io::prelude::*;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 use std::{fmt, str};
 
 const SAFE_AUTHD_PID_FILE: &str = "safe-authd.pid";
@@ -118,7 +120,13 @@ pub fn stop_authd() -> Result<(), Error> {
 }
 
 pub fn restart_authd(listen: &str) -> Result<(), Error> {
-    stop_authd()?;
+    match stop_authd() {
+        Ok(()) => {
+            // Let's give it a sec so it's properlly stopped
+            thread::sleep(Duration::from_millis(1000));
+        }
+        Err(err) => println!("{}", err),
+    }
     start_authd(listen)?;
     println!("Success, safe-authd restarted!");
     Ok(())

@@ -56,8 +56,9 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
     // get the path so we pass it down to the SafeAuthenticator API so it can connect to vault
     let config_dir_path = match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
         Some(dirs) => {
-            // FIXME: safe_Core is appending '\config' to the path provided,
-            // so we remove it from the path. It seems to be a bug in safe_core lib
+            // FIXME: safe_core is appending '\config' to the path provided,
+            // so we remove it from the path. It seems to be a bug in safe_core lib:
+            // https://github.com/maidsafe/safe_client_libs/issues/1054
             let components = dirs.config_dir().components().collect::<Vec<_>>();
             let path: std::path::PathBuf = components[..components.len()-1].iter().collect();
             path.display().to_string()
