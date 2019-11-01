@@ -19,8 +19,14 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 2. [Build](#build)
 3. [Using the CLI](#using-the-cli)
   - [Auth](#auth)
-    - [Prerequisite: run the Authenticator](#prerequisite-run-the-authenticator)
-    - [Authorise the safe CLI app](#authorise-the-safe-cli-app)
+    - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
+    - [Authd start (Linux/Mac)](#authd-start-linuxmac)
+    - [Authd start (Windows)](#authd-start-windows)
+    - [Authd status](#authd-status)
+    - [Authd create-acc](#authd-create-acc)
+    - [Authd login](#authd-login)
+    - [Authd reqs](#authd-reqs)
+    - [Authd allow-deny](#authd-allowdeny)
   - [SafeKeys](#safekeys)
     - [Create](#safekeys-creation)
     - [Balance](#safekeys-balance)
@@ -48,20 +54,22 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 
 ## Download
 
-The latest version of the SAFE CLI can be downloaded from the [releases page](https://github.com/maidsafe/safe-cli/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
+The latest version of the SAFE CLI can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
 
 If otherwise you prefer to build the SAFE CLI from source code, please follow the instructions in the next two section below.
 
 ## Build
 
-In order to build this CLI from source code you need to make sure you have `rustc v1.37.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this CLI from source code you need to make sure you have `rustc v1.38.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
-Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-cli` crate (the build process may take several minutes the first time you run it on this crate):
+Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-cli` (the build process may take several minutes the first time you run it on this crate):
 ```shell
-$ git clone https://github.com/maidsafe/safe-cli.git
-$ cd safe-cli
+$ git clone https://github.com/maidsafe/safe-api.git
+$ cd safe-api
 $ cargo build
 ```
+
+Since this project has a cargo workspace with the `safe-cli` as the default crate, when building from the root location will build the SAFE CLI. Once it's built you can find the `safe` executable at `target/debug/`.
 
 ### Using the Mock or Non-Mock SAFE Network
 
@@ -70,14 +78,14 @@ By default, the `safe-cli` is built with [Non-Mock libraries](https://github.com
 $ cargo build --features mock-network
 ```
 
-Keep in mind that when running the safe-cli with `cargo run`, please also make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe-cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
+Keep in mind that if you run the `safe-cli` with `cargo run`, you also need to make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe-cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
 ```
 $ cargo run --features mock-network -- keys create --test-coins
 ```
 
 ## Using the CLI
 
-Right now the CLI is under active development. Here we're listing commands ready to be tested (against mock).
+Right now the CLI is under active development. Here we're listing commands ready to be tested.
 
 The base command, if built is `$ safe`, or all commands can be run via `$ cargo run -- <command>`.
 
@@ -104,46 +112,157 @@ All commands have a `--help` function which lists args, options and subcommands.
 
 The CLI is just another client SAFE application, therefore it needs to be authorised by the user to gain access to the SAFE Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the account owner (the user) via the SAFE Authenticator.
 
-This command simply sends an authorisation request to the Authenticator available, e.g. the `safe_auth` CLI daemon (see further bellow for explanation of how to run it), and it then stores the authorisation response (credentials) in `<user's home directory>/.safe/credentials` file. Any subsequent CLI command will read the `~/.safe/credentials` file, to obtain the credentials and connect to the network for the corresponding operation.
+This command simply sends an authorisation request to the Authenticator available, e.g. the `safe-authd` daemon (see further bellow for explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/safe-cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the SAFE Network for the corresponding operation.
 
-#### Prerequisite: run the Authenticator
+#### The Authenticator daemon (authd)
 
-You need the [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli) running locally and exposing its WebService interface for authorising applications, and also be logged in to a SAFE account created on the mock network (i.e. `MockVault` file), making sure the port number you set is `41805`, and enabling the `mock-network` feature.
+In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)]() endpoint, which SAFE application will communicate to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
 
-Please open a second/separate terminal console, and follow the instructions found in the [SAFE Authenticator guide](https://github.com/maidsafe/safe-authenticator-cli/blob/master/README.md). Once you have an account created on the `Mock` network, and have the `safe_auth` CLI running with the `--daemon` flag:
+#### Authd start (Linux/Mac)
+
+In order to start the `SAFE Authenticator daemon (safe-authd)` we simply need to run the following command:
 ```shell
-$ safe_auth --daemon 41805
-Secret:
-Password:
-Exposing service on 127.0.0.1:41805
+$ safe auth start
+Starting SAFE Authenticator daemon (safe-authd)...
 ```
 
-You can then continue with the next step below.
+#### Authd start (Windows)
 
-#### Authorise the safe CLI app
+Windows platform requires you to first install `authd` as a Windows service before being able to start it. It also requires administrator permissions to install and start a service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
+```shell
+> safe auth install
+Installing SAFE Authenticator (safe-authd) as a Windows service...
+The safe-authd service (<'safe-authd.exe' path>) was just installed sucessfully!
 
-Now that the Authenticator is running and ready to authorise applications, we can simply invoke the `auth` command:
+> safe auth start
+Starting SAFE Authenticator service (safe-authd) from command line...
+safe-authd service started successfully!
+```
+
+#### Authd status
+
+Once we started the `authd`, it should be running in the background and ready to receive requests, we can send an status request to check it's up and running:
+```shell
+$ safe auth atatus
+Sending request to authd to obtain an status report...
++------------------------------------------+-------+
+| SAFE Authenticator status                |       |
++------------------------------------------+-------+
+| Logged in to a SAFE account?             | false |
++------------------------------------------+-------+
+| Number of pending authorisation requests | 0     |
++------------------------------------------+-------+
+| Number of notifications subscriptors     | 0     |
++------------------------------------------+-------+
+```
+
+#### Authd create-acc
+
+Since we now have our SAFE Authenticator running and ready to accept requests, we can start interacting with it by using others SAFE CLI `auth` subcommands.
+
+In order to create a SAFE Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a secret phrase and password for the new account to be created:
+```shell
+$ safe auth create-acc --test-coins
+Secret:
+Password:
+Creating a SafeKey with test-coins...
+Sending account creation request to authd...
+Account was created successfully!
+SafeKey created and preloaded with test-coins. Owner key pair generated:
+Public Key = a42c991eb33c1e2530205bc726eba0279e151a334ba8dcd7212b131abb210145bc859ae5f6f5d4ce63ece54c64fe8792
+Secret Key = 5cc0951bb95be85dec3f0358ddb40570d0e045b3ff0007562af9b5c9162f2518
+```
+
+Alternatively, if we own some safecoins on a `SafeKey` already (see [`SafeKeys` section](#safekeys) for details about `SafeKey`s), we can provide the corresponding secret key to the safe CLI to use it for paying the cost of creating the account, as well as setting it as the default `SafeKey` for the account being created:
+```shell
+$ safe auth create-acc
+Secret:
+Password:
+Enter SafeKey's secret key to pay with:
+Sending account creation request to authd...
+Account was created successfully!
+```
+
+#### Authd login
+
+Once you have a SAFE account created, we can login:
+```shell
+$ safe auth login
+Secret:
+Password:
+Sending login action request to authd...
+Logged in successfully
+```
+
+If we again send an status report request to `authd`, it should now show that it's logged in to a SAFE account:
+```shell
+$ safe auth status
+Sending request to authd to obtain an status report...
++------------------------------------------+------+
+| SAFE Authenticator status                |      |
++------------------------------------------+------+
+| Logged in to a SAFE account?             | true |
++------------------------------------------+------+
+| Number of pending authorisation requests | 0    |
++------------------------------------------+------+
+| Number of notifications subscriptors     | 0    |
++------------------------------------------+------+
+```
+
+The SAFE Authenticator is now ready to receive authorisation requests from any SAFE application, including the SAFE CLI which needs to also get permissions to perform any data operations on behalf of our account.
+
+#### Authd reqs
+
+Now that the Authenticator is running and ready to authorise applications, we can try to authorise the CLI application.
+
+In a normal scenario, an Authenticator GUI would be using `authd` as its backend process, e.g. the [SAFE Network Application](https://github.com/maidsafe/safe-network-app) provides such a GUI to review authorisation requests and allow the permissions requested to be granted.
+
+For the purpose of making this guide self contained with the SAFE CLI application, we will now use also the CLI on a second console to review and allow/deny authorisation requests.
+
+Let's first send an authorisation request from current console by simply invoking the `auth` command with no subcomands:
 ```shell
 $ safe auth
 Authorising CLI application...
 ```
 
-At this point, you need to authorise the application on the Authenticator, you should see a prompt like the following:
-```bash
-The following application authorisation request was received:
-+------------------+----------+------------------+------------------------+
-| Id               | Name     | Vendor           | Permissions requested  |
-+------------------+----------+------------------+------------------------+
-| net.maidsafe.cli | SAFE CLI | MaidSafe.net Ltd | Own container: false   |
-|                  |          |                  | Default containers: {} |
-+------------------+----------+------------------+------------------------+
-Allow authorisation? [y/N]:
+The CLI application is now waiting for an authorisation response from the `authd`.
+
+We can now open a second console which we'll use to query `authd` for pending authorisation requests, and also to allow/deny them (remember the following steps wouldn't be needed if we had any other Authenticator UI running, like the `SAFE Network App`).
+
+Once we have a second console, we can start by fetching from `authd` the list of authorisation requests pending for approval/denial:
+```shell
+$ safe auth reqs
+Requesting list of pending authorisation requests from authd...
++--------------------------------+------------------+----------+------------------+-------------------------+
+| Pending Authorisation requests |                  |          |                  |                         |
++--------------------------------+------------------+----------+------------------+-------------------------+
+| Request Id                     | App Id           | Name     | Vendor           | Permissions requested   |
++--------------------------------+------------------+----------+------------------+-------------------------+
+| 584798987                      | net.maidsafe.cli | SAFE CLI | MaidSafe.net Ltd | Own container: false    |
+|                                |                  |          |                  | Transfer coins: true    |
+|                                |                  |          |                  | Mutations: true         |
+|                                |                  |          |                  | Read coin balance: true |
+|                                |                  |          |                  | Containers: None        |
++--------------------------------+------------------+----------+------------------+-------------------------+
 ```
 
-Please go ahead and allow the authorisation by entering `y`. The Authenticator will send a response back to the `safe-cli` with the corresponding credentials it can use to connect directly with the Network. When the `safe-cli` receives the authorisation response, it will display a message like the following:
+We see there is one authorisation request pending for approval/denial, which is the one requested by the CLI application from the other console.
+
+#### Authd allow/deny
+
+In order to allow any pending authorisation request we use its request ID (e.g. '584798987' from above), the `authd` will then proceed to send a response back to the CLI with the corresponding credentials it can use to connect directly with the Network:
+```shell
+$ safe auth allow 584798987
+Sending request to authd to allow an authorisation request...
+Authorisation request was allowed successfully
+```
+
+Note we could have otherwise decided to deny this authorisation request and invoke `$ safe auth deny 584798987` instead, but let's allow it so we can continue with the next steps of this guide.
+
+If we now switch back to our previous console, the one where we sent the authorisation request with `$ safe auth` command from, we will see the SAFE CLI receiving the response from `authd`. You should see in that console a message like the following:
 ```shell
 SAFE CLI app was successfully authorised
-Credentials were stored in <home directory>/.safe/credentials
+Credentials were stored in <home directory>/.local/share/safe-cli/credentials
 ```
 
 We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.

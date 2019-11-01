@@ -237,7 +237,7 @@ fn prompt_to_allow_auth(auth_req: AuthReq) -> Option<bool> {
     println!("A new application authorisation request was received:");
     pretty_print_auth_reqs(vec![auth_req], None);
 
-    println!("To allow/deny the request, use the auth-allow/auth-deny commands respectively, e.g.: auth-allow <requst id>");
+    println!("To allow/deny the request, use the auth-allow/auth-deny commands respectively, e.g.: auth-allow <request id>");
     println!("Press Enter to continue");
     let _ = stdout().flush();
     None
