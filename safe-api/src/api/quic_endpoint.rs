@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::{ascii, fmt, fs, str};
@@ -46,7 +47,11 @@ impl ErrorExt for Error {
     }
 }
 
-pub fn quic_listen(url_str: &str, notif_channel: mpsc::Sender<AuthReq>) -> Result<(), String> {
+pub fn quic_listen(
+    url_str: &str,
+    notif_channel: mpsc::Sender<AuthReq>,
+    cert_base_path: PathBuf,
+) -> Result<(), String> {
     debug!("Launching new QUIC endpoint on '{}'", url_str);
 
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
@@ -62,7 +67,12 @@ pub fn quic_listen(url_str: &str, notif_channel: mpsc::Sender<AuthReq>) -> Resul
         .next()
         .ok_or_else(|| "The end point is an invalid address".to_string())?;
 
-    if let Err(e) = start_quic_endpoint(Logger::root(drain, o!()), endpoint, notif_channel) {
+    if let Err(e) = start_quic_endpoint(
+        Logger::root(drain, o!()),
+        endpoint,
+        notif_channel,
+        cert_base_path,
+    ) {
         Err(format!("{}", e.pretty()))
     } else {
         Ok(())
@@ -73,6 +83,7 @@ fn start_quic_endpoint(
     log: Logger,
     listen: SocketAddr,
     notif_channel: mpsc::Sender<AuthReq>,
+    cert_base_path: PathBuf,
 ) -> Result<(), Error> {
     let server_config = quinn::ServerConfig {
         transport: Arc::new(quinn::TransportConfig {
@@ -84,13 +95,8 @@ fn start_quic_endpoint(
     let mut server_config = quinn::ServerConfigBuilder::new(server_config);
     server_config.protocols(&[quinn::ALPN_QUIC_HTTP]);
 
-    let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
-        Some(dirs) => dirs,
-        None => bail!("Failed to obtain local home directory where to read certificate from"),
-    };
-    let path = dirs.data_local_dir();
-    let cert_path = path.join("cert.der");
-    let key_path = path.join("key.der");
+    let cert_path = cert_base_path.join("cert.der");
+    let key_path = cert_base_path.join("key.der");
     let (cert, key) = match fs::read(&cert_path).and_then(|x| Ok((x, fs::read(&key_path)?))) {
         Ok(x) => x,
         Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
@@ -98,7 +104,8 @@ fn start_quic_endpoint(
             let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]);
             let key = cert.serialize_private_key_der();
             let cert = cert.serialize_der();
-            fs::create_dir_all(&path).context("Failed to create certificate directory")?;
+            fs::create_dir_all(&cert_base_path)
+                .context("Failed to create certificate directory")?;
             fs::write(&cert_path, &cert).context("Failed to write certificate")?;
             fs::write(&key_path, &key).context("Failed to write private key")?;
             (cert, key)

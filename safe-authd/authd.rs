@@ -13,7 +13,7 @@ use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
 use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::io;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
@@ -125,7 +125,7 @@ pub fn run(
     let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
 
     // We keep a list of the notifications subscriptors' endpoints
-    let notif_endpoints_handle = Arc::new(Mutex::new(BTreeSet::new()));
+    let notif_endpoints_handle = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Let's spawn a thread which will monitor pending auth reqs
     // and get them allowed/denied by the user using any of the subcribed endpoints

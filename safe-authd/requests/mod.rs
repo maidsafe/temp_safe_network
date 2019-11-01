@@ -92,6 +92,7 @@ impl Future for ProcessRequest {
                     match rx.poll() {
                         Ok(Async::Ready(Some(is_allowed))) => {
                             if is_allowed {
+                                println!("Let's request the authenticator lib to authorise the request '{}'...", req_id);
                                 match lock_safe_authenticator(
                                     safe_auth_handle.clone(),
                                     |safe_authenticator| match safe_authenticator

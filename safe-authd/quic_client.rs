@@ -46,9 +46,9 @@ pub fn quic_send(
     }
 
     let ca_path = if let Some(ca_path) = cert_ca {
-        ca_path
+        ca_path.join("cert.der")
     } else {
-        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd") {
+        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd_client") {
             Some(dirs) => dirs,
             None => {
                 return Err(

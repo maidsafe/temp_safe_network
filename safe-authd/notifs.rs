@@ -8,7 +8,8 @@
 
 use super::quic_client::quic_send;
 use super::shared::*;
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
@@ -31,7 +32,7 @@ pub fn monitor_pending_auth_reqs(
                 lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
                     if auth_reqs_list.is_empty() {
                         // We don't have auth reqs so we won't need a copy of notif endpoints list
-                        Ok((AuthReqsList::default(), BTreeSet::default()))
+                        Ok((AuthReqsList::default(), BTreeMap::default()))
                     } else {
                         lock_notif_endpoints_list(
                             notif_endpoints_handle.clone(),
@@ -41,7 +42,7 @@ pub fn monitor_pending_auth_reqs(
                         )
                     }
                 })
-                .unwrap_or_else(|_| (AuthReqsList::default(), BTreeSet::default()));
+                .unwrap_or_else(|_| (AuthReqsList::default(), BTreeMap::default()));
 
             // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
             // and remove them if they don't respond or if they reply with a negative response.
@@ -77,18 +78,18 @@ pub fn monitor_pending_auth_reqs(
                 }
 
                 let mut response = None;
-                for endpoint in notif_endpoints_list.iter() {
-                    println!("Notifying subscriptor: {}", endpoint);
+                for (url, cert_base_path) in notif_endpoints_list.iter() {
+                    println!("Notifying subscriptor: {}", url);
                     match quic_send(
                         &format!(
                             "{}/{}/{}",
-                            endpoint,
+                            url,
                             incoming_auth_req.auth_req.app_id,
                             incoming_auth_req.auth_req.req_id
                         ),
                         false,
                         None,
-                        None,
+                        Some(PathBuf::from(cert_base_path)),
                         false,
                     ) {
                         Ok(notif_resp) => {
@@ -119,12 +120,9 @@ pub fn monitor_pending_auth_reqs(
                             // in the future allowing some unresponsiveness
                             println!(
                                 "Subscriptor '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
-                                endpoint, err
+                                url, err
                             );
-                            remove_notif_endpoint_from_list(
-                                notif_endpoints_handle.clone(),
-                                endpoint,
-                            );
+                            remove_notif_endpoint_from_list(notif_endpoints_handle.clone(), url);
                         }
                     }
                 }

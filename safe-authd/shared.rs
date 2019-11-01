@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_api::{AuthReq, SafeAuthenticator};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use tokio::sync::mpsc;
@@ -29,8 +29,9 @@ pub type SharedAuthReqsHandle = Arc<Mutex<AuthReqsList>>;
 // A thread-safe handle to keep the SafeAuthenticator instance
 pub type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
 
-// A thread-safe handle to keep the list of notifications subscriptors' endpoints
-pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeSet<String>>>;
+// A thread-safe handle to keep the list of notifications subscriptors' endpoints,
+// we also keep the certificates' base path which is needed to create the communication channel
+pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeMap<String, String>>>;
 
 pub fn lock_safe_authenticator<F, R>(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
@@ -75,7 +76,7 @@ pub fn lock_notif_endpoints_list<F, R>(
     mut f: F,
 ) -> Result<R, String>
 where
-    F: FnMut(&mut BTreeSet<String>) -> Result<R, String>,
+    F: FnMut(&mut BTreeMap<String, String>) -> Result<R, String>,
 {
     match notif_endpoints_handle.lock() {
         Err(err) => Err(format!(
@@ -83,7 +84,7 @@ where
             err
         )),
         Ok(mut locked_list) => {
-            let notif_endpoints_list: &mut BTreeSet<String> = &mut *(locked_list);
+            let notif_endpoints_list: &mut BTreeMap<String, String> = &mut *(locked_list);
             f(notif_endpoints_list)
         }
     }
@@ -98,10 +99,10 @@ pub fn remove_auth_req_from_list(auth_reqs_handle: SharedAuthReqsHandle, req_id:
 
 pub fn remove_notif_endpoint_from_list(
     notif_endpoints_handle: SharedNotifEndpointsHandle,
-    endpoint: &str,
+    url: &str,
 ) {
     let _ = lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
-        notif_endpoints_list.remove(endpoint);
+        notif_endpoints_list.remove(url);
         Ok(())
     });
 }

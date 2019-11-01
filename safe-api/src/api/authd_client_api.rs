@@ -11,6 +11,7 @@ use super::quic_client::quic_send;
 use super::quic_endpoint::quic_listen;
 use super::{AuthedAppsList, Error, Result, SafeAuthReqId};
 use log::{debug, error, info, trace};
+use rand::{self, Rng};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
@@ -122,7 +123,7 @@ impl Drop for SafeAuthdClient {
                 match send_unsubscribe(url, self.port) {
                     Ok(msg) => {
                         debug!("{}", msg);
-                    },
+                    }
                     Err(err) => {
                         // We are still ok, it was just us trying to be nice and unsubscribe if possible
                         // It could be the case we were already unsubscribe automatically by authd before
@@ -366,6 +367,7 @@ impl SafeAuthdClient {
     }
 
     // Subscribe a callback to receive notifications to allow/deny authorisation requests
+    // We support having only one subscripton at a time, a previous subscription will be dropped
     pub fn subscribe<
         CB: 'static + Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync,
     >(
@@ -375,10 +377,30 @@ impl SafeAuthdClient {
     ) -> Result<()> {
         debug!("Subscribing to receive authorisation requests notifications...",);
 
+        // Generate a path which is where we will store the endpoint certificates that authd will
+        // need to read to be able to create a secure channel to send us the notifications with
+        let dirs =
+            directories::ProjectDirs::from("net", "maidsafe", "authd_client").ok_or_else(|| {
+                Error::AuthdClientError(
+                    "Failed to obtain local home directory where to store endpoint certificates to"
+                        .to_string(),
+                )
+            })?;
+
+        // Let's postfix the path with a random endpoint id so we avoid clashes with other
+        // endpoints subscribed from within the same local box
+        let random_endpoint_id = rand::thread_rng().gen_range(0, std::u32::MAX) + 1;
+        let cert_base_path = dirs.config_dir().join(random_endpoint_id.to_string());
+
         let url_encoded = urlencoding::encode(endpoint_url);
+        let cert_path_encoded = urlencoding::encode(&cert_base_path.display().to_string());
         let authd_service_url = format!(
-            "{}:{}/{}{}",
-            SAFE_AUTHD_ENDPOINT_HOST, self.port, SAFE_AUTHD_ENDPOINT_SUBSCRIBE, url_encoded
+            "{}:{}/{}{}/{}",
+            SAFE_AUTHD_ENDPOINT_HOST,
+            self.port,
+            SAFE_AUTHD_ENDPOINT_SUBSCRIBE,
+            url_encoded,
+            cert_path_encoded
         );
 
         debug!("Sending subscribe action request to SAFE Authenticator...");
@@ -394,18 +416,21 @@ impl SafeAuthdClient {
         let (tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
 
         let listen = endpoint_url.to_string();
+
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
-        let endpoint_thread_join_handle = thread::spawn(move || match quic_listen(&listen, tx) {
-            Ok(_) => {
-                info!("Endpoint successfully launched for receiving auth req notifications");
-            }
-            Err(err) => {
-                error!(
-                    "Failed to launch endpoint for receiving auth req notifications: {}",
-                    err
-                );
-            }
-        });
+        // TODO: if there was a previous subscription, make sure we kill the previously created threads
+        let endpoint_thread_join_handle =
+            thread::spawn(move || match quic_listen(&listen, tx, cert_base_path) {
+                Ok(_) => {
+                    info!("Endpoint successfully launched for receiving auth req notifications");
+                }
+                Err(err) => {
+                    error!(
+                        "Failed to launch endpoint for receiving auth req notifications: {}",
+                        err
+                    );
+                }
+            });
 
         let cb = Box::new(allow_cb);
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks

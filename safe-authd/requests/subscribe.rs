@@ -15,20 +15,38 @@ pub fn process_req(
     args: &[&str],
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<String, String> {
-    if args.len() != 1 {
+    if args.len() > 2 {
         Err("Incorrect number of arguments for 'subscribe' action".to_string())
     } else {
+        let endpoint_url = args[0];
+
         println!("Subscribing to authorisation requests notifications...");
-        let mut notif_endpoint = match urlencoding::decode(args[0]) {
+        let mut notif_endpoint = match urlencoding::decode(endpoint_url) {
             Ok(url) => url,
             Err(err) => {
                 let msg = format!(
                     "Subscription rejected, the endpoint URL ('{}') is invalid: {:?}",
-                    args[0], err
+                    endpoint_url, err
                 );
                 println!("{}", msg);
                 return Err(msg);
             }
+        };
+
+        let mut cert_base_path = if args.len() == 2 {
+            match urlencoding::decode(args[1]) {
+                Ok(path) => path,
+                Err(err) => {
+                    let msg = format!(
+                    "Subscription rejected, the certification base path ('{}') is invalid: {:?}",
+                    args[1], err
+                    );
+                    println!("{}", msg);
+                    return Err(msg);
+                }
+            }
+        } else {
+            "".to_string()
         };
 
         lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
@@ -40,7 +58,11 @@ pub fn process_req(
                 if notif_endpoint.ends_with('/') {
                     notif_endpoint.pop();
                 }
-                notif_endpoints_list.insert(notif_endpoint.clone());
+                if cert_base_path.ends_with('/') {
+                    cert_base_path.pop();
+                }
+
+                notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
 
                 let msg = format!(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",

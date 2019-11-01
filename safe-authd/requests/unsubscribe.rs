@@ -29,20 +29,23 @@ pub fn process_req(
         };
 
         lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
-            if notif_endpoints_list.remove(&notif_endpoint) {
-                let msg = format!(
-                "Unsubscription successful. Endpoint '{}' will no longer receive authorisation requests notifications",
-                notif_endpoint
-            );
-                println!("{}", msg);
-                Ok(msg)
-            } else {
-                let msg = format!(
+            match notif_endpoints_list.remove(&notif_endpoint) {
+                Some(_) => {
+                    let msg = format!(
+                    "Unsubscription successful. Endpoint '{}' will no longer receive authorisation requests notifications",
+                    notif_endpoint
+                    );
+                    println!("{}", msg);
+                    Ok(msg)
+                }
+                None => {
+                    let msg = format!(
                 "Unsubscription request ignored, no such the endpoint URL ('{}') was found to be subscribed",
                 notif_endpoint
-            );
-                println!("{}", msg);
-                Err(msg)
+                );
+                    println!("{}", msg);
+                    Err(msg)
+                }
             }
         })
     }
