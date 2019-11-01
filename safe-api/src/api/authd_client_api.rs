@@ -10,7 +10,7 @@ use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::quic_client::quic_send;
 use super::quic_endpoint::quic_listen;
 use super::{AuthedAppsList, Error, Result, SafeAuthReqId};
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
@@ -114,12 +114,23 @@ pub struct SafeAuthdClient {
 
 impl Drop for SafeAuthdClient {
     fn drop(&mut self) {
+        trace!("SafeAuthdClient instance being dropped...");
         // Let's try to unsubscribe if we had a subscribed endpoint
         match &self.subscribed_endpoint {
             None => {}
             Some((url, _, _)) => {
-                send_unsubscribe(url, self.port)
-                    .expect("Failed to unsubscribe endpoint from authd");
+                match send_unsubscribe(url, self.port) {
+                    Ok(msg) => {
+                        debug!("{}", msg);
+                    },
+                    Err(err) => {
+                        // We are still ok, it was just us trying to be nice and unsubscribe if possible
+                        // It could be the case we were already unsubscribe automatically by authd before
+                        // we were attempting to do it now, which can happend due to our endpoint
+                        // being unresponsive, so it's all ok
+                        debug!("Failed to unsubscribe endpoint from authd: {}", err);
+                    }
+                }
             }
         }
     }

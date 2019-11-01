@@ -20,13 +20,13 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
 3. [Using the CLI](#using-the-cli)
   - [Auth](#auth)
     - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
-    - [Authd start (Linux/Mac)](#authd-start-linuxmac)
-    - [Authd start (Windows)](#authd-start-windows)
-    - [Authd status](#authd-status)
-    - [Authd create-acc](#authd-create-acc)
-    - [Authd login](#authd-login)
-    - [Authd reqs](#authd-reqs)
-    - [Authd allow-deny](#authd-allowdeny)
+    - [Auth start (Linux/Mac)](#auth-start-linuxmac)
+    - [Auth start (Windows)](#auth-start-windows)
+    - [Auth status](#auth-status)
+    - [Auth create-acc](#auth-create-acc)
+    - [Auth login](#auth-login)
+    - [Auth reqs](#auth-reqs)
+    - [Auth allow-deny](#auth-allowdeny)
   - [SafeKeys](#safekeys)
     - [Create](#safekeys-creation)
     - [Balance](#safekeys-balance)
@@ -118,7 +118,7 @@ This command simply sends an authorisation request to the Authenticator availabl
 
 In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)]() endpoint, which SAFE application will communicate to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
 
-#### Authd start (Linux/Mac)
+#### Auth start (Linux/Mac)
 
 In order to start the `SAFE Authenticator daemon (safe-authd)` we simply need to run the following command:
 ```shell
@@ -126,7 +126,7 @@ $ safe auth start
 Starting SAFE Authenticator daemon (safe-authd)...
 ```
 
-#### Authd start (Windows)
+#### Auth start (Windows)
 
 Windows platform requires you to first install `authd` as a Windows service before being able to start it. It also requires administrator permissions to install and start a service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
 ```shell
@@ -139,7 +139,7 @@ Starting SAFE Authenticator service (safe-authd) from command line...
 safe-authd service started successfully!
 ```
 
-#### Authd status
+#### Auth status
 
 Once we started the `authd`, it should be running in the background and ready to receive requests, we can send an status request to check it's up and running:
 ```shell
@@ -156,7 +156,7 @@ Sending request to authd to obtain an status report...
 +------------------------------------------+-------+
 ```
 
-#### Authd create-acc
+#### Auth create-acc
 
 Since we now have our SAFE Authenticator running and ready to accept requests, we can start interacting with it by using others SAFE CLI `auth` subcommands.
 
@@ -183,7 +183,7 @@ Sending account creation request to authd...
 Account was created successfully!
 ```
 
-#### Authd login
+#### Auth login
 
 Once you have a SAFE account created, we can login:
 ```shell
@@ -211,7 +211,7 @@ Sending request to authd to obtain an status report...
 
 The SAFE Authenticator is now ready to receive authorisation requests from any SAFE application, including the SAFE CLI which needs to also get permissions to perform any data operations on behalf of our account.
 
-#### Authd reqs
+#### Auth reqs
 
 Now that the Authenticator is running and ready to authorise applications, we can try to authorise the CLI application.
 
@@ -248,7 +248,7 @@ Requesting list of pending authorisation requests from authd...
 
 We see there is one authorisation request pending for approval/denial, which is the one requested by the CLI application from the other console.
 
-#### Authd allow/deny
+#### Auth allow/deny
 
 In order to allow any pending authorisation request we use its request ID (e.g. '584798987' from above), the `authd` will then proceed to send a response back to the CLI with the corresponding credentials it can use to connect directly with the Network:
 ```shell
