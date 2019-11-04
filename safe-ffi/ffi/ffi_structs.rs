@@ -169,7 +169,12 @@ pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
 ) -> Result<XorUrlEncoder> {
     // let sub_names = string_vec_to_c_str_str(xorurl_encoder.sub_names())?; // Todo: update to String Vec
-    let sub_names = serde_json::to_string(&xorurl_encoder.sub_names())?;
+    let sub_names = if xorurl_encoder.sub_names().len() > 0 {
+        serde_json::to_string(&xorurl_encoder.sub_names())?
+    } else {
+        String::new()
+    };
+
     Ok(XorUrlEncoder {
         encoding_version: xorurl_encoder.encoding_version(),
         xorname: xorurl_encoder.xorname().0,
@@ -517,12 +522,12 @@ impl Drop for NrsMapContainerInfo {
 impl NrsMapContainerInfo {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            public_name: std::ptr::null(),
-            xorurl: std::ptr::null(),
+            public_name: CString::new(String::new())?.into_raw(),
+            xorurl: CString::new(String::new())?.into_raw(),
             xorname: [0; 32],
             type_tag: 0,
             version: 0,
-            nrs_map: std::ptr::null(),
+            nrs_map: CString::new(String::new())?.into_raw(),
             data_type: 0,
         })
     }
