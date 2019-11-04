@@ -27,6 +27,7 @@ For further information please see https://safenetforum.org/t/safe-cli-high-leve
     - [Auth login](#auth-login)
     - [Auth reqs](#auth-reqs)
     - [Auth allow-deny](#auth-allowdeny)
+  - [The interactive shell](#the-interactive-shell)
   - [SafeKeys](#safekeys)
     - [Create](#safekeys-creation)
     - [Balance](#safekeys-balance)
@@ -266,6 +267,72 @@ Credentials were stored in <home directory>/.local/share/safe-cli/credentials
 ```
 
 We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.
+
+### The interactive shell
+
+When the CLI is invoked without any command, it enters into an interactive shell, which allows the user to run commands within a shell:
+```shell
+$ safe
+
+Welcome to SAFE CLI interactive shell!
+Type 'help' for a list of supported commands
+Type 'quit' to exit this shell. Enjoy it!
+
+>
+```
+
+The shell is in active development, therefore right now it supports only a subset of the operations that can be performed in the regular command line. The set of currently supported operations are all those related to the authorisation requests and those to interact with the `authd`. E.g., we can use the `auth-status` command to retrieve an status report from the `authd`:
+```shell
+> auth-status
+Sending request to authd to obtain an status report...
++------------------------------------------+-------+
+| SAFE Authenticator status                |       |
++------------------------------------------+-------+
+| Logged in to a SAFE account?             | false |
++------------------------------------------+-------+
+| Number of pending authorisation requests | 0     |
++------------------------------------------+-------+
+| Number of notifications subscriptors     | 0     |
++------------------------------------------+-------+
+```
+
+As you can see, the commands operate in an analogous way as when they are invoked outside of the interactive shell. Although there are some operations which are only possible when they are executed from the interactive shell, one nice example is the possibility to subscribe to receive authorisation request notifications, let's see how that works.
+
+In the previous section we've used the `safe auth reqs` command to obtain a list of the authorisation requests which are awaiting for approval/denial. We could instead use the interactive shell to subscribe it as an endpoint to receive notifications when this authorisation requests are sent to the `authd`:
+```shell
+> auth-subscribe
+Sending request to subscribe...
+Subscribed successfully
+Keep this shell session open to receive the notifications
+```
+
+This is telling us that as long as we keep this session of the interactive shell open, we will be notified of any new authorisation request, such notifications are being sent by the `authd` to our interactive shell session. Thus if we have any other SAFE app which is sending an authorisation request to `authd`, e.g. the SAFE Browser, a `safe auth` command invoked from another instance of the CLI, etc., we will be notified by the interactive shell:
+```shell
+>
+A new application authorisation request was received:
++------------+------------------+---------+---------+-------------------------+
+| Request Id | App Id           | Name    | Vendor  | Permissions requested   |
++------------+------------------+---------+---------+-------------------------+
+| 754801191  | net.maidsafe.cli | Unknown | Unknown | Own container: false    |
+|            |                  |         |         | Transfer coins: true    |
+|            |                  |         |         | Mutations: true         |
+|            |                  |         |         | Read coin balance: true |
+|            |                  |         |         | Containers: None        |
++------------+------------------+---------+---------+-------------------------+
+To allow/deny the request, use the auth-allow/auth-deny commands respectively, e.g.: auth-allow <request id>
+Press Enter to continue
+```
+
+The notification message contains the same information we can obtain with `safe auth reqs` command. We can now do the same as before and allow/deny such a request using its ID, in this case '754801191':
+```shell
+> auth-allow 754801191
+Sending request to authd to allow an authorisation request...
+Authorisation request was allowed successfully
+```
+
+The interactive shell will be expanded to support many more operations, and especially to cover the use cases which are not possible to cover with the non-interactive shell, like the use case we've seen of receiving notifications from `authd`.
+
+It enables the possibility to also have a state in the session, e.g. allowing the user to set a wallet to be used for all operation within that session instead of using the default wallet from the account, or several other use cases and features we'll be adding as we move forward in its development.
 
 ### SafeKeys
 
