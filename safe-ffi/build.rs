@@ -16,7 +16,7 @@ fn main() {
 
 #[cfg(feature = "bindings")]
 mod bindings {
-    use safe_bindgen::{Bindgen, FilterMode, LangCSharp};
+    use safe_bindgen::{Bindgen, FilterMode, LangCSharp, LangC};
     use safe_nd::XOR_NAME_LEN;
     use std::collections::HashMap;
     use std::env;
@@ -36,8 +36,32 @@ mod bindings {
          // specific language governing permissions and limitations relating to use\n\
          // of the SAFE Network Software.";
 
+    const FFI_UTILS_CODE: &str =
+        "#[repr(C)] pub struct FfiResult { error_code: i32, description: *const c_char }";
+
     pub fn main() {
+        gen_bindings_c();
         gen_bindings_csharp();
+    }
+
+    fn gen_bindings_c() {
+        let target_dir = Path::new("bindings/c/safe-api");
+        let mut outputs = HashMap::new();
+
+        let mut bindgen = unwrap!(Bindgen::new());
+        let mut lang = LangC::new();
+
+        lang.set_lib_name("ffi_utils");
+        bindgen.source_code("ffi_utils/src/lib.rs", FFI_UTILS_CODE);
+        bindgen.compile_or_panic(&mut lang, &mut outputs, false);
+
+        lang.add_custom_code("typedef void* Safe;\n");
+        lang.set_lib_name("safe_ffi");
+        bindgen.source_file("lib.rs");
+        bindgen.compile_or_panic(&mut lang, &mut outputs, true);
+
+        add_license_headers(&mut outputs);
+        bindgen.write_outputs_or_panic(target_dir, &outputs);
     }
 
     fn gen_bindings_csharp() {
