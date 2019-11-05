@@ -7,11 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::{auth_daemon::*, safe_net::*};
+use crate::APP_ID;
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
 use std::io::{stdout, Write};
 
-const APP_ID: &str = "net.maidsafe.cli";
+const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 
 pub fn shell_run() -> Result<(), String> {
     let safe = Safe::new("");
@@ -163,7 +164,7 @@ pub fn shell_run() -> Result<(), String> {
         0,
         |io, (_, safe_authd_client), args| {
             let endpoint = if args.is_empty() {
-                "https://localhost:33001".to_string()
+                AUTH_REQS_NOTIFS_ENDPOINT.to_string()
             } else {
                 args[0].to_string()
             };
@@ -186,7 +187,7 @@ pub fn shell_run() -> Result<(), String> {
         0,
         |io, (_, safe_authd_client), args| {
             let endpoint = if args.is_empty() {
-                "https://localhost:33001".to_string()
+                AUTH_REQS_NOTIFS_ENDPOINT.to_string()
             } else {
                 args[0].to_string()
             };

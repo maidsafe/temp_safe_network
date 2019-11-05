@@ -131,7 +131,9 @@ pub fn monitor_pending_auth_reqs(
                 );
                 if let Some(is_allowed) = response {
                     match incoming_auth_req.tx.try_send(is_allowed) {
-                        Ok(_) => println!("Auth req decision ready to be sent to application"),
+                        Ok(_) => {
+                            println!("Auth req decision ready to be sent back to the application")
+                        }
                         Err(_) => println!(
                             "Auth req decision couldn't be sent, and therefore already denied"
                         ),

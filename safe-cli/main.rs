@@ -26,6 +26,10 @@ extern crate human_panic;
 #[macro_use]
 extern crate self_update;
 
+const APP_ID: &str = "net.maidsafe.cli";
+const APP_NAME: &str = "SAFE CLI";
+const APP_VENDOR: &str = "MaidSafe.net Ltd";
+
 fn main() {
     setup_panic!();
     env_logger::init();

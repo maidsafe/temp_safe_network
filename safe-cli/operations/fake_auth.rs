@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::APP_ID;
 use log::debug;
 use safe_api::Safe;
-
-const APP_ID: &str = "net.maidsafe.cli";
 
 pub fn authorise_cli(_safe: &mut Safe, _port: Option<u16>) -> Result<(), String> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file or send authorisation request");

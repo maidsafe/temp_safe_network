@@ -441,7 +441,14 @@ impl SafeAuthdClient {
                         "Notification for authorisation request ({}) from app ID '{}' received",
                         auth_req.req_id, auth_req.app_id
                     );
-                    cb(auth_req);
+                    let _user_decision = cb(auth_req);
+                    // TODO: send the callback return value back to authd
+                    /*match auth_req.tx.try_send(user_decision) {
+                        Ok(_) => println!("Auth req decision made"),
+                        Err(_) => println!(
+                            "Auth req decision couldn't be obtained from user callback"
+                        ),
+                    };*/
                 }
                 Err(err) => {
                     debug!("Failed to receive message: {}", err);

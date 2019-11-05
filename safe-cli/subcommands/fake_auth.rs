@@ -9,8 +9,7 @@
 use log::debug;
 use safe_api::Safe;
 use structopt::StructOpt;
-
-const APP_ID: &str = "net.maidsafe.cli";
+use crate::APP_ID;
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
