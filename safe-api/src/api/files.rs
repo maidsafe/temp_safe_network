@@ -130,7 +130,7 @@ impl Safe {
             || {
                 self.safe_app.get_latest_seq_append_only_data(
                     xorurl_encoder.xorname(),
-                    FILES_CONTAINER_TYPE_TAG,
+                    xorurl_encoder.type_tag(),
                 )
             },
             |content_version| {
@@ -138,14 +138,18 @@ impl Safe {
                     .safe_app
                     .get_seq_append_only_data(
                         xorurl_encoder.xorname(),
-                        FILES_CONTAINER_TYPE_TAG,
+                        xorurl_encoder.type_tag(),
                         content_version,
                     )
-                    .map_err(|_| {
-                        Error::VersionNotFound(format!(
-                            "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                            content_version, url,
-                        ))
+                    .map_err(|err| {
+                        if let Error::VersionNotFound(_) = err {
+                            Error::VersionNotFound(format!(
+                                "Version '{}' is invalid for FilesContainer found at \"{}\"",
+                                content_version, url,
+                            ))
+                        } else {
+                            err
+                        }
                     })?;
                 Ok((content_version, (key, value)))
             },
