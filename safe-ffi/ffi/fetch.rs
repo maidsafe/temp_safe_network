@@ -14,10 +14,10 @@ pub unsafe extern "C" fn fetch(
     app: *mut Safe,
     url: *const c_char,
     user_data: *mut c_void,
-    o_published: extern "C" fn(user_data: *mut c_void, *const PublishedImmutableData),
-    o_wallet: extern "C" fn(user_data: *mut c_void, *const Wallet),
-    o_keys: extern "C" fn(user_data: *mut c_void, *const SafeKey),
-    o_container: extern "C" fn(user_data: *mut c_void, *const FilesContainer),
+    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
+    o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
+    o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
+    o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
     o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<()> {
@@ -40,10 +40,10 @@ pub unsafe extern "C" fn inspect(
     app: *mut Safe,
     url: *const c_char,
     user_data: *mut c_void,
-    o_published: extern "C" fn(user_data: *mut c_void, *const PublishedImmutableData),
-    o_wallet: extern "C" fn(user_data: *mut c_void, *const Wallet),
-    o_keys: extern "C" fn(user_data: *mut c_void, *const SafeKey),
-    o_container: extern "C" fn(user_data: *mut c_void, *const FilesContainer),
+    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
+    o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
+    o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
+    o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
     o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<()> {
@@ -64,10 +64,10 @@ pub unsafe extern "C" fn inspect(
 unsafe fn invoke_callback(
     content: safe_api::Result<SafeData>,
     user_data: *mut c_void,
-    o_published: extern "C" fn(user_data: *mut c_void, *const PublishedImmutableData),
-    o_wallet: extern "C" fn(user_data: *mut c_void, *const Wallet),
-    o_keys: extern "C" fn(user_data: *mut c_void, *const SafeKey),
-    o_container: extern "C" fn(user_data: *mut c_void, *const FilesContainer),
+    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
+    o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
+    o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
+    o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
     o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) -> Result<()> {
     let user_data = OpaqueCtx(user_data);
