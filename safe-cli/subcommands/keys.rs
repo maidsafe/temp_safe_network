@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_from_arg_or_stdin, get_secret_key};
+use super::helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id};
 use super::OutputFmt;
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
@@ -55,7 +55,7 @@ pub enum KeysSubCommands {
         #[structopt(long = "to")]
         to: Option<String>,
         /// The transaction ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
-        #[structopt(long = "tx-id")]
+        #[structopt(long = "tx-id", parse(try_from_str = "parse_tx_id"))]
         tx_id: Option<u64>,
     },
 }

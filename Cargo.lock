@@ -2457,7 +2457,7 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.10.0"
-source = "git+https://github.com/maidsafe/safe_client_libs#5ece9c738dc76ebba4866f76aa286c59189a94d0"
+source = "git+https://github.com/maidsafe/safe_client_libs#ce01d0401b1aa9344ab47035299141682ae5c622"
 dependencies = [
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "config_file_handler 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2486,7 +2486,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.10.0"
-source = "git+https://github.com/maidsafe/safe_client_libs#5ece9c738dc76ebba4866f76aa286c59189a94d0"
+source = "git+https://github.com/maidsafe/safe_client_libs#ce01d0401b1aa9344ab47035299141682ae5c622"
 dependencies = [
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "config_file_handler 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2530,7 +2530,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.35.0"
-source = "git+https://github.com/maidsafe/safe_client_libs#5ece9c738dc76ebba4866f76aa286c59189a94d0"
+source = "git+https://github.com/maidsafe/safe_client_libs#ce01d0401b1aa9344ab47035299141682ae5c622"
 dependencies = [
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
