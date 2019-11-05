@@ -169,7 +169,7 @@ pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
 ) -> Result<XorUrlEncoder> {
     // let sub_names = string_vec_to_c_str_str(xorurl_encoder.sub_names())?; // Todo: update to String Vec
-    let sub_names = if xorurl_encoder.sub_names().len() > 0 {
+    let sub_names = if !xorurl_encoder.sub_names().is_empty() {
         serde_json::to_string(&xorurl_encoder.sub_names())?
     } else {
         String::new()
