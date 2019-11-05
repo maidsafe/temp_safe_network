@@ -17,7 +17,7 @@ For example:
 ```
 QA:
 Easiest way to test this PR would be to:
-- Run safe-auth cli client in a different terminal
+- Start authd
 - login
 - safe wallet insert <problem link>
 - Expect to see an authentication error output

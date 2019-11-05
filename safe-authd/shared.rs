@@ -31,7 +31,7 @@ pub type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
 
 // A thread-safe handle to keep the list of notifications subscriptors' endpoints,
 // we also keep the certificates' base path which is needed to create the communication channel
-pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeMap<String, String>>>;
+pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeMap<String, Option<String>>>>;
 
 pub fn lock_safe_authenticator<F, R>(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
@@ -76,7 +76,7 @@ pub fn lock_notif_endpoints_list<F, R>(
     mut f: F,
 ) -> Result<R, String>
 where
-    F: FnMut(&mut BTreeMap<String, String>) -> Result<R, String>,
+    F: FnMut(&mut BTreeMap<String, Option<String>>) -> Result<R, String>,
 {
     match notif_endpoints_handle.lock() {
         Err(err) => Err(format!(
@@ -84,7 +84,7 @@ where
             err
         )),
         Ok(mut locked_list) => {
-            let notif_endpoints_list: &mut BTreeMap<String, String> = &mut *(locked_list);
+            let notif_endpoints_list: &mut BTreeMap<String, Option<String>> = &mut *(locked_list);
             f(notif_endpoints_list)
         }
     }

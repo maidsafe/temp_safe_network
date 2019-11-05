@@ -138,10 +138,11 @@ pub fn authd_deny(safe_authd: &SafeAuthdClient, req_id: u32) -> Result<(), Strin
 pub fn authd_subscribe(
     safe_authd: &mut SafeAuthdClient,
     notifs_endpoint: String,
+    app_id: &str,
     auth_allow_prompt: &'static AuthAllowPrompt,
 ) -> Result<(), String> {
     println!("Sending request to subscribe...");
-    safe_authd.subscribe(&notifs_endpoint, auth_allow_prompt)?;
+    safe_authd.subscribe(&notifs_endpoint, app_id, auth_allow_prompt)?;
     println!("Subscribed successfully");
     Ok(())
 }

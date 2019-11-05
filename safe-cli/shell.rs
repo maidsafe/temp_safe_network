@@ -11,6 +11,8 @@ use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
 use std::io::{stdout, Write};
 
+const APP_ID: &str = "net.maidsafe.cli";
+
 pub fn shell_run() -> Result<(), String> {
     let safe = Safe::new("");
     let safe_authd_client = SafeAuthdClient::new(None);
@@ -26,7 +28,7 @@ pub fn shell_run() -> Result<(), String> {
     });
     shell.new_command_noargs(
         "auth",
-        "Authorise the SAFE CLI using a remote Authenticator daemon",
+        "Authorise the CLI using a remote Authenticator daemon, or interact with it using subcommands",
         |io, (safe, _)| match authorise_cli(safe, None) {
             Ok(()) => Ok(()),
             Err(err) => {
@@ -155,12 +157,18 @@ pub fn shell_run() -> Result<(), String> {
         },
     );
 
-    shell.new_command_noargs(
+    shell.new_command(
         "auth-subscribe",
         "Send request to a remote Authenticator daemon to subscribe to receive authorisation requests notifications",
-        |io, (_, safe_authd_client)| {
-            let endpoint = "https://localhost:33001".to_string(); // args[0].to_string();
-            match authd_subscribe(safe_authd_client, endpoint, &prompt_to_allow_auth) {
+        0,
+        |io, (_, safe_authd_client), args| {
+            let endpoint = if args.is_empty() {
+                "https://localhost:33001".to_string()
+            } else {
+                args[0].to_string()
+            };
+
+            match authd_subscribe(safe_authd_client, endpoint, APP_ID, &prompt_to_allow_auth) {
                 Ok(()) => {
                     writeln!(io, "Keep this shell session open to receive the notifications")?;
                     Ok(())
@@ -172,11 +180,17 @@ pub fn shell_run() -> Result<(), String> {
             }
         },
     );
-    shell.new_command_noargs(
+    shell.new_command(
         "auth-unsubscribe",
         "Send request to a remote Authenticator daemon to unsubscribe from authorisation requests notifications",
-        |io, (_, safe_authd_client)| {
-            let endpoint = "https://localhost:33001".to_string(); // args[0].to_string();
+        0,
+        |io, (_, safe_authd_client), args| {
+            let endpoint = if args.is_empty() {
+                "https://localhost:33001".to_string()
+            } else {
+                args[0].to_string()
+            };
+
             match authd_unsubscribe(safe_authd_client, endpoint) {
                 Ok(()) => Ok(()),
                 Err(err) => {

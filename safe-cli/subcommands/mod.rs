@@ -37,7 +37,7 @@ pub enum OutputFmt {
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {
     #[structopt(name = "auth")]
-    /// Authorise the CLI
+    /// Authorise the CLI using a remote Authenticator daemon, or interact with it using subcommands
     Auth {
         /// subcommands
         #[structopt(subcommand)]

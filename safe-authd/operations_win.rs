@@ -45,7 +45,7 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
     // Since the authd service runs as a system process, we need to provide
     // the user's local project directory path which is where certificates are shared through
     let cert_base_path =
-        match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
+        match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
             Some(dirs) => dirs.config_dir().display().to_string(),
             None => return Err(format_err!(
                 "Failed to obtain local project directory path where to write authd certificate to"

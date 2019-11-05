@@ -153,7 +153,7 @@ pub fn run(
 // Private helpers
 
 pub fn get_certificate_base_path() -> Result<String, Error> {
-    match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
+    match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
         Some(dirs) => Ok(dirs.config_dir().display().to_string()),
         None => Err(format_err!(
             "Failed to obtain local project directory where to write certificate from"

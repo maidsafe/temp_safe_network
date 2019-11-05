@@ -33,9 +33,9 @@ pub fn process_req(
             }
         };
 
-        let mut cert_base_path = if args.len() == 2 {
+        let cert_base_path = if args.len() == 2 {
             match urlencoding::decode(args[1]) {
-                Ok(path) => path,
+                Ok(path) => Some(path),
                 Err(err) => {
                     let msg = format!(
                     "Subscription rejected, the certification base path ('{}') is invalid: {:?}",
@@ -46,7 +46,7 @@ pub fn process_req(
                 }
             }
         } else {
-            "".to_string()
+            None
         };
 
         lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
@@ -58,15 +58,12 @@ pub fn process_req(
                 if notif_endpoint.ends_with('/') {
                     notif_endpoint.pop();
                 }
-                if cert_base_path.ends_with('/') {
-                    cert_base_path.pop();
-                }
 
                 notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
 
                 let msg = format!(
-                        "Subscription successful. Endpoint '{}' will receive authorisation requests notifications",
-                        notif_endpoint
+                        "Subscription successful. Endpoint '{}' will receive authorisation requests notifications (cert base path: {:?})",
+                        notif_endpoint, cert_base_path
                     );
                 println!("{}", msg);
                 Ok(msg)

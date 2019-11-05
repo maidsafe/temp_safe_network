@@ -203,7 +203,7 @@ fn duration_secs(x: &Duration) -> f32 {
 }
 
 fn get_certificate_base_path() -> Result<String> {
-    match directories::ProjectDirs::from("net", "maidsafe", "safe_authd") {
+    match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
         Some(dirs) => Ok(dirs.config_dir().display().to_string()),
         None => Err(Error::AuthdClientError(
             "Failed to obtain local project directory where to read certificate from".to_string(),

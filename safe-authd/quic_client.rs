@@ -27,7 +27,7 @@ pub fn quic_send(
     url_str: &str,
     keylog: bool,
     cert_host: Option<&str>,
-    cert_ca: Option<PathBuf>,
+    cert_ca: Option<&str>,
     rebind: bool,
 ) -> Result<String> {
     let url = Url::parse(url_str).map_err(|_| "Invalid end point address".to_string())?;
@@ -46,9 +46,9 @@ pub fn quic_send(
     }
 
     let ca_path = if let Some(ca_path) = cert_ca {
-        ca_path.join("cert.der")
+        PathBuf::from(ca_path).join("cert.der")
     } else {
-        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "authd_client") {
+        let dirs = match directories::ProjectDirs::from("net", "maidsafe", "safe-authd-client") {
             Some(dirs) => dirs,
             None => {
                 return Err(

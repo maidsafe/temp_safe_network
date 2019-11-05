@@ -9,7 +9,6 @@
 use super::quic_client::quic_send;
 use super::shared::*;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
@@ -89,7 +88,7 @@ pub fn monitor_pending_auth_reqs(
                         ),
                         false,
                         None,
-                        Some(PathBuf::from(cert_base_path)),
+                        cert_base_path.as_ref().map(String::as_str),
                         false,
                     ) {
                         Ok(notif_resp) => {
