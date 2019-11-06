@@ -11,10 +11,8 @@ use super::safe_net::AppendOnlyDataRawData;
 use super::{Error, Result, SafeApp};
 use futures::future::Future;
 use log::{debug, info, warn};
-use rand::rngs::OsRng;
-use rand_core::RngCore;
 use safe_app::{run, App, AppError::CoreError as SafeAppError};
-use safe_core::{client::test_create_balance, CoreError as SafeCoreError};
+use safe_core::{client::test_create_balance, immutable_data, CoreError as SafeCoreError};
 
 #[cfg(not(feature = "fake-auth"))]
 use super::helpers::decode_ipc_msg;
@@ -25,8 +23,8 @@ use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
     ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, Coins,
     Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
-    MDataSeqValue, PubImmutableData, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
-    SeqMutableData, Transaction, TransactionId, XorName,
+    MDataSeqValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction,
+    TransactionId, XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -206,16 +204,23 @@ impl SafeApp for SafeAppScl {
     fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
 
-        let the_idata = PubImmutableData::new(data.to_vec());
-        let return_idata = the_idata.clone();
-        run(safe_app, move |client, _app_context| {
-            client.put_idata(the_idata).map_err(SafeAppError)
+        let data_vec = data.to_vec();
+        let idata = run(safe_app, move |client, _app_context| {
+            let client2 = client.clone();
+            immutable_data::create(
+                client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+            )
+            .and_then(move |data_map| {
+                let address = *data_map.address();
+                client2.put_idata(data_map).map(move |_| address)
+            })
+            .map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to PUT Published ImmutableData: {:?}", e))
         })?;
 
-        Ok(*return_idata.name())
+        Ok(*idata.name())
     }
 
     fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>> {
@@ -224,14 +229,18 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
         let immd_data_addr = IDataAddress::Pub(xorname);
         let data = run(safe_app, move |client, _app_context| {
-            client.get_idata(immd_data_addr).map_err(SafeAppError)
+            immutable_data::get_value(client, immd_data_addr, /*decryption_key:*/ None)
+                .map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
         })?;
-        debug!("the_data: {:?}", &xorname);
+        debug!(
+            "Published ImmutableData data successfully retrieved from: {:?}",
+            &xorname
+        );
 
-        Ok(data.value().to_vec())
+        Ok(data)
     }
 
     fn put_seq_append_only_data(
@@ -448,17 +457,7 @@ impl SafeApp for SafeAppScl {
             ));
         };
 
-        let xorname = match name {
-            Some(xorname) => xorname,
-            None => {
-                let mut rng = OsRng::new().map_err(|err| {
-                    Error::Unexpected(format!("Failed to generate a random XoR name: {}", err))
-                })?;
-                let mut xorname = XorName::default();
-                rng.fill_bytes(&mut xorname.0);
-                xorname
-            }
-        };
+        let xorname = name.unwrap_or_else(create_random_xorname);
 
         let permission_set = MDataPermissionSet::new()
             .allow(MDataAction::Read)
