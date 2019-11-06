@@ -30,7 +30,6 @@ pub enum Error {
     FilesSystemError(String),
     Unexpected(String),
     Unknown(String),
-    StringError(String),
 }
 
 impl From<Error> for String {
@@ -62,7 +61,6 @@ impl fmt::Display for Error {
             FilesSystemError(info) => ("FilesSystemError", info),
             Unexpected(info) => ("Unexpected", info),
             Unknown(info) => ("Unknown", info),
-            StringError(info) => ("StringError", info),
         };
         let description = format!("[Error] {} - {}", error_type, error_msg);
 

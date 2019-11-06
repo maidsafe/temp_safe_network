@@ -37,7 +37,6 @@ mod codes {
     // Misc Errors
     pub const ERR_UNEXPECTED_ERROR: i32 = -500;
     pub const ERR_UNKNOWN_ERROR: i32 = -501;
-    pub const ERR_STRING_ERROR: i32 = -502;
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -75,7 +74,6 @@ impl ErrorCode for Error {
             InvalidMediaType(ref _error) => ERR_INVALID_MEDIA_TYPE_ERROR,
             Unexpected(ref _error) => ERR_UNEXPECTED_ERROR,
             Unknown(ref _error) => ERR_UNKNOWN_ERROR,
-            StringError(ref _error) => ERR_STRING_ERROR,
         }
     }
 }
@@ -88,7 +86,7 @@ impl From<NativeError> for Error {
 
 impl From<StringError> for Error {
     fn from(_error: StringError) -> Self {
-        NativeError::StringError("string conversion error".into()).into()
+        StringError::IntoString("string conversion error".into()).into()
     }
 }
 
@@ -106,6 +104,6 @@ impl From<NulError> for Error {
 
 impl From<serde_json::error::Error> for Error {
     fn from(_error: serde_json::error::Error) -> Self {
-        NativeError::StringError("Failed to serialize or deserialize to json".into()).into()
+        StringError::IntoString("Failed to serialize or deserialize to json".into()).into()
     }
 }
