@@ -50,15 +50,23 @@ pub fn process_req(
         };
 
         lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
-            if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
+            // let's normailse the endpoint URL
+            if notif_endpoint.ends_with('/') {
+                notif_endpoint.pop();
+            }
+
+            if notif_endpoints_list.get(&notif_endpoint).is_some() {
+                let msg = format!(
+                    "Subscription rejected. Endpoint '{}' is already subscribed",
+                    notif_endpoint
+                );
+                println!("{}", msg);
+                Err(msg)
+            } else if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
                 let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
                 println!("{}", msg);
                 Err(msg)
             } else {
-                if notif_endpoint.ends_with('/') {
-                    notif_endpoint.pop();
-                }
-
                 notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
 
                 let msg = format!(
