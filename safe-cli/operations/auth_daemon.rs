@@ -53,8 +53,8 @@ pub fn authd_create(
     sk: Option<String>,
     test_coins: bool,
 ) -> Result<(), String> {
-    let secret = prompt_sensitive(None, "Secret:")?;
-    let password = prompt_sensitive(None, "Password:")?;
+    let secret = prompt_sensitive(None, "Secret: ")?;
+    let password = prompt_sensitive(None, "Password: ")?;
     if test_coins {
         // We then generate a SafeKey with test-coins to use it for the account creation
         println!("Creating a SafeKey with test-coins...");
@@ -76,8 +76,8 @@ pub fn authd_create(
 }
 
 pub fn authd_login(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
-    let secret = prompt_sensitive(None, "Secret:")?;
-    let password = prompt_sensitive(None, "Password:")?;
+    let secret = prompt_sensitive(None, "Secret: ")?;
+    let password = prompt_sensitive(None, "Password: ")?;
     println!("Sending login action request to authd...");
     safe_authd.log_in(&secret, &password)?;
     println!("Logged in successfully");

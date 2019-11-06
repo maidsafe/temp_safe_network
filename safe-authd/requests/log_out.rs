@@ -6,11 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
+use crate::shared::{
+    lock_auth_reqs_list, lock_safe_authenticator, SharedAuthReqsHandle,
+    SharedSafeAuthenticatorHandle,
+};
 
 pub fn process_req(
     args: &[&str],
     safe_auth_handle: SharedSafeAuthenticatorHandle,
+    auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<String, String> {
     if !args.is_empty() {
         Err("Incorrect number of arguments for 'logout' action".to_string())
@@ -31,5 +35,12 @@ pub fn process_req(
                 }
             },
         )
+        .and_then(|msg| {
+            let _ = lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
+                auth_reqs_list.clear();
+                Ok(())
+            });
+            Ok(msg)
+        })
     }
 }

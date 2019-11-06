@@ -194,7 +194,7 @@ fn process_authenticator_req(
             notif_endpoints_handle,
         ),
         "login" => log_in::process_req(action_args, safe_auth_handle),
-        "logout" => log_out::process_req(action_args, safe_auth_handle),
+        "logout" => log_out::process_req(action_args, safe_auth_handle, auth_reqs_handle),
         "create" => create_acc::process_req(action_args, safe_auth_handle),
         "authed-apps" => authed_apps::process_req(action_args, safe_auth_handle),
         "revoke" => revoke::process_req(action_args, safe_auth_handle),
