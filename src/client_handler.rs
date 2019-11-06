@@ -36,7 +36,7 @@ use safe_nd::{
 use serde::Serialize;
 use std::{
     cell::Cell,
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     rc::Rc,
@@ -58,6 +58,7 @@ pub(crate) struct ClientHandler {
     auth_keys: AuthKeysDb,
     balances: BalancesDb,
     clients: HashMap<SocketAddr, ClientInfo>,
+    pending_msg_ids: HashMap<MessageId, SocketAddr>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
     quic_p2p: QuicP2p,
@@ -87,6 +88,7 @@ impl ClientHandler {
             auth_keys,
             balances,
             clients: Default::default(),
+            pending_msg_ids: Default::default(),
             client_candidates: Default::default(),
             quic_p2p,
             login_packets,
@@ -237,7 +239,12 @@ impl ClientHandler {
                     message_id,
                     signature,
                 }) => {
-                    return self.handle_client_request(&client, request, message_id, signature);
+                    if let Entry::Vacant(ve) = self.pending_msg_ids.entry(message_id) {
+                        let _ = ve.insert(peer_addr);
+                        return self.handle_client_request(&client, request, message_id, signature);
+                    } else {
+                        info!("Pending MessageId reused - ignoring client message.");
+                    }
                 }
                 Ok(Message::Response { response, .. }) => {
                     info!(
@@ -300,7 +307,7 @@ impl ClientHandler {
 
         self.verify_signature(&client.public_id, &request, message_id, signature)?;
         self.authorise_app(&client.public_id, &request, message_id)?;
-        self.verify_consistent_address(&client.public_id, &request, message_id)?;
+        self.verify_consistent_address(&request, message_id)?;
 
         match request {
             //
@@ -378,7 +385,7 @@ impl ClientHandler {
                     .balance(client.public_id.name())
                     .ok_or(NdError::NoSuchBalance);
                 let response = Response::GetBalance(balance);
-                self.send_response_to_client(&client.public_id, message_id, response);
+                self.send_response_to_client(message_id, response);
                 None
             }
             CreateBalance {
@@ -519,7 +526,6 @@ impl ClientHandler {
                 client.public_id
             );
             self.send_response_to_client(
-                &client.public_id,
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOwners)),
             );
@@ -555,7 +561,6 @@ impl ClientHandler {
                     client.public_id
                 );
                 self.send_response_to_client(
-                    &client.public_id,
                     message_id,
                     Response::Mutation(Err(NdError::InvalidOwners)),
                 );
@@ -593,7 +598,6 @@ impl ClientHandler {
     ) -> Option<Action> {
         if address.kind() == IDataKind::Pub {
             self.send_response_to_client(
-                &client.public_id,
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOperation)),
             );
@@ -635,7 +639,6 @@ impl ClientHandler {
                 client.public_id
             );
             self.send_response_to_client(
-                &client.public_id,
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOwners)),
             );
@@ -659,7 +662,6 @@ impl ClientHandler {
     ) -> Option<Action> {
         if address.is_pub() {
             self.send_response_to_client(
-                &client.public_id,
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOperation)),
             );
@@ -710,16 +712,6 @@ impl ClientHandler {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    // See if we already have a peer connected with the same ID
-                    if let Some(old_peer_addr) = self.lookup_client_peer_addr(&public_id) {
-                        info!(
-                            "{}: We already have {} on {}. Cancelling the new connection from {}.",
-                            self, public_id, old_peer_addr, peer_addr
-                        );
-                        self.quic_p2p.disconnect_from(peer_addr);
-                        return;
-                    }
-
                     info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
                     let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
                 }
@@ -923,7 +915,7 @@ impl ClientHandler {
             | GetMDataValue(..)
             | Mutation(..)
             | Transaction(..) => {
-                self.send_response_to_client(&requester, message_id, response);
+                self.send_response_to_client(message_id, response);
                 None
             }
             //
@@ -1129,33 +1121,33 @@ impl ClientHandler {
     }
 
     fn send_notification_to_client(&mut self, client_id: PublicId, notification: Notification) {
-        let peer_addr = if let Some(peer_addr) = self.lookup_client_peer_addr(&client_id) {
-            *peer_addr
-        } else {
+        let peer_addrs = self.lookup_client_peer_addrs(&client_id);
+
+        if peer_addrs.is_empty() {
             info!(
-                "{}: can't notify {} as it's not connected.",
+                "{}: can't notify {} as none of the instances of the client is connected.",
                 self, client_id
             );
             return;
         };
 
-        self.send(
-            Peer::Client { peer_addr },
-            &Message::Notification { notification },
-        )
+        for peer_addr in peer_addrs {
+            self.send(
+                Peer::Client { peer_addr },
+                &Message::Notification {
+                    notification: notification.clone(),
+                },
+            )
+        }
     }
 
-    fn send_response_to_client(
-        &mut self,
-        client_id: &PublicId,
-        message_id: MessageId,
-        response: Response,
-    ) {
-        let peer_addr = if let Some(peer_addr) = self.lookup_client_peer_addr(client_id) {
-            *peer_addr
-        } else {
-            info!("{}: client {} not found", self, client_id);
-            return;
+    fn send_response_to_client(&mut self, message_id: MessageId, response: Response) {
+        let peer_addr = match self.pending_msg_ids.remove(&message_id) {
+            Some(peer_addr) => peer_addr,
+            None => {
+                info!("Expired message-id. Unable to find the client to respond to.");
+                return;
+            }
         };
 
         self.send(
@@ -1167,11 +1159,17 @@ impl ClientHandler {
         )
     }
 
-    fn lookup_client_peer_addr(&self, id: &PublicId) -> Option<&SocketAddr> {
+    fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
         self.clients
             .iter()
-            .find(|(_, client)| &client.public_id == id)
-            .map(|(peer_addr, _)| peer_addr)
+            .filter_map(|(peer_addr, client)| {
+                if &client.public_id == id {
+                    Some(*peer_addr)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
@@ -1250,11 +1248,7 @@ impl ClientHandler {
             Ok(()) => Some(()),
             Err(error) => {
                 trace!("{}: Unable to withdraw {} coins: {}", self, cost, error);
-                self.send_response_to_client(
-                    requester_id,
-                    message_id,
-                    request.error_response(error),
-                );
+                self.send_response_to_client(message_id, request.error_response(error));
                 None
             }
         }
@@ -1268,7 +1262,6 @@ impl ClientHandler {
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
             self.send_response_to_client(
-                client_id,
                 message_id,
                 Response::Mutation(Err(NdError::ExceededSize)),
             );
@@ -1323,7 +1316,6 @@ impl ClientHandler {
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
             self.send_response_to_client(
-                payer,
                 message_id,
                 Response::Transaction(Err(NdError::ExceededSize)),
             );
@@ -1434,7 +1426,7 @@ impl ClientHandler {
         let result = self
             .login_packet(utils::own_key(client_id)?, address)
             .map(LoginPacket::into_data_and_signature);
-        self.send_response_to_client(client_id, message_id, Response::GetLoginPacket(result));
+        self.send_response_to_client(message_id, Response::GetLoginPacket(result));
         None
     }
 
@@ -1467,11 +1459,7 @@ impl ClientHandler {
             .auth_keys
             .list_auth_keys_and_version(utils::client(&client.public_id)?));
 
-        self.send_response_to_client(
-            &client.public_id,
-            message_id,
-            Response::ListAuthKeysAndVersion(result),
-        );
+        self.send_response_to_client(message_id, Response::ListAuthKeysAndVersion(result));
         None
     }
 
@@ -1592,7 +1580,6 @@ impl ClientHandler {
             Some(())
         } else {
             self.send_response_to_client(
-                public_id,
                 message_id,
                 request.error_response(NdError::InvalidSignature),
             );
@@ -1631,7 +1618,7 @@ impl ClientHandler {
         };
 
         if let Err(error) = result {
-            self.send_response_to_client(public_id, message_id, request.error_response(error));
+            self.send_response_to_client(message_id, request.error_response(error));
             None
         } else {
             Some(())
@@ -1657,7 +1644,6 @@ impl ClientHandler {
 
     fn verify_consistent_address(
         &mut self,
-        public_id: &PublicId,
         request: &Request,
         message_id: MessageId,
     ) -> Option<()> {
@@ -1670,7 +1656,6 @@ impl ClientHandler {
         };
         if !consistent {
             self.send_response_to_client(
-                public_id,
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOperation)),
             );
