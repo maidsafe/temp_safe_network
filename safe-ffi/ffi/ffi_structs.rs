@@ -165,6 +165,21 @@ impl Drop for XorUrlEncoder {
     }
 }
 
+impl XorUrlEncoder {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            encoding_version: 0,
+            xorname: [0; 32],
+            type_tag: 0,
+            data_type: 0,
+            content_type: 0,
+            path: CString::new(String::new())?.into_raw(),
+            sub_names: CString::new(String::new())?.into_raw(),
+            content_version: 0,
+        })
+    }
+}
+
 pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
 ) -> Result<XorUrlEncoder> {
@@ -181,7 +196,7 @@ pub unsafe fn xorurl_encoder_into_repr_c(
         type_tag: xorurl_encoder.type_tag(),
         data_type: xorurl_encoder.data_type() as u64,
         content_type: xorurl_encoder.content_type().value()?,
-        path: CString::new(xorurl_encoder.path().to_string())?.into_raw(),
+        path: CString::new(xorurl_encoder.path())?.into_raw(),
         sub_names: CString::new(sub_names)?.into_raw(),
         // sub_names: sub_names, // Todo: update to String Vec
         // sub_names_len: xorurl_encoder.sub_names().len(),

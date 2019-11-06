@@ -45,15 +45,16 @@ pub unsafe extern "C" fn parse_and_resolve_url(
         let (encoder, resolved_from) = (*app).parse_and_resolve_url(&url_string)?;
         let ffi_xorurl_encoder = xorurl_encoder_into_repr_c(encoder)?;
         let ffi_nrs_xorurl_encoder = if let Some(nrs_xorurl_encoder) = resolved_from {
-            &xorurl_encoder_into_repr_c(nrs_xorurl_encoder)?
+            xorurl_encoder_into_repr_c(nrs_xorurl_encoder)?
         } else {
-            std::ptr::null()
+            XorUrlEncoder::new()?
         };
+
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
             &ffi_xorurl_encoder,
-            ffi_nrs_xorurl_encoder,
+            &ffi_nrs_xorurl_encoder,
         );
         Ok(())
     })
