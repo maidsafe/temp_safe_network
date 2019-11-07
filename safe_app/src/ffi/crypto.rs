@@ -8,6 +8,7 @@
 // Software.
 
 use crate::errors::AppError;
+use crate::ffi::errors::{Error, Result};
 use crate::ffi::helper::send_sync;
 use crate::ffi::object_cache::{
     EncryptPubKeyHandle, EncryptSecKeyHandle, SignPubKeyHandle, SignSecKeyHandle,
@@ -65,19 +66,21 @@ pub unsafe extern "C" fn sign_generate_key_pair(
         let public_key = *full_id.public_id().public_key();
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_, context| {
-            let public_key_handle = context.object_cache().insert_pub_sign_key(public_key);
-            let secret_key_handle = context.object_cache().insert_sec_sign_key(full_id);
+        (*app)
+            .send(move |_, context| {
+                let public_key_handle = context.object_cache().insert_pub_sign_key(public_key);
+                let secret_key_handle = context.object_cache().insert_sec_sign_key(full_id);
 
-            o_cb(
-                user_data.0,
-                FFI_RESULT_OK,
-                public_key_handle,
-                secret_key_handle,
-            );
+                o_cb(
+                    user_data.0,
+                    FFI_RESULT_OK,
+                    public_key_handle,
+                    secret_key_handle,
+                );
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -255,19 +258,21 @@ pub unsafe extern "C" fn enc_generate_key_pair(
         let (our_public_key, our_secret_key) = shared_box::gen_keypair();
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_, context| {
-            let public_key_handle = context.object_cache().insert_encrypt_key(our_public_key);
-            let secret_key_handle = context.object_cache().insert_secret_key(our_secret_key);
+        (*app)
+            .send(move |_, context| {
+                let public_key_handle = context.object_cache().insert_encrypt_key(our_public_key);
+                let secret_key_handle = context.object_cache().insert_secret_key(our_secret_key);
 
-            o_cb(
-                user_data.0,
-                FFI_RESULT_OK,
-                public_key_handle,
-                secret_key_handle,
-            );
+                o_cb(
+                    user_data.0,
+                    FFI_RESULT_OK,
+                    public_key_handle,
+                    secret_key_handle,
+                );
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -421,26 +426,28 @@ pub unsafe extern "C" fn sign(
         let plaintext = vec_clone_from_raw_parts(data, data_len);
 
         let user_data = OpaqueCtx(user_data);
-        (*app).send(move |client, context| {
-            let signature = if sign_sk_h == SIGN_WITH_APP {
-                let safe_key = client.full_id();
-                safe_key.sign(&plaintext)
-            } else {
-                let sign_sk = try_cb!(
-                    context.object_cache().get_sec_sign_key(sign_sk_h),
-                    user_data,
-                    o_cb
-                );
-                sign_sk.sign(&plaintext)
-            };
-            match serialize(&signature) {
-                Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
-                res @ Err(..) => {
-                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+        (*app)
+            .send(move |client, context| {
+                let signature = if sign_sk_h == SIGN_WITH_APP {
+                    let safe_key = client.full_id();
+                    safe_key.sign(&plaintext)
+                } else {
+                    let sign_sk = try_cb!(
+                        context.object_cache().get_sec_sign_key(sign_sk_h),
+                        user_data,
+                        o_cb
+                    );
+                    sign_sk.sign(&plaintext)
+                };
+                match serialize(&signature) {
+                    Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
+                    res @ Err(..) => {
+                        call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                    }
                 }
-            }
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -464,22 +471,24 @@ pub unsafe extern "C" fn verify(
         let signature_array = vec_clone_from_raw_parts(signature, signature_len);
         let signature: Signature = deserialize(&signature_array)?;
 
-        (*app).send(move |client, context| {
-            let sign_pk: PublicKey = if sign_pk_h == VERIFY_WITH_APP {
-                client.public_key()
-            } else {
-                let sign_pk = try_cb!(
-                    context.object_cache().get_pub_sign_key(sign_pk_h),
-                    user_data,
-                    o_cb
-                );
-                *sign_pk
-            };
-            let result = sign_pk.verify(&signature, &signed);
+        (*app)
+            .send(move |client, context| {
+                let sign_pk: PublicKey = if sign_pk_h == VERIFY_WITH_APP {
+                    client.public_key()
+                } else {
+                    let sign_pk = try_cb!(
+                        context.object_cache().get_pub_sign_key(sign_pk_h),
+                        user_data,
+                        o_cb
+                    );
+                    *sign_pk
+                };
+                let result = sign_pk.verify(&signature, &signed);
 
-            o_cb(user_data.0, FFI_RESULT_OK, result.is_ok() as u32);
-            None
-        })
+                o_cb(user_data.0, FFI_RESULT_OK, result.is_ok() as u32);
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -522,10 +531,10 @@ pub unsafe extern "C" fn encrypt(
                 res @ Err(..) => {
                     call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
-            }
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -575,10 +584,10 @@ pub unsafe extern "C" fn decrypt(
                 res @ Err(..) => {
                     call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
-            }
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }*/
 
@@ -603,21 +612,23 @@ pub unsafe extern "C" fn encrypt_sealed_box(
         let plaintext = vec_clone_from_raw_parts(data, data_len);
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_, context| {
-            let pk: AsymEncryptKey = *try_cb!(
-                context.object_cache().get_encrypt_key(public_key_h),
-                user_data,
-                o_cb
-            );
+        (*app)
+            .send(move |_, context| {
+                let pk: AsymEncryptKey = *try_cb!(
+                    context.object_cache().get_encrypt_key(public_key_h),
+                    user_data,
+                    o_cb
+                );
 
-            match serialize(&pk.encrypt(plaintext)) {
-                Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
-                res @ Err(..) => {
-                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                match serialize(&pk.encrypt(plaintext)) {
+                    Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
+                    res @ Err(..) => {
+                        call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                    }
                 }
-            }
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -642,28 +653,30 @@ pub unsafe extern "C" fn decrypt_sealed_box(
         let user_data = OpaqueCtx(user_data);
         let plaintext = vec_clone_from_raw_parts(data, data_len);
         let deserialized: Ciphertext = deserialize(plaintext.as_slice()).map_err(AppError::from)?;
-        (*app).send(move |_, context| {
-            let sk = try_cb!(
-                context.object_cache().get_secret_key(secret_key_h),
-                user_data,
-                o_cb
-            );
+        (*app)
+            .send(move |_, context| {
+                let sk = try_cb!(
+                    context.object_cache().get_secret_key(secret_key_h),
+                    user_data,
+                    o_cb
+                );
 
-            let plaintext = try_cb!(
-                sk.decrypt(&deserialized)
-                    .ok_or_else(|| AppError::EncodeDecodeError),
-                user_data,
-                o_cb
-            );
-            o_cb(
-                user_data.0,
-                FFI_RESULT_OK,
-                plaintext.as_ptr(),
-                plaintext.len(),
-            );
+                let plaintext = try_cb!(
+                    sk.decrypt(&deserialized)
+                        .ok_or_else(|| AppError::EncodeDecodeError),
+                    user_data,
+                    o_cb
+                );
+                o_cb(
+                    user_data.0,
+                    FFI_RESULT_OK,
+                    plaintext.as_ptr(),
+                    plaintext.len(),
+                );
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -680,7 +693,7 @@ pub unsafe extern "C" fn sha3_hash(
         hash_len: usize,
     ),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let plaintext = slice::from_raw_parts(data, data_len);
 
         let hash = sha3_256(plaintext);
@@ -693,7 +706,7 @@ pub unsafe extern "C" fn sha3_hash(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::ERR_INVALID_SIGN_PUB_KEY_HANDLE;
+    use crate::ffi::errors::ERR_INVALID_SIGN_PUB_KEY_HANDLE;
     use crate::ffi::mutable_data::permissions::USER_ANYONE;
     use crate::run;
     use crate::test_utils::create_app;

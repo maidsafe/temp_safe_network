@@ -9,6 +9,7 @@
 
 use crate::cipher_opt::CipherOpt;
 use crate::errors::AppError;
+use crate::ffi::errors::Error;
 use crate::ffi::object_cache::{
     CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle,
 };
@@ -38,23 +39,25 @@ pub unsafe extern "C" fn idata_new_self_encryptor(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |client, context| {
-            let se_storage = SelfEncryptionStorage::new(client.clone(), published);
-            let context = context.clone();
+        (*app)
+            .send(move |client, context| {
+                let se_storage = SelfEncryptionStorage::new(client.clone(), published);
+                let context = context.clone();
 
-            let fut = SequentialEncryptor::new(se_storage, None)
-                .map_err(AppError::from)
-                .map(move |se| {
-                    let handle = context.object_cache().insert_se_writer(se);
-                    o_cb(user_data.0, FFI_RESULT_OK, handle);
-                })
-                .map_err(move |e| {
-                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                })
-                .into_box();
+                let fut = SequentialEncryptor::new(se_storage, None)
+                    .map_err(Error::from)
+                    .map(move |se| {
+                        let handle = context.object_cache().insert_se_writer(se);
+                        o_cb(user_data.0, FFI_RESULT_OK, handle);
+                    })
+                    .map_err(move |e| {
+                        call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                    })
+                    .into_box();
 
-            Some(fut)
-        })
+                Some(fut)
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -73,25 +76,27 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(
     catch_unwind_cb(user_data, o_cb, || {
         let data_slice = vec_clone_from_raw_parts(data, data_len);
 
-        (*app).send(move |_, context| {
-            let fut = {
-                match context.object_cache().get_se_writer(se_h) {
-                    Ok(writer) => writer.write(&data_slice),
-                    res @ Err(..) => {
-                        call_result_cb!(res, user_data, o_cb);
-                        return None;
+        (*app)
+            .send(move |_, context| {
+                let fut = {
+                    match context.object_cache().get_se_writer(se_h) {
+                        Ok(writer) => writer.write(&data_slice),
+                        res @ Err(..) => {
+                            call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                            return None;
+                        }
                     }
-                }
-            };
-            let fut = fut
-                .map_err(AppError::from)
-                .then(move |res| {
-                    call_result_cb!(res, user_data, o_cb);
-                    Ok(())
-                })
-                .into_box();
-            Some(fut)
-        })
+                };
+                let fut = fut
+                    .map_err(Error::from)
+                    .then(move |res| {
+                        call_result_cb!(res, user_data, o_cb);
+                        Ok(())
+                    })
+                    .into_box();
+                Some(fut)
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -112,53 +117,56 @@ pub unsafe extern "C" fn idata_close_self_encryptor(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |client, context| {
-            let client2 = client.clone();
-            let client3 = client.clone();
-            let context2 = context.clone();
+        (*app)
+            .send(move |client, context| {
+                let client2 = client.clone();
+                let client3 = client.clone();
+                let context2 = context.clone();
 
-            let se_writer = try_cb!(
-                context.object_cache().remove_se_writer(se_h),
-                user_data,
-                o_cb
-            );
+                let se_writer = try_cb!(
+                    context.object_cache().remove_se_writer(se_h),
+                    user_data,
+                    o_cb
+                );
 
-            se_writer
-                .close()
-                .map_err(AppError::from)
-                .and_then(move |(data_map, _)| {
-                    let ser_data_map = serialize(&data_map)?;
-                    let enc_data_map = {
-                        let cipher_opt = context2.object_cache().get_cipher_opt(cipher_opt_h)?;
-                        cipher_opt.encrypt(&ser_data_map, &context2)?
-                    };
+                se_writer
+                    .close()
+                    .map_err(AppError::from)
+                    .and_then(move |(data_map, _)| {
+                        let ser_data_map = serialize(&data_map)?;
+                        let enc_data_map = {
+                            let cipher_opt =
+                                context2.object_cache().get_cipher_opt(cipher_opt_h)?;
+                            cipher_opt.encrypt(&ser_data_map, &context2)?
+                        };
 
-                    Ok(enc_data_map)
-                })
-                .and_then(move |enc_data_map| {
-                    immutable_data::create(&client2, &enc_data_map, published, None)
-                        .map_err(AppError::from)
-                })
-                .and_then(move |data| {
-                    let name = *data.name();
+                        Ok(enc_data_map)
+                    })
+                    .and_then(move |enc_data_map| {
+                        immutable_data::create(&client2, &enc_data_map, published, None)
+                            .map_err(AppError::from)
+                    })
+                    .and_then(move |data| {
+                        let name = *data.name();
 
-                    client3
-                        .put_idata(data)
-                        .map_err(AppError::from)
-                        .map(move |_| name)
-                })
-                .then(move |result| {
-                    match result {
-                        Ok(name) => o_cb(user_data.0, FFI_RESULT_OK, &name.0),
-                        res @ Err(..) => {
-                            call_result_cb!(res, user_data, o_cb);
+                        client3
+                            .put_idata(data)
+                            .map_err(AppError::from)
+                            .map(move |_| name)
+                    })
+                    .then(move |result| {
+                        match result {
+                            Ok(name) => o_cb(user_data.0, FFI_RESULT_OK, &name.0),
+                            res @ Err(..) => {
+                                call_result_cb!(res, user_data, o_cb);
+                            }
                         }
-                    }
-                    Ok(())
-                })
-                .into_box()
-                .into()
-        })
+                        Ok(())
+                    })
+                    .into_box()
+                    .into()
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -175,35 +183,37 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, context| {
-            let client2 = client.clone();
-            let client3 = client.clone();
-            let context2 = context.clone();
-            let context3 = context.clone();
-            let idata_kind = IDataKind::from_flag(published);
-            let address = IDataAddress::from_kind(idata_kind, name);
-            immutable_data::get_value(client, address, None)
-                .map_err(AppError::from)
-                .and_then(move |enc_data_map| {
-                    let ser_data_map = CipherOpt::decrypt(&enc_data_map, &context2, &client2)?;
-                    let data_map = deserialize(&ser_data_map)?;
+        (*app)
+            .send(move |client, context| {
+                let client2 = client.clone();
+                let client3 = client.clone();
+                let context2 = context.clone();
+                let context3 = context.clone();
+                let idata_kind = IDataKind::from_flag(published);
+                let address = IDataAddress::from_kind(idata_kind, name);
+                immutable_data::get_value(client, address, None)
+                    .map_err(AppError::from)
+                    .and_then(move |enc_data_map| {
+                        let ser_data_map = CipherOpt::decrypt(&enc_data_map, &context2, &client2)?;
+                        let data_map = deserialize(&ser_data_map)?;
 
-                    Ok(data_map)
-                })
-                .and_then(move |data_map| {
-                    let se_storage = SelfEncryptionStorage::new(client3, published);
-                    SelfEncryptor::new(se_storage, data_map).map_err(AppError::from)
-                })
-                .map(move |se_reader| {
-                    let handle = context3.object_cache().insert_se_reader(se_reader);
-                    o_cb(user_data.0, FFI_RESULT_OK, handle);
-                })
-                .map_err(move |e| {
-                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                })
-                .into_box()
-                .into()
-        })
+                        Ok(data_map)
+                    })
+                    .and_then(move |data_map| {
+                        let se_storage = SelfEncryptionStorage::new(client3, published);
+                        SelfEncryptor::new(se_storage, data_map).map_err(AppError::from)
+                    })
+                    .map(move |se_reader| {
+                        let handle = context3.object_cache().insert_se_reader(se_reader);
+                        o_cb(user_data.0, FFI_RESULT_OK, handle);
+                    })
+                    .map_err(move |e| {
+                        call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                    })
+                    .into_box()
+                    .into()
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -221,18 +231,20 @@ pub unsafe extern "C" fn idata_serialised_size(
     catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        (*app).send(move |client, _| {
-            let idata_kind = IDataKind::from_flag(published);
-            let address = IDataAddress::from_kind(idata_kind, name);
-            client
-                .get_idata(address)
-                .map(move |idata| o_cb(user_data.0, FFI_RESULT_OK, idata.serialised_size()))
-                .map_err(move |e| {
-                    call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
-                })
-                .into_box()
-                .into()
-        })
+        (*app)
+            .send(move |client, _| {
+                let idata_kind = IDataKind::from_flag(published);
+                let address = IDataAddress::from_kind(idata_kind, name);
+                client
+                    .get_idata(address)
+                    .map(move |idata| o_cb(user_data.0, FFI_RESULT_OK, idata.serialised_size()))
+                    .map_err(move |e| {
+                        call_result_cb!(Err::<(), _>(Error::from(e)), user_data, o_cb);
+                    })
+                    .into_box()
+                    .into()
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -247,17 +259,19 @@ pub unsafe extern "C" fn idata_size(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, context| {
-            match context.object_cache().get_se_reader(se_h) {
-                Ok(se) => {
-                    o_cb(user_data.0, FFI_RESULT_OK, se.len());
-                }
-                res @ Err(..) => {
-                    call_result_cb!(res, user_data, o_cb);
-                }
-            };
-            None
-        })
+        (*app)
+            .send(move |_, context| {
+                match context.object_cache().get_se_reader(se_h) {
+                    Ok(se) => {
+                        o_cb(user_data.0, FFI_RESULT_OK, se.len());
+                    }
+                    res @ Err(..) => {
+                        call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                    }
+                };
+                None
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -279,37 +293,39 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, context| {
-            let se = match context.object_cache().get_se_reader(se_h) {
-                Ok(r) => r,
-                res @ Err(..) => {
-                    call_result_cb!(res, user_data, o_cb);
+        (*app)
+            .send(move |_, context| {
+                let se = match context.object_cache().get_se_reader(se_h) {
+                    Ok(r) => r,
+                    res @ Err(..) => {
+                        call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                        return None;
+                    }
+                };
+
+                if from_pos + len > se.len() {
+                    call_result_cb!(
+                        Err::<(), _>(Error::from(AppError::InvalidSelfEncryptorReadOffsets)),
+                        user_data,
+                        o_cb
+                    );
                     return None;
                 }
-            };
 
-            if from_pos + len > se.len() {
-                call_result_cb!(
-                    Err::<(), _>(AppError::InvalidSelfEncryptorReadOffsets),
-                    user_data,
-                    o_cb
-                );
-                return None;
-            }
+                let fut = se
+                    .read(from_pos, len)
+                    .map(move |data| {
+                        o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
+                    })
+                    .map_err(Error::from)
+                    .map_err(move |e| {
+                        call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                    })
+                    .into_box();
 
-            let fut = se
-                .read(from_pos, len)
-                .map(move |data| {
-                    o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
-                })
-                .map_err(AppError::from)
-                .map_err(move |e| {
-                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                })
-                .into_box();
-
-            Some(fut)
-        })
+                Some(fut)
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -324,11 +340,13 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, context| {
-            let res = context.object_cache().remove_se_writer(handle);
-            call_result_cb!(res, user_data, o_cb);
-            None
-        })
+        (*app)
+            .send(move |_, context| {
+                let res = context.object_cache().remove_se_writer(handle);
+                call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                None
+            })
+            .map_err(Error::from)
     });
 }
 
@@ -343,22 +361,25 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, context| {
-            let res = context.object_cache().remove_se_reader(handle);
-            call_result_cb!(res, user_data, o_cb);
-            None
-        })
+        (*app)
+            .send(move |_, context| {
+                let res = context.object_cache().remove_se_reader(handle);
+                call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::AppError;
     use crate::ffi::cipher_opt::*;
+    use crate::ffi::errors::codes::{
+        ERR_INVALID_SELF_ENCRYPTOR_HANDLE, ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS,
+    };
     use crate::test_utils::create_app;
     use ffi_utils::test_utils::{call_0, call_1, call_vec_u8};
-    use ffi_utils::ErrorCode;
     use safe_core::utils;
 
     // Test immutable data operations.
@@ -385,7 +406,7 @@ mod tests {
                     cb,
                 )
             });
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
+            assert_eq!(res, Err(ERR_INVALID_SELF_ENCRYPTOR_HANDLE));
 
             unwrap!(call_0(|ud, cb| idata_write_to_self_encryptor(
                 &app,
@@ -407,15 +428,15 @@ mod tests {
 
             // It should've been closed by immut_data_close_self_encryptor
             let res = call_0(|ud, cb| idata_self_encryptor_writer_free(&app, se_writer_h, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
+            assert_eq!(res, Err(ERR_INVALID_SELF_ENCRYPTOR_HANDLE));
 
             // Invalid self encryptor reader.
             let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, 0, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
+            assert_eq!(res, Err(ERR_INVALID_SELF_ENCRYPTOR_HANDLE));
 
             // Invalid self encryptor reader.
             let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, se_writer_h, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
+            assert_eq!(res, Err(ERR_INVALID_SELF_ENCRYPTOR_HANDLE));
 
             // Invalid self encryptor reader.
             let res: u64 = unwrap!(call_1(|ud, cb| idata_serialised_size(
@@ -435,10 +456,7 @@ mod tests {
             let res = call_vec_u8(|ud, cb| {
                 idata_read_from_self_encryptor(&app, se_reader_h, 1, size, ud, cb)
             });
-            assert_eq!(
-                res,
-                Err(AppError::InvalidSelfEncryptorReadOffsets.error_code())
-            );
+            assert_eq!(res, Err(ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS));
 
             let received_plain_text;
             received_plain_text = call_vec_u8(|ud, cb| {
@@ -454,7 +472,7 @@ mod tests {
             )));
 
             let res = call_0(|ud, cb| idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
+            assert_eq!(res, Err(ERR_INVALID_SELF_ENCRYPTOR_HANDLE));
 
             unwrap!(call_0(|ud, cb| cipher_opt_free(&app, cipher_opt_h, ud, cb)));
         }

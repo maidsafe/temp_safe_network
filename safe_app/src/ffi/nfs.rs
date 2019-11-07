@@ -9,6 +9,7 @@
 
 use crate::client::AppClient;
 use crate::errors::AppError;
+use crate::ffi::errors::Error;
 use crate::ffi::helper::send;
 use crate::ffi::object_cache::FileContextHandle;
 use crate::App;
@@ -66,19 +67,21 @@ pub unsafe extern "C" fn dir_fetch_file(
         let file_name = String::clone_from_repr_c(file_name)?;
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |client, _| {
-            file_helper::fetch(client.clone(), parent_info, file_name)
-                .map(move |(version, file)| {
-                    let ffi_file = file.into_repr_c();
-                    o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
-                })
-                .map_err(AppError::from)
-                .map_err(move |err| {
-                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                })
-                .into_box()
-                .into()
-        })
+        (*app)
+            .send(move |client, _| {
+                file_helper::fetch(client.clone(), parent_info, file_name)
+                    .map(move |(version, file)| {
+                        let ffi_file = file.into_repr_c();
+                        o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
+                    })
+                    .map_err(Error::from)
+                    .map_err(move |err| {
+                        call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                    })
+                    .into_box()
+                    .into()
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -235,16 +238,26 @@ pub unsafe extern "C" fn file_size(
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_client, context| {
-            let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
+        (*app)
+            .send(move |_client, context| {
+                let file_ctx = try_cb!(
+                    context.object_cache().get_file(file_h).map_err(Error::from),
+                    user_data,
+                    o_cb
+                );
 
-            if let Some(ref reader) = file_ctx.reader {
-                o_cb(user_data.0, FFI_RESULT_OK, reader.size());
-            } else {
-                call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
-            }
-            None
-        })
+                if let Some(ref reader) = file_ctx.reader {
+                    o_cb(user_data.0, FFI_RESULT_OK, reader.size());
+                } else {
+                    call_result_cb!(
+                        Err::<(), _>(Error::from(AppError::InvalidFileMode)),
+                        user_data,
+                        o_cb
+                    );
+                }
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -266,32 +279,42 @@ pub unsafe extern "C" fn file_read(
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_client, context| {
-            let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
+        (*app)
+            .send(move |_client, context| {
+                let file_ctx = try_cb!(
+                    context.object_cache().get_file(file_h).map_err(Error::from),
+                    user_data,
+                    o_cb
+                );
 
-            if let Some(ref reader) = file_ctx.reader {
-                reader
-                    .read(
-                        position,
-                        if len == FILE_READ_TO_END {
-                            reader.size() - position
-                        } else {
-                            len
-                        },
-                    )
-                    .map(move |data| {
-                        o_cb(user_data.0, FFI_RESULT_OK, data.as_safe_ptr(), data.len());
-                    })
-                    .map_err(move |err| {
-                        call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
-                    })
-                    .into_box()
-                    .into()
-            } else {
-                call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
-                None
-            }
-        })
+                if let Some(ref reader) = file_ctx.reader {
+                    reader
+                        .read(
+                            position,
+                            if len == FILE_READ_TO_END {
+                                reader.size() - position
+                            } else {
+                                len
+                            },
+                        )
+                        .map(move |data| {
+                            o_cb(user_data.0, FFI_RESULT_OK, data.as_safe_ptr(), data.len());
+                        })
+                        .map_err(move |err| {
+                            call_result_cb!(Err::<(), _>(Error::from(err)), user_data, o_cb);
+                        })
+                        .into_box()
+                        .into()
+                } else {
+                    call_result_cb!(
+                        Err::<(), _>(Error::from(AppError::InvalidFileMode)),
+                        user_data,
+                        o_cb
+                    );
+                    None
+                }
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -309,23 +332,33 @@ pub unsafe extern "C" fn file_write(
         let user_data = OpaqueCtx(user_data);
         let data = vec_clone_from_raw_parts(data, data_len);
 
-        (*app).send(move |_client, context| {
-            let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
+        (*app)
+            .send(move |_client, context| {
+                let file_ctx = try_cb!(
+                    context.object_cache().get_file(file_h).map_err(Error::from),
+                    user_data,
+                    o_cb
+                );
 
-            if let Some(ref writer) = file_ctx.writer {
-                writer
-                    .write(&data)
-                    .then(move |res| {
-                        call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            } else {
-                call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
-                None
-            }
-        })
+                if let Some(ref writer) = file_ctx.writer {
+                    writer
+                        .write(&data)
+                        .then(move |res| {
+                            call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                            Ok(())
+                        })
+                        .into_box()
+                        .into()
+                } else {
+                    call_result_cb!(
+                        Err::<(), _>(Error::from(AppError::InvalidFileMode)),
+                        user_data,
+                        o_cb
+                    );
+                    None
+                }
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -348,29 +381,38 @@ pub unsafe extern "C" fn file_close(
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_client, context| {
-            let file_ctx = try_cb!(context.object_cache().remove_file(file_h), user_data, o_cb);
-
-            if let Some(writer) = file_ctx.writer {
-                writer
-                    .close()
-                    .map(move |file| {
-                        o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c());
-                    })
-                    .map_err(move |err| {
-                        call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
-                    })
-                    .into_box()
-                    .into()
-            } else {
-                // The reader will be dropped automatically.
-                o_cb(
-                    user_data.0,
-                    FFI_RESULT_OK,
-                    &file_ctx.original_file.into_repr_c(),
+        (*app)
+            .send(move |_client, context| {
+                let file_ctx = try_cb!(
+                    context
+                        .object_cache()
+                        .remove_file(file_h)
+                        .map_err(Error::from),
+                    user_data,
+                    o_cb
                 );
-                None
-            }
-        })
+
+                if let Some(writer) = file_ctx.writer {
+                    writer
+                        .close()
+                        .map(move |file| {
+                            o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c());
+                        })
+                        .map_err(move |err| {
+                            call_result_cb!(Err::<(), _>(Error::from(err)), user_data, o_cb);
+                        })
+                        .into_box()
+                        .into()
+                } else {
+                    // The reader will be dropped automatically.
+                    o_cb(
+                        user_data.0,
+                        FFI_RESULT_OK,
+                        &file_ctx.original_file.into_repr_c(),
+                    );
+                    None
+                }
+            })
+            .map_err(Error::from)
     })
 }

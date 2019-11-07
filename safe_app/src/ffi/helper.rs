@@ -9,6 +9,7 @@
 
 use crate::client::AppClient;
 use crate::errors::AppError;
+use crate::ffi::errors::{Error, Result};
 use crate::ffi_utils::callback::Callback;
 use crate::ffi_utils::{OpaqueCtx, FFI_RESULT_OK};
 use crate::{App, AppContext};
@@ -20,37 +21,29 @@ use std::os::raw::c_void;
 // Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.
 // Use this if the lambda never returns future.
-pub unsafe fn send_sync<C, F>(
-    app: *const App,
-    user_data: *mut c_void,
-    o_cb: C,
-    f: F,
-) -> Result<(), AppError>
+pub unsafe fn send_sync<C, F>(app: *const App, user_data: *mut c_void, o_cb: C, f: F) -> Result<()>
 where
     C: Callback + Copy + Send + 'static,
-    F: FnOnce(&AppClient, &AppContext) -> Result<C::Args, AppError> + Send + 'static,
+    F: FnOnce(&AppClient, &AppContext) -> Result<C::Args> + Send + 'static,
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app).send(move |client, context| {
-        match f(client, context) {
-            Ok(args) => o_cb.call(user_data.0, FFI_RESULT_OK, args),
-            res @ Err(..) => {
-                call_result_cb!(res, user_data, o_cb);
+    (*app)
+        .send(move |client, context| {
+            match f(client, context) {
+                Ok(args) => o_cb.call(user_data.0, FFI_RESULT_OK, args),
+                res @ Err(..) => {
+                    call_result_cb!(res, user_data, o_cb);
+                }
             }
-        }
-        None
-    })
+            None
+        })
+        .map_err(Error::from)
 }
 
 // Helper to reduce boilerplate when sending asynchronous operations to the app
 // event loop.
-pub unsafe fn send<C, F, U, E>(
-    app: *const App,
-    user_data: *mut c_void,
-    o_cb: C,
-    f: F,
-) -> Result<(), AppError>
+pub unsafe fn send<C, F, U, E>(app: *const App, user_data: *mut c_void, o_cb: C, f: F) -> Result<()>
 where
     C: Callback + Copy + Send + 'static,
     F: FnOnce(&AppClient, &AppContext) -> U + Send + 'static,
@@ -60,14 +53,16 @@ where
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app).send(move |client, context| {
-        f(client, context)
-            .map(move |args| o_cb.call(user_data.0, FFI_RESULT_OK, args))
-            .map_err(AppError::from)
-            .map_err(move |err| {
-                call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-            })
-            .into_box()
-            .into()
-    })
+    (*app)
+        .send(move |client, context| {
+            f(client, context)
+                .map(move |args| o_cb.call(user_data.0, FFI_RESULT_OK, args))
+                .map_err(|e| Error::from(AppError::from(e)))
+                .map_err(move |err| {
+                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })
+        .map_err(Error::from)
 }

@@ -11,7 +11,7 @@
 //! This module is exactly the same as `safe_authenticator::ffi::logging`, therefore changes to
 //! either one of them should also be reflected to the other to stay in sync.
 
-use super::AppError;
+use super::errors::Result;
 use ffi_utils::{catch_unwind_cb, FfiResult, ReprC, FFI_RESULT_OK};
 use safe_core::utils::logging;
 use std::ffi::CString;
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn app_init_logging(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         if output_file_name_override.is_null() {
             logging::init(false)?;
         } else {
@@ -44,7 +44,7 @@ pub unsafe extern "C" fn app_config_dir_path(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, log_path: *const c_char),
 ) {
-    catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let config_dir = safe_core::config_dir()?;
         let config_dir_path = CString::new(
             config_dir

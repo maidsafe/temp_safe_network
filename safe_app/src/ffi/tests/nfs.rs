@@ -8,6 +8,7 @@
 // Software.
 
 use crate::errors::AppError;
+use crate::ffi::errors::Error;
 use crate::ffi::nfs::*;
 use crate::ffi::object_cache::FileContextHandle;
 use crate::test_utils::{create_app_by_req, create_auth_req_with_access};
@@ -69,7 +70,7 @@ fn basics() {
     };
 
     match res {
-        Err(code) if code == AppError::from(NfsError::FileNotFound).error_code() => (),
+        Err(code) if code == Error::from(AppError::from(NfsError::FileNotFound)).error_code() => (),
         Err(x) => panic!("Unexpected: {:?}", x),
         Ok(_) => panic!("Unexpected success"),
     }
@@ -158,7 +159,7 @@ fn open_file() {
 
     let size: Result<u64, i32> = unsafe { call_1(|ud, cb| file_size(&app, write_h, ud, cb)) };
     match size {
-        Err(code) if code == AppError::InvalidFileMode.error_code() => (),
+        Err(code) if code == Error::from(AppError::InvalidFileMode).error_code() => (),
         Err(x) => panic!("Unexpected: {:?}", x),
         Ok(_) => panic!("Unexpected success"),
     }
@@ -989,7 +990,7 @@ fn file_read_chunks() {
         unsafe { call_vec_u8(|ud, cb| file_read(&app, read_h, size, 1, ud, cb)) };
 
     match retrieved_content {
-        Err(code) if code == AppError::from(NfsError::InvalidRange).error_code() => (),
+        Err(code) if code == Error::from(AppError::from(NfsError::InvalidRange)).error_code() => (),
         Err(x) => panic!("Unexpected: {:?}", x),
         Ok(_) => panic!("Unexpected success"),
     }

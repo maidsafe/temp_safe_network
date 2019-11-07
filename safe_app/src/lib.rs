@@ -26,9 +26,11 @@ maidsafe_logo.png",
     unused_qualifications,
     unused_results
 )]
-// Our unsafe FFI functions are missing safety documentation. It is probably not necessary for us to
-// provide this for every single function as that would be repetitive and verbose.
-#![allow(clippy::missing_safety_doc)]
+#![allow(
+    // Our unsafe FFI functions are missing safety documentation. It is probably not necessary for
+    // us to provide this for every single function as that would be repetitive and verbose.
+    clippy::missing_safety_doc,
+)]
 
 #[macro_use]
 extern crate ffi_utils;
@@ -56,9 +58,11 @@ pub use safe_nd::PubImmutableData;
 
 pub mod ffi;
 
+pub use crate::errors::AppError;
 pub use crate::ffi::access_container::*;
 pub use crate::ffi::cipher_opt::*;
 pub use crate::ffi::crypto::*;
+pub use crate::ffi::errors::codes::*;
 pub use crate::ffi::immutable_data::*;
 pub use crate::ffi::ipc::*;
 pub use crate::ffi::logging::*;
@@ -73,6 +77,7 @@ pub use crate::ffi::object_cache::*;
 #[cfg(any(test, feature = "testing"))]
 pub use crate::ffi::test_utils::*;
 pub use crate::ffi::*;
+pub use client::AppClient;
 
 pub mod cipher_opt;
 mod client;
@@ -86,9 +91,6 @@ mod tests;
 /// Utility functions to test apps functionality.
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
-
-pub use self::errors::*;
-pub use client::AppClient;
 
 use self::object_cache::ObjectCache;
 use bincode::deserialize;

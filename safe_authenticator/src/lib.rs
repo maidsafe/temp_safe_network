@@ -24,9 +24,11 @@
     unused_qualifications,
     unused_results
 )]
-// Our unsafe FFI functions are missing safety documentation. It is probably not necessary for us to
-// provide this for every single function as that would be repetitive and verbose.
-#![allow(clippy::missing_safety_doc)]
+#![allow(
+    // Our unsafe FFI functions are missing safety documentation. It is probably not necessary for
+    // us to provide this for every single function as that would be repetitive and verbose.
+    clippy::missing_safety_doc,
+)]
 
 #[macro_use]
 extern crate ffi_utils;
@@ -61,6 +63,7 @@ mod std_dirs;
 mod tests;
 
 pub use self::errors::AuthError;
+pub use crate::ffi::errors::codes::*;
 pub use client::AuthClient;
 
 use futures::stream::Stream;

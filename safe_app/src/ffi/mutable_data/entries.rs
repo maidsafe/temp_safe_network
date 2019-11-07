@@ -10,6 +10,7 @@
 //! FFI for mutable data entries, keys and values.
 
 use crate::errors::AppError;
+use crate::ffi::errors::{Error, Result};
 use crate::ffi::helper::send_sync;
 use crate::ffi::object_cache::MDataEntriesHandle;
 use crate::App;
@@ -22,7 +23,7 @@ use safe_core::ipc::resp::{
     MDataEntry as NativeMDataEntry, MDataKey as NativeMDataKey, MDataValue as NativeMDataValue,
 };
 use safe_core::CoreError;
-use safe_nd::{Error, MDataSeqValue};
+use safe_nd::{Error as NdError, MDataSeqValue};
 use std::collections::BTreeMap;
 use std::os::raw::c_void;
 
@@ -110,30 +111,35 @@ pub unsafe extern "C" fn seq_mdata_entries_get(
         let user_data = OpaqueCtx(user_data);
         let key = vec_clone_from_raw_parts(key, key_len);
 
-        (*app).send(move |_, context| {
-            let entries = try_cb!(
-                context.object_cache().get_seq_mdata_entries(entries_h),
-                user_data,
-                o_cb
-            );
+        (*app)
+            .send(move |_, context| {
+                let entries = try_cb!(
+                    context
+                        .object_cache()
+                        .get_seq_mdata_entries(entries_h)
+                        .map_err(Error::from),
+                    user_data,
+                    o_cb
+                );
 
-            let value = entries
-                .get(&key)
-                .ok_or(Error::NoSuchEntry)
-                .map_err(CoreError::from)
-                .map_err(AppError::from);
-            let value = try_cb!(value, user_data, o_cb);
+                let value = entries
+                    .get(&key)
+                    .ok_or(NdError::NoSuchEntry)
+                    .map_err(CoreError::from)
+                    .map_err(AppError::from);
+                let value = try_cb!(value.map_err(Error::from), user_data, o_cb);
 
-            o_cb(
-                user_data.0,
-                FFI_RESULT_OK,
-                value.data.as_safe_ptr(),
-                value.data.len(),
-                value.version,
-            );
+                o_cb(
+                    user_data.0,
+                    FFI_RESULT_OK,
+                    value.data.as_safe_ptr(),
+                    value.data.len(),
+                    value.version,
+                );
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -153,33 +159,38 @@ pub unsafe extern "C" fn seq_mdata_list_entries(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_client, context| {
-            let entries = try_cb!(
-                context.object_cache().get_seq_mdata_entries(entries_h),
-                user_data.0,
-                o_cb
-            );
+        (*app)
+            .send(move |_client, context| {
+                let entries = try_cb!(
+                    context
+                        .object_cache()
+                        .get_seq_mdata_entries(entries_h)
+                        .map_err(Error::from),
+                    user_data.0,
+                    o_cb
+                );
 
-            let entries_vec: Vec<MDataEntry> = entries
-                .iter()
-                .map(|(key, value)| {
-                    NativeMDataEntry {
-                        key: NativeMDataKey(key.clone()),
-                        value: NativeMDataValue::from_routing(value.clone()),
-                    }
-                    .into_repr_c()
-                })
-                .collect();
+                let entries_vec: Vec<MDataEntry> = entries
+                    .iter()
+                    .map(|(key, value)| {
+                        NativeMDataEntry {
+                            key: NativeMDataKey(key.clone()),
+                            value: NativeMDataValue::from_routing(value.clone()),
+                        }
+                        .into_repr_c()
+                    })
+                    .collect();
 
-            o_cb(
-                user_data.0,
-                FFI_RESULT_OK,
-                entries_vec.as_safe_ptr(),
-                entries_vec.len(),
-            );
+                o_cb(
+                    user_data.0,
+                    FFI_RESULT_OK,
+                    entries_vec.as_safe_ptr(),
+                    entries_vec.len(),
+                );
 
-            None
-        })
+                None
+            })
+            .map_err(Error::from)
     })
 }
 
@@ -207,10 +218,10 @@ unsafe fn with_entries<C, F>(
     user_data: *mut c_void,
     o_cb: C,
     f: F,
-) -> Result<(), AppError>
+) -> Result<()>
 where
     C: Callback + Copy + Send + 'static,
-    F: FnOnce(&mut BTreeMap<Vec<u8>, MDataSeqValue>) -> Result<C::Args, AppError> + Send + 'static,
+    F: FnOnce(&mut BTreeMap<Vec<u8>, MDataSeqValue>) -> Result<C::Args> + Send + 'static,
 {
     send_sync(app, user_data, o_cb, move |_, context| {
         let mut entries = context.object_cache().get_seq_mdata_entries(entries_h)?;
