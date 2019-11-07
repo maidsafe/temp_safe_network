@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::authd::{run as authd_run, ErrorExt};
-use failure::Error;
+use super::errors::{Error, Result};
 use std::{ffi::OsString, io, io::Write, process, time::Duration};
 use windows_service::{
     define_windows_service,
@@ -22,24 +22,24 @@ use windows_service::{
 
 const SERVICE_BINARY_FILE_NAME: &str = "safe-authd.exe";
 const SERVICE_NAME: &str = "safe-authd";
-const SERVICE_DISPLAY_NAME: &str = "AAASAFE Authenticator";
+const SERVICE_DISPLAY_NAME: &str = "SAFE Authenticator";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const SERVICE_START_TYPE: ServiceStartType = ServiceStartType::OnDemand;
 const SERVICE_LAUNCH_ARGUMENT: &str = "sc-start";
 
 define_windows_service!(ffi_authd_service, authd_service);
 
-pub fn install_authd() -> Result<(), Error> {
+pub fn install_authd() -> Result<()> {
     println!("Installing SAFE Authenticator (safe-authd) as a Windows service...");
     install_authd_service()
 }
 
-pub fn uninstall_authd() -> Result<(), Error> {
+pub fn uninstall_authd() -> Result<()> {
     println!("Uninstalling SAFE Authenticator (safe-authd) service...");
     uninstall_authd_service()
 }
 
-pub fn start_authd(listen: &str) -> Result<(), Error> {
+pub fn start_authd(listen: &str) -> Result<()> {
     println!("Starting SAFE Authenticator service (safe-authd) from command line...");
 
     // Since the authd service runs as a system process, we need to provide
@@ -47,8 +47,9 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
     let cert_base_path =
         match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
             Some(dirs) => dirs.config_dir().display().to_string(),
-            None => return Err(format_err!(
+            None => return Err(Error::GeneralError(
                 "Failed to obtain local project directory path where to write authd certificate to"
+                    .to_string(),
             )),
         };
 
@@ -63,7 +64,7 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
             let path: std::path::PathBuf = components[..components.len()-1].iter().collect();
             path.display().to_string()
         },
-        None => return Err(format_err!("Failed to obtain local project directory path where to read safe_vault certificate from"))
+        None => return Err(Error::GeneralError("Failed to obtain local project directory path where to read safe_vault certificate from".to_string()))
     };
 
     let output = process::Command::new("sc")
@@ -75,51 +76,68 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
             &config_dir_path,
         ])
         .output()
-        .map_err(|err| format_err!("Failed to execute service control manager: {}", err))?;
+        .map_err(|err| {
+            Error::GeneralError(format!(
+                "Failed to execute service control manager: {}",
+                err
+            ))
+        })?;
 
     if output.status.success() {
         println!("safe-authd service started successfully!");
         Ok(())
     } else {
-        Err(format_err!(
-            "Failed to start safe-authd service: {}",
-            String::from_utf8_lossy(&output.stdout)
-        ))
+        match output.status.code() {
+            Some(1056) => {
+                // serice control manager exit code 1056 is: An instance of the service is already running
+                Err(Error::AuthdAlreadyStarted(format!(
+                    "Failed to start safe-authd service: {}",
+                    String::from_utf8_lossy(&output.stdout)
+                )))
+            }
+            Some(_) | None => Err(Error::GeneralError(format!(
+                "Failed to start safe-authd service: {}",
+                String::from_utf8_lossy(&output.stdout)
+            ))),
+        }
     }
 }
 
-pub fn start_authd_from_sc() -> Result<(), Error> {
+pub fn start_authd_from_sc() -> Result<()> {
     println!("Starting SAFE Authenticator service (safe-authd) from Service Control Manager...");
     // Register generated `ffi_authd_service` with the system and start the service, blocking
     // this thread until the service is stopped.
-    service_dispatcher::start(SERVICE_NAME, ffi_authd_service)
-        .map_err(|err| format_err!("Failed to start safe-authd service: {:?}", err))
+    service_dispatcher::start(SERVICE_NAME, ffi_authd_service).map_err(|err| {
+        Error::GeneralError(format!("Failed to start safe-authd service: {:?}", err))
+    })
 }
 
-pub fn stop_authd() -> Result<(), Error> {
+pub fn stop_authd() -> Result<()> {
     println!("Stopping SAFE Authenticator service (safe-authd)...");
 
     // TODO: support for stopping gracefully with invoke_stop_on_service_manager()
     let output = process::Command::new("taskkill")
         .args(&["/F", "/IM", SERVICE_BINARY_FILE_NAME])
         .output()
-        .map_err(|err| format_err!("Failed to stop safe-authd service: {}", err))?;
+        .map_err(|err| {
+            Error::GeneralError(format!("Failed to stop safe-authd service: {}", err))
+        })?;
 
     if output.status.success() {
         io::stdout()
             .write_all(&output.stdout)
-            .map_err(|err| format_err!("Failed to output stdout: {}", err))?;
+            .map_err(|err| Error::GeneralError(format!("Failed to output stdout: {}", err)))?;
         println!("safe-authd service stopped successfully!");
         Ok(())
     } else {
-        Err(format_err!(
+        Err(Error::GeneralError(format!(
             "Failed to stop safe-authd service: {}",
             String::from_utf8_lossy(&output.stdout)
-        ))
+        )))
     }
 }
 
-pub fn restart_authd(listen: &str) -> Result<(), Error> {
+pub fn restart_authd(listen: &str) -> Result<()> {
     stop_authd()?;
     start_authd(listen)?;
     println!("Success, safe-authd restarted!");
@@ -216,18 +234,23 @@ fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
     Ok(())
 }
 
-fn install_authd_service() -> Result<(), Error> {
+fn install_authd_service() -> Result<()> {
     let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
     let service_manager =
         ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
-            format_err!(
+            Error::GeneralError(format!(
                 "Eror when checking if safe-authd service is installed: {:?}",
                 err
-            )
+            ))
         })?;
 
     let service_binary_path = ::std::env::current_exe()
-        .map_err(|err| format_err!("Failed to get safe-authd service binary path: {:?}", err))?
+        .map_err(|err| {
+            Error::GeneralError(format!(
+                "Failed to get safe-authd service binary path: {:?}",
+                err
+            ))
+        })?
         .with_file_name(SERVICE_BINARY_FILE_NAME);
 
     let service_info = ServiceInfo {
@@ -261,45 +284,50 @@ fn install_authd_service() -> Result<(), Error> {
                     );
                     Ok(())
                 } else {
-                    Err(format_err!(
+                    Err(Error::GeneralError(format!(
                         "Failed to install safe-authd service: {:?}",
                         err
-                    ))
+                    )))
                 }
             } else {
-                Err(format_err!(
+                Err(Error::GeneralError(format!(
                     "Failed to install safe-authd service: {:?}",
                     err
-                ))
+                )))
             }
         }
-        Err(err) => Err(format_err!(
+        Err(err) => Err(Error::GeneralError(format!(
             "Failed to install safe-authd service: {:?}",
             err
-        )),
+        ))),
     }
 }
 
-fn uninstall_authd_service() -> Result<(), Error> {
+fn uninstall_authd_service() -> Result<()> {
     let manager_access = ServiceManagerAccess::CONNECT;
-    let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)
-        .map_err(|err| format_err!("Eror when connecting to service manager: {:?}", err))?;
+    let service_manager =
+        ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
+            Error::GeneralError(format!(
+                "Eror when connecting to service manager: {:?}",
+                err
+            ))
+        })?;
 
     let service_access = ServiceAccess::DELETE;
     let service = service_manager
         .open_service(SERVICE_NAME, service_access)
         .map_err(|err| {
-            format_err!(
+            Error::GeneralError(format!(
                 "Failed when attempting to query status of safe-authd service: {:?}",
                 err
-            )
+            ))
         })?;
 
     service.delete().map_err(|err| {
-        format_err!(
+        Error::GeneralError(format!(
             "Failed when attempting to delete safe-authd service: {:?}",
             err
-        )
+        ))
     })?;
 
     println!("safe-authd sucessfully uninstalled!");
@@ -307,25 +335,30 @@ fn uninstall_authd_service() -> Result<(), Error> {
 }
 
 #[allow(dead_code)]
-fn invoke_stop_on_service_manager() -> Result<(), Error> {
+fn invoke_stop_on_service_manager() -> Result<()> {
     let manager_access = ServiceManagerAccess::CONNECT;
-    let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)
-        .map_err(|err| format_err!("Eror when connecting to service manager: {:?}", err))?;
+    let service_manager =
+        ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
+            Error::GeneralError(format!(
+                "Eror when connecting to service manager: {:?}",
+                err
+            ))
+        })?;
 
     let service = service_manager
         .open_service(SERVICE_NAME, ServiceAccess::STOP)
         .map_err(|err| {
-            format_err!(
+            Error::GeneralError(format!(
                 "Failed when attempting to stop safe-authd service: {:?}",
                 err
-            )
+            ))
         })?;
 
     let _ = service.stop().map_err(|err| {
-        format_err!(
+        Error::GeneralError(format!(
             "Failed when attempting to stop safe-authd service: {:?}",
             err
-        )
+        ))
     })?;
     Ok(())
 }

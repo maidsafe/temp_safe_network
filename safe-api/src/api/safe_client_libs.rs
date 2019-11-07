@@ -457,7 +457,7 @@ impl SafeApp for SafeAppScl {
             ));
         };
 
-        let xorname = name.unwrap_or_else(create_random_xorname);
+        let xorname = unwrap_or_gen_random(name)?;
 
         let permission_set = MDataPermissionSet::new()
             .allow(MDataAction::Read)

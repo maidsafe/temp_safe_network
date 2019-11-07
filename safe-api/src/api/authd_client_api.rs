@@ -539,10 +539,19 @@ fn authd_run_cmd(authd_path: &str, command: &str) -> Result<()> {
             .map_err(|err| Error::AuthdClientError(format!("Failed to output stdout: {}", err)))?;
         Ok(())
     } else {
-        Err(Error::AuthdClientError(format!(
-            "Failed when invoking safe-authd executable from '{}': {}",
-            authd_path,
-            String::from_utf8_lossy(&output.stderr)
-        )))
+        match output.status.code() {
+            Some(10) => {
+                // safe-authd exit code 10 is safe-authd::errors::Error::AuthdAlreadyStarted
+                Err(Error::AuthdAlreadyStarted(format!(
+                       "Failed to start safe-authd daemon '{}' as an instance seems to be already running",
+                       authd_path,
+                   )))
+            }
+            Some(_) | None => Err(Error::AuthdError(format!(
+                "Failed when invoking safe-authd executable from '{}': {}",
+                authd_path,
+                String::from_utf8_lossy(&output.stderr)
+            ))),
+        }
     }
 }

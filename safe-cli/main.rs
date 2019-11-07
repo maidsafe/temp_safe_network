@@ -27,7 +27,9 @@ extern crate human_panic;
 extern crate self_update;
 
 const APP_ID: &str = "net.maidsafe.cli";
+#[allow(dead_code)]
 const APP_NAME: &str = "SAFE CLI";
+#[allow(dead_code)]
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
 
 fn main() {

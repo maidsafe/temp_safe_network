@@ -7,70 +7,51 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::authd::run as authd_run;
-use daemonize::Daemonize;
-use failure::{Error, Fail};
+use super::errors::{Error, Result};
+use daemonize::{Daemonize, DaemonizeError};
 use log::debug;
 use std::env::temp_dir;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
+use std::str;
 use std::thread;
 use std::time::Duration;
-use std::{fmt, str};
 
 const SAFE_AUTHD_PID_FILE: &str = "safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "safe-authd.out";
 const SAFE_AUTHD_STDERR_FILE: &str = "safe-authd.err";
 
-pub struct PrettyErr<'a>(&'a dyn Fail);
-impl<'a> fmt::Display for PrettyErr<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)?;
-        let mut x: &dyn Fail = self.0;
-        while let Some(cause) = x.cause() {
-            f.write_str(": ")?;
-            fmt::Display::fmt(&cause, f)?;
-            x = cause;
-        }
-        Ok(())
-    }
+pub fn install_authd() -> Result<()> {
+    Err(Error::GeneralError("This command is only supported on Windows. You don't need to run this command in other platforms before starting safe-authd".to_string()))
 }
 
-pub trait ErrorExt {
-    fn pretty(&self) -> PrettyErr<'_>;
+pub fn uninstall_authd() -> Result<()> {
+    Err(Error::GeneralError(
+        "This command is only supported on Windows".to_string(),
+    ))
 }
 
-impl ErrorExt for Error {
-    fn pretty(&self) -> PrettyErr<'_> {
-        PrettyErr(self.as_fail())
-    }
+pub fn start_authd_from_sc() -> Result<()> {
+    Err(Error::GeneralError(
+        "This command is only supported on Windows".to_string(),
+    ))
 }
 
-pub fn install_authd() -> Result<(), Error> {
-    Err(format_err!("This command is only supported on Windows. You don't need to run this command in other platforms before starting safe-authd"))
-}
-
-pub fn uninstall_authd() -> Result<(), Error> {
-    Err(format_err!("This command is only supported on Windows"))
-}
-
-pub fn start_authd_from_sc() -> Result<(), Error> {
-    Err(format_err!("This command is only supported on Windows"))
-}
-
-pub fn start_authd(listen: &str) -> Result<(), Error> {
+pub fn start_authd(listen: &str) -> Result<()> {
     let mut stout_file: PathBuf = temp_dir();
     stout_file.push(SAFE_AUTHD_STDOUT_FILE);
     let mut stderr_file: PathBuf = temp_dir();
     stderr_file.push(SAFE_AUTHD_STDERR_FILE);
     let mut pid_file: PathBuf = temp_dir();
     pid_file.push(SAFE_AUTHD_PID_FILE);
-    let stdout = File::create(stout_file)
-        .map_err(|err| format_err!("Failed to open/create file for stdout: {}", err))?;
-    let stderr = File::create(stderr_file)
-        .map_err(|err| format_err!("Failed to open/create file for stderr: {}", err))?;
+    let stdout = File::create(stout_file).map_err(|err| {
+        Error::GeneralError(format!("Failed to open/create file for stdout: {}", err))
+    })?;
+    let stderr = File::create(stderr_file).map_err(|err| {
+        Error::GeneralError(format!("Failed to open/create file for stderr: {}", err))
+    })?;
 
     debug!("PID file to be created at: {:?}", &pid_file);
 
@@ -90,15 +71,23 @@ pub fn start_authd(listen: &str) -> Result<(), Error> {
     match daemonize.start() {
         Ok(_) => {
             println!("Initialising SAFE Authenticator services...");
-            authd_run(listen, None, None)?;
+            authd_run(listen, None, None).map_err(|err| Error::GeneralError(err.to_string()))?;
+            Ok(())
         }
-        Err(err) => eprintln!("Failed to start safe-authd daemon: {}", err),
+        Err(err) => {
+            let msg = format!("Failed to start safe-authd daemon: {:?}", err);
+            if let DaemonizeError::LockPidfile(_pid) = err {
+                // A daemon has been already started keeping the lock on the PID file,
+                // although we don't know its status
+                Err(Error::AuthdAlreadyStarted(msg))
+            } else {
+                Err(Error::GeneralError(msg))
+            }
+        }
     }
-
-    Ok(())
 }
 
-pub fn stop_authd() -> Result<(), Error> {
+pub fn stop_authd() -> Result<()> {
     let mut pid_file: PathBuf = temp_dir();
     pid_file.push(SAFE_AUTHD_PID_FILE);
 
@@ -110,16 +99,18 @@ pub fn stop_authd() -> Result<(), Error> {
     let output = Command::new("kill").arg("-9").arg(&pid).output()?;
 
     if output.status.success() {
-        io::stdout().write_all(&output.stdout)?;
-        println!("Success, safe-authd stopped!");
+        println!("Success, safe-authd (PID: {}) stopped!", pid);
         Ok(())
     } else {
-        io::stdout().write_all(&output.stderr)?;
-        bail!("Failed to stop safe-authd daemon");
+        Err(Error::GeneralError(format!(
+            "Failed to stop safe-authd daemon (PID: {}): {}",
+            pid,
+            String::from_utf8_lossy(&output.stderr)
+        )))
     }
 }
 
-pub fn restart_authd(listen: &str) -> Result<(), Error> {
+pub fn restart_authd(listen: &str) -> Result<()> {
     match stop_authd() {
         Ok(()) => {
             // Let's give it a sec so it's properlly stopped

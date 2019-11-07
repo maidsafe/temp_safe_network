@@ -8,7 +8,8 @@
 
 use crate::operations::auth_daemon::*;
 use crate::operations::safe_net::*;
-use safe_api::{Safe, SafeAuthdClient};
+use crate::APP_ID;
+use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -18,7 +19,11 @@ pub enum AuthSubCommands {
     Clear {},
     #[structopt(name = "login")]
     /// Send request to a remote Authenticator daemon to login to a SAFE account
-    Login {},
+    Login {
+        /// Automatically self authorise the CLI application using the account is being logged in with
+        #[structopt(long = "self-auth")]
+        self_auth: bool,
+    },
     #[structopt(name = "logout")]
     /// Send request to a remote Authenticator daemon to logout from currently logged in SAFE account
     Logout {},
@@ -98,9 +103,22 @@ pub fn auth_commander(
             let safe_authd = SafeAuthdClient::new(None);
             authd_create(safe, &safe_authd, sk, test_coins)
         }
-        Some(AuthSubCommands::Login {}) => {
+        Some(AuthSubCommands::Login { self_auth }) => {
             let mut safe_authd = SafeAuthdClient::new(None);
-            authd_login(&mut safe_authd)
+            authd_login(&mut safe_authd)?;
+            if self_auth {
+                // Let's subscribe so we can automatically allow our own auth request
+                safe_authd.subscribe("https://localhost:33002", APP_ID, &|auth_req: AuthReq| {
+                    let safe_authd = SafeAuthdClient::new(None);
+                    match safe_authd.allow(auth_req.req_id) {
+                        Ok(()) => {}
+                        Err(err) => println!("Failed to self authorise: {}", err),
+                    }
+                    None
+                })?;
+                authorise_cli(safe, port)?;
+            }
+            Ok(())
         }
         Some(AuthSubCommands::Logout {}) => {
             let mut safe_authd = SafeAuthdClient::new(None);

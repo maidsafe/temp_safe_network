@@ -39,8 +39,10 @@ mod codes {
     pub const ERR_UNKNOWN_ERROR: i32 = -501;
     pub const ERR_STRING_ERROR: i32 = -502;
 
-    // Authd Client Errors
+    // Authd/Authd-Client Errors
     pub const ERR_AUTHD_CLIENT_ERROR: i32 = -600;
+    pub const ERR_AUTHD_ERROR: i32 = -601;
+    pub const ERR_AUTHD_ALREADY_STARTED_ERROR: i32 = -602;
 
     // Authenticator Errors
     pub const ERR_AUTHENTICATOR_ERROR: i32 = -700;
@@ -65,6 +67,8 @@ impl ErrorCode for Error {
         match (*self).0 {
             AuthError(ref _error) => ERR_AUTH_ERROR,
             AuthdClientError(ref _error) => ERR_AUTHD_CLIENT_ERROR,
+            AuthdError(ref _error) => ERR_AUTHD_ERROR,
+            AuthdAlreadyStarted(ref _error) => ERR_AUTHD_ALREADY_STARTED_ERROR,
             AuthenticatorError(ref _error) => ERR_AUTHENTICATOR_ERROR,
             ConnectionError(ref _error) => ERR_CONNECTION_ERROR,
             NetDataError(ref _error) => ERR_NET_DATA_ERROR,

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod authd;
+mod errors;
 mod notifs;
 mod quic_client;
 mod requests;
@@ -19,6 +20,7 @@ mod operations;
 mod operations_win;
 
 use env_logger;
+use errors::{Error, Result};
 use log::debug;
 use log::error;
 use std::path::PathBuf;
@@ -46,8 +48,6 @@ use operations::{
 use operations_win::{
     install_authd, restart_authd, start_authd, start_authd_from_sc, stop_authd, uninstall_authd,
 };
-
-use authd::ErrorExt;
 
 #[derive(StructOpt, Debug)]
 /// SAFE Authenticator daemon subcommands
@@ -106,24 +106,19 @@ fn main() {
 
     if let Err(err) = process_command(opt) {
         error!("safe-authd error: {}", err);
-        process::exit(1);
+        process::exit(err.error_code());
     }
 }
 
-fn process_command(opt: CmdArgs) -> Result<(), String> {
+fn process_command(opt: CmdArgs) -> Result<()> {
     match opt {
-        CmdArgs::Update {} => {
-            update_commander().map_err(|err| format!("Error performing update: {}", err))
-        }
-        CmdArgs::Install {} => install_authd().map_err(|err| format!("{}", err.pretty())),
-        CmdArgs::Uninstall {} => uninstall_authd().map_err(|err| format!("{}", err.pretty())),
-        CmdArgs::Start { listen, .. } => {
-            start_authd(&listen).map_err(|err| format!("{}", err.pretty()))
-        }
-        CmdArgs::ScStart {} => start_authd_from_sc().map_err(|err| format!("{}", err.pretty())),
-        CmdArgs::Stop {} => stop_authd().map_err(|err| format!("{}", err.pretty())),
-        CmdArgs::Restart { listen } => {
-            restart_authd(&listen).map_err(|err| format!("{}", err.pretty()))
-        }
+        CmdArgs::Update {} => update_commander()
+            .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err))),
+        CmdArgs::Install {} => install_authd(),
+        CmdArgs::Uninstall {} => uninstall_authd(),
+        CmdArgs::Start { listen, .. } => start_authd(&listen),
+        CmdArgs::ScStart {} => start_authd_from_sc(),
+        CmdArgs::Stop {} => stop_authd(),
+        CmdArgs::Restart { listen } => restart_authd(&listen),
     }
 }

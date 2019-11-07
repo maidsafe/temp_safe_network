@@ -192,7 +192,7 @@ pub fn quic_send(
 
     // TODO: decode using JSON-RPC, authd temporarily uses a mark to signal error
     if response_str.starts_with("[AUTHD_ERROR]:") {
-        Err(Error::AuthdClientError(response_str[14..].to_string()))
+        Err(Error::AuthdError(response_str[14..].to_string()))
     } else {
         Ok(response_str.to_string())
     }
