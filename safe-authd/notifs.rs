@@ -77,58 +77,49 @@ pub fn monitor_pending_auth_reqs(
                 }
 
                 let mut response = None;
+                let mut current_req_notified = false;
                 for (url, cert_base_path) in notif_endpoints_list.iter() {
-                    println!("Notifying subscriptor: {}", url);
-                    match quic_send(
-                        &format!(
-                            "{}/{}/{}",
-                            url,
-                            incoming_auth_req.auth_req.app_id,
-                            incoming_auth_req.auth_req.req_id
-                        ),
-                        false,
-                        None,
+                    match send_notification(
+                        url,
+                        incoming_auth_req,
                         cert_base_path.as_ref().map(String::as_str),
-                        false,
                     ) {
-                        Ok(notif_resp) => {
-                            // TODO: implement JSON-RPC or some other format
-                            response = if notif_resp.starts_with("true") {
-                                Some(true)
-                            } else if notif_resp.starts_with("false") {
-                                Some(false)
-                            } else {
-                                None
-                            };
-                            println!("Subscriptor's response: {}", notif_resp);
-                            let _ =
-                                lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
-                                    let mut current_auth_req = incoming_auth_req.clone();
-                                    current_auth_req.notified = true;
-                                    auth_reqs_list.insert(*req_id, current_auth_req).unwrap();
-                                    Ok(())
-                                });
+                        None => {
+                            remove_notif_endpoint_from_list(notif_endpoints_handle.clone(), url)
+                        }
+                        Some(resp) => {
+                            // We know at least one subscriptor has been notified since it replied
+                            current_req_notified = true;
 
                             // We don't notify other subscriptors as it was allowed/denied already
-                            if response.is_some() {
+                            if resp.is_some() {
+                                response = resp;
                                 break;
                             }
                         }
-                        Err(err) => {
-                            // Let's unsubscribe it immediately, ... we could be more laxed
-                            // in the future allowing some unresponsiveness
-                            println!(
-                                "Subscriptor '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
-                                url, err
-                            );
-                            remove_notif_endpoint_from_list(notif_endpoints_handle.clone(), url);
-                        }
                     }
                 }
+
                 println!(
-                    "Decision for auth req ID: {} - App ID: {}: {:?}",
+                    "Decision obtained for auth req id: {} - from app id: {}: {:?}",
                     incoming_auth_req.auth_req.req_id, incoming_auth_req.auth_req.app_id, response
                 );
+
+                if current_req_notified {
+                    // then update its state in the list
+                    let _ = lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
+                        // ...but only if the auth req is still in the list, as it could
+                        // have been removed already if a user allowed/denied it with a request
+                        // while we were sending the notifications
+                        if auth_reqs_list.contains_key(req_id) {
+                            let mut current_auth_req = incoming_auth_req.clone();
+                            current_auth_req.notified = true;
+                            let _ = auth_reqs_list.insert(*req_id, current_auth_req);
+                        }
+                        Ok(())
+                    });
+                }
+
                 if let Some(is_allowed) = response {
                     match incoming_auth_req.tx.try_send(is_allowed) {
                         Ok(_) => {
@@ -144,4 +135,44 @@ pub fn monitor_pending_auth_reqs(
 
         thread::sleep(Duration::from_millis(AUTH_REQS_CHECK_FREQ));
     });
+}
+
+fn send_notification(
+    url: &str,
+    auth_req: &IncomingAuthReq,
+    cert_base_path: Option<&str>,
+) -> Option<Option<bool>> {
+    println!("Notifying subscriptor: {}", url);
+    match quic_send(
+        &format!(
+            "{}/{}/{}",
+            url, auth_req.auth_req.app_id, auth_req.auth_req.req_id
+        ),
+        false,
+        None,
+        cert_base_path,
+        false,
+    ) {
+        Ok(notif_resp) => {
+            // TODO: implement JSON-RPC or some other format
+            let response = if notif_resp.starts_with("true") {
+                Some(true)
+            } else if notif_resp.starts_with("false") {
+                Some(false)
+            } else {
+                None
+            };
+            println!("Subscriptor's response: {}", notif_resp);
+            Some(response)
+        }
+        Err(err) => {
+            // Let's unsubscribe it immediately, ... we could be more laxed
+            // in the future allowing some unresponsiveness
+            println!(
+                "Subscriptor '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
+                url, err
+            );
+            None
+        }
+    }
 }

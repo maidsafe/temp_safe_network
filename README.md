@@ -117,7 +117,7 @@ This command simply sends an authorisation request to the Authenticator availabl
 
 #### The Authenticator daemon (authd)
 
-In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)]() endpoint, which SAFE application will communicate to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
+In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)]() endpoint, which SAFE applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
 
 #### Auth start (Linux/Mac)
 
@@ -133,7 +133,7 @@ Windows platform requires you to first install `authd` as a Windows service befo
 ```shell
 > safe auth install
 Installing SAFE Authenticator (safe-authd) as a Windows service...
-The safe-authd service (<'safe-authd.exe' path>) was just installed sucessfully!
+The safe-authd service (<'safe-authd.exe' path>) was just installed successfully!
 
 > safe auth start
 Starting SAFE Authenticator service (safe-authd) from command line...
@@ -267,6 +267,22 @@ Credentials were stored in <home directory>/.local/share/safe-cli/credentials
 ```
 
 We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.
+
+##### Self authorising the CLI application
+
+It could be the case the SAFE CLI is the only SAFE application that the user is intended to use to interact with the SAFE Network. In such a case authorising the CLI application as explained above (when there is no other UI for the `authd`) using another instance of the CLI in a second console is not that comfortable.
+
+Therefore there is an option which allows the SAFE CLI to automatically self authorise when the user logs in using the CLI, which is as simply as:
+```shell
+$ safe auth login --self-auth
+Secret:
+Password:
+Sending login action request to authd...
+Logged in successfully
+Authorising CLI application...
+SAFE CLI app was successfully authorised
+Credentials were stored in <home directory>/.local/share/safe-cli/credentials
+```
 
 ### The interactive shell
 

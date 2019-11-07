@@ -37,7 +37,6 @@ mod codes {
     // Misc Errors
     pub const ERR_UNEXPECTED_ERROR: i32 = -500;
     pub const ERR_UNKNOWN_ERROR: i32 = -501;
-    pub const ERR_STRING_ERROR: i32 = -502;
 
     // Authd/Authd-Client Errors
     pub const ERR_AUTHD_CLIENT_ERROR: i32 = -600;

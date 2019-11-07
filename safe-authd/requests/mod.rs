@@ -82,6 +82,41 @@ impl Future for ProcessRequest {
 
         loop {
             match self {
+                HandleRequest {
+                    safe_auth_handle,
+                    auth_reqs_handle,
+                    notif_endpoints_handle,
+                    req,
+                } => {
+                    if req.len() < 4 || &req[0..4] != b"GET " {
+                        return Ok(Async::Ready(err_response("Missing GET".to_string())));
+                    }
+                    if req[4..].len() < 2 || &req[req.len() - 2..] != b"\r\n" {
+                        return Ok(Async::Ready(err_response("Missing \\r\\n".to_string())));
+                    }
+                    let req = &req[4..req.len() - 2];
+                    let end = req
+                        .iter()
+                        .position(|&c| c == b' ')
+                        .unwrap_or_else(|| req.len());
+                    let path = match str::from_utf8(&req[..end]).context("Path is malformed UTF-8")
+                    {
+                        Ok(path) => path,
+                        Err(err) => return Ok(Async::Ready(err_response(err.to_string()))),
+                    };
+                    let req_args: Vec<&str> = path.split('/').collect();
+
+                    match process_authenticator_req(
+                        req_args,
+                        safe_auth_handle.clone(),
+                        auth_reqs_handle.clone(),
+                        notif_endpoints_handle.clone(),
+                    ) {
+                        Ok(AuthdResponse::Ready(response)) => return Ok(Async::Ready(response)),
+                        Err(err) => return Err(err),
+                        Ok(AuthdResponse::NotReady(processing_resp)) => *self = processing_resp,
+                    };
+                }
                 ProcessingResponse {
                     safe_auth_handle,
                     auth_reqs_handle,
@@ -130,41 +165,6 @@ impl Future for ProcessRequest {
                             return Ok(Async::Ready(err_response(msg.to_string())));
                         }
                     }
-                }
-                HandleRequest {
-                    safe_auth_handle,
-                    auth_reqs_handle,
-                    notif_endpoints_handle,
-                    req,
-                } => {
-                    if req.len() < 4 || &req[0..4] != b"GET " {
-                        return Ok(Async::Ready(err_response("Missing GET".to_string())));
-                    }
-                    if req[4..].len() < 2 || &req[req.len() - 2..] != b"\r\n" {
-                        return Ok(Async::Ready(err_response("Missing \\r\\n".to_string())));
-                    }
-                    let req = &req[4..req.len() - 2];
-                    let end = req
-                        .iter()
-                        .position(|&c| c == b' ')
-                        .unwrap_or_else(|| req.len());
-                    let path = match str::from_utf8(&req[..end]).context("Path is malformed UTF-8")
-                    {
-                        Ok(path) => path,
-                        Err(err) => return Ok(Async::Ready(err_response(err.to_string()))),
-                    };
-                    let req_args: Vec<&str> = path.split('/').collect();
-
-                    match process_authenticator_req(
-                        req_args,
-                        safe_auth_handle.clone(),
-                        auth_reqs_handle.clone(),
-                        notif_endpoints_handle.clone(),
-                    ) {
-                        Ok(AuthdResponse::Ready(response)) => return Ok(Async::Ready(response)),
-                        Err(err) => return Err(err),
-                        Ok(AuthdResponse::NotReady(processing_resp)) => *self = processing_resp,
-                    };
                 }
             }
         }
