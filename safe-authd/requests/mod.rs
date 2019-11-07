@@ -19,11 +19,11 @@ mod status;
 mod subscribe;
 mod unsubscribe;
 
+use crate::errors::Error;
 use crate::shared::{
     lock_safe_authenticator, remove_auth_req_from_list, SharedAuthReqsHandle,
     SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
-use failure::{Error, ResultExt};
 use futures::{Async, Future, Poll, Stream};
 use std::str;
 use tokio::sync::mpsc;
@@ -99,10 +99,14 @@ impl Future for ProcessRequest {
                         .iter()
                         .position(|&c| c == b' ')
                         .unwrap_or_else(|| req.len());
-                    let path = match str::from_utf8(&req[..end]).context("Path is malformed UTF-8")
-                    {
+                    let path = match str::from_utf8(&req[..end]) {
                         Ok(path) => path,
-                        Err(err) => return Ok(Async::Ready(err_response(err.to_string()))),
+                        Err(err) => {
+                            return Ok(Async::Ready(err_response(format!(
+                                "Path is malformed UTF-8: {}",
+                                err
+                            ))))
+                        }
                     };
                     let req_args: Vec<&str> = path.split('/').collect();
 

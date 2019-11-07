@@ -23,7 +23,6 @@ path = "main.rs"
 [dependencies]
 directories = "1.0.2"
 env_logger = "0.6.0"
-failure = "0.1"
 futures = "~0.1.21"
 human-panic = "1.0.1"
 log = "0.4.6"

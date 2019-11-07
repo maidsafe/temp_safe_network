@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::authd::{run as authd_run, ErrorExt};
+use super::authd::run as authd_run;
 use super::errors::{Error, Result};
 use std::{ffi::OsString, io, io::Write, process, time::Duration};
 use windows_service::{
@@ -213,7 +213,7 @@ fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
                 ) {
                     Ok(()) => ServiceExitCode::Win32(0),
                     Err(err) => {
-                        println!("{}", err.pretty());
+                        println!("{}", err);
                         ServiceExitCode::ServiceSpecific(102)
                     }
                 }

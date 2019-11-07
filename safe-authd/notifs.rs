@@ -19,6 +19,10 @@ const AUTH_REQS_CHECK_FREQ: u64 = 1000;
 // This is used to keep the list of auth requests always clean from unhandled requests
 const AUTH_REQS_TIMEOUT: u64 = 3 * 60000;
 
+// Am auth request notification can be responded with a positive (Some(true))
+// or negative (Some(false)) decision, or simply with an acknowledgment (None)
+type NotifResponse = Option<bool>;
+
 pub fn monitor_pending_auth_reqs(
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
@@ -141,7 +145,7 @@ fn send_notification(
     url: &str,
     auth_req: &IncomingAuthReq,
     cert_base_path: Option<&str>,
-) -> Option<Option<bool>> {
+) -> Option<NotifResponse> {
     println!("Notifying subscriptor: {}", url);
     match quic_send(
         &format!(

@@ -9,7 +9,7 @@
 use super::notifs::monitor_pending_auth_reqs;
 use super::requests::process_request;
 use super::shared::*;
-use failure::{Error, Fail, ResultExt};
+use super::{Error, Result};
 use futures::{Future, Stream};
 use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
@@ -17,48 +17,25 @@ use std::collections::BTreeMap;
 use std::io;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
-use std::{ascii, fmt, fs, str};
+use std::{ascii, fs, str};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 
 // Number of milliseconds to allow an idle connection before closing it
 const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
 
-pub struct PrettyErr<'a>(&'a dyn Fail);
-impl<'a> fmt::Display for PrettyErr<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)?;
-        let mut x: &dyn Fail = self.0;
-        while let Some(cause) = x.cause() {
-            f.write_str(": ")?;
-            fmt::Display::fmt(&cause, f)?;
-            x = cause;
-        }
-        Ok(())
-    }
-}
-
-pub trait ErrorExt {
-    fn pretty(&self) -> PrettyErr<'_>;
-}
-
-impl ErrorExt for Error {
-    fn pretty(&self) -> PrettyErr<'_> {
-        PrettyErr(self.as_fail())
-    }
-}
-
 pub fn run(
     listen: &str,
     cert_base_path: Option<&str>,
     config_dir_path: Option<&str>,
-) -> Result<(), Error> {
-    let url = Url::parse(&listen).map_err(|_| format_err!("Invalid endpoint address"))?;
+) -> Result<()> {
+    let url = Url::parse(&listen)
+        .map_err(|_| Error::GeneralError("Invalid endpoint address".to_string()))?;
     let endpoint_socket_addr = url
         .to_socket_addrs()
-        .map_err(|_| format_err!("Invalid endpoint address"))?
+        .map_err(|_| Error::GeneralError("Invalid endpoint address".to_string()))?
         .next()
-        .ok_or_else(|| format_err!("The endpoint is an invalid address"))?;
+        .ok_or_else(|| Error::GeneralError("The endpoint is an invalid address".to_string()))?;
 
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
     let drain = slog_term::FullFormat::new(decorator)
@@ -80,7 +57,7 @@ pub fn run(
 
     let base_path = match cert_base_path {
         Some(path) => path.to_string(),
-        None => get_certificate_base_path().map_err(|err| format_err!("{}", err))?,
+        None => get_certificate_base_path().map_err(|err| Error::GeneralError(err.to_string()))?,
     };
 
     let cert_path = std::path::Path::new(&base_path).join("cert.der");
@@ -93,19 +70,38 @@ pub fn run(
             let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]);
             let key = cert.serialize_private_key_der();
             let cert = cert.serialize_der();
-            fs::create_dir_all(&std::path::Path::new(&base_path))
-                .context("Failed to create certificate directory")?;
-            fs::write(&cert_path, &cert).context("Failed to write certificate")?;
-            fs::write(&key_path, &key).context("Failed to write private key")?;
+            fs::create_dir_all(&std::path::Path::new(&base_path)).map_err(|err| {
+                Error::GeneralError(format!("Failed to create certificate directory: {}", err))
+            })?;
+            fs::write(&cert_path, &cert).map_err(|err| {
+                Error::GeneralError(format!("Failed to write certificate: {}", err))
+            })?;
+            fs::write(&key_path, &key).map_err(|err| {
+                Error::GeneralError(format!("Failed to write private key: {}", err))
+            })?;
             (cert, key)
         }
         Err(e) => {
-            bail!("Failed to read certificate: {}", e);
+            return Err(Error::GeneralError(format!(
+                "Failed to read certificate: {}",
+                e
+            )));
         }
     };
-    let key = quinn::PrivateKey::from_der(&key)?;
-    let cert = quinn::Certificate::from_der(&cert)?;
-    server_config.certificate(quinn::CertificateChain::from_certs(vec![cert]), key)?;
+    let key = quinn::PrivateKey::from_der(&key).map_err(|err| {
+        Error::GeneralError(format!("Failed parse private key from file: {}", err))
+    })?;
+    let cert = quinn::Certificate::from_der(&cert).map_err(|err| {
+        Error::GeneralError(format!("Failed to parse certificate from file: {}", err))
+    })?;
+    server_config
+        .certificate(quinn::CertificateChain::from_certs(vec![cert]), key)
+        .map_err(|err| {
+            Error::GeneralError(format!(
+                "Failed to set certificate for communication: {}",
+                err
+            ))
+        })?;
 
     let mut endpoint = quinn::Endpoint::builder();
     endpoint.logger(log.clone());
@@ -113,7 +109,9 @@ pub fn run(
     endpoint.listen(server_config.build());
 
     let (endpoint_driver, incoming) = {
-        let (driver, endpoint, incoming) = endpoint.bind(endpoint_socket_addr)?;
+        let (driver, endpoint, incoming) = endpoint
+            .bind(endpoint_socket_addr)
+            .map_err(|err| Error::GeneralError(format!("Failed to bind endpoint: {}", err)))?;
         info!(log, "Listening on {}", endpoint.local_addr()?);
         (driver, incoming)
     };
@@ -152,11 +150,11 @@ pub fn run(
 
 // Private helpers
 
-pub fn get_certificate_base_path() -> Result<String, Error> {
+pub fn get_certificate_base_path() -> Result<String> {
     match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
         Some(dirs) => Ok(dirs.config_dir().display().to_string()),
-        None => Err(format_err!(
-            "Failed to obtain local project directory where to write certificate from"
+        None => Err(Error::GeneralError(
+            "Failed to obtain local project directory where to write certificate from".to_string(),
         )),
     }
 }
@@ -220,7 +218,7 @@ fn handle_request(
 
     tokio_current_thread::spawn(
         recv.read_to_end(64 * 1024) // Read the request, which must be at most 64KiB
-            .map_err(|e| format_err!("Failed reading request: {}", e))
+            .map_err(|e| Error::GeneralError(format!("Failed reading request: {}", e)))
             .and_then(move |(_, req)| {
                 let mut escaped = String::new();
                 for &x in &req[..] {
@@ -238,15 +236,15 @@ fn handle_request(
                 .and_then(|resp| {
                     // Write the response
                     tokio::io::write_all(send, resp)
-                        .map_err(|e| format_err!("Failed to send response: {}", e))
+                        .map_err(|e| Error::GeneralError(format!("Failed to send response: {}", e)))
                 })
             })
             // Gracefully terminate the stream
             .and_then(|(send, _)| {
                 tokio::io::shutdown(send)
-                    .map_err(|e| format_err!("Failed to shutdown stream: {}", e))
+                    .map_err(|e| Error::GeneralError(format!("Failed to shutdown stream: {}", e)))
             })
             .map(move |_| info!(log3, "Request complete"))
-            .map_err(move |e| error!(log2, "Request Failed"; "reason" => %e.pretty())),
+            .map_err(move |e| error!(log2, "Request Failed"; "reason" => %e)),
     )
 }

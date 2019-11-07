@@ -32,8 +32,6 @@ use update::update_commander;
 extern crate human_panic;
 
 #[macro_use]
-extern crate failure;
-#[macro_use]
 extern crate slog;
 
 #[cfg(not(feature = "mock-network"))]

@@ -71,7 +71,7 @@ pub fn start_authd(listen: &str) -> Result<()> {
     match daemonize.start() {
         Ok(_) => {
             println!("Initialising SAFE Authenticator services...");
-            authd_run(listen, None, None).map_err(|err| Error::GeneralError(err.to_string()))?;
+            authd_run(listen, None, None)?;
             Ok(())
         }
         Err(err) => {
