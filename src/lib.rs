@@ -57,7 +57,7 @@ pub use routing;
 pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
     client_handler::COST_OF_PUT,
-    config_handler::Config,
+    config_handler::{write_connection_info, Config},
     error::{Error, Result},
     vault::{Command, Vault},
 };

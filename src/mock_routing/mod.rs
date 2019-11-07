@@ -47,7 +47,7 @@ impl ConsensusGroup {
 
     fn vote_for(&self, event: Vec<u8>) {
         for channel in &self.event_channels {
-            channel.send(Event::Consensus(event.clone()));
+            unwrap!(channel.send(Event::Consensus(event.clone())));
         }
     }
 }
@@ -82,7 +82,7 @@ impl Node {
                 .upgrade()
                 .map(|group| group.borrow_mut().vote_for(event));
         } else {
-            self.events_tx.send(Event::Consensus(event));
+            unwrap!(self.events_tx.send(Event::Consensus(event)));
         }
     }
 
@@ -123,7 +123,7 @@ impl Node {
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
         if let Ok(client_event) = TryFrom::try_from(event) {
-            self.events_tx.send(Event::ClientEvent(client_event));
+            unwrap!(self.events_tx.send(Event::ClientEvent(client_event)));
         }
     }
 }

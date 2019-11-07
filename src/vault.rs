@@ -18,7 +18,7 @@ use crate::{
 };
 use bincode;
 use crossbeam_channel::{Receiver, Select};
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use safe_nd::{NodeFullId, Request, XorName};
 use std::borrow::Cow;
 use std::{
@@ -172,9 +172,13 @@ impl Vault {
                     }
                 }
                 idx => {
-                    self.routing_node
+                    if let Err(err) = self
+                        .routing_node
                         .borrow_mut()
-                        .handle_selected_operation(idx);
+                        .handle_selected_operation(idx)
+                    {
+                        warn!("Could not process operation: {}", err);
+                    }
                 }
             }
         }
@@ -215,9 +219,13 @@ impl Vault {
                         processed = true;
                     }
                     idx => {
-                        self.routing_node
+                        if let Err(err) = self
+                            .routing_node
                             .borrow_mut()
-                            .handle_selected_operation(idx);
+                            .handle_selected_operation(idx)
+                        {
+                            warn!("Could not process operation: {}", err);
+                        }
                     }
                 }
             } else {
@@ -230,13 +238,6 @@ impl Vault {
 
     fn step_routing(&mut self, event: RoutingEvent) {
         let mut maybe_action = self.handle_routing_event(event);
-        while let Some(action) = maybe_action {
-            maybe_action = self.handle_action(action);
-        }
-    }
-
-    fn step_client_event(&mut self, event: ClientEvent) {
-        let mut maybe_action = self.handle_client_event(event);
         while let Some(action) = maybe_action {
             maybe_action = self.handle_action(action);
         }

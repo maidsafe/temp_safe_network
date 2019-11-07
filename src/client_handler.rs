@@ -227,9 +227,13 @@ impl ClientHandler {
                         "{}: Received unexpected challenge request from {}",
                         self, peer_addr
                     );
-                    self.routing_node
+                    if let Err(err) = self
+                        .routing_node
                         .borrow_mut()
-                        .disconnect_from_client(peer_addr);
+                        .disconnect_from_client(peer_addr)
+                    {
+                        warn!("{}: Could not disconnect client: {:?}", self, err);
+                    }
                 }
                 Err(err) => {
                     info!(
@@ -659,9 +663,13 @@ impl ClientHandler {
                     "{}: Client on {} identifies as a node: {}",
                     self, peer_addr, public_id
                 );
-                self.routing_node
+                if let Err(err) = self
+                    .routing_node
                     .borrow_mut()
-                    .disconnect_from_client(peer_addr);
+                    .disconnect_from_client(peer_addr)
+                {
+                    warn!("{}: Could not disconnect client: {:?}", self, err);
+                }
                 return;
             }
         };
@@ -676,9 +684,13 @@ impl ClientHandler {
                         "{}: Challenge failed for {} on {}: {}",
                         self, public_id, peer_addr, err
                     );
-                    self.routing_node
+                    if let Err(err) = self
+                        .routing_node
                         .borrow_mut()
-                        .disconnect_from_client(peer_addr);
+                        .disconnect_from_client(peer_addr)
+                    {
+                        warn!("{}: Could not disconnect client: {:?}", self, err);
+                    }
                 }
             }
         } else {
@@ -686,9 +698,13 @@ impl ClientHandler {
                 "{}: {} on {} supplied challenge response without us providing it.",
                 self, public_id, peer_addr
             );
-            self.routing_node
+            if let Err(err) = self
+                .routing_node
                 .borrow_mut()
-                .disconnect_from_client(peer_addr);
+                .disconnect_from_client(peer_addr)
+            {
+                warn!("{}: Could not disconnect client: {:?}", self, err);
+            }
         }
     }
 
@@ -1077,9 +1093,17 @@ impl ClientHandler {
     fn send<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) {
         let msg = utils::serialise(msg);
         let msg = Bytes::from(msg);
-        self.routing_node
+
+        if let Err(e) = self
+            .routing_node
             .borrow_mut()
-            .send_message_to_client(recipient, msg, 0);
+            .send_message_to_client(recipient, msg, 0)
+        {
+            warn!(
+                "{}: Could not send message to client {}: {:?}",
+                self, recipient, e
+            );
+        }
     }
 
     fn send_notification_to_client(&mut self, client_id: PublicId, notification: Notification) {
@@ -1095,7 +1119,7 @@ impl ClientHandler {
 
         for peer_addr in peer_addrs {
             self.send(
-                Peer::Client { peer_addr },
+                peer_addr,
                 &Message::Notification {
                     notification: notification.clone(),
                 },

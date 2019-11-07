@@ -35,8 +35,7 @@ fn main() {
 mod detail {
     use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
     use log::{self, Level, Record};
-    use safe_vault::routing::Node;
-    use safe_vault::{self, Command, Config, Vault};
+    use safe_vault::{self, routing::Node, write_connection_info, Command, Config, Vault};
     use self_update::cargo_crate_version;
     use self_update::Status;
     use std::{io::Write, process};
@@ -111,12 +110,18 @@ mod detail {
             }
         };
 
+        let is_first = config.is_first();
+
         match Vault::new(routing_node, routing_rx, config, command_rx) {
             Ok(mut vault) => {
+                let our_conn_info = unwrap!(vault.our_connection_info());
                 println!(
                     "Vault connection info:\n{}",
-                    unwrap!(serde_json::to_string(&unwrap!(vault.our_connection_info())))
+                    unwrap!(serde_json::to_string(&our_conn_info))
                 );
+                if is_first {
+                    unwrap!(write_connection_info(&our_conn_info));
+                }
                 vault.run();
             }
             Err(e) => {
