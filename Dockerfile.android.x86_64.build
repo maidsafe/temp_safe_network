@@ -1,6 +1,6 @@
 FROM rust:latest
 
-# These are only referenced in the build-cache script. 
+# These are only referenced in the build-cache script.
 ARG build_type
 ARG build_target
 ARG build_component
@@ -25,8 +25,8 @@ RUN apt-get update -y && \
     apt-get install -y gcc gcc-multilib libssl-dev unzip && \
     mkdir /target && \
     chown maidsafe:maidsafe /target && \
-    mkdir /usr/src/safe_client_libs && \
-    chown maidsafe:maidsafe /usr/src/safe_client_libs && \
+    mkdir /usr/src/safe-cli && \
+    chown maidsafe:maidsafe /usr/src/safe-cli && \
     curl -L -O https://dl.google.com/android/repository/android-ndk-r20-linux-x86_64.zip && \
     unzip android-ndk-r20-linux-x86_64.zip -d /usr/local/lib && \
     mkdir /usr/local/bin/android-toolchains && \
@@ -38,7 +38,7 @@ RUN apt-get update -y && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/safe_client_libs
+WORKDIR /usr/src/safe-cli
 COPY . .
 
 USER maidsafe:maidsafe
