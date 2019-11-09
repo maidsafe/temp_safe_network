@@ -14,7 +14,7 @@ authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.c
 publish = false
 license = "GPL-3.0"
 default-run = "safe"
-repository = "https://github.com/maidsafe/safe-cli"
+repository = "https://github.com/maidsafe/safe-api"
 edition = "2018"
 
 [[bin]]

@@ -949,7 +949,7 @@ In this case we don't only get information about the content that the URL resolv
 
 ### Update
 
-The CLI can update itself to the latest available version. If you run `safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/safe-cli/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
+The CLI can update itself to the latest available version. If you run `safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/safe-api/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
 
 ## Further Help
 
@@ -957,7 +957,7 @@ You can discuss development-related topics on the [SAFE Dev Forum](https://forum
 
 If you are just starting to develop an application for the SAFE Network, it's very advisable to visit the [SAFE Network Dev Hub](https://hub.safedev.org) where you will find a lot of relevant information.
 
-If you find any issues, or have ideas for improvements and/or new features for this application and the project, please raise them by [creating a new issue in this repository](https://github.com/maidsafe/safe-cli/issues).
+If you find any issues, or have ideas for improvements and/or new features for this application and the project, please raise them by [creating a new issue in this repository](https://github.com/maidsafe/safe-api/issues).
 
 ## License
 This SAFE Network application is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) http://www.gnu.org/licenses/gpl-3.0.en.html).

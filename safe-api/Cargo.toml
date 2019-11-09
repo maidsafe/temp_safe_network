@@ -12,7 +12,7 @@ version = "0.5.0"
 description = "SAFE API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 license = "GPL-3.0"
-repository = "https://github.com/maidsafe/safe-cli"
+repository = "https://github.com/maidsafe/safe-api"
 include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 

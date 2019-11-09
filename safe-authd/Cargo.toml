@@ -13,7 +13,7 @@ description = "SAFE Authenticator (daemon)"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 publish = false
 license = "GPL-3.0"
-repository = "https://github.com/maidsafe/safe-cli"
+repository = "https://github.com/maidsafe/safe-api"
 edition = "2018"
 
 [[bin]]

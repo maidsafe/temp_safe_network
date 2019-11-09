@@ -13,7 +13,7 @@ description = "SAFE API FFI"
 authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
 publish = false
 license = "GPL-3.0"
-repository = "https://github.com/maidsafe/safe-cli"
+repository = "https://github.com/maidsafe/safe-api"
 build = "build.rs"
 edition = "2018"
 
