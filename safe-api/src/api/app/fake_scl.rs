@@ -15,6 +15,7 @@ use super::{
     SafeApp,
 };
 use crate::{Error, Result};
+use async_trait::async_trait;
 use log::{debug, trace};
 use safe_nd::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
@@ -83,8 +84,8 @@ impl SafeAppFake {
         }
     }
 
-    fn substract_coins(&mut self, sk: SecretKey, amount: Coins) -> Result<()> {
-        let from_balance = self.get_balance_from_sk(sk.clone())?;
+    async fn substract_coins(&mut self, sk: SecretKey, amount: Coins) -> Result<()> {
+        let from_balance = self.get_balance_from_sk(sk.clone()).await?;
         match from_balance.checked_sub(amount) {
             None => Err(Error::NotEnoughBalance(from_balance.to_string())),
             Some(new_balance_coins) => {
@@ -102,8 +103,9 @@ impl SafeAppFake {
     }
 }
 
+#[async_trait]
 impl SafeApp for SafeAppFake {
-    fn new() -> SafeAppFake {
+    fn new() -> Self {
         let fake_vault = match fs::File::open(&FAKE_VAULT_FILE) {
             Ok(file) => {
                 let deserialised: FakeData =
@@ -116,7 +118,7 @@ impl SafeApp for SafeAppFake {
             }
         };
 
-        SafeAppFake { fake_vault }
+        Self { fake_vault }
     }
 
     fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
@@ -124,15 +126,16 @@ impl SafeApp for SafeAppFake {
         Ok(())
     }
 
-    fn create_balance(
+    async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
         amount: Coins,
     ) -> Result<XorName> {
         if let Some(sk) = from_sk {
-            let amount_with_cost = Coins::from_nano(amount.as_nano() + 1); // 1 nano is the creation cost
-            self.substract_coins(sk, amount_with_cost)?;
+            // 1 nano is the creation cost
+            let amount_with_cost = Coins::from_nano(amount.as_nano() + 1);
+            self.substract_coins(sk, amount_with_cost).await?;
         };
 
         let to_xorname = xorname_from_pk(new_balance_owner);
@@ -147,7 +150,7 @@ impl SafeApp for SafeAppFake {
         Ok(to_xorname)
     }
 
-    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
+    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         let to_pk = owner_sk.public_key();
         let xorname = xorname_from_pk(to_pk);
         self.fake_vault.coin_balances.insert(
@@ -161,13 +164,13 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
+    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
         let pk = sk.public_key();
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname)
     }
 
-    fn safecoin_transfer_to_xorname(
+    async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
@@ -192,7 +195,7 @@ impl SafeApp for SafeAppFake {
 
         if let Some(sk) = from_sk {
             // reduce balance from safecoin_transferer
-            self.substract_coins(sk, amount)?;
+            self.substract_coins(sk, amount).await?;
         }
 
         // credit destination
@@ -215,7 +218,8 @@ impl SafeApp for SafeAppFake {
         }
     }
 
-    fn safecoin_transfer_to_pk(
+    #[allow(dead_code)]
+    async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
@@ -224,9 +228,11 @@ impl SafeApp for SafeAppFake {
     ) -> Result<Transaction> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
+            .await
     }
 
-    fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> Result<String> {
+    #[allow(dead_code)]
+    async fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> Result<String> {
         let xorname = xorname_from_pk(pk);
         let txs_for_xorname = &self.fake_vault.txs[&xorname_to_hex(&xorname)];
         let tx_state = txs_for_xorname.get(&tx_id.to_string()).ok_or_else(|| {
@@ -235,7 +241,11 @@ impl SafeApp for SafeAppFake {
         Ok(tx_state.to_string())
     }
 
-    fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    async fn files_put_published_immutable(
+        &mut self,
+        data: &[u8],
+        dry_run: bool,
+    ) -> Result<XorName> {
         // We create a XorName based on a hash of the content, not a real one as
         // it doesn't apply self-encryption, but a unique one for our fake SCL
         let vec_hash = sha3_256(&data);
@@ -250,7 +260,11 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn files_get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    async fn files_get_published_immutable(
+        &self,
+        xorname: XorName,
+        range: Range,
+    ) -> Result<Vec<u8>> {
         let data = match self
             .fake_vault
             .published_immutable_data
@@ -274,7 +288,7 @@ impl SafeApp for SafeAppFake {
         Ok(data)
     }
 
-    fn put_seq_append_only_data(
+    async fn put_seq_append_only_data(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -290,7 +304,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn append_seq_append_only_data(
+    async fn append_seq_append_only_data(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         _new_version: u64,
@@ -317,7 +331,7 @@ impl SafeApp for SafeAppFake {
         Ok((seq_append_only.len() - 1) as u64)
     }
 
-    fn get_latest_seq_append_only_data(
+    async fn get_latest_seq_append_only_data(
         &self,
         name: XorName,
         _tag: u64,
@@ -343,7 +357,11 @@ impl SafeApp for SafeAppFake {
         }
     }
 
-    fn get_current_seq_append_only_data_version(&self, name: XorName, _tag: u64) -> Result<u64> {
+    async fn get_current_seq_append_only_data_version(
+        &self,
+        name: XorName,
+        _tag: u64,
+    ) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
         let xorname_hex = xorname_to_hex(&name);
         let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
@@ -360,7 +378,7 @@ impl SafeApp for SafeAppFake {
         Ok((length - 1) as u64)
     }
 
-    fn get_seq_append_only_data(
+    async fn get_seq_append_only_data(
         &self,
         name: XorName,
         _tag: u64,
@@ -393,7 +411,7 @@ impl SafeApp for SafeAppFake {
         }
     }
 
-    fn put_seq_mutable_data(
+    async fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,
         _tag: u64,
@@ -413,7 +431,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
+    async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
 
@@ -439,14 +457,14 @@ impl SafeApp for SafeAppFake {
         }
     }
 
-    fn seq_mutable_data_insert(
+    async fn seq_mutable_data_insert(
         &mut self,
         name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
     ) -> Result<()> {
-        let seq_md = self.get_seq_mdata(name, tag)?;
+        let seq_md = self.get_seq_mdata(name, tag).await?;
         let mut data = seq_md.entries().clone();
 
         data.insert(
@@ -468,13 +486,13 @@ impl SafeApp for SafeAppFake {
         Ok(())
     }
 
-    fn seq_mutable_data_get_value(
+    async fn seq_mutable_data_get_value(
         &self,
         name: XorName,
         tag: u64,
         key: &[u8],
     ) -> Result<MDataSeqValue> {
-        let seq_md = self.get_seq_mdata(name, tag)?;
+        let seq_md = self.get_seq_mdata(name, tag).await?;
         match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
             None => Err(Error::EntryNotFound(format!(
@@ -484,13 +502,13 @@ impl SafeApp for SafeAppFake {
         }
     }
 
-    fn list_seq_mdata_entries(
+    async fn list_seq_mdata_entries(
         &self,
         name: XorName,
         tag: u64,
     ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
         debug!("Listing seq_mdata_entries for: {}", name);
-        let seq_md = self.get_seq_mdata(name, tag)?;
+        let seq_md = self.get_seq_mdata(name, tag).await?;
         let mut res = BTreeMap::new();
         seq_md.entries().iter().for_each(|elem| {
             res.insert(elem.0.clone(), elem.1.clone());
@@ -499,7 +517,7 @@ impl SafeApp for SafeAppFake {
         Ok(res)
     }
 
-    fn seq_mutable_data_update(
+    async fn seq_mutable_data_update(
         &mut self,
         name: XorName,
         tag: u64,
@@ -507,8 +525,8 @@ impl SafeApp for SafeAppFake {
         value: &[u8],
         _version: u64,
     ) -> Result<()> {
-        self.seq_mutable_data_get_value(name, tag, key)
-            .and_then(|_| self.seq_mutable_data_insert(name, tag, key, value))
+        let _ = self.seq_mutable_data_get_value(name, tag, key).await;
+        self.seq_mutable_data_insert(name, tag, key, value).await
     }
 }
 
@@ -518,7 +536,6 @@ mod tests {
 
     #[test]
     fn test_allocate_test_coins() {
-        use self::SafeApp;
         use std::str::FromStr;
         use threshold_crypto::SecretKey;
         use unwrap::unwrap;
@@ -527,15 +544,16 @@ mod tests {
 
         let sk_to = SecretKey::random();
 
-        let balance = unwrap!(Coins::from_str("2.345678912"));
-        unwrap!(mock.allocate_test_coins(sk_to.clone(), balance));
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
-        assert_eq!(balance, current_balance);
+        async_std::task::block_on(async {
+            let balance = unwrap!(Coins::from_str("2.345678912"));
+            unwrap!(mock.allocate_test_coins(sk_to.clone(), balance).await);
+            let current_balance = unwrap!(mock.get_balance_from_sk(sk_to).await);
+            assert_eq!(balance, current_balance);
+        });
     }
 
     #[test]
     fn test_create_balance() {
-        use self::SafeApp;
         use std::str::FromStr;
         use threshold_crypto::SecretKey;
         use unwrap::unwrap;
@@ -544,19 +562,21 @@ mod tests {
 
         let sk = SecretKey::random();
 
-        let balance = unwrap!(Coins::from_str("2.345678912"));
-        unwrap!(mock.allocate_test_coins(sk.clone(), balance));
+        async_std::task::block_on(async {
+            let balance = unwrap!(Coins::from_str("2.345678912"));
+            unwrap!(mock.allocate_test_coins(sk.clone(), balance).await);
 
-        let sk_to = SecretKey::random();
-        let pk_to = sk_to.public_key();
-        assert!(mock
-            .create_balance(Some(sk), pk_to, unwrap!(Coins::from_str("1.234567891")))
-            .is_ok());
+            let sk_to = SecretKey::random();
+            let pk_to = sk_to.public_key();
+            assert!(mock
+                .create_balance(Some(sk), pk_to, unwrap!(Coins::from_str("1.234567891")))
+                .await
+                .is_ok());
+        });
     }
 
     #[test]
     fn test_check_balance() {
-        use self::SafeApp;
         use std::str::FromStr;
         use threshold_crypto::SecretKey;
         use unwrap::unwrap;
@@ -565,28 +585,29 @@ mod tests {
 
         let sk = SecretKey::random();
 
-        let balance = unwrap!(Coins::from_str("2.3"));
-        unwrap!(mock.allocate_test_coins(sk.clone(), balance));
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()));
-        assert_eq!(balance, current_balance);
+        async_std::task::block_on(async {
+            let balance = unwrap!(Coins::from_str("2.3"));
+            unwrap!(mock.allocate_test_coins(sk.clone(), balance).await);
+            let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()).await);
+            assert_eq!(balance, current_balance);
 
-        let sk_to = SecretKey::random();
-        let pk_to = sk_to.public_key();
-        let preload = unwrap!(Coins::from_str("1.234567891"));
-        unwrap!(mock.create_balance(Some(sk.clone()), pk_to, preload));
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk_to));
-        assert_eq!(preload, current_balance);
+            let sk_to = SecretKey::random();
+            let pk_to = sk_to.public_key();
+            let preload = unwrap!(Coins::from_str("1.234567891"));
+            unwrap!(mock.create_balance(Some(sk.clone()), pk_to, preload).await);
+            let current_balance = unwrap!(mock.get_balance_from_sk(sk_to).await);
+            assert_eq!(preload, current_balance);
 
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk));
-        assert_eq!(
-            unwrap!(Coins::from_str("1.065432108")), /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
-            current_balance
-        );
+            let current_balance = unwrap!(mock.get_balance_from_sk(sk).await);
+            assert_eq!(
+                unwrap!(Coins::from_str("1.065432108")), /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
+                current_balance
+            );
+        });
     }
 
     #[test]
     fn test_safecoin_transfer() {
-        use self::SafeApp;
         use rand_core::RngCore;
         use std::str::FromStr;
         use threshold_crypto::SecretKey;
@@ -599,32 +620,37 @@ mod tests {
         let sk2 = SecretKey::random();
         let pk2 = sk2.public_key();
 
-        let balance1 = unwrap!(Coins::from_str("2.5"));
-        let balance2 = unwrap!(Coins::from_str("5.7"));
-        unwrap!(mock.allocate_test_coins(sk1.clone(), balance1));
-        unwrap!(mock.allocate_test_coins(sk2.clone(), balance2));
+        async_std::task::block_on(async {
+            let balance1 = unwrap!(Coins::from_str("2.5"));
+            let balance2 = unwrap!(Coins::from_str("5.7"));
+            unwrap!(mock.allocate_test_coins(sk1.clone(), balance1).await);
+            unwrap!(mock.allocate_test_coins(sk2.clone(), balance2).await);
 
-        let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()));
-        let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()));
+            let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()).await);
+            let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()).await);
 
-        assert_eq!(balance1, curr_balance1);
-        assert_eq!(balance2, curr_balance2);
+            assert_eq!(balance1, curr_balance1);
+            assert_eq!(balance2, curr_balance2);
 
-        let mut rng = rand::thread_rng();
-        let tx_id = rng.next_u64();
+            let mut rng = rand::thread_rng();
+            let tx_id = rng.next_u64();
 
-        let _ = unwrap!(mock.safecoin_transfer_to_xorname(
-            Some(sk1.clone()),
-            xorname_from_pk(pk2),
-            tx_id,
-            unwrap!(Coins::from_str("1.4"))
-        ));
-        unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()));
+            let _ = unwrap!(
+                mock.safecoin_transfer_to_xorname(
+                    Some(sk1.clone()),
+                    xorname_from_pk(pk2),
+                    tx_id,
+                    unwrap!(Coins::from_str("1.4"))
+                )
+                .await
+            );
+            unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()).await);
 
-        let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1));
-        let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2));
+            let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1).await);
+            let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2).await);
 
-        assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
-        assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
+            assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
+            assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
+        });
     }
 }

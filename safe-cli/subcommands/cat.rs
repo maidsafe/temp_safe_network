@@ -11,6 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, serialise_output},
     OutputFmt,
 };
+use async_std::task;
 use log::debug;
 use pretty_hex;
 use prettytable::Table;
@@ -35,7 +36,7 @@ pub fn cat_commander(
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &url);
 
-    let content = safe.fetch(&url, None)?;
+    let content = task::block_on(safe.fetch(&url, None))?;
     match &content {
         SafeData::FilesContainer {
             version, files_map, ..

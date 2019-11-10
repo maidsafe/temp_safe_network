@@ -12,6 +12,7 @@ use super::{
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
+use async_std::task;
 use log::{debug, warn};
 use safe_api::{BlsKeyPair, Safe};
 use structopt::StructOpt;
@@ -93,11 +94,13 @@ pub fn key_commander(
             connect(safe)?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
-            let current_balance = if target.is_empty() {
-                safe.keys_balance_from_sk(&sk)?
-            } else {
-                safe.keys_balance_from_url(&target, &sk)?
-            };
+            let current_balance = task::block_on(async {
+                if target.is_empty() {
+                    safe.keys_balance_from_sk(&sk).await
+                } else {
+                    safe.keys_balance_from_url(&target, &sk).await
+                }
+            })?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("SafeKey's current balance: {}", current_balance);
@@ -121,12 +124,12 @@ pub fn key_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe.keys_transfer(
+            let tx_id = task::block_on(safe.keys_transfer(
                 &amount,
                 from.as_ref().map(String::as_str),
                 &destination,
                 tx_id,
-            )?;
+            ))?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);
@@ -156,7 +159,7 @@ pub fn create_new_key(
             );
         }
 
-        let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount)?;
+        let (xorurl, key_pair) = task::block_on(safe.keys_create_preload_test_coins(&amount))?;
         (xorurl, key_pair, Some(amount))
     } else {
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
@@ -165,11 +168,11 @@ pub fn create_new_key(
         if pay_with.is_none() {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
         }
-        let (xorurl, key_pair) = safe.keys_create(
+        let (xorurl, key_pair) = task::block_on(safe.keys_create(
             pay_with.as_ref().map(String::as_str),
             preload.as_ref().map(String::as_str),
             pk.as_ref().map(String::as_str),
-        )?;
+        ))?;
         (xorurl, key_pair, preload)
     };
 

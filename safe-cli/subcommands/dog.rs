@@ -11,6 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, serialise_output, xorname_to_hex},
     OutputFmt,
 };
+use async_std::task;
 use log::debug;
 use prettytable::Table;
 use safe_api::{fetch::NrsMapContainerInfo, fetch::SafeData, Safe};
@@ -30,7 +31,7 @@ pub fn dog_commander(
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running dog for: {:?}", &url);
 
-    let content = safe.fetch(&url, None)?;
+    let content = task::block_on(safe.fetch(&url, None))?;
     match &content {
         SafeData::FilesContainer {
             xorurl,

@@ -16,6 +16,7 @@ use super::{
     SafeApp,
 };
 use crate::{Error, Result};
+use async_trait::async_trait;
 use futures::future::Future;
 use log::{debug, info, warn};
 #[cfg(feature = "fake-auth")]
@@ -79,6 +80,7 @@ impl SafeAppScl {
     }
 }
 
+#[async_trait]
 impl SafeApp for SafeAppScl {
     fn new() -> Self {
         Self { safe_conn: None }
@@ -123,7 +125,7 @@ impl SafeApp for SafeAppScl {
         Ok(())
     }
 
-    fn create_balance(
+    async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
@@ -156,7 +158,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
+    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&ClientFullId::from(owner_sk), amount)
@@ -165,7 +167,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
+    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
         let safe_app: &App = self.get_safe_app()?;
         let coins = run(safe_app, move |client, _app_context| {
             client
@@ -177,7 +179,7 @@ impl SafeApp for SafeAppScl {
         Ok(coins)
     }
 
-    fn safecoin_transfer_to_xorname(
+    async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
@@ -207,7 +209,8 @@ impl SafeApp for SafeAppScl {
         Ok(tx)
     }
 
-    fn safecoin_transfer_to_pk(
+    #[allow(dead_code)]
+    async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
@@ -216,14 +219,20 @@ impl SafeApp for SafeAppScl {
     ) -> Result<Transaction> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
+            .await
     }
 
-    // TODO: Replace with SCL calling code
-    fn get_transaction(&self, _tx_id: u64, _pk: PublicKey, _sk: SecretKey) -> Result<String> {
+    #[allow(dead_code)]
+    async fn get_transaction(&self, _tx_id: u64, _pk: PublicKey, _sk: SecretKey) -> Result<String> {
+        // TODO: Replace with SCL calling code
         Ok("Success(0)".to_string())
     }
 
-    fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    async fn files_put_published_immutable(
+        &mut self,
+        data: &[u8],
+        dry_run: bool,
+    ) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
         let safe_app: &App = self.get_safe_app()?;
 
@@ -256,7 +265,11 @@ impl SafeApp for SafeAppScl {
         Ok(*idata.name())
     }
 
-    fn files_get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    async fn files_get_published_immutable(
+        &self,
+        xorname: XorName,
+        range: Range,
+    ) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let safe_app: &App = self.get_safe_app()?;
@@ -299,7 +312,7 @@ impl SafeApp for SafeAppScl {
         Ok(data)
     }
 
-    fn put_seq_append_only_data(
+    async fn put_seq_append_only_data(
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -373,7 +386,7 @@ impl SafeApp for SafeAppScl {
         })
     }
 
-    fn append_seq_append_only_data(
+    async fn append_seq_append_only_data(
         &mut self,
         the_data: Vec<(Vec<u8>, Vec<u8>)>,
         new_version: u64,
@@ -406,7 +419,7 @@ impl SafeApp for SafeAppScl {
         Ok(new_version)
     }
 
-    fn get_latest_seq_append_only_data(
+    async fn get_latest_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
@@ -419,6 +432,7 @@ impl SafeApp for SafeAppScl {
         debug!("Address for a_data : {:?}", append_only_data_address);
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
+            .await
             .map_err(|e| {
                 Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
             })?;
@@ -436,7 +450,11 @@ impl SafeApp for SafeAppScl {
         Ok((data_length, data))
     }
 
-    fn get_current_seq_append_only_data_version(&self, name: XorName, tag: u64) -> Result<u64> {
+    async fn get_current_seq_append_only_data_version(
+        &self,
+        name: XorName,
+        tag: u64,
+    ) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
         let safe_app: &App = self.get_safe_app()?;
@@ -456,7 +474,7 @@ impl SafeApp for SafeAppScl {
         .map(|data_returned| data_returned.entries_index() - 1)
     }
 
-    fn get_seq_append_only_data(
+    async fn get_seq_append_only_data(
         &self,
         name: XorName,
         tag: u64,
@@ -498,7 +516,7 @@ impl SafeApp for SafeAppScl {
         Ok((this_version.key, this_version.value))
     }
 
-    fn put_seq_mutable_data(
+    async fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,
         tag: u64,
@@ -546,7 +564,8 @@ impl SafeApp for SafeAppScl {
         .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
     }
 
-    fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
+    #[allow(dead_code)]
+    async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
             client.get_seq_mdata(name, tag).map_err(SafeAppError)
@@ -554,7 +573,7 @@ impl SafeApp for SafeAppScl {
         .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
-    fn seq_mutable_data_insert(
+    async fn seq_mutable_data_insert(
         &mut self,
         name: XorName,
         tag: u64,
@@ -566,7 +585,7 @@ impl SafeApp for SafeAppScl {
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
     }
 
-    fn seq_mutable_data_get_value(
+    async fn seq_mutable_data_get_value(
         &self,
         name: XorName,
         tag: u64,
@@ -599,7 +618,7 @@ impl SafeApp for SafeAppScl {
         })
     }
 
-    fn list_seq_mdata_entries(
+    async fn list_seq_mdata_entries(
         &self,
         name: XorName,
         tag: u64,
@@ -635,7 +654,7 @@ impl SafeApp for SafeAppScl {
         })
     }
 
-    fn seq_mutable_data_update(
+    async fn seq_mutable_data_update(
         &mut self,
         name: XorName,
         tag: u64,
@@ -682,156 +701,169 @@ mod tests {
     fn test_put_and_get_immutable_data() {
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
+        async_std::task::block_on(async {
+            let id1 = b"HELLLOOOOOOO".to_vec();
 
-        let id1 = b"HELLLOOOOOOO".to_vec();
-
-        let xorname = safe
-            .safe_app
-            .files_put_published_immutable(&id1, false)
-            .unwrap();
-        let data = safe
-            .safe_app
-            .files_get_published_immutable(xorname, None)
-            .unwrap();
-        let text = std::str::from_utf8(data.as_slice()).unwrap();
-        assert_eq!(text.to_string(), "HELLLOOOOOOO");
+            let xorname = safe
+                .safe_app
+                .files_put_published_immutable(&id1, false)
+                .await
+                .unwrap();
+            let data = safe
+                .safe_app
+                .files_get_published_immutable(xorname, None)
+                .await
+                .unwrap();
+            let text = std::str::from_utf8(data.as_slice()).unwrap();
+            assert_eq!(text.to_string(), "HELLLOOOOOOO");
+        });
     }
 
     #[test]
     fn test_put_get_update_seq_append_only_data() {
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
+        async_std::task::block_on(async {
+            let key1 = b"KEY1".to_vec();
+            let val1 = b"VALUE1".to_vec();
+            let data1 = [(key1, val1)].to_vec();
 
-        let key1 = b"KEY1".to_vec();
-        let val1 = b"VALUE1".to_vec();
-        let data1 = [(key1, val1)].to_vec();
+            let type_tag = 12322;
+            let xorname = safe
+                .safe_app
+                .put_seq_append_only_data(data1, None, type_tag, None)
+                .await
+                .unwrap();
 
-        let type_tag = 12322;
-        let xorname = safe
-            .safe_app
-            .put_seq_append_only_data(data1, None, type_tag, None)
-            .unwrap();
+            let (this_version, (key, value)) = safe
+                .safe_app
+                .get_latest_seq_append_only_data(xorname, type_tag)
+                .await
+                .unwrap();
 
-        let (this_version, data) = safe
-            .safe_app
-            .get_latest_seq_append_only_data(xorname, type_tag)
-            .unwrap();
+            assert_eq!(this_version, 0);
 
-        assert_eq!(this_version, 0);
+            assert_eq!(std::str::from_utf8(key.as_slice()).unwrap(), "KEY1");
+            assert_eq!(std::str::from_utf8(value.as_slice()).unwrap(), "VALUE1");
 
-        //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
-        assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
-        assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
+            let key2 = b"KEY2".to_vec();
+            let val2 = b"VALUE2".to_vec();
+            let data2 = [(key2, val2)].to_vec();
+            let new_version = 1;
 
-        let key2 = b"KEY2".to_vec();
-        let val2 = b"VALUE2".to_vec();
-        let data2 = [(key2, val2)].to_vec();
-        let new_version = 1;
+            let updated_version = safe
+                .safe_app
+                .append_seq_append_only_data(data2, new_version, xorname, type_tag)
+                .await
+                .unwrap();
+            let (the_latest_version, data_updated) = safe
+                .safe_app
+                .get_latest_seq_append_only_data(xorname, type_tag)
+                .await
+                .unwrap();
 
-        let updated_version = safe
-            .safe_app
-            .append_seq_append_only_data(data2, new_version, xorname, type_tag)
-            .unwrap();
-        let (the_latest_version, data_updated) = safe
-            .safe_app
-            .get_latest_seq_append_only_data(xorname, type_tag)
-            .unwrap();
+            assert_eq!(updated_version, the_latest_version);
 
-        assert_eq!(updated_version, the_latest_version);
+            assert_eq!(
+                std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
+                "KEY2"
+            );
+            assert_eq!(
+                std::str::from_utf8(data_updated.1.as_slice()).unwrap(),
+                "VALUE2"
+            );
 
-        assert_eq!(
-            std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
-            "KEY2"
-        );
-        assert_eq!(
-            std::str::from_utf8(data_updated.1.as_slice()).unwrap(),
-            "VALUE2"
-        );
+            let first_version = 0;
 
-        let first_version = 0;
+            let first_data = safe
+                .safe_app
+                .get_seq_append_only_data(xorname, type_tag, first_version)
+                .await
+                .unwrap();
 
-        let first_data = safe
-            .safe_app
-            .get_seq_append_only_data(xorname, type_tag, first_version)
-            .unwrap();
+            assert_eq!(
+                std::str::from_utf8(first_data.0.as_slice()).unwrap(),
+                "KEY1"
+            );
+            assert_eq!(
+                std::str::from_utf8(first_data.1.as_slice()).unwrap(),
+                "VALUE1"
+            );
 
-        assert_eq!(
-            std::str::from_utf8(first_data.0.as_slice()).unwrap(),
-            "KEY1"
-        );
-        assert_eq!(
-            std::str::from_utf8(first_data.1.as_slice()).unwrap(),
-            "VALUE1"
-        );
+            let second_version = 1;
+            let second_data = safe
+                .safe_app
+                .get_seq_append_only_data(xorname, type_tag, second_version)
+                .await
+                .unwrap();
 
-        let second_version = 1;
-        let second_data = safe
-            .safe_app
-            .get_seq_append_only_data(xorname, type_tag, second_version)
-            .unwrap();
+            assert_eq!(
+                std::str::from_utf8(second_data.0.as_slice()).unwrap(),
+                "KEY2"
+            );
+            assert_eq!(
+                std::str::from_utf8(second_data.1.as_slice()).unwrap(),
+                "VALUE2"
+            );
 
-        assert_eq!(
-            std::str::from_utf8(second_data.0.as_slice()).unwrap(),
-            "KEY2"
-        );
-        assert_eq!(
-            std::str::from_utf8(second_data.1.as_slice()).unwrap(),
-            "VALUE2"
-        );
-
-        // test checking for versions that dont exist
-        let nonexistant_version = 2;
-        match safe
-            .safe_app
-            .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
-        {
-            Ok(_) => panic!("No error thrown when passing an outdated new version"),
-            Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
-                "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
-                nonexistant_version, xorname
-            ))),
-            err => panic!(format!("Error returned is not the expected one: {:?}", err)),
-        }
+            // test checking for versions that dont exist
+            let nonexistant_version = 2;
+            match safe
+                .safe_app
+                .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
+                .await
+            {
+                Ok(_) => panic!("No error thrown when passing an outdated new version"),
+                Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
+                    "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+                    nonexistant_version, xorname
+                ))),
+                err => panic!(format!("Error returned is not the expected one: {:?}", err)),
+            }
+        });
     }
 
     #[test]
     fn test_update_seq_append_only_data_error() {
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
+        async_std::task::block_on(async {
+            let key1 = b"KEY1".to_vec();
+            let val1 = b"VALUE1".to_vec();
+            let data1 = [(key1, val1)].to_vec();
 
-        let key1 = b"KEY1".to_vec();
-        let val1 = b"VALUE1".to_vec();
-        let data1 = [(key1, val1)].to_vec();
+            let type_tag = 12322;
+            let xorname = safe
+                .safe_app
+                .put_seq_append_only_data(data1, None, type_tag, None)
+                .await
+                .unwrap();
 
-        let type_tag = 12322;
-        let xorname = safe
-            .safe_app
-            .put_seq_append_only_data(data1, None, type_tag, None)
-            .unwrap();
+            let (this_version, (key, value)) = safe
+                .safe_app
+                .get_latest_seq_append_only_data(xorname, type_tag)
+                .await
+                .unwrap();
 
-        let (this_version, data) = safe
-            .safe_app
-            .get_latest_seq_append_only_data(xorname, type_tag)
-            .unwrap();
+            assert_eq!(this_version, 0);
 
-        assert_eq!(this_version, 0);
+            assert_eq!(std::str::from_utf8(key.as_slice()).unwrap(), "KEY1");
+            assert_eq!(std::str::from_utf8(value.as_slice()).unwrap(), "VALUE1");
 
-        //TODO: Properly unwrap data so this is clear (0 being version, 1 being data)
-        assert_eq!(std::str::from_utf8(data.0.as_slice()).unwrap(), "KEY1");
-        assert_eq!(std::str::from_utf8(data.1.as_slice()).unwrap(), "VALUE1");
+            let key2 = b"KEY2".to_vec();
+            let val2 = b"VALUE2".to_vec();
+            let data2 = [(key2, val2)].to_vec();
+            let wrong_new_version = 0;
 
-        let key2 = b"KEY2".to_vec();
-        let val2 = b"VALUE2".to_vec();
-        let data2 = [(key2, val2)].to_vec();
-        let wrong_new_version = 0;
-
-        match safe
-            .safe_app
-            .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
-        {
-            Ok(_) => panic!("No error thrown when passing an outdated new version"),
-            Err(Error::NetDataError(msg)) => assert!(msg.contains("Invalid data successor")),
-            _ => panic!("Error returned is not the expected one"),
-        }
+            match safe
+                .safe_app
+                .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
+                .await
+            {
+                Ok(_) => panic!("No error thrown when passing an outdated new version"),
+                Err(Error::NetDataError(msg)) => assert!(msg.contains("Invalid data successor")),
+                _ => panic!("Error returned is not the expected one"),
+            }
+        });
     }
 }

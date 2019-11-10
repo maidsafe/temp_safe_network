@@ -9,6 +9,7 @@ include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 
 [dependencies]
+async-trait = "^0.1.22"
 bincode = "~1.1.4"
 chrono = "0.4.6"
 directories = "2.0.2"
@@ -46,6 +47,7 @@ default = ["authenticator", "authd_client", "app"]
 
 [dev-dependencies]
 unwrap = "~1.2.1"
+async-std = "0.99.12"
 
 [dev-dependencies.cargo-husky]
 version = "1"

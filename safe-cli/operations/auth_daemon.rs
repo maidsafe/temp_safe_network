@@ -112,7 +112,8 @@ pub fn authd_create(
     if test_coins {
         // We then generate a SafeKey with test-coins to use it for the account creation
         println!("Creating a SafeKey with test-coins...");
-        let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11")?;
+        let (_xorurl, key_pair) =
+            async_std::task::block_on(safe.keys_create_preload_test_coins("1000.11"))?;
         let kp = key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
         println!("Sending account creation request to authd...");
         safe_authd.create_acc(&kp.sk, &login_details.passphrase, &login_details.password)?;

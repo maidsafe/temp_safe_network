@@ -15,6 +15,7 @@ use super::{
     OutputFmt,
 };
 use ansi_term::Colour;
+use async_std::task;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{
     files::FilesMap,
@@ -183,13 +184,13 @@ pub fn files_commander(
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
-            let (files_container_xorurl, processed_files, _files_map) = safe
-                .files_container_create(
+            let (files_container_xorurl, processed_files, _files_map) =
+                task::block_on(safe.files_container_create(
                     &location,
                     dest.as_ref().map(String::as_str),
                     recursive,
                     dry_run,
-                )?;
+                ))?;
 
             // Now let's just print out a list of the files uploaded/processed
             if OutputFmt::Pretty == output_fmt {
@@ -226,8 +227,10 @@ pub fn files_commander(
                 notice_dry_run();
             }
             // Update the FilesContainer on the Network
-            let (version, processed_files, _files_map) = safe
-                .files_container_sync(&location, &target, recursive, delete, update_nrs, dry_run)?;
+            let (version, processed_files, _files_map) =
+                task::block_on(safe.files_container_sync(
+                    &location, &target, recursive, delete, update_nrs, dry_run,
+                ))?;
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
@@ -285,10 +288,10 @@ pub fn files_commander(
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
                     // Update the FilesContainer on the Network
-                    safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run)?
+                    task::block_on(safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run))?
                 } else {
                     // Update the FilesContainer on the Network
-                    safe.files_container_add(&location, &target_url, force, update_nrs, dry_run)?
+                    task::block_on(safe.files_container_add(&location, &target_url, force, update_nrs, dry_run))?
                 };
 
             // Now let's just print out a list of the files synced/processed
