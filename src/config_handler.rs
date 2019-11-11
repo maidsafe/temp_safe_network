@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{quic_p2p::Config as QuicP2pConfig, quic_p2p::NodeInfo, Result};
+use crate::routing::{ConnectionInfo, NetworkConfig};
+use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use log::{trace, Level};
@@ -35,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 12] = [
+const ARGS: [&str; 13] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -48,6 +49,7 @@ const ARGS: [&str; 12] = [
     "keep-alive-interval-msec",
     "our-complete-cert",
     "our-type",
+    "first",
 ];
 
 /// Vault configuration
@@ -73,9 +75,12 @@ pub struct Config {
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u64,
+    /// Is this the first node in a section?
+    #[structopt(short, long)]
+    first: bool,
     #[structopt(flatten)]
     #[allow(missing_docs)]
-    quic_p2p_config: QuicP2pConfig,
+    network_config: NetworkConfig,
 }
 
 impl Config {
@@ -87,7 +92,8 @@ impl Config {
             max_capacity: None,
             root_dir: None,
             verbose: 0,
-            quic_p2p_config: Default::default(),
+            network_config: Default::default(),
+            first: false,
         });
 
         let command_line_args = Config::clap().get_matches();
@@ -108,6 +114,11 @@ impl Config {
     /// The address to be credited when this vault farms SafeCoin.
     pub fn wallet_address(&self) -> Option<&String> {
         self.wallet_address.as_ref()
+    }
+
+    /// Is this the first node in a section?
+    pub fn is_first(&self) -> bool {
+        self.first
     }
 
     /// Upper limit in bytes for allowed network storage on this vault.
@@ -141,19 +152,19 @@ impl Config {
         }
     }
 
-    /// Quic-P2P configuration options.
-    pub fn quic_p2p_config(&self) -> &QuicP2pConfig {
-        &self.quic_p2p_config
+    /// Network configuration options.
+    pub fn network_config(&self) -> &NetworkConfig {
+        &self.network_config
     }
 
-    /// Set Quic-P2P configuration options.
-    pub fn set_quic_p2p_config(&mut self, config: QuicP2pConfig) {
-        self.quic_p2p_config = config;
+    /// Set network configuration options.
+    pub fn set_network_config(&mut self, config: NetworkConfig) {
+        self.network_config = config;
     }
 
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
-        self.quic_p2p_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
     fn set_value(&mut self, arg: &str, value: &str) {
@@ -166,24 +177,24 @@ impl Config {
         } else if arg == ARGS[3] {
             self.verbose = unwrap!(value.parse());
         } else if arg == ARGS[4] {
-            self.quic_p2p_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
+            self.network_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
         } else if arg == ARGS[5] {
-            self.quic_p2p_config.port = Some(unwrap!(value.parse()));
+            self.network_config.port = Some(unwrap!(value.parse()));
         } else if arg == ARGS[6] {
-            self.quic_p2p_config.ip = Some(unwrap!(value.parse()));
+            self.network_config.ip = Some(unwrap!(value.parse()));
         } else if arg == ARGS[11] {
-            self.quic_p2p_config.our_type = unwrap!(value.parse());
+            self.network_config.our_type = unwrap!(value.parse());
         } else {
             #[cfg(not(feature = "mock"))]
             {
                 if arg == ARGS[7] {
-                    self.quic_p2p_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
+                    self.network_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
                 } else if arg == ARGS[8] {
-                    self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
+                    self.network_config.idle_timeout_msec = Some(unwrap!(value.parse()));
                 } else if arg == ARGS[9] {
-                    self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+                    self.network_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
                 } else if arg == ARGS[10] {
-                    self.quic_p2p_config.our_complete_cert = Some(unwrap!(value.parse()));
+                    self.network_config.our_complete_cert = Some(unwrap!(value.parse()));
                 } else {
                     println!("ERROR");
                 }
@@ -197,6 +208,8 @@ impl Config {
     fn set_flag(&mut self, arg: &str, occurrences: u64) {
         if arg == ARGS[3] {
             self.verbose = occurrences;
+        } else if arg == ARGS[12] {
+            self.first = occurrences >= 1;
         } else {
             println!("ERROR");
         }
@@ -219,25 +232,25 @@ impl Config {
         let config = serde_json::from_reader(reader)?;
         Ok(config)
     }
-}
 
-/// Writes a Vault config file **for use by tests and examples**.
-///
-/// The file is written to the `current_bin_dir()` with the appropriate file name.
-///
-/// N.B. This method should only be used as a utility for test and examples.  In normal use cases,
-/// the config file should be created by the Vault's installer.
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn write_config_file(config: &Config) -> Result<PathBuf> {
-    write_file(CONFIG_FILE, config)
+    /// Writes a Vault config file **for use by tests and examples**.
+    ///
+    /// The file is written to the `current_bin_dir()` with the appropriate file name.
+    ///
+    /// N.B. This method should only be used as a utility for test and examples.  In normal use cases,
+    /// the config file should be created by the Vault's installer.
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub fn write_config_file(&self) -> Result<PathBuf> {
+        write_file(CONFIG_FILE, self)
+    }
 }
 
 /// Writes connection info to file for use by clients.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn write_connection_info(node_info: &NodeInfo) -> Result<PathBuf> {
-    write_file(CONNECTION_INFO_FILE, node_info)
+pub fn write_connection_info(conn_info: &ConnectionInfo) -> Result<PathBuf> {
+    write_file(CONNECTION_INFO_FILE, conn_info)
 }
 
 fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
@@ -279,9 +292,9 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            240
+            272
         } else {
-            152
+            184
         };
         assert_eq!(
             expected_size,
@@ -290,12 +303,16 @@ mod test {
         );
 
         let app_name = Config::clap().get_name().to_string();
-        let certificate = quic_p2p::SerialisableCertificate::default();
+        // `SerialisableCertificate` is not exposed by Routing, so we use a faux certificate consisting of zeros only.
+        let certificate = "[0,0,0,0]";
+        let base64_certificate = std::iter::repeat("A")
+            .take(400)
+            .collect::<Vec<_>>()
+            .join("");
         let node_info = format!(
-            "[{{\"peer_addr\":\"127.0.0.1:33292\",\"peer_cert_der\":{:?}}}]",
-            certificate.cert_der
+            "[{{\"peer_addr\":\"127.0.0.1:33292\",\"peer_cert_der\":{}}}]",
+            certificate
         );
-        let cert_str = certificate.to_string();
         let test_values = [
             ["wallet-address", "abc"],
             ["max-capacity", "1"],
@@ -307,8 +324,9 @@ mod test {
             ["max-msg-size-allowed", "1"],
             ["idle-timeout-msec", "1"],
             ["keep-alive-interval-msec", "1"],
-            ["our-complete-cert", cert_str.as_str()],
+            ["our-complete-cert", &base64_certificate],
             ["our-type", "client"],
+            ["first", "None"],
         ];
 
         for arg in &ARGS {
@@ -327,7 +345,8 @@ mod test {
                 max_capacity: None,
                 root_dir: None,
                 verbose: 0,
-                quic_p2p_config: Default::default(),
+                network_config: Default::default(),
+                first: false,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {

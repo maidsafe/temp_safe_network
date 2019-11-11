@@ -35,17 +35,17 @@ fn main() {
 mod detail {
     use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
     use log::{self, Level, Record};
-    use safe_vault::routing::Node;
-    use safe_vault::{self, Command, Config, Vault};
+    use safe_vault::{self, routing::Node, write_connection_info, Command, Config, Vault};
     use self_update::cargo_crate_version;
     use self_update::Status;
     use std::{io::Write, process};
     use structopt::StructOpt;
+    use unwrap::unwrap;
 
     /// Runs a SAFE Network vault.
     pub fn main() {
         let mut config = Config::new();
-        if config.quic_p2p_config().ip.is_none() {
+        if config.network_config().ip.is_none() {
             config.listen_on_loopback();
         }
 
@@ -98,7 +98,11 @@ mod detail {
             log::error!("Failed to set interrupt handler: {:?}", error)
         }
 
-        let routing_node = match Node::builder().create() {
+        let (routing_node, routing_rx) = match Node::builder()
+            .first(config.is_first())
+            .network_config(config.network_config().clone())
+            .create()
+        {
             Ok(node) => node,
             Err(e) => {
                 eprintln!("Could not start a Routing node: {:?}", e);
@@ -106,8 +110,20 @@ mod detail {
             }
         };
 
-        match Vault::new(routing_node, config, command_rx) {
-            Ok(mut vault) => vault.run(),
+        let is_first = config.is_first();
+
+        match Vault::new(routing_node, routing_rx, config, command_rx) {
+            Ok(mut vault) => {
+                let our_conn_info = unwrap!(vault.our_connection_info());
+                println!(
+                    "Vault connection info:\n{}",
+                    unwrap!(serde_json::to_string(&our_conn_info))
+                );
+                if is_first {
+                    unwrap!(write_connection_info(&our_conn_info));
+                }
+                vault.run();
+            }
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);
             }

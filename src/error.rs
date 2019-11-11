@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{chunk_store, quic_p2p, routing};
+use crate::{chunk_store, routing};
 use quick_error::quick_error;
 use safe_nd::{self, Request, Response};
 use serde_json;
@@ -48,13 +48,6 @@ quick_error! {
         /// PickleDB error.
         PickleDb(error: pickledb::error::Error) {
             display("PickleDb error: {}", error)
-            from()
-        }
-        /// Networking error.
-        Networking(error: quic_p2p::Error) {
-            cause(error)
-            description(error.description())
-            display("Networking error: {}", error)
             from()
         }
         /// NetworkData error.
