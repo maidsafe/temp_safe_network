@@ -68,7 +68,7 @@ pub struct Vault {
 }
 
 impl Vault {
-    /// Create and start vault. This will block unitl a `Command` to free it is fired.
+    /// Create and start vault. This will block until a `Command` to free it is fired.
     pub fn new(
         routing_node: Node,
         event_receiver: Receiver<RoutingEvent>,

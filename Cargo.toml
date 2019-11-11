@@ -27,7 +27,7 @@ log = "~0.4.7"
 pickledb = "~0.4.0"
 quick-error = "~1.2.2"
 rand = "~0.6.5"
-routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming", optional = true }
+routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
 safe-nd = "~0.4.0"
 self_update = "0.5.1"
 serde = { version = "~1.0.97", features = ["derive"] }
@@ -44,9 +44,7 @@ tempdir = "~0.3.7"
 [[bin]]
 name = "safe_vault"
 doc = false
-required-features = ["routing"]
 
 [features]
-default = ["routing"]
 mock = ["fxhash", "hex_fmt"]
 phase-one = []

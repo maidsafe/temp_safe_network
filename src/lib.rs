@@ -48,7 +48,6 @@ pub(crate) use to_db_key::ToDbKey;
 #[cfg(feature = "mock")]
 pub mod mock_routing;
 
-// FIXME: uncomment once we have compatible Routing API.
 #[cfg(feature = "mock")]
 pub use crate::mock_routing as routing;
 #[cfg(not(feature = "mock"))]
