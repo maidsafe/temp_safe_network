@@ -20,6 +20,9 @@ pub enum AuthSubCommands {
     #[structopt(name = "login")]
     /// Send request to a remote Authenticator daemon to login to a SAFE account
     Login {
+        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure)
+        #[structopt(short = "c", long = "config")]
+        config_file_str: Option<String>,
         /// Automatically self authorise the CLI application using the account is being logged in with
         #[structopt(long = "self-auth")]
         self_auth: bool,
@@ -33,6 +36,9 @@ pub enum AuthSubCommands {
     #[structopt(name = "create-acc")]
     /// Send request to a remote Authenticator daemon to create a new SAFE account
     Create {
+        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure)
+        #[structopt(short = "c", long = "config")]
+        config_file_str: Option<String>,
         /// The SafeKey's secret key to pay for the account creation, and to be set as the default spendable balance in the newly created SAFE account
         #[structopt(long = "sk")]
         sk: Option<String>,
@@ -99,13 +105,20 @@ pub fn auth_commander(
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(AuthSubCommands::Create { sk, test_coins }) => {
+        Some(AuthSubCommands::Create {
+            config_file_str,
+            sk,
+            test_coins,
+        }) => {
             let safe_authd = SafeAuthdClient::new(None);
-            authd_create(safe, &safe_authd, sk, test_coins)
+            authd_create(safe, &safe_authd, config_file_str, sk, test_coins)
         }
-        Some(AuthSubCommands::Login { self_auth }) => {
+        Some(AuthSubCommands::Login {
+            config_file_str,
+            self_auth,
+        }) => {
             let mut safe_authd = SafeAuthdClient::new(None);
-            authd_login(&mut safe_authd)?;
+            authd_login(&mut safe_authd, config_file_str)?;
             if self_auth {
                 // Let's subscribe so we can automatically allow our own auth request
                 safe_authd.subscribe("https://localhost:33002", APP_ID, &|auth_req: AuthReq| {

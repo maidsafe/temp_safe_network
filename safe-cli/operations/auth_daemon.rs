@@ -6,11 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use envy::from_env;
+use log::info;
 use prettytable::Table;
 use rpassword;
 use safe_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
+use serde::Deserialize;
+use std::fs;
+
+#[derive(Deserialize, Debug)]
+struct Environment {
+    safe_auth_passphrase: Option<String>,
+    safe_auth_password: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct LoginDetails {
+    pub passphrase: String,
+    pub password: String,
+}
 
 pub fn authd_install(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     let authd_path = get_authd_bin_path();
@@ -50,18 +66,18 @@ pub fn authd_restart(safe_authd: &SafeAuthdClient) -> Result<(), String> {
 pub fn authd_create(
     safe: &mut Safe,
     safe_authd: &SafeAuthdClient,
+    config_file_str: Option<String>,
     sk: Option<String>,
     test_coins: bool,
 ) -> Result<(), String> {
-    let secret = prompt_sensitive(None, "Secret: ")?;
-    let password = prompt_sensitive(None, "Password: ")?;
+    let login_details = get_login_details(config_file_str)?;
     if test_coins {
         // We then generate a SafeKey with test-coins to use it for the account creation
         println!("Creating a SafeKey with test-coins...");
         let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11")?;
         let kp = key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
         println!("Sending account creation request to authd...");
-        safe_authd.create_acc(&kp.sk, &secret, &password)?;
+        safe_authd.create_acc(&kp.sk, &login_details.passphrase, &login_details.password)?;
         println!("Account was created successfully!");
         println!("SafeKey created and preloaded with test-coins. Owner key pair generated:");
         println!("Public Key = {}", kp.pk);
@@ -69,17 +85,19 @@ pub fn authd_create(
     } else {
         let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
         println!("Sending account creation request to authd...");
-        safe_authd.create_acc(&sk, &secret, &password)?;
+        safe_authd.create_acc(&sk, &login_details.passphrase, &login_details.password)?;
         println!("Account was created successfully!");
     };
     Ok(())
 }
 
-pub fn authd_login(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
-    let secret = prompt_sensitive(None, "Secret: ")?;
-    let password = prompt_sensitive(None, "Password: ")?;
+pub fn authd_login(
+    safe_authd: &mut SafeAuthdClient,
+    config_file_str: Option<String>,
+) -> Result<(), String> {
+    let login_details = get_login_details(config_file_str)?;
     println!("Sending login action request to authd...");
-    safe_authd.log_in(&secret, &password)?;
+    safe_authd.log_in(&login_details.passphrase, &login_details.password)?;
     println!("Logged in successfully");
     Ok(())
 }
@@ -266,16 +284,6 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
 
 // Private helpers
 
-// TODO: use a different crate than rpassword as it has problems with some Windows shells including PowerShell
-fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
-    if let Some(str) = arg {
-        Ok(str)
-    } else {
-        rpassword::read_password_from_tty(Some(msg))
-            .map_err(|err| format!("Failed reading string from input: {}", err))
-    }
-}
-
 fn get_authd_bin_path() -> String {
     let mut path = std::path::PathBuf::new();
     match std::env::var("CARGO_TARGET_DIR") {
@@ -296,4 +304,92 @@ fn get_authd_bin_path() -> String {
     }
 
     path.display().to_string()
+}
+
+// TODO: use a different crate than rpassword as it has problems with some Windows shells including PowerShell
+fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
+    if let Some(str) = arg {
+        Ok(str)
+    } else {
+        rpassword::read_password_from_tty(Some(msg))
+            .map_err(|err| format!("Failed reading string from input: {}", err))
+    }
+}
+
+fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String> {
+    let environment_details = from_env::<Environment>().map_err(|err| {
+        format!(
+            "Failed when attempting to read login details from env vars: {}",
+            err
+        )
+    })?;
+
+    let mut the_passphrase = environment_details
+        .safe_auth_passphrase
+        .unwrap_or_else(|| String::from(""));
+    if !the_passphrase.is_empty() {
+        info!("Using passphrase from provided ENV var: SAFE_AUTH_PASSPHRASE")
+    }
+
+    let mut the_password = environment_details
+        .safe_auth_password
+        .unwrap_or_else(|| String::from(""));
+    if !the_password.is_empty() {
+        info!("Using password from provided ENV var: SAFE_AUTH_PASSWORD")
+    }
+
+    if the_passphrase.is_empty() ^ the_password.is_empty() {
+        return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for SAFE account creation/login.".to_string());
+    }
+
+    if the_passphrase.is_empty() || the_password.is_empty() {
+        if let Some(config_file_str) = config_file {
+            let file = match fs::File::open(&config_file_str) {
+                Ok(file) => file,
+                Err(error) => {
+                    return Err(format!("Error reading config file: {}", error));
+                }
+            };
+
+            let json: LoginDetails = serde_json::from_reader(file).map_err(|err| {
+                format!(
+                    "Format of the config file is not valid and couldn't be parsed: {}",
+                    err
+                )
+            })?;
+
+            eprintln!("Warning! Storing your passphrase/password in plaintext in a config file is not secure." );
+
+            if json.passphrase.is_empty() {
+                return Err("The config files's passphrase field cannot be empty".to_string());
+            } else {
+                the_passphrase = json.passphrase;
+            }
+
+            if json.password.is_empty() {
+                return Err("The config files's password field cannot be empty".to_string());
+            } else {
+                the_password = json.password;
+            }
+        } else {
+            // Prompt the user for the SAFE account credentials
+            the_passphrase = prompt_sensitive(None, "Secret: ")
+                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+            the_password = prompt_sensitive(None, "Password: ")
+                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+        }
+    }
+
+    if the_passphrase.is_empty() || the_password.is_empty() {
+        return Err(String::from(
+            "Neither the passphrase nor password can be empty.",
+        ));
+    }
+
+    let details = LoginDetails {
+        passphrase: the_passphrase,
+        password: the_password,
+    };
+
+    Ok(details)
 }

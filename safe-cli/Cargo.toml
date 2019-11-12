@@ -24,6 +24,7 @@ path = "main.rs"
 [dependencies]
 directories = "~2.0.1"
 env_logger = "0.6.0"
+envy = "0.4.0"
 human-panic = "1.0.1"
 log = "0.4.6"
 prettytable-rs = "^0.8"
