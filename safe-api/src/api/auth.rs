@@ -21,14 +21,14 @@ const SAFE_AUTHD_ENDPOINT_AUTHORISE: &str = "authorise/";
 #[allow(dead_code)]
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
-    // Ir returns the credentials necessary to connect to the network, encoded in a single string.
+    // It returns the credentials necessary to connect to the network, encoded in a single string.
     #[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
     pub fn auth_app(
         &mut self,
         app_id: &str,
         app_name: &str,
         app_vendor: &str,
-        port: Option<u16>,
+        endpoint: Option<&str>,
     ) -> Result<String> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
@@ -62,7 +62,7 @@ impl Safe {
         );
 
         // Send he auth req to authd and obtain the response
-        let auth_res = send_app_auth_req(&auth_req_str, port)?;
+        let auth_res = send_app_auth_req(&auth_req_str, endpoint)?;
 
         // Check if the app has been authorised
         match decode_ipc_msg(&auth_res) {
@@ -88,12 +88,20 @@ impl Safe {
 
 // Sends an authorisation request string to the SAFE Authenticator daemon endpoint.
 // It returns the credentials necessary to connect to the network, encoded in a single string.
-fn send_app_auth_req(auth_req_str: &str, port: Option<u16>) -> Result<String> {
-    let port_number = port.unwrap_or(SAFE_AUTHD_ENDPOINT_PORT);
-    let authd_service_url = format!(
-        "{}:{}/{}{}",
-        SAFE_AUTHD_ENDPOINT_HOST, port_number, SAFE_AUTHD_ENDPOINT_AUTHORISE, auth_req_str
-    );
+fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<String> {
+    let authd_service_url = match endpoint {
+        None => format!(
+            "{}:{}/{}{}",
+            SAFE_AUTHD_ENDPOINT_HOST,
+            SAFE_AUTHD_ENDPOINT_PORT,
+            SAFE_AUTHD_ENDPOINT_AUTHORISE,
+            auth_req_str
+        ),
+        Some(endpoint) => format!(
+            "{}/{}{}",
+            endpoint, SAFE_AUTHD_ENDPOINT_AUTHORISE, auth_req_str
+        ),
+    };
 
     info!("Sending authorisation request to SAFE Authenticator...");
     let authd_response = quic_send(&authd_service_url, false, None, None, false)?;

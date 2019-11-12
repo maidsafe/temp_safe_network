@@ -2,28 +2,22 @@
 
 set -e -x
 
-auth_bin_name="safe_auth"
+authd_bin_name="safe-authd"
 [[ -z $RANDOM_PORT_NUMBER ]] && export RANDOM_PORT_NUMBER=41805
 [[ -z $SAFE_MOCK_VAULT_PATH ]] && export SAFE_MOCK_VAULT_PATH=~/safe_auth
 
-function download_safe_auth_nightly() {
+function build_safe_authd() {
+    cd safe-authd
+    cargo build --release --features mock-network
+
     uname_output=$(uname -a)
     case $uname_output in
         Linux*)
-            curl -L -O https://safe-authenticator-cli.s3.amazonaws.com/safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu-dev.tar
-            tar xvf safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu-dev.tar
-            rm safe_authenticator_cli-nightly-x86_64-unknown-linux-gnu-dev.tar
             ;;
         Darwin*)
-            curl -L -O https://safe-authenticator-cli.s3.amazonaws.com/safe_authenticator_cli-nightly-x86_64-apple-darwin-dev.tar
-            tar xvf safe_authenticator_cli-nightly-x86_64-apple-darwin-dev.tar
-            rm safe_authenticator_cli-nightly-x86_64-apple-darwin-dev.tar
             ;;
         MSYS_NT*)
-            curl -L -O https://safe-authenticator-cli.s3.amazonaws.com/safe_authenticator_cli-nightly-x86_64-pc-windows-gnu-dev.tar
-            tar xvf safe_authenticator_cli-nightly-x86_64-pc-windows-gnu-dev.tar
-            rm safe_authenticator_cli-nightly-x86_64-pc-windows-gnu-dev.tar
-            auth_bin_name="safe_auth.exe"
+            authd_bin_name="safe-authd.exe"
             ;;
         *)
             echo "Platform not supported. Please extend to support this platform."
@@ -31,21 +25,20 @@ function download_safe_auth_nightly() {
     esac
     rm -rf $SAFE_MOCK_VAULT_PATH
     mkdir $SAFE_MOCK_VAULT_PATH
-    mv $auth_bin_name $SAFE_MOCK_VAULT_PATH
+    mv ../target/release/$authd_bin_name $SAFE_MOCK_VAULT_PATH
+
+    cd -
 }
 
-function run_safe_auth() {
+function run_safe_authd() {
     cd $SAFE_MOCK_VAULT_PATH
-    SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b ./$auth_bin_name --test-coins || true
+    ./$authd_bin_name stop || true
     echo "Launching safe_auth daemon on port:" $RANDOM_PORT_NUMBER
-    SAFE_AUTH_SECRET=a SAFE_AUTH_PASSWORD=b ./$auth_bin_name \
-        --daemon $RANDOM_PORT_NUMBER --allow-all-auth &
+    # ./target/release/$authd_bin_name start --listen https://localhost:$RANDOM_PORT_NUMBER &
+    ./$authd_bin_name start &
     sleep 15
     cd -
 }
 
-# TEMPORARILY disabling integration tests with auth cli
-#download_safe_auth_nightly
-#run_safe_auth
-rm -rf $SAFE_MOCK_VAULT_PATH
-mkdir $SAFE_MOCK_VAULT_PATH
+build_safe_authd
+run_safe_authd

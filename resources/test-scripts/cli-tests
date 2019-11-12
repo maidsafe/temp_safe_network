@@ -22,12 +22,18 @@ function run_cli_tests() {
     cd -
 }
 
+# run the integration tests but without fake-auth, using the safe-authd to get credentials
 function run_cli_tests_with_auth_daemon() {
-    # now let's run the integration tests but without fake-auth, using the safe_auth CLI to get credentials
-    # get auth credentials which will be then used by the integration tests to connect to mock-network
     cd safe-cli
-    echo "Sending auth request to port:" $RANDOM_PORT_NUMBER
-    cargo run --release --features=mock-network -- auth --port $RANDOM_PORT_NUMBER
+    # create account
+    echo "Creating account by sending auth request to port:" $RANDOM_PORT_NUMBER
+    CARGO_TARGET_DIR=../target SAFE_AUTH_PASSPHRASE=a SAFE_AUTH_PASSWORD=b cargo run \
+    --release --features=mock-network -- auth create-acc --test-coins # --endpoint $RANDOM_PORT_NUMBER
+
+    # get auth credentials which will be then used by the integration tests to connect to mock-network
+    echo "Logging in by sending auth request to port:" $RANDOM_PORT_NUMBER
+    CARGO_TARGET_DIR=../target SAFE_AUTH_PASSPHRASE=a SAFE_AUTH_PASSWORD=b cargo run \
+    --release --features=mock-network -- auth login --self-auth # --endpoint $RANDOM_PORT_NUMBER
 
     cargo test --release --features=mock-network --test cli_cat -- --test-threads=1
     cargo test --release --features=mock-network --test cli_dog -- --test-threads=1
@@ -39,5 +45,4 @@ function run_cli_tests_with_auth_daemon() {
 }
 
 run_cli_tests
-# TEMPORAILY disabling integration test with auth cli
-# run_cli_tests_with_auth_daemon
+run_cli_tests_with_auth_daemon

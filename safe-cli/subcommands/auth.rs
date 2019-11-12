@@ -101,7 +101,7 @@ pub enum AuthSubCommands {
 
 pub fn auth_commander(
     cmd: Option<AuthSubCommands>,
-    port: Option<u16>,
+    endpoint: Option<String>,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -110,86 +110,91 @@ pub fn auth_commander(
             sk,
             test_coins,
         }) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_create(safe, &safe_authd, config_file_str, sk, test_coins)
         }
         Some(AuthSubCommands::Login {
             config_file_str,
             self_auth,
         }) => {
-            let mut safe_authd = SafeAuthdClient::new(None);
+            let mut safe_authd = SafeAuthdClient::new(endpoint.clone());
             authd_login(&mut safe_authd, config_file_str)?;
             if self_auth {
                 // Let's subscribe so we can automatically allow our own auth request
-                safe_authd.subscribe("https://localhost:33002", APP_ID, &|auth_req: AuthReq| {
-                    let safe_authd = SafeAuthdClient::new(None);
-                    match safe_authd.allow(auth_req.req_id) {
-                        Ok(()) => {}
-                        Err(err) => println!("Failed to self authorise: {}", err),
-                    }
-                    None
-                })?;
-                authorise_cli(safe, port)?;
+                safe_authd.subscribe(
+                    "https://localhost:33002",
+                    APP_ID,
+                    &move |auth_req: AuthReq| {
+                        // TODO: pass the endpoint
+                        let safe_authd = SafeAuthdClient::new(None);
+                        match safe_authd.allow(auth_req.req_id) {
+                            Ok(()) => {}
+                            Err(err) => println!("Failed to self authorise: {}", err),
+                        }
+                        None
+                    },
+                )?;
+                authorise_cli(safe, endpoint)?;
             }
             Ok(())
         }
         Some(AuthSubCommands::Logout {}) => {
-            let mut safe_authd = SafeAuthdClient::new(None);
+            let mut safe_authd = SafeAuthdClient::new(endpoint);
             authd_logout(&mut safe_authd)
         }
         Some(AuthSubCommands::Status {}) => {
-            let mut safe_authd = SafeAuthdClient::new(None);
+            let mut safe_authd = SafeAuthdClient::new(endpoint);
             authd_status(&mut safe_authd)
         }
         Some(AuthSubCommands::Apps {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_apps(&safe_authd)
         }
         Some(AuthSubCommands::Clear {}) => clear_credentials(),
         Some(AuthSubCommands::Revoke { app_id }) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_revoke(&safe_authd, app_id)
         }
         Some(AuthSubCommands::Reqs {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_auth_reqs(&safe_authd)
         }
         Some(AuthSubCommands::Allow { req_id }) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_allow(&safe_authd, req_id)
         }
         Some(AuthSubCommands::Deny { req_id }) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_deny(&safe_authd, req_id)
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_subscribe_url(&safe_authd, notifs_endpoint)
         }
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
-            let mut safe_authd = SafeAuthdClient::new(None);
+            let mut safe_authd = SafeAuthdClient::new(endpoint);
             authd_unsubscribe(&mut safe_authd, notifs_endpoint)
         }
         Some(AuthSubCommands::Install {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_install(&safe_authd)
         }
         Some(AuthSubCommands::Uninstall {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_uninstall(&safe_authd)
         }
         Some(AuthSubCommands::Start {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_start(&safe_authd)
         }
         Some(AuthSubCommands::Stop {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_stop(&safe_authd)
         }
         Some(AuthSubCommands::Restart {}) => {
-            let safe_authd = SafeAuthdClient::new(None);
+            let safe_authd = SafeAuthdClient::new(endpoint);
             authd_restart(&safe_authd)
         }
-        None => authorise_cli(safe, port),
+        None => authorise_cli(safe, endpoint),
     }
 }

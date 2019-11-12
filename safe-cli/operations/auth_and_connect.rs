@@ -18,11 +18,16 @@ const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
 const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
 const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
 
-pub fn authorise_cli(safe: &mut Safe, port: Option<u16>) -> Result<(), String> {
+pub fn authorise_cli(safe: &mut Safe, endpoint: Option<String>) -> Result<(), String> {
     println!("Authorising CLI application...");
     let (mut file, file_path) = get_credentials_file()?;
     let auth_credentials = safe
-        .auth_app(APP_ID, APP_NAME, APP_VENDOR, port)
+        .auth_app(
+            APP_ID,
+            APP_NAME,
+            APP_VENDOR,
+            endpoint.as_ref().map(String::as_str),
+        )
         .map_err(|err| format!("Application authorisation failed: {}", err))?;
 
     file.write_all(auth_credentials.as_bytes())

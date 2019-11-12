@@ -42,9 +42,6 @@ pub enum SubCommands {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<AuthSubCommands>,
-        #[structopt(long = "port", raw(global = "true"))]
-        /// Port number of the Authenticator where to send requests to. If not provided, default port 33000 is assumed.
-        port: Option<u16>,
     },
     #[structopt(name = "container")]
     /// Create a new SAFE Network account with the credentials provided
