@@ -50,6 +50,8 @@ Therefore, if you are developing a SAFE application using a different programmin
 
 The [safe-cli](safe-cli) is a Rust application which implements a CLI (Command Line Interface) for the SAFE Network.
 
+![SAFE CLI](misc/safe-cli-animation.svg)
+
 The SAFE CLI provides all the tools necessary to interact with the SAFE Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the SAFE Network and the data stored on it.
 
 If you are just a SAFE user, or a system engineer creating automated scripts, this application provides you with all you need to interact with the SAFE Network. Please refer to [The SAFE CLI User Guide](safe-cli/README.md) to learn how to start using it.
