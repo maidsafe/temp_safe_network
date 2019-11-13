@@ -9,10 +9,7 @@
 
 This crate implements a CLI (Command Line Interface) for the SAFE Network.
 
-The SAFE CLI provides all the tools necessary to interact with the SAFE Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network. Thus using the CLI users have access to any type of operation that can be made on SAFE Network data, allowing them to also use it for automated scripts in a piped chain of commands.
-
-For further information please see https://safenetforum.org/t/safe-cli-high-level-design-document/28690
-
+The SAFE CLI provides all the tools necessary to interact with the SAFE Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the SAFE Network and the data stored on it, allowing them to also use it for automated scripts and piped chain of commands.
 
 ## Table of contents
 
