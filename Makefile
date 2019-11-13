@@ -14,68 +14,33 @@ GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe_client_libs
 
 build-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:x86_64
-	docker build -f scripts/Dockerfile.build \
-		-t maidsafe/safe-client-libs-build:x86_64 \
-		--build-arg build_type="real" .
-
-build-mock-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:x86_64-mock
-	docker build -f scripts/Dockerfile.build \
-		-t maidsafe/safe-client-libs-build:x86_64-mock \
-		--build-arg build_type="mock" .
-
-build-android-armv7-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:android-armv7
-	docker build -f scripts/Dockerfile.android.armv7.build \
-		-t maidsafe/safe-client-libs-build:android-armv7 \
-		--build-arg build_type="real" \
-		--build-arg target="armv7-linux-androideabi" .
-
-build-android-armv7-mock-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:android-armv7-mock
-	docker build -f scripts/Dockerfile.android.armv7.build \
-		-t maidsafe/safe-client-libs-build:android-armv7-mock \
-		--build-arg build_type="mock" \
-		--build-arg target="armv7-linux-androideabi" .
-
-build-android-x86_64-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:android-x86_64
-	docker build -f scripts/Dockerfile.android.x86_64.build \
-		-t maidsafe/safe-client-libs-build:android-x86_64 \
-		--build-arg build_type="real" \
-		--build-arg target="x86_64-linux-android" .
-
-build-android-x86_64-mock-container:
-	rm -rf target/
-	docker rmi -f maidsafe/safe-client-libs-build:android-x86_64-mock
-	docker build -f scripts/Dockerfile.android.x86_64.build \
-		-t maidsafe/safe-client-libs-build:android-x86_64-mock \
-		--build-arg build_type="mock" \
-		--build-arg target="x86_64-linux-android" .
+ifndef SAFE_CLIENT_LIBS_CONTAINER_TYPE
+	@echo "A container type must be specified."
+	@echo "Please set SAFE_CLIENT_LIBS_CONTAINER_TYPE to 'dev' or 'prod'."
+	@exit 1
+endif
+ifndef SAFE_CLIENT_LIBS_CONTAINER_TARGET
+	@echo "A build target must be specified."
+	@echo "Please set SAFE_CLIENT_LIBS_CONTAINER_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@exit 1
+endif
+	./scripts/build-container.sh \
+		"${SAFE_CLIENT_LIBS_CONTAINER_TARGET}" \
+		"${SAFE_CLIENT_LIBS_CONTAINER_TYPE}"
 
 push-container:
-	docker push maidsafe/safe-client-libs-build:x86_64
-
-push-mock-container:
-	docker push maidsafe/safe-client-libs-build:x86_64-mock
-
-push-android-armv7-container:
-	docker push maidsafe/safe-client-libs-build:android-armv7
-
-push-android-armv7-mock-container:
-	docker push maidsafe/safe-client-libs-build:android-armv7-mock
-
-push-android-x86_64-container:
-	docker push maidsafe/safe-client-libs-build:android-x86_64
-
-push-android-x86_64-mock-container:
-	docker push maidsafe/safe-client-libs-build:android-x86_64-mock
+ifndef SAFE_CLIENT_LIBS_CONTAINER_TYPE
+	@echo "A container type must be specified."
+	@echo "Please set SAFE_CLIENT_LIBS_CONTAINER_TYPE to 'dev' or 'prod'."
+	@exit 1
+endif
+ifndef SAFE_CLIENT_LIBS_CONTAINER_TARGET
+	@echo "A build target must be specified."
+	@echo "Please set SAFE_CLIENT_LIBS_CONTAINER_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@exit 1
+endif
+	docker push \
+		maidsafe/safe-client-libs-build:${SAFE_CLIENT_LIBS_CONTAINER_TARGET}-${SAFE_CLIENT_LIBS_CONTAINER_TYPE}
 
 build:
 	rm -rf artifacts
@@ -149,45 +114,32 @@ build-ios-mock-x86_64:
 	mkdir artifacts
 	find target/x86_64-apple-ios/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
-build-android-armv7:
-ifeq ($(UNAME_S),Linux)
-	rm -rf artifacts
-	./scripts/build-with-container "real" "android-armv7"
-	mkdir artifacts
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-else
-	echo "Only Linux is supported for this target."
+.ONESHELL:
+build-android:
+ifndef SAFE_CLIENT_LIBS_CONTAINER_TYPE
+	@echo "A container type must be specified."
+	@echo "Please set SAFE_CLIENT_LIBS_CONTAINER_TYPE to 'dev' or 'prod'."
+	@exit 1
 endif
-
-build-android-mock-armv7:
-ifeq ($(UNAME_S),Linux)
-	rm -rf artifacts
-	./scripts/build-with-container "mock" "android-armv7-mock"
-	mkdir artifacts
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-else
-	echo "Only Linux is supported for this target."
+ifndef SAFE_CLIENT_LIBS_CONTAINER_TARGET
+	@echo "A build target must be specified."
+	@echo "Please set SAFE_CLIENT_LIBS_CONTAINER_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@exit 1
 endif
-
-build-android-x86_64:
-ifeq ($(UNAME_S),Linux)
 	rm -rf artifacts
-	./scripts/build-with-container "real" "android-x86_64"
+	container_name="build-$$(uuidgen | sed 's/-//g')"
+	build_command="cargo build --release --manifest-path=safe_app/Cargo.toml --target=${SAFE_CLIENT_LIBS_CONTAINER_TARGET}"
+	[[ ${SAFE_CLIENT_LIBS_CONTAINER_TYPE} == 'dev' ]] && build_command="$$build_command --features=mock-network"
+	docker run --name "$$container_name" \
+	  -v $$(pwd):/usr/src/safe_client_libs:Z \
+	  -u $$(id -u):$$(id -g) \
+	  maidsafe/safe-client-libs-build:${SAFE_CLIENT_LIBS_CONTAINER_TARGET}-${SAFE_CLIENT_LIBS_CONTAINER_TYPE} \
+	  bash -c "$$build_command"
+	docker cp "$$container_name":/target .
+	docker rm "$$container_name"
 	mkdir artifacts
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-else
-	echo "Only Linux is supported for this target."
-endif
-
-build-android-mock-x86_64:
-ifeq ($(UNAME_S),Linux)
-	rm -rf artifacts
-	./scripts/build-with-container "mock" "android-x86_64-mock"
-	mkdir artifacts
-	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
-else
-	echo "Only Linux is supported for this target."
-endif
+	find "target/${SAFE_CLIENT_LIBS_CONTAINER_TARGET}/release" \
+		-maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 clippy:
 ifeq ($(UNAME_S),Linux)
@@ -251,24 +203,15 @@ endif
 
 package-versioned-deploy-artifacts:
 	@rm -rf deploy
-	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:x86_64 \
-		scripts/package-runner-container "versioned"
+	./scripts/package-runner "versioned"
 
 package-commit_hash-deploy-artifacts:
 	@rm -rf deploy
-	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:x86_64 \
-		scripts/package-runner-container "commit_hash"
+	./scripts/package-runner "commit_hash"
 
 package-nightly-deploy-artifacts:
 	@rm -rf deploy
-	docker run --rm -v "${PWD}":/usr/src/safe_client_libs:Z \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/safe-client-libs-build:x86_64 \
-		scripts/package-runner-container "nightly"
+	./scripts/package-runner "nightly"
 	find . -name "*.zip" -exec rm "{}" \;
 
 retrieve-cache:
@@ -444,13 +387,6 @@ endif
 		--tag ${SAFE_APP_VERSION} \
 		--name "safe_client_libs" \
 		--description "$$(./scripts/get-release-description ${SAFE_APP_VERSION})"
-	github-release upload \
-		--user ${GITHUB_REPO_OWNER} \
-		--repo ${GITHUB_REPO_NAME} \
-		--tag ${SAFE_APP_VERSION} \
-		--name "safe_app-${SAFE_APP_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
-		--file deploy/real/safe_app-${SAFE_APP_VERSION}-x86_64-unknown-linux-gnu.tar.gz
-	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_APP_VERSION} \

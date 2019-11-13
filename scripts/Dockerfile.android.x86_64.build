@@ -2,9 +2,10 @@ FROM rust:latest
 
 # These is only referenced in the build-android-cache script.
 ARG build_type
-ARG target
+ARG build_target
 
-RUN addgroup --gid 1001 maidsafe && \
+# 115 is the ID of the group on the Actions slave.
+RUN addgroup --gid 115 maidsafe && \
     adduser --uid 1001 --ingroup maidsafe --home /home/maidsafe --shell /bin/sh --disabled-password --gecos "" maidsafe && \
     # The parent container sets this to the 'staff' group, which causes problems
     # with reading code stored in Cargo's registry.
