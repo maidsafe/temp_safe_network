@@ -12,7 +12,7 @@ use log::trace;
 pub use routing::quic_p2p::Config as NetworkConfig;
 pub use routing::quic_p2p::NodeInfo as ConnectionInfo;
 use routing::quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p};
-pub use routing::{ClientEvent, Event, InterfaceError, RoutingError};
+pub use routing::{ClientEvent, Event, InterfaceError, P2pNode, RoutingError};
 use std::{
     cell::RefCell,
     net::SocketAddr,
@@ -69,6 +69,11 @@ impl Node {
     /// not be able to take part in the event loop triggers.
     pub fn register<'a>(&'a mut self, sel: &mut Select<'a>) {
         self.network_rx_idx = sel.recv(&self.network_rx);
+    }
+
+    /// Returns the connection information of all the current section elders.
+    pub fn our_elders_info(&self) -> Option<impl Iterator<Item = &P2pNode>> {
+        Some(vec![].into_iter())
     }
 
     /// Vote for an event.

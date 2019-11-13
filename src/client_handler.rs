@@ -26,10 +26,10 @@ use bytes::Bytes;
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
-    AData, ADataAddress, AppPermissions, AppPublicId, Challenge, Coins, Error as NdError, IData,
-    IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId, NodePublicId, Notification,
-    PublicId, PublicKey, Request, Response, Result as NdResult, Signature, Transaction,
-    TransactionId, XorName,
+    AData, ADataAddress, AppPermissions, AppPublicId, Challenge, Coins, ConnectionInfo,
+    Error as NdError, IData, IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId,
+    NodePublicId, Notification, PublicId, PublicKey, Request, Response, Result as NdResult,
+    Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -210,6 +210,9 @@ impl ClientHandler {
                         self, client.public_id, notification
                     );
                 }
+                Ok(Message::SectionInfo { .. }) => {
+                    info!("{}: {} invalidly sent SectionInfo", self, client.public_id);
+                }
                 Err(err) => {
                     info!(
                         "{}: Unable to deserialise message from {}: {}",
@@ -219,8 +222,12 @@ impl ClientHandler {
             }
         } else {
             match bincode::deserialize(&bytes) {
-                Ok(Challenge::Response(public_id, signature)) => {
-                    self.handle_challenge(peer_addr, public_id, signature);
+                Ok(Challenge::Response {
+                    client_id,
+                    signature,
+                    request_section_info,
+                }) => {
+                    self.handle_challenge(peer_addr, client_id, signature, request_section_info);
                 }
                 Ok(Challenge::Request(_, _)) => {
                     info!(
@@ -650,11 +657,13 @@ impl ClientHandler {
     /// Handles a received challenge response.
     ///
     /// Checks that the response contains a valid signature of the challenge we previously sent.
+    /// If a client requests the section info, we also send it.
     fn handle_challenge(
         &mut self,
         peer_addr: SocketAddr,
         public_id: PublicId,
         signature: Signature,
+        request_section_info: bool,
     ) {
         let public_key = match utils::own_key(&public_id) {
             Some(pk) => pk,
@@ -678,6 +687,10 @@ impl ClientHandler {
                 Ok(()) => {
                     info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
                     let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
+
+                    if request_section_info {
+                        self.send_section_info_to_client(peer_addr);
+                    }
                 }
                 Err(err) => {
                     info!(
@@ -1103,6 +1116,35 @@ impl ClientHandler {
                 "{}: Could not send message to client {}: {:?}",
                 self, recipient, e
             );
+        }
+    }
+
+    fn send_section_info_to_client(&mut self, peer_addr: SocketAddr) {
+        let elders = self
+            .routing_node
+            .borrow_mut()
+            .our_elders_info()
+            .map(|iter| {
+                iter.map(|p2p_node| {
+                    let routing::ConnectionInfo {
+                        peer_addr,
+                        peer_cert_der,
+                    } = p2p_node.connection_info().clone();
+                    (
+                        XorName(p2p_node.name().0),
+                        ConnectionInfo {
+                            peer_addr,
+                            peer_cert_der,
+                        },
+                    )
+                })
+                .collect::<Vec<_>>()
+            });
+
+        if let Some(elders) = elders {
+            self.send(peer_addr, &Message::SectionInfo { elders });
+        } else {
+            warn!("{}: No other elders in our section found", self);
         }
     }
 

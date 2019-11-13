@@ -28,7 +28,7 @@ pickledb = "~0.4.0"
 quick-error = "~1.2.2"
 rand = "~0.6.5"
 routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
-safe-nd = "~0.4.0"
+safe-nd = "~0.5.0"
 self_update = "0.5.1"
 serde = { version = "~1.0.97", features = ["derive"] }
 serde_json = "~1.0.40"

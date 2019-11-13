@@ -242,11 +242,15 @@ pub trait TestClientTrait {
         let challenge: Challenge = unwrap!(bincode::deserialize(&bytes));
         let payload = match challenge {
             Challenge::Request(_, payload) => payload,
-            Challenge::Response(..) => panic!("Unexpected Challenge::Response"),
+            Challenge::Response { .. } => panic!("Unexpected Challenge::Response"),
         };
 
         let signature = self.full_id().sign(payload);
-        let response = Challenge::Response(self.full_id().public_id().clone(), signature);
+        let response = Challenge::Response {
+            client_id: self.full_id().public_id().clone(),
+            signature,
+            request_section_info: false,
+        };
         self.set_connected_vault(conn_info.clone());
         self.send(&response);
     }
@@ -316,6 +320,7 @@ pub trait TestClientTrait {
             }
             Message::Request { request, .. } => unexpected!(request),
             Message::Notification { notification } => unexpected!(notification),
+            Message::SectionInfo { elders } => unexpected!(elders),
         }
     }
 
@@ -327,6 +332,7 @@ pub trait TestClientTrait {
             Message::Notification { notification } => notification,
             Message::Request { request, .. } => unexpected!(request),
             Message::Response { response, .. } => unexpected!(response),
+            Message::SectionInfo { elders } => unexpected!(elders),
         }
     }
 }
