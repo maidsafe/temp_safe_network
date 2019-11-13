@@ -115,7 +115,7 @@ This command simply sends an authorisation request to the Authenticator availabl
 
 #### The Authenticator daemon (authd)
 
-In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)]() endpoint, which SAFE applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
+In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)](https://en.wikipedia.org/wiki/QUIC) endpoint, which SAFE applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
 
 #### Auth start (Linux/Mac)
 
