@@ -23,7 +23,7 @@ use safe_core::ipc::resp::{AccessContainerEntry, IpcResp};
 use safe_core::ipc::{access_container_enc_key, decode_msg, encode_msg, IpcError, IpcMsg};
 use safe_core::utils::symmetric_decrypt;
 use safe_core::{client as safe_core_client, CoreError};
-use safe_nd::{AppPermissions, MDataAddress, PublicKey};
+use safe_nd::{AppPermissions, Error as SndError, MDataAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -118,7 +118,18 @@ impl SafeAuthenticator {
                 self.safe_authenticator = Some(auth);
                 Ok(())
             }
-            Err(err) => Err(Error::AuthError(format!("Failed to log in: {:?}", err))),
+            Err(err) => {
+                let msg = match err {
+                    AuthError::SndError(SndError::NoSuchLoginPacket) => {
+                        "no SAFE account found with the passphrase provided".to_string()
+                    }
+                    AuthError::CoreError(CoreError::SymmetricDecipherFailure) => {
+                        "unable to login with the password provided".to_string()
+                    }
+                    other => other.to_string(),
+                };
+                Err(Error::AuthError(format!("Failed to log in: {}", msg)))
+            }
         }
     }
 
@@ -196,10 +207,18 @@ impl SafeAuthenticator {
                 self.safe_authenticator = Some(auth);
                 Ok(())
             }
-            Err(err) => Err(Error::AuthError(format!(
-                "Failed to create an account: {:?}",
-                err
-            ))),
+            Err(err) => {
+                let msg = match err {
+                    AuthError::SndError(SndError::LoginPacketExists) => {
+                        "a SAFE account already exists with the passphrase provided".to_string()
+                    }
+                    other => other.to_string(),
+                };
+                Err(Error::AuthError(format!(
+                    "Failed to create an account: {}",
+                    msg
+                )))
+            }
         }
     }
 

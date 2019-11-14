@@ -28,8 +28,7 @@ pub fn process_req(
                     Ok(msg.to_string())
                 }
                 Err(err) => {
-                    let msg = format!("Error occurred when trying to log in: {}", err);
-                    println!("{}", msg);
+                    println!("Error occurred when trying to log in: {}", err);
                     Err(err.to_string())
                 }
             },
