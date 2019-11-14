@@ -17,8 +17,6 @@ use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn wallet_create(
     app: *mut Safe,
@@ -34,8 +32,6 @@ pub unsafe extern "C" fn wallet_create(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn wallet_insert(
     app: *mut Safe,
@@ -59,8 +55,6 @@ pub unsafe extern "C" fn wallet_insert(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn wallet_balance(
     app: *mut Safe,
@@ -78,8 +72,6 @@ pub unsafe extern "C" fn wallet_balance(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn wallet_get_default_balance(
     app: *mut Safe,
@@ -102,8 +94,6 @@ pub unsafe extern "C" fn wallet_get_default_balance(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn wallet_transfer(
     app: *mut Safe,
@@ -125,8 +115,6 @@ pub unsafe extern "C" fn wallet_transfer(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn wallet_get(
     app: *mut Safe,

@@ -13,8 +13,7 @@ use std::os::raw::c_char;
 use std::slice;
 
 // NOTE: The returned &str is only valid as long as the data in `ptr` is valid.
-/// # Safety
-/// Note this is an unsafe function
+
 #[inline]
 pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static str> {
     if ptr.is_null() {
@@ -24,8 +23,6 @@ pub unsafe fn from_c_str_to_str_option(ptr: *const c_char) -> Option<&'static st
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[inline]
 pub fn string_vec_to_c_str_str(argv: Vec<String>) -> Result<*const *const c_char> {
     let cstr_argv = argv
@@ -38,8 +35,6 @@ pub fn string_vec_to_c_str_str(argv: Vec<String>) -> Result<*const *const c_char
     Ok(p_argv.as_ptr())
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[inline]
 pub unsafe fn c_str_str_to_string_vec(
     argv: *const *const c_char,

@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![allow(clippy::missing_safety_doc)]
+
 /// Fetch API
 mod errors;
 pub mod fetch;
@@ -23,8 +25,6 @@ use helpers::from_c_str_to_str_option;
 use safe_api::Safe;
 use std::os::raw::{c_char, c_void};
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn connect(
     app_id: *const c_char,

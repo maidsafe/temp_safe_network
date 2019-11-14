@@ -15,8 +15,6 @@ use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn parse_url(
     url: *const c_char,
@@ -37,8 +35,6 @@ pub unsafe extern "C" fn parse_url(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn parse_and_resolve_url(
     app: *mut Safe,
@@ -72,8 +68,6 @@ pub unsafe extern "C" fn parse_and_resolve_url(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn nrs_map_container_create(
     app: *mut Safe,
@@ -111,8 +105,6 @@ pub unsafe extern "C" fn nrs_map_container_create(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn nrs_map_container_add(
     app: *mut Safe,
@@ -154,8 +146,6 @@ pub unsafe extern "C" fn nrs_map_container_add(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn nrs_map_container_remove(
     app: *mut Safe,
@@ -188,8 +178,6 @@ pub unsafe extern "C" fn nrs_map_container_remove(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn nrs_map_container_get(
     app: *mut Safe,

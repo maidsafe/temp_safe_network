@@ -19,8 +19,7 @@ use std::os::raw::{c_char, c_void};
 use std::str::FromStr;
 
 // TODO: Can be convertered to a struct
-/// # Safety
-/// Note this is an unsafe function
+
 #[no_mangle]
 pub unsafe extern "C" fn xorurl_encode(
     name: *const XorNameArray,
@@ -62,8 +61,7 @@ pub unsafe extern "C" fn xorurl_encode(
 }
 
 // TODO: Can be convertered to a struct
-/// # Safety
-/// Note this is an unsafe function
+
 #[no_mangle]
 pub unsafe extern "C" fn xorurl_encoder(
     name: *const XorNameArray,
@@ -101,8 +99,6 @@ pub unsafe extern "C" fn xorurl_encoder(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn xorurl_encoder_from_url(
     xor_url: *const c_char,

@@ -17,8 +17,6 @@ use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn fetch(
     app: *mut Safe,
@@ -45,8 +43,6 @@ pub unsafe extern "C" fn fetch(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn inspect(
     app: *mut Safe,

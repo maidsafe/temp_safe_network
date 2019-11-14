@@ -14,8 +14,6 @@ use safe_api::{BlsKeyPair as NativeBlsKeyPair, Safe};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn generate_keypair(
     app: *mut Safe,
@@ -34,8 +32,6 @@ pub unsafe extern "C" fn generate_keypair(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_create(
     app: *mut Safe,
@@ -74,8 +70,6 @@ pub unsafe extern "C" fn keys_create(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_create_preload_test_coins(
     app: *mut Safe,
@@ -103,8 +97,6 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_balance_from_sk(
     app: *mut Safe,
@@ -122,8 +114,6 @@ pub unsafe extern "C" fn keys_balance_from_sk(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_balance_from_url(
     app: *mut Safe,
@@ -143,8 +133,6 @@ pub unsafe extern "C" fn keys_balance_from_url(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn validate_sk_for_url(
     app: *mut Safe,
@@ -164,8 +152,6 @@ pub unsafe extern "C" fn validate_sk_for_url(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_transfer(
     app: *mut Safe,

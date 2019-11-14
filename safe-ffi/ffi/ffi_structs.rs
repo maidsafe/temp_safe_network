@@ -188,8 +188,6 @@ impl XorUrlEncoder {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
 ) -> Result<XorUrlEncoder> {
@@ -214,8 +212,6 @@ pub unsafe fn xorurl_encoder_into_repr_c(
     })
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn native_xorurl_encoder_from_repr_c(
     encoder: &XorUrlEncoder,
 ) -> Result<NativeXorUrlEncoder> {
@@ -253,8 +249,6 @@ impl Drop for WalletSpendableBalance {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub fn wallet_spendable_balance_into_repr_c(
     wallet_balance: &NativeWalletSpendableBalance,
 ) -> Result<WalletSpendableBalance> {
@@ -298,8 +292,6 @@ impl Drop for WalletSpendableBalances {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub fn wallet_spendable_balances_into_repr_c(
     wallet_balances: &NativeWalletSpendableBalances,
 ) -> Result<WalletSpendableBalances> {
@@ -359,8 +351,6 @@ impl Drop for ProcessedFiles {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn processed_files_into_repr_c(map: &NativeProcessedFiles) -> Result<ProcessedFiles> {
     let mut vec = Vec::with_capacity(map.len());
 
@@ -415,8 +405,6 @@ impl Drop for FileInfo {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn file_info_into_repr_c(
     file_name: &str,
     file_item_map: &NativeFileItem,
@@ -452,8 +440,6 @@ impl Drop for FilesMap {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn files_map_into_repr_c(files_map: &NativeFilesMap) -> Result<FilesMap> {
     let mut vec = Vec::with_capacity(files_map.len());
 
@@ -507,8 +493,6 @@ impl Drop for ProcessedEntries {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn processed_entries_into_repr_c(
     entries: &NativeProcessedEntries,
 ) -> Result<ProcessedEntries> {
@@ -572,8 +556,6 @@ impl NrsMapContainerInfo {
     }
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub unsafe fn nrs_map_container_info_into_repr_c(
     nrs_container_info: &NativeNrsMapContainerInfo,
 ) -> Result<NrsMapContainerInfo> {
@@ -595,8 +577,6 @@ pub struct NrsMap {
     pub default: *const c_char,
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub fn nrs_map_into_repr_c(nrs_map: &NativeNrsMap) -> Result<NrsMap> {
     Ok(NrsMap {
         sub_names_map: sub_names_map_into_repr_c(nrs_map.sub_names_map.clone())?,
@@ -616,8 +596,6 @@ pub struct SubNamesMap {
     pub sub_name_len: usize,
 }
 
-/// # Safety
-/// Note this is an unsafe function
 pub fn sub_names_map_into_repr_c(map: NativeSubNamesMap) -> Result<SubNamesMap> {
     let mut vec = Vec::with_capacity(map.len());
 
