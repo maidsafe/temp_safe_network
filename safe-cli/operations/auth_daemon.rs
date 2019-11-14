@@ -16,6 +16,9 @@ use safe_api::{
 use serde::Deserialize;
 use std::fs;
 
+const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
+const SAFE_AUTHD_WINDOWS_EXECUTABLE: &str = "safe-authd.exe";
+
 #[derive(Deserialize, Debug)]
 struct Environment {
     safe_auth_passphrase: Option<String>,
@@ -286,23 +289,33 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
 
 fn get_authd_bin_path() -> String {
     let mut path = std::path::PathBuf::new();
-    match std::env::var("CARGO_TARGET_DIR") {
-        Ok(target_dir) => path.push(target_dir),
-        Err(_) => path.push("target"),
+
+    let authd_bin = if cfg!(windows) {
+        std::path::Path::new(SAFE_AUTHD_WINDOWS_EXECUTABLE)
+    } else {
+        std::path::Path::new(SAFE_AUTHD_EXECUTABLE)
     };
 
-    if cfg!(debug_assertions) {
-        path.push("debug");
-    } else {
-        path.push("release");
+    match std::env::var("SAFE_AUTHD_PATH") {
+        Ok(authd_path) => path.push(authd_path),
+        Err(_) => {
+            // If there is no 'safe-authd' executable in PATH we then try to find in cargo target folder
+            if !authd_bin.is_file() {
+                match std::env::var("CARGO_TARGET_DIR") {
+                    Ok(target_dir) => path.push(target_dir),
+                    Err(_) => path.push("target"),
+                };
+
+                if cfg!(debug_assertions) {
+                    path.push("debug");
+                } else {
+                    path.push("release");
+                };
+            }
+        }
     };
 
-    if cfg!(windows) {
-        path.push("safe-authd.exe");
-    } else {
-        path.push("safe-authd");
-    }
-
+    path.push(authd_bin);
     path.display().to_string()
 }
 

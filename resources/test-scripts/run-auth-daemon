@@ -32,8 +32,13 @@ function build_safe_authd() {
 
 function run_safe_authd() {
     cd $SAFE_MOCK_VAULT_PATH
+
+    # this won't have any effect on Linux/Mac, but it's required for Windows
+    ./$authd_bin_name install || true
+
+    echo "Stopping safe-authd daemon.."
     ./$authd_bin_name stop || true
-    echo "Launching safe_auth daemon on port:" $RANDOM_PORT_NUMBER
+    echo "Launching safe-authd daemon on port:" $RANDOM_PORT_NUMBER
     # ./target/release/$authd_bin_name start --listen https://localhost:$RANDOM_PORT_NUMBER &
     ./$authd_bin_name start &
     sleep 15
