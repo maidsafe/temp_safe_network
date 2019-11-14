@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_put_and_get_immutable_data() {
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let id1 = b"HELLLOOOOOOO".to_vec();
@@ -618,7 +618,7 @@ mod tests {
 
     #[test]
     fn test_put_get_update_seq_append_only_data() {
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let key1 = b"KEY1".to_vec();
@@ -715,7 +715,7 @@ mod tests {
 
     #[test]
     fn test_update_seq_append_only_data_error() {
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let key1 = b"KEY1".to_vec();

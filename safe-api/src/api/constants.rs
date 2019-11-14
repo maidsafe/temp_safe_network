@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::xorurl::XorUrlBase;
+
 pub const CONTENT_ADDED_SIGN: &str = "+";
 pub const CONTENT_UPDATED_SIGN: &str = "*";
 pub const CONTENT_DELETED_SIGN: &str = "-";
@@ -21,3 +23,6 @@ pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
 pub const SAFE_AUTHD_ENDPOINT_HOST: &str = "https://localhost";
 // Default authenticator port number where to send requests to
 pub const SAFE_AUTHD_ENDPOINT_PORT: u16 = 33000;
+
+// Default base encoding used for XOR URLs
+pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;

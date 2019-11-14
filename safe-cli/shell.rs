@@ -15,7 +15,7 @@ use std::io::{stdout, Write};
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 
 pub fn shell_run() -> Result<(), String> {
-    let safe = Safe::new("");
+    let safe = Safe::new(None);
     let safe_authd_client = SafeAuthdClient::new(None);
     let mut shell = Shell::new((safe, safe_authd_client));
     shell.set_default(|io, _, cmd| {

@@ -45,7 +45,7 @@ impl Safe {
             None,
             None,
             None,
-            &self.xorurl_base,
+            self.xorurl_base,
         )
     }
 
@@ -67,7 +67,7 @@ impl Safe {
             None,
             None,
             None,
-            &self.xorurl_base,
+            self.xorurl_base,
         )?;
         let value = WalletSpendableBalance {
             xorurl: xorurl.clone(),
@@ -234,7 +234,7 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # use unwrap::unwrap;
-    /// let mut safe = Safe::new("base32z");
+    /// let mut safe = Safe::new(None);
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let wallet_xorurl = unwrap!(safe.wallet_create());
     /// let wallet_xorurl2 = unwrap!(safe.wallet_create());
@@ -491,7 +491,7 @@ mod tests {
     #[test]
     fn test_wallet_create() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorurl = unwrap!(safe.wallet_create());
         assert!(xorurl.starts_with("safe://"));
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn test_wallet_insert_and_balance() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
@@ -533,7 +533,7 @@ mod tests {
     #[test]
     fn test_wallet_insert_and_get() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let wallet_xorurl = unwrap!(safe.wallet_create());
         let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn test_wallet_insert_and_set_default() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let wallet_xorurl = unwrap!(safe.wallet_create());
         let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("65.82"));
@@ -611,7 +611,7 @@ mod tests {
     #[test]
     fn test_wallet_transfer_no_default() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let from_wallet_xorurl = unwrap!(safe.wallet_create()); // this one won't have a default balance
 
@@ -654,7 +654,7 @@ mod tests {
     #[test]
     fn test_wallet_transfer_from_zero_balance() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
@@ -700,7 +700,7 @@ mod tests {
     #[test]
     fn test_wallet_transfer_diff_amounts() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
@@ -758,7 +758,7 @@ mod tests {
     #[test]
     fn test_wallet_transfer_to_safekey() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn test_wallet_transfer_from_safekey() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let (safekey_xorurl1, _) = unwrap!(safe.keys_create_preload_test_coins("7"));
@@ -814,7 +814,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -855,7 +855,7 @@ mod tests {
     #[test]
     fn test_wallet_transfer_from_specific_balance() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
@@ -937,7 +937,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.7"));
@@ -1015,7 +1015,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let from_wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("10.1"));
@@ -1117,7 +1117,7 @@ mod tests {
     #[cfg(not(feature = "scl-mock"))]
     fn test_wallet_transfer_from_not_owned_wallet() {
         use unwrap::unwrap;
-        let mut safe = Safe::new("base32z");
+        let mut safe = Safe::new(None);
         unwrap!(safe.connect("", Some("fake-credentials")));
         let account1_wallet_xorurl = unwrap!(safe.wallet_create());
         let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
@@ -1128,7 +1128,7 @@ mod tests {
             &unwrap!(key_pair1.clone()).sk,
         ));
 
-        let mut another_safe = Safe::new("base32z");
+        let mut another_safe = Safe::new(None);
         unwrap!(another_safe.connect("", Some("another-fake-credentials")));
         let (key_xorurl, _key_pair) = unwrap!(another_safe.keys_create_preload_test_coins("100.5"));
 

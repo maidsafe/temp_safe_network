@@ -26,7 +26,7 @@ pub unsafe extern "C" fn connect(
         let user_data = OpaqueCtx(user_data);
         let app_id = String::clone_from_repr_c(app_id)?;
         let auth_cred = from_c_str_to_str_option(auth_credentials);
-        let mut safe = Safe::new("");
+        let mut safe = Safe::new(None);
         safe.connect(&app_id, auth_cred)?;
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(safe)));
         Ok(())

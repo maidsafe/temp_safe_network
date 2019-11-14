@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::constants::DEFAULT_XORURL_BASE;
 use super::helpers::get_subnames_host_path_and_version;
 use super::xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 use super::{Error, Result};
@@ -22,6 +23,41 @@ const XOR_NAME_BYTES_OFFSET: usize = 4; // offset where to find the XoR name byt
 
 // The XOR-URL type
 pub type XorUrl = String;
+
+// Supported base encoding for XOR URLs
+#[derive(Copy, Clone, Debug)]
+pub enum XorUrlBase {
+    Base32z,
+    Base32,
+    Base64,
+}
+
+impl std::str::FromStr for XorUrlBase {
+    type Err = Error;
+    fn from_str(str: &str) -> Result<Self> {
+        match str {
+            "base32z" => Ok(Self::Base32z),
+            "base32" => Ok(Self::Base32),
+            "base64" => Ok(Self::Base64),
+            other => Err(Error::InvalidInput(format!(
+                "Invalid XOR URL base encoding: {}. Supported values are base32z, base32, and base64",
+                other
+            ))),
+        }
+    }
+}
+
+impl XorUrlBase {
+    #[allow(dead_code)]
+    pub fn from_u8(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(Self::Base32z),
+            1 => Ok(Self::Base32),
+            2 => Ok(Self::Base64),
+            _other => Err(Error::InvalidInput("Invalid XOR URL base encoding code. Supported values are 0=base32z, 1=base32, and 2=base64".to_string())),
+        }
+    }
+}
 
 // We encode the content type that a XOR-URL is targetting, this allows the consumer/user to
 // treat the content in particular ways when the content requires it.
@@ -42,12 +78,12 @@ impl std::fmt::Display for SafeContentType {
 
 impl SafeContentType {
     #[allow(dead_code)]
-    pub fn from_u16(value: u16) -> Result<SafeContentType> {
+    pub fn from_u16(value: u16) -> Result<Self> {
         match value {
-            0 => Ok(SafeContentType::Raw),
-            1 => Ok(SafeContentType::Wallet),
-            2 => Ok(SafeContentType::FilesContainer),
-            3 => Ok(SafeContentType::NrsMapContainer),
+            0 => Ok(Self::Raw),
+            1 => Ok(Self::Wallet),
+            2 => Ok(Self::FilesContainer),
+            3 => Ok(Self::NrsMapContainer),
             _other => Err(Error::InvalidInput("Invalid Media-type code".to_string())),
         }
     }
@@ -55,11 +91,11 @@ impl SafeContentType {
     #[allow(dead_code)]
     pub fn value(&self) -> Result<u16> {
         match &*self {
-            SafeContentType::Raw => Ok(0),
-            SafeContentType::Wallet => Ok(1),
-            SafeContentType::FilesContainer => Ok(2),
-            SafeContentType::NrsMapContainer => Ok(3),
-            SafeContentType::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
+            Self::Raw => Ok(0),
+            Self::Wallet => Ok(1),
+            Self::FilesContainer => Ok(2),
+            Self::NrsMapContainer => Ok(3),
+            Self::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
                 Some(media_type_code) => Ok(*media_type_code),
                 None => Err(Error::Unexpected("Unsupported Media-type".to_string())),
             },
@@ -91,17 +127,17 @@ impl std::fmt::Display for SafeDataType {
 
 impl SafeDataType {
     #[allow(dead_code)]
-    pub fn from_u64(value: u64) -> Result<SafeDataType> {
+    pub fn from_u64(value: u64) -> Result<Self> {
         match value {
-            0 => Ok(SafeDataType::SafeKey),
-            1 => Ok(SafeDataType::PublishedImmutableData),
-            2 => Ok(SafeDataType::UnpublishedImmutableData),
-            3 => Ok(SafeDataType::SeqMutableData),
-            4 => Ok(SafeDataType::UnseqMutableData),
-            5 => Ok(SafeDataType::PublishedSeqAppendOnlyData),
-            6 => Ok(SafeDataType::PublishedUnseqAppendOnlyData),
-            7 => Ok(SafeDataType::UnpublishedSeqAppendOnlyData),
-            8 => Ok(SafeDataType::UnpublishedUnseqAppendOnlyData),
+            0 => Ok(Self::SafeKey),
+            1 => Ok(Self::PublishedImmutableData),
+            2 => Ok(Self::UnpublishedImmutableData),
+            3 => Ok(Self::SeqMutableData),
+            4 => Ok(Self::UnseqMutableData),
+            5 => Ok(Self::PublishedSeqAppendOnlyData),
+            6 => Ok(Self::PublishedUnseqAppendOnlyData),
+            7 => Ok(Self::UnpublishedSeqAppendOnlyData),
+            8 => Ok(Self::UnpublishedUnseqAppendOnlyData),
             _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
@@ -130,7 +166,7 @@ impl XorUrlEncoder {
         content_version: Option<u64>,
     ) -> Result<Self> {
         if let SafeContentType::MediaType(ref media_type) = content_type {
-            if !XorUrlEncoder::is_media_type_supported(media_type) {
+            if !Self::is_media_type_supported(media_type) {
                 return Err(Error::InvalidMediaType(format!(
                         "Media-type '{}' not supported. You can use 'SafeContentType::Raw' as the 'content_type' for this type of content",
                         media_type
@@ -165,7 +201,7 @@ impl XorUrlEncoder {
         path: Option<&str>,
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
-        base: &str,
+        base: XorUrlBase,
     ) -> Result<String> {
         let xorurl_encoder = XorUrlEncoder::new(
             xorname,
@@ -324,10 +360,10 @@ impl XorUrlEncoder {
     // and up to 8 bytes for type_tag
     // query param "v=" is treated as the content version
     pub fn to_string(&self) -> Result<String> {
-        self.to_base("")
+        self.to_base(DEFAULT_XORURL_BASE)
     }
 
-    pub fn to_base(&self, base: &str) -> Result<String> {
+    pub fn to_base(&self, base: XorUrlBase) -> Result<String> {
         // let's set the first byte with the XOR-URL format version
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
 
@@ -367,20 +403,12 @@ impl XorUrlEncoder {
         cid_vec.extend_from_slice(&self.type_tag.to_be_bytes()[start_byte..]);
 
         let base_encoding = match base {
-            "base32z" => Base::Base32z,
-            "base32" => Base::Base32,
-            "base64" => Base::Base64,
-            base => {
-                if !base.is_empty() {
-                    println!(
-                        "Base encoding '{}' not supported for XOR-URL. Using default 'base32z'.",
-                        base
-                    );
-                }
-                Base::Base32z
-            }
+            XorUrlBase::Base32z => Base::Base32z,
+            XorUrlBase::Base32 => Base::Base32,
+            XorUrlBase::Base64 => Base::Base64,
         };
         let cid_str = encode(base_encoding, cid_vec);
+
         let xorurl = format!("{}{}{}{}", SAFE_URL_PROTOCOL, sub_names, cid_str, self.path);
 
         match self.content_version {
@@ -413,7 +441,7 @@ mod tests {
             None,
             None,
             None,
-            "base32"
+            XorUrlBase::Base32
         ));
         let base32_xorurl =
             "safe://biaaaatcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
@@ -432,7 +460,7 @@ mod tests {
             None,
             None,
             None,
-            "base32z"
+            XorUrlBase::Base32z
         ));
         let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
         assert_eq!(xorurl, base32z_xorurl);
@@ -450,12 +478,15 @@ mod tests {
             None,
             None,
             None,
-            "base64"
+            XorUrlBase::Base64
         ));
         let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
         let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&base64_xorurl));
-        assert_eq!(base64_xorurl, unwrap!(xorurl_encoder.to_base("base64")));
+        assert_eq!(
+            base64_xorurl,
+            unwrap!(xorurl_encoder.to_base(XorUrlBase::Base64))
+        );
         assert_eq!("", xorurl_encoder.path());
         assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
         assert_eq!(xorname, xorurl_encoder.xorname());
@@ -483,7 +514,7 @@ mod tests {
             None,
             None,
             None,
-            "" // forces it to use the default
+            DEFAULT_XORURL_BASE
         ));
         assert_eq!(xorurl, base32z_xorurl);
     }
@@ -526,14 +557,14 @@ mod tests {
             None,
             None,
             None,
-            "base32z"
+            XorUrlBase::Base32z
         ));
 
         let xorurl_with_path = format!("{}/subfolder/file", xorurl);
         let xorurl_encoder_with_path = unwrap!(XorUrlEncoder::from_url(&xorurl_with_path));
         assert_eq!(
             xorurl_with_path,
-            unwrap!(xorurl_encoder_with_path.to_base("base32z"))
+            unwrap!(xorurl_encoder_with_path.to_base(XorUrlBase::Base32z))
         );
         assert_eq!("/subfolder/file", xorurl_encoder_with_path.path());
         assert_eq!(
@@ -565,7 +596,7 @@ mod tests {
             None,
             Some(vec!("sub".to_string())),
             None,
-            "base32z"
+            XorUrlBase::Base32z
         ));
 
         let xorurl_with_subname = xorurl.to_string();
@@ -573,7 +604,7 @@ mod tests {
         let xorurl_encoder_with_subname = unwrap!(XorUrlEncoder::from_url(&xorurl_with_subname));
         assert_eq!(
             xorurl_with_subname,
-            unwrap!(xorurl_encoder_with_subname.to_base("base32z"))
+            unwrap!(xorurl_encoder_with_subname.to_base(XorUrlBase::Base32z))
         );
         assert_eq!("", xorurl_encoder_with_subname.path());
         assert_eq!(1, xorurl_encoder_with_subname.encoding_version());
@@ -599,7 +630,7 @@ mod tests {
             None,
             None,
             None,
-            "base32z"
+            XorUrlBase::Base32z
         ));
 
         let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));

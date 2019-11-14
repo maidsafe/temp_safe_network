@@ -20,7 +20,7 @@ use crate::subcommands::nrs::nrs_commander;
 use crate::subcommands::update::update_commander;
 use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::{OutputFmt, SubCommands};
-use safe_api::Safe;
+use safe_api::{Safe, XorUrlBase};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
@@ -49,14 +49,14 @@ struct CmdArgs {
     dry: bool,
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
     #[structopt(long = "xorurl", raw(global = "true"))]
-    xorurl_base: Option<String>,
+    xorurl_base: Option<XorUrlBase>,
 }
 
 pub fn run() -> Result<(), String> {
     // Let's first get all the arguments passed in
     let args = CmdArgs::from_args();
 
-    let mut safe = Safe::new(&args.xorurl_base.clone().unwrap_or_else(|| "".to_string()));
+    let mut safe = Safe::new(args.xorurl_base);
 
     let output_fmt = if args.output_json {
         OutputFmt::Json

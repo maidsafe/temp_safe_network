@@ -32,6 +32,7 @@ pub use authd_client_api::{
     AuthAllowPrompt, AuthReq, AuthdStatus, PendingAuthReqs, SafeAuthdClient,
 };
 pub use authenticator::{AuthedApp, AuthedAppsList, SafeAuthReq, SafeAuthReqId, SafeAuthenticator};
+use constants::DEFAULT_XORURL_BASE;
 pub use errors::{Error, Result};
 pub use fetch::{
     NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
@@ -42,7 +43,7 @@ pub use nrs::ProcessedEntries;
 pub use nrs_map::{NrsMap, SubNamesMap};
 pub use safe_nd::XorName;
 pub use safe_net::SafeApp;
-pub use xorurl::{XorUrl, XorUrlEncoder};
+pub use xorurl::{XorUrl, XorUrlBase, XorUrlEncoder};
 
 #[cfg(feature = "scl-mock")]
 use fake_scl::SafeAppFake as SafeAppImpl;
@@ -51,15 +52,15 @@ use safe_client_libs::SafeAppScl as SafeAppImpl;
 
 pub struct Safe {
     safe_app: SafeAppImpl,
-    pub xorurl_base: String,
+    pub xorurl_base: XorUrlBase,
 }
 
 #[allow(dead_code)]
 impl Safe {
-    pub fn new(xorurl_base: &str) -> Self {
+    pub fn new(xorurl_base: Option<XorUrlBase>) -> Self {
         Self {
             safe_app: SafeApp::new(),
-            xorurl_base: xorurl_base.to_string(),
+            xorurl_base: xorurl_base.unwrap_or_else(|| DEFAULT_XORURL_BASE),
         }
     }
 }

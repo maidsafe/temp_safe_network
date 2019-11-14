@@ -17,7 +17,7 @@ use common::{
     SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
-use safe_api::{SafeContentType, SafeDataType, XorName, XorUrlEncoder};
+use safe_api::{SafeContentType, SafeDataType, XorName, XorUrlBase, XorUrlEncoder};
 use std::process::Command;
 use unwrap::unwrap;
 
@@ -33,7 +33,7 @@ fn gen_fake_target() -> String {
         None,
         None,
         Some(5),
-        "base32"
+        XorUrlBase::Base32
     ))
 }
 
