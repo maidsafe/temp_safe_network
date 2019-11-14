@@ -55,6 +55,12 @@ pub struct Safe {
     pub xorurl_base: XorUrlBase,
 }
 
+impl Default for Safe {
+    fn default() -> Self {
+        Self::new(Some(DEFAULT_XORURL_BASE))
+    }
+}
+
 #[allow(dead_code)]
 impl Safe {
     pub fn new(xorurl_base: Option<XorUrlBase>) -> Self {

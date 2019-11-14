@@ -70,7 +70,7 @@ impl Safe {
     /// # use safe_api::{Safe, SafeData};
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
     ///
@@ -107,7 +107,7 @@ impl Safe {
     /// # use safe_api::{Safe, SafeData};
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false));
     ///
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_fetch_key() {
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let preload_amount = "1324.12";
         let (xorurl, _key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
@@ -409,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_fetch_wallet() {
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorurl = unwrap!(safe.wallet_create());
 
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_fetch_files_container() {
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         safe.connect("", Some("")).unwrap();
 
@@ -479,7 +479,7 @@ mod tests {
     fn test_fetch_resolvable_container() {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("")).unwrap();
 
         let (xorurl, _, the_files_map) =
@@ -528,7 +528,7 @@ mod tests {
     fn test_fetch_resolvable_map_data() {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("")).unwrap();
 
         let (xorurl, _, _the_files_map) =
@@ -575,7 +575,7 @@ mod tests {
 
     #[test]
     fn test_fetch_published_immutable_data() {
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let data = b"Something super immutable";
         let xorurl = safe
@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn test_fetch_unsupported() {
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorname = create_random_xorname().unwrap();
         let type_tag = 575_756_443;
@@ -647,7 +647,7 @@ mod tests {
 
     #[test]
     fn test_fetch_unsupported_with_media_type() {
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let xorname = create_random_xorname().unwrap();
         let type_tag = 575_756_443;

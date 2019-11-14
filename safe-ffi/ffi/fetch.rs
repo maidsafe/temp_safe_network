@@ -1,3 +1,11 @@
+// Copyright 2019 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use super::errors::{Error, Result};
 use super::ffi_structs::{
     nrs_map_container_info_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
@@ -9,6 +17,8 @@ use safe_api::Safe;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn fetch(
     app: *mut Safe,
@@ -35,6 +45,8 @@ pub unsafe extern "C" fn fetch(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn inspect(
     app: *mut Safe,

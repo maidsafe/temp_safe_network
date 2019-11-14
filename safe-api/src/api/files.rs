@@ -46,7 +46,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("../testdata", None, true, false).unwrap();
     /// assert!(xorurl.contains("safe://"))
@@ -114,7 +114,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("../testdata", None, true, false).unwrap();
     /// let (version, files_map) = safe.files_container_get(&xorurl).unwrap();
@@ -189,7 +189,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("../testdata", None, true, false).unwrap();
     /// let (version, new_processed_files, new_files_map) = safe.files_container_sync("../testdata", &xorurl, true, false, false, false).unwrap();
@@ -273,7 +273,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("../testdata", None, true, false).unwrap();
     /// let new_file_name = format!("{}/new_name_test.md", xorurl);
@@ -335,7 +335,7 @@ impl Safe {
     ///
     /// ```rust
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let (xorurl, _processed_files, _files_map) = safe.files_container_create("../testdata", None, true, false).unwrap();
     /// let new_file_name = format!("{}/new_name_test.md", xorurl);
@@ -435,7 +435,7 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data, Some("text/plain")).unwrap();
@@ -482,7 +482,7 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data, None).unwrap();
@@ -1138,7 +1138,7 @@ mod tests {
     #[test]
     fn test_files_container_create_file() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let filename = "../testdata/test.md";
         let (xorurl, processed_files, files_map) =
@@ -1158,7 +1158,7 @@ mod tests {
     #[test]
     fn test_files_container_create_dry_run() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let filename = "../testdata/";
         let (xorurl, processed_files, files_map) =
@@ -1204,7 +1204,7 @@ mod tests {
     #[test]
     fn test_files_container_create_folder_without_trailing_slash() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata", None, true, false));
@@ -1245,7 +1245,7 @@ mod tests {
     #[test]
     fn test_files_container_create_folder_with_trailing_slash() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1286,7 +1286,7 @@ mod tests {
     #[test]
     fn test_files_container_create_dest_path_without_trailing_slash() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata", Some("/myroot"), true, false));
@@ -1327,7 +1327,7 @@ mod tests {
     #[test]
     fn test_files_container_create_dest_path_with_trailing_slash() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata", Some("/myroot/"), true, false));
@@ -1368,7 +1368,7 @@ mod tests {
     #[test]
     fn test_files_container_sync() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1435,7 +1435,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_dry_run() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1504,7 +1504,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_with_versioned_target() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let (xorurl, _, _) =
@@ -1533,7 +1533,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_with_delete() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1595,7 +1595,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_delete_without_recursive() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         match safe.files_container_sync(
             "../testdata/subfolder/",
@@ -1620,7 +1620,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, _, _) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1644,7 +1644,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_update_nrs_with_xorurl() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let (xorurl, _, _) =
@@ -1674,7 +1674,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, _, _) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1712,7 +1712,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_target_path_without_trailing_slash() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1774,7 +1774,7 @@ mod tests {
     #[test]
     fn test_files_container_sync_target_path_with_trailing_slash() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1837,7 +1837,7 @@ mod tests {
     #[test]
     fn test_files_container_get() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, _processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1859,7 +1859,7 @@ mod tests {
     #[test]
     fn test_files_container_version() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, _, _) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1886,7 +1886,7 @@ mod tests {
     #[test]
     fn test_files_container_get_with_version() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, _processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/", None, true, false));
@@ -1955,7 +1955,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, _, _) =
             unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
@@ -1998,7 +1998,7 @@ mod tests {
     #[test]
     fn test_files_container_add() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
@@ -2042,7 +2042,7 @@ mod tests {
     #[test]
     fn test_files_container_add_dir() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
@@ -2071,7 +2071,7 @@ mod tests {
     #[test]
     fn test_files_container_add_existing_name() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
@@ -2120,7 +2120,7 @@ mod tests {
     #[test]
     fn test_files_container_fail_add_or_sync_invalid_path() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
@@ -2161,7 +2161,7 @@ mod tests {
     #[test]
     fn test_files_container_add_a_url() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
@@ -2235,7 +2235,7 @@ mod tests {
     #[test]
     fn test_files_container_add_from_raw() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, processed_files, files_map) =
             unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));

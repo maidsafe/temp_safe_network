@@ -195,7 +195,7 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # use unwrap::unwrap;
-    /// let mut safe = Safe::new(None);
+    /// let mut safe = Safe::default();
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14"));
     /// let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1"));
@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn test_keys_create_preload_test_coins() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
         assert!(xorurl.starts_with("safe://"));
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_keys_create() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.23"));
 
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn test_keys_create_preload() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("543.2312"));
 
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn test_keys_create_preload_invalid_amounts() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         match safe.keys_create_preload_test_coins(".45") {
             Err(err) => assert_eq!(
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn test_keys_create_pk() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1"));
         let pk = pk_to_hex(&SecretKey::random().public_key());
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn test_keys_test_coins_balance_pk() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let preload_amount = "1.154200000";
         let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn test_keys_test_coins_balance_xorurl() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let preload_amount = "0.243000000";
         let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn test_keys_test_coins_balance_wrong_url() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0"));
 
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn test_keys_test_coins_balance_wrong_location() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let amount = "35312.000000000";
         let (mut xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(amount));
@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn test_keys_test_coins_balance_wrong_sk() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0"));
         let mut unwrapped_sk = unwrap!(key_pair).sk;
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn test_keys_balance_pk() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let preload_amount = "1743.234";
         let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount));
@@ -493,7 +493,7 @@ mod tests {
     #[test]
     fn test_keys_balance_xorname() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let preload_amount = "435.34";
         let (from_xorname, from_key_pair) =
@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn test_validate_sk_for_url() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.22"));
         let key_pair_unwrapped = unwrap!(key_pair);
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn test_keys_transfer_from_zero_balance() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0"));
         let (to_safekey_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn test_keys_transfer_diff_amounts() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let (safekey1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.5"));
         let (safekey2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("100.5"));
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn test_keys_transfer_to_wallet() {
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let to_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -657,7 +657,7 @@ mod tests {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let (_from_safekey_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2"));

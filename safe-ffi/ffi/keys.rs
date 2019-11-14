@@ -1,3 +1,11 @@
+// Copyright 2019 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use super::errors::Result;
 use super::ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
 use super::helpers::from_c_str_to_str_option;
@@ -6,6 +14,8 @@ use safe_api::{BlsKeyPair as NativeBlsKeyPair, Safe};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn generate_keypair(
     app: *mut Safe,
@@ -24,6 +34,8 @@ pub unsafe extern "C" fn generate_keypair(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_create(
     app: *mut Safe,
@@ -62,6 +74,8 @@ pub unsafe extern "C" fn keys_create(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_create_preload_test_coins(
     app: *mut Safe,
@@ -89,6 +103,8 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_balance_from_sk(
     app: *mut Safe,
@@ -106,6 +122,8 @@ pub unsafe extern "C" fn keys_balance_from_sk(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_balance_from_url(
     app: *mut Safe,
@@ -125,6 +143,8 @@ pub unsafe extern "C" fn keys_balance_from_url(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn validate_sk_for_url(
     app: *mut Safe,
@@ -144,6 +164,8 @@ pub unsafe extern "C" fn validate_sk_for_url(
     })
 }
 
+/// # Safety
+/// Note this is an unsafe function
 #[no_mangle]
 pub unsafe extern "C" fn keys_transfer(
     app: *mut Safe,

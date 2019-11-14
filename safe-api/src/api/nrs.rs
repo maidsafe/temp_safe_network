@@ -123,7 +123,7 @@ impl Safe {
     /// # use rand::{thread_rng, Rng};
     /// # use unwrap::unwrap;
     /// # use safe_api::Safe;
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let file_xorurl = safe.files_put_published_immutable(&vec![], None).unwrap();
@@ -232,7 +232,7 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # use rand::distributions::Alphanumeric;
     /// # use rand::{thread_rng, Rng};
-    /// # let mut safe = Safe::new(None);
+    /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     /// let file_xorurl = safe.files_put_published_immutable(&vec![], Some("text/plain")).unwrap();
@@ -354,7 +354,7 @@ mod tests {
 
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let nrs_xorname = xorname_from_nrs_string(&site_name).unwrap();
@@ -397,7 +397,7 @@ mod tests {
 
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
@@ -437,7 +437,7 @@ mod tests {
 
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let _ = unwrap!(safe.nrs_map_container_create(
@@ -486,7 +486,7 @@ mod tests {
 
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
@@ -525,7 +525,7 @@ mod tests {
 
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
@@ -561,7 +561,7 @@ mod tests {
 
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::new(None);
+        let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
         let (_xor_url, _entries, nrs_map) = unwrap!(safe.nrs_map_container_create(
