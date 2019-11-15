@@ -112,7 +112,9 @@ pub fn run(
         let (driver, endpoint, incoming) = endpoint
             .bind(endpoint_socket_addr)
             .map_err(|err| Error::GeneralError(format!("Failed to bind endpoint: {}", err)))?;
-        info!(log, "Listening on {}", endpoint.local_addr()?);
+        let local_addr = endpoint.local_addr()?;
+        info!(log, "Listening on {}", local_addr);
+        println!("Listening on {}", local_addr);
         (driver, incoming)
     };
 
