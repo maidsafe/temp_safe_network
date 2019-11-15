@@ -16,9 +16,6 @@ use safe_api::{
 use serde::Deserialize;
 use std::fs;
 
-const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
-const SAFE_AUTHD_WINDOWS_EXECUTABLE: &str = "safe-authd.exe";
-
 #[derive(Deserialize, Debug)]
 struct Environment {
     safe_auth_passphrase: Option<String>,
@@ -32,38 +29,23 @@ struct LoginDetails {
 }
 
 pub fn authd_install(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    let authd_path = get_authd_bin_path();
-    safe_authd
-        .install(Some(&authd_path))
-        .map_err(|err| err.to_string())
+    safe_authd.install(None).map_err(|err| err.to_string())
 }
 
 pub fn authd_uninstall(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    let authd_path = get_authd_bin_path();
-    safe_authd
-        .uninstall(Some(&authd_path))
-        .map_err(|err| err.to_string())
+    safe_authd.uninstall(None).map_err(|err| err.to_string())
 }
 
 pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    let authd_path = get_authd_bin_path();
-    safe_authd
-        .start(Some(&authd_path))
-        .map_err(|err| err.to_string())
+    safe_authd.start(None).map_err(|err| err.to_string())
 }
 
 pub fn authd_stop(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    let authd_path = get_authd_bin_path();
-    safe_authd
-        .stop(Some(&authd_path))
-        .map_err(|err| err.to_string())
+    safe_authd.stop(None).map_err(|err| err.to_string())
 }
 
 pub fn authd_restart(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    let authd_path = get_authd_bin_path();
-    safe_authd
-        .restart(Some(&authd_path))
-        .map_err(|err| err.to_string())
+    safe_authd.restart(None).map_err(|err| err.to_string())
 }
 
 pub fn authd_create(
@@ -286,38 +268,6 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
 }
 
 // Private helpers
-
-fn get_authd_bin_path() -> String {
-    let mut path = std::path::PathBuf::new();
-
-    let authd_bin = if cfg!(windows) {
-        std::path::Path::new(SAFE_AUTHD_WINDOWS_EXECUTABLE)
-    } else {
-        std::path::Path::new(SAFE_AUTHD_EXECUTABLE)
-    };
-
-    match std::env::var("SAFE_AUTHD_PATH") {
-        Ok(authd_path) => path.push(authd_path),
-        Err(_) => {
-            // If there is no 'safe-authd' executable in PATH we then try to find in cargo target folder
-            if !authd_bin.is_file() {
-                match std::env::var("CARGO_TARGET_DIR") {
-                    Ok(target_dir) => path.push(target_dir),
-                    Err(_) => path.push("target"),
-                };
-
-                if cfg!(debug_assertions) {
-                    path.push("debug");
-                } else {
-                    path.push("release");
-                };
-            }
-        }
-    };
-
-    path.push(authd_bin);
-    path.display().to_string()
-}
 
 // TODO: use a different crate than rpassword as it has problems with some Windows shells including PowerShell
 fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {

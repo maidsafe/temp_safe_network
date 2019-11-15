@@ -6,11 +6,12 @@ authd_bin_name="safe-authd"
 [[ -z $RANDOM_PORT_NUMBER ]] && export RANDOM_PORT_NUMBER=41805
 [[ -z $SAFE_MOCK_VAULT_PATH ]] && export SAFE_MOCK_VAULT_PATH=~/safe_auth
 
+uname_output=$(uname -a)
+
 function build_safe_authd() {
     cd safe-authd
     cargo build --release --features mock-network
 
-    uname_output=$(uname -a)
     case $uname_output in
         Linux*)
             ;;
@@ -26,7 +27,8 @@ function build_safe_authd() {
     rm -rf $SAFE_MOCK_VAULT_PATH
     mkdir $SAFE_MOCK_VAULT_PATH
     mv ../target/release/$authd_bin_name $SAFE_MOCK_VAULT_PATH
-
+    pwd
+    ls -la
     cd -
 }
 
@@ -39,11 +41,12 @@ function run_safe_authd() {
     echo "Stopping safe-authd daemon.."
     ./$authd_bin_name stop || true
     echo "Launching safe-authd daemon on port:" $RANDOM_PORT_NUMBER
-    # ./target/release/$authd_bin_name start --listen https://localhost:$RANDOM_PORT_NUMBER &
-    ./$authd_bin_name start &
+    # ./$authd_bin_name start --listen https://localhost:$RANDOM_PORT_NUMBER &
+    ./$authd_bin_name start
     sleep 15
     cd -
 }
 
 build_safe_authd
-run_safe_authd
+# Temporarily diasabled until we migrate to GH Actions setup for CI
+# run_safe_authd

@@ -16,9 +16,18 @@ use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
+
+const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
+const SAFE_AUTHD_WINDOWS_EXECUTABLE: &str = "safe-authd.exe";
+const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
+const ENV_VAR_PATH: &str = "PATH";
+const ENV_VAR_CARGO_TARGET_DIR: &str = "CARGO_TARGET_DIR";
+const ENV_VAR_PATH_SEPARATOR: &str = ":";
+const ENV_VAR_PATH_SEPARATOR_WINDOWS: &str = ";";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthReq {
@@ -517,7 +526,10 @@ fn send_request(url_str: &str) -> Result<String> {
 }
 
 fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
-    let path = authd_path.unwrap_or_else(|| "");
+    let path = match authd_path {
+        None => get_authd_bin_path(),
+        Some(p) => p.into(),
+    };
     debug!("Attempting to {} authd '{}' ...", args[0], path);
 
     let output = Command::new(&path).args(args).output().map_err(|err| {
@@ -544,5 +556,55 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
                 String::from_utf8_lossy(&output.stderr)
             ))),
         }
+    }
+}
+
+fn get_authd_bin_path() -> String {
+    let mut path = PathBuf::new();
+
+    let authd_bin = if cfg!(windows) {
+        Path::new(SAFE_AUTHD_WINDOWS_EXECUTABLE)
+    } else {
+        Path::new(SAFE_AUTHD_EXECUTABLE)
+    };
+
+    // if SAFE_AUTHD_PATH is set it then overrides PATH
+    if let Ok(authd_path) = std::env::var(ENV_VAR_SAFE_AUTHD_PATH) {
+        path.push(authd_path);
+    } else {
+        // If there is no 'safe-authd' executable in PATH we then try to find in cargo target folder
+        if !is_exec_in_path(authd_bin) {
+            match std::env::var(ENV_VAR_CARGO_TARGET_DIR) {
+                Ok(target_dir) => path.push(target_dir),
+                Err(_) => path.push("target"),
+            };
+
+            if cfg!(debug_assertions) {
+                path.push("debug");
+            } else {
+                path.push("release");
+            };
+        }
+    }
+
+    path.push(authd_bin);
+    path.display().to_string()
+}
+
+#[inline]
+fn is_exec_in_path(exec: &Path) -> bool {
+    if let Ok(path) = std::env::var(ENV_VAR_PATH) {
+        let mut path_vec = if cfg!(windows) {
+            path.split(ENV_VAR_PATH_SEPARATOR_WINDOWS)
+        } else {
+            path.split(ENV_VAR_PATH_SEPARATOR)
+        };
+
+        path_vec.any(|p| {
+            let exec_path = Path::new(p).join(exec);
+            exec_path.metadata().is_ok()
+        })
+    } else {
+        false
     }
 }

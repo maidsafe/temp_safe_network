@@ -45,4 +45,5 @@ function run_cli_tests_with_auth_daemon() {
 }
 
 run_cli_tests
-run_cli_tests_with_auth_daemon
+# Temporarily diasable these tests until we migrate to GH Actions setup for CI
+# run_cli_tests_with_auth_daemon
