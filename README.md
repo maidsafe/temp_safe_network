@@ -157,6 +157,25 @@ Sending request to authd to obtain an status report...
 +------------------------------------------+-------+
 ```
 
+#### Vault must be running
+
+Before we can create an account (or login) a safe_vault must be running.
+
+1. download latest release from [safe_vault releases](https://github.com/maidsafe/safe_vault/releases).
+2. untar/unzip downloaded file into a directory of your choice.
+3. exec safe_vault.
+
+Example commands on linux:
+
+```
+$ mkdir ~/safe_vault
+$ cd ~/safe_vault
+$ wget https://github.com/maidsafe/safe_vault/releases/download/0.19.2/safe_vault-0.19.2-x86_64-unknown-linux-musl.tar.gz
+$ tar -xzvf safe_vault-0.19.2-x86_64-unknown-linux-musl.tar.gz
+$ ./safe_vault
+```
+
+
 #### Auth create-acc
 
 Since we now have our SAFE Authenticator running and ready to accept requests, we can start interacting with it by using others SAFE CLI `auth` subcommands.
