@@ -1,15 +1,21 @@
 # SAFE Authenticator daemon
 
-This crate implements a SAFE Authenticator service which runs as a daemon (or as a service in Windows platforms).
-
-The `safe-authd` exposes its services as a [QUIC](https://en.wikipedia.org/wiki/QUIC) interface allowing applications and users to connect to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
+| [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
+|:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 ## Table of contents
 
-1. [Download](#download)
-2. [Build](#build)
-3. [Launching the safe-authd](#launching-the-safe-authd)
-4. [License](#license)
+1. [Description](#description)
+2. [Download](#download)
+3. [Build](#build)
+4. [Launching the safe-authd](#launching-the-safe-authd)
+5. [License](#license)
+
+## Description
+
+This crate implements a SAFE Authenticator service which runs as a daemon (or as a service in Windows platforms).
+
+The `safe-authd` exposes its services as a [QUIC](https://en.wikipedia.org/wiki/QUIC) interface allowing applications and users to connect to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
 
 ## Download
 

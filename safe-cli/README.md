@@ -1,21 +1,14 @@
-|Documentation|Linux/macOS/Windows|
-|:-----------:|:-----------------:|
-| [![Documentation](https://docs.rs/safe-cli/badge.svg)](https://docs.rs/safe-cli) | [![Build Status](https://travis-ci.com/maidsafe/safe-cli.svg?branch=master)](https://travis-ci.com/maidsafe/safe-cli) |
+# SAFE CLI
 
 | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
-# SAFE CLI
-
-This crate implements a CLI (Command Line Interface) for the SAFE Network.
-
-The SAFE CLI provides all the tools necessary to interact with the SAFE Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the SAFE Network and the data stored on it, allowing them to also use it for automated scripts and piped chain of commands.
-
 ## Table of contents
 
-1. [Download](#download)
-2. [Build](#build)
-3. [Using the CLI](#using-the-cli)
+1. [Description](#description)
+2. [Download](#download)
+3. [Build](#build)
+4. [Using the CLI](#using-the-cli)
   - [Auth](#auth)
     - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
     - [Auth start (Linux/Mac)](#auth-start-linuxmac)
@@ -48,8 +41,14 @@ The SAFE CLI provides all the tools necessary to interact with the SAFE Network,
   - [SAFE-URLs](#safe-urls)
   - [Dog](#dog)
   - [Update](#update)
-4. [Further Help](#further-help)
-5. [License](#license)
+5. [Further Help](#further-help)
+6. [License](#license)
+
+## Description
+
+This crate implements a CLI (Command Line Interface) for the SAFE Network.
+
+The SAFE CLI provides all the tools necessary to interact with the SAFE Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the SAFE Network and the data stored on it, allowing them to also use it for automated scripts and piped chain of commands.
 
 ## Download
 
@@ -154,6 +153,24 @@ Sending request to authd to obtain an status report...
 | Number of notifications subscriptors     | 0     |
 +------------------------------------------+-------+
 ```
+
+##### Vault must be running
+
+Before we can create an account (or login) we need either a safe_vault running locally, or the configuration file to connect to a remote vault in the right place. To run a vault locally follow these steps:
+1. download latest release from [safe_vault releases](https://github.com/maidsafe/safe_vault/releases/latest)
+2. untar/unzip downloaded file into a directory of your choice
+3. execute the safe_vault
+
+Example commands on Linux/Mac:
+```shell
+$ mkdir ~/safe_vault
+$ cd ~/safe_vault
+$ wget https://github.com/maidsafe/safe_vault/releases/download/0.19.2/safe_vault-0.19.2-x86_64-unknown-linux-musl.tar.gz
+$ tar -xzvf safe_vault-0.19.2-x86_64-unknown-linux-musl.tar.gz
+$ ./safe_vault
+```
+
+Once we made sure we have a vault running locally (or otherwise the right configuration for a remote vault), we can proceed with the next steps.
 
 #### Auth create-acc
 

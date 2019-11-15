@@ -1,26 +1,23 @@
 # The SAFE API
 
-|Documentation|Linux/macOS/Windows|
-|:-----------:|:-----------------:|
-| [![Documentation](https://docs.rs/safe-api/badge.svg)](https://docs.rs/safe-api) | [![Build Status](https://travis-ci.com/maidsafe/safe-api.svg?branch=master)](https://travis-ci.com/maidsafe/safe-api) |
-
 | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 ## Table of contents
+
 1. [Description](#description)
 2. [The SAFE API](#the-safe-api)
 3. [The FFI layer](#the-ffi-layer)
-3. [The CLI](#the-cli)
-3. [The Authenticator daemon](#the-authenticator-daemon)
-5. [Contributing](#contributing)
+4. [The SAFE CLI](#the-safe-cli)
+5. [The Authenticator daemon](#the-authenticator-daemon)
+6. [Contributing](#contributing)
     * [Project board](#project-board)
     * [Issues](#issues)
     * [Commits and Pull Requests](#commits-and-pull-requests)
     * [Releases](#releases)
     * [Copyrights](#copyrights)
-6. [Further Help](#further-help)
-7. [License](#license)
+7. [Further Help](#further-help)
+8. [License](#license)
 
 ## Description
 
@@ -46,7 +43,7 @@ The [safe-ffi](safe-ffi) is a Rust crate exposing the same functions as the SAFE
 
 Therefore, if you are developing a SAFE application using a different programming language than Rust, this is the crate you need to access the SAFE API. This crate also provides scripts to automatically generate the binding libraries for some languages like Java and C#. Please refer to its documentation for more details according to the programming language you are intending to use.
 
-## The CLI
+## The SAFE CLI
 
 The [safe-cli](safe-cli) is a Rust application which implements a CLI (Command Line Interface) for the SAFE Network.
 
