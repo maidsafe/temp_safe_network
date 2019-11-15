@@ -41,7 +41,7 @@ The [safe-api](safe-api) is a Rust crate which exposes the SAFE API with all the
 
 The [safe-ffi](safe-ffi) is a Rust crate exposing the same functions as the SAFE API (`safe-api`) but in the form of an interface which can be consumed from other programming languages like C, this is achieved by the use of the [Rust FFI feature](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#using-extern-functions-to-call-external-code).
 
-Therefore, if you are developing a SAFE application using a different programming language than Rust, this is the crate you need to access the SAFE API. This crate also provides scripts to automatically generate the binding libraries for some languages like Java and C#. Please refer to its documentation for more details according to the programming language you are intending to use.
+Therefore, if you are developing a SAFE application using a different programming language than Rust, this is the crate you need to access the SAFE API. This crate also provides scripts to automatically generate the binding libraries for some languages like Java and C#.
 
 ## The SAFE CLI
 

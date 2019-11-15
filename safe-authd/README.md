@@ -17,6 +17,10 @@ This crate implements a SAFE Authenticator service which runs as a daemon (or as
 
 The `safe-authd` exposes its services as a [QUIC](https://en.wikipedia.org/wiki/QUIC) interface allowing applications and users to connect to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
 
+It keeps in memory a list of authorisation requests pending of approval/denial, as well as the list of the registered subscribers that the notifications shall be sent to.
+
+![authd software architecture](/misc/authd-software.png)
+
 ## Download
 
 The latest version of the SAFE Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/safe-authd/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.
