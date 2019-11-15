@@ -100,7 +100,7 @@ pub struct FilesContainer {
     pub xorname: XorNameArray,
     pub type_tag: u64,
     pub version: u64,
-    pub files_map: *const c_char,
+    pub files_map: FilesMap,
     pub data_type: u64,
     pub resolved_from: NrsMapContainerInfo,
 }
@@ -110,10 +110,6 @@ impl Drop for FilesContainer {
         unsafe {
             if !self.xorurl.is_null() {
                 let _ = CString::from_raw(self.xorurl as *mut _);
-            }
-
-            if !self.files_map.is_null() {
-                let _ = CString::from_raw(self.files_map as *mut _);
             }
         }
     }
@@ -367,20 +363,20 @@ pub unsafe fn processed_files_into_repr_c(map: &NativeProcessedFiles) -> Result<
 }
 
 #[repr(C)]
-pub struct FileItem {
-    pub file_meta_data: *const c_char,
-    pub xorurl: *const c_char,
+pub struct FileMetaDataItem {
+    pub meta_data_key: *const c_char,
+    pub meta_data_value: *const c_char,
 }
 
-impl Drop for FileItem {
+impl Drop for FileMetaDataItem {
     fn drop(&mut self) {
         unsafe {
-            if !self.file_meta_data.is_null() {
-                let _ = CString::from_raw(self.file_meta_data as *mut _);
+            if !self.meta_data_key.is_null() {
+                let _ = CString::from_raw(self.meta_data_key as *mut _);
             }
 
-            if !self.xorurl.is_null() {
-                let _ = CString::from_raw(self.xorurl as *mut _);
+            if !self.meta_data_value.is_null() {
+                let _ = CString::from_raw(self.meta_data_value as *mut _);
             }
         }
     }
@@ -389,8 +385,8 @@ impl Drop for FileItem {
 #[repr(C)]
 pub struct FileInfo {
     pub file_name: *const c_char,
-    pub file_items: *const FileItem,
-    pub file_items_len: usize,
+    pub file_meta_data: *const FileMetaDataItem,
+    pub file_meta_data_len: usize,
 }
 
 impl Drop for FileInfo {
@@ -400,7 +396,10 @@ impl Drop for FileInfo {
                 let _ = CString::from_raw(self.file_name as *mut _);
             }
 
-            let _ = vec_from_raw_parts(self.file_items as *mut FileItem, self.file_items_len);
+            let _ = vec_from_raw_parts(
+                self.file_meta_data as *mut FileMetaDataItem,
+                self.file_meta_data_len,
+            );
         }
     }
 }
@@ -412,17 +411,17 @@ pub unsafe fn file_info_into_repr_c(
     let mut vec = Vec::with_capacity(file_item_map.len());
 
     for (file_meta_data, xorurl) in file_item_map {
-        vec.push(FileItem {
-            file_meta_data: CString::new(file_meta_data.to_string())?.into_raw(),
-            xorurl: CString::new(xorurl.to_string())?.into_raw(),
+        vec.push(FileMetaDataItem {
+            meta_data_key: CString::new(file_meta_data.to_string())?.into_raw(),
+            meta_data_value: CString::new(xorurl.to_string())?.into_raw(),
         })
     }
 
-    let (file_items, file_items_len) = vec_into_raw_parts(vec);
+    let (file_meta_data, file_meta_data_len) = vec_into_raw_parts(vec);
     Ok(FileInfo {
         file_name: CString::new(file_name.to_string())?.into_raw(),
-        file_items,
-        file_items_len,
+        file_meta_data,
+        file_meta_data_len,
     })
 }
 

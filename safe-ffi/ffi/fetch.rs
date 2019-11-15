@@ -8,8 +8,9 @@
 
 use super::errors::{Error, Result};
 use super::ffi_structs::{
-    nrs_map_container_info_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
-    NrsMapContainerInfo, PublishedImmutableData, SafeKey, Wallet,
+    files_map_into_repr_c, nrs_map_container_info_into_repr_c,
+    wallet_spendable_balances_into_repr_c, FilesContainer, NrsMapContainerInfo,
+    PublishedImmutableData, SafeKey, Wallet,
 };
 use ffi_utils::{catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC};
 use safe_api::fetch::SafeData;
@@ -112,11 +113,10 @@ unsafe fn invoke_callback(
             data_type,
             resolved_from,
         }) => {
-            let files_map_json = serde_json::to_string(&files_map)?;
             let container = FilesContainer {
                 xorurl: CString::new(xorurl.clone())?.into_raw(),
                 version: *version,
-                files_map: CString::new(files_map_json)?.into_raw(),
+                files_map: files_map_into_repr_c(&files_map)?,
                 type_tag: *type_tag,
                 xorname: xorname.0,
                 data_type: (*data_type).clone() as u64,
