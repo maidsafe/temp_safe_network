@@ -14,11 +14,15 @@ use prettytable::Table;
 use safe_api::{Safe, SafeData};
 use std::io::{self, Write};
 use structopt::StructOpt;
+use pretty_hex;
 
 #[derive(StructOpt, Debug)]
 pub struct CatCommands {
     /// The safe:// location to retrieve
     location: Option<String>,
+    /// renders file output as hex
+    #[structopt(long = "hexdump")]
+    hexdump: bool,
 }
 
 pub fn cat_commander(
@@ -65,10 +69,18 @@ pub fn cat_commander(
             }
         }
         SafeData::PublishedImmutableData { data, .. } => {
-            // Render ImmutableData file
-            io::stdout()
-                .write_all(data)
-                .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
+            if cmd.hexdump {
+                // Render hex representation of ImmutableData file
+                io::stdout()
+                    .write_all(pretty_hex::pretty_hex(data).as_bytes())
+                    .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
+            }
+            else {
+                // Render ImmutableData file
+                io::stdout()
+                    .write_all(data)
+                    .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
+            }
         }
         SafeData::Wallet { balances, .. } => {
             // Render Wallet
