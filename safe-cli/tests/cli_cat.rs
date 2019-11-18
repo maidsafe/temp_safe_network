@@ -23,6 +23,7 @@ use unwrap::unwrap;
 
 const TEST_FILE: &str = "../testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
+const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6c 6c  6f 20 74 65  73 74 73 21                hello tests!\n";
 const ANOTHER_FILE: &str = "../testdata/another.md";
 const ANOTHER_FILE_CONTENT: &str = "exists";
 
@@ -37,6 +38,30 @@ fn calling_safe_cat() {
     cmd.args(&vec!["cat", &map[TEST_FILE].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
+        .success();
+
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
+    assert_eq!(
+        xorurl_encoder.content_type(),
+        SafeContentType::MediaType("text/x-markdown".to_string())
+    );
+    assert_eq!(
+        xorurl_encoder.data_type(),
+        SafeDataType::PublishedImmutableData
+    );
+}
+
+#[test]
+fn calling_safe_cat_hexdump() {
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
+        .read()
+        .unwrap();
+
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", "--hexdump", &map[TEST_FILE].1])
+        .assert()
+        .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
         .success();
 
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
