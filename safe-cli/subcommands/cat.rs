@@ -20,8 +20,8 @@ use pretty_hex;
 pub struct CatCommands {
     /// The safe:// location to retrieve
     location: Option<String>,
-    /// renders file output as hex
-    #[structopt(long = "hexdump")]
+    /// Renders file output as hex
+    #[structopt(short = "x", long = "hexdump")]
     hexdump: bool,
 }
 
@@ -71,9 +71,7 @@ pub fn cat_commander(
         SafeData::PublishedImmutableData { data, .. } => {
             if cmd.hexdump {
                 // Render hex representation of ImmutableData file
-                io::stdout()
-                    .write_all(pretty_hex::pretty_hex(data).as_bytes())
-                    .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
+                println!("{}", pretty_hex::pretty_hex(data).to_string());
             }
             else {
                 // Render ImmutableData file
