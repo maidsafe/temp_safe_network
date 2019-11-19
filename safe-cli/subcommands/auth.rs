@@ -74,13 +74,13 @@ pub enum AuthSubCommands {
     /// Send request to a remote Authenticator daemon to subscribe an endpoint URL to receive authorisation requests notifications
     Subscribe {
         /// The endpoint URL to subscribe
-        notifs_endpoint: String,
+        notifs_endpoint: Option<String>,
     },
     #[structopt(name = "unsubscribe")]
     /// Send request to a remote Authenticator daemon to unsubscribe an endpoint URL from authorisation requests notifications
     Unsubscribe {
         /// The endpoint URL to unsubscribe
-        notifs_endpoint: String,
+        notifs_endpoint: Option<String>,
     },
     #[structopt(name = "install")]
     /// Install safe-authd as a service. Only for Windows platforms
@@ -167,10 +167,13 @@ pub fn auth_commander(
             let safe_authd = SafeAuthdClient::new(endpoint);
             authd_deny(&safe_authd, req_id)
         }
-        Some(AuthSubCommands::Subscribe { notifs_endpoint }) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_subscribe_url(&safe_authd, notifs_endpoint)
-        }
+        Some(AuthSubCommands::Subscribe { notifs_endpoint }) => match notifs_endpoint {
+            None => Err("The endpoint URL needs to be provided. If you subscribe within the interactive shell the URL is then optional".to_string()),
+            Some(endpoint) => {
+                let safe_authd = SafeAuthdClient::new(Some(endpoint.clone()));
+                authd_subscribe_url(&safe_authd, endpoint)
+            }
+        },
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
             let mut safe_authd = SafeAuthdClient::new(endpoint);
             authd_unsubscribe(&mut safe_authd, notifs_endpoint)

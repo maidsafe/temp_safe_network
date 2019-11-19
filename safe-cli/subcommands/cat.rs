@@ -10,11 +10,11 @@ use super::helpers::get_from_arg_or_stdin;
 use super::OutputFmt;
 use crate::operations::safe_net::connect;
 use log::debug;
+use pretty_hex;
 use prettytable::Table;
 use safe_api::{Safe, SafeData};
 use std::io::{self, Write};
 use structopt::StructOpt;
-use pretty_hex;
 
 #[derive(StructOpt, Debug)]
 pub struct CatCommands {
@@ -72,12 +72,11 @@ pub fn cat_commander(
             if cmd.hexdump {
                 // Render hex representation of ImmutableData file
                 println!("{}", pretty_hex::pretty_hex(data).to_string());
-            }
-            else {
+            } else {
                 // Render ImmutableData file
-                io::stdout()
-                    .write_all(data)
-                    .map_err(|err| format!("Failed to print out the content of the file: {}", err))?
+                io::stdout().write_all(data).map_err(|err| {
+                    format!("Failed to print out the content of the file: {}", err)
+                })?
             }
         }
         SafeData::Wallet { balances, .. } => {

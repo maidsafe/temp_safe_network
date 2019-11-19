@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::operations::{auth_daemon::*, safe_net::*};
-use crate::APP_ID;
+use super::cli;
+use crate::operations::auth_daemon::*;
+use crate::subcommands::auth::{auth_commander, AuthSubCommands};
+use crate::subcommands::SubCommands;
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
 use std::io::{stdout, Write};
-
-const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
+use structopt::StructOpt;
 
 pub fn shell_run() -> Result<(), String> {
     let safe = Safe::default();
@@ -24,173 +25,50 @@ pub fn shell_run() -> Result<(), String> {
             "Command '{}' is unknown or not supported yet in interactive mode",
             cmd
         )?;
-        writeln!(io, "Type 'help' for a list of currently supported commands")?;
+        writeln!(io, "Type 'help' for a list of currently supported top level commands")?;
+        writeln!(io, "Pass '--help' flag to any top level command for a complete list of supported subcommands and arguments")?;
         Ok(())
     });
-    shell.new_command_noargs(
-        "auth",
-        "Authorise the CLI using a remote Authenticator daemon, or interact with it using subcommands",
-        |io, (safe, _)| match authorise_cli(safe, None) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
-    );
     shell.new_command(
-        "auth-create",
-        "Send request to a remote Authenticator daemon to create a new SAFE account",
+        "auth",
+        "Authorise the SAFE CLI and interact with a remote Authenticator daemon",
         0,
         |io, (safe, safe_authd_client), args| {
-            let config_file = if args.is_empty() {
-                None
-            } else {
-                Some(args[0].to_string())
-            };
+            // Let's create an args array to mimic the one we'd receive commands were passed from outside shell
+            let mut mimic_cli_args = vec!["safe", "auth"];
+            mimic_cli_args.extend(args.iter());
 
-            match authd_create(safe, safe_authd_client, config_file, None, true) {
-                Ok(()) => Ok(()),
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        },
-    );
-    shell.new_command_noargs(
-        "auth-status",
-        "Send request to a remote Authenticator daemon to obtain an status report",
-        |io, (_, safe_authd_client)| match authd_status(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
-    );
-    shell.new_command(
-        "auth-login",
-        "Send request to a remote Authenticator daemon to login to a SAFE account",
-        0,
-        |io, (_, safe_authd_client), args| {
-            let config_file = if args.is_empty() {
-                None
-            } else {
-                Some(args[0].to_string())
-            };
-
-            match authd_login(safe_authd_client, config_file) {
-                Ok(()) => Ok(()),
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        },
-    );
-    shell.new_command_noargs("auth-logout", "Send request to a remote Authenticator daemon to logout from currently logged in SAFE account", |io, (_, safe_authd_client)| {
-        match authd_logout(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        }
-    });
-    shell.new_command_noargs(
-        "auth-clear",
-        "Clear SAFE CLI authorisation credentials from local file",
-        |io, (_, _)| match clear_credentials() {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
-    );
-    shell.new_command_noargs(
-        "auth-apps",
-        "Send request to a remote Authenticator daemon to retrieve the list of the authorised applications",
-        |io, (_, safe_authd_client)| match authd_apps(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
-    );
-    shell.new_command(
-        "auth-revoke",
-        "Send request to a remote Authenticator daemon to revoke permissions from a previously authorised application",
-        1, |io, (_, safe_authd_client), args| {
-            let app_id = args[0];
-            match authd_revoke(safe_authd_client, app_id.to_string()) {
-                Ok(()) => Ok(()),
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        }
-    );
-    shell.new_command_noargs(
-        "auth-reqs",
-        "Send request to a remote Authenticator daemon to retrieve the list of the pending authorisation requests",
-        |io, (_, safe_authd_client)| match authd_auth_reqs(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
-    );
-    shell.new_command(
-        "auth-allow",
-        "Send request to a remote Authenticator daemon to allow an authorisation request",
-        1,
-        |io, (_, safe_authd_client), args| {
-            let req_id = args[0].to_string().parse::<u32>()?;
-            match authd_allow(safe_authd_client, req_id) {
-                Ok(()) => Ok(()),
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        },
-    );
-    shell.new_command(
-        "auth-deny",
-        "Send request to a remote Authenticator daemon to deny an authorisation request",
-        1,
-        |io, (_, safe_authd_client), args| {
-            let req_id = args[0].to_string().parse::<u32>()?;
-            match authd_deny(safe_authd_client, req_id) {
-                Ok(()) => Ok(()),
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        },
-    );
-
-    shell.new_command(
-        "auth-subscribe",
-        "Send request to a remote Authenticator daemon to subscribe to receive authorisation requests notifications",
-        0,
-        |io, (_, safe_authd_client), args| {
-            let endpoint = if args.is_empty() {
-                AUTH_REQS_NOTIFS_ENDPOINT.to_string()
-            } else {
-                args[0].to_string()
-            };
-
-            match authd_subscribe(safe_authd_client, endpoint, APP_ID, &prompt_to_allow_auth) {
-                Ok(()) => {
-                    writeln!(io, "Keep this shell session open to receive the notifications")?;
-                    Ok(())
+            // We can now pass this args array to the CLI structopt parser
+            match cli::CmdArgs::from_iter_safe(mimic_cli_args) {
+                Ok(cmd_args) => {
+                    match cmd_args.cmd {
+                        Some(SubCommands::Auth { cmd }) => {
+                            if let Some(AuthSubCommands::Subscribe { notifs_endpoint }) = cmd {
+                                match authd_subscribe(safe_authd_client, notifs_endpoint, &prompt_to_allow_auth) {
+                                    Ok(()) => {
+                                        writeln!(io, "Keep this shell session open to receive the notifications")?;
+                                        Ok(())
+                                    },
+                                    Err(err) => {
+                                        writeln!(io, "{}", err)?;
+                                        Ok(())
+                                    }
+                                }
+                            } else {
+                                match auth_commander(cmd, cmd_args.endpoint, safe) {
+                                    Ok(()) => Ok(()),
+                                    Err(err) => {
+                                        writeln!(io, "{}", err)?;
+                                        Ok(())
+                                    }
+                                }
+                            }
+                        },
+                        _other => {
+                            writeln!(io, "Unexpected error. Command not valid")?;
+                            Ok(())
+                        }
+                    }
                 },
                 Err(err) => {
                     writeln!(io, "{}", err)?;
@@ -200,62 +78,58 @@ pub fn shell_run() -> Result<(), String> {
         },
     );
     shell.new_command(
-        "auth-unsubscribe",
-        "Send request to a remote Authenticator daemon to unsubscribe from authorisation requests notifications",
+        "cat",
+        "Read data on the SAFE Network",
         0,
-        |io, (_, safe_authd_client), args| {
-            let endpoint = if args.is_empty() {
-                AUTH_REQS_NOTIFS_ENDPOINT.to_string()
-            } else {
-                args[0].to_string()
-            };
-
-            match authd_unsubscribe(safe_authd_client, endpoint) {
-                Ok(()) => Ok(()),
-                Err(err) => {
-                    writeln!(io, "{}", err)?;
-                    Ok(())
-                }
-            }
-        },
+        |io, (safe, _safe_authd_client), args| call_cli("cat", args, safe, io),
     );
-    shell.new_command_noargs(
-        "auth-start",
-        "Starts the Authenticator daemon if it's not running already",
-        |io, (_, safe_authd_client)| match authd_start(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
+    shell.new_command(
+        "dog",
+        "Inspect data on the SAFE Network providing only metadata information about the content",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("dog", args, safe, io),
     );
-    shell.new_command_noargs(
-        "auth-stop",
-        "Stops the Authenticator daemon if it's running",
-        |io, (_, safe_authd_client)| match authd_stop(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
+    shell.new_command(
+        "files",
+        "Manage files on the SAFE Network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("files", args, safe, io),
     );
-    shell.new_command_noargs(
-        "auth-restart",
-        "Restarts the Authenticator daemon if it's running already",
-        |io, (_, safe_authd_client)| match authd_restart(safe_authd_client) {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                writeln!(io, "{}", err)?;
-                Ok(())
-            }
-        },
+    shell.new_command(
+        "keypair",
+        "Generate a key pair without creating and/or storing a SafeKey on the network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("keypair", args, safe, io),
+    );
+    shell.new_command(
+        "nrs",
+        "Manage public names on the SAFE Network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("nrs", args, safe, io),
+    );
+    shell.new_command(
+        "keys",
+        "Manage keys on the SAFE Network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("keys", args, safe, io),
+    );
+    shell.new_command(
+        "wallet",
+        "Manage wallets on the SAFE Network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("wallet", args, safe, io),
+    );
+    shell.new_command(
+        "update",
+        "Update the application to the latest available version",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("update", args, safe, io),
     );
 
     println!();
     println!("Welcome to SAFE CLI interactive shell!");
     println!("Type 'help' for a list of supported commands");
+    println!("Pass '--help' flag to any top level command for a complete list of supported subcommands and arguments");
     println!("Type 'quit' to exit this shell. Enjoy it!");
     println!();
 
@@ -263,6 +137,26 @@ pub fn shell_run() -> Result<(), String> {
     shell.run_loop(&mut ShellIO::default());
 
     Ok(())
+}
+
+fn call_cli(
+    subcommand: &str,
+    args: &[&str],
+    safe: &mut Safe,
+    io: &mut shrust::ShellIO,
+) -> Result<(), shrust::ExecError> {
+    // Let's create an args array to mimic the one we'd receive when passed to CLI
+    let mut mimic_cli_args = vec!["safe", subcommand];
+    mimic_cli_args.extend(args.iter());
+
+    // We can now pass this args array to the CLI
+    match cli::run_with(&mimic_cli_args, safe) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            writeln!(io, "{}", err)?;
+            Ok(())
+        }
+    }
 }
 
 fn prompt_to_allow_auth(auth_req: AuthReq) -> Option<bool> {

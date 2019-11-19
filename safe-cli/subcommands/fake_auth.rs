@@ -20,7 +20,7 @@ pub enum AuthSubCommands {
 
 pub fn auth_commander(
     cmd: Option<AuthSubCommands>,
-    _port: Option<u16>,
+    _endpoint: Option<String>,
     _safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
@@ -28,7 +28,7 @@ pub fn auth_commander(
             debug!("Fake-auth is enabled so we don't try to clear the credentials file");
             Ok(())
         }
-        None => {
+        _other => {
             debug!("Fake-auth is enabled so we don't try to read the credentials file or send auth request");
             Ok(())
         }

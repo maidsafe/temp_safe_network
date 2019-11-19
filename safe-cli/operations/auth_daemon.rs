@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::APP_ID;
 use envy::from_env;
 use log::info;
 use prettytable::Table;
@@ -15,6 +16,8 @@ use safe_api::{
 };
 use serde::Deserialize;
 use std::fs;
+
+const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 
 #[derive(Deserialize, Debug)]
 struct Environment {
@@ -140,12 +143,12 @@ pub fn authd_deny(safe_authd: &SafeAuthdClient, req_id: u32) -> Result<(), Strin
 
 pub fn authd_subscribe(
     safe_authd: &mut SafeAuthdClient,
-    notifs_endpoint: String,
-    app_id: &str,
+    notifs_endpoint: Option<String>,
     auth_allow_prompt: &'static AuthAllowPrompt,
 ) -> Result<(), String> {
     println!("Sending request to subscribe...");
-    safe_authd.subscribe(&notifs_endpoint, app_id, auth_allow_prompt)?;
+    let endpoint = notifs_endpoint.unwrap_or_else(|| AUTH_REQS_NOTIFS_ENDPOINT.to_string());
+    safe_authd.subscribe(&endpoint, APP_ID, auth_allow_prompt)?;
     println!("Subscribed successfully");
     Ok(())
 }
@@ -163,10 +166,11 @@ pub fn authd_subscribe_url(
 
 pub fn authd_unsubscribe(
     safe_authd: &mut SafeAuthdClient,
-    notifs_endpoint: String,
+    notifs_endpoint: Option<String>,
 ) -> Result<(), String> {
     println!("Sending request to unsubscribe...");
-    safe_authd.unsubscribe(&notifs_endpoint)?;
+    let endpoint = notifs_endpoint.unwrap_or_else(|| AUTH_REQS_NOTIFS_ENDPOINT.to_string());
+    safe_authd.unsubscribe(&endpoint)?;
     println!("Unsubscribed successfully");
     Ok(())
 }

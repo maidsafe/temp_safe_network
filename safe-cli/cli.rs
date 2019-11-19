@@ -25,10 +25,10 @@ use safe_api::{Safe, XorUrlBase};
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
 #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
-struct CmdArgs {
+pub struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
-    cmd: Option<SubCommands>,
+    pub cmd: Option<SubCommands>,
     // /// The account's Root Container address
     // #[structopt(long = "root", raw(global = "true"))]
     // root: bool,
@@ -52,14 +52,26 @@ struct CmdArgs {
     xorurl_base: Option<XorUrlBase>,
     /// Endpoint of the Authenticator daemon where to send requests to. If not provided, https://localhost:33000 is assumed.
     #[structopt(long = "endpoint", raw(global = "true"))]
-    endpoint: Option<String>,
+    pub endpoint: Option<String>,
 }
 
 pub fn run() -> Result<(), String> {
-    // Let's first get all the arguments passed in
-    let args = CmdArgs::from_args();
+    let mut safe = Safe::default();
+    run_with(&[], &mut safe)
+}
 
-    let mut safe = Safe::new(args.xorurl_base);
+pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
+    // Let's first get all the arguments passed in, either as function's args, or CLI args
+    let args = if cmd_args.is_empty() {
+        CmdArgs::from_args()
+    } else {
+        CmdArgs::from_iter_safe(cmd_args).map_err(|err| err.to_string())?
+    };
+
+    let prev_base = safe.xorurl_base;
+    if let Some(base) = args.xorurl_base {
+        safe.xorurl_base = base;
+    }
 
     let output_fmt = if args.output_json {
         OutputFmt::Json
@@ -79,7 +91,7 @@ pub fn run() -> Result<(), String> {
 
     debug!("Processing command: {:?}", args);
 
-    match args.cmd {
+    let result = match args.cmd {
         Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, &mut safe),
         Some(SubCommands::Cat(cmd)) => cat_commander(cmd, output_fmt, &mut safe),
         Some(SubCommands::Dog(cmd)) => dog_commander(cmd, output_fmt, &mut safe),
@@ -108,5 +120,13 @@ pub fn run() -> Result<(), String> {
             }
         }
         None => shell::shell_run(), // then enter in SAFE interactive shell
+    };
+
+    match result {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            safe.xorurl_base = prev_base;
+            Err(err)
+        }
     }
 }

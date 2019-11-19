@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// #[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
+//#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 pub mod auth;
 pub mod cat;
 pub mod container;
 pub mod dog;
-// #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
-// pub mod fake_auth;
+//#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
+//pub mod fake_auth;
 pub mod files;
 mod helpers;
 pub mod keys;
@@ -21,10 +21,10 @@ pub mod safe_id;
 pub mod update;
 pub mod wallet;
 
-// #[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
+//#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 use auth::AuthSubCommands;
-// #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
-// pub use fake_auth::{self as auth, AuthSubCommands};
+//#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
+//pub use fake_auth::{self as auth, AuthSubCommands};
 
 use structopt::StructOpt;
 
@@ -37,21 +37,21 @@ pub enum OutputFmt {
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {
     #[structopt(name = "auth")]
-    /// Authorise the CLI using a remote Authenticator daemon, or interact with it using subcommands
+    /// Authorise the SAFE CLI and interact with a remote Authenticator daemon
     Auth {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<AuthSubCommands>,
     },
-    #[structopt(name = "container")]
-    /// Create a new SAFE Network account with the credentials provided
-    Container {
-        /// subcommands
-        #[structopt(subcommand)]
-        cmd: Option<container::ContainerSubCommands>,
-    },
+    // [structopt(name = "container")]
+    // /// Create a new SAFE Network account with the credentials provided
+    // Container {
+    //     /// subcommands
+    //     #[structopt(subcommand)]
+    //     cmd: Option<container::ContainerSubCommands>,
+    // },
     #[structopt(name = "cat")]
-    /// Read data on the SAFE Network.
+    /// Read data on the SAFE Network
     Cat(cat::CatCommands),
     #[structopt(name = "dog")]
     /// Inspect data on the SAFE Network providing only metadata information about the content
