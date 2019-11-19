@@ -6,8 +6,8 @@
 ## Table of contents
 
 1. [Description](#description)
-2. [The SAFE API](#the-safe-api)
-3. [The FFI layer](#the-ffi-layer)
+2. [The SAFE API](#the-safe-api-safe-api)
+3. [The FFI layer](#the-ffi-layer-safe-ffi)
 4. [The SAFE CLI](#the-safe-cli)
 5. [The Authenticator daemon](#the-authenticator-daemon)
 6. [Contributing](#contributing)

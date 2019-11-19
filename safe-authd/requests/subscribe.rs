@@ -8,7 +8,7 @@
 
 use crate::shared::{lock_notif_endpoints_list, SharedNotifEndpointsHandle};
 
-// Maximum number of allowed auth reqs notifs subscriptors
+// Maximum number of allowed auth reqs notifs subscribers
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
 
 pub fn process_req(

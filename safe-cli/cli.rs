@@ -122,11 +122,6 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
         None => shell::shell_run(), // then enter in SAFE interactive shell
     };
 
-    match result {
-        Ok(()) => Ok(()),
-        Err(err) => {
-            safe.xorurl_base = prev_base;
-            Err(err)
-        }
-    }
+    safe.xorurl_base = prev_base;
+    result
 }

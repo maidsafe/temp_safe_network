@@ -29,7 +29,7 @@ pub type SharedAuthReqsHandle = Arc<Mutex<AuthReqsList>>;
 // A thread-safe handle to keep the SafeAuthenticator instance
 pub type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
 
-// A thread-safe handle to keep the list of notifications subscriptors' endpoints,
+// A thread-safe handle to keep the list of notifications subscribers' endpoints,
 // we also keep the certificates' base path which is needed to create the communication channel
 pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeMap<String, Option<String>>>>;
 
@@ -80,7 +80,7 @@ where
 {
     match notif_endpoints_handle.lock() {
         Err(err) => Err(format!(
-            "Unexpectedly failed to obtain lock of list of notif subscriptors: {}",
+            "Unexpectedly failed to obtain lock of list of notif subscribers: {}",
             err
         )),
         Ok(mut locked_list) => {

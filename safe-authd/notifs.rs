@@ -47,7 +47,7 @@ pub fn monitor_pending_auth_reqs(
                 })
                 .unwrap_or_else(|_| (AuthReqsList::default(), BTreeMap::default()));
 
-            // TODO: send a "keep subscription?" notif/request to subscriptors periodically,
+            // TODO: send a "keep subscription?" notif/request to subscribers periodically,
             // and remove them if they don't respond or if they reply with a negative response.
             for (req_id, incoming_auth_req) in reqs_to_process.iter_mut() {
                 // Let's remove this auth req from the list if it's been standing for too long,
@@ -92,10 +92,10 @@ pub fn monitor_pending_auth_reqs(
                             remove_notif_endpoint_from_list(notif_endpoints_handle.clone(), url)
                         }
                         Some(resp) => {
-                            // We know at least one subscriptor has been notified since it replied
+                            // We know at least one subscriber has been notified since it replied
                             current_req_notified = true;
 
-                            // We don't notify other subscriptors as it was allowed/denied already
+                            // We don't notify other subscribers as it was allowed/denied already
                             if resp.is_some() {
                                 response = resp;
                                 break;
@@ -146,7 +146,7 @@ fn send_notification(
     auth_req: &IncomingAuthReq,
     cert_base_path: Option<&str>,
 ) -> Option<NotifResponse> {
-    println!("Notifying subscriptor: {}", url);
+    println!("Notifying subscriber: {}", url);
     match quic_send(
         &format!(
             "{}/{}/{}",
@@ -166,14 +166,14 @@ fn send_notification(
             } else {
                 None
             };
-            println!("Subscriptor's response: {}", notif_resp);
+            println!("subscriber's response: {}", notif_resp);
             Some(response)
         }
         Err(err) => {
             // Let's unsubscribe it immediately, ... we could be more laxed
             // in the future allowing some unresponsiveness
             println!(
-                "Subscriptor '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
+                "subscriber '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
                 url, err
             );
             None

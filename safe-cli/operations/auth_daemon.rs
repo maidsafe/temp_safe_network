@@ -265,7 +265,7 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
         status_report.num_auth_reqs,
     ]);
     table.add_row(row![
-        "Number of notifications subscriptors",
+        "Number of notifications subscribers",
         status_report.num_notif_subs,
     ]);
     table.printstd();

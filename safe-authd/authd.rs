@@ -124,7 +124,7 @@ pub fn run(
     // We keep a queue for all the authorisation requests
     let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
 
-    // We keep a list of the notifications subscriptors' endpoints
+    // We keep a list of the notifications subscribers' endpoints
     let notif_endpoints_handle = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Let's spawn a thread which will monitor pending auth reqs
