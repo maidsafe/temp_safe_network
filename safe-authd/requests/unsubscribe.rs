@@ -7,16 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::shared::{lock_notif_endpoints_list, SharedNotifEndpointsHandle};
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if args.len() != 1 {
         Err("Incorrect number of arguments for 'unsubscribe' action".to_string())
     } else {
         println!("Unsubscribing from authorisation requests notifications...");
-        let notif_endpoint = match urlencoding::decode(args[0]) {
+        let notif_endpoint = match urlencoding::decode(&args[0]) {
             Ok(url) => url,
             Err(err) => {
                 let msg = format!(
@@ -36,7 +37,7 @@ pub fn process_req(
                     notif_endpoint
                     );
                     println!("{}", msg);
-                    Ok(msg)
+                    Ok(json!(msg))
                 }
                 None => {
                     let msg = format!(

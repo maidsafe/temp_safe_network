@@ -11,13 +11,14 @@ use crate::shared::{
     SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
 use safe_api::AuthdStatus;
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if !args.is_empty() {
         Err("Incorrect number of arguments for 'status' request".to_string())
     } else {
@@ -42,11 +43,7 @@ pub fn process_req(
             num_notif_subs,
         };
 
-        let status_report_serialised = serde_json::to_string(&status_report)
-            .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
-
         println!("Status report sent: {:?}", status_report);
-
-        Ok(status_report_serialised)
+        Ok(json!(status_report))
     }
 }

@@ -8,7 +8,7 @@
 
 use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::helpers::decode_ipc_msg;
-use super::quic_client::quic_send;
+use super::quic_client::send_request;
 use super::{Error, Result, Safe, SafeApp};
 use log::{debug, info};
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
@@ -16,7 +16,7 @@ use safe_nd::AppPermissions;
 use std::collections::HashMap;
 
 // Path of authenticator endpoint for authorising applications
-const SAFE_AUTHD_ENDPOINT_AUTHORISE: &str = "authorise/";
+const SAFE_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 
 #[allow(dead_code)]
 impl Safe {
@@ -90,21 +90,16 @@ impl Safe {
 // It returns the credentials necessary to connect to the network, encoded in a single string.
 fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<String> {
     let authd_service_url = match endpoint {
-        None => format!(
-            "{}:{}/{}{}",
-            SAFE_AUTHD_ENDPOINT_HOST,
-            SAFE_AUTHD_ENDPOINT_PORT,
-            SAFE_AUTHD_ENDPOINT_AUTHORISE,
-            auth_req_str
-        ),
-        Some(endpoint) => format!(
-            "{}/{}{}",
-            endpoint, SAFE_AUTHD_ENDPOINT_AUTHORISE, auth_req_str
-        ),
+        None => format!("{}:{}", SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT,),
+        Some(endpoint) => endpoint.to_string(),
     };
 
     info!("Sending authorisation request to SAFE Authenticator...");
-    let authd_response = quic_send(&authd_service_url, false, None, None, false)?;
+    let authd_response = send_request(
+        &authd_service_url,
+        SAFE_AUTHD_METHOD_AUTHORISE,
+        vec![auth_req_str],
+    )?;
 
     info!("SAFE authorisation response received!");
     Ok(authd_response)

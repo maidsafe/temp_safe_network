@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
-use std::{ascii, fs, str};
+use std::{fs, str};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 
@@ -222,18 +222,13 @@ fn handle_request(
         recv.read_to_end(64 * 1024) // Read the request, which must be at most 64KiB
             .map_err(|e| Error::GeneralError(format!("Failed reading request: {}", e)))
             .and_then(move |(_, req)| {
-                let mut escaped = String::new();
-                for &x in &req[..] {
-                    let part = ascii::escape_default(x).collect::<Vec<_>>();
-                    escaped.push_str(str::from_utf8(&part).unwrap());
-                }
                 info!(log, "Got request");
                 // Execute the request
                 process_request(
                     safe_auth_handle,
                     auth_reqs_handle,
                     notif_endpoints_handle,
-                    &req,
+                    req,
                 )
                 .and_then(|resp| {
                     // Write the response

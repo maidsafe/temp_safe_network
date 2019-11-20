@@ -10,12 +10,13 @@ use crate::shared::{
     lock_auth_reqs_list, lock_safe_authenticator, SharedAuthReqsHandle,
     SharedSafeAuthenticatorHandle,
 };
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if !args.is_empty() {
         Err("Incorrect number of arguments for 'logout' action".to_string())
     } else {
@@ -26,7 +27,7 @@ pub fn process_req(
                 Ok(()) => {
                     let msg = "Logged out successfully";
                     println!("{}", msg);
-                    Ok(msg.to_string())
+                    Ok(json!(msg))
                 }
                 Err(err) => {
                     let msg = format!("Failed to log out: {}", err);

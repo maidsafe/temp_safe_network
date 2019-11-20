@@ -7,18 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::shared::{lock_notif_endpoints_list, SharedNotifEndpointsHandle};
+use serde_json::{json, Value};
 
 // Maximum number of allowed auth reqs notifs subscribers
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if args.len() > 2 {
         Err("Incorrect number of arguments for 'subscribe' action".to_string())
     } else {
-        let endpoint_url = args[0];
+        let endpoint_url = &args[0];
 
         println!("Subscribing to authorisation requests notifications...");
         let mut notif_endpoint = match urlencoding::decode(endpoint_url) {
@@ -34,7 +35,7 @@ pub fn process_req(
         };
 
         let cert_base_path = if args.len() == 2 {
-            match urlencoding::decode(args[1]) {
+            match urlencoding::decode(&args[1]) {
                 Ok(path) => Some(path),
                 Err(err) => {
                     let msg = format!(
@@ -74,7 +75,7 @@ pub fn process_req(
                         notif_endpoint, cert_base_path
                     );
                 println!("{}", msg);
-                Ok(msg)
+                Ok(json!(msg))
             }
         })
     }

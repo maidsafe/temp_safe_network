@@ -25,36 +25,94 @@ use crate::shared::{
     SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
 use futures::{Async, Future, Poll, Stream};
+use serde::{Deserialize, Serialize};
 use std::str;
 use tokio::sync::mpsc;
 
 type FutureItemType = Box<[u8]>;
 type FutureErrorType = Error;
 
-// TODO: implement JSON-RPC rather.
-// Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
-// once we have JSON-RPC we can adhere to its format for errors.
-fn err_response(str: String) -> FutureItemType {
-    format!("[AUTHD_ERROR]:SAFE Authenticator: {}", str)
-        .into_bytes()
-        .into()
+// Version of the JSON-RPC used
+const SAFE_AUTHD_JSONRPC_VERSION: &str = "2.0";
+
+// JSON-RPC error codes as defined at https://www.jsonrpc.org/specification#response_object
+const JSONRPC_PARSE_ERROR: isize = -32700;
+const JSONRPC_INVALID_REQUEST: isize = -32600;
+const JSONRPC_AUTH_ERROR: isize = -1;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonRpcReq<'a> {
+    pub jsonrpc: &'a str,
+    method: &'a str,
+    params: Vec<&'a str>,
+    id: usize,
 }
 
-fn successful_response(str: String) -> FutureItemType {
-    str.into_bytes().into()
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonRpcResponse<'a> {
+    jsonrpc: &'a str,
+    result: serde_json::Value,
+    id: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonRpcResponseError<'a> {
+    jsonrpc: &'a str,
+    error: JsonRpcError<'a>,
+    id: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonRpcError<'a> {
+    code: isize,
+    message: &'a str,
+    data: &'a str,
+}
+
+fn err_response(message: &str, data: &str, code: isize) -> Result<FutureItemType, FutureErrorType> {
+    let jsonrpc_err = JsonRpcResponseError {
+        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION,
+        error: JsonRpcError {
+            code,
+            message,
+            data,
+        },
+        id: 1,
+    };
+    let serialised_err_res = serde_json::to_string(&jsonrpc_err).map_err(|err| {
+        Error::Unexpected(format!(
+            "Failed to serialise authd error response: {:?}",
+            err
+        ))
+    })?;
+
+    Ok(serialised_err_res.into_bytes().into())
+}
+
+fn successful_response(result: serde_json::Value) -> Result<FutureItemType, FutureErrorType> {
+    let jsonrpc_res = JsonRpcResponse {
+        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION,
+        result,
+        id: 1,
+    };
+    let serialised_res = serde_json::to_string(&jsonrpc_res).map_err(|err| {
+        Error::Unexpected(format!("Failed to serialise authd response: {:?}", err))
+    })?;
+
+    Ok(serialised_res.into_bytes().into())
 }
 
 pub fn process_request(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
-    req: &[u8],
+    req: Vec<u8>,
 ) -> ProcessRequest {
     ProcessRequest::HandleRequest {
         safe_auth_handle,
         auth_reqs_handle,
         notif_endpoints_handle,
-        req: req.to_vec(),
+        req,
     }
 }
 
@@ -88,30 +146,30 @@ impl Future for ProcessRequest {
                     notif_endpoints_handle,
                     req,
                 } => {
-                    if req.len() < 4 || &req[0..4] != b"GET " {
-                        return Ok(Async::Ready(err_response("Missing GET".to_string())));
-                    }
-                    if req[4..].len() < 2 || &req[req.len() - 2..] != b"\r\n" {
-                        return Ok(Async::Ready(err_response("Missing \\r\\n".to_string())));
-                    }
-                    let req = &req[4..req.len() - 2];
-                    let end = req
-                        .iter()
-                        .position(|&c| c == b' ')
-                        .unwrap_or_else(|| req.len());
-                    let path = match str::from_utf8(&req[..end]) {
-                        Ok(path) => path,
+                    let req_payload = match String::from_utf8(req.to_vec()) {
+                        Ok(payload) => payload,
                         Err(err) => {
-                            return Ok(Async::Ready(err_response(format!(
-                                "Path is malformed UTF-8: {}",
-                                err
-                            ))))
+                            return Ok(Async::Ready(err_response(
+                                "Request payload is a malformed UTF-8 string",
+                                &err.to_string(),
+                                JSONRPC_PARSE_ERROR,
+                            )?))
                         }
                     };
-                    let req_args: Vec<&str> = path.split('/').collect();
+
+                    let jsonrpc_req: JsonRpcReq = match serde_json::from_str(&req_payload) {
+                        Ok(req) => req,
+                        Err(err) => {
+                            return Ok(Async::Ready(err_response(
+                                "Failed to deserialise request payload as a JSON-RPC message",
+                                &err.to_string(),
+                                JSONRPC_INVALID_REQUEST,
+                            )?))
+                        }
+                    };
 
                     match process_authenticator_req(
-                        req_args,
+                        jsonrpc_req,
                         safe_auth_handle.clone(),
                         auth_reqs_handle.clone(),
                         notif_endpoints_handle.clone(),
@@ -147,13 +205,27 @@ impl Future for ProcessRequest {
                                         }
                                     },
                                 ) {
-                                    Ok(resp) => return Ok(Async::Ready(successful_response(resp))),
-                                    Err(err) => return Ok(Async::Ready(err_response(err))),
+                                    Ok(resp) => {
+                                        return Ok(Async::Ready(successful_response(
+                                            serde_json::value::Value::String(resp),
+                                        )?))
+                                    }
+                                    Err(err) => {
+                                        return Ok(Async::Ready(err_response(
+                                            &err,
+                                            "",
+                                            JSONRPC_AUTH_ERROR,
+                                        )?))
+                                    }
                                 }
                             } else {
                                 let msg = format!("Authorisation request ({}) was denied", req_id);
                                 println!("{}", msg);
-                                return Ok(Async::Ready(err_response(msg)));
+                                return Ok(Async::Ready(err_response(
+                                    &msg,
+                                    "",
+                                    JSONRPC_AUTH_ERROR,
+                                )?));
                             }
                         }
                         Ok(Async::NotReady) => {
@@ -166,7 +238,7 @@ impl Future for ProcessRequest {
                             remove_auth_req_from_list(auth_reqs_handle.clone(), *req_id);
                             let msg = "Failed to get authorisation response";
                             println!("{}", msg);
-                            return Ok(Async::Ready(err_response(msg.to_string())));
+                            return Ok(Async::Ready(err_response(msg, "", JSONRPC_AUTH_ERROR)?));
                         }
                     }
                 }
@@ -181,38 +253,34 @@ enum AuthdResponse {
 }
 
 fn process_authenticator_req(
-    req_args: Vec<&str>,
+    jsonrpc_req: JsonRpcReq,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<AuthdResponse, FutureErrorType> {
-    let action = req_args[1];
-    let action_args = &req_args[2..];
-    println!("Processing new incoming request: '{}'", action);
+    println!("Processing new incoming request: '{}'", jsonrpc_req.method);
 
-    let outcome = match action {
+    let params = jsonrpc_req.params;
+    let outcome = match jsonrpc_req.method {
         "status" => status::process_req(
-            action_args,
+            params,
             safe_auth_handle,
             auth_reqs_handle,
             notif_endpoints_handle,
         ),
-        "login" => log_in::process_req(action_args, safe_auth_handle),
-        "logout" => log_out::process_req(action_args, safe_auth_handle, auth_reqs_handle),
-        "create" => create_acc::process_req(action_args, safe_auth_handle),
-        "authed-apps" => authed_apps::process_req(action_args, safe_auth_handle),
-        "revoke" => revoke::process_req(action_args, safe_auth_handle),
-        "auth-reqs" => auth_reqs::process_req(action_args, auth_reqs_handle),
-        "allow" => allow::process_req(action_args, auth_reqs_handle),
-        "deny" => deny::process_req(action_args, auth_reqs_handle),
-        "subscribe" => subscribe::process_req(action_args, notif_endpoints_handle),
-        "unsubscribe" => unsubscribe::process_req(action_args, notif_endpoints_handle),
+        "login" => log_in::process_req(params, safe_auth_handle),
+        "logout" => log_out::process_req(params, safe_auth_handle, auth_reqs_handle),
+        "create" => create_acc::process_req(params, safe_auth_handle),
+        "authed-apps" => authed_apps::process_req(params, safe_auth_handle),
+        "revoke" => revoke::process_req(params, safe_auth_handle),
+        "auth-reqs" => auth_reqs::process_req(params, auth_reqs_handle),
+        "allow" => allow::process_req(params, auth_reqs_handle),
+        "deny" => deny::process_req(params, auth_reqs_handle),
+        "subscribe" => subscribe::process_req(params, notif_endpoints_handle),
+        "unsubscribe" => unsubscribe::process_req(params, notif_endpoints_handle),
         "authorise" => {
-            match authorise::process_req(
-                action_args,
-                safe_auth_handle.clone(),
-                auth_reqs_handle.clone(),
-            ) {
+            match authorise::process_req(params, safe_auth_handle.clone(), auth_reqs_handle.clone())
+            {
                 Ok(authorise::AuthorisationResponse::NotReady((rx, req_id, auth_req_str))) => {
                     let processing_resp = ProcessRequest::ProcessingResponse {
                         safe_auth_handle: safe_auth_handle.clone(),
@@ -228,16 +296,21 @@ fn process_authenticator_req(
             }
         }
         other => {
-            println!(
+            let msg = format!(
                 "Action '{}' not supported or unknown by the Authenticator daemon",
                 other
             );
-            Err("Action not supported or unknown".to_string())
+            println!("{}", msg);
+            Err(msg)
         }
     };
 
     match outcome {
-        Ok(resp_msg) => Ok(AuthdResponse::Ready(successful_response(resp_msg))),
-        Err(err_msg) => Ok(AuthdResponse::Ready(err_response(err_msg))),
+        Ok(result) => Ok(AuthdResponse::Ready(successful_response(result)?)),
+        Err(err_msg) => Ok(AuthdResponse::Ready(err_response(
+            &err_msg,
+            "",
+            JSONRPC_AUTH_ERROR,
+        )?)),
     }
 }

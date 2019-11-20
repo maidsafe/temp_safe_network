@@ -7,11 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if !args.is_empty() {
         Err("Incorrect number of arguments for 'authed-apps' action".to_string())
     } else {
@@ -20,12 +21,8 @@ pub fn process_req(
             safe_auth_handle,
             |safe_authenticator| match safe_authenticator.authed_apps() {
                 Ok(authed_apps_list) => {
-                    let auth_apps_serialised = serde_json::to_string(&authed_apps_list)
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
-
                     println!("List of authorised apps sent: {:?}", authed_apps_list);
-
-                    Ok(auth_apps_serialised)
+                    Ok(json!(authed_apps_list))
                 }
                 Err(err) => {
                     println!("Failed to get list of authorised apps: {}", err);

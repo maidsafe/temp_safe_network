@@ -7,16 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if args.len() != 1 {
         Err("Incorrect number of arguments for 'revoke' action".to_string())
     } else {
         println!("Revoking application...");
-        let app_id = args[0];
+        let app_id = &args[0];
 
         lock_safe_authenticator(
             safe_auth_handle,
@@ -24,7 +25,7 @@ pub fn process_req(
                 Ok(()) => {
                     let msg = "Application revoked successfully";
                     println!("{}", msg);
-                    Ok(msg.to_string())
+                    Ok(json!(msg))
                 }
                 Err(err) => {
                     println!("Failed to revoke application '{}': {}", app_id, err);

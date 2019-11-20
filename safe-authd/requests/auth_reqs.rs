@@ -8,11 +8,12 @@
 
 use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
 use safe_api::PendingAuthReqs;
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     auth_reqs_handle: SharedAuthReqsHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if !args.is_empty() {
         Err("Incorrect number of arguments for 'auth-reqs' action".to_string())
     } else {
@@ -25,14 +26,10 @@ pub fn process_req(
                     .collect())
             })?;
 
-        let auth_reqs_serialised = serde_json::to_string(&pending_auth_reqs)
-            .unwrap_or_else(|_| "Failed to serialise output to json".to_string());
-
         println!(
             "List of pending authorisation requests sent: {:?}",
             pending_auth_reqs
         );
-
-        Ok(auth_reqs_serialised)
+        Ok(json!(pending_auth_reqs))
     }
 }

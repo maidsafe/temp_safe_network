@@ -9,6 +9,7 @@
 use super::{Error, Result};
 use futures::Future;
 use log::{debug, error, info};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fs;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -20,18 +21,100 @@ use url::Url;
 // Number of milliseconds to allow an idle connection before closing it
 const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
 
+// Version of the JSON-RPC used in the requests
+const SAFE_AUTHD_JSONRPC_VERSION: &str = "2.0";
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonRpcReq<'a> {
+    jsonrpc: &'a str,
+    method: &'a str,
+    params: Vec<&'a str>,
+    id: usize,
+}
+
+#[derive(Deserialize, Debug)]
+struct JsonRpcRes<'a> {
+    jsonrpc: &'a str,
+    result: Option<serde_json::Value>,
+    error: Option<JsonRpcError<'a>>,
+    id: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonRpcError<'a> {
+    code: isize,
+    message: &'a str,
+    data: &'a str,
+}
+
+pub fn send_request<T>(endpoint: &str, method: &str, params: Vec<&str>) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let jsonrpc_req = JsonRpcReq {
+        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION,
+        method,
+        params,
+        id: 1,
+    };
+    let serialised_req = serde_json::to_string(&jsonrpc_req)
+        .map_err(|err| Error::Unexpected(format!("Failed to serialise authd request: {}", err)))?;
+
+    let received_bytes = quic_send(&endpoint, &serialised_req, false, None, None, false)?;
+
+    let res_payload = std::str::from_utf8(received_bytes.as_slice()).map_err(|err| {
+        Error::AuthdClientError(format!("Failed to decode response data: {}", err))
+    })?;
+
+    match serde_json::from_str(&res_payload) {
+        Ok(JsonRpcRes {
+            jsonrpc,
+            result: Some(r),
+            ..
+        }) => {
+            if jsonrpc != SAFE_AUTHD_JSONRPC_VERSION {
+                Err(Error::AuthdClientError(format!(
+                    "JSON-RPC version {} not supported, only version {} is supported",
+                    jsonrpc, SAFE_AUTHD_JSONRPC_VERSION
+                )))
+            } else {
+                let result = serde_json::from_value(r).map_err(|err| {
+                    Error::AuthdClientError(format!("Failed to decode response result: {}", err))
+                })?;
+
+                Ok(result)
+            }
+        }
+        Ok(JsonRpcRes {
+            error: Some(err), ..
+        }) => Err(Error::AuthdError(err.message.to_string())),
+        Ok(JsonRpcRes {
+            result: None,
+            error: None,
+            ..
+        }) => Err(Error::AuthdClientError(
+            "Received an invalid JSON-RPC response from authd".to_string(),
+        )),
+        Err(err) => Err(Error::AuthdClientError(format!(
+            "Failed to parse authd response: {}",
+            err
+        ))),
+    }
+}
+
 // HTTP/0.9 over QUIC client
 // keylog: Perform NSS-compatible TLS key logging to the file specified in `SSLKEYLOGFILE`
 // cert_host: Override hostname used for certificate verification
 // cert_ca: Custom certificate authority to trust, in DER format
 // rebind: Simulate NAT rebinding after connecting
-pub fn quic_send(
+fn quic_send(
     url_str: &str,
+    request: &str,
     keylog: bool,
     cert_host: Option<&str>,
     cert_ca: Option<PathBuf>,
     rebind: bool,
-) -> Result<String> {
+) -> Result<Vec<u8>> {
     let url = Url::parse(url_str)
         .map_err(|_| Error::AuthdClientError("Invalid end point address".to_string()))?;
     let remote = url
@@ -100,7 +183,6 @@ pub fn quic_send(
     })?;
     runtime.spawn(endpoint_driver.map_err(|e| error!("IO error: {}", e)));
 
-    let request = format!("GET {}\r\n", url.path());
     let start = Instant::now();
     let host = cert_host
         .as_ref()
@@ -186,16 +268,7 @@ pub fn quic_send(
         .run()
         .map_err(|err| Error::AuthdClientError(format!("Failed to connect with authd: {}", err)))?;
 
-    let response_str = std::str::from_utf8(received_bytes.as_slice()).map_err(|err| {
-        Error::AuthdClientError(format!("Failed to decode response data: {}", err))
-    })?;
-
-    // TODO: decode using JSON-RPC, authd temporarily uses a mark to signal error
-    if response_str.starts_with("[AUTHD_ERROR]:") {
-        Err(Error::AuthdError(response_str[14..].to_string()))
-    } else {
-        Ok(response_str.to_string())
-    }
+    Ok(received_bytes)
 }
 
 fn duration_secs(x: &Duration) -> f32 {

@@ -11,6 +11,7 @@ use crate::shared::{
     SharedSafeAuthenticatorHandle,
 };
 use safe_api::{AuthReq, SafeAuthReq};
+use serde_json::{json, Value};
 use std::time::SystemTime;
 use tokio::sync::mpsc;
 
@@ -19,12 +20,12 @@ use tokio::sync::mpsc;
 const MAX_NUMBER_QUEUED_AUTH_REQS: usize = 64;
 
 pub enum AuthorisationResponse {
-    Ready(String),
+    Ready(Value),
     NotReady((mpsc::Receiver<bool>, u32, String)),
 }
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<AuthorisationResponse, String> {
@@ -32,7 +33,7 @@ pub fn process_req(
         Err("Incorrect number of arguments for 'authorise' action".to_string())
     } else {
         println!("Authorising application...");
-        let auth_req_str = args[0];
+        let auth_req_str = &args[0];
 
         lock_safe_authenticator(safe_auth_handle, |safe_authenticator| {
             match safe_authenticator.decode_req(auth_req_str) {
@@ -106,7 +107,7 @@ pub fn process_req(
                             match safe_authenticator.authorise_app(auth_req_str) {
                                 Ok(resp) => {
                                     println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
-                                    Ok(AuthorisationResponse::Ready(resp))
+                                    Ok(AuthorisationResponse::Ready(json!(resp)))
                                 }
                                 Err(err) => {
                                     println!("Failed to authorise application: {}", err);

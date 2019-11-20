@@ -15,7 +15,7 @@
 
 This crate implements a SAFE Authenticator service which runs as a daemon (or as a service in Windows platforms).
 
-The `safe-authd` exposes its services as a [QUIC](https://en.wikipedia.org/wiki/QUIC) interface allowing applications and users to connect to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
+The `safe-authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
 
 It keeps in memory a list of authorisation requests pending of approval/denial, as well as the list of the registered subscribers that the notifications shall be sent to.
 

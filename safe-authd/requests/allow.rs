@@ -7,16 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     auth_reqs_handle: SharedAuthReqsHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if args.len() != 1 {
         Err("Incorrect number of arguments for 'allow' action".to_string())
     } else {
         println!("Allowing authorisation request...");
-        let auth_req_id = args[0];
+        let auth_req_id = &args[0];
         let req_id = match auth_req_id.parse::<u32>() {
             Ok(id) => id,
             Err(err) => return Err(err.to_string()),
@@ -31,7 +32,7 @@ pub fn process_req(
                             auth_req_id
                         );
                         println!("{}", msg);
-                        Ok(msg)
+                        Ok(json!(msg))
                     }
                     Err(_) => {
                         let msg = format!("Failed to allow authorisation request '{}' since the response couldn't be sent to the requesting application", auth_req_id);

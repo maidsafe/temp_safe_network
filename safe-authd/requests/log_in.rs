@@ -7,17 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
+use serde_json::{json, Value};
 
 pub fn process_req(
-    args: &[&str],
+    args: Vec<&str>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
-) -> Result<String, String> {
+) -> Result<Value, String> {
     if args.len() != 2 {
         Err("Incorrect number of arguments for 'login' action".to_string())
     } else {
         println!("Logging in to SAFE account...");
-        let secret = args[0];
-        let password = args[1];
+        let secret = &args[0];
+        let password = &args[1];
 
         lock_safe_authenticator(
             safe_auth_handle,
@@ -25,7 +26,7 @@ pub fn process_req(
                 Ok(_) => {
                     let msg = "Logged in successfully!";
                     println!("{}", msg);
-                    Ok(msg.to_string())
+                    Ok(json!(msg))
                 }
                 Err(err) => {
                     println!("Error occurred when trying to log in: {}", err);
