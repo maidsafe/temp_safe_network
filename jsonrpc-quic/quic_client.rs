@@ -16,13 +16,14 @@ use std::time::{Duration, Instant};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 
-type Result<T> = std::result::Result<T, String>;
-
-// HTTP/0.9 over QUIC client
+// QUIC client
+// url_str: QUIC destination endpoint URL
+// request: Request payload
 // keylog: Perform NSS-compatible TLS key logging to the file specified in `SSLKEYLOGFILE`
 // cert_host: Override hostname used for certificate verification
 // cert_ca: Custom certificate authority to trust, in DER format
 // rebind: Simulate NAT rebinding after connecting
+// timeout: Optional number of millis before timing out an idle connection
 pub fn quic_send(
     url_str: &str,
     request: &str,
@@ -31,7 +32,7 @@ pub fn quic_send(
     cert_ca: Option<&str>,
     rebind: bool,
     timeout: Option<u64>,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, String> {
     let url = Url::parse(url_str).map_err(|_| "Invalid end point address".to_string())?;
     let remote = url
         .to_socket_addrs()

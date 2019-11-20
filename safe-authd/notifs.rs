@@ -170,13 +170,26 @@ fn send_notification(
             Some(response)
         }
         Err(err) => {
-            // Let's unsubscribe it immediately, ... we could be more laxed
-            // in the future allowing some unresponsiveness
-            println!(
-                "Subscriber '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
-                url, err
-            );
-            None
+            match err {
+                jsonrpc_quic::Error::ClientError(msg) => {
+                    // Let's unsubscribe it immediately, ... we could be more laxed
+                    // in the future allowing some unresponsiveness
+                    println!(
+                        "Subscriber '{}' is being automatically unsubscribed since it didn't respond to notification: {:?}",
+                        url, msg
+                    );
+                    None
+                }
+                jsonrpc_quic::Error::ServerError(msg) => {
+                    // Subscriber responded but with an error, we won't unsubscribe it, but will
+                    // consider this response as a "no decision" for the auth req
+                    println!(
+                        "Subscriber '{}' responded to the notification with an error: {:?}",
+                        url, msg
+                    );
+                    Some(None)
+                }
+            }
         }
     }
 }

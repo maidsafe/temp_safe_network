@@ -9,4 +9,11 @@
 mod jsonrpc;
 mod quic_client;
 
+pub enum Error {
+    ClientError(String),
+    ServerError(String),
+}
+
+type Result<T> = std::result::Result<T, Error>;
+
 pub use jsonrpc::send_request;

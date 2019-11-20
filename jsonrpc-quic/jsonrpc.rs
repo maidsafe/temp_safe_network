@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::quic_client::quic_send;
+use super::quic_client::quic_send;
+use super::{Error, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-type Result<T> = std::result::Result<T, String>;
 
 // Version of the JSON-RPC used in the requests
 const SAFE_AUTHD_JSONRPC_VERSION: &str = "2.0";
@@ -53,8 +52,9 @@ where
         params,
         id: 1,
     };
+
     let serialised_req = serde_json::to_string(&jsonrpc_req)
-        .map_err(|err| format!("Failed to serialise authd request: {}", err))?;
+        .map_err(|err| Error::ClientError(format!("Failed to serialise authd request: {}", err)))?;
 
     // Send request over QUIC, and await for JSON-RPC response
     let received_bytes = quic_send(
@@ -65,10 +65,11 @@ where
         cert_base_path,
         false,
         timeout,
-    )?;
+    )
+    .map_err(Error::ClientError)?;
 
     let res_payload = std::str::from_utf8(received_bytes.as_slice())
-        .map_err(|err| format!("Failed to decode response data: {}", err))?;
+        .map_err(|err| Error::ClientError(format!("Failed to decode response data: {}", err)))?;
 
     match serde_json::from_str(&res_payload) {
         Ok(JsonRpcRes {
@@ -77,25 +78,31 @@ where
             ..
         }) => {
             if jsonrpc != SAFE_AUTHD_JSONRPC_VERSION {
-                Err(format!(
+                Err(Error::ClientError(format!(
                     "JSON-RPC version {} not supported, only version {} is supported",
                     jsonrpc, SAFE_AUTHD_JSONRPC_VERSION
-                ))
+                )))
             } else {
-                let result = serde_json::from_value(r)
-                    .map_err(|err| format!("Failed to decode response result: {}", err))?;
+                let result = serde_json::from_value(r).map_err(|err| {
+                    Error::ClientError(format!("Failed to decode response result: {}", err))
+                })?;
 
                 Ok(result)
             }
         }
         Ok(JsonRpcRes {
             error: Some(err), ..
-        }) => Err(err.message.to_string()),
+        }) => Err(Error::ServerError(err.message.to_string())),
         Ok(JsonRpcRes {
             result: None,
             error: None,
             ..
-        }) => Err("Received an invalid JSON-RPC response from authd".to_string()),
-        Err(err) => Err(format!("Failed to parse authd response: {}", err)),
+        }) => Err(Error::ClientError(
+            "Received an invalid JSON-RPC response from authd".to_string(),
+        )),
+        Err(err) => Err(Error::ClientError(format!(
+            "Failed to parse authd response: {}",
+            err
+        ))),
     }
 }

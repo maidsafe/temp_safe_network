@@ -245,7 +245,10 @@ where
                 Some(&cert_base_path),
                 Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
             )
-            .map_err(|err| Error::AuthdClientError(err))
+            .map_err(|err| match err {
+                jsonrpc_quic::Error::ClientError(msg) => Error::AuthdClientError(msg),
+                jsonrpc_quic::Error::ServerError(msg) => Error::AuthdError(msg),
+            })
         }
     }
 }
