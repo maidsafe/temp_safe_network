@@ -769,6 +769,30 @@ Spendable balances of Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsji
 
 As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
+#### Retrieving binary files with --hexdump
+
+By default, binary files are treated just like a plaintext file and will typically display unreadable garbage on the screen unless output is redirected to a file, eg:
+
+```shell
+$ safe cat safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky > /tmp/favicon.ico
+```
+
+However, the flag --hexdump is available which provides a more human friendly hexadecimal dump, similar to that of the standard *xxd* unix tool.  Here's an example.
+
+```shell
+$ safe cat --hexdump safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky | head
+Length: 1406 (0x57e) bytes
+0000:   00 00 01 00  01 00 10 10  00 00 01 00  08 00 68 05   ..............h.
+0010:   00 00 16 00  00 00 28 00  00 00 10 00  00 00 20 00   ......(....... .
+0020:   00 00 01 00  08 00 00 00  00 00 00 01  00 00 00 00   ................
+0030:   00 00 00 00  00 00 00 01  00 00 00 00  00 00 f4 cc   ................
+0040:   a8 00 cb 7b  45 00 fb f2  e5 00 ab 62  46 00 ab 60   ...{E......bF..`
+0050:   46 00 c0 a6  8e 00 f2 d9  c1 00 f5 e8  df 00 e0 9a   F...............
+0060:   5e 00 ea c0  9e 00 e8 ae  77 00 be 85  5d 00 bb 61   ^.......w...]..a
+0070:   35 00 fa ed  d7 00 ff fc  f7 00 ce 88  4c 00 b0 56   5...........L..V
+0080:   34 00 fe fa  f6 00 bf 87  5b 00 b1 6b  50 00 dd 82   4.......[..kP...
+```
+
 #### Retrieving older versions of content
 
 As we've seen above, we can use `cat` command to retrieve the latest/current version of any type of content from the Network using their URL. But every change made to content that is uploaded to the Network as Published data is perpetual, and therefore a new version is generated when performing any amendments to it, keeping older versions also available forever.
