@@ -1163,6 +1163,26 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "jsonrpc-quic"
+version = "0.0.1"
+dependencies = [
+ "directories 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quinn 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rcgen 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-term 2.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-current-thread 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-reactor 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2253,6 +2273,7 @@ dependencies = [
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-quic 0.0.1",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mime_guess 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2293,6 +2314,7 @@ dependencies = [
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "human-panic 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-quic 0.0.1",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quinn 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcgen 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

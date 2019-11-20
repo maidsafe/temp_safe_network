@@ -19,7 +19,6 @@ mod helpers;
 pub mod keys;
 pub mod nrs;
 pub mod nrs_map;
-mod quic_client;
 mod quic_endpoint;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;

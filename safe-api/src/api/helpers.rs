@@ -9,6 +9,8 @@
 use super::{Error, Result};
 use chrono::{SecondsFormat, Utc};
 
+use super::constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT;
+use jsonrpc_quic::send_request;
 use log::debug;
 use rand::rngs::OsRng;
 use rand_core::RngCore;
@@ -16,6 +18,7 @@ use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
 use safe_nd::{
     Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName, MAX_COINS_VALUE,
 };
+use serde::de::DeserializeOwned;
 use std::iter::FromIterator;
 use std::str;
 use std::str::FromStr;
@@ -223,4 +226,26 @@ pub fn gen_timestamp_secs() -> String {
 
 pub fn gen_timestamp_nanos() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
+}
+
+pub fn send_authd_request<T>(endpoint: &str, method: &str, params: serde_json::Value) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
+        None => Err(Error::AuthdClientError(
+            "Failed to obtain local project directory where to read certificate from".to_string(),
+        )),
+        Some(dirs) => {
+            let cert_base_path = dirs.config_dir().display().to_string();
+            send_request::<T>(
+                endpoint,
+                method,
+                params,
+                Some(&cert_base_path),
+                Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
+            )
+            .map_err(|err| Error::AuthdClientError(err))
+        }
+    }
 }

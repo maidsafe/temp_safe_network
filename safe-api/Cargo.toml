@@ -23,6 +23,7 @@ directories = "1.0.2"
 env_logger = "0.6.0"
 failure = "0.1"
 futures = "~0.1.17"
+jsonrpc-quic = { path = "../jsonrpc-quic" }
 lazy_static = "1.2.0"
 log = "0.4.6"
 mime_guess = "2.0.1"

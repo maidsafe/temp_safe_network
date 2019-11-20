@@ -82,7 +82,7 @@ impl SafeAuthenticator {
     /// use safe_api::SafeAuthenticator;
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account's secret and password:
+    /// /// Using an already existing account's passphrase and password:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
@@ -110,9 +110,9 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn log_in(&mut self, secret: &str, password: &str) -> Result<()> {
+    pub fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to log in...");
-        match Authenticator::login(secret, password, || info!("Disconnected from network")) {
+        match Authenticator::login(passphrase, password, || info!("Disconnected from network")) {
             Ok(auth) => {
                 debug!("Logged-in successfully");
                 self.safe_authenticator = Some(auth);
@@ -172,13 +172,13 @@ impl SafeAuthenticator {
     ///```
     ///
     /// ## Error Example
-    /// If an account with same secret already exists,
+    /// If an account with same passphrase already exists,
     /// the function will return an error:
     /// ```ignore
     /// use safe_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account's secret and password:
+    /// /// Using an already existing account's passphrase and password:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
@@ -194,11 +194,11 @@ impl SafeAuthenticator {
     ///    Err(_) => assert!(false), // This should not pass
     /// }
     ///```
-    pub fn create_acc(&mut self, sk: &str, secret: &str, password: &str) -> Result<()> {
+    pub fn create_acc(&mut self, sk: &str, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a SAFE account...");
         let secret_key = sk_from_hex(sk)?;
 
-        match Authenticator::create_acc(secret, password, secret_key, || {
+        match Authenticator::create_acc(passphrase, password, secret_key, || {
             // TODO: allow the caller to provide the callback function
             // eprintln!("{}", "Disconnected from network");
         }) {
@@ -263,7 +263,7 @@ impl SafeAuthenticator {
     /// use safe_api::SafeAuthenticator;
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account's secret and password:
+    /// /// Using an already existing account's passphrase and password:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
@@ -283,7 +283,7 @@ impl SafeAuthenticator {
     /// use safe_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account's secret and password:
+    /// /// Using an already existing account's passphrase and password:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());

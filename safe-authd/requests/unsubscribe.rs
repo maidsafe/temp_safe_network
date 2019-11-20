@@ -10,25 +10,11 @@ use crate::shared::{lock_notif_endpoints_list, SharedNotifEndpointsHandle};
 use serde_json::{json, Value};
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<Value, String> {
-    if args.len() != 1 {
-        Err("Incorrect number of arguments for 'unsubscribe' action".to_string())
-    } else {
+    if let Value::String(notif_endpoint) = params {
         println!("Unsubscribing from authorisation requests notifications...");
-        let notif_endpoint = match urlencoding::decode(&args[0]) {
-            Ok(url) => url,
-            Err(err) => {
-                let msg = format!(
-                    "Unsubscription request rejected, the endpoint URL ('{}') is invalid: {:?}",
-                    args[0], err
-                );
-                println!("{}", msg);
-                return Err(msg);
-            }
-        };
-
         lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
             match notif_endpoints_list.remove(&notif_endpoint) {
                 Some(_) => {
@@ -49,5 +35,10 @@ pub fn process_req(
                 }
             }
         })
+    } else {
+        Err(format!(
+            "Incorrect params for 'unsubscribe' method: {:?}",
+            params
+        ))
     }
 }

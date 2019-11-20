@@ -13,12 +13,15 @@ use crate::shared::{
 use serde_json::{json, Value};
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<Value, String> {
-    if !args.is_empty() {
-        Err("Incorrect number of arguments for 'logout' action".to_string())
+    if Value::Null != params {
+        Err(format!(
+            "Unexpected param for 'logout' method: {:?}",
+            params
+        ))
     } else {
         println!("Logging out...");
         lock_safe_authenticator(

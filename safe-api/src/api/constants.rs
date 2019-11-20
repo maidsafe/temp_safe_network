@@ -26,3 +26,6 @@ pub const SAFE_AUTHD_ENDPOINT_PORT: u16 = 33000;
 
 // Default base encoding used for XOR URLs
 pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;
+
+// Number of milliseconds to allow an idle connection with authd before closing it
+pub const SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT: u64 = 60_000;

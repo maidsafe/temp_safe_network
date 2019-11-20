@@ -9,7 +9,6 @@
 mod authd;
 mod errors;
 mod notifs;
-mod quic_client;
 mod requests;
 mod shared;
 mod update;

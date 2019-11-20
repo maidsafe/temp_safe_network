@@ -10,30 +10,44 @@ use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 use serde_json::{json, Value};
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
-    if args.len() != 3 {
-        Err("Incorrect number of arguments for 'create' action".to_string())
-    } else {
-        println!("Creating an account in SAFE...");
-        let secret = &args[0];
-        let password = &args[1];
-        let sk = &args[2];
+    if let Value::Array(args) = &params {
+        if args.len() > 3 || !args[0].is_string() || !args[1].is_string() || !args[2].is_string() {
+            Err(format!(
+                "Incorrect params for 'create-acc' method: {:?}",
+                params
+            ))
+        } else {
+            println!("Creating an account in SAFE...");
+            let passphrase = args[0].to_string();
+            let password = args[1].to_string();
+            let sk = args[2].to_string();
 
-        lock_safe_authenticator(
-            safe_auth_handle,
-            |safe_authenticator| match safe_authenticator.create_acc(sk, secret, password) {
-                Ok(_) => {
-                    let msg = "Account created successfully";
-                    println!("{}", msg);
-                    Ok(json!(msg))
-                }
-                Err(err) => {
-                    println!("Error occurred when trying to create SAFE account: {}", err);
-                    Err(err.to_string())
-                }
-            },
-        )
+            lock_safe_authenticator(
+                safe_auth_handle,
+                |safe_authenticator| match safe_authenticator.create_acc(
+                    &sk,
+                    &passphrase,
+                    &password,
+                ) {
+                    Ok(_) => {
+                        let msg = "Account created successfully";
+                        println!("{}", msg);
+                        Ok(json!(msg))
+                    }
+                    Err(err) => {
+                        println!("Error occurred when trying to create SAFE account: {}", err);
+                        Err(err.to_string())
+                    }
+                },
+            )
+        }
+    } else {
+        Err(format!(
+            "Incorrect params for 'create-acc' method: {:?}",
+            params
+        ))
     }
 }

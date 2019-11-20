@@ -340,7 +340,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
             }
         } else {
             // Prompt the user for the SAFE account credentials
-            the_passphrase = prompt_sensitive(None, "Secret: ")
+            the_passphrase = prompt_sensitive(None, "Passphrase: ")
                 .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
             the_password = prompt_sensitive(None, "Password: ")
                 .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;

@@ -179,7 +179,7 @@ Since we now have our SAFE Authenticator running and ready to accept requests, w
 In order to create a SAFE Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a secret phrase and password for the new account to be created:
 ```shell
 $ safe auth create-acc --test-coins
-Secret:
+Passphrase:
 Password:
 Creating a SafeKey with test-coins...
 Sending account creation request to authd...
@@ -192,7 +192,7 @@ Secret Key = 5cc0951bb95be85dec3f0358ddb40570d0e045b3ff0007562af9b5c9162f2518
 Alternatively, if we own some safecoins on a `SafeKey` already (see [`SafeKeys` section](#safekeys) for details about `SafeKey`s), we can provide the corresponding secret key to the safe CLI to use it for paying the cost of creating the account, as well as setting it as the default `SafeKey` for the account being created:
 ```shell
 $ safe auth create-acc
-Secret:
+Passphrase:
 Password:
 Enter SafeKey's secret key to pay with:
 Sending account creation request to authd...
@@ -204,7 +204,7 @@ Account was created successfully!
 Once you have a SAFE account created, we can login:
 ```shell
 $ safe auth login
-Secret:
+Passphrase:
 Password:
 Sending login action request to authd...
 Logged in successfully
@@ -290,7 +290,7 @@ It could be the case the SAFE CLI is the only SAFE application that the user is 
 Therefore there is an option which allows the SAFE CLI to automatically self authorise when the user logs in using the CLI, which is as simply as:
 ```shell
 $ safe auth login --self-auth
-Secret:
+Passphrase:
 Password:
 Sending login action request to authd...
 Logged in successfully

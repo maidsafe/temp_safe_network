@@ -25,18 +25,14 @@ pub enum AuthorisationResponse {
 }
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<AuthorisationResponse, String> {
-    if args.len() != 1 {
-        Err("Incorrect number of arguments for 'authorise' action".to_string())
-    } else {
+    if let Value::String(auth_req_str) = params {
         println!("Authorising application...");
-        let auth_req_str = &args[0];
-
         lock_safe_authenticator(safe_auth_handle, |safe_authenticator| {
-            match safe_authenticator.decode_req(auth_req_str) {
+            match safe_authenticator.decode_req(&auth_req_str) {
                 Ok((req_id, request)) => {
                     // We have a valid decoded authorisation request,
                     // let's now treat it according to its type
@@ -104,7 +100,7 @@ pub fn process_req(
                         }
                         SafeAuthReq::Unregistered(_) => {
                             // We simply allow unregistered authorisation requests
-                            match safe_authenticator.authorise_app(auth_req_str) {
+                            match safe_authenticator.authorise_app(&auth_req_str) {
                                 Ok(resp) => {
                                     println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
                                     Ok(AuthorisationResponse::Ready(json!(resp)))
@@ -123,5 +119,10 @@ pub fn process_req(
                 }
             }
         })
+    } else {
+        Err(format!(
+            "Incorrect params for 'authorise' method: {:?}",
+            params
+        ))
     }
 }

@@ -10,12 +10,12 @@ use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
 use safe_api::PendingAuthReqs;
 use serde_json::{json, Value};
 
-pub fn process_req(
-    args: Vec<&str>,
-    auth_reqs_handle: SharedAuthReqsHandle,
-) -> Result<Value, String> {
-    if !args.is_empty() {
-        Err("Incorrect number of arguments for 'auth-reqs' action".to_string())
+pub fn process_req(params: Value, auth_reqs_handle: SharedAuthReqsHandle) -> Result<Value, String> {
+    if Value::Null != params {
+        Err(format!(
+            "Unexpected param for 'auth-reqs' method: {:?}",
+            params
+        ))
     } else {
         println!("Obtaining list of pending authorisation requests...");
         let pending_auth_reqs: PendingAuthReqs =

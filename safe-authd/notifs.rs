@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::quic_client::quic_send;
 use super::shared::*;
+use jsonrpc_quic::send_request;
+use serde_json::json;
 use std::collections::BTreeMap;
 use std::thread;
 use std::time::Duration;
@@ -18,6 +19,9 @@ const AUTH_REQS_CHECK_FREQ: u64 = 1000;
 // Time elapsed since an auth request was received to consider it timed out
 // This is used to keep the list of auth requests always clean from unhandled requests
 const AUTH_REQS_TIMEOUT: u64 = 3 * 60000;
+
+// JSON-RPC Method name for authorisation request notification
+const JSONRPC_METHOD_AUTH_REQ_NOTIF: &str = "auth-req-notif";
 
 // Am auth request notification can be responded with a positive (Some(true))
 // or negative (Some(false)) decision, or simply with an acknowledgment (None)
@@ -147,33 +151,29 @@ fn send_notification(
     cert_base_path: Option<&str>,
 ) -> Option<NotifResponse> {
     println!("Notifying subscriber: {}", url);
-    match quic_send(
-        &format!(
-            "{}/{}/{}",
-            url, auth_req.auth_req.app_id, auth_req.auth_req.req_id
-        ),
-        false,
-        None,
+    match send_request::<String>(
+        url,
+        JSONRPC_METHOD_AUTH_REQ_NOTIF,
+        json!(auth_req.auth_req),
         cert_base_path,
-        false,
+        None,
     ) {
-        Ok(notif_resp) => {
-            // TODO: implement JSON-RPC or some other format
-            let response = if notif_resp.starts_with("true") {
+        Ok(notif_result) => {
+            let response = if notif_result == "true" {
                 Some(true)
-            } else if notif_resp.starts_with("false") {
+            } else if notif_result == "false" {
                 Some(false)
             } else {
                 None
             };
-            println!("subscriber's response: {}", notif_resp);
+            println!("Subscriber's response: {}", notif_result);
             Some(response)
         }
         Err(err) => {
             // Let's unsubscribe it immediately, ... we could be more laxed
             // in the future allowing some unresponsiveness
             println!(
-                "subscriber '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
+                "Subscriber '{}' is being automatically unsubscribed since it didn't respond to notification: {}",
                 url, err
             );
             None

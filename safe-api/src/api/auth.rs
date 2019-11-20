@@ -8,11 +8,12 @@
 
 use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
 use super::helpers::decode_ipc_msg;
-use super::quic_client::send_request;
+use super::helpers::send_authd_request;
 use super::{Error, Result, Safe, SafeApp};
 use log::{debug, info};
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
+use serde_json::json;
 use std::collections::HashMap;
 
 // Path of authenticator endpoint for authorising applications
@@ -95,10 +96,10 @@ fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<Strin
     };
 
     info!("Sending authorisation request to SAFE Authenticator...");
-    let authd_response = send_request(
+    let authd_response = send_authd_request::<String>(
         &authd_service_url,
         SAFE_AUTHD_METHOD_AUTHORISE,
-        vec![auth_req_str],
+        json!(auth_req_str),
     )?;
 
     info!("SAFE authorisation response received!");

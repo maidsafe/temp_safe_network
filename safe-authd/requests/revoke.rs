@@ -10,18 +10,14 @@ use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 use serde_json::{json, Value};
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
-    if args.len() != 1 {
-        Err("Incorrect number of arguments for 'revoke' action".to_string())
-    } else {
+    if let Value::String(app_id) = params {
         println!("Revoking application...");
-        let app_id = &args[0];
-
         lock_safe_authenticator(
             safe_auth_handle,
-            |safe_authenticator| match safe_authenticator.revoke_app(app_id) {
+            |safe_authenticator| match safe_authenticator.revoke_app(&app_id) {
                 Ok(()) => {
                     let msg = "Application revoked successfully";
                     println!("{}", msg);
@@ -33,5 +29,10 @@ pub fn process_req(
                 }
             },
         )
+    } else {
+        Err(format!(
+            "Incorrect params for 'revoke' method: {:?}",
+            params
+        ))
     }
 }

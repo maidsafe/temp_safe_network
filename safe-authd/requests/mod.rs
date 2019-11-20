@@ -44,7 +44,7 @@ const JSONRPC_AUTH_ERROR: isize = -1;
 struct JsonRpcReq<'a> {
     pub jsonrpc: &'a str,
     method: &'a str,
-    params: Vec<&'a str>,
+    params: serde_json::Value,
     id: usize,
 }
 
@@ -270,7 +270,7 @@ fn process_authenticator_req(
         ),
         "login" => log_in::process_req(params, safe_auth_handle),
         "logout" => log_out::process_req(params, safe_auth_handle, auth_reqs_handle),
-        "create" => create_acc::process_req(params, safe_auth_handle),
+        "create-acc" => create_acc::process_req(params, safe_auth_handle),
         "authed-apps" => authed_apps::process_req(params, safe_auth_handle),
         "revoke" => revoke::process_req(params, safe_auth_handle),
         "auth-reqs" => auth_reqs::process_req(params, auth_reqs_handle),

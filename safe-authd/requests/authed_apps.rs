@@ -10,11 +10,14 @@ use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
 use serde_json::{json, Value};
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
-    if !args.is_empty() {
-        Err("Incorrect number of arguments for 'authed-apps' action".to_string())
+    if Value::Null != params {
+        Err(format!(
+            "Unexpected param for 'authed-apps' method: {:?}",
+            params
+        ))
     } else {
         println!("Obtaining list of authorised applications...");
         lock_safe_authenticator(

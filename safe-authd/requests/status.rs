@@ -14,13 +14,16 @@ use safe_api::AuthdStatus;
 use serde_json::{json, Value};
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<Value, String> {
-    if !args.is_empty() {
-        Err("Incorrect number of arguments for 'status' request".to_string())
+    if Value::Null != params {
+        Err(format!(
+            "Unexpected param for 'status' method: {:?}",
+            params
+        ))
     } else {
         println!("Preparing authd status report...");
 

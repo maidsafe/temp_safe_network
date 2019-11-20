@@ -11,7 +11,7 @@ use log::{debug, error, info};
 use std::fs;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
@@ -25,11 +25,13 @@ type Result<T> = std::result::Result<T, String>;
 // rebind: Simulate NAT rebinding after connecting
 pub fn quic_send(
     url_str: &str,
+    request: &str,
     keylog: bool,
     cert_host: Option<&str>,
     cert_ca: Option<&str>,
     rebind: bool,
-) -> Result<String> {
+    timeout: Option<u64>,
+) -> Result<Vec<u8>> {
     let url = Url::parse(url_str).map_err(|_| "Invalid end point address".to_string())?;
     let remote = url
         .to_socket_addrs()
@@ -37,8 +39,19 @@ pub fn quic_send(
         .next()
         .ok_or_else(|| "The end point is an invalid address".to_string())?;
 
-    let mut endpoint = quinn::Endpoint::builder();
-    let mut client_config = quinn::ClientConfigBuilder::default();
+    let client_config = if let Some(idle_timeout) = timeout {
+        quinn::ClientConfig {
+            transport: Arc::new(quinn::TransportConfig {
+                idle_timeout,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    } else {
+        quinn::ClientConfig::default()
+    };
+
+    let mut client_config = quinn::ClientConfigBuilder::new(client_config);
     client_config.protocols(&[quinn::ALPN_QUIC_HTTP]);
 
     if keylog {
@@ -83,6 +96,7 @@ pub fn quic_send(
             )
         })?;
 
+    let mut endpoint = quinn::Endpoint::builder();
     endpoint.default_client_config(client_config.build());
 
     let (endpoint_driver, endpoint, _) = endpoint
@@ -92,7 +106,6 @@ pub fn quic_send(
         .map_err(|err| format!("Unexpected error setting up client endpoint: {}", err))?;
     runtime.spawn(endpoint_driver.map_err(|e| error!("IO error: {}", e)));
 
-    let request = format!("GET {}\r\n", url.path());
     let start = Instant::now();
     let host = cert_host
         .as_ref()
@@ -160,15 +173,7 @@ pub fn quic_send(
         .run()
         .map_err(|err| format!("Failed to connect with authd: {}", err))?;
 
-    let response_str = std::str::from_utf8(received_bytes.as_slice())
-        .map_err(|err| format!("Failed to decode response data: {}", err))?;
-
-    // TODO: decode using JSON-RPC, authd temporarily uses a mark to signal error
-    if response_str.starts_with("[AUTHD_ERROR]:") {
-        Err(response_str[14..].to_string())
-    } else {
-        Ok(response_str.to_string())
-    }
+    Ok(received_bytes)
 }
 
 fn duration_secs(x: &Duration) -> f32 {

@@ -13,70 +13,60 @@ use serde_json::{json, Value};
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
 
 pub fn process_req(
-    args: Vec<&str>,
+    params: Value,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<Value, String> {
-    if args.len() > 2 {
-        Err("Incorrect number of arguments for 'subscribe' action".to_string())
-    } else {
-        let endpoint_url = &args[0];
+    if let Value::Array(args) = &params {
+        if args.len() > 2 || !args[0].is_string() || !args[1].is_string() {
+            Err(format!(
+                "Incorrect params for 'subscribe' method: {:?}",
+                params
+            ))
+        } else {
+            let mut notif_endpoint = args[0].to_string();
+            println!("Subscribing to authorisation requests notifications...");
+            let cert_base_path = if args.len() == 2 {
+                Some(args[1].to_string())
+            } else {
+                None
+            };
 
-        println!("Subscribing to authorisation requests notifications...");
-        let mut notif_endpoint = match urlencoding::decode(endpoint_url) {
-            Ok(url) => url,
-            Err(err) => {
-                let msg = format!(
-                    "Subscription rejected, the endpoint URL ('{}') is invalid: {:?}",
-                    endpoint_url, err
-                );
-                println!("{}", msg);
-                return Err(msg);
-            }
-        };
+            lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
+                // let's normailse the endpoint URL
+                if notif_endpoint.ends_with('/') {
+                    notif_endpoint.pop();
+                }
 
-        let cert_base_path = if args.len() == 2 {
-            match urlencoding::decode(&args[1]) {
-                Ok(path) => Some(path),
-                Err(err) => {
+                if notif_endpoints_list
+                    .get(&notif_endpoint.to_string())
+                    .is_some()
+                {
                     let msg = format!(
-                    "Subscription rejected, the certification base path ('{}') is invalid: {:?}",
-                    args[1], err
+                        "Subscription rejected. Endpoint '{}' is already subscribed",
+                        notif_endpoint
                     );
                     println!("{}", msg);
-                    return Err(msg);
-                }
-            }
-        } else {
-            None
-        };
+                    Err(msg)
+                } else if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
+                    let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
+                    println!("{}", msg);
+                    Err(msg)
+                } else {
+                    notif_endpoints_list.insert(notif_endpoint.to_string(), cert_base_path.clone());
 
-        lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
-            // let's normailse the endpoint URL
-            if notif_endpoint.ends_with('/') {
-                notif_endpoint.pop();
-            }
-
-            if notif_endpoints_list.get(&notif_endpoint).is_some() {
-                let msg = format!(
-                    "Subscription rejected. Endpoint '{}' is already subscribed",
-                    notif_endpoint
-                );
-                println!("{}", msg);
-                Err(msg)
-            } else if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
-                let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
-                println!("{}", msg);
-                Err(msg)
-            } else {
-                notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
-
-                let msg = format!(
+                    let msg = format!(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications (cert base path: {:?})",
                         notif_endpoint, cert_base_path
                     );
-                println!("{}", msg);
-                Ok(json!(msg))
-            }
-        })
+                    println!("{}", msg);
+                    Ok(json!(msg))
+                }
+            })
+        }
+    } else {
+        Err(format!(
+            "Incorrect params for 'subscribe' method: {:?}",
+            params
+        ))
     }
 }

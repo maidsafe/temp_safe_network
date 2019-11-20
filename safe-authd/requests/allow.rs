@@ -9,15 +9,9 @@
 use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
 use serde_json::{json, Value};
 
-pub fn process_req(
-    args: Vec<&str>,
-    auth_reqs_handle: SharedAuthReqsHandle,
-) -> Result<Value, String> {
-    if args.len() != 1 {
-        Err("Incorrect number of arguments for 'allow' action".to_string())
-    } else {
+pub fn process_req(params: Value, auth_reqs_handle: SharedAuthReqsHandle) -> Result<Value, String> {
+    if let Value::String(auth_req_id) = params {
         println!("Allowing authorisation request...");
-        let auth_req_id = &args[0];
         let req_id = match auth_req_id.parse::<u32>() {
             Ok(id) => id,
             Err(err) => return Err(err.to_string()),
@@ -50,5 +44,7 @@ pub fn process_req(
                 }
             }
         })
+    } else {
+        Err(format!("Incorrect params for 'allow' method: {:?}", params))
     }
 }
