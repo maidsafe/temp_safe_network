@@ -44,7 +44,7 @@ function run_packaging() {
     package_args="$package_args --target $target --artifacts artifacts/$build_type"
     [[ "$deployment_type" == "nightly" ]] && package_args="$package_args --nightly"
     [[ "$deployment_type" == "commit_hash" ]] && package_args="$package_args --commit"
-    [[ "$build_type" == "dev" ]] && package_args="$package_args --mock"
+    [[ "$build_type" == "dev" ]] && package_args="$package_args --dev"
 
     package_command=(./scripts/package.rs $package_args)
     "${package_command[@]}"

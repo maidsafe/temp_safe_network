@@ -1,0 +1,117 @@
+on: [pull_request]
+
+jobs:
+  #build-ios:
+    #runs-on: macOS-latest
+    #strategy:
+      #matrix:
+        #target: [aarch64-apple-ios, x86_64-apple-ios]
+    #steps:
+      #- uses: actions/checkout@v1
+      #- uses: actions-rs/toolchain@v1
+        #with:
+          #toolchain: stable
+          #override: true
+          #target: ${{ matrix.target }}
+      #- uses: actions-rs/cargo@v1
+        #with:
+          #command: build
+          #args: >
+            #--release --manifest-path=safe_authenticator/Cargo.toml
+            #--target=${{ matrix.target }}
+      #- uses: actions-rs/cargo@v1
+        #with:
+          #command: build
+          #args: >
+            #--release --manifest-path=safe_app/Cargo.toml
+            #--target=${{ matrix.target }}
+      #- shell: bash
+        #run: |
+          #[[ -d "artifacts" ]] && rm -rf artifacts
+          #mkdir artifacts
+          #find "target/${{ matrix.target }}/release" -maxdepth 1 -type f
+            #-exec cp '{}' artifacts \;
+      #- uses: actions/upload-artifact@master
+        #with:
+          #name: safe_client_libs-${{ matrix.target }}-prod
+          #path: artifacts
+      #- uses: actions-rs/cargo@v1
+        #with:
+          #command: build
+          #args: >
+            #--release --manifest-path=safe_authenticator/Cargo.toml
+            #--features=mock-network --target=${{ matrix.target }}
+      #- uses: actions-rs/cargo@v1
+        #with:
+          #command: build
+          #args: >
+            #--release --manifest-path=safe_app/Cargo.toml
+            #--features=mock-network --target=${{ matrix.target }}
+      #- shell: bash
+        #run: |
+          #[[ -d "artifacts" ]] && rm -rf artifacts
+          #mkdir artifacts
+          #find "target/${{ matrix.target }}/release" -maxdepth 1 -type f
+            #-exec cp '{}' artifacts \;
+      #- uses: actions/upload-artifact@master
+        #with:
+          #name: safe_client_libs-${{ matrix.target }}-dev
+          #path: artifacts
+          
+  # Put the universal iOS build here when macOS is ready.
+  # It will need to depend on the build-ios job.
+
+  build-android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [armv7-linux-androideabi, x86_64-linux-android]
+        type: [prod, dev]
+    env:
+      SAFE_CLIENT_LIBS_CONTAINER_TARGET: ${{ matrix.target }}
+      SAFE_CLIENT_LIBS_CONTAINER_TYPE: ${{ matrix.type }}
+    steps:
+      - uses: actions/checkout@v1
+      - shell: bash
+        run: make build-android
+      - uses: actions/upload-artifact@master
+        with:
+          name: safe_client_libs-${{ matrix.target }}-${{ matrix.type }}
+          path: artifacts
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      SAFE_MOCK_IN_MEMORY_STORAGE: 1
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: >
+            config_mock_vault_path
+            --manifest-path=safe_core/Cargo.toml --features=mock-network
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: >
+            --manifest-path=safe_core/Cargo.toml --features=mock-network
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: >
+            --manifest-path=safe_authenticator/Cargo.toml --features=mock-network
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: >
+            --release --manifest-path=safe_app/Cargo.toml
+            --features=mock-network
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: >
+            --release --manifest-path=tests/Cargo.toml --features=mock-network

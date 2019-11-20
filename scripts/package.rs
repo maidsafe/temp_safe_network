@@ -167,8 +167,8 @@ fn main() {
                 .long("bindings")
                 .help("Generates bindings package"),
         )
-        .arg(Arg::with_name("MOCK").short("m").long("mock").help(
-            "Generates mock version of the library",
+        .arg(Arg::with_name("DEV").short("m").long("dev").help(
+            "Generates dev version of the library",
         ))
         .arg(
             Arg::with_name("TOOLCHAIN")
@@ -199,7 +199,7 @@ fn main() {
                 .help("Directory containing the artifacts to package. If not specified, the CARGO_TARGET_DIR
                       variable will be queried for its value, and if that's not set, we will assume the 'target'
                       directory in the current directory. The artifacts directory should be structured as
-                      <target triple>/release, e.g. x86_64-unknown-linux-gnu/release."),
+                      <type>/<target triple>/release, e.g. dev/x86_64-unknown-linux-gnu/release."),
         )
         .get_matches();
 
@@ -214,7 +214,7 @@ fn main() {
     let dest_dir = matches.value_of("DEST").unwrap_or(".");
     let bindings = matches.is_present("BINDINGS");
     let lib = matches.is_present("LIB");
-    let mock = matches.is_present("MOCK");
+    let dev = matches.is_present("DEV");
     let strip = matches.is_present("STRIP");
 
     let toolchain_path = matches.value_of("TOOLCHAIN");
@@ -230,7 +230,7 @@ fn main() {
 
     // Gather features.
     let mut features = vec![];
-    if mock {
+    if dev {
         features.push("mock-network");
         features.push("testing");
     }
@@ -291,10 +291,10 @@ fn main() {
             &dest_dir,
             &libs,
             &version_string,
-            mock,
+            dev,
             file_options,
         );
-        package_artifacts_as_tar_gz(&target_name, &krate, &dest_dir, &libs, &version_string, mock);
+        package_artifacts_as_tar_gz(&target_name, &krate, &dest_dir, &libs, &version_string, dev);
     }
 
     // Create bindings archive.
@@ -339,10 +339,10 @@ fn package_artifacts_as_zip(
     dest_dir: &str,
     libs: &[PathBuf],
     version_string: &str,
-    mock: bool,
+    dev: bool,
     file_options: FileOptions,
 ) {
-    let archive_name = get_archive_name(&target_name, &krate, "zip", &version_string, mock);
+    let archive_name = get_archive_name(&target_name, &krate, "zip", &version_string, dev);
     let path: PathBuf = [dest_dir, &archive_name].iter().collect();
     let file = File::create(path).unwrap();
     let mut archive = ZipWriter::new(file);
@@ -362,9 +362,9 @@ fn package_artifacts_as_tar_gz(
     dest_dir: &str,
     libs: &[PathBuf],
     version_string: &str,
-    mock: bool,
+    dev: bool,
 ) {
-    let archive_name = get_archive_name(&target_name, &krate, "tar.gz", &version_string, mock);
+    let archive_name = get_archive_name(&target_name, &krate, "tar.gz", &version_string, dev);
     let path: PathBuf = [dest_dir, &archive_name].iter().collect();
     let file = File::create(path).unwrap();
     let enc = GzEncoder::new(file, Compression::default());
@@ -382,12 +382,12 @@ fn get_archive_name(
     krate: &str,
     archive_type: &str,
     version_string: &str,
-    mock: bool,
+    dev: bool,
 ) -> String {
-    let mock = if mock { "-mock" } else { "" };
+    let dev = if dev { "-dev" } else { "" };
     format!(
         "{}{}-{}-{}.{}",
-        krate, mock, version_string, target_name, archive_type
+        krate, dev, version_string, target_name, archive_type
     )
 }
 
