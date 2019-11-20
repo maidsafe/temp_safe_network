@@ -135,6 +135,11 @@ pub fn get_config() -> Config {
     Config::new()
 }
 
+/// Returns the directory from which the config files are read
+pub fn config_dir() -> Result<PathBuf, CoreError> {
+    Ok(dirs()?.config_dir().to_path_buf())
+}
+
 fn dirs() -> Result<ProjectDirs, CoreError> {
     let project_dirs = if let Some(custom_path) = unwrap!(CONFIG_DIR_PATH.lock()).clone() {
         ProjectDirs::from_path(custom_path)
@@ -181,9 +186,8 @@ where
 /// the config file should be created by the Vault's installer.
 #[cfg(test)]
 pub fn write_config_file(config: &Config) -> Result<PathBuf, CoreError> {
-    let dirs = dirs()?;
-    let dir = dirs.config_dir();
-    fs::create_dir_all(dir)?;
+    let dir = config_dir()?;
+    fs::create_dir_all(dir.clone())?;
 
     let path = dir.join(CONFIG_FILE);
     dbg!(&path);
@@ -194,7 +198,7 @@ pub fn write_config_file(config: &Config) -> Result<PathBuf, CoreError> {
     Ok(path)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mock-network"))]
 mod test {
     use super::*;
     use std::env::temp_dir;

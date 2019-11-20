@@ -11,8 +11,8 @@ use super::{Account, CoinBalance};
 use crate::client::mock::connection_manager::unlimited_coins;
 use crate::client::COST_OF_PUT;
 use crate::config_handler::{Config, DevConfig};
+use bincode::{deserialize, serialize};
 use fs2::FileExt;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
 use safe_nd::{
     verify_signature, AData, ADataAction, ADataAddress, ADataIndex, AppPermissions, AppendOnlyData,
     Coins, Data, Error as SndError, IData, IDataAddress, LoginPacket, MData, MDataAction,
@@ -596,11 +596,6 @@ impl Vault {
                     self.authorise_operations(req_perms.as_slice(), source, requester_pk)
                 } {
                     Err(e)
-                } else if self
-                    .get_login_packet(new_login_packet.destination())
-                    .is_some()
-                {
-                    Err(SndError::LoginPacketExists)
                 } else {
                     self.get_balance(&source)
                         .and_then(|source_balance| {
@@ -610,14 +605,24 @@ impl Vault {
                             if !self.has_sufficient_balance(source_balance, debit_amt) {
                                 return Err(SndError::InsufficientBalance);
                             }
-                            // Debit the requester's wallet the cost of inserting a login packet
-                            self.commit_mutation(&source);
 
                             // Create the balance and transfer the mentioned amount of coins
                             self.create_balance(new_balance_dest, new_owner)
                         })
                         .and_then(|_| {
+                            // Debit the requester's wallet the cost of `CreateLoginPacketFor`
+                            self.commit_mutation(&source);
                             self.transfer_coins(source, new_balance_dest, amount, transaction_id)
+                        })
+                        .and_then(|_| {
+                            if self
+                                .get_login_packet(new_login_packet.destination())
+                                .is_some()
+                            {
+                                Err(SndError::LoginPacketExists)
+                            } else {
+                                Ok(())
+                            }
                         })
                         // Store the login packet
                         .map(|_| {
@@ -1493,7 +1498,7 @@ impl Store for FileStore {
             let mut raw_data = Vec::with_capacity(metadata.len() as usize);
             match file.read_to_end(&mut raw_data) {
                 Ok(0) => (),
-                Ok(_) => match deserialise::<Cache>(&raw_data) {
+                Ok(_) => match deserialize::<Cache>(&raw_data) {
                     Ok(cache) => {
                         self.sync_time = Some(mtime);
                         result = Some(cache);
@@ -1519,7 +1524,7 @@ impl Store for FileStore {
         // the lock.
         if let Some((mut file, writing)) = self.file.take() {
             if writing {
-                let raw_data = unwrap!(serialise(&cache));
+                let raw_data = unwrap!(serialize(&cache));
                 unwrap!(file.set_len(0));
                 let _ = unwrap!(file.seek(SeekFrom::Start(0)));
                 unwrap!(file.write_all(&raw_data));

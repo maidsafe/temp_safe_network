@@ -11,13 +11,17 @@ mod futures;
 
 /// Seed utilities.
 pub mod seed;
+
+/// Logging utilities.
+pub mod logging;
+
 /// Common utility functions for writing test cases.
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 pub use self::futures::FutureExt;
 use crate::errors::CoreError;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
+use bincode::{deserialize, serialize};
 use rand::Rng;
 use rust_sodium::crypto::hash::sha512::{self, Digest, DIGESTBYTES};
 use rust_sodium::crypto::secretbox;
@@ -79,7 +83,7 @@ pub fn symmetric_encrypt(
 
     let cipher_text = secretbox::seal(plain_text, &nonce, secret_key);
 
-    Ok(serialise(&SymmetricEnc {
+    Ok(serialize(&SymmetricEnc {
         nonce: nonce.0,
         cipher_text,
     })?)
@@ -90,7 +94,7 @@ pub fn symmetric_decrypt(
     cipher_text: &[u8],
     secret_key: &secretbox::Key,
 ) -> Result<Vec<u8>, CoreError> {
-    let SymmetricEnc { nonce, cipher_text } = deserialise::<SymmetricEnc>(cipher_text)?;
+    let SymmetricEnc { nonce, cipher_text } = deserialize::<SymmetricEnc>(cipher_text)?;
     secretbox::open(&cipher_text, &secretbox::Nonce(nonce), secret_key)
         .map_err(|_| CoreError::SymmetricDecipherFailure)
 }
