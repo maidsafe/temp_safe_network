@@ -8,9 +8,9 @@
 
 use super::helpers::sk_from_hex;
 use super::{Error, Result};
+use bincode::deserialize;
 use futures::{stream, Future, Stream};
 use log::{debug, info};
-use maidsafe_utilities::serialisation::deserialise;
 use safe_authenticator::ipc::{decode_ipc_msg, update_container_perms};
 use safe_authenticator::revocation::revoke_app as safe_authenticator_revoke_app;
 use safe_authenticator::{
@@ -429,7 +429,7 @@ impl SafeAuthenticator {
 
                         if let Some(entry) = entry {
                             let plaintext = symmetric_decrypt(&entry.data, &app.keys.enc_key)?;
-                            let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
+                            let app_access = deserialize::<AccessContainerEntry>(&plaintext)?;
 
                             let mut containers = HashMap::new();
                             for (container_name, (_mdata_info, permission_set)) in app_access {
