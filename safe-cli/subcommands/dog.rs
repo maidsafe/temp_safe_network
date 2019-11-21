@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_from_arg_or_stdin, xorname_to_hex};
+use super::helpers::{get_from_arg_or_stdin, serialise_output, xorname_to_hex};
 use super::OutputFmt;
 use crate::operations::safe_net::connect;
 use log::debug;
@@ -49,20 +49,18 @@ pub fn dog_commander(
                 println!("XOR-URL: {}", xorurl);
                 print_resolved_from(100, resolved_from);
             } else if resolved_from.is_some() {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(&url, content))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
+                println!("{}", serialise_output(&(url, content), output_fmt));
             } else {
-                println!(
-                        "[{}, {{ \"data_type\": \"{}\", \"version\":\"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}]",
-                        url,
-                        data_type,
-                        version,
-                        type_tag,
-                        xorname_to_hex(xorname),
-                );
+                let jsonv = serde_json::json!([
+                    url,
+                    {
+                        "data_type": data_type,
+                        "version": version,
+                        "type_tag": type_tag,
+                        "xorname": xorname_to_hex(xorname)
+                    }
+                ]);
+                println!("{}", serialise_output(&jsonv, output_fmt));
             }
         }
         SafeData::PublishedImmutableData {
@@ -82,18 +80,17 @@ pub fn dog_commander(
                 );
                 print_resolved_from(100, resolved_from);
             } else if resolved_from.is_some() {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(&url, content))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
+                println!("{}", serialise_output(&(url, content), output_fmt));
             } else {
-                println!(
-                    "[{}, {{ \"data_type\": \"PublishedImmutableData\", \"media_type\": \"{}\", \"xorname\": \"{}\" }}]",
+                let jsonv = serde_json::json!([
                     url,
-                    media_type.clone().unwrap_or_else(|| "Unknown".to_string()),
-                    xorname_to_hex(xorname),
-                );
+                    {
+                        "data_type": "PublishedImmutableData",
+                        "media_type": media_type.clone().unwrap_or_else(|| "Unknown".to_string()),
+                        "xorname": xorname_to_hex(xorname)
+                    }
+                ]);
+                println!("{}", serialise_output(&jsonv, output_fmt));
             }
         }
         SafeData::Wallet {
@@ -111,19 +108,17 @@ pub fn dog_commander(
                 println!("XOR-URL: {}", xorurl);
                 print_resolved_from(100, resolved_from);
             } else if resolved_from.is_some() {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(&url, content))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
+                println!("{}", serialise_output(&(url, content), output_fmt));
             } else {
-                println!(
-                    "[{}, {{ \"data_type\": \"{}\", \"type_tag\": \"{}\", \"xorname\": \"{}\" }}]",
+                let jsonv = serde_json::json!([
                     url,
-                    data_type,
-                    type_tag,
-                    xorname_to_hex(xorname),
-                );
+                    {
+                        "data_type": data_type,
+                        "type_type": type_tag,
+                        "xorname": xorname_to_hex(xorname)
+                    }
+                ]);
+                println!("{}", serialise_output(&jsonv, output_fmt));
             }
         }
         SafeData::SafeKey {
@@ -137,17 +132,16 @@ pub fn dog_commander(
                 println!("XOR-URL: {}", xorurl);
                 print_resolved_from(100, resolved_from);
             } else if resolved_from.is_some() {
-                println!(
-                    "{}",
-                    serde_json::to_string(&(&url, content))
-                        .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-                );
+                println!("{}", serialise_output(&(url, content), output_fmt));
             } else {
-                println!(
-                    "[{}, {{ \"data_type\": \"SafeKey\", \"xorname\": \"{}\" }}]",
+                let jsonv = serde_json::json!([
                     url,
-                    xorname_to_hex(xorname),
-                );
+                    {
+                        "data_type": "SafeKey",
+                        "xorname": xorname_to_hex(xorname)
+                    }
+                ]);
+                println!("{}", serialise_output(&jsonv, output_fmt));
             }
         }
     }

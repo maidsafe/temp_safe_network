@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_from_arg_or_stdin, notice_dry_run};
+use super::helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output};
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{Safe, XorUrl, XorUrlEncoder};
@@ -97,7 +97,7 @@ pub fn files_commander(
                 }
                 table.printstd();
             } else {
-                print_json_output(files_container_xorurl, 0, processed_files)?;
+                print_serialized_output(files_container_xorurl, 0, processed_files, output_fmt)?;
             }
 
             Ok(())
@@ -145,7 +145,7 @@ pub fn files_commander(
                     println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
-                print_json_output(target, version, processed_files)?;
+                print_serialized_output(target, version, processed_files, output_fmt)?;
             }
             Ok(())
         }
@@ -191,7 +191,7 @@ pub fn files_commander(
                     );
                 }
             } else {
-                print_json_output(target, version, processed_files)?;
+                print_serialized_output(target, version, processed_files, output_fmt)?;
             }
             Ok(())
         }
@@ -216,10 +216,11 @@ fn gen_processed_files_table(processed_files: &BTreeMap<String, (String, String)
     (table, success_count)
 }
 
-fn print_json_output(
+fn print_serialized_output(
     xorurl: XorUrl,
     version: u64,
     processed_files: BTreeMap<String, (String, String)>,
+    output_fmt: OutputFmt,
 ) -> Result<(), String> {
     let url = match XorUrlEncoder::from_url(&xorurl) {
         Ok(mut xorurl_encoder) => {
@@ -228,11 +229,7 @@ fn print_json_output(
         }
         Err(_) => xorurl,
     };
-    println!(
-        "{}",
-        serde_json::to_string(&(url, processed_files))
-            .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-    );
+    println!("{}", serialise_output(&(url, processed_files), output_fmt));
 
     Ok(())
 }

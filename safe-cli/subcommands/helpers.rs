@@ -6,8 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::OutputFmt;
 use log::debug;
 use safe_api::XorName;
+use serde::ser::Serialize;
 use std::io::{self, stdin, stdout, Write};
 
 // Warn the user about a dry-run being performed
@@ -85,4 +87,23 @@ pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result
 pub fn parse_tx_id(src: &str) -> Result<u64, String> {
     src.parse::<u64>()
         .map_err(|err| format!("{}. A valid TX Id is a number between 0 and 2^64", err))
+}
+
+// serialize structured value using any format from OutputFmt
+pub fn serialise_output<T: ?Sized>(value: &T, fmt: OutputFmt) -> String
+where
+    T: Serialize,
+{
+    match fmt {
+        OutputFmt::Json => serde_json::to_string_pretty(&value)
+            .unwrap_or_else(|_| "Failed to serialise output to json".to_string()),
+        OutputFmt::JsonCompact => serde_json::to_string(&value)
+            .unwrap_or_else(|_| "Failed to serialise output to json".to_string()),
+        OutputFmt::Yaml => serde_yaml::to_string(&value)
+            .unwrap_or_else(|_| "Failed to serialise output to yaml".to_string()),
+        OutputFmt::Pretty => {
+            // For now we panic.  maybe make a default Pretty output later.
+            panic!("Pretty format must be handled by caller")
+        }
+    }
 }

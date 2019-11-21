@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id};
+use super::helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output};
 use super::OutputFmt;
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
@@ -191,16 +191,8 @@ pub fn print_new_key_output(
             println!("Secret Key = {}", pair.sk);
         }
     } else if let Some(pair) = &key_pair {
-        println!(
-            "{}",
-            serde_json::to_string(&(&xorurl, pair))
-                .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-        );
+        println!("{}", serialise_output(&(&xorurl, pair), output_fmt));
     } else {
-        println!(
-            "{}",
-            serde_json::to_string(&xorurl)
-                .unwrap_or_else(|_| "Failed to serialise output to json".to_string())
-        );
+        println!("{}", serialise_output(&xorurl, output_fmt));
     }
 }

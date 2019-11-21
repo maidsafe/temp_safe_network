@@ -32,7 +32,7 @@ pub struct CmdArgs {
     // /// The account's Root Container address
     // #[structopt(long = "root", raw(global = "true"))]
     // root: bool,
-    /// Output data serialisation. Currently only supported 'json'
+    /// Output data serialisation: [json, jsoncompact, yaml]
     #[structopt(short = "o", long = "output", raw(global = "true"))]
     output_fmt: Option<String>,
     /// Sets JSON as output serialisation format (alias of '--output json')
@@ -79,6 +79,8 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
         let fmt = args.output_fmt.clone().unwrap_or_else(|| "".to_string());
         match fmt.as_ref() {
             "json" => OutputFmt::Json,
+            "jsoncompact" => OutputFmt::JsonCompact,
+            "yaml" => OutputFmt::Yaml,
             "" => OutputFmt::Pretty,
             other => {
                 return Err(format!(
