@@ -55,9 +55,7 @@ function build_on_linux() {
     local container_tag
     local uuid
     uuid=$(uuidgen | sed 's/-//g')
-    container_tag=$(sed 's/safe-//g' <<< "$component")
-    container_tag="$container_tag-$target"
-    [[ $build_type == "dev" ]] && container_tag="$container_tag-dev"
+    container_tag="$component-$target-$build_type"
     build_command=$(get_docker_build_command)
     docker run --name "$component-build-${uuid}" -v "$(pwd)":/usr/src/safe-cli:Z \
         -u "$(id -u)":"$(id -g)" \

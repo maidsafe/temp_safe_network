@@ -111,14 +111,8 @@ ifndef SAFE_CLI_CONTAINER_TARGET
 	@echo "Please set SAFE_CLI_CONTAINER_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
 	@exit 1
 endif
-	$(eval COMPONENT_NAME := $(shell echo ${SAFE_CLI_CONTAINER_COMPONENT} | sed 's/safe-//g'))
-ifeq ($(SAFE_CLI_CONTAINER_TYPE), dev)
 	docker push \
-		maidsafe/safe-cli-build:${COMPONENT_NAME}-${SAFE_CLI_CONTAINER_TARGET}-dev
-else
-	docker push \
-		maidsafe/safe-cli-build:${COMPONENT_NAME}-${SAFE_CLI_CONTAINER_TARGET}
-endif
+		maidsafe/safe-cli-build:${SAFE_CLI_CONTAINER_COMPONENT}-${SAFE_CLI_CONTAINER_TARGET}-${SAFE_CLI_CONTAINER_TYPE}
 
 retrieve-ios-build-artifacts:
 ifndef SAFE_CLI_BRANCH
@@ -134,29 +128,19 @@ endif
 	rm -rf artifacts
 	./resources/retrieve-build-artifacts.sh "x86_64-apple-ios" "aarch64-apple-ios"
 
-universal-ios-lib: retrieve-ios-build-artifacts
+universal-ios-lib:
 ifneq ($(UNAME_S),Darwin)
 	@echo "This target can only be run on macOS"
 	@exit 1
 endif
-ifndef SAFE_CLI_BRANCH
-	@echo "A branch or PR reference must be provided."
-	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
-	@exit 1
-endif
-ifndef SAFE_CLI_BUILD_NUMBER
-	@echo "A valid build number must be supplied for the artifacts to be retrieved."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
-	@exit 1
-endif
-	mkdir -p artifacts/safe-ffi/real/universal
-	mkdir -p artifacts/safe-ffi/mock/universal
-	lipo -create -output artifacts/safe-ffi/real/universal/libsafe_ffi.a \
-		artifacts/safe-ffi/real/x86_64-apple-ios/release/libsafe_ffi.a \
-		artifacts/safe-ffi/real/aarch64-apple-ios/release/libsafe_ffi.a
-	lipo -create -output artifacts/safe-ffi/mock/universal/libsafe_ffi.a \
-		artifacts/safe-ffi/mock/x86_64-apple-ios/release/libsafe_ffi.a \
-		artifacts/safe-ffi/mock/aarch64-apple-ios/release/libsafe_ffi.a
+	mkdir -p artifacts/safe-ffi/prod/universal
+	mkdir -p artifacts/safe-ffi/dev/universal
+	lipo -create -output artifacts/safe-ffi/prod/universal/libsafe_ffi.a \
+		artifacts/safe-ffi/prod/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/safe-ffi/prod/aarch64-apple-ios/release/libsafe_ffi.a
+	lipo -create -output artifacts/safe-ffi/dev/universal/libsafe_ffi.a \
+		artifacts/safe-ffi/dev/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/safe-ffi/dev/aarch64-apple-ios/release/libsafe_ffi.a
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
@@ -278,10 +262,10 @@ endif
 		"armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
 		"aarch64-apple-ios" "apple-ios"
 	find artifacts -type d -empty -delete
-	rm -rf artifacts/safe-ffi/real/aarch64-apple-ios
-	rm -rf artifacts/safe-ffi/mock/aarch64-apple-ios
-	rm -rf artifacts/safe-ffi/real/x86_64-apple-ios
-	rm -rf artifacts/safe-ffi/mock/x86_64-apple-ios
+	rm -rf artifacts/safe-ffi/prod/aarch64-apple-ios
+	rm -rf artifacts/safe-ffi/dev/aarch64-apple-ios
+	rm -rf artifacts/safe-ffi/prod/x86_64-apple-ios
+	rm -rf artifacts/safe-ffi/dev/x86_64-apple-ios
 
 package-universal-ios-lib:
 ifndef SAFE_CLI_BRANCH
@@ -320,16 +304,16 @@ endif
 
 package-commit_hash-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/mock
-	mkdir -p deploy/real
+	mkdir -p deploy/dev
+	mkdir -p deploy/prod
 	./resources/package-deploy-artifacts.sh "safe-cli" $$(git rev-parse --short HEAD)
 	./resources/package-deploy-artifacts.sh "safe-ffi" $$(git rev-parse --short HEAD)
 	find deploy -name "*.tar.gz" -exec rm '{}' \;
 
 package-version-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/mock
-	mkdir -p deploy/real
+	mkdir -p deploy/dev
+	mkdir -p deploy/prod
 	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-ffi" "${SAFE_FFI_VERSION}"
 	find deploy -name "safe-ffi-*.tar.gz" -exec rm '{}' \;

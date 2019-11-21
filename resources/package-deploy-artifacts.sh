@@ -61,7 +61,7 @@ function get_archive_name() {
     extension=$4
 
     archive_name="$component-$stamp-$target"
-    [[ "$type" == "mock" ]] && archive_name="$archive_name-dev"
+    [[ "$type" == "dev" ]] && archive_name="$archive_name-dev"
     archive_name="$archive_name.$extension"
     echo "$archive_name"
 }
@@ -98,7 +98,7 @@ function create_zip_archive() {
         "../../artifacts/$component/$type/$target/release/$distributable"
 }
 
-declare -a types=("mock" "real")
+declare -a types=("dev" "prod")
 for type in "${types[@]}"; do
     targets=($(ls -1 "artifacts/$component/$type"))
     for target in "${targets[@]}"
