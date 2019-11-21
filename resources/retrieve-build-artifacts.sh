@@ -21,10 +21,7 @@ for component in "${components[@]}"; do
             mkdir -p "artifacts/$component/$type/$target/release"
             (
                 cd "artifacts/$component/$type/$target/release"
-                key="$SAFE_CLI_BRANCH-$SAFE_CLI_BUILD_NUMBER-$component-$target.tar.gz"
-                if [[ "$type" == "mock" ]]; then
-                    key="$SAFE_CLI_BRANCH-$SAFE_CLI_BUILD_NUMBER-$component-$target-dev.tar.gz"
-                fi
+                key="$SAFE_CLI_BRANCH-$SAFE_CLI_BUILD_NUMBER-$component-$type-$target.tar.gz"
                 # If the key being queried doesn't exist this check prints out an ugly error message
                 # that could potentially be confusing to people who are reading the logs.
                 # It's not a problem, so the output is suppressed.

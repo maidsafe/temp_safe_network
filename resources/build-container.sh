@@ -19,7 +19,7 @@ fi
 build_type=$3
 if [[ -z "$build_type" ]]; then
     echo "You must supply the type for the build."
-    echo "Valid values are 'dev' or 'non-dev'."
+    echo "Valid values are 'dev' or 'prod'."
     exit 1
 fi
 

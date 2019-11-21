@@ -10,27 +10,9 @@ properties([
 ])
 
 stage('build & test') {
-    parallel(test_linux: {
-        node('safe_cli') {
-            checkout(scm)
-            runTests("cli")
-            packageBuildArtifacts("safe-cli", "dev", "x86_64-unknown-linux-gnu")
-            uploadBuildArtifacts()
-        }
-    },
-    test_cli_windows: {
-        node('windows') {
-            checkout(scm)
-            retrieveCache('windows')
-            runTests("cli")
-            packageBuildArtifacts("safe-cli", "dev", "x86_64-pc-windows-gnu")
-            uploadBuildArtifacts()
-        }
-    },
-    test_cli_macos: {
+    parallel(test_cli_macos: {
         node('osx') {
             checkout(scm)
-            retrieveCache('macos')
             runTests("cli")
             packageBuildArtifacts("safe-cli", "dev", "x86_64-apple-darwin")
             uploadBuildArtifacts()
@@ -42,28 +24,10 @@ stage('build & test') {
             runTests("api")
         }
     },
-    test_api_windows: {
-        node('windows') {
-            checkout(scm)
-            runTests("api")
-        }
-    },
-    test_api_linux: {
-        node('safe_cli') {
-            checkout(scm)
-            runTests("api")
-        }
-    },
-    clippy: {
-        node('safe_cli') {
-            checkout(scm)
-            sh("make clippy")
-        }
-    },
     ffi_ios_aarch64: {
         node('osx') {
             checkout(scm)
-            ["non-dev", "dev"].each({
+            ["prod", "dev"].each({
                 runReleaseBuild("safe-ffi", "${it}", "aarch64-apple-ios")
                 packageBuildArtifacts("safe-ffi", "${it}", "aarch64-apple-ios")
                 uploadBuildArtifacts()
@@ -73,7 +37,7 @@ stage('build & test') {
     ffi_ios_x86_64: {
         node('osx') {
             checkout(scm)
-            ["non-dev", "dev"].each({
+            ["prod", "dev"].each({
                 runReleaseBuild("safe-ffi", "${it}", "x86_64-apple-ios")
                 packageBuildArtifacts("safe-ffi", "${it}", "x86_64-apple-ios")
                 uploadBuildArtifacts()
@@ -83,7 +47,7 @@ stage('build & test') {
     ffi_macos: {
         node('osx') {
             checkout(scm)
-            ["non-dev", "dev"].each({
+            ["prod", "dev"].each({
                 runReleaseBuild("safe-ffi", "${it}", "x86_64-apple-darwin")
                 stripArtifacts()
                 packageBuildArtifacts("safe-ffi", "${it}", "x86_64-apple-darwin")
@@ -91,95 +55,15 @@ stage('build & test') {
             })
         }
     },
-    ffi_windows: {
-        node('windows') {
-            checkout(scm)
-            ["non-dev", "dev"].each({
-                runReleaseBuild("safe-ffi", "${it}", "x86_64-pc-windows-gnu")
-                packageBuildArtifacts("safe-ffi", "${it}", "x86_64-pc-windows-gnu")
-                uploadBuildArtifacts()
-            })
-        }
-    },
-    release_cli_linux: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-cli", "non-dev", "x86_64-unknown-linux-gnu")
-            stripArtifacts()
-            packageBuildArtifacts("safe-cli", "non-dev", "x86_64-unknown-linux-gnu")
-            uploadBuildArtifacts()
-        }
-    },
-    cli_windows: {
-        node('windows') {
-            checkout(scm)
-            ["non-dev", "dev"].each({
-                runReleaseBuild("safe-cli", "${it}", "x86_64-pc-windows-gnu")
-                stripArtifacts()
-                packageBuildArtifacts("safe-cli", "${it}", "x86_64-pc-windows-gnu")
-                uploadBuildArtifacts()
-            })
-        }
-    },
     cli_macos: {
         node('osx') {
             checkout(scm)
-            ["non-dev", "dev"].each({
+            ["prod", "dev"].each({
                 runReleaseBuild("safe-cli", "${it}", "x86_64-apple-darwin")
                 stripArtifacts()
                 packageBuildArtifacts("safe-cli", "${it}", "x86_64-apple-darwin")
                 uploadBuildArtifacts()
             })
-        }
-    },
-    release_ffi_linux: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "x86_64-unknown-linux-gnu")
-            stripArtifacts()
-            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-unknown-linux-gnu")
-            uploadBuildArtifacts()
-        }
-    },
-    release_ffi_android_x86_64: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "x86_64-linux-android")
-            packageBuildArtifacts("safe-ffi", "non-dev", "x86_64-linux-android")
-            uploadBuildArtifacts()
-        }
-    },
-    release_ffi_android_armv7: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "non-dev", "armv7-linux-androideabi")
-            packageBuildArtifacts("safe-ffi", "non-dev", "armv7-linux-androideabi")
-            uploadBuildArtifacts()
-        }
-    },
-    dev_ffi_linux: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "x86_64-unknown-linux-gnu")
-            stripArtifacts()
-            packageBuildArtifacts("safe-ffi", "dev", "x86_64-unknown-linux-gnu")
-            uploadBuildArtifacts()
-        }
-    },
-    dev_ffi_android_armv7: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "armv7-linux-androideabi")
-            packageBuildArtifacts("safe-ffi", "dev", "armv7-linux-androideabi")
-            uploadBuildArtifacts()
-        }
-    },
-    dev_ffi_android_x86_64: {
-        node('safe_cli') {
-            checkout(scm)
-            runReleaseBuild("safe-ffi", "dev", "x86_64-linux-android")
-            packageBuildArtifacts("safe-ffi", "dev", "x86_64-linux-android")
-            uploadBuildArtifacts()
         }
     })
 }
@@ -190,6 +74,7 @@ stage("build universal iOS lib") {
         def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
         withEnv(["SAFE_CLI_BRANCH=${branch}",
                  "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+            sh("make retrieve-ios-build-artifacts")
             sh("make universal-ios-lib")
             sh("make package-universal-ios-lib")
             uploadBuildArtifacts()
@@ -203,55 +88,11 @@ stage('deploy') {
             checkout(scm)
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
-            if (isVersionChangeCommit()) {
-                version = sh(
-                    returnStdout: true,
-                    script: "grep '^version' < safe-cli/Cargo.toml | head -n 1 | awk '{ print \$3 }' | sed 's/\"//g'").trim()
-                packageArtifactsForDeploy(true)
-                createTag(version)
-                createGithubRelease(version)
-                uploadDeployArtifacts("mock")
-                uploadDeployArtifacts("real")
-            } else {
-                packageArtifactsForDeploy(false)
-                uploadDeployArtifacts("mock")
-                uploadDeployArtifacts("real")
-            }
+            packageArtifactsForDeploy(false)
+            uploadDeployArtifacts("dev")
+            uploadDeployArtifacts("prod")
         } else {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
-        }
-    }
-    if (env.BRANCH_NAME == "master") {
-        build(job: "../rust_cache_build-safe_api", wait: false)
-        build(job: "../docker_build-safe_api_build_container", wait: false)
-    }
-}
-
-stage("publishing") {
-    node("safe_cli") {
-        checkout(scm)
-        if (shouldPublish()) {
-            withCredentials(
-                [string(
-                    credentialsId: "crates_io_token", variable: "CRATES_IO_TOKEN")]) {
-                sh("make publish-api")
-            }
-        } else {
-            echo("Not publishing.")
-            echo("Not a version change commit or the publish branch doesn't match.")
-        }
-    }
-}
-
-def shouldPublish() {
-    return isVersionChangeCommit() && env.BRANCH_NAME == "${params.PUBLISH_BRANCH}"
-}
-
-def retrieveCache(os) {
-    if (!fileExists("target")) {
-        withEnv(["SAFE_CLI_BRANCH=${params.CACHE_BRANCH}",
-                 "SAFE_CLI_OS=${os}"]) {
-            sh("make retrieve-cache")
         }
     }
 }
@@ -284,46 +125,11 @@ def runTests(component) {
     }
 }
 
-def isVersionChangeCommit() {
-    shortCommitHash = sh(
-        returnStdout: true,
-        script: "git log -n 1 --no-merges --pretty=format:'%h'").trim()
-    message = sh(
-        returnStdout: true,
-        script: "git log --format=%B -n 1 ${shortCommitHash}").trim()
-    return message.startsWith("Version change")
-}
-
 def packageArtifactsForDeploy(isVersionCommit) {
     if (isVersionCommit) {
         sh("make package-version-artifacts-for-deploy")
     } else {
         sh("make package-commit_hash-artifacts-for-deploy")
-    }
-}
-
-def createTag(version) {
-    withCredentials(
-        [usernamePassword(
-            credentialsId: "github_maidsafe_qa_user_credentials",
-            usernameVariable: "GIT_USER",
-            passwordVariable: "GIT_PASSWORD")]) {
-        sh("git config --global user.name \$GIT_USER")
-        sh("git config --global user.email qa@maidsafe.net")
-        sh("git config credential.username \$GIT_USER")
-        sh("git config credential.helper '!f() { echo password=\$GIT_PASSWORD; }; f'")
-        sh("git tag -a ${version} -m 'Creating tag for ${version}'")
-        sh("GIT_ASKPASS=true git push origin --tags")
-    }
-}
-
-def createGithubRelease(version) {
-    withCredentials(
-        [usernamePassword(
-            credentialsId: "github_maidsafe_token_credentials",
-            usernameVariable: "GITHUB_USER",
-            passwordVariable: "GITHUB_TOKEN")]) {
-        sh("make deploy-github-release")
     }
 }
 
