@@ -324,7 +324,7 @@ impl SafeAuthdClient {
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_ALLOW,
-            json!(req_id),
+            json!(req_id.to_string()),
         )?;
 
         debug!(
@@ -341,7 +341,7 @@ impl SafeAuthdClient {
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_DENY,
-            json!(req_id),
+            json!(req_id.to_string()),
         )?;
 
         debug!(

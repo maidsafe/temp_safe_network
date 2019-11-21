@@ -6,20 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{AuthReq, SafeAuthReqId};
+use super::AuthReq;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
+use jsonrpc_quic::{parse_request, successful_response};
 use log::debug;
-use safe_nd::AppPermissions;
+use serde_json::json;
 use slog::{Drain, Logger};
-use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::Arc;
-use std::{ascii, fmt, fs, str};
+use std::{fmt, fs, str};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 
@@ -182,20 +182,9 @@ fn handle_request(_log: &Logger, stream: quinn::NewStream, notif_channel: mpsc::
         recv.read_to_end(64 * 1024) // Read the request, which must be at most 64KiB
             .map_err(|e| format_err!("Failed reading request: {}", e))
             .and_then(move |(_, req)| {
-                let mut escaped = String::new();
-                for &x in &req[..] {
-                    let part = ascii::escape_default(x).collect::<Vec<_>>();
-                    escaped.push_str(str::from_utf8(&part).unwrap());
-                }
                 // info!(log, "Got request");
-                // Execute the request
-                let resp = process_get(&req, notif_channel).unwrap_or_else(move |e| {
-                    // error!(log, "Failed to process request"; "reason" => %e.pretty());
-                    // TODO: implement JSON-RPC rather.
-                    // Temporarily prefix message with "[AUTHD_ERROR]" to signal error to the caller,
-                    // once we have JSON-RPC we can adhere to its format for errors.
-                    format!("[ERROR]: {}", e.pretty()).into_bytes().into()
-                });
+                // Process the request
+                let resp = process_req(&req, notif_channel);
 
                 // Write the response
                 tokio::io::write_all(send, resp)
@@ -211,50 +200,32 @@ fn handle_request(_log: &Logger, stream: quinn::NewStream, notif_channel: mpsc::
     )
 }
 
-fn process_get(x: &[u8], notif_channel: mpsc::Sender<AuthReq>) -> Result<Box<[u8]>, Error> {
-    if x.len() < 4 || &x[0..4] != b"GET " {
-        bail!("Missing GET");
-    }
-    if x[4..].len() < 2 || &x[x.len() - 2..] != b"\r\n" {
-        bail!("Missing \\r\\n");
-    }
-    let x = &x[4..x.len() - 2];
-    let end = x.iter().position(|&c| c == b' ').unwrap_or_else(|| x.len());
-    let path = str::from_utf8(&x[..end]).context("Path is malformed UTF-8")?;
-    let req_args: Vec<&str> = path.split('/').collect();
+fn process_req(req: &[u8], notif_channel: mpsc::Sender<AuthReq>) -> Box<[u8]> {
+    let jsonrpc_req = match parse_request(req.to_vec()) {
+        Ok(jsonrpc) => jsonrpc,
+        Err(err_str) => return err_str.into_bytes().into(),
+    };
 
-    if req_args.len() != 3 {
-        bail!(
-            "Incorrect number of arguments for authorisation request notification, missing app ID"
-        )
-    } else {
-        let app_id = req_args[1];
-        let req_id = req_args[2].parse::<SafeAuthReqId>()?;
+    let auth_req: AuthReq = match serde_json::from_value(jsonrpc_req.params) {
+        Ok(auth_req) => auth_req,
+        Err(err) => return err.to_string().as_bytes().into(),
+    };
 
-        // TODO: get the rest of auth req info from the request
-        let auth_req = AuthReq {
-            req_id,
-            app_id: app_id.to_string(),
-            app_name: String::from("Unknown"),
-            app_vendor: String::from("Unknown"),
-            app_permissions: AppPermissions {
-                get_balance: true,
-                perform_mutations: true,
-                transfer_coins: true,
-            },
-            own_container: false,
-            containers: HashMap::default(),
-        };
+    // New notification for auth req to be sent to user
+    let app_id = auth_req.app_id.clone();
+    let msg = match notif_channel.send(auth_req) {
+        Ok(_) => format!(
+            "Auth req from app id '{}' ready to be notified to user",
+            app_id
+        ),
+        Err(err) => format!(
+            "Auth req notification for app id '{}' couldn't be sent to user: {}",
+            app_id, err
+        ),
+    };
 
-        // New notification for auth req to be sent to user
-        let msg = match notif_channel.send(auth_req) {
-            Ok(_) => format!(
-                "Ok - auth req from app ID: {} ready to be notified to user",
-                app_id
-            ),
-            Err(err) => format!("Auth req notification couldn't be sent to user: {}", err),
-        };
-
-        Ok(msg.as_bytes().into())
+    match successful_response(json!(msg), 0) {
+        Ok(res) => res.as_bytes().into(),
+        Err(err) => err.as_bytes().into(),
     }
 }

@@ -23,24 +23,38 @@ pub fn process_req(
                 params
             ))
         } else {
-            let mut notif_endpoint = args[0].to_string();
+            let mut notif_endpoint = match args[0].as_str() {
+                None => return Err(format!(
+                    "Invalid endpoint URL string passed as first param for 'subscribe' method: {:?}",
+                    params
+                )),
+                Some(str) => {
+                    str.to_string()
+                }
+            };
+
             println!("Subscribing to authorisation requests notifications...");
             let cert_base_path = if args.len() == 2 {
-                Some(args[1].to_string())
+                match args[1].as_str() {
+                    None => return Err(format!(
+                        "Invalid certificate base path string passed as second param for 'subscribe' method: {:?}",
+                        params
+                    )),
+                    Some(str) => {
+                        Some(str.to_string())
+                    }
+                }
             } else {
                 None
             };
 
-            lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
+            lock_notif_endpoints_list(notif_endpoints_handle, move |notif_endpoints_list| {
                 // let's normailse the endpoint URL
                 if notif_endpoint.ends_with('/') {
                     notif_endpoint.pop();
                 }
 
-                if notif_endpoints_list
-                    .get(&notif_endpoint.to_string())
-                    .is_some()
-                {
+                if notif_endpoints_list.get(&notif_endpoint).is_some() {
                     let msg = format!(
                         "Subscription rejected. Endpoint '{}' is already subscribed",
                         notif_endpoint
@@ -52,7 +66,7 @@ pub fn process_req(
                     println!("{}", msg);
                     Err(msg)
                 } else {
-                    notif_endpoints_list.insert(notif_endpoint.to_string(), cert_base_path.clone());
+                    notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
 
                     let msg = format!(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications (cert base path: {:?})",

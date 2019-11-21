@@ -14,6 +14,4 @@ pub enum Error {
     ServerError(String),
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-pub use jsonrpc::send_request;
+pub use jsonrpc::{err_response, parse_request, send_request, successful_response, JsonRpcReq};
