@@ -6,7 +6,7 @@ if [[ -z "$build_type" ]]; then
 fi
 
 if [[ -z "$build_component" ]]; then
-    echo "build_component must be set safe-api, safe-cli or safe-ffi"
+    echo "build_component must be set safe-api, safe-cli, safe-authd or safe-ffi"
     exit 1
 fi
 
