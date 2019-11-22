@@ -13,29 +13,29 @@ GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe-api
 
 build-component:
-ifndef SAFE_CLI_BUILD_COMPONENT
+ifndef SAFE_API_BUILD_COMPONENT
 	@echo "A build component must be specified."
-	@echo "Please set SAFE_CLI_BUILD_COMPONENT to 'safe-api', 'safe-ffi', 'safe-authd', 'safe-authd' or 'safe-cli'."
+	@echo "Please set SAFE_API_BUILD_COMPONENT to 'safe-api', 'safe-ffi', 'safe-authd', 'safe-authd' or 'safe-cli'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TYPE
+ifndef SAFE_API_BUILD_TYPE
 	@echo "A build type must be specified."
-	@echo "Please set SAFE_CLI_BUILD_TYPE to 'dev' or 'prod'."
+	@echo "Please set SAFE_API_BUILD_TYPE to 'dev' or 'prod'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TARGET
+ifndef SAFE_API_BUILD_TARGET
 	@echo "A build target must be specified."
-	@echo "Please set SAFE_CLI_BUILD_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@echo "Please set SAFE_API_BUILD_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_CLEAN
-	$(eval SAFE_CLI_BUILD_CLEAN := false)
+ifndef SAFE_API_BUILD_CLEAN
+	$(eval SAFE_API_BUILD_CLEAN := false)
 endif
 	./resources/build-component.sh \
-		"${SAFE_CLI_BUILD_COMPONENT}" \
-		"${SAFE_CLI_BUILD_TARGET}" \
-		"${SAFE_CLI_BUILD_TYPE}" \
-		"${SAFE_CLI_BUILD_CLEAN}"
+		"${SAFE_API_BUILD_COMPONENT}" \
+		"${SAFE_API_BUILD_TARGET}" \
+		"${SAFE_API_BUILD_TYPE}" \
+		"${SAFE_API_BUILD_CLEAN}"
 
 build-all-containers:
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
@@ -121,9 +121,9 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
 	rm -rf artifacts
@@ -243,26 +243,26 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A build number must be supplied for build artifact packaging."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TYPE
-	@echo "A value must be supplied for SAFE_CLI_BUILD_TYPE."
+ifndef SAFE_API_BUILD_TYPE
+	@echo "A value must be supplied for SAFE_API_BUILD_TYPE."
 	@echo "Valid values are 'dev' or 'prod'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_COMPONENT
-	@echo "A value must be supplied for SAFE_CLI_BUILD_COMPONENT."
+ifndef SAFE_API_BUILD_COMPONENT
+	@echo "A value must be supplied for SAFE_API_BUILD_COMPONENT."
 	@echo "Valid values are 'safe-li', 'safe-api' or 'safe-ffi'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TARGET
-	@echo "A value must be supplied for SAFE_CLI_BUILD_TARGET."
+ifndef SAFE_API_BUILD_TARGET
+	@echo "A value must be supplied for SAFE_API_BUILD_TARGET."
 	@exit 1
 endif
-	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TYPE}-${SAFE_CLI_BUILD_TARGET}.tar.gz)
+	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-${SAFE_API_BUILD_COMPONENT}-${SAFE_API_BUILD_TYPE}-${SAFE_API_BUILD_TARGET}.tar.gz)
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
 	mv ${ARCHIVE_NAME} artifacts
@@ -273,9 +273,9 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A build number must be supplied for build artifact packaging."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
 	rm -rf artifacts
@@ -294,20 +294,20 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
 	( \
 		cd artifacts; \
 		tar -C safe-ffi/prod/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-prod-apple-ios.tar.gz .; \
+			${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-safe-ffi-prod-apple-ios.tar.gz .; \
 	)
 	( \
 		cd artifacts; \
 		tar -C safe-ffi/dev/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-dev-apple-ios.tar.gz .; \
+			${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-safe-ffi-dev-apple-ios.tar.gz .; \
 	)
 	rm -rf artifacts/safe-ffi
 

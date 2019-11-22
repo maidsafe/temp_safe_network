@@ -34,9 +34,9 @@ jobs:
         target: [armv7-linux-androideabi, x86_64-linux-android]
         type: [dev, prod]
     env:
-      SAFE_CLI_BUILD_COMPONENT: safe-ffi
-      SAFE_CLI_BUILD_TYPE: ${{ matrix.type }}
-      SAFE_CLI_BUILD_TARGET: ${{ matrix.target }}
+      SAFE_API_BUILD_COMPONENT: safe-ffi
+      SAFE_API_BUILD_TYPE: ${{ matrix.type }}
+      SAFE_API_BUILD_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v1
       - shell: bash

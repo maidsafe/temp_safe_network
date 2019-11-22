@@ -73,7 +73,7 @@ stage("build universal iOS lib") {
         checkout(scm)
         def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
         withEnv(["SAFE_CLI_BRANCH=${branch}",
-                 "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+                 "SAFE_API_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
             sh("make retrieve-ios-build-artifacts")
             sh("make universal-ios-lib")
             sh("make package-universal-ios-lib")
@@ -101,10 +101,10 @@ def runReleaseBuild(component, type, target) {
     // Running a dev build as a clean build is very slow if we're trying to do
     // both the prod and dev builds as part of the same job.
     def cleanBuild = env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}" && type != "dev"
-    withEnv(["SAFE_CLI_BUILD_COMPONENT=${component}",
-             "SAFE_CLI_BUILD_TYPE=${type}",
-             "SAFE_CLI_BUILD_CLEAN=${cleanBuild}",
-             "SAFE_CLI_BUILD_TARGET=${target}"]) {
+    withEnv(["SAFE_API_BUILD_COMPONENT=${component}",
+             "SAFE_API_BUILD_TYPE=${type}",
+             "SAFE_API_BUILD_CLEAN=${cleanBuild}",
+             "SAFE_API_BUILD_TARGET=${target}"]) {
         sh("make build-component")
     }
 }
@@ -136,7 +136,7 @@ def packageArtifactsForDeploy(isVersionCommit) {
 def retrieveBuildArtifacts() {
     branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
     withEnv(["SAFE_CLI_BRANCH=${branch}",
-             "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+             "SAFE_API_BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
         sh("make retrieve-all-build-artifacts")
     }
 }
@@ -144,10 +144,10 @@ def retrieveBuildArtifacts() {
 def packageBuildArtifacts(component, type, target) {
     def branch = env.CHANGE_ID?.trim() ?: env.BRANCH_NAME
     withEnv(["SAFE_CLI_BRANCH=${branch}",
-             "SAFE_CLI_BUILD_NUMBER=${env.BUILD_NUMBER}",
-             "SAFE_CLI_BUILD_TYPE=${type}",
-             "SAFE_CLI_BUILD_COMPONENT=${component}",
-             "SAFE_CLI_BUILD_TARGET=${target}"]) {
+             "SAFE_API_BUILD_NUMBER=${env.BUILD_NUMBER}",
+             "SAFE_API_BUILD_TYPE=${type}",
+             "SAFE_API_BUILD_COMPONENT=${component}",
+             "SAFE_API_BUILD_TARGET=${target}"]) {
         sh("make package-build-artifacts")
     }
 }

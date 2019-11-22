@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-if [[ -z "$SAFE_CLI_BUILD_NUMBER" ]]; then
-	echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+if [[ -z "$SAFE_API_BUILD_NUMBER" ]]; then
+	echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
     exit 1
 fi
 
@@ -21,7 +21,7 @@ for component in "${components[@]}"; do
             mkdir -p "artifacts/$component/$type/$target/release"
             (
                 cd "artifacts/$component/$type/$target/release"
-                key="$SAFE_CLI_BRANCH-$SAFE_CLI_BUILD_NUMBER-$component-$type-$target.tar.gz"
+                key="$SAFE_CLI_BRANCH-$SAFE_API_BUILD_NUMBER-$component-$type-$target.tar.gz"
                 # If the key being queried doesn't exist this check prints out an ugly error message
                 # that could potentially be confusing to people who are reading the logs.
                 # It's not a problem, so the output is suppressed.
