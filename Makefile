@@ -19,7 +19,7 @@ ifndef SAFE_CLI_BUILD_COMPONENT
 endif
 ifndef SAFE_CLI_BUILD_TYPE
 	@echo "A build type must be specified."
-	@echo "Please set SAFE_CLI_BUILD_TYPE to 'dev' or 'non-dev'."
+	@echo "Please set SAFE_CLI_BUILD_TYPE to 'dev' or 'prod'."
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_TARGET
@@ -38,7 +38,7 @@ endif
 
 build-all-containers:
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
 		make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
@@ -54,7 +54,7 @@ build-all-containers:
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
@@ -62,7 +62,7 @@ build-all-containers:
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
-	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
 	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
@@ -70,7 +70,7 @@ build-all-containers:
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
 	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
-	SAFE_CLI_CONTAINER_TYPE=non-dev \
+	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
 
@@ -82,7 +82,7 @@ ifndef SAFE_CLI_CONTAINER_COMPONENT
 endif
 ifndef SAFE_CLI_CONTAINER_TYPE
 	@echo "A container type must be specified."
-	@echo "Please set SAFE_CLI_CONTAINER_TYPE to 'dev' or 'non-dev'."
+	@echo "Please set SAFE_CLI_CONTAINER_TYPE to 'dev' or 'prod'."
 	@exit 1
 endif
 ifndef SAFE_CLI_CONTAINER_TARGET
@@ -103,7 +103,7 @@ ifndef SAFE_CLI_CONTAINER_COMPONENT
 endif
 ifndef SAFE_CLI_CONTAINER_TYPE
 	@echo "A container type must be specified."
-	@echo "Please set SAFE_CLI_CONTAINER_TYPE to 'dev' or 'non-dev'."
+	@echo "Please set SAFE_CLI_CONTAINER_TYPE to 'dev' or 'prod'."
 	@exit 1
 endif
 ifndef SAFE_CLI_CONTAINER_TARGET
@@ -224,7 +224,7 @@ ifndef SAFE_CLI_BUILD_NUMBER
 endif
 ifndef SAFE_CLI_BUILD_TYPE
 	@echo "A value must be supplied for SAFE_CLI_BUILD_TYPE."
-	@echo "Valid values are 'dev' or 'non-dev'."
+	@echo "Valid values are 'dev' or 'prod'."
 	@exit 1
 endif
 ifndef SAFE_CLI_BUILD_COMPONENT
@@ -236,11 +236,7 @@ ifndef SAFE_CLI_BUILD_TARGET
 	@echo "A value must be supplied for SAFE_CLI_BUILD_TARGET."
 	@exit 1
 endif
-ifeq ($(SAFE_CLI_BUILD_TYPE),dev)
-	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TARGET}-dev.tar.gz)
-else
-	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TARGET}.tar.gz)
-endif
+	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TYPE}-${SAFE_CLI_BUILD_TARGET}.tar.gz)
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
 	mv ${ARCHIVE_NAME} artifacts
@@ -258,8 +254,7 @@ ifndef SAFE_CLI_BUILD_NUMBER
 endif
 	rm -rf artifacts
 	./resources/retrieve-build-artifacts.sh \
-		"x86_64-unknown-linux-gnu" "x86_64-pc-windows-gnu" "x86_64-apple-darwin" \
-		"armv7-linux-androideabi" "x86_64-linux-android" "x86_64-apple-ios" \
+		"x86_64-apple-darwin" "x86_64-apple-ios" \
 		"aarch64-apple-ios" "apple-ios"
 	find artifacts -type d -empty -delete
 	rm -rf artifacts/safe-ffi/prod/aarch64-apple-ios
@@ -280,13 +275,13 @@ ifndef SAFE_CLI_BUILD_NUMBER
 endif
 	( \
 		cd artifacts; \
-		tar -C safe-ffi/real/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios.tar.gz .; \
+		tar -C safe-ffi/prod/universal -zcvf \
+			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-prod-apple-ios.tar.gz .; \
 	)
 	( \
 		cd artifacts; \
-		tar -C safe-ffi/mock/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-apple-ios-dev.tar.gz .; \
+		tar -C safe-ffi/dev/universal -zcvf \
+			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-dev-apple-ios.tar.gz .; \
 	)
 	rm -rf artifacts/safe-ffi
 
