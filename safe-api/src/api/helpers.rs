@@ -10,7 +10,7 @@ use super::{Error, Result};
 use chrono::{SecondsFormat, Utc};
 
 use super::constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT;
-use jsonrpc_quic::send_request;
+use jsonrpc_quic::jsonrpc_send;
 use log::debug;
 use rand::rngs::OsRng;
 use rand_core::RngCore;
@@ -238,7 +238,7 @@ where
         )),
         Some(dirs) => {
             let cert_base_path = dirs.config_dir().display().to_string();
-            send_request::<T>(
+            jsonrpc_send::<T>(
                 endpoint,
                 method,
                 params,

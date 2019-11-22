@@ -43,11 +43,13 @@ struct JsonRpcError<'a> {
     data: &'a str,
 }
 
-pub fn parse_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, String> {
+// It parses the request bytes an returns a JsonRpcReq, or a
+// serialised JSON-RPC error response ready to send back to the origin
+pub fn parse_jsonrpc_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, String> {
     let req_payload = match String::from_utf8(req) {
         Ok(payload) => payload,
         Err(err) => {
-            let err_str = err_response(
+            let err_str = jsonrpc_serialised_error(
                 "Request payload is a malformed UTF-8 string",
                 &err.to_string(),
                 JSONRPC_PARSE_ERROR,
@@ -60,7 +62,7 @@ pub fn parse_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, String> {
     let jsonrpc_req: JsonRpcReq = match serde_json::from_str(&req_payload) {
         Ok(jsonrpc) => jsonrpc,
         Err(err) => {
-            let err_str = err_response(
+            let err_str = jsonrpc_serialised_error(
                 "Failed to deserialise request payload as a JSON-RPC message",
                 &err.to_string(),
                 JSONRPC_INVALID_REQUEST,
@@ -73,7 +75,8 @@ pub fn parse_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, String> {
     Ok(jsonrpc_req)
 }
 
-pub fn err_response(
+// Generates a serialised JSON-RPC error response
+pub fn jsonrpc_serialised_error(
     message: &str,
     data: &str,
     code: isize,
@@ -95,7 +98,8 @@ pub fn err_response(
     Ok(serialised_err_res)
 }
 
-pub fn successful_response(
+// Generates a serialised JSON-RPC response containing the result, ready to be send back to the origin
+pub fn jsonrpc_serialised_result(
     result: serde_json::Value,
     id: u32,
 ) -> std::result::Result<String, String> {
@@ -111,7 +115,8 @@ pub fn successful_response(
     Ok(serialised_res)
 }
 
-pub fn send_request<T>(
+// Generates a JSON-RPC request and sends it to the provided endpoint URL using QUIC
+pub fn jsonrpc_send<T>(
     endpoint: &str,
     method: &str,
     params: serde_json::Value,

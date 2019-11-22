@@ -25,7 +25,9 @@ use crate::shared::{
     SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
 use futures::{Async, Future, Poll, Stream};
-use jsonrpc_quic::{err_response, parse_request, successful_response, JsonRpcReq};
+use jsonrpc_quic::{
+    jsonrpc_serialised_error, jsonrpc_serialised_result, parse_jsonrpc_request, JsonRpcReq,
+};
 use std::str;
 use tokio::sync::mpsc;
 
@@ -79,9 +81,11 @@ impl Future for ProcessRequest {
                     notif_endpoints_handle,
                     req,
                 } => {
-                    let jsonrpc_req = match parse_request(req.to_vec()) {
+                    let jsonrpc_req = match parse_jsonrpc_request(req.to_vec()) {
                         Ok(jsonrpc) => jsonrpc,
-                        Err(err_str) => return Ok(Async::Ready(err_str.into_bytes().into())),
+                        Err(err_response) => {
+                            return Ok(Async::Ready(err_response.into_bytes().into()))
+                        }
                     };
 
                     match process_authenticator_req(
@@ -252,7 +256,7 @@ fn gen_err_response(
     id: u32,
 ) -> Result<FutureItemType, FutureErrorType> {
     let serialised_err_res =
-        err_response(message, data, code, Some(id)).map_err(Error::Unexpected)?;
+        jsonrpc_serialised_error(message, data, code, Some(id)).map_err(Error::Unexpected)?;
     Ok(serialised_err_res.into_bytes().into())
 }
 
@@ -260,7 +264,6 @@ fn gen_successful_response(
     result: serde_json::Value,
     id: u32,
 ) -> Result<FutureItemType, FutureErrorType> {
-    let serialised_res = successful_response(result, id).map_err(Error::Unexpected)?;
-
+    let serialised_res = jsonrpc_serialised_result(result, id).map_err(Error::Unexpected)?;
     Ok(serialised_res.into_bytes().into())
 }

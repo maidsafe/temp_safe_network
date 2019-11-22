@@ -9,7 +9,7 @@
 use super::AuthReq;
 use failure::{Error, Fail, ResultExt};
 use futures::{Future, Stream};
-use jsonrpc_quic::{parse_request, successful_response};
+use jsonrpc_quic::{jsonrpc_serialised_result, parse_jsonrpc_request};
 use log::debug;
 use serde_json::json;
 use slog::{Drain, Logger};
@@ -201,7 +201,7 @@ fn handle_request(_log: &Logger, stream: quinn::NewStream, notif_channel: mpsc::
 }
 
 fn process_req(req: &[u8], notif_channel: mpsc::Sender<AuthReq>) -> Box<[u8]> {
-    let jsonrpc_req = match parse_request(req.to_vec()) {
+    let jsonrpc_req = match parse_jsonrpc_request(req.to_vec()) {
         Ok(jsonrpc) => jsonrpc,
         Err(err_str) => return err_str.into_bytes().into(),
     };
@@ -224,7 +224,7 @@ fn process_req(req: &[u8], notif_channel: mpsc::Sender<AuthReq>) -> Box<[u8]> {
         ),
     };
 
-    match successful_response(json!(msg), 0) {
+    match jsonrpc_serialised_result(json!(msg), 0) {
         Ok(res) => res.as_bytes().into(),
         Err(err) => err.as_bytes().into(),
     }

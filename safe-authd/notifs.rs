@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::shared::*;
-use jsonrpc_quic::send_request;
+use jsonrpc_quic::jsonrpc_send;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::thread;
@@ -151,7 +151,7 @@ fn send_notification(
     cert_base_path: Option<&str>,
 ) -> Option<NotifResponse> {
     println!("Notifying subscriber: {}", url);
-    match send_request::<String>(
+    match jsonrpc_send::<String>(
         url,
         JSONRPC_METHOD_AUTH_REQ_NOTIF,
         json!(auth_req.auth_req),

@@ -14,4 +14,7 @@ pub enum Error {
     ServerError(String),
 }
 
-pub use jsonrpc::{err_response, parse_request, send_request, successful_response, JsonRpcReq};
+pub use jsonrpc::{
+    jsonrpc_send, jsonrpc_serialised_error, jsonrpc_serialised_result, parse_jsonrpc_request,
+    JsonRpcReq,
+};
