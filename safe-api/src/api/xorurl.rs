@@ -47,6 +47,12 @@ impl std::str::FromStr for XorUrlBase {
     }
 }
 
+impl fmt::Display for XorUrlBase {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl XorUrlBase {
     #[allow(dead_code)]
     pub fn from_u8(value: u8) -> Result<Self> {
