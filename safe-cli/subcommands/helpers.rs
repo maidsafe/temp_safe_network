@@ -90,20 +90,20 @@ pub fn parse_tx_id(src: &str) -> Result<u64, String> {
 }
 
 // serialize structured value using any format from OutputFmt
+// except OutputFmt::Pretty, which must be handled by caller.
 pub fn serialise_output<T: ?Sized>(value: &T, fmt: OutputFmt) -> String
 where
     T: Serialize,
 {
     match fmt {
+        OutputFmt::Yaml => serde_yaml::to_string(&value)
+            .unwrap_or_else(|_| "Failed to serialise output to yaml".to_string()),
         OutputFmt::Json => serde_json::to_string_pretty(&value)
             .unwrap_or_else(|_| "Failed to serialise output to json".to_string()),
         OutputFmt::JsonCompact => serde_json::to_string(&value)
             .unwrap_or_else(|_| "Failed to serialise output to json".to_string()),
-        OutputFmt::Yaml => serde_yaml::to_string(&value)
-            .unwrap_or_else(|_| "Failed to serialise output to yaml".to_string()),
         OutputFmt::Pretty => {
-            // For now we panic.  maybe make a default Pretty output later.
-            panic!("Pretty format must be handled by caller")
+            "OutputFmt::Pretty' not handled by caller, in serialise_output()".to_string()
         }
     }
 }
