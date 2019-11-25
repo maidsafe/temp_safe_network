@@ -21,6 +21,72 @@ It keeps in memory a list of authorisation requests pending of approval/denial, 
 
 ![authd software architecture](/misc/authd-software.png)
 
+The following are few examples of JSON-RPC requests/responses exchanged with `safe-authd` over QUIC:
+JSON-RPC call to log in:
+```
+Request: {
+  "jsonrpc": "2.0",
+  "method": "login",
+  "params": ["<passphrase>", "<password>"],
+  "id": 743533851
+}
+
+Response: {
+  "jsonrpc": "2.0",
+  "result": "Logged in successfully!",
+  "id": 743533851
+}
+```
+
+JSON-RPC call to obtain list of already authorised applications:
+```
+Request: {
+  "jsonrpc": "2.0",
+  "method": "authed-apps",
+  "params": null,
+  "id": 2294806509
+}
+
+Response: {
+  "jsonrpc": "2.0",
+  "result": [{
+      "app_permissions": {
+          "get_balance": true,
+          "perform_mutations": true,
+          "transfer_coins": true
+      },
+      "containers": {},
+      "id": "net.maidsafe.cli",
+      "name": "SAFE CLI",
+      "own_container": false,
+      "vendor": "MaidSafe.net Ltd"
+  }],
+  "id": 2294806509
+}
+```
+
+When `safe-authd` sends a notification to each of the subscribers it also uses JSON-RPC over QUIC. The following is an example of a JSON-RPC message corresponding to an authorisation request notification sent from the `safe-authd` to a subscriber:
+```
+{
+  jsonrpc: "2.0",
+  method: "auth-req-notif",
+  params: {
+      "app_id": "net.maidsafe.cli",
+      "app_name": "SAFE CLI",
+      "app_permissions": {
+          "get_balance": true,
+          "perform_mutations": true,
+          "transfer_coins": true
+      },
+      "app_vendor": "MaidSafe.net Ltd",
+      "containers": {},
+      "own_container": false,
+      "req_id": 2039120779
+  },
+  id: 1195581342
+}
+```
+
 ## Download
 
 The latest version of the SAFE Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/safe-authd/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.

@@ -10,14 +10,15 @@
 3. [The FFI layer](#the-ffi-layer-safe-ffi)
 4. [The SAFE CLI](#the-safe-cli)
 5. [The Authenticator daemon](#the-authenticator-daemon)
-6. [Contributing](#contributing)
+6. [JSON-RPC and QUIC](#json-rpc-and-quic)
+7. [Contributing](#contributing)
     * [Project board](#project-board)
     * [Issues](#issues)
     * [Commits and Pull Requests](#commits-and-pull-requests)
     * [Releases](#releases)
     * [Copyrights](#copyrights)
-7. [Further Help](#further-help)
-8. [License](#license)
+8. [Further Help](#further-help)
+9. [License](#license)
 
 ## Description
 
@@ -60,6 +61,12 @@ The [safe-authd](safe-authd) is a SAFE Authenticator implementation which runs i
 The SAFE Authenticator gives complete control over the type of access and permissions that are granted to the applications used by the SAFE users. Any application that is intending to write data on the Network on behalf of the user needs to get credentials which are authorised by the user, and the SAFE Authenticator is the component which facilitates such mechanism.
 
 This application is normally shipped as part of the package of an Authenticator GUI, like the [SAFE Network Application](), and therefore SAFE users and SAFE app developers don't need it or worry about since the SAFE API already provides functions to interact with the `safe-authd`, and the SAFE CLI also has commands to do so.
+
+## JSON-RPC and QUIC
+
+One last crate found in this repository is the [jsonrpc-quic](jsonrpc-quic). This crate provides the implementation of [JSON-RPC](https://www.jsonrpc.org/) over [QUIC](https://en.wikipedia.org/wiki/QUIC), which is required by the Authenticator daemon communication protocol.
+
+This crate exposes a minimised set of functions which are used by other crates to implement the Authenticator daemon communication protocol. On one hand the `safe-api` makes use of it to be able to send JSON-RPC messages to the `authd` over QUIC, and on the other hand the `safe-authd` makes use of it to accept those requests from clients, generating and sending back a JSON-RPC response over QUIC. Please refer to the [safe-authd README](safe-authd/README.md) to see some examples of these type of requests/responses.
 
 ## Contributing
 
