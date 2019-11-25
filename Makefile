@@ -42,34 +42,34 @@ build-all-containers:
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
 		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
-		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-api \
-		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
-		make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
+	# 	make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-api \
+	# 	make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+	# 	make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
-		make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+	# 	make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
-	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
-		make build-container
+	# SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+	# 	make build-container
 	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
@@ -135,13 +135,10 @@ ifneq ($(UNAME_S),Darwin)
 	@exit 1
 endif
 	mkdir -p artifacts/safe-ffi/prod/universal
-	mkdir -p artifacts/safe-ffi/dev/universal
+	# mkdir -p artifacts/safe-ffi/dev/universal
 	lipo -create -output artifacts/safe-ffi/prod/universal/libsafe_ffi.a \
 		artifacts/safe-ffi/prod/x86_64-apple-ios/release/libsafe_ffi.a \
 		artifacts/safe-ffi/prod/aarch64-apple-ios/release/libsafe_ffi.a
-	lipo -create -output artifacts/safe-ffi/dev/universal/libsafe_ffi.a \
-		artifacts/safe-ffi/dev/x86_64-apple-ios/release/libsafe_ffi.a \
-		artifacts/safe-ffi/dev/aarch64-apple-ios/release/libsafe_ffi.a
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
@@ -284,9 +281,7 @@ endif
 		"aarch64-apple-ios" "apple-ios"
 	find artifacts -type d -empty -delete
 	rm -rf artifacts/safe-ffi/prod/aarch64-apple-ios
-	rm -rf artifacts/safe-ffi/dev/aarch64-apple-ios
 	rm -rf artifacts/safe-ffi/prod/x86_64-apple-ios
-	rm -rf artifacts/safe-ffi/dev/x86_64-apple-ios
 
 package-universal-ios-lib:
 ifndef SAFE_CLI_BRANCH
@@ -304,11 +299,6 @@ endif
 		tar -C safe-ffi/prod/universal -zcvf \
 			${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-safe-ffi-prod-apple-ios.tar.gz .; \
 	)
-	( \
-		cd artifacts; \
-		tar -C safe-ffi/dev/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-safe-ffi-dev-apple-ios.tar.gz .; \
-	)
 	rm -rf artifacts/safe-ffi
 
 clean:
@@ -325,7 +315,6 @@ endif
 
 package-commit_hash-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/dev
 	mkdir -p deploy/prod
 	./resources/package-deploy-artifacts.sh "safe-authd" $$(git rev-parse --short HEAD)
 	./resources/package-deploy-artifacts.sh "safe-cli" $$(git rev-parse --short HEAD)
@@ -334,7 +323,6 @@ package-commit_hash-artifacts-for-deploy:
 
 package-version-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/dev
 	mkdir -p deploy/prod
 	./resources/package-deploy-artifacts.sh "safe-authd" "${SAFE_AUTHD_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"

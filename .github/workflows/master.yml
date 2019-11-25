@@ -3,20 +3,32 @@ name: Master
 on:
   push:
     branches:
-      - master
+      - Feat-AuthDReleaseAndNotarize
 
 jobs:
-  build-component:
+  build-cli-authd:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        component: [safe-cli, safe-ffi]
+        component: [safe-cli, safe-authd]
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+            component: safe-cli
+            target: safe
+            output: safe-x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            component: safe-authd
+            target: safe-authd
+            output: safe-authd-x86_64-unknown-linux-gnu
           - os: windows-latest
-            target: x86_64-pc-windows-gnu
+            component: safe-cli
+            target: safe.exe
+            output: safe-x86_64-pc-windows-gnu
+          - os: windows-latest
+            component: safe-authd
+            target: safe-authd.exe
+            output: safe-authd-x86_64-pc-windows-gnu
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -29,29 +41,129 @@ jobs:
           args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
       - uses: actions/upload-artifact@master
         with:
-          name: ${{ matrix.component }}-${{ matrix.target }}-prod
-          path: target/release
+          name: ${{ matrix.output }}
+          path: target/release/${{ matrix.target }}
+
+  build-ffi:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        component: [safe-ffi]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            output: libsafe_ffi.so
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            output: safe_ffi.dll
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: >
-            --release --manifest-path=${{ matrix.component }}/Cargo.toml
-            --features=fake-auth,mock-network
-      - shell: bash
-        run: |
-          mkdir artifacts
-          find "target/release" -maxdepth 1 -type f -exec cp '{}' artifacts \;
+          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
       - uses: actions/upload-artifact@master
         with:
-          name: ${{ matrix.component }}-${{ matrix.target }}-dev
-          path: artifacts
+          name: ${{ matrix.output }}
+          path: target/release/${{ matrix.output }}
+
+  build-mac-ffi:
+    runs-on: ${{ matrix.os }}
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_SIGN_ID: ${{ secrets.APPLE_SIGN_ID }}
+      APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+      RUST_SODIUM_USE_PKG_CONFIG : 1
+    strategy:
+      matrix:
+        os: [macos-latest]
+        component: [safe-ffi]
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            output: libsafe_ffi.dylib
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install libsodium
+        shell: bash
+        run: brew install libsodium && brew install pkg-config
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
+      # - name: Sign & Notarize
+      #   shell: bash
+      #   run: ./resources/notarize.sh ${{ matrix.output }}
+      - uses: actions/upload-artifact@master
+        with:
+          name: ${{ matrix.output }}
+          path: target/release/${{ matrix.output }}
+
+  build-mac-cli-authd:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest]
+        component: [safe-cli, safe-authd]
+        include:
+          - os: macos-latest
+            component: safe-cli
+            target: safe
+            output: safe-x86_64-apple-darwin
+          - os: macos-latest
+            component: safe-authd
+            target: safe-authd
+            output: safe-authd-x86_64-apple-darwin
+    env:
+      RUST_SODIUM_USE_PKG_CONFIG : 1
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_SIGN_ID: ${{ secrets.APPLE_SIGN_ID }}
+      APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_IDENTITY_AUTO_DISCOVERY : true
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install libsodium
+        shell: bash
+        run: brew install libsodium && brew install pkg-config
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
+      - name: Sign & Notarize
+        shell: bash
+        run: ./resources/notarize.sh ${{ matrix.target }}
+      - name: what is in release...
+        shell: bash
+        run: ls target/release
+      - uses: actions/upload-artifact@master
+        with:
+          name: ${{ matrix.output }}
+          path: target/release/${{ matrix.target }}
+
+
 
   build-ffi-android:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target: [armv7-linux-androideabi, x86_64-linux-android]
-        type: [dev, prod]
+        type: [prod]
     env:
       SAFE_API_BUILD_COMPONENT: safe-ffi
       SAFE_API_BUILD_TYPE: ${{ matrix.type }}
@@ -60,179 +172,135 @@ jobs:
       - uses: actions/checkout@v1
       - shell: bash
         run: make build-component
+      - name: What does ./target/release look like
+        shell: bash
+        run: ls artifacts
       - uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-${{ matrix.type }}
-          path: artifacts
+          path: artifacts/libsafe_ffi.so
 
-  #build-ffi-ios:
-    #runs-on: macOS-latest
-    #strategy:
-      #matrix:
-        #target: [aarch64-apple-ios, x86_64-apple-ios]
-    #env:
-      ##RUST_SODIUM_LIB_DIR: /Users/runner/libsodium
-      #DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
-    #steps:
-      #- shell: bash
-        #run: |
-          #brew install curl
-          #curl -O https://libsodium.s3.amazonaws.com/libsodium-1.0.17-stable-macos.tar.gz
-          #mkdir $HOME/libsodium
-          #mv libsodium-1.0.17-stable-macos.tar.gz $HOME/libsodium
-          #cd $HOME/libsodium
-          #tar xvf libsodium-1.0.17-stable-macos.tar.gz
-          #rm libsodium-1.0.17-stable-macos.tar.gz
-      #- uses: actions/checkout@v1
-      #- uses: actions-rs/toolchain@v1
-        #with:
-          #toolchain: stable
-          #override: true
-          #target: ${{ matrix.target }}
-      #- uses: actions-rs/cargo@v1
-        #with:
-          #command: build
-          #args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-${{ matrix.target }}-prod
-          #path: target/${{ matrix.target }}/release
-      #- uses: actions-rs/cargo@v1
-        #with:
-          #command: build
-          #args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }} --features=mock-network
-      #- shell: bash
-        #run: |
-          #mkdir artifacts
-          #find "target/${{ matrix.target }}/release" -maxdepth 1 -type f -exec cp '{}' artifacts \;
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-${{ matrix.target }}-dev
-          #path: target/${{ matrix.target }}/release
+  build-ffi-ios:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-ios, x86_64-apple-ios]
+    env:
+      RUST_SODIUM_USE_PKG_CONFIG : 1
+      PKG_CONFIG_ALLOW_CROSS: 1
+      DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
+    steps:
+      - name: Install libsodium
+        shell: bash
+        run: brew install libsodium && brew install pkg-config
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
+      - name: what is in release...
+        shell: bash
+        run: ls target/release
+      - uses: actions/upload-artifact@master
+        with:
+          name: safe-ffi-${{ matrix.target }}-prod
+          path: target/${{ matrix.target }}/release/libsafe_ffi.a
 
-  #build-ffi-ios-universal:
-    #runs-on: macOS-latest
-    #needs: build-ffi-ios
-    #steps:
-      #- uses: actions/checkout@v1
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/x86_64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/x86_64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-aarch64-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/aarch64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-aarch64-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/aarch64-apple-ios/release
-      #- shell: bash
-        #run: make universal-ios-lib
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/universal
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/universal
+
+  build-ffi-ios-universal:
+    runs-on: macos-latest
+    needs: build-ffi-ios
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions/download-artifact@master
+        with:
+          name: safe-ffi-x86_64-apple-ios-prod
+          path: artifacts/safe-ffi/prod/x86_64-apple-ios/release
+      - uses: actions/download-artifact@master
+        with:
+          name: safe-ffi-aarch64-apple-ios-prod
+          path: artifacts/safe-ffi/prod/aarch64-apple-ios/release
+      - shell: bash
+        run: make universal-ios-lib
+      - uses: actions/upload-artifact@master
+        with:
+          name: safe-ffi-apple-ios-prod
+          path: artifacts/safe-ffi/prod/universal
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
   # action.
   deploy:
     runs-on: ubuntu-latest
-    # Put the iOS build in this list when it's working.
-    needs: [build-component, build-ffi-android]
+    needs: [build-cli-authd, build-ffi, build-mac-cli-authd, build-mac-ffi, build-ffi-android, build-ffi-ios-universal]
     env:
-      AWS_ACCESS_KEY_ID: AKIAVVODCRMSDTFZ72NK
+      AWS_ACCESS_KEY_ID: AKIAVVODCRMSJ5MV63VB
       AWS_SECRET_ACCESS_KEY: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: eu-west-2
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       # Checkout and get all the artifacts built in the previous jobs.
       - uses: actions/checkout@v1
+      # cli
       - uses: actions/download-artifact@master
         with:
-          name: safe-cli-x86_64-pc-windows-gnu-prod
+          name: safe-x86_64-pc-windows-gnu
           path: artifacts/safe-cli/prod/x86_64-pc-windows-gnu/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-cli-x86_64-pc-windows-gnu-dev
-          path: artifacts/safe-cli/dev/x86_64-pc-windows-gnu/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-cli-x86_64-unknown-linux-gnu-prod
+          name: safe-x86_64-unknown-linux-gnu
           path: artifacts/safe-cli/prod/x86_64-unknown-linux-gnu/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-cli-x86_64-unknown-linux-gnu-dev
-          path: artifacts/safe-cli/dev/x86_64-unknown-linux-gnu/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-cli-x86_64-apple-darwin-prod
-          #path: artifacts/safe-cli/prod/x86_64-apple-darwin/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-cli-x86_64-apple-darwin-dev
-          #path: artifacts/safe-cli/dev/x86_64-apple-darwin/release
+          name: safe-x86_64-apple-darwin
+          path: artifacts/safe-cli/prod/x86_64-apple-darwin/release
+
+      # authd
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-pc-windows-gnu-prod
+          name: safe-authd-x86_64-pc-windows-gnu
+          path: artifacts/safe-authd/prod/x86_64-pc-windows-gnu/release
+      - uses: actions/download-artifact@master
+        with:
+          name: safe-authd-x86_64-unknown-linux-gnu
+          path: artifacts/safe-authd/prod/x86_64-unknown-linux-gnu/release
+      - uses: actions/download-artifact@master
+        with:
+          name: safe-authd-x86_64-apple-darwin
+          path: artifacts/safe-authd/prod/x86_64-apple-darwin/release
+
+      # ffi
+      - uses: actions/download-artifact@master
+        with:
+          name: safe_ffi.dll
           path: artifacts/safe-ffi/prod/x86_64-pc-windows-gnu/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-pc-windows-gnu-dev
-          path: artifacts/safe-ffi/dev/x86_64-pc-windows-gnu/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-x86_64-unknown-linux-gnu-prod
+          name: libsafe_ffi.so
           path: artifacts/safe-ffi/prod/x86_64-unknown-linux-gnu/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-unknown-linux-gnu-dev
-          path: artifacts/safe-ffi/dev/x86_64-unknown-linux-gnu/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-darwin-prod
-          #path: artifacts/safe-ffi/prod/x86_64-apple-darwin/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-darwin-dev
-          #path: artifacts/safe-ffi/dev/x86_64-apple-darwin/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-darwin-dev
-          #path: artifacts/safe-ffi/dev/x86_64-apple-darwin/release
+          name: libsafe_ffi.dylib
+          path: artifacts/safe-ffi/prod/x86_64-apple-darwin/release
       - uses: actions/download-artifact@master
         with:
           name: safe-ffi-armv7-linux-androideabi-prod
           path: artifacts/safe-ffi/prod/armv7-linux-androideabi/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-armv7-linux-androideabi-dev
-          path: artifacts/safe-ffi/dev/armv7-linux-androideabi/release
-      - uses: actions/download-artifact@master
-        with:
           name: safe-ffi-x86_64-linux-android-prod
           path: artifacts/safe-ffi/prod/x86_64-linux-android/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-linux-android-dev
-          path: artifacts/safe-ffi/dev/x86_64-linux-android/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/apple-ios/release
+          name: safe-ffi-apple-ios-prod
+          path: artifacts/safe-ffi/prod/apple-ios/release
 
       # Get information for the release.
       - shell: bash
@@ -245,13 +313,21 @@ jobs:
         run: |
           api_version=$(grep "^version" < safe-api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           cli_version=$(grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          authd_version=$(grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           ffi_version=$(grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           commit_message=$(git log --format=%B -n 1 ${{ github.sha }})
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=cli_version::$cli_version"
+          echo "::set-output name=authd_version::$cli_version"
           echo "::set-output name=ffi_version::$ffi_version"
 
       # Put the artifacts into tar/zip archives for deployment with the release.
+      - name: chmod
+        shell: bash
+        run: chmod -R +x artifacts/safe-authd
+      - name: chmod
+        shell: bash
+        run: chmod -R +x artifacts/safe-cli
       - shell: bash
         run: make package-commit_hash-artifacts-for-deploy
         if: "!startsWith(steps.commit_message.outputs.commit_message, 'Version change')"
@@ -292,13 +368,13 @@ jobs:
           asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-gnu.zip
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
-      #- uses: actions/upload-release-asset@v1.0.1
-        #with:
-          #upload_url: ${{ steps.create_release.outputs.upload_url }}
-          #asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
-          #asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
-          #asset_content_type: application/zip
-        #if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
+          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
+          asset_content_type: application/zip
+        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -313,13 +389,13 @@ jobs:
           asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-gnu.tar.gz
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
-      #- uses: actions/upload-release-asset@v1.0.1
-        #with:
-          #upload_url: ${{ steps.create_release.outputs.upload_url }}
-          #asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
-          #asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
-          #asset_content_type: application/zip
-        #if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
+      - uses: actions/upload-release-asset@v1.0.1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
+          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
+          asset_content_type: application/zip
+        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -328,13 +404,11 @@ jobs:
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 
+
       # Upload all the release archives to S3; FFI links will be in the release description.
       - uses: actions/aws/cli@master
         with:
-          args: s3 sync deploy/dev s3://safe-cli --acl public-read
-      - uses: actions/aws/cli@master
-        with:
-          args: s3 sync deploy/prod s3://safe-cli --acl public-read
+          args: s3 sync deploy/prod s3://safe-api --acl public-read
 
   publish:
     needs: deploy

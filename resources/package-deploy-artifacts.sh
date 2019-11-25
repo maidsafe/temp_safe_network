@@ -101,11 +101,18 @@ function create_zip_archive() {
 
     distributable=$(get_distributable_for_component "$component" "$target")
     archive_name=$(get_archive_name "$component" "$target" "$type" "zip")
+
+    echo $archive_name;
+    ls "../../artifacts/$component"
+    ls "../../artifacts/$component/$type/$target"
+    ls "../../artifacts/$component/$type/$target/release"
+
     zip -j "$archive_name" \
         "../../artifacts/$component/$type/$target/release/$distributable"
 }
 
-declare -a types=("dev" "prod")
+declare -a types=("prod")
+# declare -a types=("dev" "prod")
 for type in "${types[@]}"; do
     targets=($(ls -1 "artifacts/$component/$type"))
     for target in "${targets[@]}"
