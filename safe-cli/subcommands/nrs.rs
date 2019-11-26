@@ -132,7 +132,7 @@ pub fn nrs_commander(
 
             Ok(())
         }
-        None => Err("Missing keys sub-command. Use --help for details.".to_string()),
+        None => Err("Missing nrs sub-command. Use --help for details.".to_string()),
     }
 }
 

@@ -195,7 +195,7 @@ pub fn files_commander(
             }
             Ok(())
         }
-        None => Err("Missing keys sub-command. Use --help for details.".to_string()),
+        None => Err("Missing files sub-command. Use --help for details.".to_string()),
     }
 }
 
