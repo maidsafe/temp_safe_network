@@ -121,17 +121,15 @@ pub unsafe extern "C" fn auth_reconnect(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_> {
         let user_data = OpaqueCtx(user_data);
-        (*auth)
-            .send(move |client| {
-                try_cb!(
-                    client.restart_network().map_err(Error::from),
-                    user_data.0,
-                    o_cb
-                );
-                o_cb(user_data.0, FFI_RESULT_OK);
-                None
-            })
-            .map_err(Error::from)
+        (*auth).send(move |client| {
+            try_cb!(
+                client.restart_network().map_err(Error::from),
+                user_data.0,
+                o_cb
+            );
+            o_cb(user_data.0, FFI_RESULT_OK);
+            None
+        })
     })
 }
 

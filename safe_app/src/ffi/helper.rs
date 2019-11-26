@@ -28,17 +28,15 @@ where
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app)
-        .send(move |client, context| {
-            match f(client, context) {
-                Ok(args) => o_cb.call(user_data.0, FFI_RESULT_OK, args),
-                res @ Err(..) => {
-                    call_result_cb!(res, user_data, o_cb);
-                }
+    (*app).send(move |client, context| {
+        match f(client, context) {
+            Ok(args) => o_cb.call(user_data.0, FFI_RESULT_OK, args),
+            res @ Err(..) => {
+                call_result_cb!(res, user_data, o_cb);
             }
-            None
-        })
-        .map_err(Error::from)
+        }
+        None
+    })
 }
 
 // Helper to reduce boilerplate when sending asynchronous operations to the app
@@ -53,16 +51,14 @@ where
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app)
-        .send(move |client, context| {
-            f(client, context)
-                .map(move |args| o_cb.call(user_data.0, FFI_RESULT_OK, args))
-                .map_err(|e| Error::from(AppError::from(e)))
-                .map_err(move |err| {
-                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                })
-                .into_box()
-                .into()
-        })
-        .map_err(Error::from)
+    (*app).send(move |client, context| {
+        f(client, context)
+            .map(move |args| o_cb.call(user_data.0, FFI_RESULT_OK, args))
+            .map_err(|e| Error::from(AppError::from(e)))
+            .map_err(move |err| {
+                call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+            })
+            .into_box()
+            .into()
+    })
 }

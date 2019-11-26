@@ -10,7 +10,6 @@
 
 use bincode::Error as SerialisationError;
 use ffi_utils::StringError;
-use ffi_utils::StringError;
 use futures::sync::mpsc::SendError;
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;

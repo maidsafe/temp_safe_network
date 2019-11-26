@@ -93,6 +93,7 @@ mod tests;
 pub mod test_utils;
 
 use self::object_cache::ObjectCache;
+use crate::ffi::errors::Error;
 use bincode::deserialize;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -131,7 +132,7 @@ pub struct App {
 
 impl App {
     /// Send a message to app's event loop.
-    pub fn send<F>(&self, f: F) -> Result<(), AppError>
+    pub fn send<F>(&self, f: F) -> Result<(), Error>
     where
         F: FnOnce(&AppClient, &AppContext) -> Option<Box<dyn Future<Item = (), Error = ()>>>
             + Send
@@ -139,7 +140,7 @@ impl App {
     {
         let msg = CoreMsg::new(f);
         let core_tx = unwrap!(self.core_tx.lock());
-        core_tx.unbounded_send(msg).map_err(AppError::from)
+        core_tx.unbounded_send(msg).map_err(Error::from)
     }
 
     /// Create unregistered app.

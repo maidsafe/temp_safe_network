@@ -11,7 +11,8 @@
 //! This module is exactly the same as `safe_authenticator::ffi::logging`, therefore changes to
 //! either one of them should also be reflected to the other to stay in sync.
 
-use super::errors::Result;
+use super::errors::{Error, Result};
+use crate::errors::AppError;
 use ffi_utils::{catch_unwind_cb, FfiResult, ReprC, FFI_RESULT_OK};
 use safe_core::utils::logging;
 use std::ffi::CString;
@@ -50,7 +51,8 @@ pub unsafe extern "C" fn app_config_dir_path(
             config_dir
                 .into_os_string()
                 .into_string()
-                .map_err(|_| AppError::Unexpected("Couldn't convert OsString".to_string()))?
+                .map_err(|_| AppError::Unexpected("Couldn't convert OsString".to_string()))
+                .map_err(Error::from)?
                 .into_bytes(),
         )?;
         o_cb(user_data, FFI_RESULT_OK, config_dir_path.as_ptr());

@@ -11,10 +11,9 @@ pub use crate::ffi::errors::codes::*;
 pub use safe_core::ffi::error_codes::*;
 
 use crate::errors::AppError;
-use config_file_handler::Error as ConfigFileHandlerError;
+use bincode::Error as SerialisationError;
 use ffi_utils::{ErrorCode, StringError};
 use futures::sync::mpsc::SendError;
-use maidsafe_utilities::serialisation::SerialisationError;
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 use safe_core::{CoreError, SelfEncryptionStorageError};
@@ -105,12 +104,6 @@ impl From<IpcError> for Error {
             IpcError::Unexpected(reason) => Self(AppError::Unexpected(reason)),
             _ => Self(AppError::IpcError(err)),
         }
-    }
-}
-
-impl From<ConfigFileHandlerError> for Error {
-    fn from(err: ConfigFileHandlerError) -> Self {
-        Self(AppError::Unexpected(err.to_string()))
     }
 }
 

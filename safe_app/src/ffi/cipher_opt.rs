@@ -24,15 +24,13 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app)
-            .send(move |_, context| {
-                let handle = context
-                    .object_cache()
-                    .insert_cipher_opt(CipherOpt::PlainText);
-                o_cb(user_data.0, FFI_RESULT_OK, handle);
-                None
-            })
-            .map_err(Error::from)
+        (*app).send(move |_, context| {
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::PlainText);
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
+            None
+        })
     });
 }
 
@@ -45,15 +43,13 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(
 ) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        (*app)
-            .send(move |_, context| {
-                let handle = context
-                    .object_cache()
-                    .insert_cipher_opt(CipherOpt::Symmetric);
-                o_cb(user_data.0, FFI_RESULT_OK, handle);
-                None
-            })
-            .map_err(Error::from)
+        (*app).send(move |_, context| {
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::Symmetric);
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
+            None
+        })
     })
 }
 
@@ -68,25 +64,23 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app)
-            .send(move |_, context| {
-                let pk = try_cb!(
-                    context
-                        .object_cache()
-                        .get_encrypt_key(peer_encrypt_key_h)
-                        .map_err(Error::from),
-                    user_data,
-                    o_cb
-                );
-                let handle = context
+        (*app).send(move |_, context| {
+            let pk = try_cb!(
+                context
                     .object_cache()
-                    .insert_cipher_opt(CipherOpt::Asymmetric {
-                        peer_encrypt_key: *pk,
-                    });
-                o_cb(user_data.0, FFI_RESULT_OK, handle);
-                None
-            })
-            .map_err(Error::from)
+                    .get_encrypt_key(peer_encrypt_key_h)
+                    .map_err(Error::from),
+                user_data,
+                o_cb
+            );
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::Asymmetric {
+                    peer_encrypt_key: *pk,
+                });
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
+            None
+        })
     });
 }
 

@@ -76,7 +76,8 @@ pub unsafe extern "C" fn mdata_put(
                     BTreeMap::<PublicKey, MDataPermissionSet>::default()
                 } else {
                     try_cb!(
-                        helper::get_permissions(context.object_cache(), permissions_h),
+                        helper::get_permissions(context.object_cache(), permissions_h)
+                            .map_err(Error::from),
                         user_data,
                         o_cb
                     )
@@ -86,7 +87,10 @@ pub unsafe extern "C" fn mdata_put(
                     BTreeMap::<Vec<u8>, MDataSeqValue>::default()
                 } else {
                     try_cb!(
-                        context.object_cache().get_seq_mdata_entries(entries_h),
+                        context
+                            .object_cache()
+                            .get_seq_mdata_entries(entries_h)
+                            .map_err(Error::from),
                         user_data,
                         o_cb
                     )
@@ -103,7 +107,7 @@ pub unsafe extern "C" fn mdata_put(
 
                 client
                     .put_seq_mutable_data(data)
-                    .map_err(AppError::from)
+                    .map_err(Error::from)
                     .then(move |result| {
                         call_result_cb!(result, user_data, o_cb);
                         Ok(())
@@ -129,7 +133,6 @@ pub unsafe extern "C" fn mdata_get_version(
         send(app, user_data, o_cb, move |client, _| {
             client.get_mdata_version(*info.address())
         })
-        .map_err(Error::from)
     };
     catch_unwind_cb(user_data, o_cb, f)
 }
@@ -151,7 +154,6 @@ pub unsafe extern "C" fn mdata_serialised_size(
                 .map_err(AppError::from)
                 .and_then(move |mdata| serialized_size(&mdata).map_err(AppError::from))
         })
-        .map_err(Error::from)
     })
 }
 
@@ -179,28 +181,26 @@ pub unsafe extern "C" fn mdata_get_value(
         let key = vec_clone_from_raw_parts(key, key_len);
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
-        (*app)
-            .send(move |client, _| {
-                client
-                    .get_seq_mdata_value(info.name(), info.type_tag(), key)
-                    .and_then(move |value| Ok((value.data, value.version)))
-                    .map(move |(content, version)| {
-                        o_cb(
-                            user_data.0,
-                            FFI_RESULT_OK,
-                            content.as_safe_ptr(),
-                            content.len(),
-                            version,
-                        );
-                    })
-                    .map_err(Error::from)
-                    .map_err(move |err| {
-                        call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+        (*app).send(move |client, _| {
+            client
+                .get_seq_mdata_value(info.name(), info.type_tag(), key)
+                .and_then(move |value| Ok((value.data, value.version)))
+                .map(move |(content, version)| {
+                    o_cb(
+                        user_data.0,
+                        FFI_RESULT_OK,
+                        content.as_safe_ptr(),
+                        content.len(),
+                        version,
+                    );
+                })
+                .map_err(Error::from)
+                .map_err(move |err| {
+                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 
@@ -229,7 +229,6 @@ pub unsafe extern "C" fn mdata_entries(
                     Ok(context.object_cache().insert_seq_mdata_entries(entries))
                 })
         })
-        .map_err(Error::from)
     })
 }
 
@@ -251,37 +250,35 @@ pub unsafe extern "C" fn mdata_list_keys(
     catch_unwind_cb(user_data, o_cb, || {
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
-        (*app)
-            .send(move |client, _context| {
-                client
-                    .list_mdata_keys(*info.address())
-                    .map_err(Error::from)
-                    .then(move |result| {
-                        match result {
-                            Ok(keys) => {
-                                let repr_c: Vec<_> = keys
-                                    .into_iter()
-                                    .map(|vec| NativeMDataKey::from_bytes(&vec))
-                                    .map(NativeMDataKey::into_repr_c)
-                                    .collect();
+        (*app).send(move |client, _context| {
+            client
+                .list_mdata_keys(*info.address())
+                .map_err(Error::from)
+                .then(move |result| {
+                    match result {
+                        Ok(keys) => {
+                            let repr_c: Vec<_> = keys
+                                .into_iter()
+                                .map(|vec| NativeMDataKey::from_bytes(&vec))
+                                .map(NativeMDataKey::into_repr_c)
+                                .collect();
 
-                                o_cb(
-                                    user_data.0,
-                                    FFI_RESULT_OK,
-                                    repr_c.as_safe_ptr(),
-                                    repr_c.len(),
-                                )
-                            }
-                            Err(..) => {
-                                call_result_cb!(result, user_data, o_cb);
-                            }
+                            o_cb(
+                                user_data.0,
+                                FFI_RESULT_OK,
+                                repr_c.as_safe_ptr(),
+                                repr_c.len(),
+                            )
                         }
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+                        Err(..) => {
+                            call_result_cb!(result, user_data, o_cb);
+                        }
+                    }
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 
@@ -303,37 +300,35 @@ pub unsafe extern "C" fn seq_mdata_list_values(
     catch_unwind_cb(user_data, o_cb, || {
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
-        (*app)
-            .send(move |client, _context| {
-                client
-                    .list_seq_mdata_values(info.name(), info.type_tag())
-                    .map_err(Error::from)
-                    .then(move |result| {
-                        match result {
-                            Ok(values) => {
-                                let repr_c: Vec<_> = values
-                                    .into_iter()
-                                    .map(NativeMDataValue::from_routing)
-                                    .map(NativeMDataValue::into_repr_c)
-                                    .collect();
+        (*app).send(move |client, _context| {
+            client
+                .list_seq_mdata_values(info.name(), info.type_tag())
+                .map_err(Error::from)
+                .then(move |result| {
+                    match result {
+                        Ok(values) => {
+                            let repr_c: Vec<_> = values
+                                .into_iter()
+                                .map(NativeMDataValue::from_routing)
+                                .map(NativeMDataValue::into_repr_c)
+                                .collect();
 
-                                o_cb(
-                                    user_data.0,
-                                    FFI_RESULT_OK,
-                                    repr_c.as_safe_ptr(),
-                                    repr_c.len(),
-                                )
-                            }
-                            Err(..) => {
-                                call_result_cb!(result, user_data, o_cb);
-                            }
+                            o_cb(
+                                user_data.0,
+                                FFI_RESULT_OK,
+                                repr_c.as_safe_ptr(),
+                                repr_c.len(),
+                            )
                         }
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+                        Err(..) => {
+                            call_result_cb!(result, user_data, o_cb);
+                        }
+                    }
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 
@@ -350,28 +345,26 @@ pub unsafe extern "C" fn mdata_mutate_entries(
         let user_data = OpaqueCtx(user_data);
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
-        (*app)
-            .send(move |client, context| {
-                let actions = try_cb!(
-                    context
-                        .object_cache()
-                        .get_seq_mdata_entry_actions(actions_h)
-                        .map_err(Error::from),
-                    user_data,
-                    o_cb
-                );
+        (*app).send(move |client, context| {
+            let actions = try_cb!(
+                context
+                    .object_cache()
+                    .get_seq_mdata_entry_actions(actions_h)
+                    .map_err(Error::from),
+                user_data,
+                o_cb
+            );
 
-                client
-                    .mutate_seq_mdata_entries(info.name(), info.type_tag(), actions.clone())
-                    .map_err(Error::from)
-                    .then(move |result| {
-                        call_result_cb!(result, user_data, o_cb);
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+            client
+                .mutate_seq_mdata_entries(info.name(), info.type_tag(), actions.clone())
+                .map_err(Error::from)
+                .then(move |result| {
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 
@@ -397,7 +390,6 @@ pub unsafe extern "C" fn mdata_list_permissions(
                 .list_mdata_permissions(*info.address())
                 .map(move |perms| helper::insert_permissions(context.object_cache(), perms))
         })
-        .map_err(Error::from)
     })
 }
 
@@ -420,28 +412,26 @@ pub unsafe extern "C" fn mdata_list_user_permissions(
         let user_data = OpaqueCtx(user_data);
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
-        (*app)
-            .send(move |client, context| {
-                let user = try_cb!(
-                    helper::get_user(context.object_cache(), user_h),
-                    user_data,
-                    o_cb
-                );
+        (*app).send(move |client, context| {
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
 
-                client
-                    .list_mdata_user_permissions(*info.address(), user)
-                    .map(move |set| {
-                        let perm_set = permission_set_into_repr_c(set);
-                        o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
-                    })
-                    .map_err(Error::from)
-                    .map_err(move |err| {
-                        call_result_cb!(Err::<(), _>(err), user_data, o_cb);
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+            client
+                .list_mdata_user_permissions(*info.address(), user)
+                .map(move |set| {
+                    let perm_set = permission_set_into_repr_c(set);
+                    o_cb(user_data.0, FFI_RESULT_OK, &perm_set);
+                })
+                .map_err(Error::from)
+                .map_err(move |err| {
+                    call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 
@@ -463,26 +453,24 @@ pub unsafe extern "C" fn mdata_set_user_permissions(
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
         let permission_set = *permission_set;
 
-        (*app)
-            .send(move |client, context| {
-                let user = try_cb!(
-                    helper::get_user(context.object_cache(), user_h),
-                    user_data,
-                    o_cb
-                );
-                let permission_set = unwrap!(permission_set_clone_from_repr_c(permission_set));
+        (*app).send(move |client, context| {
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
+            let permission_set = unwrap!(permission_set_clone_from_repr_c(permission_set));
 
-                client
-                    .set_mdata_user_permissions(*info.address(), user, permission_set, version)
-                    .map_err(Error::from)
-                    .then(move |result| {
-                        call_result_cb!(result, user_data, o_cb);
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+            client
+                .set_mdata_user_permissions(*info.address(), user, permission_set, version)
+                .map_err(Error::from)
+                .then(move |result| {
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 
@@ -502,24 +490,22 @@ pub unsafe extern "C" fn mdata_del_user_permissions(
         let user_data = OpaqueCtx(user_data);
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
-        (*app)
-            .send(move |client, context| {
-                let user = try_cb!(
-                    helper::get_user(context.object_cache(), user_h),
-                    user_data,
-                    o_cb
-                );
+        (*app).send(move |client, context| {
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h),
+                user_data,
+                o_cb
+            );
 
-                client
-                    .del_mdata_user_permissions(*info.address(), user, version)
-                    .map_err(Error::from)
-                    .then(move |result| {
-                        call_result_cb!(result, user_data, o_cb);
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+            client
+                .del_mdata_user_permissions(*info.address(), user, version)
+                .map_err(Error::from)
+                .then(move |result| {
+                    call_result_cb!(result, user_data, o_cb);
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     })
 }

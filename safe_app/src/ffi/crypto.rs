@@ -66,21 +66,19 @@ pub unsafe extern "C" fn sign_generate_key_pair(
         let public_key = *full_id.public_id().public_key();
         let user_data = OpaqueCtx(user_data);
 
-        (*app)
-            .send(move |_, context| {
-                let public_key_handle = context.object_cache().insert_pub_sign_key(public_key);
-                let secret_key_handle = context.object_cache().insert_sec_sign_key(full_id);
+        (*app).send(move |_, context| {
+            let public_key_handle = context.object_cache().insert_pub_sign_key(public_key);
+            let secret_key_handle = context.object_cache().insert_sec_sign_key(full_id);
 
-                o_cb(
-                    user_data.0,
-                    FFI_RESULT_OK,
-                    public_key_handle,
-                    secret_key_handle,
-                );
+            o_cb(
+                user_data.0,
+                FFI_RESULT_OK,
+                public_key_handle,
+                secret_key_handle,
+            );
 
-                None
-            })
-            .map_err(Error::from)
+            None
+        })
     })
 }
 
@@ -120,7 +118,10 @@ pub unsafe extern "C" fn sign_pub_key_get(
         (*app).send(move |_, context| {
             let key: PublicKey = {
                 let sign_pk = try_cb!(
-                    context.object_cache().get_pub_sign_key(handle),
+                    context
+                        .object_cache()
+                        .get_pub_sign_key(handle)
+                        .map_err(Error::from),
                     user_data,
                     o_cb
                 );
@@ -129,7 +130,7 @@ pub unsafe extern "C" fn sign_pub_key_get(
             match serialize(&key) {
                 Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
                 res @ Err(..) => {
-                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                    call_result_cb!(res.map_err(Error::from), user_data, o_cb);
                 }
             }
             None
@@ -189,7 +190,10 @@ pub unsafe extern "C" fn sign_sec_key_get(
         (*app).send(move |_, context| {
             let sign_sk = {
                 let sign_sk = try_cb!(
-                    context.object_cache().get_sec_sign_key(handle),
+                    context
+                        .object_cache()
+                        .get_sec_sign_key(handle)
+                        .map_err(Error::from),
                     user_data,
                     o_cb
                 );
@@ -199,7 +203,7 @@ pub unsafe extern "C" fn sign_sec_key_get(
             match serialize(&sign_sk) {
                 Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
                 res @ Err(..) => {
-                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                    call_result_cb!(res.map_err(Error::from), user_data, o_cb);
                 }
             }
             None
@@ -258,21 +262,19 @@ pub unsafe extern "C" fn enc_generate_key_pair(
         let (our_public_key, our_secret_key) = shared_box::gen_keypair();
         let user_data = OpaqueCtx(user_data);
 
-        (*app)
-            .send(move |_, context| {
-                let public_key_handle = context.object_cache().insert_encrypt_key(our_public_key);
-                let secret_key_handle = context.object_cache().insert_secret_key(our_secret_key);
+        (*app).send(move |_, context| {
+            let public_key_handle = context.object_cache().insert_encrypt_key(our_public_key);
+            let secret_key_handle = context.object_cache().insert_secret_key(our_secret_key);
 
-                o_cb(
-                    user_data.0,
-                    FFI_RESULT_OK,
-                    public_key_handle,
-                    secret_key_handle,
-                );
+            o_cb(
+                user_data.0,
+                FFI_RESULT_OK,
+                public_key_handle,
+                secret_key_handle,
+            );
 
-                None
-            })
-            .map_err(Error::from)
+            None
+        })
     })
 }
 
@@ -374,12 +376,17 @@ pub unsafe extern "C" fn enc_secret_key_get(
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
             let key = try_cb!(
-                context.object_cache().get_secret_key(handle),
+                context
+                    .object_cache()
+                    .get_secret_key(handle)
+                    .map_err(Error::from),
                 user_data,
                 o_cb
             );
             let raw = try_cb!(
-                serialize(&*key).map_err(|_| AppError::EncodeDecodeError),
+                serialize(&*key)
+                    .map_err(|_| AppError::EncodeDecodeError)
+                    .map_err(Error::from),
                 user_data,
                 o_cb
             );
@@ -433,7 +440,10 @@ pub unsafe extern "C" fn sign(
                     safe_key.sign(&plaintext)
                 } else {
                     let sign_sk = try_cb!(
-                        context.object_cache().get_sec_sign_key(sign_sk_h),
+                        context
+                            .object_cache()
+                            .get_sec_sign_key(sign_sk_h)
+                            .map_err(Error::from),
                         user_data,
                         o_cb
                     );
@@ -442,7 +452,7 @@ pub unsafe extern "C" fn sign(
                 match serialize(&signature) {
                     Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
                     res @ Err(..) => {
-                        call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                        call_result_cb!(res.map_err(Error::from), user_data, o_cb);
                     }
                 }
                 None
@@ -477,7 +487,10 @@ pub unsafe extern "C" fn verify(
                     client.public_key()
                 } else {
                     let sign_pk = try_cb!(
-                        context.object_cache().get_pub_sign_key(sign_pk_h),
+                        context
+                            .object_cache()
+                            .get_pub_sign_key(sign_pk_h)
+                            .map_err(Error::from),
                         user_data,
                         o_cb
                     );
@@ -531,10 +544,10 @@ pub unsafe extern "C" fn encrypt(
                 res @ Err(..) => {
                     call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
+            }
 
-                None
-            })
-            .map_err(Error::from)
+            None
+        })
     })
 }
 
@@ -584,10 +597,10 @@ pub unsafe extern "C" fn decrypt(
                 res @ Err(..) => {
                     call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
+            }
 
-                None
-            })
-            .map_err(Error::from)
+            None
+        })
     })
 }*/
 
@@ -615,7 +628,10 @@ pub unsafe extern "C" fn encrypt_sealed_box(
         (*app)
             .send(move |_, context| {
                 let pk: AsymEncryptKey = *try_cb!(
-                    context.object_cache().get_encrypt_key(public_key_h),
+                    context
+                        .object_cache()
+                        .get_encrypt_key(public_key_h)
+                        .map_err(Error::from),
                     user_data,
                     o_cb
                 );
@@ -623,7 +639,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(
                 match serialize(&pk.encrypt(plaintext)) {
                     Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
                     res @ Err(..) => {
-                        call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                        call_result_cb!(res.map_err(Error::from), user_data, o_cb);
                     }
                 }
                 None
@@ -653,17 +669,22 @@ pub unsafe extern "C" fn decrypt_sealed_box(
         let user_data = OpaqueCtx(user_data);
         let plaintext = vec_clone_from_raw_parts(data, data_len);
         let deserialized: Ciphertext = deserialize(plaintext.as_slice()).map_err(AppError::from)?;
+
         (*app)
             .send(move |_, context| {
                 let sk = try_cb!(
-                    context.object_cache().get_secret_key(secret_key_h),
+                    context
+                        .object_cache()
+                        .get_secret_key(secret_key_h)
+                        .map_err(Error::from),
                     user_data,
                     o_cb
                 );
 
                 let plaintext = try_cb!(
                     sk.decrypt(&deserialized)
-                        .ok_or_else(|| AppError::EncodeDecodeError),
+                        .ok_or_else(|| AppError::EncodeDecodeError)
+                        .map_err(Error::from),
                     user_data,
                     o_cb
                 );
@@ -948,7 +969,7 @@ mod tests {
         }
 
         // Test that calling `sign_pub_key_get` on `USER_ANYONE` returns an error.
-        let user: Result<Vec<u8>, i32> =
+        let user: ::std::result::Result<Vec<u8>, i32> =
             unsafe { call_vec_u8(|ud, cb| sign_pub_key_get(&app, USER_ANYONE, ud, cb)) };
         match user {
             Err(ERR_INVALID_SIGN_PUB_KEY_HANDLE) => (),

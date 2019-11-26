@@ -230,17 +230,15 @@ pub unsafe extern "C" fn auth_flush_app_revocation_queue(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_> {
-        (*auth)
-            .send(move |client| {
-                flush_app_revocation_queue(client)
-                    .then(move |res| {
-                        call_result_cb!(res.map_err(Error::from), user_data, o_cb);
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+        (*auth).send(move |client| {
+            flush_app_revocation_queue(client)
+                .then(move |res| {
+                    call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     })
 }
 

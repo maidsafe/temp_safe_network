@@ -60,17 +60,15 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_> {
         let app_id = String::clone_from_repr_c(app_id)?;
 
-        (*auth)
-            .send(move |client| {
-                remove_revoked_app(client, app_id)
-                    .then(move |res| {
-                        call_result_cb!(res.map_err(Error::from), user_data, o_cb);
-                        Ok(())
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+        (*auth).send(move |client| {
+            remove_revoked_app(client, app_id)
+                .then(move |res| {
+                    call_result_cb!(res.map_err(Error::from), user_data, o_cb);
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
     });
 }
 

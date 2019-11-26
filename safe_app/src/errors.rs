@@ -176,6 +176,12 @@ impl From<Utf8Error> for AppError {
     }
 }
 
+impl From<crate::ffi::errors::Error> for AppError {
+    fn from(err: crate::ffi::errors::Error) -> Self {
+        err.into()
+    }
+}
+
 impl From<StringError> for AppError {
     fn from(_err: StringError) -> Self {
         Self::EncodeDecodeError
@@ -228,5 +234,11 @@ impl From<RecvTimeoutError> for AppError {
     fn from(_err: RecvTimeoutError) -> Self {
         // TODO: change this to err.description() once that lands in stable.
         Self::from("mpsc receive error")
+    }
+}
+
+impl From<FromBytesError> for AppError {
+    fn from(err: FromBytesError) -> Self {
+        Self::from(err.to_string())
     }
 }

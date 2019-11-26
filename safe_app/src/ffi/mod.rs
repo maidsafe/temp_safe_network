@@ -116,17 +116,15 @@ pub unsafe extern "C" fn app_reconnect(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_> {
         let user_data = OpaqueCtx(user_data);
-        (*app)
-            .send(move |client, _| {
-                try_cb!(
-                    client.restart_network().map_err(Error::from),
-                    user_data.0,
-                    o_cb
-                );
-                o_cb(user_data.0, FFI_RESULT_OK);
-                None
-            })
-            .map_err(Error::from)
+        (*app).send(move |client, _| {
+            try_cb!(
+                client.restart_network().map_err(Error::from),
+                user_data.0,
+                o_cb
+            );
+            o_cb(user_data.0, FFI_RESULT_OK);
+            None
+        })
     })
 }
 
@@ -164,13 +162,11 @@ pub unsafe extern "C" fn app_reset_object_cache(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_> {
         let user_data = OpaqueCtx(user_data);
-        (*app)
-            .send(move |_, context| {
-                context.object_cache().reset();
-                o_cb(user_data.0, FFI_RESULT_OK);
-                None
-            })
-            .map_err(Error::from)
+        (*app).send(move |_, context| {
+            context.object_cache().reset();
+            o_cb(user_data.0, FFI_RESULT_OK);
+            None
+        })
     })
 }
 

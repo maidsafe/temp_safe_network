@@ -66,6 +66,7 @@ pub use self::errors::AuthError;
 pub use crate::ffi::errors::codes::*;
 pub use client::AuthClient;
 
+use crate::ffi::errors::Error;
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use futures::{Future, IntoFuture};
@@ -106,13 +107,13 @@ pub struct Authenticator {
 
 impl Authenticator {
     /// Send a message to the authenticator event loop.
-    pub fn send<F>(&self, f: F) -> Result<(), AuthError>
+    pub fn send<F>(&self, f: F) -> crate::ffi::errors::Result<()>
     where
         F: FnOnce(&AuthClient) -> Option<Box<dyn Future<Item = (), Error = ()>>> + Send + 'static,
     {
         let msg = CoreMsg::new(|client, _| f(client));
         let core_tx = unwrap!(self.core_tx.lock());
-        core_tx.unbounded_send(msg).map_err(AuthError::from)
+        core_tx.unbounded_send(msg).map_err(Error::from)
     }
 
     /// Create a new account.

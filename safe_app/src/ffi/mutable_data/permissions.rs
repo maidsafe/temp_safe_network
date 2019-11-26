@@ -92,35 +92,33 @@ pub unsafe extern "C" fn mdata_permissions_get(
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        (*app)
-            .send(move |_, context| {
-                let permissions = try_cb!(
-                    context
-                        .object_cache()
-                        .get_mdata_permissions(permissions_h)
-                        .map_err(Error::from),
-                    user_data,
-                    o_cb
-                );
-                let user = try_cb!(
-                    helper::get_user(context.object_cache(), user_h).map_err(Error::from),
-                    user_data,
-                    o_cb
-                );
+        (*app).send(move |_, context| {
+            let permissions = try_cb!(
+                context
+                    .object_cache()
+                    .get_mdata_permissions(permissions_h)
+                    .map_err(Error::from),
+                user_data,
+                o_cb
+            );
+            let user = try_cb!(
+                helper::get_user(context.object_cache(), user_h).map_err(Error::from),
+                user_data,
+                o_cb
+            );
 
-                let permission_set = try_cb!(
-                    permissions
-                        .get(&user,)
-                        .ok_or_else(|| Error::from(AppError::InvalidSignPubKeyHandle)),
-                    user_data,
-                    o_cb
-                );
-                let permission_set = permission_set_into_repr_c(permission_set.clone());
+            let permission_set = try_cb!(
+                permissions
+                    .get(&user,)
+                    .ok_or_else(|| Error::from(AppError::InvalidSignPubKeyHandle)),
+                user_data,
+                o_cb
+            );
+            let permission_set = permission_set_into_repr_c(permission_set.clone());
 
-                o_cb(user_data.0, FFI_RESULT_OK, &permission_set);
-                None
-            })
-            .map_err(Error::from)
+            o_cb(user_data.0, FFI_RESULT_OK, &permission_set);
+            None
+        })
     })
 }
 

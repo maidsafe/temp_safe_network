@@ -10,10 +10,8 @@ pub use crate::ffi::errors::codes::*;
 pub use safe_core::ffi::error_codes::*;
 
 use crate::errors::AuthError;
-use config_file_handler::Error as ConfigFileHandlerError;
 use ffi_utils::{ErrorCode, StringError};
 use futures::sync::mpsc::SendError;
-use maidsafe_utilities::serialisation::SerialisationError;
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 use safe_core::CoreError;
@@ -101,12 +99,6 @@ impl<T: 'static> From<SendError<T>> for Error {
     }
 }
 
-impl From<ConfigFileHandlerError> for Error {
-    fn from(error: ConfigFileHandlerError) -> Self {
-        Self(AuthError::from(error.to_string()))
-    }
-}
-
 impl From<IpcError> for Error {
     fn from(error: IpcError) -> Self {
         Self(AuthError::IpcError(error))
@@ -146,12 +138,6 @@ impl From<String> for Error {
 impl From<NfsError> for Error {
     fn from(error: NfsError) -> Self {
         Self(AuthError::NfsError(error))
-    }
-}
-
-impl From<SerialisationError> for Error {
-    fn from(_err: SerialisationError) -> Self {
-        Self(AuthError::EncodeDecodeError)
     }
 }
 

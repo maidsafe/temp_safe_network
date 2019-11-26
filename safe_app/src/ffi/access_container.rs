@@ -59,30 +59,28 @@ pub unsafe extern "C" fn access_container_fetch(
     let f = || {
         let user_data = OpaqueCtx(user_data);
 
-        (*app)
-            .send(move |client, context| {
-                context
-                    .get_access_info(client)
-                    .and_then(move |containers| {
-                        let ffi_containers = containers_into_vec(
-                            containers.into_iter().map(|(key, (_, value))| (key, value)),
-                        )?;
-                        o_cb(
-                            user_data.0,
-                            FFI_RESULT_OK,
-                            ffi_containers.as_safe_ptr(),
-                            ffi_containers.len(),
-                        );
-                        Ok(())
-                    })
-                    .map_err(Error::from)
-                    .map_err(move |e| {
-                        call_result_cb!(Err::<(), _>(e), user_data, o_cb);
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+        (*app).send(move |client, context| {
+            context
+                .get_access_info(client)
+                .and_then(move |containers| {
+                    let ffi_containers = containers_into_vec(
+                        containers.into_iter().map(|(key, (_, value))| (key, value)),
+                    )?;
+                    o_cb(
+                        user_data.0,
+                        FFI_RESULT_OK,
+                        ffi_containers.as_safe_ptr(),
+                        ffi_containers.len(),
+                    );
+                    Ok(())
+                })
+                .map_err(Error::from)
+                .map_err(move |e| {
+                    call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })
     };
     catch_unwind_cb(user_data, o_cb, f)
 }
@@ -103,29 +101,27 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
         let user_data = OpaqueCtx(user_data);
         let name = String::clone_from_repr_c(name)?;
 
-        (*app)
-            .send(move |client, context| {
-                context
-                    .get_access_info(client)
-                    .map(move |mut containers| {
-                        if let Some((mdata_info, _)) = containers.remove(&name) {
-                            let mdata_info = mdata_info.into_repr_c();
-                            o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
-                        } else {
-                            call_result_cb!(
-                                Err::<(), _>(Error::from(AppError::NoSuchContainer(name))),
-                                user_data,
-                                o_cb
-                            );
-                        }
-                    })
-                    .map_err(move |err| {
-                        call_result_cb!(Err::<(), _>(Error::from(err)), user_data, o_cb);
-                    })
-                    .into_box()
-                    .into()
-            })
-            .map_err(Error::from)
+        (*app).send(move |client, context| {
+            context
+                .get_access_info(client)
+                .map(move |mut containers| {
+                    if let Some((mdata_info, _)) = containers.remove(&name) {
+                        let mdata_info = mdata_info.into_repr_c();
+                        o_cb(user_data.0, FFI_RESULT_OK, &mdata_info);
+                    } else {
+                        call_result_cb!(
+                            Err::<(), _>(Error::from(AppError::NoSuchContainer(name))),
+                            user_data,
+                            o_cb
+                        );
+                    }
+                })
+                .map_err(move |err| {
+                    call_result_cb!(Err::<(), _>(Error::from(err)), user_data, o_cb);
+                })
+                .into_box()
+                .into()
+        })
     };
     catch_unwind_cb(user_data, o_cb, f)
 }
