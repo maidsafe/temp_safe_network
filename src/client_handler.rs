@@ -26,10 +26,10 @@ use bytes::Bytes;
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
-    AData, ADataAddress, AppPermissions, AppPublicId, Challenge, Coins, ConnectionInfo,
-    Error as NdError, IData, IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId,
-    NodePublicId, Notification, PublicId, PublicKey, Request, Response, Result as NdResult,
-    Signature, Transaction, TransactionId, XorName,
+    AData, ADataAddress, AppPermissions, AppPublicId, Coins, ConnectionInfo, Error as NdError,
+    HandshakeRequest, HandshakeResponse, IData, IDataAddress, IDataKind, LoginPacket, MData,
+    Message, MessageId, NodePublicId, Notification, PublicId, PublicKey, Request, Response,
+    Result as NdResult, Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -58,7 +58,7 @@ pub(crate) struct ClientHandler {
     clients: HashMap<SocketAddr, ClientInfo>,
     pending_msg_ids: HashMap<MessageId, SocketAddr>,
     // Map of new client connections to the challenge value we sent them.
-    client_candidates: HashMap<SocketAddr, Vec<u8>>,
+    client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
     login_packets: LoginPacketChunkStore,
     routing_node: Rc<RefCell<Node>>,
 }
@@ -101,12 +101,6 @@ impl ClientHandler {
             return;
         }
 
-        let challenge = utils::random_vec(8);
-        self.send(
-            peer_addr,
-            &Challenge::Request(PublicId::Node(self.id.clone()), challenge.clone()),
-        );
-        let _ = self.client_candidates.insert(peer_addr, challenge);
         info!("{}: Connected to new client on {}", self, peer_addr);
     }
 
@@ -210,9 +204,6 @@ impl ClientHandler {
                         self, client.public_id, notification
                     );
                 }
-                Ok(Message::SectionInfo { .. }) => {
-                    info!("{}: {} invalidly sent SectionInfo", self, client.public_id);
-                }
                 Err(err) => {
                     info!(
                         "{}: Unable to deserialise message from {}: {}",
@@ -222,29 +213,24 @@ impl ClientHandler {
             }
         } else {
             match bincode::deserialize(&bytes) {
-                Ok(Challenge::Response {
-                    client_id,
-                    signature,
-                    request_section_info,
-                }) => {
-                    self.handle_challenge(peer_addr, client_id, signature, request_section_info);
+                Ok(HandshakeRequest::Bootstrap(_client_id)) => {
+                    // TODO: check if we are not the destination section (routing.match_our_prefix) and send
+                    // `HandshakeResponse::Rebootstrap` in that case.
+
+                    // Sent Join or Rebootstrap.
+                    self.handle_bootstrap_request(peer_addr);
                 }
-                Ok(Challenge::Request(_, _)) => {
-                    info!(
-                        "{}: Received unexpected challenge request from {}",
-                        self, peer_addr
-                    );
-                    if let Err(err) = self
-                        .routing_node
-                        .borrow_mut()
-                        .disconnect_from_client(peer_addr)
-                    {
-                        warn!("{}: Could not disconnect client: {:?}", self, err);
-                    }
+                Ok(HandshakeRequest::Join(client_id)) => {
+                    // Send challenge
+                    self.handle_join_request(peer_addr, client_id);
+                }
+                Ok(HandshakeRequest::ChallengeResult(signature)) => {
+                    // Handle challenge
+                    self.handle_challenge(peer_addr, signature);
                 }
                 Err(err) => {
                     info!(
-                        "{}: Unable to deserialise challenge from {}: {}",
+                        "{}: Unable to deserialise handshake request from {}: {}",
                         self, peer_addr, err
                     );
                 }
@@ -654,43 +640,45 @@ impl ClientHandler {
         }))
     }
 
+    /// Handles a received join request from a client.
+    fn handle_join_request(&mut self, peer_addr: SocketAddr, client_id: PublicId) {
+        let challenge = utils::random_vec(8);
+        self.send(
+            peer_addr,
+            &HandshakeResponse::Challenge(PublicId::Node(self.id.clone()), challenge.clone()),
+        );
+        let _ = self
+            .client_candidates
+            .insert(peer_addr, (challenge, client_id));
+    }
+
     /// Handles a received challenge response.
     ///
     /// Checks that the response contains a valid signature of the challenge we previously sent.
     /// If a client requests the section info, we also send it.
-    fn handle_challenge(
-        &mut self,
-        peer_addr: SocketAddr,
-        public_id: PublicId,
-        signature: Signature,
-        request_section_info: bool,
-    ) {
-        let public_key = match utils::own_key(&public_id) {
-            Some(pk) => pk,
-            None => {
-                info!(
-                    "{}: Client on {} identifies as a node: {}",
-                    self, peer_addr, public_id
-                );
-                if let Err(err) = self
-                    .routing_node
-                    .borrow_mut()
-                    .disconnect_from_client(peer_addr)
-                {
-                    warn!("{}: Could not disconnect client: {:?}", self, err);
+    fn handle_challenge(&mut self, peer_addr: SocketAddr, signature: Signature) {
+        if let Some((challenge, public_id)) = self.client_candidates.remove(&peer_addr) {
+            let public_key = match utils::own_key(&public_id) {
+                Some(pk) => pk,
+                None => {
+                    info!(
+                        "{}: Client on {} identifies as a node: {}",
+                        self, peer_addr, public_id
+                    );
+                    if let Err(err) = self
+                        .routing_node
+                        .borrow_mut()
+                        .disconnect_from_client(peer_addr)
+                    {
+                        warn!("{}: Could not disconnect client: {:?}", self, err);
+                    }
+                    return;
                 }
-                return;
-            }
-        };
-        if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
+            };
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
                     info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
                     let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
-
-                    if request_section_info {
-                        self.send_section_info_to_client(peer_addr);
-                    }
                 }
                 Err(err) => {
                     info!(
@@ -708,8 +696,8 @@ impl ClientHandler {
             }
         } else {
             info!(
-                "{}: {} on {} supplied challenge response without us providing it.",
-                self, public_id, peer_addr
+                "{}: {} supplied challenge response without us providing it.",
+                self, peer_addr
             );
             if let Err(err) = self
                 .routing_node
@@ -1119,7 +1107,7 @@ impl ClientHandler {
         }
     }
 
-    fn send_section_info_to_client(&mut self, peer_addr: SocketAddr) {
+    fn handle_bootstrap_request(&mut self, peer_addr: SocketAddr) {
         let elders = self
             .routing_node
             .borrow_mut()
@@ -1142,7 +1130,7 @@ impl ClientHandler {
             });
 
         if let Some(elders) = elders {
-            self.send(peer_addr, &Message::SectionInfo { elders });
+            self.send(peer_addr, &HandshakeResponse::Join(elders));
         } else {
             warn!("{}: No other elders in our section found", self);
         }
