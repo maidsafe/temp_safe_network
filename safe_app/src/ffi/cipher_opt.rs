@@ -95,16 +95,14 @@ pub unsafe extern "C" fn cipher_opt_free(
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app)
-            .send(move |_, context| {
-                let res = context
-                    .object_cache()
-                    .remove_cipher_opt(handle)
-                    .map_err(Error::from);
-                call_result_cb!(res, user_data, o_cb);
-                None
-            })
-            .map_err(Error::from)
+        (*app).send(move |_, context| {
+            let res = context
+                .object_cache()
+                .remove_cipher_opt(handle)
+                .map_err(Error::from);
+            call_result_cb!(res, user_data, o_cb);
+            None
+        })
     });
 }
 

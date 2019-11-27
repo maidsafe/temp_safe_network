@@ -56,7 +56,7 @@ pub unsafe extern "C" fn access_container_fetch(
         container_perms_len: usize,
     ),
 ) {
-    let f = || {
+    catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
@@ -81,8 +81,7 @@ pub unsafe extern "C" fn access_container_fetch(
                 .into_box()
                 .into()
         })
-    };
-    catch_unwind_cb(user_data, o_cb, f)
+    });
 }
 
 /// Retrieve `MDataInfo` for the given container name from the access container.
@@ -97,7 +96,7 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
         mdata_info: *const MDataInfo,
     ),
 ) {
-    let f = || {
+    catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = String::clone_from_repr_c(name)?;
 
@@ -122,8 +121,7 @@ pub unsafe extern "C" fn access_container_get_container_mdata_info(
                 .into_box()
                 .into()
         })
-    };
-    catch_unwind_cb(user_data, o_cb, f)
+    });
 }
 
 #[cfg(test)]

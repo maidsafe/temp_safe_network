@@ -127,14 +127,13 @@ pub unsafe extern "C" fn mdata_get_version(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, version: u64),
 ) {
-    let f = || {
+    catch_unwind_cb(user_data, o_cb, || {
         let info = NativeMDataInfo::clone_from_repr_c(info)?;
 
         send(app, user_data, o_cb, move |client, _| {
             client.get_mdata_version(*info.address())
         })
-    };
-    catch_unwind_cb(user_data, o_cb, f)
+    });
 }
 
 /// Get size of serialised mutable data.

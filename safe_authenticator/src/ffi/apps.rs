@@ -85,7 +85,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
     ),
 ) {
     let user_data = OpaqueCtx(user_data);
-    let f = || -> Result<_> {
+    catch_unwind_cb(user_data.0, o_cb, || -> Result<_> {
         (*auth).send(move |client| {
             list_revoked(client)
                 .and_then(move |apps| {
@@ -110,8 +110,7 @@ pub unsafe extern "C" fn auth_revoked_apps(
         })?;
 
         Ok(())
-    };
-    catch_unwind_cb(user_data.0, o_cb, f)
+    });
 }
 
 /// Get a list of apps registered in authenticator.
