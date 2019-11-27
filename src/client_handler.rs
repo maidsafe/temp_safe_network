@@ -213,15 +213,10 @@ impl ClientHandler {
             }
         } else {
             match bincode::deserialize(&bytes) {
-                Ok(HandshakeRequest::Bootstrap(_client_id)) => {
-                    // TODO: check if we are not the destination section (routing.match_our_prefix) and send
-                    // `HandshakeResponse::Rebootstrap` in that case.
-
-                    // Sent Join or Rebootstrap.
-                    self.handle_bootstrap_request(peer_addr);
+                Ok(HandshakeRequest::Bootstrap(client_id)) => {
+                    self.handle_bootstrap_request(peer_addr, client_id);
                 }
                 Ok(HandshakeRequest::Join(client_id)) => {
-                    // Send challenge
                     self.handle_join_request(peer_addr, client_id);
                 }
                 Ok(HandshakeRequest::ChallengeResult(signature)) => {
@@ -642,6 +637,19 @@ impl ClientHandler {
 
     /// Handles a received join request from a client.
     fn handle_join_request(&mut self, peer_addr: SocketAddr, client_id: PublicId) {
+        if !self
+            .routing_node
+            .borrow()
+            .matches_our_prefix(client_id.name())
+        {
+            debug!(
+                "Client {} ({}) wants to join us but we are not its client handler",
+                client_id, peer_addr
+            );
+            self.routing_node
+                .borrow_mut()
+                .disconnect_from_client(peer_addr);
+        }
         let challenge = utils::random_vec(8);
         self.send(
             peer_addr,
@@ -1107,32 +1115,69 @@ impl ClientHandler {
         }
     }
 
-    fn handle_bootstrap_request(&mut self, peer_addr: SocketAddr) {
-        let elders = self
+    fn handle_bootstrap_request(&mut self, peer_addr: SocketAddr, client_id: PublicId) {
+        if !self
             .routing_node
-            .borrow_mut()
-            .our_elders_info()
-            .map(|iter| {
-                iter.map(|p2p_node| {
-                    let routing::ConnectionInfo {
-                        peer_addr,
-                        peer_cert_der,
-                    } = p2p_node.connection_info().clone();
-                    (
-                        XorName(p2p_node.name().0),
-                        ConnectionInfo {
+            .borrow()
+            .match_our_prefix(client_id.name())
+        {
+            let closest_known_elders = match self
+                .routing_node
+                .borrow()
+                .closest_known_elders_to(client_id.name())
+            {
+                Ok(elders_iter) => elders_iter.map(|p2p_node| {
+                        let routing::ConnectionInfo {
                             peer_addr,
                             peer_cert_der,
-                        },
-                    )
-                })
-                .collect::<Vec<_>>()
-            });
+                        } = p2p_node.connection_info().clone();
+                        (
+                            XorName(p2p_node.name().0),
+                            ConnectionInfo {
+                                peer_addr,
+                                peer_cert_der,
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                Err(e) => {
+                    info!("Could not handle bootstrap request: {:?}", e);
+                    return;
+                }
+            };
 
-        if let Some(elders) = elders {
-            self.send(peer_addr, &HandshakeResponse::Join(elders));
+            if let Some(elders) = closest_known_elders {
+                self.send(peer_addr, &HandshakeResponse::Join(elders));
+            } else {
+                warn!("{}: No closest known elders in any section we know of", self);
+            }
         } else {
-            warn!("{}: No other elders in our section found", self);
+            let elders = self
+                .routing_node
+                .borrow_mut()
+                .our_elders_info()
+                .map(|iter| {
+                    iter.map(|p2p_node| {
+                        let routing::ConnectionInfo {
+                            peer_addr,
+                            peer_cert_der,
+                        } = p2p_node.connection_info().clone();
+                        (
+                            XorName(p2p_node.name().0),
+                            ConnectionInfo {
+                                peer_addr,
+                                peer_cert_der,
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                });
+
+            if let Some(elders) = elders {
+                self.send(peer_addr, &HandshakeResponse::Join(elders));
+            } else {
+                warn!("{}: No other elders in our section found", self);
+            }
         }
     }
 
