@@ -93,7 +93,7 @@ mod tests;
 pub mod test_utils;
 
 use self::object_cache::ObjectCache;
-use crate::ffi::errors::Error;
+use crate::ffi::errors::{Error, Result as FfiResult};
 use bincode::deserialize;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -132,7 +132,7 @@ pub struct App {
 
 impl App {
     /// Send a message to app's event loop.
-    pub fn send<F>(&self, f: F) -> Result<(), Error>
+    pub fn send<F>(&self, f: F) -> FfiResult<()>
     where
         F: FnOnce(&AppClient, &AppContext) -> Option<Box<dyn Future<Item = (), Error = ()>>>
             + Send
@@ -378,7 +378,7 @@ impl AppContext {
 }
 
 /// Helper to execute a future by blocking the thread until the result arrives.
-pub fn run<F, I, T>(app: &App, f: F) -> Result<T, AppError>
+pub fn run<F, I, T>(app: &App, f: F) -> FfiResult<T>
 where
     F: FnOnce(&AppClient, &AppContext) -> I + Send + 'static,
     I: IntoFuture<Item = T, Error = AppError> + 'static,
@@ -395,7 +395,7 @@ where
             .into_box();
         Some(future)
     })?;
-    rx.recv()?
+    rx.recv()?.map_err(|e| crate::ffi::errors::Error::from(e))
 }
 
 fn refresh_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFuture<()>> {

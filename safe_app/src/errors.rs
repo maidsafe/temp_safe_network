@@ -176,12 +176,6 @@ impl From<Utf8Error> for AppError {
     }
 }
 
-impl From<crate::ffi::errors::Error> for AppError {
-    fn from(err: crate::ffi::errors::Error) -> Self {
-        err.into()
-    }
-}
-
 impl From<StringError> for AppError {
     fn from(_err: StringError) -> Self {
         Self::EncodeDecodeError

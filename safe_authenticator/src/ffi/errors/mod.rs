@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod codes;
+
 pub use crate::ffi::errors::codes::*;
 pub use safe_core::ffi::error_codes::*;
 
@@ -22,29 +24,6 @@ use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::RecvError;
-
-#[allow(missing_docs)]
-pub mod codes {
-    // Data type errors
-    pub const ERR_NO_SUCH_DATA: i32 = -101;
-    pub const ERR_DATA_EXISTS: i32 = -102;
-    pub const ERR_NO_SUCH_ENTRY: i32 = -103;
-    pub const ERR_TOO_MANY_ENTRIES: i32 = -104;
-    pub const ERR_NO_SUCH_KEY: i32 = -105;
-    pub const ERR_INVALID_OWNERS: i32 = -106;
-    pub const ERR_INVALID_SUCCESSOR: i32 = -107;
-    pub const ERR_INVALID_OPERATION: i32 = -108;
-    pub const ERR_NETWORK_OTHER: i32 = -109;
-    pub const ERR_INVALID_ENTRY_ACTIONS: i32 = -110;
-    pub const ERR_DUPLICATE_MSG_ID: i32 = -111;
-    pub const ERR_DUPLICATE_ENTRY_KEYS: i32 = -112;
-    pub const ERR_KEYS_EXIST: i32 = -113;
-
-    // Authenticator errors.
-    pub const ERR_ACCOUNT_CONTAINERS_CREATION: i32 = -1014;
-    pub const ERR_NO_SUCH_CONTAINER: i32 = -1015;
-    pub const ERR_PENDING_REVOCATION: i32 = -1016;
-}
 
 /// FFI Result type
 pub type Result<T> = std::result::Result<T, Error>;

@@ -17,7 +17,6 @@ use crate::access_container as access_container_tools;
 use crate::config::{self, KEY_APPS};
 use crate::errors::AuthError;
 use crate::ffi::apps::*;
-use crate::ffi::errors::codes::ERR_NO_SUCH_CONTAINER;
 use crate::ffi::errors::{ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use crate::ffi::ipc::{
     auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp,
@@ -33,6 +32,7 @@ use ffi_utils::test_utils::{call_1, call_vec, sender_as_user_data};
 use ffi_utils::{ReprC, StringError};
 use futures::{future, Future};
 use safe_core::config_handler::Config;
+use safe_core::ffi::error_codes::ERR_NO_SUCH_CONTAINER;
 use safe_core::{app_container_name, mdata_info, AuthActions, Client};
 use std::collections::HashMap;
 use std::ffi::CString;

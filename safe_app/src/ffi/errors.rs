@@ -50,7 +50,6 @@ pub mod codes {
     pub const ERR_KEYS_EXIST: i32 = -120;
 
     // App errors
-    pub const ERR_NO_SUCH_CONTAINER: i32 = -1002;
     pub const ERR_INVALID_CIPHER_OPT_HANDLE: i32 = -1003;
     pub const ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE: i32 = -1004;
     pub const ERR_INVALID_MDATA_INFO_HANDLE: i32 = -1005;

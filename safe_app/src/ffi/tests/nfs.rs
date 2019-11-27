@@ -7,19 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::errors::AppError;
-use crate::ffi::errors::Error;
+use crate::ffi::errors::{ERR_INVALID_FILE_MODE, ERR_INVALID_RANGE};
 use crate::ffi::nfs::*;
 use crate::ffi::object_cache::FileContextHandle;
 use crate::test_utils::{create_app_by_req, create_auth_req_with_access};
 use crate::{run, App};
 use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
-use ffi_utils::ErrorCode;
 use futures::Future;
 use safe_core::ffi::nfs::File;
 use safe_core::ffi::MDataInfo;
 use safe_core::ipc::Permission;
-use safe_core::nfs::{File as NativeFile, NfsError};
+use safe_core::nfs::File as NativeFile;
 use safe_core::utils;
 use std;
 use std::collections::HashMap;
@@ -159,7 +157,7 @@ fn open_file() {
 
     let size: Result<u64, i32> = unsafe { call_1(|ud, cb| file_size(&app, write_h, ud, cb)) };
     match size {
-        Err(code) if code == Error::from(AppError::InvalidFileMode).error_code() => (),
+        Err(code) if code == ERR_INVALID_FILE_MODE => (),
         Err(x) => panic!("Unexpected: {:?}", x),
         Ok(_) => panic!("Unexpected success"),
     }
@@ -990,7 +988,7 @@ fn file_read_chunks() {
         unsafe { call_vec_u8(|ud, cb| file_read(&app, read_h, size, 1, ud, cb)) };
 
     match retrieved_content {
-        Err(code) if code == Error::from(AppError::from(NfsError::InvalidRange)).error_code() => (),
+        Err(code) if code == ERR_INVALID_RANGE => (),
         Err(x) => panic!("Unexpected: {:?}", x),
         Ok(_) => panic!("Unexpected success"),
     }

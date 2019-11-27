@@ -30,6 +30,19 @@ pub const ERR_IO: i32 = -16;
 
 // Data type errors
 pub const ERR_ACCESS_DENIED: i32 = -100;
+pub const ERR_NO_SUCH_DATA: i32 = -101;
+pub const ERR_DATA_EXISTS: i32 = -102;
+pub const ERR_NO_SUCH_ENTRY: i32 = -103;
+pub const ERR_TOO_MANY_ENTRIES: i32 = -104;
+pub const ERR_NO_SUCH_KEY: i32 = -105;
+pub const ERR_INVALID_OWNERS: i32 = -106;
+pub const ERR_INVALID_SUCCESSOR: i32 = -107;
+pub const ERR_INVALID_OPERATION: i32 = -108;
+pub const ERR_NETWORK_OTHER: i32 = -109;
+pub const ERR_INVALID_ENTRY_ACTIONS: i32 = -110;
+pub const ERR_DUPLICATE_MSG_ID: i32 = -111;
+pub const ERR_DUPLICATE_ENTRY_KEYS: i32 = -112;
+pub const ERR_KEYS_EXIST: i32 = -113;
 
 // IPC errors.
 pub const ERR_AUTH_DENIED: i32 = -200;
@@ -49,6 +62,9 @@ pub const ERR_INVALID_RANGE: i32 = -302;
 
 // IO error.
 pub const ERR_IO_ERROR: i32 = -1013;
+
+// Authenticator errors.
+pub const ERR_NO_SUCH_CONTAINER: i32 = -1014;
 
 // Unexpected error.
 pub const ERR_UNEXPECTED: i32 = -2000;
