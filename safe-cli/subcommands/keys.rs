@@ -61,18 +61,18 @@ pub enum KeysSubCommands {
 }
 
 pub fn key_commander(
-    cmd: Option<KeysSubCommands>,
+    cmd: KeysSubCommands,
     output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(KeysSubCommands::Create {
+        KeysSubCommands::Create {
             preload,
             pk,
             pay_with,
             test_coins,
             ..
-        }) => {
+        } => {
             if test_coins && (pk.is_some() | pay_with.is_some()) {
                 // We don't support these args with --test-coins
                 return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
@@ -86,7 +86,7 @@ pub fn key_commander(
             print_new_key_output(output_fmt, xorurl, key_pair, amount);
             Ok(())
         }
-        Some(KeysSubCommands::Balance { keyurl, secret }) => {
+        KeysSubCommands::Balance { keyurl, secret } => {
             connect(safe)?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
@@ -103,12 +103,12 @@ pub fn key_commander(
             }
             Ok(())
         }
-        Some(KeysSubCommands::Transfer {
+        KeysSubCommands::Transfer {
             amount,
             from,
             to,
             tx_id,
-        }) => {
+        } => {
             // TODO: don't connect if --from sk was passed
             connect(safe)?;
 
@@ -133,7 +133,6 @@ pub fn key_commander(
 
             Ok(())
         }
-        None => Err("Missing keys sub-command. Use -h / --help for details.".to_string()),
     }
 }
 

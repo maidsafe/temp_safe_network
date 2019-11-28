@@ -51,17 +51,17 @@ pub enum NrsSubCommands {
 }
 
 pub fn nrs_commander(
-    cmd: Option<NrsSubCommands>,
+    cmd: NrsSubCommands,
     output_fmt: OutputFmt,
     dry_run: bool,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(NrsSubCommands::Create {
+        NrsSubCommands::Create {
             name,
             link,
             direct_link,
-        }) => {
+        } => {
             // TODO: Where do we store/reference these? add it to the Root container,
             // sanitize name / spacing etc., validate destination?
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
@@ -89,12 +89,12 @@ pub fn nrs_commander(
 
             Ok(())
         }
-        Some(NrsSubCommands::Add {
+        NrsSubCommands::Add {
             name,
             link,
             default,
             direct_link,
-        }) => {
+        } => {
             let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
 
             if dry_run && OutputFmt::Pretty == output_fmt {
@@ -114,7 +114,7 @@ pub fn nrs_commander(
 
             Ok(())
         }
-        Some(NrsSubCommands::Remove { name }) => {
+        NrsSubCommands::Remove { name } => {
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
@@ -132,7 +132,6 @@ pub fn nrs_commander(
 
             Ok(())
         }
-        None => Err("Missing nrs sub-command. Use --help for details.".to_string()),
     }
 }
 

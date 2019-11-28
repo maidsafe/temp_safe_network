@@ -99,12 +99,12 @@ pub enum WalletSubCommands {
 }
 
 pub fn wallet_commander(
-    cmd: Option<WalletSubCommands>,
+    cmd: WalletSubCommands,
     output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(WalletSubCommands::Create {
+        WalletSubCommands::Create {
             preload,
             test_coins,
             no_balance,
@@ -112,7 +112,7 @@ pub fn wallet_commander(
             name,
             pay_with,
             secret_key,
-        }) => {
+        } => {
             // create wallet
             let wallet_xorurl = safe.wallet_create()?;
             let mut key_generated_output: (String, Option<BlsKeyPair>, Option<String>) =
@@ -167,7 +167,7 @@ pub fn wallet_commander(
 
             Ok(())
         }
-        Some(WalletSubCommands::Balance { target }) => {
+        WalletSubCommands::Balance { target } => {
             let target = get_from_arg_or_stdin(
                 target,
                 Some("...awaiting Wallet address/location from STDIN stream..."),
@@ -195,14 +195,14 @@ pub fn wallet_commander(
 
             Ok(())
         }
-        Some(WalletSubCommands::Insert {
+        WalletSubCommands::Insert {
             target,
             keyurl,
             name,
             default,
             secret_key,
             pay_with,
-        }) => {
+        } => {
             if pay_with.is_some() {
                 println!("The '--pay-with' argument is being ignored for now as it's not supported yet for this command.");
             }
@@ -228,12 +228,12 @@ pub fn wallet_commander(
             }
             Ok(())
         }
-        Some(WalletSubCommands::Transfer {
+        WalletSubCommands::Transfer {
             amount,
             from,
             to,
             tx_id,
-        }) => {
+        } => {
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(
                 to,
@@ -255,6 +255,5 @@ pub fn wallet_commander(
 
             Ok(())
         }
-        None => Err("Missing wallet sub-command. Use -h / --help for details.".to_string()),
     }
 }

@@ -60,17 +60,17 @@ pub enum FilesSubCommands {
 }
 
 pub fn files_commander(
-    cmd: Option<FilesSubCommands>,
+    cmd: FilesSubCommands,
     output_fmt: OutputFmt,
     dry_run: bool,
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        Some(FilesSubCommands::Put {
+        FilesSubCommands::Put {
             location,
             dest,
             recursive,
-        }) => {
+        } => {
             // create FilesContainer from a given path to local files/folders
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
@@ -102,13 +102,13 @@ pub fn files_commander(
 
             Ok(())
         }
-        Some(FilesSubCommands::Sync {
+        FilesSubCommands::Sync {
             location,
             target,
             recursive,
             delete,
             update_nrs,
-        }) => {
+        } => {
             let target = get_from_arg_or_stdin(target, None)?;
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
@@ -149,12 +149,12 @@ pub fn files_commander(
             }
             Ok(())
         }
-        Some(FilesSubCommands::Add {
+        FilesSubCommands::Add {
             location,
             target,
             update_nrs,
             force,
-        }) => {
+        } => {
             let target = get_from_arg_or_stdin(target, None)?;
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
@@ -195,7 +195,6 @@ pub fn files_commander(
             }
             Ok(())
         }
-        None => Err("Missing files sub-command. Use --help for details.".to_string()),
     }
 }
 

@@ -34,7 +34,7 @@ pub struct CmdArgs {
     // root: bool,
     /// Output data serialisation: [json, jsoncompact, yaml]
     #[structopt(short = "o", long = "output", raw(global = "true"))]
-    output_fmt: Option<String>,
+    output_fmt: Option<OutputFmt>,
     /// Sets JSON as output serialisation format (alias of '--output json')
     #[structopt(long = "json", raw(global = "true"))]
     output_json: bool,
@@ -76,18 +76,9 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
     let output_fmt = if args.output_json {
         OutputFmt::Json
     } else {
-        let fmt = args.output_fmt.clone().unwrap_or_else(|| "".to_string());
-        match fmt.as_ref() {
-            "json" => OutputFmt::Json,
-            "jsoncompact" => OutputFmt::JsonCompact,
-            "yaml" => OutputFmt::Yaml,
-            "" => OutputFmt::Pretty,
-            other => {
-                return Err(format!(
-                    "Output serialisation format '{}' not supported",
-                    other
-                ))
-            }
+        match args.output_fmt {
+            Some(fmt) => fmt,
+            None => OutputFmt::Pretty,
         }
     };
 
@@ -109,19 +100,19 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
         Some(SubCommands::Update {}) => {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
-        Some(SubCommands::Keys { cmd }) => key_commander(cmd, output_fmt, &mut safe),
+        Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, &mut safe),
         Some(other) => {
             // We treat these separatelly since we need to connect before
             // handling any of these commands
             connect(&mut safe)?;
             match other {
-                SubCommands::Wallet { cmd } => wallet_commander(cmd, output_fmt, &mut safe),
-                SubCommands::Files { cmd } => files_commander(cmd, output_fmt, args.dry, &mut safe),
-                SubCommands::Nrs { cmd } => nrs_commander(cmd, output_fmt, args.dry, &mut safe),
+                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &mut safe),
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, &mut safe),
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, &mut safe),
                 _ => Err("Unknown safe subcommand".to_string()),
             }
         }
-        None => shell::shell_run(), // then enter in SAFE interactive shell
+        None => shell::shell_run(), // then enter in interactive shell
     };
 
     safe.xorurl_base = prev_base;
