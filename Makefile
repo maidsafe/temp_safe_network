@@ -2,6 +2,7 @@ SHELL := /bin/bash
 SAFE_CLI_VERSION := $(shell grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 SAFE_AUTHD_VERSION := $(shell grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 SAFE_FFI_VERSION := $(shell grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+COMMIT_HASH := $(shell git rev-parse --short HEAD)
 USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
 UNAME_S := $(shell uname -s)
@@ -316,9 +317,9 @@ endif
 package-commit_hash-artifacts-for-deploy:
 	rm -rf deploy
 	mkdir -p deploy/prod
-	./resources/package-deploy-artifacts.sh "safe-authd" $$(git rev-parse --short HEAD)
-	./resources/package-deploy-artifacts.sh "safe-cli" $$(git rev-parse --short HEAD)
-	./resources/package-deploy-artifacts.sh "safe-ffi" $$(git rev-parse --short HEAD)
+	./resources/package-deploy-artifacts.sh "safe-authd" ${COMMIT_HASH}
+	./resources/package-deploy-artifacts.sh "safe-cli" ${COMMIT_HASH}
+	./resources/package-deploy-artifacts.sh "safe-ffi" ${COMMIT_HASH}
 	find deploy -name "*.tar.gz" -exec rm '{}' \;
 
 package-version-artifacts-for-deploy:

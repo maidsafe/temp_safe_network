@@ -28,6 +28,7 @@ jobs:
           args: --all-targets --all-features
 
   build-ffi-android:
+    name: Build FFI Android
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -47,6 +48,7 @@ jobs:
           path: artifacts
 
   #build-ffi-ios:
+    #name: Build FFI iOS
     #runs-on: macOS-latest
     #strategy:
       #matrix:
@@ -68,6 +70,7 @@ jobs:
       #- uses: actions/checkout@v1
       #- uses: actions-rs/toolchain@v1
         #with:
+          #profile: minimal
           #toolchain: stable
           #override: true
           #target: ${{ matrix.target }}
@@ -93,6 +96,7 @@ jobs:
           #path: target/${{ matrix.target }}/release
 
   #build-ffi-ios-universal:
+    #name: Build FFI iOS Universal
     #runs-on: macOS-latest
     #needs: build-ffi-ios
     #steps:
@@ -125,6 +129,7 @@ jobs:
           #path: artifacts/safe-ffi/prod/universal
 
   #build-ffi-ios-universal:
+    #name: Build FFI iOS Universal
     #runs-on: macOS-latest
     #needs: build-ffi-ios
     #steps:
@@ -158,6 +163,7 @@ jobs:
 
   # Add macOS-latest to the matrix when rust_sodium has been removed.
   test-component:
+    name: Test Component
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -167,6 +173,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
         with:
+          profile: minimal
           toolchain: stable
           override: true
       - shell: bash
