@@ -13,6 +13,7 @@ use futures::sync::mpsc::SendError;
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 use safe_core::{CoreError, SelfEncryptionStorageError};
+use safe_nd::Error as SndError;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
 use std::ffi::NulError;
@@ -28,6 +29,8 @@ use threshold_crypto::error::FromBytesError;
 pub enum AppError {
     /// Error from safe_core.
     CoreError(CoreError),
+    /// Error from safe-nd
+    SndError(SndError),
     /// IPC error.
     IpcError(IpcError),
     /// NFS error.
@@ -81,6 +84,7 @@ impl Display for AppError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match *self {
             Self::CoreError(ref error) => write!(formatter, "Core error: {}", error),
+            Self::SndError(ref error) => write!(formatter, "Safe ND error: {}", error),
             Self::IpcError(ref error) => write!(formatter, "IPC error: {:?}", error),
             Self::NfsError(ref error) => write!(formatter, "NFS error: {}", error),
             Self::EncodeDecodeError => write!(formatter, "Serialisation error"),
@@ -191,6 +195,12 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for AppError {
 impl From<IoError> for AppError {
     fn from(err: IoError) -> Self {
         Self::IoError(err)
+    }
+}
+
+impl From<SndError> for AppError {
+    fn from(error: SndError) -> Self {
+        Self::SndError(error)
     }
 }
 

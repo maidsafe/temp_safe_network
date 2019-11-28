@@ -7,17 +7,20 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::ffi::errors::{ERR_INVALID_FILE_MODE, ERR_INVALID_RANGE};
+use crate::ffi::errors::{Error, ERR_INVALID_FILE_MODE, ERR_INVALID_RANGE};
 use crate::ffi::nfs::*;
 use crate::ffi::object_cache::FileContextHandle;
 use crate::test_utils::{create_app_by_req, create_auth_req_with_access};
+use crate::AppError;
 use crate::{run, App};
 use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
+use ffi_utils::ErrorCode;
 use futures::Future;
 use safe_core::ffi::nfs::File;
 use safe_core::ffi::MDataInfo;
 use safe_core::ipc::Permission;
 use safe_core::nfs::File as NativeFile;
+use safe_core::nfs::NfsError;
 use safe_core::utils;
 use std;
 use std::collections::HashMap;

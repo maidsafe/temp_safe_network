@@ -395,7 +395,7 @@ where
             .into_box();
         Some(future)
     })?;
-    rx.recv()?.map_err(|e| crate::ffi::errors::Error::from(e))
+    rx.recv()?.map_err(crate::ffi::errors::Error::from)
 }
 
 fn refresh_access_info(context: Rc<Registered>, client: &AppClient) -> Box<AppFuture<()>> {

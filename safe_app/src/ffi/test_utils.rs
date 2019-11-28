@@ -80,10 +80,10 @@ pub unsafe extern "C" fn test_simulate_network_disconnect(
 #[cfg(test)]
 mod tests {
     use super::test_create_app_with_access;
-    use crate::ffi::errors::codes::ERR_NO_SUCH_CONTAINER;
     use crate::App;
     use ffi_utils::test_utils::call_1;
     use safe_authenticator::test_utils::rand_app;
+    use safe_core::ffi::error_codes::ERR_NO_SUCH_CONTAINER;
     use safe_core::ipc::req::AuthReq;
     use safe_core::ipc::Permission;
     use std::collections::HashMap;

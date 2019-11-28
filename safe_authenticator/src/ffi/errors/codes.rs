@@ -8,5 +8,6 @@
 
 #![allow(missing_docs)]
 
-pub const ERR_ACCOUNT_CONTAINERS_CREATION: i32 = -1014;
-pub const ERR_PENDING_REVOCATION: i32 = -1016;
+// These error codes are positive so as not to conflict with the shared error codes, which are negative
+pub const ERR_ACCOUNT_CONTAINERS_CREATION: i32 = 1;
+pub const ERR_PENDING_REVOCATION: i32 = 2;

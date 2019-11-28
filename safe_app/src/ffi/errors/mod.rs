@@ -7,6 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+pub mod codes;
+
 pub use crate::ffi::errors::codes::*;
 pub use safe_core::ffi::error_codes::*;
 
@@ -24,49 +26,6 @@ use std::fmt::{self, Display, Formatter};
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::sync::mpsc::{RecvError, RecvTimeoutError};
-
-#[allow(missing_docs)]
-pub mod codes {
-    // Data type errors
-    pub const ERR_NO_SUCH_ACCOUNT: i32 = -101;
-    pub const ERR_ACCOUNT_EXISTS: i32 = -102;
-    pub const ERR_NO_SUCH_DATA: i32 = -103;
-    pub const ERR_DATA_EXISTS: i32 = -104;
-    pub const ERR_DATA_TOO_LARGE: i32 = -105;
-    pub const ERR_NO_SUCH_ENTRY: i32 = -106;
-    pub const ERR_INVALID_ENTRY_ACTIONS: i32 = -107;
-    pub const ERR_TOO_MANY_ENTRIES: i32 = -108;
-    pub const ERR_NO_SUCH_KEY: i32 = -109;
-    pub const ERR_INVALID_OWNERS: i32 = -110;
-    pub const ERR_INVALID_SUCCESSOR: i32 = -111;
-    pub const ERR_INVALID_OPERATION: i32 = -112;
-    pub const ERR_LOW_BALANCE: i32 = -113;
-    pub const ERR_NETWORK_FULL: i32 = -114;
-    pub const ERR_NETWORK_OTHER: i32 = -115;
-    pub const ERR_INVALID_INVITATION: i32 = -116;
-    pub const ERR_INVITATION_ALREADY_CLAIMED: i32 = -117;
-    pub const ERR_DUPLICATE_MSG_ID: i32 = -118;
-    pub const ERR_DUPLICATE_ENTRY_KEYS: i32 = -119;
-    pub const ERR_KEYS_EXIST: i32 = -120;
-
-    // App errors
-    pub const ERR_INVALID_CIPHER_OPT_HANDLE: i32 = -1003;
-    pub const ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE: i32 = -1004;
-    pub const ERR_INVALID_MDATA_INFO_HANDLE: i32 = -1005;
-    pub const ERR_INVALID_MDATA_ENTRIES_HANDLE: i32 = -1006;
-    pub const ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE: i32 = -1007;
-    pub const ERR_INVALID_MDATA_PERMISSIONS_HANDLE: i32 = -1008;
-    pub const ERR_INVALID_MDATA_PERMISSION_SET_HANDLE: i32 = -1009;
-    pub const ERR_INVALID_SELF_ENCRYPTOR_HANDLE: i32 = -1010;
-    pub const ERR_INVALID_SIGN_PUB_KEY_HANDLE: i32 = -1011;
-    pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
-    pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
-    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
-    pub const ERR_INVALID_FILE_MODE: i32 = -1016;
-    pub const ERR_INVALID_SIGN_SEC_KEY_HANDLE: i32 = -1017;
-    pub const ERR_UNREGISTERED_CLIENT_ACCESS: i32 = -1018;
-    pub const ERR_INVALID_PUB_KEY_HANDLE: i32 = -1019;
-}
 
 /// FFI Result type
 pub type Result<T> = std::result::Result<T, Error>;
@@ -189,6 +148,7 @@ impl ErrorCode for Error {
     fn error_code(&self) -> i32 {
         match (*self).0 {
             AppError::CoreError(ref err) => core_error_code(err),
+            AppError::SndError(ref err) => safe_nd_error_core(err),
             AppError::IpcError(ref err) => match *err {
                 IpcError::AuthDenied => ERR_AUTH_DENIED,
                 IpcError::ContainersDenied => ERR_CONTAINERS_DENIED,
@@ -232,6 +192,39 @@ impl ErrorCode for Error {
             AppError::IoError(_) => ERR_IO_ERROR,
             AppError::Unexpected(_) => ERR_UNEXPECTED,
         }
+    }
+}
+
+fn safe_nd_error_core(err: &SndError) -> i32 {
+    match *err {
+        SndError::AccessDenied => ERR_ACCESS_DENIED,
+        SndError::NoSuchLoginPacket => ERR_NO_SUCH_LOGIN_PACKET,
+        SndError::LoginPacketExists => ERR_LOGIN_PACKET_EXISTS,
+        SndError::NoSuchData => ERR_NO_SUCH_DATA,
+        SndError::DataExists => ERR_DATA_EXISTS,
+        SndError::NoSuchEntry => ERR_NO_SUCH_ENTRY,
+        SndError::TooManyEntries => ERR_TOO_MANY_ENTRIES,
+        SndError::InvalidEntryActions(_) => ERR_INVALID_ENTRY_ACTIONS,
+        SndError::NoSuchKey => ERR_NO_SUCH_KEY,
+        SndError::KeysExist(_) => ERR_KEYS_EXIST,
+        SndError::DuplicateEntryKeys => ERR_DUPLICATE_ENTRY_KEYS,
+        SndError::DuplicateMessageId => ERR_DUPLICATE_MSG_ID,
+        SndError::InvalidOwners => ERR_INVALID_OWNERS,
+        SndError::InvalidSuccessor(_) => ERR_INVALID_SUCCESSOR,
+        SndError::InvalidOperation => ERR_INVALID_OPERATION,
+        SndError::NetworkOther(_) => ERR_NETWORK_OTHER,
+        SndError::InvalidOwnersSuccessor(_) => ERR_INVALID_OWNERS_SUCCESSOR,
+        SndError::InvalidPermissionsSuccessor(_) => ERR_INVALID_PERMISSIONS_SUCCESSOR,
+        SndError::SigningKeyTypeMismatch => ERR_SIGN_KEYTYPE_MISMATCH,
+        SndError::InvalidSignature => ERR_INVALID_SIGNATURE,
+        SndError::LossOfPrecision => ERR_LOSS_OF_PRECISION,
+        SndError::ExcessiveValue => ERR_EXCESSIVE_VALUE,
+        SndError::NoSuchBalance => ERR_NO_SUCH_BALANCE,
+        SndError::BalanceExists => ERR_BALANCE_EXISTS,
+        SndError::FailedToParse(_) => ERR_FAILED_TO_PARSE,
+        SndError::TransactionIdExists => ERR_TRANSACTION_ID_EXISTS,
+        SndError::InsufficientBalance => ERR_INSUFFICIENT_BALANCE,
+        SndError::ExceededSize => ERR_EXCEEDED_SIZE,
     }
 }
 
