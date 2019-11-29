@@ -31,7 +31,3 @@ pub fn new() -> TestRng {
 
     TestRng::seed_from_u64(seed)
 }
-
-pub fn from_rng(rng: &mut TestRng) -> TestRng {
-    unwrap!(TestRng::from_rng(rng))
-}

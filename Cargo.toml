@@ -46,5 +46,5 @@ name = "safe_vault"
 doc = false
 
 [features]
-mock = ["fxhash", "hex_fmt"]
+mock = ["routing/mock_base", "fxhash", "hex_fmt"]
 phase-one = []

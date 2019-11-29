@@ -6,19 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-/// Mock version of Quic-P2P
-pub mod quic_p2p;
-
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
-pub use quic_p2p::Config as NetworkConfig;
-pub use quic_p2p::NodeInfo as ConnectionInfo;
-use quic_p2p::{Error, Event as NetworkEvent, Peer, QuicP2p};
+pub use routing::quic_p2p::Config as NetworkConfig;
+pub use routing::quic_p2p::NodeInfo as ConnectionInfo;
+use routing::quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p};
 pub use routing::{ClientEvent, Event, InterfaceError, RoutingError};
 use std::{
     cell::RefCell,
-    convert::TryFrom,
     net::SocketAddr,
     rc::{Rc, Weak},
 };
@@ -122,54 +118,51 @@ impl Node {
     }
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
-        if let Ok(client_event) = TryFrom::try_from(event) {
+        if let Ok(client_event) = into_client_event(event) {
             unwrap!(self.events_tx.send(Event::ClientEvent(client_event)));
         }
     }
 }
 
-impl TryFrom<NetworkEvent> for ClientEvent {
-    type Error = ();
+/// Map a Network event into a ClientEvent if applies.
+pub fn into_client_event(network_event: NetworkEvent) -> Result<ClientEvent, ()> {
+    use ClientEvent::*;
+    use NetworkEvent::*;
 
-    fn try_from(value: NetworkEvent) -> Result<Self, Self::Error> {
-        use ClientEvent::*;
-        use NetworkEvent::*;
+    let client_event = match network_event {
+        ConnectedTo { peer } => ConnectedToClient {
+            peer_addr: peer.peer_addr(),
+        },
+        NewMessage { peer_addr, msg } => NewMessageFromClient { peer_addr, msg },
+        ConnectionFailure {
+            peer_addr,
+            err: _err,
+        } => ConnectionFailureToClient { peer_addr },
+        UnsentUserMessage {
+            peer_addr,
+            msg,
+            token,
+        } => UnsentUserMsgToClient {
+            peer_addr,
+            msg,
+            token,
+        },
+        SentUserMessage {
+            peer_addr,
+            msg,
+            token,
+        } => SentUserMsgToClient {
+            peer_addr,
+            msg,
+            token,
+        },
+        _event => {
+            // There's no equivalent `ClientEvent`
+            return Err(());
+        }
+    };
 
-        let client_event = match value {
-            ConnectedTo { peer } => ConnectedToClient {
-                peer_addr: peer.peer_addr(),
-            },
-            NewMessage { peer_addr, msg } => NewMessageFromClient { peer_addr, msg },
-            ConnectionFailure {
-                peer_addr,
-                err: _err,
-            } => ConnectionFailureToClient { peer_addr },
-            UnsentUserMessage {
-                peer_addr,
-                msg,
-                token,
-            } => UnsentUserMsgToClient {
-                peer_addr,
-                msg,
-                token,
-            },
-            SentUserMessage {
-                peer_addr,
-                msg,
-                token,
-            } => SentUserMsgToClient {
-                peer_addr,
-                msg,
-                token,
-            },
-            _event => {
-                // There's no equivalent `ClientEvent`
-                return Err(());
-            }
-        };
-
-        Ok(client_event)
-    }
+    Ok(client_event)
 }
 
 /// A builder to configure and create a new `Node`.

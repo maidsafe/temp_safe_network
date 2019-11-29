@@ -14,15 +14,13 @@ pub use self::rng::TestRng;
 
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
-use log::Record;
+use routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
 use safe_nd::{
     AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, Error, Message,
     MessageId, Notification, PublicId, PublicKey, Request, Response, Signature, Transaction,
     TransactionId,
 };
 use safe_vault::{
-    mock_routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p},
     routing::{ConsensusGroup, ConsensusGroupRef, Node},
     Command, Config, Vault,
 };
@@ -30,7 +28,6 @@ use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    io::Write,
     net::SocketAddr,
     ops::{Deref, DerefMut},
     slice,
@@ -58,31 +55,9 @@ impl Environment {
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 0);
 
-        let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
-            let now = formatter.timestamp();
-            writeln!(
-                formatter,
-                "{} {} [{}:{}] {}",
-                formatter.default_styled_level(record.level()),
-                now,
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                record.args()
-            )
-        };
-
-        let _ = LoggerBuilder::from_default_env()
-            .format(do_format)
-            .is_test(true)
-            .try_init();
-
-        let mut rng = rng::new();
-        let network_rng = rng::from_rng(&mut rng);
-
-        let network = Network::new(network_rng);
+        let network = Network::new(Default::default());
 
         let consensus_group = ConsensusGroup::new();
-
         let vaults = if num_vaults > 1 {
             let mut vaults = Vec::with_capacity(num_vaults);
             for _ in 0..num_vaults {
@@ -94,7 +69,7 @@ impl Environment {
         };
 
         Self {
-            rng,
+            rng: rng::new(),
             network,
             vaults,
             _consensus_group: consensus_group,
@@ -268,16 +243,25 @@ pub trait TestClientTrait {
     }
 
     fn expect_new_message(&self) -> (SocketAddr, Bytes) {
-        match self.rx().try_recv() {
-            Ok(Event::NewMessage { peer_addr, msg }) => (peer_addr, msg),
-            x => unexpected!(x),
+        loop {
+            match self.rx().try_recv() {
+                Ok(Event::SentUserMessage { .. }) => continue,
+                Ok(Event::NewMessage { peer_addr, msg }) => return (peer_addr, msg),
+                x => unexpected!(x),
+            }
         }
     }
 
     fn expect_no_new_message(&self) {
-        match self.rx().try_recv() {
-            Err(error) => assert!(error.is_empty()),
-            x => unexpected!(x),
+        loop {
+            match self.rx().try_recv() {
+                Ok(Event::SentUserMessage { .. }) => continue,
+                Err(error) => {
+                    assert!(error.is_empty());
+                    return;
+                }
+                x => unexpected!(x),
+            }
         }
     }
 
