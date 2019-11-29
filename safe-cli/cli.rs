@@ -13,9 +13,11 @@ use crate::operations::safe_net::connect;
 use crate::shell;
 use crate::subcommands::auth::auth_commander;
 use crate::subcommands::cat::cat_commander;
+use crate::subcommands::config::config_commander;
 use crate::subcommands::dog::dog_commander;
 use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
+use crate::subcommands::networks::networks_commander;
 use crate::subcommands::nrs::nrs_commander;
 use crate::subcommands::update::update_commander;
 use crate::subcommands::wallet::wallet_commander;
@@ -85,6 +87,8 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
     debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
+        Some(SubCommands::Config { cmd }) => config_commander(cmd),
+        Some(SubCommands::Networks { network_name }) => networks_commander(network_name),
         Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, &mut safe),
         Some(SubCommands::Cat(cmd)) => cat_commander(cmd, output_fmt, &mut safe),
         Some(SubCommands::Dog(cmd)) => dog_commander(cmd, output_fmt, &mut safe),

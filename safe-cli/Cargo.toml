@@ -30,6 +30,7 @@ log = "0.4.6"
 prettytable-rs = "^0.8"
 rand = "0.6.5"
 relative-path = "0.4.0"
+reqwest = "0.9.22"
 rpassword = "4.0.1"
 safe-api = { path = "../safe-api" }
 self_update = "0.5.1"

@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{APP_ID, APP_NAME, APP_VENDOR};
+use crate::{
+    APP_ID, APP_NAME, APP_VENDOR, PROJECT_DATA_DIR_APPLICATION, PROJECT_DATA_DIR_ORGANISATION,
+    PROJECT_DATA_DIR_QUALIFIER,
+};
 use directories::ProjectDirs;
 use log::debug;
 use safe_api::Safe;
@@ -14,9 +17,6 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
-const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
-const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
-const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
 
 pub fn authorise_cli(safe: &mut Safe, endpoint: Option<String>) -> Result<(), String> {
     println!("Authorising CLI application...");

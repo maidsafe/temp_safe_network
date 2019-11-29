@@ -9,6 +9,7 @@
 #[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 mod auth_and_connect;
 pub mod auth_daemon;
+pub mod config;
 #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
 mod fake_auth;
 

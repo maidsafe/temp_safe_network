@@ -31,6 +31,9 @@ const APP_ID: &str = "net.maidsafe.cli";
 const APP_NAME: &str = "SAFE CLI";
 #[allow(dead_code)]
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
+const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
+const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
+const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
 
 fn main() {
     setup_panic!();

@@ -6,26 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 pub mod auth;
 pub mod cat;
+pub mod config;
 pub mod container;
 pub mod dog;
-//#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
-//pub mod fake_auth;
 pub mod files;
 mod helpers;
 pub mod keys;
+pub mod networks;
 pub mod nrs;
 pub mod safe_id;
 pub mod update;
 pub mod wallet;
 
-//#[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 use auth::AuthSubCommands;
-//#[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
-//pub use fake_auth::{self as auth, AuthSubCommands};
-
 use structopt::StructOpt;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -44,7 +39,7 @@ impl std::str::FromStr for OutputFmt {
             "jsoncompact" => Ok(Self::JsonCompact),
             "yaml" => Ok(Self::Yaml),
             other => {
-                return Err(format!(
+                Err(format!(
                     "Output serialisation format '{}' not supported. Supported values are json, jsoncompact, and yaml",
                     other
                 ))
@@ -55,6 +50,19 @@ impl std::str::FromStr for OutputFmt {
 
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {
+    #[structopt(name = "config")]
+    /// CLI config settings
+    Config {
+        /// subcommands
+        #[structopt(subcommand)]
+        cmd: Option<config::ConfigCommands>,
+    },
+    #[structopt(name = "networks")]
+    /// Switch between SAFE networks
+    Networks {
+        /// Network to switch to
+        network_name: Option<String>,
+    },
     #[structopt(name = "auth")]
     /// Authorise the SAFE CLI and interact with a remote Authenticator daemon
     Auth {
