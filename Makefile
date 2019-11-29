@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 SAFE_CLI_VERSION := $(shell grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SAFE_AUTHD_VERSION := $(shell grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 SAFE_FFI_VERSION := $(shell grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
@@ -9,66 +10,66 @@ UUID := $(shell uuidgen | sed 's/-//g')
 S3_BUCKET := safe-jenkins-build-artifacts
 SAFE_AUTH_DEFAULT_PORT := 41805
 GITHUB_REPO_OWNER := maidsafe
-GITHUB_REPO_NAME := safe-cli
+GITHUB_REPO_NAME := safe-api
 
 build-component:
-ifndef SAFE_CLI_BUILD_COMPONENT
+ifndef SAFE_API_BUILD_COMPONENT
 	@echo "A build component must be specified."
-	@echo "Please set SAFE_CLI_BUILD_COMPONENT to 'safe-api', 'safe-ffi' or 'safe-cli'."
+	@echo "Please set SAFE_API_BUILD_COMPONENT to 'safe-api', 'safe-ffi', 'safe-authd', 'safe-authd' or 'safe-cli'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TYPE
+ifndef SAFE_API_BUILD_TYPE
 	@echo "A build type must be specified."
-	@echo "Please set SAFE_CLI_BUILD_TYPE to 'dev' or 'prod'."
+	@echo "Please set SAFE_API_BUILD_TYPE to 'dev' or 'prod'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TARGET
+ifndef SAFE_API_BUILD_TARGET
 	@echo "A build target must be specified."
-	@echo "Please set SAFE_CLI_BUILD_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
+	@echo "Please set SAFE_API_BUILD_TARGET to a valid Rust 'target triple', e.g. 'x86_64-unknown-linux-gnu'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_CLEAN
-	$(eval SAFE_CLI_BUILD_CLEAN := false)
+ifndef SAFE_API_BUILD_CLEAN
+	$(eval SAFE_API_BUILD_CLEAN := false)
 endif
 	./resources/build-component.sh \
-		"${SAFE_CLI_BUILD_COMPONENT}" \
-		"${SAFE_CLI_BUILD_TARGET}" \
-		"${SAFE_CLI_BUILD_TYPE}" \
-		"${SAFE_CLI_BUILD_CLEAN}"
+		"${SAFE_API_BUILD_COMPONENT}" \
+		"${SAFE_API_BUILD_TARGET}" \
+		"${SAFE_API_BUILD_TYPE}" \
+		"${SAFE_API_BUILD_CLEAN}"
 
 build-all-containers:
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
 		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
-		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-api \
-		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
-		make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-cli \
+	# 	make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-api \
+	# 	make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+	# 	make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-unknown-linux-gnu \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
-	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
-		make build-container
+	# SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+	# 	make build-container
 	SAFE_CLI_CONTAINER_TARGET=x86_64-linux-android \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
 		make build-container
-	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
-	SAFE_CLI_CONTAINER_TYPE=dev \
-	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
-		make build-container
+	# SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
+	# SAFE_CLI_CONTAINER_TYPE=dev \
+	# SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
+	# 	make build-container
 	SAFE_CLI_CONTAINER_TARGET=armv7-linux-androideabi \
 	SAFE_CLI_CONTAINER_TYPE=prod \
 	SAFE_CLI_CONTAINER_COMPONENT=safe-ffi \
@@ -77,7 +78,7 @@ build-all-containers:
 build-container:
 ifndef SAFE_CLI_CONTAINER_COMPONENT
 	@echo "A component to build must be specified."
-	@echo "Please set SAFE_CLI_CONTAINER_COMPONENT to 'safe-api', 'safe-ffi' or 'safe-cli'."
+	@echo "Please set SAFE_CLI_CONTAINER_COMPONENT to 'safe-api', 'safe-ffi', 'safe-authd' or 'safe-cli'."
 	@exit 1
 endif
 ifndef SAFE_CLI_CONTAINER_TYPE
@@ -98,7 +99,7 @@ endif
 push-container:
 ifndef SAFE_CLI_CONTAINER_COMPONENT
 	@echo "A component to build must be specified."
-	@echo "Please set SAFE_CLI_CONTAINER_COMPONENT to 'safe-api', 'safe-ffi' or 'safe-cli'."
+	@echo "Please set SAFE_CLI_CONTAINER_COMPONENT to 'safe-api', 'safe-ffi', 'safe-authd' or 'safe-cli'."
 	@exit 1
 endif
 ifndef SAFE_CLI_CONTAINER_TYPE
@@ -120,9 +121,9 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
 	rm -rf artifacts
@@ -134,13 +135,10 @@ ifneq ($(UNAME_S),Darwin)
 	@exit 1
 endif
 	mkdir -p artifacts/safe-ffi/prod/universal
-	mkdir -p artifacts/safe-ffi/dev/universal
+	# mkdir -p artifacts/safe-ffi/dev/universal
 	lipo -create -output artifacts/safe-ffi/prod/universal/libsafe_ffi.a \
 		artifacts/safe-ffi/prod/x86_64-apple-ios/release/libsafe_ffi.a \
 		artifacts/safe-ffi/prod/aarch64-apple-ios/release/libsafe_ffi.a
-	lipo -create -output artifacts/safe-ffi/dev/universal/libsafe_ffi.a \
-		artifacts/safe-ffi/dev/x86_64-apple-ios/release/libsafe_ffi.a \
-		artifacts/safe-ffi/dev/aarch64-apple-ios/release/libsafe_ffi.a
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
@@ -187,6 +185,31 @@ endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
+test-authd:
+ifndef SAFE_AUTH_PORT
+	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
+endif
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-authd-build-${UUID}" -v "${PWD}":/usr/src/safe-authd:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
+		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+		maidsafe/safe-authd-build:cli-x86_64-unknown-linux-gnu-dev \
+		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-tests"
+	docker cp "safe-authd-build-${UUID}":/target .
+	docker rm "safe-authd-build-${UUID}"
+else
+	$(eval MOCK_VAULT_PATH := ~/safe_auth-${SAFE_AUTH_PORT})
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+	   ./resources/test-scripts/run-auth-daemon
+	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
+	   ./resources/test-scripts/cli-tests
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+.ONESHELL:
 test-api:
 ifndef SAFE_AUTH_PORT
 	$(eval SAFE_AUTH_PORT := ${SAFE_AUTH_DEFAULT_PORT})
@@ -217,26 +240,26 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A build number must be supplied for build artifact packaging."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TYPE
-	@echo "A value must be supplied for SAFE_CLI_BUILD_TYPE."
+ifndef SAFE_API_BUILD_TYPE
+	@echo "A value must be supplied for SAFE_API_BUILD_TYPE."
 	@echo "Valid values are 'dev' or 'prod'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_COMPONENT
-	@echo "A value must be supplied for SAFE_CLI_BUILD_COMPONENT."
+ifndef SAFE_API_BUILD_COMPONENT
+	@echo "A value must be supplied for SAFE_API_BUILD_COMPONENT."
 	@echo "Valid values are 'safe-li', 'safe-api' or 'safe-ffi'."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_TARGET
-	@echo "A value must be supplied for SAFE_CLI_BUILD_TARGET."
+ifndef SAFE_API_BUILD_TARGET
+	@echo "A value must be supplied for SAFE_API_BUILD_TARGET."
 	@exit 1
 endif
-	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-${SAFE_CLI_BUILD_COMPONENT}-${SAFE_CLI_BUILD_TYPE}-${SAFE_CLI_BUILD_TARGET}.tar.gz)
+	$(eval ARCHIVE_NAME := ${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-${SAFE_API_BUILD_COMPONENT}-${SAFE_API_BUILD_TYPE}-${SAFE_API_BUILD_TARGET}.tar.gz)
 	tar -C artifacts -zcvf ${ARCHIVE_NAME} .
 	rm artifacts/**
 	mv ${ARCHIVE_NAME} artifacts
@@ -247,9 +270,9 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A build number must be supplied for build artifact packaging."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
 	rm -rf artifacts
@@ -258,9 +281,7 @@ endif
 		"aarch64-apple-ios" "apple-ios"
 	find artifacts -type d -empty -delete
 	rm -rf artifacts/safe-ffi/prod/aarch64-apple-ios
-	rm -rf artifacts/safe-ffi/dev/aarch64-apple-ios
 	rm -rf artifacts/safe-ffi/prod/x86_64-apple-ios
-	rm -rf artifacts/safe-ffi/dev/x86_64-apple-ios
 
 package-universal-ios-lib:
 ifndef SAFE_CLI_BRANCH
@@ -268,20 +289,15 @@ ifndef SAFE_CLI_BRANCH
 	@echo "Please set SAFE_CLI_BRANCH to a valid branch or PR reference."
 	@exit 1
 endif
-ifndef SAFE_CLI_BUILD_NUMBER
+ifndef SAFE_API_BUILD_NUMBER
 	@echo "A valid build number must be supplied for the artifacts to be retrieved."
-	@echo "Please set SAFE_CLI_BUILD_NUMBER to a valid build number."
+	@echo "Please set SAFE_API_BUILD_NUMBER to a valid build number."
 	@exit 1
 endif
 	( \
 		cd artifacts; \
 		tar -C safe-ffi/prod/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-prod-apple-ios.tar.gz .; \
-	)
-	( \
-		cd artifacts; \
-		tar -C safe-ffi/dev/universal -zcvf \
-			${SAFE_CLI_BRANCH}-${SAFE_CLI_BUILD_NUMBER}-safe-ffi-dev-apple-ios.tar.gz .; \
+			${SAFE_CLI_BRANCH}-${SAFE_API_BUILD_NUMBER}-safe-ffi-prod-apple-ios.tar.gz .; \
 	)
 	rm -rf artifacts/safe-ffi
 
@@ -299,16 +315,16 @@ endif
 
 package-commit_hash-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/dev
 	mkdir -p deploy/prod
+	./resources/package-deploy-artifacts.sh "safe-authd" $$(git rev-parse --short HEAD)
 	./resources/package-deploy-artifacts.sh "safe-cli" $$(git rev-parse --short HEAD)
 	./resources/package-deploy-artifacts.sh "safe-ffi" $$(git rev-parse --short HEAD)
 	find deploy -name "*.tar.gz" -exec rm '{}' \;
 
 package-version-artifacts-for-deploy:
 	rm -rf deploy
-	mkdir -p deploy/dev
 	mkdir -p deploy/prod
+	./resources/package-deploy-artifacts.sh "safe-authd" "${SAFE_AUTHD_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-ffi" "${SAFE_FFI_VERSION}"
 	find deploy -name "safe-ffi-*.tar.gz" -exec rm '{}' \;
@@ -366,6 +382,50 @@ endif
 		--tag ${SAFE_CLI_VERSION} \
 		--name "safe_completion.sh" \
 		--file resources/safe_completion.sh
+	# safe-authd
+	github-release release \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd" \
+		--description "$$(./resources/get_release_description.sh ${SAFE_AUTHD_VERSION})";
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd-${SAFE_AUTHD_VERSION}-x86_64-unknown-linux-gnu.zip" \
+		--file deploy/real/safe-authd-${SAFE_AUTHD_VERSION}-x86_64-unknown-linux-gnu.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd-${SAFE_AUTHD_VERSION}-x86_64-pc-windows-gnu.zip" \
+		--file deploy/real/safe-authd-${SAFE_AUTHD_VERSION}-x86_64-pc-windows-gnu.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd-${SAFE_AUTHD_VERSION}-x86_64-apple-darwin.zip" \
+		--file deploy/real/safe-authd-${SAFE_AUTHD_VERSION}-x86_64-apple-darwin.zip;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd-${SAFE_AUTHD_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+		--file deploy/real/safe-authd-${SAFE_AUTHD_VERSION}-x86_64-unknown-linux-gnu.tar.gz;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd-${SAFE_AUTHD_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
+		--file deploy/real/safe-authd-${SAFE_AUTHD_VERSION}-x86_64-pc-windows-gnu.tar.gz;
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_AUTHD_VERSION} \
+		--name "safe-authd-${SAFE_AUTHD_VERSION}-x86_64-apple-darwin.tar.gz" \
+		--file deploy/real/safe-authd-${SAFE_AUTHD_VERSION}-x86_64-apple-darwin.tar.gz;
+
 
 retrieve-cache:
 ifndef SAFE_CLI_BRANCH
@@ -396,3 +456,14 @@ endif
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu \
 		/bin/bash -c "cd safe-api && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"
+
+publish-authd:
+ifndef CRATES_IO_TOKEN
+	@echo "A login token for crates.io must be provided."
+	@exit 1
+endif
+	rm -rf artifacts deploy
+	docker run --rm -v "${PWD}":/usr/src/safe-authd:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-authd-build:cli-x86_64-unknown-linux-gnu \
+		/bin/bash -c "cd safe-authd && cargo login ${CRATES_IO_TOKEN} && cargo package && cargo publish"

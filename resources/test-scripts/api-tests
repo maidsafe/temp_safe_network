@@ -5,6 +5,14 @@
 
 set -e -x
 
+# HACK: evade MacOs catalina libsodium error
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	brew install libsodium
+	brew install pkg-config
+
+	export RUST_SODIUM_USE_PKG_CONFIG=1
+fi
+
 cd safe-api
 rm -f fake_vault_data.json
 cargo test --lib --release --features=scl-mock -- --test-threads=1

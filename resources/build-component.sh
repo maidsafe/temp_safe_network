@@ -5,14 +5,14 @@ set -e -x
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'safe-cli', 'safe-api' or 'safe-ffi'."
+    echo "Valid values are 'safe-cli', 'safe-api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 
 target=$2
 if [[ -z "$target" ]]; then
     echo "You must supply the target for the build."
-    echo "Valid values are rust target triples, e.g. 'x86_64-unknown-linux-gnu', 'safe-api' or 'safe-ffi'."
+    echo "Valid values are rust target triples, e.g. 'x86_64-unknown-linux-gnu', 'safe-api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 
@@ -96,6 +96,9 @@ function build_on_windows() {
         safe-api)
             build_lib
             ;;
+        safe-authd)
+            build_lib
+            ;;
         *)
             echo "$component is not supported. Please extend to support this component."
             exit 1
@@ -104,8 +107,14 @@ function build_on_windows() {
 }
 
 function build_on_macos() {
-    # Right now it's the same process for building on Windows.
-    # Potentially that could change at some point.
+	# HACK: evade MacOs catalina libsodium error
+	if [[ "$OSTYPE" == "darwin"* ]]; then
+		brew install libsodium
+		brew install pkg-config
+
+		export RUST_SODIUM_USE_PKG_CONFIG=1
+	fi
+
     build_on_windows
 }
 

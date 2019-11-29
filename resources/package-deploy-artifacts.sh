@@ -5,7 +5,7 @@ set -e
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'safe-cli', 'safe-api' or 'safe-ffi'."
+    echo "Valid values are 'safe-cli', 'safe-api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 
@@ -23,6 +23,13 @@ function get_distributable_for_component() {
     component=$1
     target=$2
     case "$component" in
+        safe-authd)
+            if [[ "$target" == *"windows"* ]]; then
+                distributable="safe-authd.exe"
+            else
+                distributable="safe-authd"
+            fi
+            ;;
         safe-cli)
             if [[ "$target" == *"windows"* ]]; then
                 distributable="safe.exe"
@@ -94,11 +101,18 @@ function create_zip_archive() {
 
     distributable=$(get_distributable_for_component "$component" "$target")
     archive_name=$(get_archive_name "$component" "$target" "$type" "zip")
+
+    echo $archive_name;
+    ls "../../artifacts/$component"
+    ls "../../artifacts/$component/$type/$target"
+    ls "../../artifacts/$component/$type/$target/release"
+
     zip -j "$archive_name" \
         "../../artifacts/$component/$type/$target/release/$distributable"
 }
 
-declare -a types=("dev" "prod")
+declare -a types=("prod")
+# declare -a types=("dev" "prod")
 for type in "${types[@]}"; do
     targets=($(ls -1 "artifacts/$component/$type"))
     for target in "${targets[@]}"

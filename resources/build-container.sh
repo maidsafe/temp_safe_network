@@ -5,14 +5,14 @@ set -e -x
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'safe-cli', 'safe-api' or 'safe-ffi'."
+    echo "Valid values are 'safe-cli', 'safe-api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 
 target=$2
 if [[ -z "$target" ]]; then
     echo "You must supply the target for the build."
-    echo "Valid values are rust target triples, e.g. 'x86_64-unknown-linux-gnu', 'safe-api' or 'safe-ffi'."
+    echo "Valid values are rust target triples, e.g. 'x86_64-unknown-linux-gnu', 'safe-api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 

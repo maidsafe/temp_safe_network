@@ -62,10 +62,10 @@ FFI is used to generate the native libraries which can be used by other high lev
 * [SAFE Vault](https://github.com/maidsafe/safe_vault/releases/latest/)
 EOF
 
-safe_completion_url="https:\/\/github.com\/maidsafe\/safe-cli\/releases\/download\/$version\/safe_completion.sh"
-s3_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-unknown-linux-gnu-dev.zip"
-s3_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-pc-windows-gnu-dev.zip"
-s3_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-cli-$version-x86_64-apple-darwin-dev.zip"
+safe_completion_url="https:\/\/github.com\/maidsafe\/safe-api\/releases\/download\/$version\/safe_completion.sh"
+s3_linux_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-api-$version-x86_64-unknown-linux-gnu-dev.zip"
+s3_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-api-$version-x86_64-pc-windows-gnu-dev.zip"
+s3_macos_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-api-$version-x86_64-apple-darwin-dev.zip"
 
 zip_linux_checksum=$(sha256sum \
     "./deploy/prod/safe-cli-$version-x86_64-unknown-linux-gnu.zip" | \
@@ -86,18 +86,18 @@ tar_win_checksum=$(sha256sum \
     "./deploy/prod/safe-cli-$version-x86_64-pc-windows-gnu.tar.gz" | \
     awk '{ print $1 }')
 
-s3_ffi_dev_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-unknown-linux-gnu-dev.zip"
-s3_ffi_dev_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-pc-windows-gnu-dev.zip"
-s3_ffi_dev_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-apple-darwin-dev.zip"
-s3_ffi_dev_android_x86_64_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-linux-android-dev.zip"
-s3_ffi_dev_android_armv7_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-armv7-linux-androideabi-dev.zip"
-s3_ffi_dev_ios_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-apple-ios-dev.zip"
-s3_ffi_linux_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-unknown-linux-gnu.zip"
-s3_ffi_win_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-pc-windows-gnu.zip"
-s3_ffi_macos_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-apple-darwin.zip"
-s3_ffi_android_x86_64_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-x86_64-linux-android.zip"
-s3_ffi_android_armv7_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-armv7-linux-androideabi.zip"
-s3_ffi_ios_deploy_url="https:\/\/safe-cli.s3.amazonaws.com\/safe-ffi-$version-apple-ios.zip"
+s3_ffi_dev_linux_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-unknown-linux-gnu-dev.zip"
+s3_ffi_dev_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-pc-windows-gnu-dev.zip"
+s3_ffi_dev_macos_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-apple-darwin-dev.zip"
+s3_ffi_dev_android_x86_64_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-linux-android-dev.zip"
+s3_ffi_dev_android_armv7_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-armv7-linux-androideabi-dev.zip"
+s3_ffi_dev_ios_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-apple-ios-dev.zip"
+s3_ffi_linux_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-unknown-linux-gnu.zip"
+s3_ffi_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-pc-windows-gnu.zip"
+s3_ffi_macos_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-apple-darwin.zip"
+s3_ffi_android_x86_64_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-x86_64-linux-android.zip"
+s3_ffi_android_armv7_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-armv7-linux-androideabi.zip"
+s3_ffi_ios_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$version-apple-ios.zip"
 
 release_description=$(sed "s/S3_LINUX_DEPLOY_URL/$s3_linux_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/S3_MACOS_DEPLOY_URL/$s3_macos_deploy_url/g" <<< "$release_description")
