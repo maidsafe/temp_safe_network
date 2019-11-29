@@ -3,7 +3,7 @@ name: Master
 on:
   push:
     branches:
-      - Feat-AuthDReleaseAndNotarize
+      - master
 
 jobs:
   build-cli-authd:
