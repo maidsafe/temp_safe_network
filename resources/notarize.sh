@@ -56,7 +56,7 @@ security find-identity -v
 echo "Attempting to sign: $build_app_location"
 echo "Notarization: signing."
 # first lets sign the bin
-codesign --force --deep --options=runtime --timestamp  --verbose  --sign $APPLE_SIGN_ID  $build_app_location
+codesign --force --deep --timestamp  --verbose  --sign $APPLE_SIGN_ID  $build_app_location
 echo "Singed successfully."
 
 echo "Notarization: zipping."
