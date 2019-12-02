@@ -40,7 +40,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
                     let conn_info_file_path = get_network_conn_info_path()?;
                     fs::write(&conn_info_file_path, conn_info)
                         .map_err(|err| format!("Unable to write config in {}: {}", conn_info_file_path.display(), err))?;
-                    println!("Succesfully switched to '{}' network in your system!", network_name);
+                    println!("Successfully switched to '{}' network in your system!", network_name);
                     println!("You'll need to re-authorise the CLI if you need write access to the '{}' network", network_name);
                 },
                 None => return Err(format!("No network with name '{}' was found in the config. Please use the 'config add network' command to add it", network_name))
@@ -70,7 +70,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
             }
             println!();
             match matched_network {
-                Some(name) => println!("'{}' network matched. Current set network connection information at '{}' matches '{}' network as per your config", name, conn_info_file_path.display(), name),
+                Some(name) => println!("'{}' network matched. Current set network connection information at '{}' matches '{}' network as per current config", name, conn_info_file_path.display(), name),
                 None => println!("Current network setup in your system doesn't match any of your networks in the CLI config. Use 'networks switch' command to switch to any of them")
             }
         }
