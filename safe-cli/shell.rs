@@ -165,7 +165,7 @@ fn prompt_to_allow_auth(auth_req: AuthReq) -> Option<bool> {
     let req_id = auth_req.req_id;
     pretty_print_auth_reqs(vec![auth_req], None);
 
-    println!("You can use \"auth allow\"/\"auth deny\" commands to allow/deny the request respectively, e.g.: auth allow {}", req_id);
+    println!("You can use 'auth allow'/'auth deny' commands to allow/deny the request respectively, e.g.: auth allow {}", req_id);
     println!("Press Enter to continue");
     let _ = stdout().flush();
     None

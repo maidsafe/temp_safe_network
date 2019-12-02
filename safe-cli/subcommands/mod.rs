@@ -55,13 +55,14 @@ pub enum SubCommands {
     Config {
         /// subcommands
         #[structopt(subcommand)]
-        cmd: Option<config::ConfigCommands>,
+        cmd: Option<config::ConfigSubCommands>,
     },
     #[structopt(name = "networks")]
     /// Switch between SAFE networks
     Networks {
-        /// Network to switch to
-        network_name: Option<String>,
+        /// subcommands
+        #[structopt(subcommand)]
+        cmd: Option<networks::NetworksSubCommands>,
     },
     #[structopt(name = "auth")]
     /// Authorise the SAFE CLI and interact with a remote Authenticator daemon

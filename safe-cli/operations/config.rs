@@ -119,8 +119,8 @@ pub fn print_networks_settings() -> Result<(), String> {
 
 pub fn retrieve_conn_info(name: &str, location: &str) -> Result<Vec<u8>, String> {
     println!(
-        "Fetching network connection information from '{}' ...",
-        location
+        "Fetching '{}' network connection information from '{}' ...",
+        name, location
     );
     if location.starts_with("http") {
         // Fetch info from an HTTP/s location

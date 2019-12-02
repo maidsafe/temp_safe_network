@@ -88,7 +88,7 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
 
     let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd),
-        Some(SubCommands::Networks { network_name }) => networks_commander(network_name),
+        Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
         Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, &mut safe),
         Some(SubCommands::Cat(cmd)) => cat_commander(cmd, output_fmt, &mut safe),
         Some(SubCommands::Dog(cmd)) => dog_commander(cmd, output_fmt, &mut safe),

@@ -14,7 +14,7 @@ use log::debug;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-pub enum ConfigCommands {
+pub enum ConfigSubCommands {
     #[structopt(name = "add")]
     /// Add a config setting
     Add(SettingAddCmd),
@@ -58,9 +58,9 @@ pub enum SettingRemoveCmd {
     // },
 }
 
-pub fn config_commander(cmd: Option<ConfigCommands>) -> Result<(), String> {
+pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<(), String> {
     match cmd {
-        Some(ConfigCommands::Add(SettingAddCmd::Network {
+        Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
             config_location,
         })) => {
@@ -75,16 +75,16 @@ pub fn config_commander(cmd: Option<ConfigCommands>) -> Result<(), String> {
             );
             println!("Network '{}' was added to the list", network_name);
         }
-        // Some(ConfigCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
-        Some(ConfigCommands::Remove(SettingRemoveCmd::Network { network_name })) => {
+        // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
+        Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {
             let (mut settings, file_path) = read_config_settings()?;
             settings.networks.remove(&network_name);
             write_config_settings(&file_path, settings)?;
             debug!("Network {} removed from settings", network_name);
             println!("Network '{}' was removed from the list", network_name);
         }
-        // Some(ConfigCommands::Remove(SettingRemoveCmd::Contact { name })) => {}
-        Some(ConfigCommands::Clear) => {
+        // Some(ConfigSubCommands::Remove(SettingRemoveCmd::Contact { name })) => {}
+        Some(ConfigSubCommands::Clear) => {
             let file_path = config_file_path()?;
             let empty_settings = ConfigSettings::default();
             write_config_settings(&file_path, empty_settings)?;

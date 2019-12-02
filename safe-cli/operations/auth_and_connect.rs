@@ -19,8 +19,10 @@ use std::io::{Read, Write};
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
 pub fn authorise_cli(safe: &mut Safe, endpoint: Option<String>) -> Result<(), String> {
-    println!("Authorising CLI application...");
     let (mut file, file_path) = get_credentials_file()?;
+    println!("Authorising CLI application...");
+    println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth login' command to automatically self authorise the CLI app.");
+    println!("Awaiting for authorising response from authd...");
     let auth_credentials = safe
         .auth_app(
             APP_ID,
