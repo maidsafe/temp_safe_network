@@ -440,11 +440,11 @@ jobs:
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions-rs/cargo@v1
         with:
-          command: package
-          args: --manifest-path=safe-api/Cargo.toml
+          command: publish
+          args: --manifest-path=jsonrpc-quic/Cargo.toml
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions-rs/cargo@v1
         with:
           command: publish
-          args: --manifest-path=safe-api/Cargo.toml --dry-run
+          args: --manifest-path=safe-api/Cargo.toml
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')

@@ -1,89 +1,287 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [0.5.0] (15-10-2019)
+## 0.6.0 (2019-12-03)
+
+
+### Features
+
+* **api:** add APIs to start/stop/restart authd ([cbf6ae9](https://github.com/bochaco/safe-api/commit/cbf6ae904c3e96e66c23b6e1e8744bf2b874281f))
+* **api:** additional subscribe API which automatically launches a QUIC endpoint to receive auth reqs notifications from authd ([10cdcd4](https://github.com/bochaco/safe-api/commit/10cdcd492ab3b84bf17fe2eff18b229b03dc6212))
+* **api:** additional subscribe API which automatically launches a QUIC endpoint to receive auth reqs notifications from authd ([9f63fd3](https://github.com/bochaco/safe-api/commit/9f63fd326147a839152709384d10c28f90c47429))
+* **api:** expose a Safe::default() which uses default value for XOR URL base encoding ([7d45947](https://github.com/bochaco/safe-api/commit/7d4594704ae16f7bdacd03da32d48a31a42bdf69))
+* **api:** first draft implementation of safe-authd client APIs and safe-cli commands ([dc71315](https://github.com/bochaco/safe-api/commit/dc713150de63417341f793a33ae612bf6c3a9e81))
+* **api:** first draft implementation of SafeAuthenticator API and using it from authd to expose the first set of auth services ([0480f3b](https://github.com/bochaco/safe-api/commit/0480f3b1b6611edf729be4ab012bbd97f020238f))
+* **api:** return a PendingAuthReqs type when retrieving the list pending auth reqs fom authd ([5ecb082](https://github.com/bochaco/safe-api/commit/5ecb0824aaa998ee51567f66cbddcf36332f834c))
+* **authd:** allow to receive endpoint certificate in the subscription request ([3a0a9b6](https://github.com/bochaco/safe-api/commit/3a0a9b6da30b088ae434839b6f217c8666f5bfc8))
+* **authd:** automatically clear up the list of pending auth reqs when the user logs out ([48922a2](https://github.com/bochaco/safe-api/commit/48922a2b564b99362625fe747ad5ccb60777955e))
+* **authd:** clone the list of notif endpoints so it doesn't lock the mutex while sending notifications ([c553d92](https://github.com/bochaco/safe-api/commit/c553d9221d7f8edaf78f2a5282a51bdb3731aac8))
+* **authd:** expose a service to retrieve an status report from authd ([f7ea7c9](https://github.com/bochaco/safe-api/commit/f7ea7c94ace454e5ccb49ec85be3689affc94869))
+* **authd:** first draft implementation of allow/deny/subscribe APIs for auth reqs keeping reqs and subscriptions within authd ([d16117d](https://github.com/bochaco/safe-api/commit/d16117d82a3cb7293454940236247d39c29407c7))
+* **authd:** first draft implementation of authd binary exposing QUIC end point ([7ea759f](https://github.com/bochaco/safe-api/commit/7ea759f5356ce337143664d9d0e366303f67f807))
+* **authd:** first draft implementation of sending auth req notifications to subscribed endpoints ([05c8a74](https://github.com/bochaco/safe-api/commit/05c8a741a9acd2bd43cf40969a55b37514d924cf))
+* **authd:** first draft implementation of stop and restart authd, and adding commands to CLI to also start/stop/restart authd ([cfbf6e3](https://github.com/bochaco/safe-api/commit/cfbf6e3d179f26bb594442fdd2b938c99d0c287d))
+* **authd:** implement json-rpc format for the authd requests ([07adb3a](https://github.com/bochaco/safe-api/commit/07adb3aeed7bdd3446756ef8b82ca64603252a30))
+* **authd:** make sure auth reqs eventually time out and removed from the internal queue ([2ed1839](https://github.com/bochaco/safe-api/commit/2ed183995b8f1d79713b09d5a0aef018b8fadf10))
+* **authd:** reject notif subscription if the endpoint URL is already subscribed ([1cc71b4](https://github.com/bochaco/safe-api/commit/1cc71b44f199d91f5ddc18177848e89edb06c1a9))
+* **authd:** support to start/stop authd from CLI in Windows and realise of correct authd and vault certificates paths ([23d9fe1](https://github.com/bochaco/safe-api/commit/23d9fe11e9284d408a836df77e8592ce7161a46a))
+* **authd:** use json-rpc for authd notifications format. Move json-rpc and quic client functions to its own crate ([a11fe71](https://github.com/bochaco/safe-api/commit/a11fe71f7e0f3ba01c3dd02dd406220e3c675221))
+* **authd:** use ProgramData as the folder to share QUIC certificates ([9781076](https://github.com/bochaco/safe-api/commit/9781076fa6849ef6370c67ecadd3dc9d6ecdf00c))
+* **authd:** Windows support to run authd as a service ([b51a696](https://github.com/bochaco/safe-api/commit/b51a69635b1378fe356af41d770a6af8e31bd072))
+* **authd-api:** automatically send an unsubscribe request to authd when dropping an authd client API instance ([a5eff57](https://github.com/bochaco/safe-api/commit/a5eff572dc11b1305fbbf9e8791c8b75b0bbe745))
+* **authd-api:** implement json-rpc for receiving and responding to authd notifications ([aac18e6](https://github.com/bochaco/safe-api/commit/aac18e608bca2218bf618f7a581f354508b9d396))
+* **authd-api:** return a full AuthReq instance in the auth req notifications callback ([d969f3a](https://github.com/bochaco/safe-api/commit/d969f3adda3b3ec0df47e819113fcfc4009cdc21))
+* **cli:** add command to check current network set up in the system ([ff78239](https://github.com/bochaco/safe-api/commit/ff782394c8b7b9feea703a0e8f2c60402f0cb52a))
+* **cli:** allow to find authd in PATH if neither a path to authd client api was passed, nor SAFE_AUTHD_PATH was set ([ae2696e](https://github.com/bochaco/safe-api/commit/ae2696ece0797ccbedd0916e819d125e5fd34d8d))
+* **cli:** allow to pass account creation/login details with env vars or config file ([6354325](https://github.com/bochaco/safe-api/commit/63543253527bde64d5180b240c63eb5ad6aba399))
+* **cli:** allow to pass the authd endpoint address as an arg in the commands ([0cef9a2](https://github.com/bochaco/safe-api/commit/0cef9a20654d335be03cfe4d2b8c44685bb67e2e))
+* **cli:** allow to provide the path of the safe-authd executable with SAFE_AUTHD_PATH env var ([39b4ffb](https://github.com/bochaco/safe-api/commit/39b4ffb2774533a20108658e0e721e7e39481803))
+* **cli:** first implementation of CLI interactive shell ([11ba883](https://github.com/bochaco/safe-api/commit/11ba883ab91ca08021a4d1d4b24291b9820b9e22))
+* **cli:** support additional --output options, jsonpretty and yaml ([67eb5ad](https://github.com/bochaco/safe-api/commit/67eb5ad317e7e09998c0243099050c65edc4009c))
+* **cli:** support for caching current network conn info in CLI networks config ([2d48f71](https://github.com/bochaco/safe-api/commit/2d48f71bc7b48b39a7a91b9024a99dab47922464))
+* **cli:** support for having config settings, and a network command to switch networks ([31f054f](https://github.com/bochaco/safe-api/commit/31f054f604afbab5fd3daaacb97f2f91ca70baf1))
+* **jsonrpc:** make a distinction between errors on the client side and those received from the server within a json-rpc response ([22f22ef](https://github.com/bochaco/safe-api/commit/22f22ef52e052c68533985c94e5286215929ffd4))
+* **safe-cli:** improve afe-cli shell UI in the scenario of receiving an auth req notification ([8abfdc0](https://github.com/bochaco/safe-api/commit/8abfdc02f9cfc801d05d93048a886f19d4209845))
+* **xorurl:** add Display impl for XorUrlBase struct ([f55baab](https://github.com/bochaco/safe-api/commit/f55baabce9708aa5d90f62df4c4dab5a6920fc98))
+
 
 ### Bug Fixes
 
-    **ffi:** keys_create to return new BlsKeyPair instance when None returned from native API
-    **ffi:** adapt FFI return type for parse_and_resolve_url function
-    **files:** check local file path before trying to attempt a files add operation
-    **api:** change args which expected Option<String> for some args to receive Option<&str>
+* **api:** provide more descriptive error messages for login/create_acc functions ([7532cb7](https://github.com/bochaco/safe-api/commit/7532cb7224888d9e27f01bb38e29a328d81076bb))
+* **authd:** add a small delay when restarting authd right after it has been stopped ([2093669](https://github.com/bochaco/safe-api/commit/20936693ca7c25f426c984d2c7de6d79aba972b0))
+* **authd:** prevent from trying to update auth-req to a notified state if it was already removed from the queue/list ([0df5a07](https://github.com/bochaco/safe-api/commit/0df5a073cd4cc692326ddbbfa3d186fa43b504a2))
+* **authd:** set default certificate storage location to be local project config dir ([e3e0d44](https://github.com/bochaco/safe-api/commit/e3e0d44a41d8e7f5059bceef9fba9246a9e3d323))
+* **ci:** use correct source path ([8a94bf0](https://github.com/bochaco/safe-api/commit/8a94bf0c9e0fa654f9eea6144507c304b32e539b))
+* **cli:** files and nrs subcommand help text referred to keys subcommand ([02119c3](https://github.com/bochaco/safe-api/commit/02119c3ab495a5c7cbc852ae0ed80bfbf81a1dee))
+* **cli:** make sure credential file is not cleared with every auth command ([e7bc4f2](https://github.com/bochaco/safe-api/commit/e7bc4f208aed75055e93670d52c1a763d21becd2))
+* **cli:** show a more informative error when an invalid TX id is provided in a wallet/safekey transfer command ([ca809c9](https://github.com/bochaco/safe-api/commit/ca809c94aeccd42b33a3b8e46ce915c57434428c))
+* **mac:** Changes for mac compatability. ([f404cf9](https://github.com/bochaco/safe-api/commit/f404cf976a1e9e7d085f03611eb73a7e402b146e))
+* **mac:** remove hardened runtime for catalina ([5c32119](https://github.com/bochaco/safe-api/commit/5c321192dfed5ce7d7de4ab8ade6e3b18e589045))
+* **safe-api:** handle an error response from authd when trying to unsubscribe an authd client ([45ced7b](https://github.com/bochaco/safe-api/commit/45ced7ba2c6fbc5c18ce81c097cff02a1fa41b33))
+
+### 0.5.3 (2019-11-06)
+
 
 ### Features
 
-    **safe-api:** publishing for safe-api on crates.io
-    **safe-ffi:** automatically build and publish safe-ffi libraries
-    **user-guide:** add details about the new dog command
-    **cli:** new `dog` command to inspect content retrieving only metadata
-    **ffi:** create FFI for new `inspect` API
-    **api:** add a new (`inspect`) API which allows to inspect a safe URL without retrieving the actual content
-    **user-guide:** add information about using spendable balances names in Wallet operations
-    **wallet:** allow to specify a specific speandable balance (as source or destination) for wallet operations
-    **bindings:** add NRS, SafeKeys, XorUrlEncoder, fetch and auth API bindings
+* **api:** migrate ImmutableData API to use self-encryption mechanism/chunking for all published and (and unencrypted) immutable data stored with this API ([9f19b23](https://github.com/bochaco/safe-api/commit/9f19b2380a73b3d5433469b89cc3bdba0bb2a984))
 
-### [0.4.0] (19-09-2019)
 
 ### Bug Fixes
 
-    **wallet:** reporting a more accurate error messages for `safe wallet transfer` when passing invalid xorurls to `--to`, fixes #238
+* **api:** use type tag decoded from xorurl when fetching a FilesContainer ([59392e9](https://github.com/bochaco/safe-api/commit/59392e99de614723da654a052dba912011117ecc))
+* **ci:** use correct job references ([0b7ef5c](https://github.com/bochaco/safe-api/commit/0b7ef5c79437598c2cdd40b37e2eb1dd0bd69239))
+* **cli:** fix issue 203 storing credentials onto XDG_DATA_HOME based path ([9ee9df0](https://github.com/bochaco/safe-api/commit/9ee9df0485fb19944d0c3fdfcff509abf976e533))
+* **mobile-build:** fix mobile builds by removing the `reqwest` ([603bbe1](https://github.com/bochaco/safe-api/commit/603bbe13fcf656d800af295c01ce729c7cc06325))
+
+## 0.5.0 (2019-10-16)
+
 
 ### Features
 
-    **files:** when uploading files to FilesContainers encode the MIME-type as the ContentType in the resulting XOR-URL
-    **safekeys:** error message more informative when attempting to preload too high a number of test-coins, closes #213
-    **files:** support adding individual files with a files add command, either from a local path or with a file's safe:// URL
-    **user-guide:** add details about the safe files add command
+* **bindings:** add bindings setup, expose fetch and connect function ([370fadd](https://github.com/bochaco/safe-api/commit/370fadd6b03bec25a6874232addedc576ab9f818))
+* **bindings:** add keys bindings ([326d869](https://github.com/bochaco/safe-api/commit/326d8694560e0793d48c53b80894fc5039732a23))
+* **bindings:** add nrs bindings ([920c282](https://github.com/bochaco/safe-api/commit/920c28283a8600f0f74c755d01822a3c4ff7758b))
+* **bindings:** add rust logging from SCL ([5c8ee5f](https://github.com/bochaco/safe-api/commit/5c8ee5fc9c17ec45335e60daf49debc420f60b37))
+* **bindings:** add structs for blskeypair and xorurlencoder ([6515306](https://github.com/bochaco/safe-api/commit/6515306b588ce2cdd33882548a4f6d7acfe3299a))
+* **bindings:** add xorurl bindings ([bce7e1f](https://github.com/bochaco/safe-api/commit/bce7e1fcef96abd52f92ee7b4d48d9ce583e60ee))
+* **bindings:** generate static libs ([9810eda](https://github.com/bochaco/safe-api/commit/9810edaf2571a9ebf47f10f97c83be3296ce8b21))
+* **bindings:** WIP wallet bindings ([1cf55ed](https://github.com/bochaco/safe-api/commit/1cf55ed4acf35013d8fc455dbf269b8357f40390))
+* **cli:** new dog command to inspect content retrieving only metadata ([5ee29ec](https://github.com/bochaco/safe-api/commit/5ee29ec963dd63a479553feb7b3bf907259abd03))
+* **fetch:** add a new API which allows to inspect a safe URL without retrieving the actual content ([37b0bd6](https://github.com/bochaco/safe-api/commit/37b0bd6d762f8d299975795e36097a060836d953))
+* **ffi:** create FFI for new inspect API ([308b00a](https://github.com/bochaco/safe-api/commit/308b00aeb1aff796c89258b64352f29c699d76d8))
+* **wallet:** allow to specify a specific speandable balance (as source or destination) for wallet operations ([a0237d0](https://github.com/bochaco/safe-api/commit/a0237d03c408db32713c79dc97431cd4b210de7c))
 
-### [0.3.0] (4-09-2019)
 
 ### Bug Fixes
 
-    **files-sync:** when sync-ing a FilesContainer using an NRS name it was not correctly realising the latest version, closes #230
-    **wallet:** change wallet transfer args from being positional to --from and --to
-    **ci:** remove dir structure from zips
+* **ci:** correct mount point for container ([23bd3c6](https://github.com/bochaco/safe-api/commit/23bd3c68410e950ecd29dfca1ce3daa38477b1ee))
+* **ffi:** adapt FFI return type for parse_and_resolve_url function ([0621ec6](https://github.com/bochaco/safe-api/commit/0621ec687201d6294df6aa86409d10dad66c69a4))
+* **ffi:** fix bindings to use into_raw() instead of as_ptr() for CString(s) ([96fbab3](https://github.com/bochaco/safe-api/commit/96fbab329c5596734e282e95ed6f296d0ecf0eeb))
+* **ffi:** fix keys_create to return new BlsKeyPair instance when None returned from API ([5aadae5](https://github.com/bochaco/safe-api/commit/5aadae5daff0fe36917de4df77a497f3ed280ba9))
+* **ffi:** fix native lib file name ([dfa878d](https://github.com/bochaco/safe-api/commit/dfa878d7067fb56ebf364cd9b40db3f6b1f7780c))
+* **ffi:** fix typo in structure name ([647d705](https://github.com/bochaco/safe-api/commit/647d705fc216cb77acac496c97ad517d6e807f16))
+* **ffi:** fixed build.rs to not add ref for appPtr ([fe6e3cd](https://github.com/bochaco/safe-api/commit/fe6e3cded2906970e98a85c8b031b3eba8e610e5))
+* **ffi:** minor fixes to issues introduced after rebasing ffi code with master ([b40a94b](https://github.com/bochaco/safe-api/commit/b40a94bb1b527473a2ee7bc437720553ae8e21eb))
+* **files:** check local file path before trying to attempt a files add operantion ([6bab08c](https://github.com/bochaco/safe-api/commit/6bab08c31129779ebaf8b528d43f32834f5090e5))
+* **wallet:** make sure we use the path when using Wallet NRS URLs in transfer operations ([872d69c](https://github.com/bochaco/safe-api/commit/872d69c7b89961f74ebb6659e7dc51d8060dd3eb))
+* **wallet:** return a specific error when the Wallet URL has an invalid spendable balance name as the path ([dbce607](https://github.com/bochaco/safe-api/commit/dbce607370ab86acb30b5a9a0a69f52decb1179c))
+
+## 0.4.0 (2019-09-19)
+
 
 ### Features
 
-    **transfers:** allow to pass a --tx-id to the keys/wallet transfer cmds to specify a TX ID
-    **user-guide:** add details about the safe keys transfer command
-    **safekeys:** implementation of a safe keys transfer cmd
-    **SafeKey:** cat cmd to show information when targeting a SafeKey
-    **ci:** produce tar.gz assets
-    **ci:** add the community contributed safe_completion.sh as a release asset and provide some instructions in the release description for setting it up
-    **ci:** distribute zips
-    **ci:** sha-256 checksums in release description
-    **ci:** perform strip correctly
+* **files:** implementation of files-add command and API for uploading single local files onto an existing FilesContainer ([68da824](https://github.com/bochaco/safe-api/commit/68da8246d63bf248aa42df10a8d2368dee392fa6))
+* **files:** support for adding a file using a safe:// URL to an existing FilesContainer ([5177dea](https://github.com/bochaco/safe-api/commit/5177dea38ee9bcab14d2972c0a7eed79ecc5d27d))
+* **files:** upload files as Raw content-type when their detected media-type is not supported, plus minor enhancements to errors reported by wallet API ([fc22254](https://github.com/bochaco/safe-api/commit/fc2225422a0fbc732396d56a30d5badfa72e2573))
+* **lib:** add files_container_add_from_raw API to add a file to an existing FilesContainer from raw bytes ([bd3a68b](https://github.com/bochaco/safe-api/commit/bd3a68b56cd29a6a3b5e86e951c48e681b204da1))
+* **xorurl:** allow to encode media-type in XOR-URLs for ImmutableData files ([b2affd5](https://github.com/bochaco/safe-api/commit/b2affd5076ffec87b533d8cbc8415df430783f40))
+* **xorurl:** support a subset of IANA media-types and encode them in XOR-URLs ([5910ca9](https://github.com/bochaco/safe-api/commit/5910ca91dbe3539352d7af94f551d4f2ed164dc4))
 
-
-### [0.2.2] (29-08-2019)
 
 ### Bug Fixes
 
-    **wallet:** add test and check in fake-scl for scenario when transferring 0 amount
-    **wallet:** update default when set in wallet insert cmd, plus add details to User Guide about fetching Wallets and subfolders from FilesContainers
-    **lib:** use the client instance's transfer_coin instead of the client independent wallet_transfer_coins API
-    **wallet:** make use of the --sk when provided without a --keyurl in a wallet create cmd
-    **lib:** catch the correct error for insufficient balance from SCL, plus cosmetic improvement to CLI output when generating a key pair
+* **files:** report an error when adding a file with same name as existing one on target evne if its content is different ([cdd194f](https://github.com/bochaco/safe-api/commit/cdd194f36a7e3626aaa8543c0e769ad41f022c8f))
+* **wallet:** minor enhancements to error messages (issue [#238](https://github.com/bochaco/safe-api/issues/238) and [#213](https://github.com/bochaco/safe-api/issues/213)) ([a0ed709](https://github.com/bochaco/safe-api/commit/a0ed7097ce16985855235fa871d1fca42a4fcc7c))
+
+## 0.3.0 (2019-09-05)
+
 
 ### Features
 
-    **wallet:** support for fetching the content of a Wallet and listing it with cat cmd
-    **fetch:** support for fetching a FilesContainer with a subfolder path
-    **cli:** display version in the xorurl for files sync feedback information
-    **lib:** handle access denied error from wallet transfer API
+* **SafeKey:** cat cmd to show information when targeting a SafeKey ([894ed15](https://github.com/bochaco/safe-api/commit/894ed150b6b6fa9ddd467e7095ee2088b6aafad0))
+* **safekeys:** implementation of a safe keys transfer cmd ([bcd4990](https://github.com/bochaco/safe-api/commit/bcd4990afebbc3302063c46221a227d4ffb89d89))
+* **transfers:** allow to pass a --tx-id to the keys/wallet transfer cmds to specify a TX ID ([80287d1](https://github.com/bochaco/safe-api/commit/80287d1a6a546e55e4377547d2a330c5304ac5c0))
 
 
-### [0.1.0] (22-08-2019)
+### Bug Fixes
+
+* **ci:** integration tests were not running for dev builds ([3db2c47](https://github.com/bochaco/safe-api/commit/3db2c473956c738e1f240893c4882a59ee0c4239))
+* **ci:** perform strip correctly ([501cf1c](https://github.com/bochaco/safe-api/commit/501cf1cf4dba7a44c496e97e49e28aa7cf2b04ab))
+* **ci:** remove dir structure from zips ([ac7c6e2](https://github.com/bochaco/safe-api/commit/ac7c6e23154652ea58ce8c7bbe109e9b6abc55b3))
+* **cli:** make sure cli connects authorised to network before performing keys transfer cmd ([6bbdd42](https://github.com/bochaco/safe-api/commit/6bbdd42be3095222646ff806f624f8fb430caa9f))
+* **files sync:** when sync-ing a FilesContainer using an NRS name it was not correctly realising the latest version ([4ca7bd4](https://github.com/bochaco/safe-api/commit/4ca7bd444355b38eac0d6074394abc4bab6d115d))
+* **wallet:** change wallet transfer args from being positional to --from and --to ([865d365](https://github.com/bochaco/safe-api/commit/865d3651ccdfa4da8afee0226e624fc774e177a0))
+
+### 0.2.2 (2019-08-29)
+
 
 ### Features
 
-    **auth:** support to send/receive authorisation requests to/from safe_auth CLI
-    **safekeys:** support for creating SafeKeys and checking their coins balance
-    **keypair:** utilities to generate BLS key pair
-    **wallet:** commands to create wallets, check total balance, transfer coins between them, and insert SafeKeys to them
-    **files:** upload entire folders and files onto the network, as well as sync-ing local changes with uploaded files/folders
-    **nrs:** create and update NRS (Name Resolution System) names/subname, to link them to any type of content
-    **cat:** allow to fetch any type of content, fetching also additional information and metadata about their native data type and NRS Resolution
-    **cat:** support for fetching specific versions of published data from the Network
+* **cli:** display version in the xorurl for files sync feedback information ([96e4102](https://github.com/bochaco/safe-api/commit/96e41020d263da914256d77736fed5d6d2ce4943))
+* **fetch:** support for fetching a FilesContainer with a subfolder path ([3ad0955](https://github.com/bochaco/safe-api/commit/3ad095507d387b4413419281f59604dc55f3c53b))
+* **lib:** handle access denied error from wallet transfer API ([88da83e](https://github.com/bochaco/safe-api/commit/88da83ef3c712f38fcd636a1d03095f34102991b))
+* **wallet:** support for fetching the content of a Wallet and listing it with cat cmd ([7b79c95](https://github.com/bochaco/safe-api/commit/7b79c9520304a7eff9455d47189005b923b1442a))
+
+
+### Bug Fixes
+
+* **cli:** minor fix to show the Wallet XOR-URL as the first line in the output of wallet create cmd ([199c577](https://github.com/bochaco/safe-api/commit/199c5772173cc5407eecd0d2b456da30cc160b6c))
+* **lib:** catch the correct error for insufficient balance from SCL, plus cosmetic improvement to CLI output when generating a key pair ([544139c](https://github.com/bochaco/safe-api/commit/544139c765d03b10795d9ac5ebd3ecb1a73e7a59))
+* **lib:** use the client instance's transfer_coin instead of the client independent wallet_transfer_coins API ([e3353c6](https://github.com/bochaco/safe-api/commit/e3353c649efb3ca3e9f22d498cbb88394b2bff7e))
+* **wallet:** add test and check in fake-scl for scenario when transferring 0 amount ([380e979](https://github.com/bochaco/safe-api/commit/380e9793e1f21e7a4b13fcb55567afcadac0a64c))
+* **wallet:** make use of the --sk when provided without a --keyurl in a wallet create cmd ([b3817b5](https://github.com/bochaco/safe-api/commit/b3817b53a0f3abaaa0f3e8dcb3c03031ce395eaf))
+* **wallet:** update default when set in wallet insert cmd, plus add details to User Guide about fetching Wallets and subfolders from FilesContainers ([ee457b0](https://github.com/bochaco/safe-api/commit/ee457b0dfa347824f70e169160707e81be3a670d))
+
+## 0.1.0 (2019-08-22)
+
+
+### Features
+
+* **cat:** implement an additional level for --info to cat command, i.e. -iii argument, to show a summary of the NRS map when retrieving content using public name ([ba57f31](https://github.com/bochaco/safe-api/commit/ba57f318b68faf319ae44760bebd9ba32bf2cc9d))
+* **cli:** check for release availability ([950dc0b](https://github.com/bochaco/safe-api/commit/950dc0b13663781ae1b0fa63d3a02464893b9653))
+* **cli:** have the files sync command to return the xorurl with new version (rather than the provided one) when the output is --json ([da7c57d](https://github.com/bochaco/safe-api/commit/da7c57d69f60ce2baa51160539390bd767e0fc13))
+* **cli:** initial use of self_update crate ([4532f35](https://github.com/bochaco/safe-api/commit/4532f351e2fa3d02aafec50e79b55d0e8685f411))
+* **cli:** introduce a --pay-with argument for keys and wallet commands to choose the payer wallet more explicitly ([9a24664](https://github.com/bochaco/safe-api/commit/9a24664a191346c161bb5bc6d8c2906417f0b98b))
+* **cli:** pull down new version ([59c0649](https://github.com/bochaco/safe-api/commit/59c0649d76f9334666994d2d7657a61c1fd20c54))
+* **fetch:** return NRS container info and render it with CLI if -ii passed ([f75981c](https://github.com/bochaco/safe-api/commit/f75981c0db76df998ba33c95a0d39933e80efba8))
+* **files sync:** support update-nrs arg in 'files sync' cmd which automatically updates the NRS link if an NRS-URL was passed ([370ffda](https://github.com/bochaco/safe-api/commit/370ffda23ada391b060b06572e2bfd906f7dfecf))
+* **lib:** make sure NRS name provided to nrs create/add, and target URL provided to files sync commands are unversioned ([624a51e](https://github.com/bochaco/safe-api/commit/624a51e3933cc135737db333d2df19586584cbef))
+* **nrs:** first draft code for nrs remove command ([1208062](https://github.com/bochaco/safe-api/commit/120806238c4aa2a4e1db81b51da07b07a780ccf9))
+* **nrs:** make NRS resolution to work only with versioned links, unless the linked content is unversionable ([1804390](https://github.com/bochaco/safe-api/commit/1804390b017821dab019963f585937fd4d14067e))
+* **nrs:** set default link as soft-links (to other sub names) and allow to set them as hard-links as well (to final link) ([febd818](https://github.com/bochaco/safe-api/commit/febd818ee895ff1ef44590d8bfb8762865285a4e))
+* **nrs:** support for fetching a specific version of NRS Map container by providing it in the URL ([1bdbe76](https://github.com/bochaco/safe-api/commit/1bdbe764c698d4d0e6e222671a73ba60fed1eddf))
+* **NRS:** Enable adding / updating NRS names + subnames. ([bfef3d2](https://github.com/bochaco/safe-api/commit/bfef3d288a61947abdfee373762e8e7fc4981422)), closes [#142](https://github.com/bochaco/safe-api/issues/142)
+* **NRS:** Subname creation and resolution. ([91cb91a](https://github.com/bochaco/safe-api/commit/91cb91a7fc1ca678fe6dddcf7fc6325d4f6d3d00))
+* **update:** provide an update command ([c95df9d](https://github.com/bochaco/safe-api/commit/c95df9d09d49c62aaa0d6eebdd4a155687216874))
+* **urls:** support not only XOR URLs but also NRS URLs in all commands ([cdcab58](https://github.com/bochaco/safe-api/commit/cdcab58beb76e1d17964b86a8ee9f152a12bdeed))
+* **wallet:** support Key's URL (apart from Wallet's URL) as the destination for a wallet transfer operation, plus some additional info to the User Guide ([641a3f9](https://github.com/bochaco/safe-api/commit/641a3f92db66b205bc775a6916a52885d1a6488f))
+* **xorurl:** support for decoding the version from XOR URLs and fetching the specified version from FilesContainers ([9458663](https://github.com/bochaco/safe-api/commit/9458663c91cf0a312c1a64bfec41ba174e3b5609))
+* **xorurl:** use one byte to encode SAFE native data type, and separate two bytes for the content type info ([da086c5](https://github.com/bochaco/safe-api/commit/da086c5600fd3cf4ea3258bcec37b1c6aad8823d))
+
+
+### Bug Fixes
+
+* **cat:** properly print out data and avoid panic-ing when retriving binary content ([65f86f3](https://github.com/bochaco/safe-api/commit/65f86f3470110b41a6c159176bf8b6d01717bee7))
+* **cli:** change owner back to maidsafe ([d897e0f](https://github.com/bochaco/safe-api/commit/d897e0ff77515386bddf6a70e1853031b73669ab))
+* **cli:** remove one non-supported --version arg from CLI help menu ([a78ecaf](https://github.com/bochaco/safe-api/commit/a78ecaf73f62ef90afd14b42a44a199cd1920896))
+* **files sync:** files sync was not committing the changes in FilesContainer when all changes were files removal ([37b01c6](https://github.com/bochaco/safe-api/commit/37b01c6a026820267a1d4d36784c5d5c5d9f1c52))
+* **nrs:** use higher precision (nanos) for the timestamp in the NRS Map container entries to prevent from collisions ([bbff014](https://github.com/bochaco/safe-api/commit/bbff014476c4c5b5a5d342e39820c8b3be1ceced))
+* **NRS:** Subname addition fixed. ([b6acddc](https://github.com/bochaco/safe-api/commit/b6acddc4950765d4ad7ed3260530ee6e9abadab3))
+* **nrs_map:** minor fix for when resolving a subname which doesn't have a link ([c364a29](https://github.com/bochaco/safe-api/commit/c364a29b6490a005aaaa9eb981fac5e6b5472111))
+* **scl:** minor fix related to handling versions with safe_client_libs ([7f423ce](https://github.com/bochaco/safe-api/commit/7f423ceea8d1aae5a4decf2d28d265a883ba5e94))
+* **tests:** minor fix to tests and resolve several issues reported by clippy ([8cc94d9](https://github.com/bochaco/safe-api/commit/8cc94d953f52559211a807a60f2a8542ca014663))
+* **update:** bin name based on target ([76ccd53](https://github.com/bochaco/safe-api/commit/76ccd53ce50d9734b3130d40f3c1e252c2cd1721))
+
+### 0.0.4 (2019-07-23)
+
+
+### Features
+
+* **API:** add mock API for unpublished append only data ([cc4e9df](https://github.com/bochaco/safe-api/commit/cc4e9df443e2b1f383ab6d884ebc66d985dc714b))
+* **API:** finalise SCL mock impl to allow wallet API testing ([8dcb27f](https://github.com/bochaco/safe-api/commit/8dcb27fb5d482394fd419f77ee1645cb5d1aa87d))
+* **API:** first draft implementation of keys_create function ([44a50e5](https://github.com/bochaco/safe-api/commit/44a50e5d78f4d374ecbb3ccd56f68690279b23b9))
+* **API:** first draft of the SCL API mock needed for testing ([a75807a](https://github.com/bochaco/safe-api/commit/a75807a05e974b8a3812f748a92514a69a9320eb))
+* **API:** use Hex encoded strings for sk and pk exposed/accepted from the API ([5137f9e](https://github.com/bochaco/safe-api/commit/5137f9e53096b3cf353983607654a672ce2d888e))
+* **auth:** allow to set the port number where to send the auth request to ([983ac63](https://github.com/bochaco/safe-api/commit/983ac636ef29c4c2760818d9b1e986a46f2fffdf))
+* **cat:** show additional info about native data type of content fetched ([c0d3f35](https://github.com/bochaco/safe-api/commit/c0d3f3525d34f683484998281c53f9587e66429b))
+* **cat:** show created and modified timestamps for each file ([3c29919](https://github.com/bochaco/safe-api/commit/3c29919ffaa07ba47212f27214fd2f9dbe096071))
+* **Cat:** Enable cat of safe://xor/some/path data. ([ef29698](https://github.com/bochaco/safe-api/commit/ef296980cac4f57164aecf5d0228d2634173162d))
+* **cli:** change default output to be human readable, plus explain cat cmd in user guide ([1712a8d](https://github.com/bochaco/safe-api/commit/1712a8d3b20b80c4f592baa19ec5a3e4ce99df70))
+* **cli:** implementation of auth command to get authorisation from SAFE Authenticator ([9a0a247](https://github.com/bochaco/safe-api/commit/9a0a247c969467e0b92fa8bde5e4d26cc1984097))
+* **cli:** make the Key XOR-URL arg to be optional for keys commands ([9f7f2fa](https://github.com/bochaco/safe-api/commit/9f7f2faea1429d7c618f02a4776b8c5d95aa81b0))
+* **cli:** making top lovel flags and options global for all cmds and subcmds ([7670499](https://github.com/bochaco/safe-api/commit/76704996e48ef71de90be1ae2ec0cb07a7d98f2f))
+* **errors:** make Key arg optional in wallet commands, plus enhancements to error handling in SCL integration code to have all tests passing with SCL mock-network feature ([f5309be](https://github.com/bochaco/safe-api/commit/f5309be9ca91b86f62a4126cd140078aa9ba9e19))
+* **files:** cleaning up tests for files put cmd and documenting command in user guide ([48149e1](https://github.com/bochaco/safe-api/commit/48149e1ac1abc2c758b158157dc16d66725181e8))
+* **files:** implementation of files sync command reporting add/modified/delete on each file uploaded ([79c5638](https://github.com/bochaco/safe-api/commit/79c56380388359f21ad33d5f5f9a6e31ab46e669))
+* **files:** implementation of the --dry-run for files put and files sync commands ([4e32c3b](https://github.com/bochaco/safe-api/commit/4e32c3bc694a3a863a9e878831d18d8d9fa3daea))
+* **files:** restrict the use of --delete flag for files sync to only when --recursive is also set ([d49a214](https://github.com/bochaco/safe-api/commit/d49a214ae7e7afdb679e7264dfcbc6c1b1cc6eea))
+* **files:** return and show current version of FilesContainer upon a sync/cat cmd ([9e9008b](https://github.com/bochaco/safe-api/commit/9e9008b8d5150fb4b30a2339ab0f106dbba94639))
+* **files:** support non-recursive put and sync for directories ([ae958d1](https://github.com/bochaco/safe-api/commit/ae958d19dc340d56b2f66b6dd6cae55e20838694))
+* **Files:** Enable setting alternate route for FilesMap RDF ([9047f7d](https://github.com/bochaco/safe-api/commit/9047f7da2badb0d1c10b934134b2c13673c7d3ff))
+* **Files:** Init of Files subcommand. ([da01954](https://github.com/bochaco/safe-api/commit/da019549019aa096fdd0ea608ce0a25765c48021))
+* **FilesContainer:** first draft impl of FilesContainer put and cat plus general clean up ([e7efba5](https://github.com/bochaco/safe-api/commit/e7efba52990bfb74cafbbdb2693fea286e8969c7))
+* **filesmap:** draft code to generate a serialised FilesMap ([5a3814b](https://github.com/bochaco/safe-api/commit/5a3814bbbbe5fbcf4f9f3f9fbb302212bdc17265))
+* **Init:** Initial code setup ([#4](https://github.com/bochaco/safe-api/issues/4)) ([60c810a](https://github.com/bochaco/safe-api/commit/60c810aefda01238814c35d67eb1d6e89e939caa))
+* **keypair:** implement 'keys keypair' sub-command which generates a key-pair without creating a Key on the network ([f5e4cc5](https://github.com/bochaco/safe-api/commit/f5e4cc581997abf3ef4904e0b2e65977d04036c8))
+* **keys:** first draft implementation for the integration with SCL CoinBalance API ([e73041c](https://github.com/bochaco/safe-api/commit/e73041c58feb7bdcdd666a141410968132a754d4))
+* **keys:** making the 'source' arg for 'keys create' optional and to be a SecretKey ([60317da](https://github.com/bochaco/safe-api/commit/60317da29cd42ce0b94e2618412fe925c799ebb8))
+* **keys:** making the 'target' arg totally optional for 'keys create' and make changes to have all keys unit tests to pass ([9d8e979](https://github.com/bochaco/safe-api/commit/9d8e97954ae7f173de189bdbd1697fe2b86be9b6))
+* **lib:** add function to create a Key and allocate test coins into it ([dc60d55](https://github.com/bochaco/safe-api/commit/dc60d550a33aec6ce712d61451409889be8090a1))
+* **lib:** first draft of lib's custom Error enum to be returned by all functions of its API ([f797198](https://github.com/bochaco/safe-api/commit/f7971984da9ab5df19ebd7e67d46d958b059cf97))
+* **MD:** Add remove mock func ([7bf197b](https://github.com/bochaco/safe-api/commit/7bf197b808dc1abe243c3b4fe5286e639de9c8c0))
+* **mock:** read/write mock file at creation/drop of MockSCL struct ([bbec6fa](https://github.com/bochaco/safe-api/commit/bbec6fa94653b3589540f3cc47111babd7cfe9d4))
+* **NRS:** Add basic NRS creation and fetching. ([65c6e68](https://github.com/bochaco/safe-api/commit/65c6e688834c291444f66675c72136003a5dd60b)), closes [#68](https://github.com/bochaco/safe-api/issues/68) [#149](https://github.com/bochaco/safe-api/issues/149)
+* **SCL:** Bindings for seq_appendable_data ([a3d33d3](https://github.com/bochaco/safe-api/commit/a3d33d32981615cb515f43d56ae6933af82a38d5))
+* **SCL:** initial integration functions with SCL. ([fa13b90](https://github.com/bochaco/safe-api/commit/fa13b9065565ab945c7de4d5363a8a779c858caf)), closes [#23](https://github.com/bochaco/safe-api/issues/23)
+* **SCL:** Integration for published immutable data ([b2a8d49](https://github.com/bochaco/safe-api/commit/b2a8d4940ecf029b808133a72bfa72256e3fe8f9))
+* **Versioned Data:** Add simple versioned data put and test ([dd78b51](https://github.com/bochaco/safe-api/commit/dd78b5114ad31412a5412910fb3e395ce64f63ff))
+* **wallet:** add first draft implementation for wallet add and balance commands ([c2abe65](https://github.com/bochaco/safe-api/commit/c2abe65621f030a616b0f44bc27ef52ddad90b8a))
+* **wallet:** add first draft implementation of wallet create API and command ([7db002d](https://github.com/bochaco/safe-api/commit/7db002d920399251103f840216562b94c767f971))
+* **wallet:** Basic transfer set up. ([f57185b](https://github.com/bochaco/safe-api/commit/f57185b9bb4ee68ea8322f43eb2dbed6bb79bea4))
+* **Wallet:** Improve create / insert commands. ([1d264f0](https://github.com/bochaco/safe-api/commit/1d264f0a791bacecd06429aee3bf42692327b680)), closes [#92](https://github.com/bochaco/safe-api/issues/92)
+* **xor-url:** add support for XOR-URL using CID and allow base32 (default) and base32z encoding to be chosen by the user ([84090d3](https://github.com/bochaco/safe-api/commit/84090d3d10ec408d16d59414a35ff73fb150243b))
+* **xorurl:** add path to XOR-URL when converting it to string ([da6d25f](https://github.com/bochaco/safe-api/commit/da6d25f9fd13d2b8af92b2da5ec82394ca84cf57))
+* **xorurl:** encode version, content-type and type tag in the XOR-URL ([be3dd30](https://github.com/bochaco/safe-api/commit/be3dd30377e4b98e18f01b1ee06fe34d70258414))
+* **xorurl:** enhance the XOR-URL encoding to remove zero bytes from type tag bytes, plus general cleanup and tests for fetch function ([bcf3a61](https://github.com/bochaco/safe-api/commit/bcf3a617d0cfbc98bd38f7a4754b959d90989db0))
+* **xorurl:** remove CID from xorurls for now and make base32z default base encoding, add first version of fetch and first impl of rendering a Filescontainer with cat cmd ([1994d9a](https://github.com/bochaco/safe-api/commit/1994d9a550aa0cf72b787262031203be3caf7519))
+
+
+### Bug Fixes
+
+* **auth:** resolve the user home directory using 'dirs' crate ([0d4e010](https://github.com/bochaco/safe-api/commit/0d4e01088f3664c1c80a36bbddd498210bc7dc6a))
+* **auth:** show informative message if cannot send auth request to Authenticator ([65d6d4e](https://github.com/bochaco/safe-api/commit/65d6d4e77978c5e49e6cd74b90b9e742f9176747))
+* **CI:** dockerfile additions for CI ([effbb18](https://github.com/bochaco/safe-api/commit/effbb1893974ecf4048b1dbcbdce67fb85d3159a))
+* **CI:** Windows remove mock vault before tests ([3208115](https://github.com/bochaco/safe-api/commit/32081153222ff419b1773bebf6cfb8536a09a549))
+* **CI:** Windows SCl-Vault remote command tweak ([395d866](https://github.com/bochaco/safe-api/commit/395d86634be07a206ac2b7e51df58e79a7486036))
+* **cli:** return error message if no <source> is provided when creating a Key ([8bdf7fc](https://github.com/bochaco/safe-api/commit/8bdf7fce001b4708cdd99a523c011b2db0b782d1))
+* **files:** remove --set-root arg in favor of using source and dest args, taking into account trailing slash in each of them to realise the final destination path, both for files put and sync commands ([a6da1a7](https://github.com/bochaco/safe-api/commit/a6da1a7dfb747e70ea77028bd06d42b1221fab6f))
+* **files:** use timestamp with nanos for the FilesContainer entry key in SeqAppendOnlyData ([aadd43e](https://github.com/bochaco/safe-api/commit/aadd43ed07b380b9fecada77366ee910e6ff4abb))
+* **Files:** Trailing slash for files commands now indicates to use folder as root ([#130](https://github.com/bochaco/safe-api/issues/130)) ([dc81f95](https://github.com/bochaco/safe-api/commit/dc81f95a0fa9ce6a25f54b129f766e75ce808c3a))
+* **Files/Sync:** Use AD version not url schema version :| ([ae34a08](https://github.com/bochaco/safe-api/commit/ae34a089cfb3a68eb23f36d45e102e900bc16bae))
+* **keypair:** Enable keypair generation without authentication ([0dc81f0](https://github.com/bochaco/safe-api/commit/0dc81f0d8997f3afdcd7843fd5c3dfbb454ad912))
+* **keys:** gracefully handle the error when the source Key is not found upon Key creation ([a328f80](https://github.com/bochaco/safe-api/commit/a328f80bf1006252197126ec763a51364b9c56f6))
+* **keys:** restrict the preload amount to be numeric in all cases when creating keys ([bd76f40](https://github.com/bochaco/safe-api/commit/bd76f405a72e9fcf1afcca7032ec98daad56270d))
+* **lib:** fix issue [#158](https://github.com/bochaco/safe-api/issues/158) by removing unwrap statement an returning proper Error ([88a0db5](https://github.com/bochaco/safe-api/commit/88a0db527a2d0aa6d69a655f812ea67a3ba17d8b))
+* **lib:** fix issues [#30](https://github.com/bochaco/safe-api/issues/30) and [#31](https://github.com/bochaco/safe-api/issues/31) to handle invalid args from CLI ([504e85c](https://github.com/bochaco/safe-api/commit/504e85c370452c85b80de39b4fb9fdaf051a3b50))
+* **lib:** gracefully handle the scenario when there is not enough funds at source for preloading a new Key ([4d84f91](https://github.com/bochaco/safe-api/commit/4d84f91f22df6e95b1221b557306b498daa91774))
+* **lib:** handle errors for invalid xorurl or pk when querying for Key balance ([e766cdd](https://github.com/bochaco/safe-api/commit/e766cddcbfdac130288207ad9372a4cab5f7c545))
+* **paths:** fixing treatment of paths to normalise them always to use '/' separator ([100d757](https://github.com/bochaco/safe-api/commit/100d757eb94caff36520c555b8ddf87779975b4d))
+* **SCL:** Post rebase fixes to SCL integration. ([1f2df4c](https://github.com/bochaco/safe-api/commit/1f2df4cb9fd55d2dd3bc728bfa586501252c2339))
+* **wallet:** enhancements to error message returned by wallet balance cmd ([4461686](https://github.com/bochaco/safe-api/commit/4461686421e1bdc48102a9e405c298710477abda))
+* **wallet:** handle errors for invalid/insufficient amounts for wallet transfers, and for wallets with no default balance ([2a4d42c](https://github.com/bochaco/safe-api/commit/2a4d42c75c0206b792f73155b670cea8346927b0))
+* **Wallet:** Validate SK and PK upon wallet creation. ([59bd39a](https://github.com/bochaco/safe-api/commit/59bd39a2232632a24e09fe775284765bff10b559)), closes [#118](https://github.com/bochaco/safe-api/issues/118) [#119](https://github.com/bochaco/safe-api/issues/119)
+* Handle files with no extension ([#132](https://github.com/bochaco/safe-api/issues/132)) ([21a3ec1](https://github.com/bochaco/safe-api/commit/21a3ec1913e4950c1c212adeac3474e12b6aef49))
+* **Wallet:** Enable insert <name> to be optional. Update readme ([983c888](https://github.com/bochaco/safe-api/commit/983c88879e7553f0ce8d2da7be7c976bd7cb6c7d))

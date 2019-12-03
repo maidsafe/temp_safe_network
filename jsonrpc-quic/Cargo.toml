@@ -11,7 +11,6 @@ name = "jsonrpc-quic"
 version = "0.0.1"
 description = "JSON-RPC over QUIC for safe-authd comm"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
-publish = false
 license = "GPL-3.0"
 repository = "https://github.com/maidsafe/safe-api"
 edition = "2018"
@@ -25,7 +24,7 @@ futures = "~0.1.21"
 log = "0.4.6"
 quinn = "~0.3.0"
 rand = "0.6.5"
-serde = "1.0.91"
+serde = { version = "1.0.91", features = ["derive"] }
 serde_json = "1.0.41"
 tokio = "0.1.6"
 tokio-current-thread = "0.1"
