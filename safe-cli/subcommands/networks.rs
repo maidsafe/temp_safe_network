@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::config::{
-    print_networks_settings, read_config_settings, retrieve_conn_info,
+    add_network_to_config, print_networks_settings, read_config_settings,
+    read_current_network_conn_info, remove_network_from_config, retrieve_conn_info,
+    write_current_network_conn_info,
 };
 use log::debug;
-use std::fs;
-use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -25,6 +25,20 @@ pub enum NetworksSubCommands {
     #[structopt(name = "check")]
     /// Check current network configuration and try to match it to networks in the CLI config
     Check {},
+    #[structopt(name = "add")]
+    /// Add a network to the CLI config
+    Add {
+        /// Network name
+        network_name: String,
+        /// Location of the network connection information. If this argument is not passed, it takes current network connection information and caches it
+        config_location: Option<String>,
+    },
+    #[structopt(name = "remove")]
+    /// Remove a network from the CLI config
+    Remove {
+        /// Network to remove
+        network_name: String,
+    },
 }
 
 pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String> {
@@ -37,11 +51,9 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
             match settings.networks.get(&network_name) {
                 Some(config_location) => {
                     let conn_info = retrieve_conn_info(&network_name, config_location)?;
-                    let conn_info_file_path = get_network_conn_info_path()?;
-                    fs::write(&conn_info_file_path, conn_info)
-                        .map_err(|err| format!("Unable to write config in {}: {}", conn_info_file_path.display(), err))?;
+                    write_current_network_conn_info(&conn_info)?;
                     println!("Successfully switched to '{}' network in your system!", network_name);
-                    println!("You'll need to re-authorise the CLI if you need write access to the '{}' network", network_name);
+                    println!("You'll need to login again, and re-authorise the CLI, if you need write access to the '{}' network", network_name);
                 },
                 None => return Err(format!("No network with name '{}' was found in the config. Please use the 'config add network' command to add it", network_name))
             }
@@ -49,13 +61,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
         Some(NetworksSubCommands::Check {}) => {
             let (settings, _) = read_config_settings()?;
             println!("Checking current setup network connection information...");
-            let conn_info_file_path = get_network_conn_info_path()?;
-            let current_conn_info = fs::read(&conn_info_file_path).map_err(|err| {
-                format!(
-                    "There doesn't seem to be a any network setup in your system. Unable to read current network connection information from '{}': {}",
-                    conn_info_file_path.display(), err
-                )
-            })?;
+            let (conn_info_file_path, current_conn_info) = read_current_network_conn_info()?;
             let mut matched_network = None;
             for (network_name, config_location) in settings.networks.iter() {
                 match retrieve_conn_info(&network_name, config_location) {
@@ -74,18 +80,15 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
                 None => println!("Current network setup in your system doesn't match any of your networks in the CLI config. Use 'networks switch' command to switch to any of them")
             }
         }
+        Some(NetworksSubCommands::Add {
+            network_name,
+            config_location,
+        }) => add_network_to_config(&network_name, config_location)?,
+        Some(NetworksSubCommands::Remove { network_name }) => {
+            remove_network_from_config(&network_name)?
+        }
         None => print_networks_settings()?,
     }
 
     Ok(())
-}
-
-fn get_network_conn_info_path() -> Result<PathBuf, String> {
-    match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
-        Some(dirs) => Ok(dirs.config_dir().join("vault_connection_info.config")),
-        None => Err(
-            "Failed to obtain local home directory where to set network connection info"
-                .to_string(),
-        ),
-    }
 }

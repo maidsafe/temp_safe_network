@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::config::{
-    config_file_path, print_networks_settings, read_config_settings, write_config_settings,
-    ConfigSettings,
+    add_network_to_config, config_file_path, print_networks_settings, remove_network_from_config,
+    write_config_settings, ConfigSettings,
 };
 use log::debug;
 use structopt::StructOpt;
@@ -32,8 +32,8 @@ pub enum SettingAddCmd {
     Network {
         /// Network name
         network_name: String,
-        /// Location of the network connection information
-        config_location: String,
+        /// Location of the network connection information. If this argument is not passed, it takes current network connection information and caches it
+        config_location: Option<String>,
     },
     // #[structopt(name = "contact")]
     // Contact {
@@ -63,25 +63,10 @@ pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<(), String> {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
             config_location,
-        })) => {
-            let (mut settings, file_path) = read_config_settings()?;
-            settings
-                .networks
-                .insert(network_name.clone(), config_location.clone());
-            write_config_settings(&file_path, settings)?;
-            debug!(
-                "Network {} - {} added to settings",
-                network_name, config_location
-            );
-            println!("Network '{}' was added to the list", network_name);
-        }
+        })) => add_network_to_config(&network_name, config_location)?,
         // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
         Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {
-            let (mut settings, file_path) = read_config_settings()?;
-            settings.networks.remove(&network_name);
-            write_config_settings(&file_path, settings)?;
-            debug!("Network {} removed from settings", network_name);
-            println!("Network '{}' was removed from the list", network_name);
+            remove_network_from_config(&network_name)?
         }
         // Some(ConfigSubCommands::Remove(SettingRemoveCmd::Contact { name })) => {}
         Some(ConfigSubCommands::Clear) => {
