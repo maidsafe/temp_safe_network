@@ -90,17 +90,14 @@ Right now the CLI is under active development. Here we're listing commands ready
 
 The base command, if built is `$ safe`, or all commands can be run via `$ cargo run -- <command>`.
 
-Various global flags are available (those commented out are not yet implemented):
+Various global flags are available:
 
 ```
 --dry-run                  Dry run of command. No data will be written. No coins spent.
 -h, --help                 Prints help information
 --json                     Sets JSON as output serialisation format (alias of '--output json')
-# --root                   The account's Root Container address
 -V, --version              Prints version information
-# -v, --verbose            Increase output verbosity. (More logs!)
--o, --output <output_fmt>  Output data serialisation. Currently only supported 'json'
-# -q, --query <query>      Enable to query the output via SPARQL eg.
+-o, --output <output_fmt>  Output data serialisation: [json, jsoncompact, yaml]
 --xorurl <xorurl_base>     Base encoding to be used for XOR-URLs generated. Currently supported: base32z
                            (default), base32 and base64
 ```
@@ -118,6 +115,22 @@ This command simply sends an authorisation request to the Authenticator availabl
 #### The Authenticator daemon (authd)
 
 In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)](https://en.wikipedia.org/wiki/QUIC) endpoint, which SAFE applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
+
+The SAFE Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the SAFE CLI if the `safe-authd`/`safe-authd.exe` binary is in the system's PATH with execution permissions.
+
+First make sure you [download latest version of the SAFE Authenticator daemon](https://github.com/maidsafe/safe-api/releases/latest), unzipping the package and placing the `safe-authd`/`safe-authd.exe` binary in any folder of your preference.
+
+In order to have the CLI to be able to find the `safe-authd` binary we just need to set up the local PATH (`<safe-authd path>` shall be replaced with the actual path where you placed the `safe-authd`/`safe-authd.exe` binary in your local system):
+```shell
+$ export PATH=$PATH:<safe-authd path>
+```
+
+If you are a Windows user then you can use the [System Settings GUI](https://www.computerhope.com/issues/ch000549.htm)(note you'll need to start a new console so the new PATH is properly setup). Alternatively, if you want to set it up only for the current console you plan to use authd you run this command:
+```shell
+> set PATH=%PATH%;<safe-authd.exe path>
+```
+
+Note the CLI and `safe-authd` are in active development, this process of downloading and installing the safe-authd binary will be simplified in the near future.
 
 #### Auth start (Linux/Mac)
 
