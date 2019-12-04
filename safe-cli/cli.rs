@@ -19,6 +19,7 @@ use crate::subcommands::files::files_commander;
 use crate::subcommands::keys::key_commander;
 use crate::subcommands::networks::networks_commander;
 use crate::subcommands::nrs::nrs_commander;
+use crate::subcommands::setup::setup_commander;
 use crate::subcommands::update::update_commander;
 use crate::subcommands::wallet::wallet_commander;
 use crate::subcommands::{OutputFmt, SubCommands};
@@ -105,6 +106,7 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
             update_commander().map_err(|err| format!("Error performing update: {}", err))
         }
         Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, &mut safe),
+        Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
         Some(other) => {
             // We treat these separatelly since we need to connect before
             // handling any of these commands

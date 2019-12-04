@@ -17,6 +17,7 @@ pub mod keys;
 pub mod networks;
 pub mod nrs;
 pub mod safe_id;
+pub mod setup;
 pub mod update;
 pub mod wallet;
 
@@ -83,6 +84,9 @@ pub enum SubCommands {
     #[structopt(name = "files")]
     /// Manage files on the SAFE Network
     Files(files::FilesSubCommands),
+    #[structopt(name = "setup")]
+    /// Perform setup tasks
+    Setup(setup::SetupSubCommands),
     #[structopt(name = "keypair")]
     /// Generate a key pair without creating and/or storing a SafeKey on the network
     Keypair {},
