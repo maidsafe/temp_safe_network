@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{unwrap_or_gen_random, xorname_from_pk, xorname_to_hex};
+use super::helpers::{unwrap_or_gen_random, xorname_from_pk, xorname_to_hex, AuthResponseType};
 use super::safe_net::AppendOnlyDataRawData;
 use super::{Error, Result, SafeApp};
 use futures::future::Future;
@@ -97,7 +97,14 @@ impl SafeApp for SafeAppScl {
         let app = match auth_credentials {
             Some(auth_credentials) => {
                 let auth_granted = decode_ipc_msg(auth_credentials)?;
-                App::registered(app_id.to_string(), auth_granted, disconnect_cb)
+                match auth_granted {
+                    AuthResponseType::Registered(authgranted) => {
+                        App::registered(app_id.to_string(), authgranted, disconnect_cb)
+                    }
+                    AuthResponseType::Unregistered(config) => {
+                        App::unregistered(disconnect_cb, Some(config))
+                    }
+                }
             }
             None => App::unregistered(disconnect_cb, None),
         }

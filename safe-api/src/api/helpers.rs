@@ -14,7 +14,7 @@ use jsonrpc_quic::jsonrpc_send;
 use log::debug;
 use rand::rngs::OsRng;
 use rand_core::RngCore;
-use safe_core::ipc::{decode_msg, resp::AuthGranted, IpcMsg, IpcResp};
+use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use safe_nd::{
     Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName, MAX_COINS_VALUE,
 };
@@ -156,14 +156,37 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Coins> {
     })
 }
 
-pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthGranted> {
+pub enum AuthResponseType {
+    Registered(AuthGranted),
+    Unregistered(BootstrapConfig),
+}
+
+pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
     let msg = decode_msg(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
-        IpcMsg::Resp {
-            resp: IpcResp::Auth(res),
-            ..
-        } => res.map_err(|err| Error::AuthError(format!("{:?}", err))),
+        IpcMsg::Resp { resp, .. } => {
+            match resp {
+                IpcResp::Auth(res) => res
+                    .map(|authgranted| AuthResponseType::Registered(authgranted))
+                    .map_err(|err| Error::AuthError(format!("{:?}", err))),
+                IpcResp::Unregistered(res) => res
+                    .map(|config| AuthResponseType::Unregistered(config))
+                    .map_err(|err| Error::AuthError(format!("{:?}", err))),
+                _ => Err(Error::AuthError(
+                    "Doesn't support other request.".to_string(),
+                )),
+                // IpcResp::Auth(res) => match res {
+                //     Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
+                //     Err(e) => Err(Error::AuthError(format!("{:?}", e)))
+                // },
+                // IpcResp::Unregistered(res) => match res {
+                //     Ok(config) => Ok(AuthResponseType::Unregistered(config)),
+                //     Err(e) => Err(Error::AuthError(format!("{:?}", e)))
+                // },
+                // _ => Err(Error::AuthError("Doesn't support other request.".to_string()))
+            }
+        }
         IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
