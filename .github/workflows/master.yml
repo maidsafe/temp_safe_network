@@ -109,7 +109,6 @@ jobs:
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_IDENTITY_AUTO_DISCOVERY : true
-
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -130,8 +129,6 @@ jobs:
         with:
           name: ${{ matrix.output }}
           path: target/release/${{ matrix.target }}
-
-
 
   build-ffi-android:
     name: Build FFI Android
@@ -162,9 +159,6 @@ jobs:
     strategy:
       matrix:
         target: [aarch64-apple-ios, x86_64-apple-ios]
-    env:
-      PKG_CONFIG_ALLOW_CROSS: 1
-      DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -195,40 +189,30 @@ jobs:
           name: safe-ffi-${{ matrix.target }}-dev
           path: target/${{ matrix.target }}/release/libsafe_ffi.a
 
-
+  # Use a single job for each type to build all targets.
   build-ffi-ios-universal:
     name: Build FFI iOS Universal
     runs-on: macos-latest
     needs: build-ffi-ios
+    strategy:
+      matrix:
+        type: [dev, prod]
     steps:
       - uses: actions/checkout@v1
-
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-apple-ios-dev
-          path: artifacts/safe-ffi/dev/x86_64-apple-ios/release
+          name: safe-ffi-x86_64-apple-ios-${{ matrix.type }}
+          path: artifacts/safe-ffi/${{ matrix.type }}/x86_64-apple-ios/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-apple-ios-prod
-          path: artifacts/safe-ffi/prod/x86_64-apple-ios/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-aarch64-apple-ios-dev
-          path: artifacts/safe-ffi/dev/aarch64-apple-ios/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-aarch64-apple-ios-prod
-          path: artifacts/safe-ffi/prod/aarch64-apple-ios/release
+          name: safe-ffi-aarch64-apple-ios-${{ matrix.type }}
+          path: artifacts/safe-ffi/${{ matrix.type }}/aarch64-apple-ios/release
       - shell: bash
-        run: make universal-ios-lib
+        run: make universal-ios-lib-${{ matrix.type }}
       - uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-apple-ios-dev
-          path: artifacts/safe-ffi/dev/universal
-      - uses: actions/upload-artifact@master
-        with:
-          name: safe-ffi-apple-ios-prod
-          path: artifacts/safe-ffi/prod/universal
+          name: safe-ffi-apple-ios-${{ matrix.type }}
+          path: artifacts/safe-ffi/${{ matrix.type }}/universal
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'

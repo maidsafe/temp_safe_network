@@ -107,14 +107,6 @@ function build_on_windows() {
 }
 
 function build_on_macos() {
-	# HACK: evade MacOs catalina libsodium error
-	if [[ "$OSTYPE" == "darwin"* ]]; then
-		brew install libsodium
-		brew install pkg-config
-
-		export RUST_SODIUM_USE_PKG_CONFIG=1
-	fi
-
     build_on_windows
 }
 

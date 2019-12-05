@@ -42,126 +42,61 @@ jobs:
       - uses: actions/checkout@v1
       - shell: bash
         run: make build-component
+
+  build-ffi-ios:
+    name: Build FFI iOS
+    runs-on: macOS-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-ios, x86_64-apple-ios]
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
+      # Upload for build-ffi-ios-universal
       - uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-${{ matrix.type }}
-          path: artifacts
+          name: safe-ffi-${{ matrix.target }}-prod
+          path: target/${{ matrix.target }}/release/libsafe_ffi.a
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }} --features=mock-network
+      # Upload for build-ffi-ios-universal
+      - uses: actions/upload-artifact@master
+        with:
+          name: safe-ffi-${{ matrix.target }}-dev
+          path: target/${{ matrix.target }}/release/libsafe_ffi.a
 
-  #build-ffi-ios:
-    #name: Build FFI iOS
-    #runs-on: macOS-latest
-    #strategy:
-      #matrix:
-        #target: [aarch64-apple-ios, x86_64-apple-ios]
-    #env:
-      ##RUST_SODIUM_LIB_DIR: /Users/runner/libsodium
-      #DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
-    #steps:
-      # Remove when rust_sodium is dealt with.
-      #- shell: bash
-        #run: |
-          #brew install curl
-          #curl -O https://libsodium.s3.amazonaws.com/libsodium-1.0.17-stable-macos.tar.gz
-          #mkdir $HOME/libsodium
-          #mv libsodium-1.0.17-stable-macos.tar.gz $HOME/libsodium
-          #cd $HOME/libsodium
-          #tar xvf libsodium-1.0.17-stable-macos.tar.gz
-          #rm libsodium-1.0.17-stable-macos.tar.gz
-      #- uses: actions/checkout@v1
-      #- uses: actions-rs/toolchain@v1
-        #with:
-          #profile: minimal
-          #toolchain: stable
-          #override: true
-          #target: ${{ matrix.target }}
-      #- uses: actions-rs/cargo@v1
-        #with:
-          #command: build
-          #args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-${{ matrix.target }}-prod
-          #path: target/${{ matrix.target }}/release
-      #- uses: actions-rs/cargo@v1
-        #with:
-          #command: build
-          #args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }} --features=mock-network
-      #- shell: bash
-        #run: |
-          #mkdir artifacts
-          #find "target/${{ matrix.target }}/release" -maxdepth 1 -type f -exec cp '{}' artifacts \;
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-${{ matrix.target }}-dev
-          #path: target/${{ matrix.target }}/release
+  # Use a single job for each type to build all targets.
+  build-ffi-ios-universal:
+    name: Build FFI iOS Universal
+    runs-on: macos-latest
+    needs: build-ffi-ios
+    strategy:
+      matrix:
+        type: [dev, prod]
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/download-artifact@master
+        with:
+          name: safe-ffi-x86_64-apple-ios-${{ matrix.type }}
+          path: artifacts/safe-ffi/${{ matrix.type }}/x86_64-apple-ios/release
+      - uses: actions/download-artifact@master
+        with:
+          name: safe-ffi-aarch64-apple-ios-${{ matrix.type }}
+          path: artifacts/safe-ffi/${{ matrix.type }}/aarch64-apple-ios/release
+      - shell: bash
+        run: make universal-ios-lib-${{ matrix.type }}
 
-  #build-ffi-ios-universal:
-    #name: Build FFI iOS Universal
-    #runs-on: macOS-latest
-    #needs: build-ffi-ios
-    #steps:
-      #- uses: actions/checkout@v1
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/x86_64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/x86_64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-aarch64-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/aarch64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-aarch64-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/aarch64-apple-ios/release
-      #- shell: bash
-        #run: make universal-ios-lib
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/universal
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/universal
-
-  #build-ffi-ios-universal:
-    #name: Build FFI iOS Universal
-    #runs-on: macOS-latest
-    #needs: build-ffi-ios
-    #steps:
-      #- uses: actions/checkout@v1
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/x86_64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-x86_64-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/x86_64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-aarch64-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/aarch64-apple-ios/release
-      #- uses: actions/download-artifact@master
-        #with:
-          #name: safe-ffi-aarch64-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/aarch64-apple-ios/release
-      #- shell: bash
-        #run: make universal-ios-lib
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-dev
-          #path: artifacts/safe-ffi/dev/universal
-      #- uses: actions/upload-artifact@master
-        #with:
-          #name: safe-ffi-apple-ios-prod
-          #path: artifacts/safe-ffi/prod/universal
-
-  # Add macOS-latest to the matrix when rust_sodium has been removed.
   test-component:
     name: Test Component
     runs-on: ${{ matrix.os }}
