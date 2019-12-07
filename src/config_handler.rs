@@ -359,6 +359,7 @@ mod test {
                 verbose: 0,
                 network_config: Default::default(),
                 first: false,
+                completions: None,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {
