@@ -50,7 +50,7 @@ const ARGS: [&str; 14] = [
     "our-complete-cert",
     "our-type",
     "first",
-    "dump-completions",
+    "completions",
 ];
 
 /// Vault configuration
@@ -83,8 +83,8 @@ pub struct Config {
     #[allow(missing_docs)]
     network_config: NetworkConfig,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
-    #[structopt(long = "dump-completions", raw(global = "true"))]
-    dump_completions: Option<String>,
+    #[structopt(long = "completions", raw(global = "true"))]
+    completions: Option<String>,
 }
 
 impl Config {
@@ -98,7 +98,7 @@ impl Config {
             verbose: 0,
             network_config: Default::default(),
             first: false,
-            dump_completions: None,
+            completions: None,
         });
 
         let command_line_args = Config::clap().get_matches();
@@ -167,9 +167,9 @@ impl Config {
         self.network_config = config;
     }
 
-    /// Get the dump-completions option
-    pub fn dump_completions(&self) -> &Option<String> {
-        &self.dump_completions
+    /// Get the completions option
+    pub fn completions(&self) -> &Option<String> {
+        &self.completions
     }
 
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
@@ -195,7 +195,7 @@ impl Config {
         } else if arg == ARGS[11] {
             self.network_config.our_type = unwrap!(value.parse());
         } else if arg == ARGS[13] {
-            self.dump_completions = Some(unwrap!(value.parse()));
+            self.completions = Some(unwrap!(value.parse()));
         } else {
             #[cfg(not(feature = "mock"))]
             {

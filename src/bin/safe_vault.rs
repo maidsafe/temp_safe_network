@@ -46,7 +46,7 @@ mod detail {
     pub fn main() {
         let mut config = Config::new();
 
-        if let Some(c) = &config.dump_completions() {
+        if let Some(c) = &config.completions() {
             match c.parse::<clap::Shell>() {
                 Ok(shell) => match gen_completions_for_shell(shell) {
                     Ok(buf) => {
@@ -56,7 +56,7 @@ mod detail {
                     }
                     Err(e) => println!("{}", e),
                 },
-                Err(e) => println!("Unknown dump-completions option. {}", e),
+                Err(e) => println!("Unknown completions option. {}", e),
             }
             // we exit program on both success and error.
             return;
