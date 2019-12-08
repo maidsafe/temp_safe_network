@@ -83,7 +83,7 @@ pub struct Config {
     #[allow(missing_docs)]
     network_config: NetworkConfig,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
-    #[structopt(long = "completions", raw(global = "true"))]
+    #[structopt(long)]
     completions: Option<String>,
 }
 
@@ -304,7 +304,7 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            272
+            296
         } else {
             184
         };
@@ -339,6 +339,7 @@ mod test {
             ["our-complete-cert", &base64_certificate],
             ["our-type", "client"],
             ["first", "None"],
+            ["completions", "bash"],
         ];
 
         for arg in &ARGS {
