@@ -24,7 +24,7 @@ use crate::{
 };
 use bytes::Bytes;
 use lazy_static::lazy_static;
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use safe_nd::{
     AData, ADataAddress, AppPermissions, AppPublicId, Coins, ConnectionInfo, Error as NdError,
     HandshakeRequest, HandshakeResponse, IData, IDataAddress, IDataKind, LoginPacket, MData,
@@ -220,7 +220,6 @@ impl ClientHandler {
                     self.handle_join_request(peer_addr, client_id);
                 }
                 Ok(HandshakeRequest::ChallengeResult(signature)) => {
-                    // Handle challenge
                     self.handle_challenge(peer_addr, signature);
                 }
                 Err(err) => {
@@ -640,13 +639,15 @@ impl ClientHandler {
         if !self
             .routing_node
             .borrow()
-            .matches_our_prefix(client_id.name())
+            .matches_our_prefix(&routing::XorName(client_id.name().0))
+            .unwrap_or(false)
         {
             debug!(
                 "Client {} ({}) wants to join us but we are not its client handler",
                 client_id, peer_addr
             );
-            self.routing_node
+            let _ = self
+                .routing_node
                 .borrow_mut()
                 .disconnect_from_client(peer_addr);
         }
@@ -670,7 +671,7 @@ impl ClientHandler {
                 Some(pk) => pk,
                 None => {
                     info!(
-                        "{}: Client on {} identifies as a node: {}",
+                        "{}: Client on {} identifies as a node: {}, hence disconnect from it.",
                         self, peer_addr, public_id
                     );
                     if let Err(err) = self
@@ -1119,14 +1120,16 @@ impl ClientHandler {
         if !self
             .routing_node
             .borrow()
-            .match_our_prefix(client_id.name())
+            .matches_our_prefix(&routing::XorName(client_id.name().0))
+            .unwrap_or(false)
         {
             let closest_known_elders = match self
                 .routing_node
                 .borrow()
-                .closest_known_elders_to(client_id.name())
+                .closest_known_elders_to(&routing::XorName(client_id.name().0))
             {
-                Ok(elders_iter) => elders_iter.map(|p2p_node| {
+                Ok(elders_iter) => elders_iter
+                    .map(|p2p_node| {
                         let routing::ConnectionInfo {
                             peer_addr,
                             peer_cert_der,
@@ -1139,17 +1142,20 @@ impl ClientHandler {
                             },
                         )
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>(),
                 Err(e) => {
                     info!("Could not handle bootstrap request: {:?}", e);
                     return;
                 }
             };
 
-            if let Some(elders) = closest_known_elders {
-                self.send(peer_addr, &HandshakeResponse::Join(elders));
+            if closest_known_elders.is_empty() {
+                warn!(
+                    "{}: No closest known elders in any section we know of",
+                    self
+                );
             } else {
-                warn!("{}: No closest known elders in any section we know of", self);
+                self.send(peer_addr, &HandshakeResponse::Join(closest_known_elders));
             }
         } else {
             let elders = self

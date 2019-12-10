@@ -11,7 +11,10 @@ use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
 pub use routing::quic_p2p::Config as NetworkConfig;
 pub use routing::quic_p2p::NodeInfo as ConnectionInfo;
-use routing::quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p};
+use routing::{
+    quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p},
+    XorName,
+};
 pub use routing::{ClientEvent, Event, InterfaceError, P2pNode, RoutingError};
 use std::{
     cell::RefCell,
@@ -103,7 +106,7 @@ impl Node {
     pub fn matches_our_prefix(&self, _name: &XorName) -> Result<bool, RoutingError> {
         // Currently due to there being just one section, this will always be true
         // TODO: This would return an error if we are neither an elder nor an adult
-        OK(true)
+        Ok(true)
     }
 
     /// Find out the closest Elders to a given XorName that we know of.
