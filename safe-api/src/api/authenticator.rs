@@ -23,7 +23,7 @@ use safe_core::ipc::resp::{AccessContainerEntry, IpcResp};
 use safe_core::ipc::{access_container_enc_key, decode_msg, encode_msg, IpcError, IpcMsg};
 use safe_core::utils::symmetric_decrypt;
 use safe_core::{client as safe_core_client, CoreError};
-use safe_nd::{AppPermissions, Error as SndError, MDataAddress, PublicKey};
+use safe_nd::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -198,10 +198,15 @@ impl SafeAuthenticator {
         debug!("Attempting to create a SAFE account...");
         let secret_key = sk_from_hex(sk)?;
 
-        match Authenticator::create_acc(passphrase, password, secret_key, || {
-            // TODO: allow the caller to provide the callback function
-            // eprintln!("{}", "Disconnected from network");
-        }) {
+        match Authenticator::create_acc(
+            passphrase,
+            password,
+            ClientFullId::from(secret_key),
+            || {
+                // TODO: allow the caller to provide the callback function
+                // eprintln!("{}", "Disconnected from network");
+            },
+        ) {
             Ok(auth) => {
                 debug!("Account just created successfully");
                 self.safe_authenticator = Some(auth);
@@ -601,7 +606,7 @@ fn gen_cont_auth_response(
 
         config::get_app(client, &app_id)
             .and_then(move |app| {
-                let sign_pk = PublicKey::from(app.keys.bls_pk);
+                let sign_pk = app.keys.public_key();
                 update_container_perms(&c2, permissions, sign_pk).map(move |perms| (app, perms))
             })
             .and_then(move |(app, mut perms)| {
@@ -678,7 +683,7 @@ fn gen_shared_md_auth_response(
         let client_cloned0 = client.clone();
         let client_cloned1 = client.clone();
         config::get_app(client, &share_mdata_req.app.id).and_then(move |app_info| {
-            let user = PublicKey::from(app_info.keys.bls_pk);
+            let user = app_info.keys.public_key();
             let num_mdata = share_mdata_req.mdata.len();
             stream::iter_ok(share_mdata_req.mdata.into_iter())
                 .map(move |mdata| {

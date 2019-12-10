@@ -3,6 +3,7 @@
 set -e -x
 
 [[ -z $SAFE_AUTHD_MOCK_PATH ]] && export SAFE_AUTHD_MOCK_PATH=~/safe-authd-with-mock
+[[ -z $SAFE_MOCK_VAULT_PATH ]] && export SAFE_MOCK_VAULT_PATH=$SAFE_AUTHD_MOCK_PATH
 
 uname_output=$(uname -a)
 authd_bin_name="safe-authd"

@@ -21,7 +21,7 @@ use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
-    ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, Coins,
+    ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, ClientFullId, Coins,
     Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
     MDataSeqValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction,
     TransactionId, XorName,
@@ -118,9 +118,10 @@ impl SafeApp for SafeAppScl {
     ) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
+            let from_fullid = from_sk.map(|sk| ClientFullId::from(sk));
             client
                 .create_balance(
-                    from_sk.as_ref(),
+                    from_fullid.as_ref(),
                     SafeNdPublicKey::Bls(new_balance_owner),
                     amount,
                     None,
@@ -142,7 +143,7 @@ impl SafeApp for SafeAppScl {
     fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
-        test_create_balance(&owner_sk, amount)
+        test_create_balance(&ClientFullId::from(owner_sk), amount)
             .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 
         Ok(xorname)
@@ -151,7 +152,9 @@ impl SafeApp for SafeAppScl {
     fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
         let safe_app: &App = self.get_safe_app()?;
         let coins = run(safe_app, move |client, _app_context| {
-            client.get_balance(Some(&sk)).map_err(SafeAppError)
+            client
+                .get_balance(Some(&ClientFullId::from(sk)))
+                .map_err(SafeAppError)
         })
         .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
 
@@ -167,8 +170,9 @@ impl SafeApp for SafeAppScl {
     ) -> Result<Transaction> {
         let safe_app: &App = self.get_safe_app()?;
         let tx = run(safe_app, move |client, _app_context| {
+            let from_fullid = from_sk.map(|sk| ClientFullId::from(sk));
             client
-                .transfer_coins(from_sk.as_ref(), to_xorname, amount, Some(tx_id))
+                .transfer_coins(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
                 .map_err(SafeAppError)
         })
         .map_err(|err| match err {
@@ -585,7 +589,11 @@ fn get_owner_pk(safe_app: &App) -> Result<SafeNdPublicKey> {
 
 fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
     run(safe_app, move |client, _app_context| {
-        Ok(client.public_bls_key())
+        let pk = client
+            .public_key()
+            .bls()
+            .ok_or("it's not a BLS Public Key".to_string())?;
+        Ok(pk)
     })
     .map_err(|err| {
         Error::Unexpected(format!(

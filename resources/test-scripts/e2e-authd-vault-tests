@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -e -x
+source ./resources/test-scripts/run-vault-and-authd
+
+# run the api tests with vault
+function run_api_tests_with_local_vault() {
+    cd safe-api
+    echo "Run let's run the api tests against local vault..."
+    cargo test --lib --release --features=fake-auth
+    cargo test --doc --release --features=fake-auth
+    cd -
+}
+
+# run the integration tests but without fake-auth,
+# using the safe-authd to get credentials and against local vault
+function run_cli_tests_with_auth_daemon() {
+    cd safe-cli
+    passphrase=${RANDOM:0:6}
+    password=${RANDOM:0:6}
+    # create account
+    echo "Creating account by sending 'create-acc' request to authd..."
+    SAFE_AUTH_PASSPHRASE=$passphrase SAFE_AUTH_PASSWORD=$password cargo run --release \
+    -- auth create-acc --test-coins
+
+    # get auth credentials which will be then used by the integration tests to connect to mock-network
+    echo "Logging in by sending 'login' request to authd:"
+    SAFE_AUTH_PASSPHRASE=$passphrase SAFE_AUTH_PASSWORD=$password cargo run --release \
+    -- auth login --self-auth
+
+    echo "Run let's run the CLI integration tests..."
+    cargo test --release --test cli_cat
+    cargo test --release --test cli_dog
+    cargo test --release --test cli_files -- --test-threads=1
+    cargo test --release --test cli_keys
+    cargo test --release --test cli_wallet
+    cargo test --release --test cli_nrs
+    cd -
+}
+
+# Temporarily disabled
+#download_and_run_safe_vault
+#run_api_tests_with_local_vault
+#build_safe_authd
+#run_safe_authd
+#run_cli_tests_with_auth_daemon
