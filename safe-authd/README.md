@@ -89,7 +89,7 @@ When `safe-authd` sends a notification to each of the subscribers it also uses J
 
 ## Download
 
-The latest version of the SAFE Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/safe-authd/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.
+The latest version of the SAFE Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.
 
 If otherwise you prefer to build the SAFE Authenticator daemon from source code, please follow the instructions in the next two section below.
 
@@ -155,7 +155,7 @@ safe-authd service started successfully!
 
 ### Stop
 
-To stop the SAFE Authenticator daemon (`safe-authd`) we just run the following command (on Windows make sure you the `safe-authd.exe` executable):
+To stop the SAFE Authenticator daemon (`safe-authd`) we just run the following command (on Windows make sure you use the `safe-authd.exe` executable):
 ```shell
 $ safe-authd stop
 Stopping SAFE Authenticator daemon (safe-authd)...
@@ -164,7 +164,7 @@ Success, safe-authd (PID: <pid>) stopped!
 
 ### Restart
 
-We can also restart the SAFE Authenticator daemon (`safe-authd`) if it's already running, with the following command (on Windows make sure you the `safe-authd.exe` executable):
+We can also restart the SAFE Authenticator daemon (`safe-authd`) if it's already running, with the following command (on Windows make sure you use the `safe-authd.exe` executable):
 ```shell
 $ safe-authd restart
 Stopping SAFE Authenticator daemon (safe-authd)...

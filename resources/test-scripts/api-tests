@@ -1,7 +1,4 @@
 #!/bin/bash
-# This script will not work if called individually.
-# The integration tests require the auth daemon to be running.
-# It's better to either run the all-tests script or call Makefile targets.
 
 set -e -x
 

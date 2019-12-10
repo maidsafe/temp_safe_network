@@ -165,12 +165,18 @@ jobs:
   test-component:
     name: Test Component
     runs-on: ${{ matrix.os }}
+    env:
+      RUST_SODIUM_USE_PKG_CONFIG: 1
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        component: [api-tests, cli-tests]
+        component: [api-tests, cli-tests, e2e-authd-mock-tests]
     steps:
       - uses: actions/checkout@v1
+      - uses: actions/checkout@v1
+      - name: Install libsodium
+        shell: bash
+        run: brew install libsodium && brew install pkg-config
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal

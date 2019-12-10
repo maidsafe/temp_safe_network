@@ -2,7 +2,6 @@
 
 set -e -x
 
-source ./resources/test-scripts/run-auth-daemon
 cargo fmt -- --check
 source ./resources/test-scripts/api-tests
 source ./resources/test-scripts/cli-tests
