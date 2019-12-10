@@ -8,7 +8,6 @@
 
 use super::helpers::{get_from_arg_or_stdin, serialise_output, xorname_to_hex};
 use super::OutputFmt;
-use crate::operations::safe_net::connect;
 use log::debug;
 use prettytable::Table;
 use safe_api::{NrsMapContainerInfo, Safe, SafeData};
@@ -28,8 +27,6 @@ pub fn dog_commander(
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running dog for: {:?}", &url);
 
-    // TODO: switch to connect_without_auth(safe)?;
-    connect(safe)?;
     let content = safe.fetch(&url)?;
     match &content {
         SafeData::FilesContainer {

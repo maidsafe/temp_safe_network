@@ -134,7 +134,7 @@ pub fn auth_commander(
                         None
                     },
                 )?;
-                authorise_cli(safe, endpoint)?;
+                authorise_cli(safe, endpoint, true)?;
             }
             Ok(())
         }
@@ -198,6 +198,6 @@ pub fn auth_commander(
             let safe_authd = SafeAuthdClient::new(endpoint);
             authd_restart(&safe_authd)
         }
-        None => authorise_cli(safe, endpoint),
+        None => authorise_cli(safe, endpoint, false),
     }
 }

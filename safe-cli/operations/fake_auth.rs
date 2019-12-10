@@ -10,7 +10,11 @@ use crate::APP_ID;
 use log::debug;
 use safe_api::Safe;
 
-pub fn authorise_cli(_safe: &mut Safe, _endpoint: Option<String>) -> Result<(), String> {
+pub fn authorise_cli(
+    _safe: &mut Safe,
+    _endpoint: Option<String>,
+    _is_self_authing: bool,
+) -> Result<(), String> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file or send authorisation request");
     Ok(())
 }

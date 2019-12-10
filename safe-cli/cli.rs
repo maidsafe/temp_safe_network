@@ -91,8 +91,6 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
         Some(SubCommands::Config { cmd }) => config_commander(cmd),
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
         Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, &mut safe),
-        Some(SubCommands::Cat(cmd)) => cat_commander(cmd, output_fmt, &mut safe),
-        Some(SubCommands::Dog(cmd)) => dog_commander(cmd, output_fmt, &mut safe),
         Some(SubCommands::Keypair {}) => {
             let key_pair = safe.keypair()?;
             if OutputFmt::Pretty == output_fmt {
@@ -108,10 +106,13 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
         Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, &mut safe),
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
         Some(other) => {
-            // We treat these separatelly since we need to connect before
-            // handling any of these commands
+            // We treat these separatelly since we use the credentials if they are available to
+            // connect to the network with them, otherwise the connection created will be with
+            // read-only access and some of these commands will fail if they require write access
             connect(&mut safe)?;
             match other {
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe),
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, &mut safe),
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, &mut safe),

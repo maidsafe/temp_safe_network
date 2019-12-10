@@ -8,7 +8,6 @@
 
 use super::helpers::{get_from_arg_or_stdin, serialise_output};
 use super::OutputFmt;
-use crate::operations::safe_net::connect;
 use log::debug;
 use pretty_hex;
 use prettytable::Table;
@@ -33,8 +32,6 @@ pub fn cat_commander(
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &url);
 
-    // TODO: switch to connect_without_auth(safe)?;
-    connect(safe)?;
     let content = safe.fetch(&url)?;
     match &content {
         SafeData::FilesContainer {
