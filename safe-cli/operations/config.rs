@@ -14,7 +14,7 @@ use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fs::{self, create_dir_all};
+use std::fs::{self, create_dir_all, remove_file};
 use std::path::PathBuf;
 
 const CONFIG_FILENAME: &str = "config.json";
@@ -101,10 +101,32 @@ pub fn add_network_to_config(
 
 pub fn remove_network_from_config(network_name: &str) -> Result<(), String> {
     let (mut settings, file_path) = read_config_settings()?;
-    settings.networks.remove(network_name);
-    write_config_settings(&file_path, settings)?;
-    debug!("Network {} removed from settings", network_name);
-    println!("Network '{}' was removed from the list", network_name);
+    match settings.networks.remove(network_name) {
+        Some(location) => {
+            write_config_settings(&file_path, settings)?;
+            debug!("Network {} removed from settings", network_name);
+            println!("Network '{}' was removed from the list", network_name);
+            let mut config_local_path = get_cli_config_path()?;
+            config_local_path.push(CONFIG_NETWORKS_DIRNAME);
+            if PathBuf::from(&location).starts_with(config_local_path) {
+                println!(
+                    "Removing cached network connection information from {}",
+                    location
+                );
+                remove_file(&location).map_err(|err| {
+                    format!(
+                        "Failed to remove cached network connection information from {}: {}",
+                        location, err
+                    )
+                })?;
+            }
+        }
+        None => println!(
+            "No network with name '{}' was found in config",
+            network_name
+        ),
+    }
+
     Ok(())
 }
 
@@ -221,7 +243,7 @@ pub fn retrieve_conn_info(name: &str, location: &str) -> Result<Vec<u8>, String>
         "Fetching '{}' network connection information from '{}' ...",
         name, location
     );
-    if location.starts_with("http") {
+    if is_remote_location(location) {
         // Fetch info from an HTTP/s location
         let mut resp = reqwest::get(location).map_err(|err| {
             format!(
@@ -247,4 +269,9 @@ pub fn retrieve_conn_info(name: &str, location: &str) -> Result<Vec<u8>, String>
         })?;
         Ok(conn_info)
     }
+}
+
+#[inline]
+fn is_remote_location(location: &str) -> bool {
+    location.starts_with("http")
 }
