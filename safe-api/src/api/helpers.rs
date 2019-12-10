@@ -156,6 +156,7 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Coins> {
     })
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum AuthResponseType {
     Registered(AuthGranted),
     Unregistered(BootstrapConfig),
@@ -168,10 +169,10 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
         IpcMsg::Resp { resp, .. } => {
             match resp {
                 IpcResp::Auth(res) => res
-                    .map(|authgranted| AuthResponseType::Registered(authgranted))
+                    .map(AuthResponseType::Registered)
                     .map_err(|err| Error::AuthError(format!("{:?}", err))),
                 IpcResp::Unregistered(res) => res
-                    .map(|config| AuthResponseType::Unregistered(config))
+                    .map(AuthResponseType::Unregistered)
                     .map_err(|err| Error::AuthError(format!("{:?}", err))),
                 _ => Err(Error::AuthError(
                     "Doesn't support other request.".to_string(),
