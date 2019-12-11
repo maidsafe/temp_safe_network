@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{unwrap_or_gen_random, xorname_from_pk, xorname_to_hex, AuthResponseType};
+use super::helpers::{unwrap_or_gen_random, xorname_from_pk, xorname_to_hex};
 use super::safe_net::AppendOnlyDataRawData;
 use super::{Error, Result, SafeApp};
 use futures::future::Future;
@@ -15,7 +15,7 @@ use safe_app::{run, App, AppError::CoreError as SafeAppError};
 use safe_core::{client::test_create_balance, immutable_data, CoreError as SafeCoreError};
 
 #[cfg(not(feature = "fake-auth"))]
-use super::helpers::decode_ipc_msg;
+use super::helpers::{decode_ipc_msg, AuthResponseType};
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;

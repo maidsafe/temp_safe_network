@@ -166,28 +166,19 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
     let msg = decode_msg(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
-        IpcMsg::Resp { resp, .. } => {
-            match resp {
-                IpcResp::Auth(res) => res
-                    .map(AuthResponseType::Registered)
-                    .map_err(|err| Error::AuthError(format!("{:?}", err))),
-                IpcResp::Unregistered(res) => res
-                    .map(AuthResponseType::Unregistered)
-                    .map_err(|err| Error::AuthError(format!("{:?}", err))),
-                _ => Err(Error::AuthError(
-                    "Doesn't support other request.".to_string(),
-                )),
-                // IpcResp::Auth(res) => match res {
-                //     Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
-                //     Err(e) => Err(Error::AuthError(format!("{:?}", e)))
-                // },
-                // IpcResp::Unregistered(res) => match res {
-                //     Ok(config) => Ok(AuthResponseType::Unregistered(config)),
-                //     Err(e) => Err(Error::AuthError(format!("{:?}", e)))
-                // },
-                // _ => Err(Error::AuthError("Doesn't support other request.".to_string()))
-            }
-        }
+        IpcMsg::Resp { resp, .. } => match resp {
+            IpcResp::Auth(res) => match res {
+                Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
+                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
+            },
+            IpcResp::Unregistered(res) => match res {
+                Ok(config) => Ok(AuthResponseType::Unregistered(config)),
+                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
+            },
+            _ => Err(Error::AuthError(
+                "Doesn't support other request.".to_string(),
+            )),
+        },
         IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
