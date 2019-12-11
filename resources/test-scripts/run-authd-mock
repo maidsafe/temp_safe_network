@@ -10,9 +10,11 @@ authd_bin_name="safe-authd"
 case $uname_output in
     MSYS_NT*)   # Windows in Jenkins
         authd_bin_name="safe-authd.exe"
+        setx SAFE_MOCK_VAULT_PATH "$SAFE_MOCK_VAULT_PATH" -m
         ;;
     MINGW*)     # Windows in GH Actions
         authd_bin_name="safe-authd.exe"
+        setx SAFE_MOCK_VAULT_PATH "$SAFE_MOCK_VAULT_PATH" -m
         ;;
 esac
 
@@ -29,7 +31,7 @@ function build_safe_authd_with_mock() {
 
 function run_safe_authd_with_mock() {
     cd $SAFE_AUTHD_MOCK_PATH
-
+    echo $SAFE_MOCK_VAULT_PATH
     # this won't have any effect on Linux/Mac, but it's required for Windows
     ./$authd_bin_name install || true
 

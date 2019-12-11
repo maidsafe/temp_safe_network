@@ -80,7 +80,6 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_SIGN_ID: ${{ secrets.APPLE_SIGN_ID }}
       APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-      RUST_SODIUM_USE_PKG_CONFIG : 1
     strategy:
       matrix:
         os: [macos-latest]
@@ -91,9 +90,6 @@ jobs:
             output: libsafe_ffi.dylib
     steps:
       - uses: actions/checkout@v1
-      - name: Install libsodium
-        shell: bash
-        run: brew install libsodium && brew install pkg-config
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -126,7 +122,6 @@ jobs:
             target: safe-authd
             output: safe-authd-x86_64-apple-darwin
     env:
-      RUST_SODIUM_USE_PKG_CONFIG : 1
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_SIGN_ID: ${{ secrets.APPLE_SIGN_ID }}
       APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
@@ -136,9 +131,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
-      - name: Install libsodium
-        shell: bash
-        run: brew install libsodium && brew install pkg-config
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -190,13 +182,9 @@ jobs:
       matrix:
         target: [aarch64-apple-ios, x86_64-apple-ios]
     env:
-      RUST_SODIUM_USE_PKG_CONFIG: 1
       PKG_CONFIG_ALLOW_CROSS: 1
       DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
     steps:
-      - name: Install libsodium
-        shell: bash
-        run: brew install libsodium && brew install pkg-config
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
         with:
@@ -324,7 +312,7 @@ jobs:
           ffi_version=$(grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=cli_version::$cli_version"
-          echo "::set-output name=authd_version::$cli_version"
+          echo "::set-output name=authd_version::$authd_version"
           echo "::set-output name=ffi_version::$ffi_version"
 
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
@@ -344,7 +332,7 @@ jobs:
       - shell: bash
         id: release_description
         run: |
-          description=$(./resources/get_release_description.sh ${{ steps.versioning.outputs.api_version }} ${{ steps.versioning.outputs.cli_version }} ${{ steps.versioning.outputs.ffi_version }})
+          description=$(./resources/get_release_description.sh ${{ steps.versioning.outputs.api_version }} ${{ steps.versioning.outputs.cli_version }} ${{ steps.versioning.outputs.ffi_version }} ${{ steps.versioning.outputs.authd_version }})
           description="${description//'%'/'%25'}"
           description="${description//$'\n'/'%0A'}"
           description="${description//$'\r'/'%0D'}"
@@ -406,13 +394,6 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
           asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
-          asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
-      - uses: actions/upload-release-asset@v1.0.1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: resources/safe_completion.sh
-          asset_name: safe_completion.sh
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 
