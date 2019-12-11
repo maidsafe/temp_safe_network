@@ -14,16 +14,22 @@ pub use self::rng::TestRng;
 
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
+#[cfg(feature = "mock-parsec")]
+use fake_clock::FakeClock;
 use routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
+#[cfg(feature = "mock-parsec")]
+use routing::{NetworkConfig, Node};
 use safe_nd::{
     AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, Error, HandshakeRequest,
     HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey, Request, Response,
     Signature, Transaction, TransactionId,
 };
+#[cfg(feature = "mock")]
 use safe_vault::{
-    routing::{ConsensusGroup, ConsensusGroupRef, Node},
-    Command, Config, Vault,
+    mock_routing::{ConsensusGroup, ConsensusGroupRef},
+    routing::Node,
 };
+use safe_vault::{Command, Config, Vault};
 use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
@@ -48,10 +54,12 @@ pub struct Environment {
     rng: TestRng,
     network: Network,
     vaults: Vec<TestVault>,
+    #[cfg(feature = "mock")]
     _consensus_group: ConsensusGroupRef,
 }
 
 impl Environment {
+    #[cfg(feature = "mock")]
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 0);
 
@@ -61,14 +69,17 @@ impl Environment {
         let vaults = if num_vaults > 1 {
             let mut vaults = Vec::with_capacity(num_vaults);
             for _ in 0..num_vaults {
-                vaults.push(TestVault::new(
+                vaults.push(TestVault::new_with_mock_routing(
                     Some(consensus_group.clone()),
                     rng::new(network.new_rng()),
                 ));
             }
             vaults
         } else {
-            vec![TestVault::new(None, rng::new(network.new_rng()))]
+            vec![TestVault::new_with_mock_routing(
+                None,
+                rng::new(network.new_rng()),
+            )]
         };
 
         Self {
@@ -79,6 +90,51 @@ impl Environment {
         }
     }
 
+    #[cfg(feature = "mock-parsec")]
+    pub fn with_multiple_vaults(num_vaults: usize) -> Self {
+        assert!(num_vaults > 0);
+
+        let network = Network::new(Default::default());
+
+        let mut env = Self {
+            rng: rng::new(),
+            network,
+            vaults: Default::default(),
+        };
+
+        if num_vaults > 1 {
+            env.vaults
+                .push(TestVault::new_with_real_routing_first(rng::new(
+                    network.new_rng(),
+                )));
+
+            while !env.vaults[0].is_elder() {
+                env.poll()
+            }
+            let endpoint = env.vaults[0].connection_info();
+
+            // Create other nodes using the seed node endpoint as bootstrap contact.
+            let config = NetworkConfig::node().with_hard_coded_contact(endpoint);
+
+            for i in 1..num_vaults {
+                env.vaults.push(TestVault::new_with_real_routing(
+                    config.clone(),
+                    rng::new(network.new_rng()),
+                ));
+                while !env.vaults[i].is_elder() {
+                    env.poll()
+                }
+            }
+        } else {
+            env.vaults
+                .push(TestVault::new_with_real_routing_first(rng::new(
+                    network.new_rng(),
+                )));
+        }
+
+        env
+    }
+
     pub fn new() -> Self {
         Self::with_multiple_vaults(DEFAULT_NUM_VAULTS)
     }
@@ -87,12 +143,27 @@ impl Environment {
         &mut self.rng
     }
 
+    #[cfg(not(feature = "mock-parsec"))]
     // Poll the mock network and the environment's vault.
     pub fn poll(&mut self) {
         let mut progress = true;
         while progress {
             self.network.poll();
             progress = self.vaults.iter_mut().any(|vault| vault.inner.poll());
+        }
+    }
+
+    #[cfg(feature = "mock-parsec")]
+    // Poll the mock network and the environment's vault.
+    pub fn poll(&mut self) {
+        let mut max_poll = 0;
+        while max_poll < 100 {
+            max_poll += 1;
+            self.network.poll();
+            let _ = self.vaults.iter_mut().for_each(|vault| {
+                let _ = vault.inner.poll();
+            });
+            FakeClock::advance_time(1001);
         }
     }
 
@@ -145,8 +216,10 @@ struct TestVault {
 
 impl TestVault {
     /// Create a test Vault within a group.
-    fn new(consensus_group: Option<ConsensusGroupRef>, mut rng: TestRng) -> Self {
+    #[cfg(feature = "mock")]
+    fn new_with_mock_routing(consensus_group: Option<ConsensusGroupRef>, mut rng: TestRng) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
+        println!("creating a test vault at root_dir {:?}", root_dir);
 
         let mut config = Config::default();
         config.set_root_dir(root_dir.path());
@@ -173,8 +246,65 @@ impl TestVault {
         }
     }
 
+    #[cfg(feature = "mock-parsec")]
+    fn new_with_real_routing(network_config: NetworkConfig, mut rng: TestRng) -> Self {
+        let root_dir = unwrap!(TempDir::new("safe_vault"));
+        println!("creating a test vault at root_dir {:?}", root_dir);
+
+        let mut config = Config::default();
+        config.set_root_dir(root_dir.path());
+
+        let (command_tx, command_rx) = crossbeam_channel::bounded(0);
+        let (routing_node, routing_rx) =
+            unwrap!(Node::builder().network_config(network_config).create());
+        let inner = unwrap!(Vault::new(
+            routing_node,
+            routing_rx,
+            config,
+            command_rx,
+            &mut rng
+        ));
+
+        Self {
+            inner,
+            _root_dir: root_dir,
+            _command_tx: command_tx,
+        }
+    }
+
+    #[cfg(feature = "mock-parsec")]
+    fn new_with_real_routing_first(mut rng: TestRng) -> Self {
+        let root_dir = unwrap!(TempDir::new("safe_vault"));
+        println!("creating a test vault at root_dir {:?}", root_dir);
+
+        let mut config = Config::default();
+        config.set_root_dir(root_dir.path());
+
+        let (command_tx, command_rx) = crossbeam_channel::bounded(0);
+
+        let (routing_node, routing_rx) = unwrap!(Node::builder().first(true).create());
+        let inner = unwrap!(Vault::new(
+            routing_node,
+            routing_rx,
+            config,
+            command_rx,
+            &mut rng
+        ));
+
+        Self {
+            inner,
+            _root_dir: root_dir,
+            _command_tx: command_tx,
+        }
+    }
+
     fn connection_info(&mut self) -> NodeInfo {
         unwrap!(self.inner.our_connection_info())
+    }
+
+    #[cfg(feature = "mock-parsec")]
+    fn is_elder(&mut self) -> bool {
+        self.inner.is_elder()
     }
 }
 

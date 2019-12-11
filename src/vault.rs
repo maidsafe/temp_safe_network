@@ -20,6 +20,8 @@ use bincode;
 use crossbeam_channel::{Receiver, Select};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng};
+#[cfg(feature = "mock-parsec")]
+use routing::EventStream;
 use safe_nd::{NodeFullId, Request, XorName};
 use std::borrow::Cow;
 use std::{
@@ -141,6 +143,12 @@ impl Vault {
             .map_err(From::from)
     }
 
+    #[cfg(feature = "mock-parsec")]
+    /// Returns whether routing node is in elder state.
+    pub fn is_elder(&mut self) -> bool {
+        self.routing_node.borrow().is_elder()
+    }
+
     /// Runs the main event loop. Blocks until the vault is terminated.
     // FIXME: remove when https://github.com/crossbeam-rs/crossbeam/issues/404 is resolved
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
@@ -190,8 +198,18 @@ impl Vault {
     /// Returns whether at least one event was processed.
     pub fn poll(&mut self) -> bool {
         let mut processed = false;
-
+        let mut max_poll = 0;
         loop {
+            max_poll += 1;
+            if processed || max_poll > 1000 {
+                return processed;
+            }
+
+            #[cfg(feature = "mock-parsec")]
+            {
+                processed = self.routing_node.borrow_mut().poll();
+            }
+
             let mut sel = Select::new();
             let mut r_node = self.routing_node.borrow_mut();
             r_node.register(&mut sel);
@@ -221,12 +239,12 @@ impl Vault {
                         processed = true;
                     }
                     idx => {
-                        if let Err(err) = self
+                        if let Err(_err) = self
                             .routing_node
                             .borrow_mut()
                             .handle_selected_operation(idx)
                         {
-                            warn!("Could not process operation: {}", err);
+                            // warn!("Could not process operation: {}", err);
                         }
                     }
                 }
