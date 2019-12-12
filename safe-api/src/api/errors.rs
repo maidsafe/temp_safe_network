@@ -31,7 +31,7 @@ pub enum Error {
     InvalidXorUrl(String),
     InvalidMediaType(String),
     NotEnoughBalance(String),
-    FilesSystemError(String),
+    FileSystemError(String),
     Unexpected(String),
     Unknown(String),
 }
@@ -66,7 +66,7 @@ impl fmt::Display for Error {
             InvalidXorUrl(info) => ("InvalidXorUrl", info),
             InvalidMediaType(info) => ("InvalidMediaType", info),
             NotEnoughBalance(info) => ("NotEnoughBalance", info),
-            FilesSystemError(info) => ("FilesSystemError", info),
+            FileSystemError(info) => ("FileSystemError", info),
             Unexpected(info) => ("Unexpected", info),
             Unknown(info) => ("Unknown", info),
         };

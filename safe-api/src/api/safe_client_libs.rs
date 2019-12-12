@@ -212,18 +212,27 @@ impl SafeApp for SafeAppScl {
         Ok("Success(0)".to_string())
     }
 
-    fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName> {
+    fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
 
         let data_vec = data.to_vec();
         let idata = run(safe_app, move |client, _app_context| {
             let client2 = client.clone();
-            immutable_data::create(
-                client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
-            )
+            if dry_run {
+                immutable_data::gen_data_map(
+                    client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+                )
+            } else {
+                immutable_data::create(
+                    client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+                )
+            }
             .and_then(move |data_map| {
                 let address = *data_map.address();
-                client2.put_idata(data_map).map(move |_| address)
+                if !dry_run {
+                    let _ = client2.put_idata(data_map);
+                }
+                futures::future::ok(address)
             })
             .map_err(SafeAppError)
         })

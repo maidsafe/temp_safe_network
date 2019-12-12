@@ -82,7 +82,7 @@ impl ErrorCode for Error {
             InvalidAmount(ref _error) => ERR_INVALID_AMOUNT_ERROR,
             InvalidXorUrl(ref _error) => ERR_INVALID_XOR_URL_ERROR,
             NotEnoughBalance(ref _error) => ERR_NOT_ENOUGH_BALANCE_ERROR,
-            FilesSystemError(ref _error) => ERR_FILE_SYSTEM_ERROR,
+            FileSystemError(ref _error) => ERR_FILE_SYSTEM_ERROR,
             InvalidMediaType(ref _error) => ERR_INVALID_MEDIA_TYPE_ERROR,
             Unexpected(ref _error) => ERR_UNEXPECTED_ERROR,
             Unknown(ref _error) => ERR_UNKNOWN_ERROR,

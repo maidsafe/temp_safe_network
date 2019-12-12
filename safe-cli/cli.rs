@@ -22,6 +22,7 @@ use crate::subcommands::nrs::nrs_commander;
 use crate::subcommands::setup::setup_commander;
 use crate::subcommands::update::update_commander;
 use crate::subcommands::wallet::wallet_commander;
+use crate::subcommands::xorurl::xorurl_commander;
 use crate::subcommands::{OutputFmt, SubCommands};
 use safe_api::{Safe, XorUrlBase};
 
@@ -116,6 +117,7 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
                 SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, &mut safe),
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, &mut safe),
+                SubCommands::Xorurl(cmd) => xorurl_commander(cmd, output_fmt, &mut safe),
                 _ => Err("Unknown safe subcommand".to_string()),
             }
         }

@@ -20,6 +20,7 @@ pub mod safe_id;
 pub mod setup;
 pub mod update;
 pub mod wallet;
+pub mod xorurl;
 
 use auth::AuthSubCommands;
 use structopt::StructOpt;
@@ -99,6 +100,9 @@ pub enum SubCommands {
     #[structopt(name = "wallet")]
     /// Manage wallets on the SAFE Network
     Wallet(wallet::WalletSubCommands),
+    #[structopt(name = "xorurl")]
+    /// Obtain the XOR-URL of data without uploading it to the network
+    Xorurl(xorurl::XorurlSubCommands),
     // #[structopt(name = "safe-id")]
     // /// Manage identities on the SAFE Network
     // SafeId(safe_id::SafeIdSubCommands),

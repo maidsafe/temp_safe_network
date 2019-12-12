@@ -239,12 +239,14 @@ impl SafeApp for SafeAppFake {
         Ok(tx_state.to_string())
     }
 
-    fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName> {
+    fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         let xorname = create_random_xorname()?;
-        // TODO: hash to get xorname.
-        self.fake_vault
-            .published_immutable_data
-            .insert(xorname_to_hex(&xorname), data.to_vec());
+        if !dry_run {
+            // TODO: hash to get xorname.
+            self.fake_vault
+                .published_immutable_data
+                .insert(xorname_to_hex(&xorname), data.to_vec());
+        }
 
         Ok(xorname)
     }

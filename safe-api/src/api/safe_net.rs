@@ -47,7 +47,7 @@ pub trait SafeApp {
 
     fn get_transaction(&self, tx_id: u64, pk: PublicKey, sk: SecretKey) -> Result<String>;
 
-    fn files_put_published_immutable(&mut self, data: &[u8]) -> Result<XorName>;
+    fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
 
     fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>>;
 

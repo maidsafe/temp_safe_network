@@ -62,7 +62,7 @@ impl Safe {
         // Warn about ownership?
 
         // Let's upload the files and generate the list of local files paths
-        let processed_files = file_system_dir_walk(self, location, recursive, !dry_run)?;
+        let processed_files = file_system_dir_walk(self, location, recursive, dry_run)?;
 
         // The FilesContainer is created as a AppendOnlyData with a single entry containing the
         // timestamp as the entry's key, and the serialised FilesMap as the entry's value
@@ -237,7 +237,7 @@ impl Safe {
             self.files_container_get(&xorurl_encoder.to_string()?)?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
-        let processed_files = file_system_dir_walk(self, location, recursive, false)?;
+        let processed_files = file_system_dir_walk(self, location, recursive, true)?;
 
         let dest_path = Some(xorurl_encoder.path());
 
@@ -249,7 +249,7 @@ impl Safe {
                 processed_files,
                 dest_path,
                 delete,
-                !dry_run,
+                dry_run,
                 false,
                 true,
             )?;
@@ -301,7 +301,7 @@ impl Safe {
             files_map_add_link(self, current_files_map, source_file, dest_path, force)?
         } else {
             // Let's generate the list of local files paths, without uploading any new file yet
-            let processed_files = file_system_single_file(self, source_file, false)?;
+            let processed_files = file_system_single_file(self, source_file, true)?;
 
             files_map_sync(
                 self,
@@ -356,7 +356,7 @@ impl Safe {
             validate_files_add_params(self, "", url, update_nrs)?;
 
         let dest_path = xorurl_encoder.path();
-        let new_file_xorurl = self.files_put_published_immutable(data, None)?;
+        let new_file_xorurl = self.files_put_published_immutable(data, None, false)?;
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
@@ -438,7 +438,7 @@ impl Safe {
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let data = b"Something super good";
-    /// let xorurl = safe.files_put_published_immutable(data, Some("text/plain")).unwrap();
+    /// let xorurl = safe.files_put_published_immutable(data, Some("text/plain"), false).unwrap();
     /// # let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
@@ -446,6 +446,7 @@ impl Safe {
         &mut self,
         data: &[u8],
         media_type: Option<&str>,
+        dry_run: bool,
     ) -> Result<XorUrl> {
         let content_type = media_type.map_or_else(
             || Ok(SafeContentType::Raw),
@@ -462,7 +463,9 @@ impl Safe {
         )?;
 
         // TODO: do we want ownership from other PKs yet?
-        let xorname = self.safe_app.files_put_published_immutable(&data)?;
+        let xorname = self
+            .safe_app
+            .files_put_published_immutable(&data, dry_run)?;
 
         XorUrlEncoder::encode(
             xorname,
@@ -485,7 +488,7 @@ impl Safe {
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # let data = b"Something super good";
-    /// let xorurl = safe.files_put_published_immutable(data, None).unwrap();
+    /// let xorurl = safe.files_put_published_immutable(data, None, false).unwrap();
     /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
@@ -610,7 +613,7 @@ fn gen_new_file_item(
     let now = gen_timestamp_secs();
     let mut file_item = FileItem::new();
     let xorurl = match link {
-        None => upload_file_to_net(safe, file_path)?,
+        None => upload_file_to_net(safe, file_path, false)?,
         Some(link) => link.to_string(),
     };
     file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl);
@@ -694,7 +697,7 @@ fn files_map_sync(
     new_content: ProcessedFiles,
     dest_path: Option<&str>,
     delete: bool,
-    upload_files: bool,
+    dry_run: bool,
     force: bool,
     compare_file_content: bool,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
@@ -721,7 +724,7 @@ fn files_map_sync(
         let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()));
 
         // Let's update FileItem if there is a change or it doesn't exist in current_files_map
-        let link = if upload_files { None } else { Some("") };
+        let link = if dry_run { Some("") } else { None };
         match current_files_map.get(&normalised_file_name) {
             None => {
                 // We need to add a new FileItem
@@ -897,17 +900,17 @@ fn files_map_add_link(
 }
 
 // Upload a files to the Network as a Published-ImmutableData
-fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<XorUrl> {
+fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
 
     let mime_type = mime_guess::from_path(&path);
-    safe.files_put_published_immutable(&data, mime_type.first_raw())
+    safe.files_put_published_immutable(&data, mime_type.first_raw(), dry_run)
         .or_else(|err| {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_put_published_immutable(&data, None)
+                safe.files_put_published_immutable(&data, None, dry_run)
             } else {
                 Err(err)
             }
@@ -917,7 +920,7 @@ fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<XorUrl> {
 // Get file metadata from local filesystem
 fn get_metadata(path: &Path) -> Result<(fs::Metadata, String)> {
     let metadata = fs::metadata(path).map_err(|err| {
-        Error::FilesSystemError(format!(
+        Error::FileSystemError(format!(
             "Couldn't read metadata from source path ('{}'): {}",
             path.display(),
             err
@@ -931,13 +934,13 @@ fn get_metadata(path: &Path) -> Result<(fs::Metadata, String)> {
 }
 
 // Walk the local filesystem starting from `location`, creating a list of files paths,
-// and if requested with `upload_files` arg, upload the files to the network filling up
+// and if not requested as a `dry_run` upload the files to the network filling up
 // the list of files with their corresponding XOR-URLs
 fn file_system_dir_walk(
     safe: &mut Safe,
     location: &str,
     recursive: bool,
-    upload_files: bool,
+    dry_run: bool,
 ) -> Result<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading files from {}", file_path.display());
@@ -962,8 +965,8 @@ fn file_system_dir_walk(
                         if metadata.is_dir() {
                             // Everything is in the iter. We dont need to recurse.
                             // so what do we do with dirs? decide if we want to support empty dirs also
-                        } else if upload_files {
-                            match upload_file_to_net(safe, &current_file_path) {
+                        } else {
+                            match upload_file_to_net(safe, &current_file_path, dry_run) {
                                 Ok(xorurl) => {
                                     processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
                                 }
@@ -974,8 +977,6 @@ fn file_system_dir_walk(
                                     normalised_path, err);
                                 },
                             };
-                        } else {
-                            processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), "".to_string()));
                         }
                     },
                     Err(err) => {
@@ -1009,12 +1010,12 @@ fn not_hidden_and_valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
 }
 
 // Read the local filesystem at `location`, creating a list of one single file's path,
-// and if requested with `upload_files` arg, upload the file to the network and putting
+// and if not as a `dry_run` upload the file to the network and putting
 // the obtained XOR-URL in the single file list returned
 fn file_system_single_file(
     safe: &mut Safe,
     location: &str,
-    upload_files: bool,
+    dry_run: bool,
 ) -> Result<ProcessedFiles> {
     let file_path = Path::new(location);
     info!("Reading file {}", file_path.display());
@@ -1028,8 +1029,8 @@ fn file_system_single_file(
             "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",
             location
         )))
-    } else if upload_files {
-        match upload_file_to_net(safe, &file_path) {
+    } else {
+        match upload_file_to_net(safe, &file_path, dry_run) {
             Ok(xorurl) => {
                 processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
             }
@@ -1041,12 +1042,6 @@ fn file_system_single_file(
                 info!("Skipping file \"{}\". {}", normalised_path, err);
             }
         };
-        Ok(processed_files)
-    } else {
-        processed_files.insert(
-            normalised_path,
-            (CONTENT_ADDED_SIGN.to_string(), "".to_string()),
-        );
         Ok(processed_files)
     }
 }
@@ -2129,7 +2124,7 @@ mod tests {
 
         match safe.files_container_sync("/non-existing-path", &xorurl, false, false, false, false) {
             Ok(_) => panic!("unexpectdly added a folder to files container"),
-            Err(Error::FilesSystemError(msg)) => {
+            Err(Error::FileSystemError(msg)) => {
                 assert!(msg
                     .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
             }
@@ -2147,7 +2142,7 @@ mod tests {
             false,
         ) {
             Ok(_) => panic!("unexpectdly added a folder to files container"),
-            Err(Error::FilesSystemError(msg)) => {
+            Err(Error::FileSystemError(msg)) => {
                 assert!(msg
                     .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
             }
@@ -2168,7 +2163,7 @@ mod tests {
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
         let data = b"0123456789";
-        let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
+        let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None, false));
         let new_filename = "/new_filename_test.md";
 
         let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
@@ -2209,7 +2204,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let other_file_xorurl = unwrap!(safe.files_put_published_immutable(data, None));
+        let other_file_xorurl = unwrap!(safe.files_put_published_immutable(data, None, false));
         let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
             &other_file_xorurl,
             &format!("{}{}", xorurl, new_filename),

@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output};
+use super::helpers::{
+    gen_processed_files_table, get_from_arg_or_stdin, notice_dry_run, serialise_output,
+};
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{Safe, XorUrl, XorUrlEncoder};
@@ -119,7 +121,7 @@ pub fn files_commander(
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
-                let (table, success_count) = gen_processed_files_table(&processed_files);
+                let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
                     let url = match XorUrlEncoder::from_url(&target) {
                         Ok(mut xorurl_encoder) => {
@@ -165,7 +167,7 @@ pub fn files_commander(
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
-                let (table, success_count) = gen_processed_files_table(&processed_files);
+                let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
                     let url = match XorUrlEncoder::from_url(&target) {
                         Ok(mut xorurl_encoder) => {
@@ -196,23 +198,6 @@ pub fn files_commander(
             Ok(())
         }
     }
-}
-
-fn gen_processed_files_table(processed_files: &BTreeMap<String, (String, String)>) -> (Table, u64) {
-    let mut table = Table::new();
-    let format = FormatBuilder::new()
-        .column_separator(' ')
-        .padding(0, 1)
-        .build();
-    table.set_format(format);
-    let mut success_count = 0;
-    for (file_name, (change, link)) in processed_files.iter() {
-        if change != "E" {
-            success_count += 1;
-        }
-        table.add_row(row![change, file_name, link]);
-    }
-    (table, success_count)
 }
 
 fn print_serialized_output(

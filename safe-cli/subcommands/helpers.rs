@@ -8,8 +8,10 @@
 
 use super::OutputFmt;
 use log::debug;
+use prettytable::{format::FormatBuilder, Table};
 use safe_api::XorName;
 use serde::ser::Serialize;
+use std::collections::BTreeMap;
 use std::io::{self, stdin, stdout, Write};
 
 // Warn the user about a dry-run being performed
@@ -87,6 +89,30 @@ pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result
 pub fn parse_tx_id(src: &str) -> Result<u64, String> {
     src.parse::<u64>()
         .map_err(|err| format!("{}. A valid TX Id is a number between 0 and 2^64", err))
+}
+
+pub fn gen_processed_files_table(
+    processed_files: &BTreeMap<String, (String, String)>,
+    show_change_sign: bool,
+) -> (Table, u64) {
+    let mut table = Table::new();
+    let format = FormatBuilder::new()
+        .column_separator(' ')
+        .padding(0, 1)
+        .build();
+    table.set_format(format);
+    let mut success_count = 0;
+    for (file_name, (change, link)) in processed_files.iter() {
+        if change != "E" {
+            success_count += 1;
+        }
+        if show_change_sign {
+            table.add_row(row![change, file_name, link]);
+        } else {
+            table.add_row(row![file_name, link]);
+        }
+    }
+    (table, success_count)
 }
 
 // serialize structured value using any format from OutputFmt
