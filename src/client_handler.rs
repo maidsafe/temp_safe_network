@@ -25,6 +25,7 @@ use crate::{
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
+use rand::{CryptoRng, Rng};
 use safe_nd::{
     AData, ADataAddress, AppPermissions, AppPublicId, Coins, ConnectionInfo, Error as NdError,
     HandshakeRequest, HandshakeResponse, IData, IDataAddress, IDataKind, LoginPacket, MData,
@@ -57,6 +58,7 @@ pub(crate) struct ClientHandler {
     balances: BalancesDb,
     clients: HashMap<SocketAddr, ClientInfo>,
     pending_msg_ids: HashMap<MessageId, SocketAddr>,
+    pending_actions: HashMap<MessageId, Response>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
     login_packets: LoginPacketChunkStore,
@@ -87,6 +89,7 @@ impl ClientHandler {
             balances,
             clients: Default::default(),
             pending_msg_ids: Default::default(),
+            pending_actions: Default::default(),
             client_candidates: Default::default(),
             login_packets,
             routing_node,
@@ -177,7 +180,12 @@ impl ClientHandler {
         }
     }
 
-    pub fn handle_client_message(&mut self, peer_addr: SocketAddr, bytes: Bytes) -> Option<Action> {
+    pub fn handle_client_message<R: CryptoRng + Rng>(
+        &mut self,
+        peer_addr: SocketAddr,
+        bytes: Bytes,
+        rng: &mut R,
+    ) -> Option<Action> {
         if let Some(client) = self.clients.get(&peer_addr).cloned() {
             match bincode::deserialize(&bytes) {
                 Ok(Message::Request {
@@ -185,11 +193,27 @@ impl ClientHandler {
                     message_id,
                     signature,
                 }) => {
+                    // We could receive a consensused vault rpc contains a client request,
+                    // before receiving the request from that client directly.
+                    if let Some(response) = self.pending_actions.remove(&message_id) {
+                        self.send(
+                            peer_addr,
+                            &Message::Response {
+                                response,
+                                message_id,
+                            },
+                        );
+                        return None;
+                    }
+
                     if let Entry::Vacant(ve) = self.pending_msg_ids.entry(message_id) {
                         let _ = ve.insert(peer_addr);
                         return self.handle_client_request(&client, request, message_id, signature);
                     } else {
-                        info!("Pending MessageId reused - ignoring client message.");
+                        info!(
+                            "Pending MessageId {:?} reused - ignoring client message.",
+                            message_id
+                        );
                     }
                 }
                 Ok(Message::Response { response, .. }) => {
@@ -217,7 +241,7 @@ impl ClientHandler {
                     self.handle_bootstrap_request(peer_addr, client_id);
                 }
                 Ok(HandshakeRequest::Join(client_id)) => {
-                    self.handle_join_request(peer_addr, client_id);
+                    self.handle_join_request(peer_addr, client_id, rng);
                 }
                 Ok(HandshakeRequest::ChallengeResult(signature)) => {
                     self.handle_challenge(peer_addr, signature);
@@ -635,7 +659,12 @@ impl ClientHandler {
     }
 
     /// Handles a received join request from a client.
-    fn handle_join_request(&mut self, peer_addr: SocketAddr, client_id: PublicId) {
+    fn handle_join_request<R: CryptoRng + Rng>(
+        &mut self,
+        peer_addr: SocketAddr,
+        client_id: PublicId,
+        rng: &mut R,
+    ) {
         if !self
             .routing_node
             .borrow()
@@ -651,7 +680,7 @@ impl ClientHandler {
                 .borrow_mut()
                 .disconnect_from_client(peer_addr);
         }
-        let challenge = utils::random_vec(8);
+        let challenge = utils::random_vec(rng, 8);
         self.send(
             peer_addr,
             &HandshakeResponse::Challenge(PublicId::Node(self.id.clone()), challenge.clone()),
@@ -1191,7 +1220,7 @@ impl ClientHandler {
         let peer_addrs = self.lookup_client_peer_addrs(&client_id);
 
         if peer_addrs.is_empty() {
-            info!(
+            warn!(
                 "{}: can't notify {} as none of the instances of the client is connected.",
                 self, client_id
             );
@@ -1212,7 +1241,11 @@ impl ClientHandler {
         let peer_addr = match self.pending_msg_ids.remove(&message_id) {
             Some(peer_addr) => peer_addr,
             None => {
-                info!("Expired message-id. Unable to find the client to respond to.");
+                info!(
+                    "{} for message-id {:?}, Unable to find the client to respond to.",
+                    self, message_id
+                );
+                let _ = self.pending_actions.insert(message_id, response);
                 return;
             }
         };

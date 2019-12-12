@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// TODO: make these tests work without mock too.
-#![cfg(any(feature = "mock", feature = "mock-parsec"))]
+#![cfg(feature = "mock_parsec")]
 // For explanation of lint checks, run `rustc -W help`.
 #![forbid(unsafe_code)]
 #![warn(
@@ -65,7 +64,7 @@ fn invalid_signature() {
         signature: None,
     });
     env.poll();
-    match client.expect_response(message_id) {
+    match client.expect_response(message_id, &mut env) {
         Response::GetIData(Err(NdError::InvalidSignature)) => (),
         x => unexpected!(x),
     }
@@ -82,7 +81,7 @@ fn invalid_signature() {
         signature: Some(signature),
     });
     env.poll();
-    match client.expect_response(message_id) {
+    match client.expect_response(message_id, &mut env) {
         Response::GetIData(Err(NdError::InvalidSignature)) => (),
         x => unexpected!(x),
     }
@@ -1991,6 +1990,7 @@ fn get_immutable_data_that_doesnt_exist() {
     // Try to get non-existing unpublished immutable data while having balance
     let start_nano = 1_000_000_000_000;
     common::create_balance(&mut env, &mut client, None, start_nano);
+
     common::send_request_expect_err(
         &mut env,
         &mut client,
@@ -2246,7 +2246,7 @@ fn auth_keys() {
     common::create_balance(&mut env, &mut owner, None, start_nano);
 
     // The app receives the transaction notification too.
-    let _ = app.expect_notification();
+    let _ = app.expect_notification(&mut env);
 
     // Check that listing authorised keys returns an empty collection.
     let mut expected_map = BTreeMap::new();
@@ -2302,7 +2302,6 @@ fn auth_keys() {
 #[test]
 fn app_permissions() {
     let mut env = Environment::new();
-
     let mut owner = env.new_connected_client();
     let balance = unwrap!(Coins::from_nano(1000));
     common::create_balance(&mut env, &mut owner, None, balance);

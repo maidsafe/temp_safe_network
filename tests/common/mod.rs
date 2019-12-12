@@ -14,10 +14,11 @@ pub use self::rng::TestRng;
 
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-#[cfg(feature = "mock-parsec")]
+#[cfg(feature = "mock_parsec")]
 use fake_clock::FakeClock;
+use log::trace;
 use routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
-#[cfg(feature = "mock-parsec")]
+#[cfg(feature = "mock_parsec")]
 use routing::{NetworkConfig, Node};
 use safe_nd::{
     AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, Error, HandshakeRequest,
@@ -71,15 +72,12 @@ impl Environment {
             for _ in 0..num_vaults {
                 vaults.push(TestVault::new_with_mock_routing(
                     Some(consensus_group.clone()),
-                    rng::new(network.new_rng()),
+                    &network,
                 ));
             }
             vaults
         } else {
-            vec![TestVault::new_with_mock_routing(
-                None,
-                rng::new(network.new_rng()),
-            )]
+            vec![TestVault::new_with_mock_routing(None, &network)]
         };
 
         Self {
@@ -90,46 +88,37 @@ impl Environment {
         }
     }
 
-    #[cfg(feature = "mock-parsec")]
+    #[cfg(feature = "mock_parsec")]
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
-        assert!(num_vaults > 0);
+        assert!(num_vaults > 1);
 
         let network = Network::new(Default::default());
 
         let mut env = Self {
-            rng: rng::new(),
+            rng: rng::new(network.new_rng()),
             network,
             vaults: Default::default(),
         };
 
-        if num_vaults > 1 {
-            env.vaults
-                .push(TestVault::new_with_real_routing_first(rng::new(
-                    network.new_rng(),
-                )));
+        env.vaults
+            .push(TestVault::new_with_real_routing(None, &env.network));
 
-            while !env.vaults[0].is_elder() {
+        while !env.vaults[0].is_elder() {
+            env.poll()
+        }
+        let endpoint = env.vaults[0].connection_info();
+
+        // Create other nodes using the seed node endpoint as bootstrap contact.
+        let config = NetworkConfig::node().with_hard_coded_contact(endpoint);
+
+        for i in 1..num_vaults {
+            env.vaults.push(TestVault::new_with_real_routing(
+                Some(config.clone()),
+                &env.network,
+            ));
+            while !env.vaults[i].is_elder() {
                 env.poll()
             }
-            let endpoint = env.vaults[0].connection_info();
-
-            // Create other nodes using the seed node endpoint as bootstrap contact.
-            let config = NetworkConfig::node().with_hard_coded_contact(endpoint);
-
-            for i in 1..num_vaults {
-                env.vaults.push(TestVault::new_with_real_routing(
-                    config.clone(),
-                    rng::new(network.new_rng()),
-                ));
-                while !env.vaults[i].is_elder() {
-                    env.poll()
-                }
-            }
-        } else {
-            env.vaults
-                .push(TestVault::new_with_real_routing_first(rng::new(
-                    network.new_rng(),
-                )));
         }
 
         env
@@ -143,7 +132,7 @@ impl Environment {
         &mut self.rng
     }
 
-    #[cfg(not(feature = "mock-parsec"))]
+    #[cfg(not(feature = "mock_parsec"))]
     // Poll the mock network and the environment's vault.
     pub fn poll(&mut self) {
         let mut progress = true;
@@ -153,16 +142,17 @@ impl Environment {
         }
     }
 
-    #[cfg(feature = "mock-parsec")]
+    #[cfg(feature = "mock_parsec")]
     // Poll the mock network and the environment's vault.
     pub fn poll(&mut self) {
-        let mut max_poll = 0;
-        while max_poll < 100 {
-            max_poll += 1;
+        let mut processed = true;
+        while processed {
+            processed = false;
             self.network.poll();
-            let _ = self.vaults.iter_mut().for_each(|vault| {
-                let _ = vault.inner.poll();
-            });
+            self.vaults
+                .iter_mut()
+                .for_each(|vault| processed = processed || vault.inner.poll());
+            // Advance time for next route/gossip iter, same as used within routing tests.
             FakeClock::advance_time(1001);
         }
     }
@@ -185,22 +175,28 @@ impl Environment {
 
     /// Establish connection assuming we are already at the destination section.
     pub fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
-        let conn_info = self.vaults[0].connection_info();
-        client.quic_p2p().connect_to(conn_info.clone());
-        self.poll();
+        let conn_infos: Vec<_> = self
+            .vaults
+            .iter_mut()
+            .map(|vault| vault.connection_info().clone())
+            .collect();
+        for conn_info in conn_infos {
+            client.quic_p2p().connect_to(conn_info.clone());
+            self.poll();
 
-        client.expect_connected_to(&conn_info);
+            client.expect_connected_to(&conn_info);
 
-        // Bootstrap handshake procedure where we assume that we don't have to rebootstrap
-        let client_public_id = client.full_id().public_id();
-        client.send_bootstrap_request(&client_public_id);
-        self.poll();
+            // Bootstrap handshake procedure where we assume that we don't have to rebootstrap
+            let client_public_id = client.full_id().public_id();
+            client.send_bootstrap_request(&client_public_id, &conn_info);
+            self.poll();
 
-        client.handle_handshake_response_join_from(&client_public_id, &conn_info);
-        self.poll();
+            client.handle_handshake_response_join_from(&client_public_id, &conn_info, self);
+            self.poll();
 
-        client.handle_challenge_from(&conn_info);
-        self.poll();
+            client.handle_challenge_from(&conn_info, self);
+            self.poll();
+        }
     }
 }
 
@@ -209,7 +205,7 @@ trait AsMutSlice<T> {
 }
 
 struct TestVault {
-    inner: Vault,
+    inner: Vault<TestRng>,
     _root_dir: TempDir,
     _command_tx: Sender<Command>,
 }
@@ -217,9 +213,12 @@ struct TestVault {
 impl TestVault {
     /// Create a test Vault within a group.
     #[cfg(feature = "mock")]
-    fn new_with_mock_routing(consensus_group: Option<ConsensusGroupRef>, mut rng: TestRng) -> Self {
+    fn new_with_mock_routing(
+        consensus_group: Option<ConsensusGroupRef>,
+        network: &Network,
+    ) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
-        println!("creating a test vault at root_dir {:?}", root_dir);
+        trace!("Creating a test vault at root_dir {:?}", root_dir);
 
         let mut config = Config::default();
         config.set_root_dir(root_dir.path());
@@ -236,7 +235,7 @@ impl TestVault {
             routing_rx,
             config,
             command_rx,
-            &mut rng
+            rng::new(network.new_rng()),
         ));
 
         Self {
@@ -246,49 +245,34 @@ impl TestVault {
         }
     }
 
-    #[cfg(feature = "mock-parsec")]
-    fn new_with_real_routing(network_config: NetworkConfig, mut rng: TestRng) -> Self {
+    #[cfg(feature = "mock_parsec")]
+    fn new_with_real_routing(network_config: Option<NetworkConfig>, network: &Network) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
-        println!("creating a test vault at root_dir {:?}", root_dir);
+        trace!("creating a test vault at root_dir {:?}", root_dir);
 
         let mut config = Config::default();
         config.set_root_dir(root_dir.path());
 
+        let mut routing_rng = network.new_rng();
+        let vault_rng = rng::new_rng(&mut routing_rng);
+
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
-        let (routing_node, routing_rx) =
-            unwrap!(Node::builder().network_config(network_config).create());
+
+        let (routing_node, routing_rx) = if let Some(network_config) = network_config {
+            unwrap!(Node::builder()
+                .network_config(network_config)
+                .rng(routing_rng)
+                .create())
+        } else {
+            unwrap!(Node::builder().first(true).rng(routing_rng).create())
+        };
+
         let inner = unwrap!(Vault::new(
             routing_node,
             routing_rx,
             config,
             command_rx,
-            &mut rng
-        ));
-
-        Self {
-            inner,
-            _root_dir: root_dir,
-            _command_tx: command_tx,
-        }
-    }
-
-    #[cfg(feature = "mock-parsec")]
-    fn new_with_real_routing_first(mut rng: TestRng) -> Self {
-        let root_dir = unwrap!(TempDir::new("safe_vault"));
-        println!("creating a test vault at root_dir {:?}", root_dir);
-
-        let mut config = Config::default();
-        config.set_root_dir(root_dir.path());
-
-        let (command_tx, command_rx) = crossbeam_channel::bounded(0);
-
-        let (routing_node, routing_rx) = unwrap!(Node::builder().first(true).create());
-        let inner = unwrap!(Vault::new(
-            routing_node,
-            routing_rx,
-            config,
-            command_rx,
-            &mut rng
+            vault_rng
         ));
 
         Self {
@@ -302,14 +286,14 @@ impl TestVault {
         unwrap!(self.inner.our_connection_info())
     }
 
-    #[cfg(feature = "mock-parsec")]
+    #[cfg(feature = "mock_parsec")]
     fn is_elder(&mut self) -> bool {
         self.inner.is_elder()
     }
 }
 
 impl Deref for TestVault {
-    type Target = Vault;
+    type Target = Vault<TestRng>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -360,33 +344,24 @@ pub trait TestClientTrait {
     fn rx(&self) -> &Receiver<Event>;
     fn full_id(&self) -> &FullId;
     fn set_connected_vault(&mut self, connected_vault: NodeInfo);
-    fn connected_vault(&self) -> NodeInfo;
+    fn connected_vaults(&self) -> Vec<NodeInfo>;
 
     fn sign<T: AsRef<[u8]>>(&self, data: T) -> Signature {
         self.full_id().sign(data)
     }
 
-    fn expect_connected_to(&mut self, conn_info: &NodeInfo) {
-        match self.rx().try_recv() {
-            Ok(Event::ConnectedTo {
-                peer: Peer::Node { ref node_info },
-            }) if node_info == conn_info => (),
-            x => unexpected!(x),
-        };
-        self.set_connected_vault(conn_info.clone());
-    }
-
-    fn send_bootstrap_request(&mut self, client_public_id: &PublicId) {
+    fn send_bootstrap_request(&mut self, client_public_id: &PublicId, conn_info: &NodeInfo) {
         let bootstrap_request = HandshakeRequest::Bootstrap(client_public_id.clone());
-        self.send(&bootstrap_request);
+        self.send_to_target(&bootstrap_request, conn_info.clone());
     }
 
     fn handle_handshake_response_join_from(
         &mut self,
         client_public_id: &PublicId,
         conn_info: &NodeInfo,
+        env: &mut Environment,
     ) {
-        let (sender, bytes) = self.expect_new_message();
+        let (sender, bytes) = self.expect_new_message(env);
         assert_eq!(sender, conn_info.peer_addr);
 
         let handshake_response: HandshakeResponse = unwrap!(bincode::deserialize(&bytes));
@@ -399,11 +374,24 @@ pub trait TestClientTrait {
         // connect to the new set of elders if necessary.
 
         let request = HandshakeRequest::Join(client_public_id.clone());
-        self.send(&request);
+        self.send_to_target(&request, conn_info.clone());
     }
 
-    fn handle_challenge_from(&mut self, conn_info: &NodeInfo) {
-        let (sender, bytes) = self.expect_new_message();
+    fn expect_connected_to(&mut self, conn_info: &NodeInfo) {
+        loop {
+            match self.rx().try_recv() {
+                Ok(Event::ConnectedTo {
+                    peer: Peer::Node { ref node_info },
+                }) if node_info == conn_info => break,
+                Ok(Event::SentUserMessage { .. }) => continue,
+                x => unexpected!(x),
+            }
+        }
+        self.set_connected_vault(conn_info.clone());
+    }
+
+    fn handle_challenge_from(&mut self, conn_info: &NodeInfo, env: &mut Environment) {
+        let (sender, bytes) = self.expect_new_message(env);
         assert_eq!(sender, conn_info.peer_addr);
 
         let handshake_response: HandshakeResponse = unwrap!(bincode::deserialize(&bytes));
@@ -415,14 +403,21 @@ pub trait TestClientTrait {
 
         let signature = self.full_id().sign(payload);
         let response = HandshakeRequest::ChallengeResult(signature);
-        self.send(&response);
+        self.send_to_target(&response, conn_info.clone());
     }
 
-    fn expect_new_message(&self) -> (SocketAddr, Bytes) {
+    fn expect_new_message(&self, env: &mut Environment) -> (SocketAddr, Bytes) {
         loop {
+            env.poll();
             match self.rx().try_recv() {
                 Ok(Event::SentUserMessage { .. }) => continue,
                 Ok(Event::NewMessage { peer_addr, msg }) => return (peer_addr, msg),
+                Err(error) => {
+                    if error.is_empty() {
+                        continue;
+                    }
+                    panic!("unexpected error {:?}", error);
+                }
                 x => unexpected!(x),
             }
         }
@@ -442,10 +437,16 @@ pub trait TestClientTrait {
     }
 
     fn send<T: Serialize>(&mut self, msg: &T) {
-        let msg = unwrap!(bincode::serialize(msg));
-        let node_info = self.connected_vault();
-        self.quic_p2p()
-            .send(Peer::Node { node_info }, Bytes::from(msg), 0)
+        let msg = Bytes::from(unwrap!(bincode::serialize(msg)));
+        for node_info in self.connected_vaults() {
+            self.quic_p2p()
+                .send(Peer::Node { node_info }, msg.clone(), 0);
+        }
+    }
+
+    fn send_to_target<T: Serialize>(&mut self, msg: &T, node_info: NodeInfo) {
+        let msg = Bytes::from(unwrap!(bincode::serialize(msg)));
+        self.quic_p2p().send(Peer::Node { node_info }, msg, 0);
     }
 
     fn send_request(&mut self, request: Request) -> MessageId {
@@ -466,35 +467,93 @@ pub trait TestClientTrait {
         message_id
     }
 
-    fn expect_response(&mut self, expected_message_id: MessageId) -> Response {
-        let bytes = self.expect_new_message().1;
-        let message: Message = unwrap!(bincode::deserialize(&bytes));
+    fn expect_response(
+        &mut self,
+        expected_message_id: MessageId,
+        env: &mut Environment,
+    ) -> Response {
+        // expect responses from all connected vaults.
+        let mut expected_recivers = self.connected_vaults().len();
 
-        match message {
-            Message::Response {
-                message_id,
-                response,
-            } => {
-                assert_eq!(
-                    message_id, expected_message_id,
-                    "Received Response with unexpected MessageId."
-                );
-                response
+        loop {
+            let bytes = self.expect_new_message(env).1;
+            let message: Message = unwrap!(bincode::deserialize(&bytes));
+
+            match message {
+                Message::Response {
+                    message_id,
+                    response,
+                } => {
+                    assert_eq!(
+                        message_id, expected_message_id,
+                        "Received Response with unexpected MessageId and response {:?}",
+                        response
+                    );
+                    expected_recivers -= 1;
+                    if expected_recivers == 0 {
+                        return response;
+                    }
+                }
+                Message::Request { request, .. } => unexpected!(request),
+                Message::Notification { notification } => unexpected!(notification),
             }
-            Message::Request { request, .. } => unexpected!(request),
-            Message::Notification { notification } => unexpected!(notification),
         }
     }
 
-    fn expect_notification(&mut self) -> Notification {
-        let bytes = self.expect_new_message().1;
-        let message: Message = unwrap!(bincode::deserialize(&bytes));
+    fn expect_notification(&mut self, env: &mut Environment) -> Notification {
+        // expect notifications from all connected vaults.
+        let connected_vaults = self.connected_vaults().len();
+        let mut received_notifications = Vec::new();
 
-        match message {
-            Message::Notification { notification } => notification,
-            Message::Request { request, .. } => unexpected!(request),
-            Message::Response { response, .. } => unexpected!(response),
+        while received_notifications.len() < connected_vaults {
+            let bytes = self.expect_new_message(env).1;
+            let message: Message = unwrap!(bincode::deserialize(&bytes));
+
+            match message {
+                Message::Notification { notification } => received_notifications.push(notification),
+                Message::Request { request, .. } => unexpected!(request),
+                Message::Response { response, .. } => unexpected!(response),
+            }
         }
+        received_notifications[0].clone()
+    }
+
+    fn expect_notification_and_response(
+        &mut self,
+        env: &mut Environment,
+        expected_message_id: MessageId,
+    ) -> (Notification, Response) {
+        // expect notifications and responses from all connected vaults.
+        let connected_vaults = self.connected_vaults().len();
+        let mut received_notifications = Vec::new();
+        let mut received_responses = Vec::new();
+
+        while received_notifications.len() < connected_vaults
+            || received_responses.len() < connected_vaults
+        {
+            let bytes = self.expect_new_message(env).1;
+            let message: Message = unwrap!(bincode::deserialize(&bytes));
+
+            match message {
+                Message::Notification { notification } => received_notifications.push(notification),
+                Message::Request { request, .. } => unexpected!(request),
+                Message::Response {
+                    message_id,
+                    response,
+                } => {
+                    assert_eq!(
+                        message_id, expected_message_id,
+                        "Received Response with unexpected MessageId and response {:?}",
+                        response
+                    );
+                    received_responses.push(response);
+                }
+            }
+        }
+        (
+            received_notifications[0].clone(),
+            received_responses[0].clone(),
+        )
     }
 }
 
@@ -503,7 +562,7 @@ pub struct TestClient {
     rx: Receiver<Event>,
     full_id: FullId,
     public_id: ClientPublicId,
-    connected_vault: Option<NodeInfo>,
+    connected_vaults: Vec<NodeInfo>,
 }
 
 impl TestClient {
@@ -521,7 +580,7 @@ impl TestClient {
             rx,
             full_id: FullId::Client(client_full_id),
             public_id,
-            connected_vault: None,
+            connected_vaults: Default::default(),
         }
     }
 
@@ -544,11 +603,11 @@ impl TestClientTrait for TestClient {
     }
 
     fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
-        self.connected_vault = Some(connected_vault);
+        self.connected_vaults.push(connected_vault);
     }
 
-    fn connected_vault(&self) -> NodeInfo {
-        unwrap!(self.connected_vault.clone())
+    fn connected_vaults(&self) -> Vec<NodeInfo> {
+        self.connected_vaults.clone()
     }
 }
 
@@ -571,7 +630,7 @@ pub struct TestApp {
     rx: Receiver<Event>,
     full_id: FullId,
     public_id: AppPublicId,
-    connected_vault: Option<NodeInfo>,
+    connected_vaults: Vec<NodeInfo>,
 }
 
 impl TestApp {
@@ -589,7 +648,7 @@ impl TestApp {
             rx,
             full_id: FullId::App(app_full_id),
             public_id,
-            connected_vault: None,
+            connected_vaults: Default::default(),
         }
     }
 
@@ -612,11 +671,11 @@ impl TestClientTrait for TestApp {
     }
 
     fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
-        self.connected_vault = Some(connected_vault);
+        self.connected_vaults.push(connected_vault);
     }
 
-    fn connected_vault(&self) -> NodeInfo {
-        unwrap!(self.connected_vault.clone())
+    fn connected_vaults(&self) -> Vec<NodeInfo> {
+        self.connected_vaults.clone()
     }
 }
 
@@ -642,7 +701,7 @@ where
 {
     let message_id = client.send_request(request);
     env.poll();
-    let response = client.expect_response(message_id);
+    let response = client.expect_response(message_id, env);
     unwrap!(response.try_into())
 }
 
@@ -674,9 +733,14 @@ pub fn send_request_expect_err<T: TestClientTrait>(
     expected_error: Error,
 ) {
     let expected_response = request.error_response(expected_error);
-    let message_id = client.send_request(request);
+    let message_id = client.send_request(request.clone());
+    trace!(
+        "client sent request {:?} with msg_id {:?}",
+        request,
+        message_id
+    );
     env.poll();
-    assert_eq!(expected_response, client.expect_response(message_id));
+    assert_eq!(expected_response, client.expect_response(message_id, env));
 }
 
 pub fn create_balance(
@@ -704,10 +768,16 @@ pub fn create_balance(
         amount,
     };
 
-    let notification = dst_client.unwrap_or(src_client).expect_notification();
+    let (notification, response) = if let Some(target_clent) = dst_client {
+        (
+            target_clent.expect_notification(env),
+            src_client.expect_response(message_id, env),
+        )
+    } else {
+        src_client.expect_notification_and_response(env, message_id)
+    };
     assert_eq!(notification, Notification(expected));
 
-    let response = src_client.expect_response(message_id);
     let actual = unwrap!(Transaction::try_from(response));
     assert_eq!(actual, expected);
 }
@@ -733,10 +803,10 @@ pub fn transfer_coins(
         amount,
     };
 
-    let notification = dst_client.expect_notification();
+    let notification = dst_client.expect_notification(env);
     assert_eq!(notification, Notification(expected));
 
-    let response = src_client.expect_response(message_id);
+    let response = src_client.expect_response(message_id, env);
     let actual = unwrap!(Transaction::try_from(response));
     assert_eq!(actual, expected);
 }

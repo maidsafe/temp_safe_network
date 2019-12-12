@@ -11,7 +11,7 @@ use crate::{rpc::Rpc, vault::Init, Result};
 use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
-use rand::{distributions::Standard, thread_rng, Rng};
+use rand::{distributions::Standard, CryptoRng, Rng};
 use safe_nd::{
     ClientPublicId, Coins, IDataAddress, PublicId, PublicKey, Request, Result as NdResult, XorName,
 };
@@ -42,8 +42,8 @@ pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     Ok(result?)
 }
 
-pub(crate) fn random_vec(size: usize) -> Vec<u8> {
-    thread_rng().sample_iter(&Standard).take(size).collect()
+pub(crate) fn random_vec<R: CryptoRng + Rng>(rng: &mut R, size: usize) -> Vec<u8> {
+    rng.sample_iter(&Standard).take(size).collect()
 }
 
 pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {

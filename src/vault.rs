@@ -19,8 +19,9 @@ use crate::{
 use bincode;
 use crossbeam_channel::{Receiver, Select};
 use log::{error, info, trace, warn};
-use rand::{CryptoRng, Rng};
-#[cfg(feature = "mock-parsec")]
+use rand::{CryptoRng, Rng, SeedableRng};
+use rand_chacha::ChaChaRng;
+#[cfg(feature = "mock_parsec")]
 use routing::EventStream;
 use safe_nd::{NodeFullId, Request, XorName};
 use std::borrow::Cow;
@@ -61,18 +62,19 @@ pub enum Command {
 }
 
 /// Main vault struct.
-pub struct Vault {
+pub struct Vault<R: CryptoRng + Rng> {
     id: NodeFullId,
     root_dir: PathBuf,
     state: State,
     event_receiver: Receiver<RoutingEvent>,
     command_receiver: Receiver<Command>,
     routing_node: Rc<RefCell<Node>>,
+    rng: R,
 }
 
-impl Vault {
+impl<R: CryptoRng + Rng> Vault<R> {
     /// Create and start vault. This will block until a `Command` to free it is fired.
-    pub fn new<R: CryptoRng + Rng>(
+    pub fn new(
         routing_node: Node,
         event_receiver: Receiver<RoutingEvent>,
         config: Config,
@@ -86,6 +88,15 @@ impl Vault {
             init_mode = Init::New;
             (true, id)
         });
+
+        #[cfg(feature = "mock_parsec")]
+        {
+            trace!(
+                "creating vault {:?} with routing_id {:?}",
+                id.public_id().name(),
+                routing_node.id()
+            );
+        }
 
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
@@ -130,6 +141,7 @@ impl Vault {
             event_receiver,
             command_receiver,
             routing_node,
+            rng,
         };
         vault.dump_state()?;
         Ok(vault)
@@ -143,7 +155,7 @@ impl Vault {
             .map_err(From::from)
     }
 
-    #[cfg(feature = "mock-parsec")]
+    #[cfg(feature = "mock_parsec")]
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
         self.routing_node.borrow().is_elder()
@@ -197,17 +209,11 @@ impl Vault {
     /// Processes any outstanding network events and returns. Does not block.
     /// Returns whether at least one event was processed.
     pub fn poll(&mut self) -> bool {
-        let mut processed = false;
-        let mut max_poll = 0;
+        let mut _processed = false;
         loop {
-            max_poll += 1;
-            if processed || max_poll > 1000 {
-                return processed;
-            }
-
-            #[cfg(feature = "mock-parsec")]
+            #[cfg(feature = "mock_parsec")]
             {
-                processed = self.routing_node.borrow_mut().poll();
+                _processed = self.routing_node.borrow_mut().poll();
             }
 
             let mut sel = Select::new();
@@ -226,7 +232,7 @@ impl Vault {
                             Err(e) => panic!("FIXME: {:?}", e),
                         };
                         self.step_routing(event);
-                        processed = true;
+                        _processed = true;
                     }
                     idx if idx == command_rx_idx => {
                         let command = match self.command_receiver.recv() {
@@ -236,15 +242,16 @@ impl Vault {
                         match command {
                             Command::Shutdown => (),
                         }
-                        processed = true;
+                        _processed = true;
                     }
                     idx => {
-                        if let Err(_err) = self
+                        if let Err(err) = self
                             .routing_node
                             .borrow_mut()
                             .handle_selected_operation(idx)
                         {
-                            // warn!("Could not process operation: {}", err);
+                            warn!("Could not process operation: {}", err);
+                            break;
                         }
                     }
                 }
@@ -253,7 +260,7 @@ impl Vault {
             }
         }
 
-        processed
+        _processed
     }
 
     fn step_routing(&mut self, event: RoutingEvent) {
@@ -286,6 +293,8 @@ impl Vault {
     fn handle_client_event(&mut self, event: ClientEvent) -> Option<Action> {
         use ClientEvent::*;
 
+        let mut rng = ChaChaRng::from_seed(self.rng.gen());
+
         let client_handler = self.client_handler_mut()?;
         match event {
             ConnectedToClient { peer_addr } => client_handler.handle_new_connection(peer_addr),
@@ -293,7 +302,7 @@ impl Vault {
                 client_handler.handle_connection_failure(peer_addr);
             }
             NewMessageFromClient { peer_addr, msg } => {
-                return client_handler.handle_client_message(peer_addr, msg);
+                return client_handler.handle_client_message(peer_addr, msg, &mut rng);
             }
             SentUserMsgToClient { peer_addr, .. } => {
                 trace!("{}: Succesfully sent message to: {}", self, peer_addr);
@@ -313,16 +322,10 @@ impl Vault {
     }
 
     fn handle_action(&mut self, action: Action) -> Option<Action> {
+        trace!("{} handle action {:?}", self, action);
         use Action::*;
         match action {
-            ConsensusVote(action) => {
-                if cfg!(feature = "phase-one") {
-                    let client_handler = self.client_handler_mut()?;
-                    client_handler.handle_consensused_action(action)
-                } else {
-                    self.vote_for_action(action)
-                }
-            }
+            ConsensusVote(action) => self.vote_for_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {
@@ -365,6 +368,7 @@ impl Vault {
     }
 
     fn forward_client_request(&mut self, rpc: Rpc) -> Option<Action> {
+        trace!("{} received a client request {:?}", self, rpc);
         let requester_name = if let Rpc::Request {
             request: Request::CreateLoginPacketFor { ref new_owner, .. },
             ..
@@ -569,7 +573,7 @@ impl Vault {
     }
 }
 
-impl Display for Vault {
+impl<R: CryptoRng + Rng> Display for Vault<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.public_id())
     }
