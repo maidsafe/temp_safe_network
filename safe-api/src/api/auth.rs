@@ -23,9 +23,7 @@ const SAFE_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
     // It returns the credentials necessary to connect to the network, encoded in a single string.
-    #[cfg(not(any(target_os = "android", target_os = "androideabi", target_os = "ios")))]
     pub fn auth_app(
-        &mut self,
         app_id: &str,
         app_name: &str,
         app_vendor: &str,
