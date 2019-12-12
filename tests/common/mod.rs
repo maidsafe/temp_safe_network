@@ -69,7 +69,7 @@ impl Environment {
         };
 
         Self {
-            rng: rng::new(),
+            rng: rng::new(network.new_rng()),
             network,
             vaults,
             _consensus_group: consensus_group,
