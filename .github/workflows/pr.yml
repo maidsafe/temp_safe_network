@@ -21,11 +21,13 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
+
       # Check if the code is formatted correctly.
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1
@@ -42,6 +44,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
       # Run Clippy.
       - uses: actions-rs/cargo@v1
         with:
@@ -78,6 +81,7 @@ jobs:
           toolchain: stable
           override: true
           target: ${{ matrix.target }}
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1

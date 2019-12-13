@@ -221,6 +221,9 @@ jobs:
     strategy:
       matrix:
         target: [aarch64-apple-ios, x86_64-apple-ios]
+    env:
+      PKG_CONFIG_ALLOW_CROSS: 1
+      DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -488,6 +491,7 @@ jobs:
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 
+  # Automatic publish, triggered by a commit starting with "Version change".
   publish:
     name: Publish
     needs: deploy
@@ -499,6 +503,21 @@ jobs:
         run: |
           commit_message=$(git log --format=%B -n 1 ${{ github.sha }})
           echo "::set-output name=commit_message::$commit_message"
+      - shell: bash
+        id: versioning
+        run: |
+          jsonrpc_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          api_version=$(grep "^version" < safe-api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          old_jsonrpc_version=$(cargo search jsonrpc-quic --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          old_api_version=$(cargo search safe-api --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          echo "Current jsonrpc-quic version: $jsonrpc_version"
+          echo "Current safe-api version: $api_version"
+          echo "Old jsonrpc-quic version: $old_jsonrpc_version"
+          echo "Old safe-api version: $old_api_version"
+          echo "::set-output name=jsonrpc_version::$jsonrpc_version"
+          echo "::set-output name=api_version::$api_version"
+          echo "::set-output name=old_jsonrpc_version::$old_jsonrpc_version"
+          echo "::set-output name=old_api_version::$old_api_version"
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -514,9 +533,14 @@ jobs:
         with:
           command: publish
           args: --manifest-path=jsonrpc-quic/Cargo.toml
-        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
+        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change') && steps.versioning.outputs.jsonrpc_version != steps.versioning.outputs.old_jsonrpc_version
+      # Sleep between publishes, crates.io needs some time after publishing a new version before it reports its existence.
+      - shell: bash
+        name: Sleep
+        run: sleep 120
+        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change') && steps.versioning.outputs.jsonrpc_version != steps.versioning.outputs.old_jsonrpc_version
       - uses: actions-rs/cargo@v1
         with:
           command: publish
           args: --manifest-path=safe-api/Cargo.toml
-        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
+        if: startsWith(steps.commit_message.outputs.commit_message, 'Version change') && steps.versioning.outputs.api_version != steps.versioning.outputs.old_api_version
