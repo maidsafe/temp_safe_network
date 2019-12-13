@@ -7,12 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{
-    gen_processed_files_table, get_from_arg_or_stdin, notice_dry_run, serialise_output,
+    gen_processed_files_table, get_from_arg_or_stdin, notice_dry_run, parse_stdin_arg,
+    serialise_output,
 };
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{Safe, XorUrl, XorUrlEncoder};
 use std::collections::BTreeMap;
+use std::io::Read;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -48,9 +50,15 @@ pub enum FilesSubCommands {
     #[structopt(name = "add")]
     /// Add a file to an existing FilesContainer on the network
     Add {
-        /// The source file location
+        /// The source file location.  Specify '-' to read from stdin
+        #[structopt(
+            parse(from_str = "parse_stdin_arg"),
+            raw(requires_if = "\"\", \"target\""),
+            raw(requires_if = "\"-\", \"target\"")
+        )]
         location: String,
         /// The target FilesContainer to add the source file to, optionally including the destination path (default is '/') and new file name
+        #[structopt(parse(from_str = "parse_stdin_arg"))]
         target: Option<String>,
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
         #[structopt(short = "u", long = "update-nrs")]
@@ -161,13 +169,34 @@ pub fn files_commander(
             update_nrs,
             force,
         } => {
+            // Validate that location and target are not both "", ie stdin.
+            if let Some(ref t) = target {
+                if t == "" && location == "" {
+                    return Err("Cannot read both Location and Target from stdin.".to_string());
+                }
+            }
+
             let target = get_from_arg_or_stdin(target, None)?;
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
-            // Update the FilesContainer on the Network
+
             let (version, processed_files, _files_map) =
-                safe.files_container_add(&location, &target, force, update_nrs, dry_run)?;
+                // If location is "" then we read data from stdin instead of a file.
+                if location == "" {
+                    let mut buffer = Vec::new();
+                    match std::io::stdin().read_to_end(&mut buffer) {
+                        Ok(_size) => {
+                            // Update the FilesContainer on the Network
+                            safe.files_container_add_from_raw(&buffer, &target, force, update_nrs, dry_run)?
+                        },
+                        Err(e) => return Err(format!("Error reading from stdin. {}", e))
+                    }
+                }
+                else {
+                    // Update the FilesContainer on the Network
+                    safe.files_container_add(&location, &target, force, update_nrs, dry_run)?
+                };
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
