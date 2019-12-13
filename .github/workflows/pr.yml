@@ -3,7 +3,10 @@ name: PR
 on: [pull_request]
 
 env:
+  # Run all cargo commands with --verbose.
+  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
+  # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
 jobs:
@@ -18,10 +21,28 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
+      # Check if the code is formatted correctly.
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
+      # Cache.
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      # Run Clippy.
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
@@ -57,6 +78,24 @@ jobs:
           toolchain: stable
           override: true
           target: ${{ matrix.target }}
+      # Cache.
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # Build prod library.
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -66,6 +105,8 @@ jobs:
         with:
           name: safe-ffi-${{ matrix.target }}-prod
           path: target/${{ matrix.target }}/release/libsafe_ffi.a
+
+      # Build dev library.
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -111,5 +152,23 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      # Cache.
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run tests.
       - shell: bash
         run: ./resources/test-scripts/${{ matrix.component }}
