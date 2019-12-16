@@ -803,7 +803,7 @@ As we've seen above, we can use `cat` command to retrieve the latest/current ver
 
 We can use the `cat` command to also retrieve any version of content that was uploaded as Published data by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w`), which reached version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
 ```shell
-$ safe cat safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0
+$ safe cat "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0"
 Files of FilesContainer (version 0) at "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
@@ -843,7 +843,7 @@ FilesContainer created at: "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6
 
 As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human friendly NRS-URL:
 ```shell
-$ safe nrs create mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
+$ safe nrs create mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
 New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
@@ -889,7 +889,7 @@ For example, you may wish to have `safe://mywebsite` to be about you in general,
 
 To create a public name with subnames, you need only to pass the full string with `.` separators, just like any traditional URL, to the CLI:
 ```shell
-$ safe nrs create blog.mywebsite --link safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
+$ safe nrs create blog.mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
 New NRS Map for "safe://blog.mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  blog.mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
@@ -902,7 +902,7 @@ Once a public name has been created with `nrs create` command, more sub names ca
 
 Let's add `profile` sub name to the `mywebsite` NRS name we created before:
 ```shell
-$ safe nrs add profile.mywebsite --link safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc?v=0
+$ safe nrs add profile.mywebsite --link "safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc?v=0"
 NRS Map updated (version 1): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
 ```
@@ -933,8 +933,8 @@ In previous sections of this guide we explained how we can create two types of s
 All these types of safe:// URLs can be used in any of the supported CLI commands interchangeably as the argument of any command which expects safe:// URL.
 
 E.g. we can retrieve the content of a website with the `cat` command using either its XOR-URL or its NRS-URL, and either fetching the latest version of it or supplying the query param to get a specific version of it. Thus, if we wanted to fetch `version #1` of the site we published at `safe://mywebsite` (which NRS Map Container XOR-URL is `safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh`), the following two commands would be equivalent:
-- `$ safe cat safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1`
-- `$ safe cat safe://mywebsite?v=1`
+- `$ safe cat "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1"`
+- `$ safe cat "safe://mywebsite?v=1"`
 
 In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `dog` command.
 
