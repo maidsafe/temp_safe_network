@@ -157,7 +157,7 @@ safe-authd service started successfully!
 
 Once we started the `authd`, it should be running in the background and ready to receive requests, we can send an status request to check it's up and running:
 ```shell
-$ safe auth atatus
+$ safe auth status
 Sending request to authd to obtain an status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
@@ -683,6 +683,14 @@ FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiu
 ```
 
 The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
+
+One more thing to note about Files Sync is the use of the `--update-nrs` flag. If you want to sync the NRS URL rather than the XOR-URL (see NRS section below for more information about NRS Containers and commands) then this must be specified using this flag:
+```shell
+$ safe files sync ./to-upload/ safe://mywebsite --update-NRS
+FilesContainer synced up (version 1): "safe://mywebsite"
+*  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
++  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
+```
 
 #### Files Add
 
