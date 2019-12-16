@@ -61,11 +61,14 @@ impl Environment {
         let vaults = if num_vaults > 1 {
             let mut vaults = Vec::with_capacity(num_vaults);
             for _ in 0..num_vaults {
-                vaults.push(TestVault::new(Some(consensus_group.clone())));
+                vaults.push(TestVault::new(
+                    Some(consensus_group.clone()),
+                    rng::new(network.new_rng()),
+                ));
             }
             vaults
         } else {
-            vec![TestVault::new(None)]
+            vec![TestVault::new(None, rng::new(network.new_rng()))]
         };
 
         Self {
@@ -132,7 +135,7 @@ struct TestVault {
 
 impl TestVault {
     /// Create a test Vault within a group.
-    fn new(consensus_group: Option<ConsensusGroupRef>) -> Self {
+    fn new(consensus_group: Option<ConsensusGroupRef>, mut rng: TestRng) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
 
         let mut config = Config::default();
@@ -145,7 +148,13 @@ impl TestVault {
         } else {
             unwrap!(Node::builder().create())
         };
-        let inner = unwrap!(Vault::new(routing_node, routing_rx, config, command_rx));
+        let inner = unwrap!(Vault::new(
+            routing_node,
+            routing_rx,
+            config,
+            command_rx,
+            &mut rng
+        ));
 
         Self {
             inner,
