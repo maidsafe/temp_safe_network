@@ -162,7 +162,6 @@ jobs:
     strategy:
       matrix:
         target: [aarch64-apple-ios, x86_64-apple-ios]
-        type: [dev, prod]
     env:
       PKG_CONFIG_ALLOW_CROSS: 1
       DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
@@ -183,7 +182,17 @@ jobs:
         run: ls target/release
       - uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-${{ matrix.type }}
+          name: safe-ffi-${{ matrix.target }}-prod
+          path: target/${{ matrix.target }}/release/libsafe_ffi.a
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: >
+            --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
+            --features=mock-network
+      - uses: actions/upload-artifact@master
+        with:
+          name: safe-ffi-${{ matrix.target }}-dev
           path: target/${{ matrix.target }}/release/libsafe_ffi.a
 
 
@@ -198,7 +207,7 @@ jobs:
         with:
           name: safe-ffi-x86_64-apple-ios-dev
           path: artifacts/safe-ffi/dev/x86_64-apple-ios/release
-      - uses: actions/download-artifacts@master
+      - uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-apple-ios-prod
           path: artifacts/safe-ffi/prod/x86_64-apple-ios/release
