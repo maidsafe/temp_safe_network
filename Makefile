@@ -136,10 +136,13 @@ ifneq ($(UNAME_S),Darwin)
 	@exit 1
 endif
 	mkdir -p artifacts/safe-ffi/prod/universal
-	# mkdir -p artifacts/safe-ffi/dev/universal
+	mkdir -p artifacts/safe-ffi/dev/universal
 	lipo -create -output artifacts/safe-ffi/prod/universal/libsafe_ffi.a \
 		artifacts/safe-ffi/prod/x86_64-apple-ios/release/libsafe_ffi.a \
 		artifacts/safe-ffi/prod/aarch64-apple-ios/release/libsafe_ffi.a
+	lipo -create -output artifacts/safe-ffi/dev/universal/libsafe_ffi.a \
+		artifacts/safe-ffi/dev/x86_64-apple-ios/release/libsafe_ffi.a \
+		artifacts/safe-ffi/dev/aarch64-apple-ios/release/libsafe_ffi.a
 
 strip-artifacts:
 ifeq ($(OS),Windows_NT)
