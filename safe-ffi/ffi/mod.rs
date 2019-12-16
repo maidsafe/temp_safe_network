@@ -26,7 +26,7 @@ use safe_api::Safe;
 use std::os::raw::{c_char, c_void};
 
 #[no_mangle]
-pub unsafe extern "C" fn connect(
+pub unsafe extern "C" fn connect_app(
     app_id: *const c_char,
     auth_credentials: *const c_char,
     user_data: *mut c_void,
