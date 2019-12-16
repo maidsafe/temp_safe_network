@@ -6,28 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use rand::{self, Rng, SeedableRng};
+use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
-use std::{env, thread};
 use unwrap::unwrap;
 
 pub type TestRng = ChaChaRng;
 
-// Create new random number generator suitable for tests. To provide repeatable results, the seed
-// can be overridden using the "SEED" env variable. If this variable is not provided, a random one
-// is used (to support soak testing). The current seed is printed to stdout.
-pub fn new() -> TestRng {
-    let seed = if let Ok(seed) = env::var("SEED") {
-        unwrap!(seed.parse(), "SEED must contain a valid u64 value")
-    } else {
-        rand::thread_rng().gen()
-    };
-
-    println!(
-        "RNG seed for thread {:?}: {}",
-        unwrap!(thread::current().name()),
-        seed
-    );
-
-    TestRng::seed_from_u64(seed)
+// Create new random number generator suitable for tests, from the given generator from routing.
+pub fn new<R: RngCore>(rng: R) -> TestRng {
+    unwrap!(TestRng::from_rng(rng))
 }
