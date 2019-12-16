@@ -277,7 +277,7 @@ jobs:
       # ffi
       - uses: actions/download-artifact@master
         with:
-          name: safe_ffi.dll
+          name: safe-ffi-x86_64-pc-windows-gnu-prod
           path: artifacts/safe-ffi/prod/x86_64-pc-windows-gnu/release
       - uses: actions/download-artifact@master
         with:
@@ -285,7 +285,7 @@ jobs:
           path: artifacts/safe-ffi/dev/x86_64-pc-windows-gnu/release
       - uses: actions/download-artifact@master
         with:
-          name: libsafe_ffi.so
+          name: safe-ffi-x86_64-unknown-linux-gnu-prod
           path: artifacts/safe-ffi/prod/x86_64-unknown-linux-gnu/release
       - uses: actions/download-artifact@master
         with:
@@ -293,7 +293,7 @@ jobs:
           path: artifacts/safe-ffi/dev/x86_64-unknown-linux-gnu/release
       - uses: actions/download-artifact@master
         with:
-          name: libsafe_ffi.dylib
+          name: safe-ffi-x86_64-apple-darwin-prod
           path: artifacts/safe-ffi/prod/x86_64-apple-darwin/release
       - uses: actions/download-artifact@master
         with:
