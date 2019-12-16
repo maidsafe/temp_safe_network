@@ -235,6 +235,7 @@ endif
 package-commit_hash-artifacts-for-deploy:
 	rm -rf deploy
 	mkdir -p deploy/prod
+	mkdir -p deploy/dev
 	./resources/package-deploy-artifacts.sh "safe-authd" ${COMMIT_HASH}
 	./resources/package-deploy-artifacts.sh "safe-cli" ${COMMIT_HASH}
 	./resources/package-deploy-artifacts.sh "safe-ffi" ${COMMIT_HASH}
@@ -243,6 +244,7 @@ package-commit_hash-artifacts-for-deploy:
 package-version-artifacts-for-deploy:
 	rm -rf deploy
 	mkdir -p deploy/prod
+	mkdir -p deploy/dev
 	./resources/package-deploy-artifacts.sh "safe-authd" "${SAFE_AUTHD_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"
 	./resources/package-deploy-artifacts.sh "safe-ffi" "${SAFE_FFI_VERSION}"

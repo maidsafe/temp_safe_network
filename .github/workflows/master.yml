@@ -437,6 +437,9 @@ jobs:
       - uses: actions/aws/cli@master
         with:
           args: s3 sync deploy/prod s3://safe-api --acl public-read
+      - uses: actions/aws/cli@master
+        with:
+          args: s3 sync deploy/dev s3://safe-api --acl public-read
 
       # Create the release and attach safe-cli archives as assets.
       - uses: csexton/create-release@add-body
