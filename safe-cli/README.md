@@ -9,6 +9,9 @@
 2. [Download](#download)
 3. [Build](#build)
 4. [Using the CLI](#using-the-cli)
+  - [Shell Completions](#shell-completions)
+    - [Bash Completions](#bash-completions)
+    - [Windows Powershell Completions](#windows-powershell-completions)
   - [Auth](#auth)
     - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
     - [Auth start (Linux/Mac)](#auth-start-linuxmac)
@@ -105,6 +108,37 @@ Various global flags are available:
 #### `--help`
 
 All commands have a `--help` function which lists args, options and subcommands.
+
+### Shell Completions
+
+Automatic command completions via <tab> are available for popular shells such as bash and powershell (windows).  Completions are also provided for the shells fish, zsh, and elvish.
+
+Until an installer becomes available, these completions must be manually enabled as per below.
+
+#### Bash Completions
+
+To enable bash completions in the current bash session, use the following command:
+
+```
+SC=/tmp/safe.rc && safe setup completions bash > $SC && source $SC
+```
+
+To enable bash completions always for the current user, the following should work:
+
+```
+SC=~/.bash_safe_cli && safe setup completions bash > $SC && echo "source $SC" >> ~/.bashrc
+```
+
+#### Windows Powershell Completions
+
+To enable completions in the current powershell session, use the following commands:
+
+```
+safe setup completions bash > safe_cli.ps1
+./safe_cli.ps1
+```
+
+To enable powershell completions permanently, generate the safe_cli.ps1 files as per above and then see this [stackoverflow answer](<https://stackoverflow.com/questions/20575257/how-do-i-run-a-powershell-script-when-the-computer-starts#32189430>).
 
 ### Auth
 
