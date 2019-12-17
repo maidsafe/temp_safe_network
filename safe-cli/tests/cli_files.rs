@@ -54,6 +54,24 @@ fn calling_safe_files_put() {
 }
 
 #[test]
+fn calling_safe_files_put_dry_run() {
+    let content = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json",
+        "--dry-run"
+    )
+    .read()
+    .unwrap();
+
+    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", &map[TEST_FILE].1]).assert().failure();
+}
+
+#[test]
 fn calling_safe_files_put_recursive() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
@@ -258,6 +276,37 @@ fn calling_safe_files_sync() {
     .read()
     .unwrap();
     assert_eq!(synced_file_cat, "hello from a subfolder!");
+}
+
+#[test]
+fn calling_safe_files_sync_dry_run() {
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
+        .read()
+        .unwrap();
+
+    let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
+    let mut target = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    target.set_content_version(None);
+    let sync_content = cmd!(
+        get_bin_location(),
+        "files",
+        "sync",
+        TEST_FOLDER_SUBFOLDER,
+        unwrap!(target.to_string()),
+        "--json",
+        "--dry-run"
+    )
+    .read()
+    .unwrap();
+
+    let (_, map) = parse_files_put_or_sync_output(&sync_content);
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec![
+        "cat",
+        &map[&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER)].1,
+    ])
+    .assert()
+    .failure();
 }
 
 #[test]
@@ -661,6 +710,41 @@ fn calling_safe_files_add() {
     .read()
     .unwrap();
     assert_eq!(synced_file_cat, "hello tests!");
+}
+
+#[test]
+fn calling_safe_files_add_dry_run() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container_output);
+
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    let _ = cmd!(
+        get_bin_location(),
+        "files",
+        "add",
+        TEST_FILE,
+        &format!("{}/new_test.md", xorurl_encoder),
+        "--dry-run"
+    )
+    .read()
+    .unwrap();
+
+    xorurl_encoder.set_path("/new_test.md");
+    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string())])
+        .assert()
+        .failure();
 }
 
 #[test]

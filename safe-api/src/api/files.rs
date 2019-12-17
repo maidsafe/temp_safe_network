@@ -310,7 +310,7 @@ impl Safe {
                 processed_files,
                 Some(dest_path),
                 false,
-                !dry_run,
+                dry_run,
                 force,
                 false,
             )?
@@ -609,11 +609,12 @@ fn gen_new_file_item(
     file_size: &str,
     file_created: Option<&str>,
     link: Option<&str>,
+    dry_run: bool,
 ) -> Result<FileItem> {
     let now = gen_timestamp_secs();
     let mut file_item = FileItem::new();
     let xorurl = match link {
-        None => upload_file_to_net(safe, file_path, false)?,
+        None => upload_file_to_net(safe, file_path, dry_run)?,
         Some(link) => link.to_string(),
     };
     file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl);
@@ -638,6 +639,7 @@ fn add_or_update_file_item(
     file_created: Option<&str>,
     file_link: Option<&str>,
     name_exists: bool,
+    dry_run: bool,
     files_map: &mut FilesMap,
     processed_files: &mut ProcessedFiles,
 ) -> bool {
@@ -649,6 +651,7 @@ fn add_or_update_file_item(
         file_size,
         file_created,
         file_link,
+        dry_run,
     ) {
         Ok(new_file_item) => {
             let content_added_sign = if name_exists {
@@ -724,7 +727,6 @@ fn files_map_sync(
         let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()));
 
         // Let's update FileItem if there is a change or it doesn't exist in current_files_map
-        let link = if dry_run { Some("") } else { None };
         match current_files_map.get(&normalised_file_name) {
             None => {
                 // We need to add a new FileItem
@@ -736,8 +738,9 @@ fn files_map_sync(
                     &file_type,
                     &file_size,
                     None,
-                    link,
+                    None,
                     false,
+                    dry_run,
                     &mut updated_files_map,
                     &mut processed_files,
                 ) {
@@ -759,8 +762,9 @@ fn files_map_sync(
                         &file_type,
                         &file_size,
                         Some(&file_item[FAKE_RDF_PREDICATE_CREATED]),
-                        link,
+                        None,
                         true,
+                        dry_run,
                         &mut updated_files_map,
                         &mut processed_files,
                     ) {
@@ -852,6 +856,7 @@ fn files_map_add_link(
                                 None,
                                 Some(file_link),
                                 true,
+                                true,
                                 &mut files_map,
                                 &mut processed_files,
                             ) {
@@ -886,6 +891,7 @@ fn files_map_add_link(
                         None,
                         Some(file_link),
                         false,
+                        true,
                         &mut files_map,
                         &mut processed_files,
                     ) {
@@ -1165,7 +1171,7 @@ mod tests {
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-        assert!(processed_files[filename1].1.is_empty());
+        assert!(!processed_files[filename1].1.is_empty());
         assert_eq!(
             processed_files[filename1].1,
             files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
@@ -1173,7 +1179,7 @@ mod tests {
 
         let filename2 = "../testdata/another.md";
         assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-        assert!(processed_files[filename2].1.is_empty());
+        assert!(!processed_files[filename2].1.is_empty());
         assert_eq!(
             processed_files[filename2].1,
             files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
@@ -1181,7 +1187,7 @@ mod tests {
 
         let filename3 = "../testdata/subfolder/subexists.md";
         assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-        assert!(processed_files[filename3].1.is_empty());
+        assert!(!processed_files[filename3].1.is_empty());
         assert_eq!(
             processed_files[filename3].1,
             files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
@@ -1189,7 +1195,7 @@ mod tests {
 
         let filename4 = "../testdata/noextension";
         assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-        assert!(processed_files[filename4].1.is_empty());
+        assert!(!processed_files[filename4].1.is_empty());
         assert_eq!(
             processed_files[filename4].1,
             files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
@@ -1481,7 +1487,7 @@ mod tests {
 
         let filename5 = "../testdata/subfolder/subexists.md";
         assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-        assert!(new_processed_files[filename5].1.is_empty());
+        assert!(!new_processed_files[filename5].1.is_empty());
         assert_eq!(
             new_processed_files[filename5].1,
             new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
@@ -1489,7 +1495,7 @@ mod tests {
 
         let filename6 = "../testdata/subfolder/sub2.md";
         assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
-        assert!(new_processed_files[filename6].1.is_empty());
+        assert!(!new_processed_files[filename6].1.is_empty());
         assert_eq!(
             new_processed_files[filename6].1,
             new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
@@ -2031,6 +2037,54 @@ mod tests {
         assert_eq!(
             new_processed_files[filename3].1,
             new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_add_dry_run() {
+        use unwrap::unwrap;
+        let mut safe = Safe::default();
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
+
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/new_filename_test.md", xorurl),
+            false,
+            false,
+            true, // dry run
+        ));
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
+
+        // a dry run again should give the exact same results
+        let (version2, new_processed_files2, new_files_map2) = unwrap!(safe.files_container_add(
+            "../testdata/test.md",
+            &format!("{}/new_filename_test.md", xorurl),
+            false,
+            false,
+            true, // dry run
+        ));
+
+        assert_eq!(version, version2);
+        assert_eq!(new_processed_files.len(), new_processed_files2.len());
+        assert_eq!(new_files_map.len(), new_files_map2.len());
+
+        let filename = "../testdata/test.md";
+        assert_eq!(new_processed_files[filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(new_processed_files2[filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename].1,
+            new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+        assert_eq!(
+            new_processed_files2[filename].1,
+            new_files_map2["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
         );
     }
 

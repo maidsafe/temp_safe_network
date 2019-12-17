@@ -579,7 +579,7 @@ mod tests {
         unwrap!(safe.connect("", Some("fake-credentials")));
         let data = b"Something super immutable";
         let xorurl = safe
-            .files_put_published_immutable(data, Some("text/plain"))
+            .files_put_published_immutable(data, Some("text/plain"), false)
             .unwrap();
 
         let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));

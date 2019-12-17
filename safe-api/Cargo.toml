@@ -33,9 +33,9 @@ rand = "0.6.5"
 rand_core = "0.4.0"
 rcgen = "0.2"
 relative-path = "0.4.0"
-safe_app = "0.12.0"
-safe_authenticator = "0.12.0"
-safe_core = "0.37.3"
+safe_app = { git = "https://github.com/bochaco/safe_client_libs.git", branch = "self-encrypt-dry-run" }
+safe_authenticator = { git = "https://github.com/bochaco/safe_client_libs.git", branch = "self-encrypt-dry-run" }
+safe_core = { git = "https://github.com/bochaco/safe_client_libs.git", branch = "self-encrypt-dry-run" }
 safe-nd = "~0.6.1"
 serde = "1.0.91"
 serde_json = "1.0.41"
