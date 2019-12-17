@@ -684,9 +684,9 @@ FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiu
 
 The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
 
-One more thing to note about Files Sync is the use of the `--update-nrs` flag. If you want to sync the NRS URL rather than the XOR-URL (see NRS section below for more information about NRS Containers and commands) then this must be specified using this flag:
+One more thing to note about `files sync` command is the use of the `--update-nrs` flag. When syncing content using an NRS-URL (see [NRS section](#nrs-name-resolution-system) below for more information about NRS names and commands), if you want to update the NRS name to the new version generated after syncing the target `FilesContainer`, then it can be specified using the `--update-nrs` flag:
 ```shell
-$ safe files sync ./to-upload/ safe://mywebsite --update-NRS
+$ safe files sync ./to-upload/ safe://mywebsite --update-nrs
 FilesContainer synced up (version 1): "safe://mywebsite"
 *  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
 +  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
