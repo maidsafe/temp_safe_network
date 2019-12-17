@@ -28,34 +28,34 @@ use safe_api::{Safe, XorUrlBase};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network
-#[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
+#[structopt(global_settings(&[structopt::clap::AppSettings::ColoredHelp]))]
 pub struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
     pub cmd: Option<SubCommands>,
     // /// The account's Root Container address
-    // #[structopt(long = "root", raw(global = "true"))]
+    // #[structopt(long = "root", global(true))]
     // root: bool,
     /// Output data serialisation: [json, jsoncompact, yaml]
-    #[structopt(short = "o", long = "output", raw(global = "true"))]
+    #[structopt(short = "o", long = "output", global(true))]
     output_fmt: Option<OutputFmt>,
     /// Sets JSON as output serialisation format (alias of '--output json')
-    #[structopt(long = "json", raw(global = "true"))]
+    #[structopt(long = "json", global(true))]
     output_json: bool,
     // /// Increase output verbosity. (More logs!)
-    // #[structopt(short = "v", long = "verbose", raw(global = "true"))]
+    // #[structopt(short = "v", long = "verbose", global(true))]
     // verbose: bool,
     // /// Enable to query the output via SPARQL eg.
-    // #[structopt(short = "q", long = "query", raw(global = "true"))]
+    // #[structopt(short = "q", long = "query", global(true))]
     // query: Option<String>,
     /// Dry run of command. No data will be written. No coins spent
-    #[structopt(short = "n", long = "dry-run", raw(global = "true"))]
+    #[structopt(short = "n", long = "dry-run", global(true))]
     dry: bool,
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
-    #[structopt(long = "xorurl", raw(global = "true"))]
+    #[structopt(long = "xorurl", global(true))]
     xorurl_base: Option<XorUrlBase>,
     /// Endpoint of the Authenticator daemon where to send requests to. If not provided, https://localhost:33000 is assumed.
-    #[structopt(long = "endpoint", raw(global = "true"))]
+    #[structopt(long = "endpoint", global(true))]
     pub endpoint: Option<String>,
 }
 

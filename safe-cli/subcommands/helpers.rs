@@ -12,7 +12,7 @@ use prettytable::{format::FormatBuilder, Table};
 use safe_api::XorName;
 use serde::ser::Serialize;
 use std::collections::BTreeMap;
-use std::io::{self, stdin, stdout, Write};
+use std::io::{stdin, stdout, Read, Write};
 
 // Warn the user about a dry-run being performed
 pub fn notice_dry_run() {
@@ -30,22 +30,27 @@ pub fn get_from_arg_or_stdin(
     message: Option<&str>,
 ) -> Result<String, String> {
     match target_arg {
-        Some(ref t) if t == "" => get_from_stdin(message),
+        Some(ref t) if t.is_empty() => {
+            let val = get_from_stdin(message)?;
+            Ok(String::from_utf8_lossy(&val).to_string())
+        }
         Some(t) => Ok(t),
-        None => get_from_stdin(message),
+        None => {
+            let val = get_from_stdin(message)?;
+            Ok(String::from_utf8_lossy(&val).to_string())
+        }
     }
 }
 
-// Outputs a message and then reads a single line from stdin
-pub fn get_from_stdin(message: Option<&str>) -> Result<String, String> {
+// Outputs a message and then reads from stdin
+pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>, String> {
     let the_message = message.unwrap_or_else(|| "...awaiting data from STDIN stream...");
     println!("{}", &the_message);
-    let mut input = String::new();
-    match io::stdin().read_line(&mut input) {
-        Ok(n) => {
-            debug!("Read ({} bytes) from STDIN: {}", n, input);
-            input.truncate(input.len() - 1);
-            Ok(input)
+    let mut buffer = Vec::new();
+    match std::io::stdin().read_to_end(&mut buffer) {
+        Ok(size) => {
+            debug!("Read ({} bytes) from STDIN", size);
+            Ok(buffer)
         }
         Err(_) => Err("Failed to read from STDIN stream".to_string()),
     }
@@ -121,7 +126,7 @@ pub fn gen_processed_files_table(
 
 // converts "-" to "", both of which mean to read from stdin.
 pub fn parse_stdin_arg(src: &str) -> String {
-    if src == "-" || src == "" {
+    if src.is_empty() || src == "-" {
         "".to_string()
     } else {
         src.to_string()

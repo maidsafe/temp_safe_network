@@ -2047,7 +2047,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "structopt",
+ "structopt 0.2.18",
  "tokio",
  "unwrap",
 ]
@@ -2604,7 +2604,7 @@ dependencies = [
  "serde_json",
  "slog",
  "slog-term",
- "structopt",
+ "structopt 0.2.18",
  "tokio",
  "tokio-current-thread",
  "tokio-reactor",
@@ -2641,7 +2641,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shrust",
- "structopt",
+ "structopt 0.3.5",
  "unwrap",
 ]
 
@@ -3152,7 +3152,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16c2cdbf9cc375f15d1b4141bc48aeef444806655cd0e904207edc8d68d86ed7"
 dependencies = [
  "clap",
- "structopt-derive",
+ "structopt-derive 0.2.18",
+]
+
+[[package]]
+name = "structopt"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30b3a3e93f5ad553c38b3301c8a0a0cec829a36783f6a0c467fc4bf553a5f5bf"
+dependencies = [
+ "clap",
+ "structopt-derive 0.3.5",
 ]
 
 [[package]]
@@ -3165,6 +3175,19 @@ dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "structopt-derive"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea692d40005b3ceba90a9fe7a78fa8d4b82b0ce627eebbffc329aab850f3410e"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2 1.0.7",
+ "quote 1.0.2",
+ "syn 1.0.13",
 ]
 
 [[package]]

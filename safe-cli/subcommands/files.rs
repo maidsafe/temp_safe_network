@@ -7,14 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{
-    gen_processed_files_table, get_from_arg_or_stdin, notice_dry_run, parse_stdin_arg,
+    gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, notice_dry_run, parse_stdin_arg,
     serialise_output,
 };
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{Safe, XorUrl, XorUrlEncoder};
 use std::collections::BTreeMap;
-use std::io::Read;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -52,13 +51,13 @@ pub enum FilesSubCommands {
     Add {
         /// The source file location.  Specify '-' to read from stdin
         #[structopt(
-            parse(from_str = "parse_stdin_arg"),
-            raw(requires_if = "\"\", \"target\""),
-            raw(requires_if = "\"-\", \"target\"")
+            parse(from_str = parse_stdin_arg),
+            requires_if("", "target"),
+            requires_if("-", "target")
         )]
         location: String,
         /// The target FilesContainer to add the source file to, optionally including the destination path (default is '/') and new file name
-        #[structopt(parse(from_str = "parse_stdin_arg"))]
+        #[structopt(parse(from_str = parse_stdin_arg))]
         target: Option<String>,
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
         #[structopt(short = "u", long = "update-nrs")]
@@ -170,45 +169,39 @@ pub fn files_commander(
             force,
         } => {
             // Validate that location and target are not both "", ie stdin.
-            if let Some(ref t) = target {
-                if t == "" && location == "" {
-                    return Err("Cannot read both Location and Target from stdin.".to_string());
-                }
+            let target_url = target.unwrap_or_else(|| "".to_string());
+            if target_url.is_empty() && location.is_empty() {
+                return Err("Cannot read both <location> and <target> from stdin.".to_string());
             }
 
-            let target = get_from_arg_or_stdin(target, None)?;
+            let target_url =
+                get_from_arg_or_stdin(Some(target_url), Some("...awaiting target URl from STDIN"))?;
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
 
             let (version, processed_files, _files_map) =
-                // If location is "" then we read data from stdin instead of a file.
-                if location == "" {
-                    let mut buffer = Vec::new();
-                    match std::io::stdin().read_to_end(&mut buffer) {
-                        Ok(_size) => {
-                            // Update the FilesContainer on the Network
-                            safe.files_container_add_from_raw(&buffer, &target, force, update_nrs, dry_run)?
-                        },
-                        Err(e) => return Err(format!("Error reading from stdin. {}", e))
-                    }
-                }
-                else {
+                // If location is empty then we read arg from STDIN, which can still be a safe:// URL
+                if location.is_empty() {
+                    let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
                     // Update the FilesContainer on the Network
-                    safe.files_container_add(&location, &target, force, update_nrs, dry_run)?
+                    safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run)?
+                } else {
+                    // Update the FilesContainer on the Network
+                    safe.files_container_add(&location, &target_url, force, update_nrs, dry_run)?
                 };
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
                 let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
-                    let url = match XorUrlEncoder::from_url(&target) {
+                    let url = match XorUrlEncoder::from_url(&target_url) {
                         Ok(mut xorurl_encoder) => {
                             xorurl_encoder.set_content_version(Some(version));
                             xorurl_encoder.set_path("");
                             xorurl_encoder.to_string()?
                         }
-                        Err(_) => target,
+                        Err(_) => target_url,
                     };
 
                     println!("FilesContainer updated (version {}): \"{}\"", version, url);
@@ -216,17 +209,17 @@ pub fn files_commander(
                 } else if !processed_files.is_empty() {
                     println!(
                         "No changes were made to FilesContainer (version {}) at \"{}\"",
-                        version, target
+                        version, target_url
                     );
                     table.printstd();
                 } else {
                     println!(
                         "No changes were made to the FilesContainer (version {}) at: \"{}\"",
-                        version, target
+                        version, target_url
                     );
                 }
             } else {
-                print_serialized_output(target, version, processed_files, output_fmt)?;
+                print_serialized_output(target_url, version, processed_files, output_fmt)?;
             }
             Ok(())
         }
