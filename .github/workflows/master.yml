@@ -218,9 +218,6 @@ jobs:
   build-ffi-ios:
     name: Build FFI iOS
     runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [aarch64-apple-ios, x86_64-apple-ios]
     env:
       PKG_CONFIG_ALLOW_CROSS: 1
       DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
@@ -231,7 +228,14 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-          target: ${{ matrix.target }}
+          target: aarch64-apple-ios
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: x86_64-apple-ios
+      
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1
@@ -252,50 +256,22 @@ jobs:
       # Build
       - uses: actions-rs/cargo@v1
         with:
-          command: build
-          args: --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
-      - name: what is in release...
+          command: install
+          args: cargo-lipo
+      - name: Build universal lib - Prod
         shell: bash
-        run: ls target/release
+        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml
       - uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-prod
-          path: target/${{ matrix.target }}/release/libsafe_ffi.a
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: >
-            --release --manifest-path=safe-ffi/Cargo.toml --target=${{ matrix.target }}
-            --features=mock-network
+          name: safe-ffi-apple-ios-prod
+          path: target/universal/release/libsafe_ffi.a
+      - name: Build universal lib - Dev
+        shell: bash
+        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=mock-network
       - uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-dev
-          path: target/${{ matrix.target }}/release/libsafe_ffi.a
-
-  # Use a single job for each type to build all targets.
-  build-ffi-ios-universal:
-    name: Build FFI iOS Universal
-    runs-on: macos-latest
-    needs: build-ffi-ios
-    strategy:
-      matrix:
-        type: [dev, prod]
-    steps:
-      - uses: actions/checkout@v1
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-x86_64-apple-ios-${{ matrix.type }}
-          path: artifacts/safe-ffi/${{ matrix.type }}/x86_64-apple-ios/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-aarch64-apple-ios-${{ matrix.type }}
-          path: artifacts/safe-ffi/${{ matrix.type }}/aarch64-apple-ios/release
-      - shell: bash
-        run: make universal-ios-lib-${{ matrix.type }}
-      - uses: actions/upload-artifact@master
-        with:
-          name: safe-ffi-apple-ios-${{ matrix.type }}
-          path: artifacts/safe-ffi/${{ matrix.type }}/universal
+          name: safe-ffi-apple-ios-dev
+          path: target/universal/release/libsafe_ffi.a
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
