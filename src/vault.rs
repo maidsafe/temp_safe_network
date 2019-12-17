@@ -19,6 +19,7 @@ use crate::{
 use bincode;
 use crossbeam_channel::{Receiver, Select};
 use log::{error, info, trace, warn};
+use rand::{CryptoRng, Rng};
 use safe_nd::{NodeFullId, Request, XorName};
 use std::borrow::Cow;
 use std::{
@@ -69,15 +70,16 @@ pub struct Vault {
 
 impl Vault {
     /// Create and start vault. This will block until a `Command` to free it is fired.
-    pub fn new(
+    pub fn new<R: CryptoRng + Rng>(
         routing_node: Node,
         event_receiver: Receiver<RoutingEvent>,
         config: Config,
         command_receiver: Receiver<Command>,
+        mut rng: R,
     ) -> Result<Self> {
         let mut init_mode = Init::Load;
+
         let (is_elder, id) = Self::read_state(&config)?.unwrap_or_else(|| {
-            let mut rng = rand::thread_rng();
             let id = NodeFullId::new(&mut rng);
             init_mode = Init::New;
             (true, id)

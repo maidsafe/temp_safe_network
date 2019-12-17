@@ -112,7 +112,9 @@ mod detail {
 
         let is_first = config.is_first();
 
-        match Vault::new(routing_node, routing_rx, config, command_rx) {
+        let mut rng = rand::thread_rng();
+
+        match Vault::new(routing_node, routing_rx, config, command_rx, &mut rng) {
             Ok(mut vault) => {
                 let our_conn_info = unwrap!(vault.our_connection_info());
                 println!(
