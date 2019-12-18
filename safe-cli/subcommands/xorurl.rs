@@ -35,9 +35,13 @@ pub fn xorurl_commander(
 
     // Now let's just print out a list of the xorurls
     if OutputFmt::Pretty == output_fmt {
-        let (table, success_count) = gen_processed_files_table(&processed_files, false);
-        println!("{} files processed:", success_count);
-        table.printstd();
+        if processed_files.is_empty() {
+            println!("No files were processed");
+        } else {
+            let (table, success_count) = gen_processed_files_table(&processed_files, false);
+            println!("{} file/s processed:", success_count);
+            table.printstd();
+        }
     } else {
         let mut list = Vec::<(String, String)>::new();
         for (file_name, (_change, link)) in processed_files {

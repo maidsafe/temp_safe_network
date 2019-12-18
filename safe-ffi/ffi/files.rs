@@ -196,6 +196,7 @@ pub unsafe extern "C" fn files_put_published_immutable(
     data: *const u8,
     data_len: usize,
     media_type: *const c_char,
+    dry_run: bool,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, xorurl: *const c_char),
 ) {
@@ -203,7 +204,7 @@ pub unsafe extern "C" fn files_put_published_immutable(
         let user_data = OpaqueCtx(user_data);
         let media_type_str = from_c_str_to_str_option(media_type);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        let xorurl = (*app).files_put_published_immutable(&data_vec, media_type_str)?;
+        let xorurl = (*app).files_put_published_immutable(&data_vec, media_type_str, dry_run)?;
         let xorurl_string = CString::new(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, xorurl_string.as_ptr());
         Ok(())

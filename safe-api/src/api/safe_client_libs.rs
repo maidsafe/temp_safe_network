@@ -229,10 +229,11 @@ impl SafeApp for SafeAppScl {
             }
             .and_then(move |data_map| {
                 let address = *data_map.address();
-                if !dry_run {
-                    let _ = client2.put_idata(data_map);
+                if dry_run {
+                    futures::future::Either::A(futures::future::ok(address))
+                } else {
+                    futures::future::Either::B(client2.put_idata(data_map).map(move |_| address))
                 }
-                futures::future::ok(address)
             })
             .map_err(SafeAppError)
         })
@@ -631,7 +632,10 @@ mod tests {
 
         let id1 = b"HELLLOOOOOOO".to_vec();
 
-        let xorname = safe.safe_app.files_put_published_immutable(&id1).unwrap();
+        let xorname = safe
+            .safe_app
+            .files_put_published_immutable(&id1, false)
+            .unwrap();
         let data = safe
             .safe_app
             .files_get_published_immutable(xorname)
