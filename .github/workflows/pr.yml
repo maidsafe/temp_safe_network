@@ -66,7 +66,7 @@ jobs:
           profile: minimal
           override: true
           target: ${{ matrix.target }}
-      
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1
@@ -83,12 +83,12 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      
+
       # Check if NDK bundle is installed and list files.
       - name: Check Android NDK bundle
         shell: bash
         run: ls /usr/local/lib/android/sdk/ndk-bundle
-      
+
       # Setup NDK build toolchain for arm.
       - if: matrix.target == 'armv7-linux-androideabi'
         name: Setup NDK toolchain for armv7
@@ -99,7 +99,7 @@ jobs:
           echo "::set-env name=CC_armv7_linux_androideabi::arm-linux-androideabi-clang"
           echo "::set-env name=CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER::arm-linux-androideabi-clang"
           echo "::add-path::$PWD/toolchains/bin"
-      
+
       # Setup NDK build toolchain for x86_64.
       - if: matrix.target == 'x86_64-linux-android'
         name: Setup NDK toolchain for x86_64
@@ -109,7 +109,7 @@ jobs:
           /usr/local/lib/android/sdk/ndk-bundle/build/tools/make_standalone_toolchain.py --arch x86_64 --api 21 --install-dir toolchains --force
           echo "::set-env name=CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER::x86_64-linux-android-gcc"
           echo "::add-path::$PWD/toolchains/bin"
-      
+
       # Verify installed NDK toolchain for the target.
       - name: Check Android NDK toolchain Files
         shell: bash
@@ -117,28 +117,28 @@ jobs:
       - name: Download Android Build Toolchain
         shell: bash
         run:  rustup target add ${{matrix.target}}
-      
-      # Build dev native lib.
+
+      # Build prod native lib.
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
-      
-      # Upload dev native lib.
+
+      # Upload prod native lib.
       - uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-prod
           path: target/${{ matrix.target }}/release/libsafe_ffi.so
-      
-      # Build prod native lib.
+
+      # Build dev native lib.
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: >
             --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
-            --features=mock-network 
-      
-      # Upload prod native lib.
+            --features=mock-network
+
+      # Upload dev native lib.
       - uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-dev
