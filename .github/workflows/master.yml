@@ -235,7 +235,7 @@ jobs:
           profile: minimal
           override: true
           target: x86_64-apple-ios
-      
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1
@@ -253,21 +253,25 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      # Build
+     # Install cargo-lipo to generate universal libs.
       - uses: actions-rs/cargo@v1
         with:
           command: install
           args: cargo-lipo
+      # Build prod universal library.
       - name: Build universal lib - Prod
         shell: bash
         run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml
+      # Upload prod universal library.
       - uses: actions/upload-artifact@master
         with:
           name: safe-ffi-apple-ios-prod
           path: target/universal/release/libsafe_ffi.a
+      # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
         run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=mock-network
+      # Upload dev universal library.
       - uses: actions/upload-artifact@master
         with:
           name: safe-ffi-apple-ios-dev
