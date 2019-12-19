@@ -11,8 +11,11 @@ use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
 pub use routing::quic_p2p::Config as NetworkConfig;
 pub use routing::quic_p2p::NodeInfo as ConnectionInfo;
-use routing::quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p};
-pub use routing::{ClientEvent, Event, InterfaceError, RoutingError};
+use routing::{
+    quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p},
+    XorName,
+};
+pub use routing::{ClientEvent, Event, InterfaceError, P2pNode, RoutingError};
 use std::{
     cell::RefCell,
     net::SocketAddr,
@@ -71,6 +74,11 @@ impl Node {
         self.network_rx_idx = sel.recv(&self.network_rx);
     }
 
+    /// Returns the connection information of all the current section elders.
+    pub fn our_elders_info(&self) -> Option<impl Iterator<Item = &P2pNode>> {
+        Some(vec![].into_iter())
+    }
+
     /// Vote for an event.
     pub fn vote_for(&mut self, event: Vec<u8>) {
         if let Some(ref consensus_group) = self.consensus_group {
@@ -92,6 +100,26 @@ impl Node {
             idx => panic!("Unknown operation selected: {}", idx),
         }
         Ok(())
+    }
+
+    /// Find out if the given XorName matches our prefix.
+    pub fn matches_our_prefix(&self, _name: &XorName) -> Result<bool, RoutingError> {
+        // Currently due to there being just one section, this will always be true
+        // TODO: This would return an error if we are neither an elder nor an adult
+        Ok(true)
+    }
+
+    /// Find out the closest Elders to a given XorName that we know of.
+    ///
+    /// Note that the Adults of a section only know about their section Elders. Hence they will
+    /// always return the section Elders' info.
+    pub fn closest_known_elders_to(
+        &self,
+        _name: &XorName,
+    ) -> Result<impl Iterator<Item = &P2pNode>, RoutingError> {
+        // Currently due to there being just one section, return our section eleders.
+        self.our_elders_info()
+            .ok_or(RoutingError::InvalidStateForOperation)
     }
 
     /// Return the client connection info

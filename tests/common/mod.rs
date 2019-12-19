@@ -16,9 +16,9 @@ use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
 use safe_nd::{
-    AppFullId, AppPublicId, Challenge, ClientFullId, ClientPublicId, Coins, Error, Message,
-    MessageId, Notification, PublicId, PublicKey, Request, Response, Signature, Transaction,
-    TransactionId,
+    AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, Error, HandshakeRequest,
+    HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey, Request, Response,
+    Signature, Transaction, TransactionId,
 };
 use safe_vault::{
     routing::{ConsensusGroup, ConsensusGroupRef, Node},
@@ -112,12 +112,22 @@ impl Environment {
         TestApp::new_disconnected(&mut self.rng, owner)
     }
 
+    /// Establish connection assuming we are already at the destination section.
     pub fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
         let conn_info = self.vaults[0].connection_info();
         client.quic_p2p().connect_to(conn_info.clone());
         self.poll();
 
         client.expect_connected_to(&conn_info);
+
+        // Bootstrap handshake procedure where we assume that we don't have to rebootstrap
+        let client_public_id = client.full_id().public_id();
+        client.send_bootstrap_request(&client_public_id);
+        self.poll();
+
+        client.handle_handshake_response_join_from(&client_public_id, &conn_info);
+        self.poll();
+
         client.handle_challenge_from(&conn_info);
         self.poll();
     }
@@ -226,28 +236,55 @@ pub trait TestClientTrait {
         self.full_id().sign(data)
     }
 
-    fn expect_connected_to(&self, conn_info: &NodeInfo) {
+    fn expect_connected_to(&mut self, conn_info: &NodeInfo) {
         match self.rx().try_recv() {
             Ok(Event::ConnectedTo {
                 peer: Peer::Node { ref node_info },
             }) if node_info == conn_info => (),
             x => unexpected!(x),
-        }
+        };
+        self.set_connected_vault(conn_info.clone());
+    }
+
+    fn send_bootstrap_request(&mut self, client_public_id: &PublicId) {
+        let bootstrap_request = HandshakeRequest::Bootstrap(client_public_id.clone());
+        self.send(&bootstrap_request);
+    }
+
+    fn handle_handshake_response_join_from(
+        &mut self,
+        client_public_id: &PublicId,
+        conn_info: &NodeInfo,
+    ) {
+        let (sender, bytes) = self.expect_new_message();
+        assert_eq!(sender, conn_info.peer_addr);
+
+        let handshake_response: HandshakeResponse = unwrap!(bincode::deserialize(&bytes));
+        let _payload = match handshake_response {
+            HandshakeResponse::Join(payload) => payload,
+            _ => panic!("Unexpected HandshakeResponse"),
+        };
+
+        // TODO: For Phase 2B and multiple sections we need handle the payload, disconnect and
+        // connect to the new set of elders if necessary.
+
+        let request = HandshakeRequest::Join(client_public_id.clone());
+        self.send(&request);
     }
 
     fn handle_challenge_from(&mut self, conn_info: &NodeInfo) {
         let (sender, bytes) = self.expect_new_message();
         assert_eq!(sender, conn_info.peer_addr);
 
-        let challenge: Challenge = unwrap!(bincode::deserialize(&bytes));
-        let payload = match challenge {
-            Challenge::Request(_, payload) => payload,
-            Challenge::Response(..) => panic!("Unexpected Challenge::Response"),
+        let handshake_response: HandshakeResponse = unwrap!(bincode::deserialize(&bytes));
+        let payload = match handshake_response {
+            // TODO: handle the set of PublicIds sent as part of the challenge response.
+            HandshakeResponse::Challenge(_, payload) => payload,
+            _ => panic!("Unexpected"),
         };
 
         let signature = self.full_id().sign(payload);
-        let response = Challenge::Response(self.full_id().public_id().clone(), signature);
-        self.set_connected_vault(conn_info.clone());
+        let response = HandshakeRequest::ChallengeResult(signature);
         self.send(&response);
     }
 
