@@ -244,7 +244,7 @@ impl NrsMap {
             }
         };
         match link {
-            Some(the_link) => Ok(the_link.to_string()),
+            Some(the_link) => Ok(the_link),
             None => Err(Error::ContentError(format!(
                 "No link found for entry: {}.",
                 &sub_name
@@ -265,7 +265,7 @@ fn create_public_name_description(link: &str) -> Result<DefinitionData> {
     let mut public_name = DefinitionData::new();
     public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
     public_name.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
-    public_name.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now.clone());
+    public_name.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now);
     Ok(public_name)
 }
 
@@ -290,7 +290,7 @@ fn sub_names_vec_to_str(sub_names: &[SubName]) -> String {
 
 fn parse_nrs_name(name: &str) -> Result<Vec<String>> {
     // santize to a simple string
-    let sanitized_name = str::replace(&name, "safe://", "").to_string();
+    let sanitized_name = str::replace(&name, "safe://", "");
 
     let mut sub_names: Vec<String> = sanitized_name.split('.').map(String::from).collect();
     // get the TLD

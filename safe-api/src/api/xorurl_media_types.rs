@@ -32,7 +32,7 @@ lazy_static! {
         let mut populate = |subtypes: &[&'static str], range| {
             for (i, subtype) in subtypes.iter().enumerate() {
                 let code = range + (i as u16);
-                m.insert(subtype.to_string(), code);
+                m.insert((*subtype).to_string(), code);
             }
         };
         populate(&APPLICATION_SUBTYPES, 0x5000);

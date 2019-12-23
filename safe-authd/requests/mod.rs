@@ -212,8 +212,8 @@ fn process_authenticator_req(
             {
                 Ok(authorise::AuthorisationResponse::NotReady((rx, req_id, auth_req_str))) => {
                     let processing_resp = ProcessRequest::ProcessingResponse {
-                        safe_auth_handle: safe_auth_handle.clone(),
-                        auth_reqs_handle: auth_reqs_handle.clone(),
+                        safe_auth_handle,
+                        auth_reqs_handle,
                         rx,
                         req_id,
                         auth_req_str,

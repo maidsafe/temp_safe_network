@@ -31,12 +31,12 @@ pub fn process_req(
             Ok(safe_authenticator.is_logged_in())
         })?;
 
-        let num_auth_reqs = lock_auth_reqs_list(auth_reqs_handle.clone(), |auth_reqs_list| {
+        let num_auth_reqs = lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
             Ok(auth_reqs_list.len() as u32)
         })?;
 
         let num_notif_subs =
-            lock_notif_endpoints_list(notif_endpoints_handle.clone(), |notif_endpoints_list| {
+            lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
                 Ok(notif_endpoints_list.len() as u32)
             })?;
 

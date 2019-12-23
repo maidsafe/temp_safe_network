@@ -82,11 +82,7 @@ pub fn create_wallet_with_balance(
 
     let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
     let unwrapped_key_pair = unwrap!(key_pair);
-    (
-        wallet_xor.to_string(),
-        unwrapped_key_pair.pk,
-        unwrapped_key_pair.sk,
-    )
+    (wallet_xor, unwrapped_key_pair.pk, unwrapped_key_pair.sk)
 }
 
 #[allow(dead_code)]

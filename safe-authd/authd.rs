@@ -211,9 +211,6 @@ fn handle_request(
         quinn::NewStream::Bi(send, recv) => (send, recv),
         quinn::NewStream::Uni(_) => unreachable!("Disabled by endpoint configuration"),
     };
-    let safe_auth_handle = safe_auth_handle.clone();
-    let auth_reqs_handle = auth_reqs_handle.clone();
-    let notif_endpoints_handle = notif_endpoints_handle.clone();
     let log = log.clone();
     let log2 = log.clone();
     let log3 = log.clone();

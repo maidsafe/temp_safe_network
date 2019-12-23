@@ -189,10 +189,7 @@ impl SafeApp for SafeAppFake {
             Some(txs) => txs.clone(),
             None => BTreeMap::new(),
         };
-        txs_for_xorname.insert(
-            tx_id.to_string(),
-            format!("Success({})", amount).to_string(),
-        );
+        txs_for_xorname.insert(tx_id.to_string(), format!("Success({})", amount));
         self.fake_vault
             .txs
             .insert(to_xorname_hex.clone(), txs_for_xorname);

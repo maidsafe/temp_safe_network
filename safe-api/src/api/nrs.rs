@@ -94,10 +94,7 @@ impl Safe {
 
         let link = nrs_map.nrs_map_update_or_create_data(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
-        processed_entries.insert(
-            name.to_string(),
-            (CONTENT_ADDED_SIGN.to_string(), link.to_string()),
-        );
+        processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
         debug!("The new NRS Map: {:?}", nrs_map);
         if !dry_run {
@@ -149,10 +146,7 @@ impl Safe {
             let mut nrs_map = NrsMap::default();
             let link = nrs_map.nrs_map_update_or_create_data(&name, link, default, hard_link)?;
             let mut processed_entries = ProcessedEntries::new();
-            processed_entries.insert(
-                name.to_string(),
-                (CONTENT_ADDED_SIGN.to_string(), link.to_string()),
-            );
+            processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
             debug!("The new NRS Map: {:?}", nrs_map);
             if dry_run {

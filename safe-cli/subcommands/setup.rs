@@ -89,7 +89,7 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<(), String> {
             let buf = gen_completions_for_shell(shell)?;
             match std::str::from_utf8(&buf) {
                 Ok(v) => {
-                    map.insert(shellname.to_string(), serde_json::json!(v));
+                    map.insert((*shellname).to_string(), serde_json::json!(v));
                 }
                 Err(e) => println!("Invalid UTF-8 sequence: {}", e),
             };

@@ -125,7 +125,7 @@ impl SafeApp for SafeAppScl {
     ) -> Result<XorName> {
         let safe_app: &App = self.get_safe_app()?;
         run(safe_app, move |client, _app_context| {
-            let from_fullid = from_sk.map(|sk| ClientFullId::from(sk));
+            let from_fullid = from_sk.map(ClientFullId::from);
             client
                 .create_balance(
                     from_fullid.as_ref(),
@@ -177,7 +177,7 @@ impl SafeApp for SafeAppScl {
     ) -> Result<Transaction> {
         let safe_app: &App = self.get_safe_app()?;
         let tx = run(safe_app, move |client, _app_context| {
-            let from_fullid = from_sk.map(|sk| ClientFullId::from(sk));
+            let from_fullid = from_sk.map(ClientFullId::from);
             client
                 .transfer_coins(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
                 .map_err(SafeAppError)
@@ -599,7 +599,7 @@ fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
         let pk = client
             .public_key()
             .bls()
-            .ok_or("it's not a BLS Public Key".to_string())?;
+            .ok_or_else(|| "It's not a BLS Public Key".to_string())?;
         Ok(pk)
     })
     .map_err(|err| {

@@ -4,19 +4,7 @@
 # and running cargo test to install it again
 set -e
 
-# Stash unstaged changes
-git stash -q --keep-index
-
-echo 'PrePush: cargo test'
-cargo test --features="scl-mock" -- --test-threads=1
 echo 'PrePush: cargo clippy -- -D warnings'
 cargo clippy -- -D warnings
 echo 'PrePush: cargo fmt -- --check'
-cargo fmt
-
-echo 'PrePush: updating formatted files'
-# Stage updated files
-git add -u
-
-# Re-apply original unstaged changes
-git stash pop -q
+cargo fmt -- --check

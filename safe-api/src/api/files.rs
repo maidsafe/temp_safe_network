@@ -555,7 +555,7 @@ fn validate_files_add_params(
 
 // Simply change Windows style path separator into `/`
 fn normalise_path_separator(from: &str) -> String {
-    str::replace(&from, "\\", "/").to_string()
+    str::replace(&from, "\\", "/")
 }
 
 // From the location path and the destination path chosen by the user, calculate
@@ -975,7 +975,7 @@ fn file_system_dir_walk(
                                 },
                             };
                         } else {
-                            processed_files.insert(normalised_path.clone(), (CONTENT_ADDED_SIGN.to_string(), "".to_string()));
+                            processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), "".to_string()));
                         }
                     },
                     Err(err) => {

@@ -254,7 +254,7 @@ impl XorUrlEncoder {
             2 => SafeContentType::FilesContainer,
             3 => SafeContentType::NrsMapContainer,
             other => match MEDIA_TYPE_STR.get(&other) {
-                Some(media_type_str) => SafeContentType::MediaType(media_type_str.to_string()),
+                Some(media_type_str) => SafeContentType::MediaType((*media_type_str).to_string()),
                 None => {
                     return Err(Error::InvalidXorUrl(format!(
                         "Invalid content type encoded in the XOR-URL string: {}",
@@ -306,7 +306,7 @@ impl XorUrlEncoder {
             type_tag,
             data_type,
             content_type,
-            path: path.to_string(),
+            path,
             sub_names,
             content_version,
         })
@@ -594,7 +594,7 @@ mod tests {
         use unwrap::unwrap;
         let xorname = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = unwrap!(XorUrlEncoder::encode(
+        let xorurl_with_subname = unwrap!(XorUrlEncoder::encode(
             xorname,
             type_tag,
             SafeDataType::PublishedImmutableData,
@@ -605,7 +605,6 @@ mod tests {
             XorUrlBase::Base32z
         ));
 
-        let xorurl_with_subname = xorurl.to_string();
         assert!(xorurl_with_subname.contains("safe://sub."));
         let xorurl_encoder_with_subname = unwrap!(XorUrlEncoder::from_url(&xorurl_with_subname));
         assert_eq!(

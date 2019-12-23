@@ -64,7 +64,7 @@ pub fn cat_commander(
         SafeData::PublishedImmutableData { data, .. } => {
             if cmd.hexdump {
                 // Render hex representation of ImmutableData file
-                println!("{}", pretty_hex::pretty_hex(data).to_string());
+                println!("{}", pretty_hex::pretty_hex(data));
             } else {
                 // Render ImmutableData file
                 io::stdout().write_all(data).map_err(|err| {

@@ -597,7 +597,7 @@ fn gen_cont_auth_response(
     cont_req: ContainersReq,
 ) -> Result<String> {
     let permissions = cont_req.containers.clone();
-    let app_id = cont_req.app.id.clone();
+    let app_id = cont_req.app.id;
 
     auth_run_helper(authenticator, move |client| {
         let c2 = client.clone();

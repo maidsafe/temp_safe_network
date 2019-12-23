@@ -52,7 +52,7 @@ pub unsafe extern "C" fn keys_create(
         let preload_option = from_c_str_to_str_option(preload);
         let pk_option = from_c_str_to_str_option(pk);
         let (xorurl, keypair) = (*app).keys_create(from_option, preload_option, pk_option)?;
-        let xorurl_c_str = CString::new(xorurl.to_string())?;
+        let xorurl_c_str = CString::new(xorurl)?;
         let keypair = match keypair {
             Some(keypair) => keypair,
             None => NativeBlsKeyPair {
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
         let user_data = OpaqueCtx(user_data);
         let preload_option = String::clone_from_repr_c(preload)?;
         let (xorurl, keypair) = (*app).keys_create_preload_test_coins(&preload_option)?;
-        let xorurl_c_str = CString::new(xorurl.to_string())?;
+        let xorurl_c_str = CString::new(xorurl)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,

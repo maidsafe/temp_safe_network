@@ -708,7 +708,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let to_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -717,7 +717,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("also-my-balance"),
             true, // set --default
-            &unwrap!(key_pair2.clone()).sk,
+            &unwrap!(key_pair2).sk,
         ));
 
         // test fail to transfer more than current balance at wallet in <from> argument
@@ -767,7 +767,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.0"));
@@ -823,7 +823,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let from_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
@@ -863,7 +863,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("from-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("200.5"));
@@ -871,7 +871,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("from-second-balance"),
             false,
-            &unwrap!(key_pair2.clone()).sk,
+            &unwrap!(key_pair2).sk,
         ));
 
         let to_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -880,7 +880,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &unwrap!(key_pair3.clone()).sk,
+            &unwrap!(key_pair3).sk,
         ));
 
         // test fail to transfer more than current balance at 'from-firstbaance'
@@ -945,7 +945,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("from-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let to_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -954,7 +954,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &unwrap!(key_pair2.clone()).sk,
+            &unwrap!(key_pair2).sk,
         ));
 
         let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("20.2"));
@@ -962,7 +962,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-second-balance"),
             false,
-            &unwrap!(key_pair3.clone()).sk,
+            &unwrap!(key_pair3).sk,
         ));
 
         // test successful transfer to 'to-second-balance'
@@ -1023,7 +1023,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("from-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("20.2"));
@@ -1031,7 +1031,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("from-second-balance"),
             false,
-            &unwrap!(key_pair2.clone()).sk,
+            &unwrap!(key_pair2).sk,
         ));
 
         let to_wallet_xorurl = unwrap!(safe.wallet_create());
@@ -1040,7 +1040,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &unwrap!(key_pair3.clone()).sk,
+            &unwrap!(key_pair3).sk,
         ));
 
         let (_key_xorurl4, key_pair4) = unwrap!(safe.keys_create_preload_test_coins("40.4"));
@@ -1048,7 +1048,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-second-balance"),
             false,
-            &unwrap!(key_pair4.clone()).sk,
+            &unwrap!(key_pair4).sk,
         ));
 
         // create NRS URLs for both wallets
