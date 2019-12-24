@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#![cfg(feature = "mock_parsec")]
+#![cfg(feature = "mock_base")]
 // For explanation of lint checks, run `rustc -W help`.
 #![forbid(unsafe_code)]
 #![warn(
@@ -223,7 +223,7 @@ fn create_login_packet_for_other() {
             new_owner: *new_client.public_id().public_key(),
             amount: unwrap!(Coins::from_nano(nano_to_transfer)),
             transaction_id: 2,
-            new_login_packet: login_packet.clone(),
+            new_login_packet: login_packet,
         },
         NdError::BalanceExists,
     );
@@ -982,7 +982,7 @@ fn append_only_data_get_entries() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::PutAData(data.clone()),
+        Request::PutAData(data),
         NdError::InsufficientBalance,
     );
 
@@ -1605,7 +1605,7 @@ fn append_only_data_put_owners() {
         owners_index: 1,
     };
 
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append_permissions(perms_0, 0));
     unwrap!(data.append(
         vec![ADataEntry {
             key: b"one".to_vec(),
@@ -1731,7 +1731,7 @@ fn append_only_data_append_seq() {
         owners_index: 1,
     };
 
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append_permissions(perms_0, 0));
     unwrap!(data.append(
         vec![ADataEntry {
             key: b"one".to_vec(),
@@ -1813,7 +1813,7 @@ fn append_only_data_append_unseq() {
         owners_index: 1,
     };
 
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.append_permissions(perms_0, 0));
     unwrap!(data.append(vec![ADataEntry {
         key: b"one".to_vec(),
         value: b"foo".to_vec()
@@ -1948,15 +1948,11 @@ fn put_immutable_data() {
     );
 
     // Published data can be put again, but unpublished not
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        Request::PutIData(pub_idata.clone()),
-    );
+    common::perform_mutation(&mut env, &mut client_a, Request::PutIData(pub_idata));
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::PutIData(unpub_idata.clone()),
+        Request::PutIData(unpub_idata),
         NdError::DataExists,
     );
 
@@ -2144,7 +2140,7 @@ fn delete_immutable_data() {
     common::create_balance(&mut env, &mut client_a, None, start_nano);
 
     let raw_data = vec![1, 2, 3];
-    let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
+    let pub_idata = IData::Pub(PubImmutableData::new(raw_data));
     let pub_idata_address: XorName = *pub_idata.address().name();
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(pub_idata));
 
@@ -2166,7 +2162,7 @@ fn delete_immutable_data() {
 
     let raw_data = vec![42];
     let owner = client_a.public_id().public_key();
-    let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data.clone(), *owner));
+    let unpub_idata = IData::Unpub(UnpubImmutableData::new(raw_data, *owner));
     let unpub_idata_address: XorName = *unpub_idata.address().name();
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
@@ -2599,11 +2595,7 @@ fn read_seq_mutable_data() {
         Default::default(),
         *client.public_id().public_key(),
     );
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        Request::PutMData(MData::Seq(mdata.clone())),
-    );
+    common::perform_mutation(&mut env, &mut client, Request::PutMData(MData::Seq(mdata)));
 
     // Get version.
     let address = MDataAddress::Seq { name, tag };
@@ -2658,11 +2650,7 @@ fn mutate_seq_mutable_data() {
     let name: XorName = env.rng().gen();
     let tag = 100;
     let mdata = SeqMutableData::new(name, tag, *client.public_id().public_key());
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        Request::PutMData(MData::Seq(mdata.clone())),
-    );
+    common::perform_mutation(&mut env, &mut client, Request::PutMData(MData::Seq(mdata)));
 
     // Get a non-existant value by key.
     let address = MDataAddress::Seq { name, tag };
@@ -2770,7 +2758,7 @@ fn mutate_unseq_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::PutMData(MData::Unseq(mdata.clone())),
+        Request::PutMData(MData::Unseq(mdata)),
     );
 
     // Get a non-existant value by key.
@@ -2864,7 +2852,7 @@ fn mutable_data_permissions() {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutMData(MData::Unseq(mdata.clone())),
+        Request::PutMData(MData::Unseq(mdata)),
     );
 
     // Make sure client B can't insert anything.
@@ -2943,7 +2931,7 @@ fn delete_mutable_data() {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutMData(MData::Unseq(mdata.clone())),
+        Request::PutMData(MData::Unseq(mdata)),
     );
     let balance_a = unwrap!(balance_a.checked_sub(*COST_OF_PUT));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);

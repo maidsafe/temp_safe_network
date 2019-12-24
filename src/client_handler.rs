@@ -965,7 +965,7 @@ impl ClientHandler {
             .unwrap_or(false);
         if own_request {
             return Some(Action::ConsensusVote(ConsensusAction::Forward {
-                request: request.clone(),
+                request,
                 client_public_id: requester.clone(),
                 message_id,
             }));

@@ -178,7 +178,7 @@ impl Environment {
         let conn_infos: Vec<_> = self
             .vaults
             .iter_mut()
-            .map(|vault| vault.connection_info().clone())
+            .map(|vault| vault.connection_info())
             .collect();
         for conn_info in conn_infos {
             client.quic_p2p().connect_to(conn_info.clone());
