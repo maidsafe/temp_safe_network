@@ -7,7 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-
 #![allow(missing_docs)]
 
 // Core errors

@@ -39,6 +39,19 @@ extern crate safe_core;
 #[macro_use]
 extern crate unwrap;
 
+// Export FFI interface
+
+pub use crate::ffi::apps::*;
+pub use crate::ffi::errors::codes::*;
+pub use crate::ffi::ipc::*;
+pub use crate::ffi::logging::*;
+pub use crate::ffi::*;
+
+// Export public auth objects.
+
+pub use self::errors::AuthError;
+pub use client::AuthClient;
+
 pub mod access_container;
 pub mod app_auth;
 pub mod app_container;
@@ -52,19 +65,10 @@ pub mod revocation;
 #[macro_use]
 pub mod test_utils;
 
-pub use ffi::apps::*;
-pub use ffi::ipc::*;
-pub use ffi::logging::*;
-pub use ffi::*;
-
 mod client;
 mod std_dirs;
 #[cfg(test)]
 mod tests;
-
-pub use self::errors::AuthError;
-pub use crate::ffi::errors::codes::*;
-pub use client::AuthClient;
 
 use crate::ffi::errors::Error;
 use futures::stream::Stream;

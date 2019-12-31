@@ -24,7 +24,7 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
-    let f = || {
+    catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         (*app)
@@ -40,8 +40,7 @@ pub unsafe extern "C" fn access_container_refresh_access_info(
                     .into()
             })
             .map_err(Error::from)
-    };
-    catch_unwind_cb(user_data, o_cb, f)
+    });
 }
 
 /// Retrieve a list of container names that an app has access to.

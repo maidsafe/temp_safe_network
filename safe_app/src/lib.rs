@@ -56,9 +56,6 @@ pub use safe_nd::PubImmutableData;
 
 // Export FFI interface.
 
-pub mod ffi;
-
-pub use crate::errors::AppError;
 pub use crate::ffi::access_container::*;
 pub use crate::ffi::cipher_opt::*;
 pub use crate::ffi::crypto::*;
@@ -77,20 +74,25 @@ pub use crate::ffi::object_cache::*;
 #[cfg(any(test, feature = "testing"))]
 pub use crate::ffi::test_utils::*;
 pub use crate::ffi::*;
+
+// Export public app objects.
+
+pub use crate::errors::AppError;
 pub use client::AppClient;
 
 pub mod cipher_opt;
-mod client;
-mod errors;
+pub mod ffi;
 pub mod object_cache;
 pub mod permissions;
-
-#[cfg(test)]
-mod tests;
 
 /// Utility functions to test apps functionality.
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
+
+mod client;
+mod errors;
+#[cfg(test)]
+mod tests;
 
 use self::object_cache::ObjectCache;
 use crate::ffi::errors::{Error, Result as FfiResult};
