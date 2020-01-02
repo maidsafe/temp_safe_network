@@ -225,12 +225,12 @@ impl IDataHandler {
         let (idata_address, op_type) = self.idata_op_mut(&message_id).and_then(|idata_op| {
             let op_type = idata_op.op_type();
             idata_op
-                .handle_mutation_resp(sender, result.clone(), own_id, message_id)
+                .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
                 .map(|address| (address, op_type))
         })?;
 
         if op_type == OpType::Put {
-            self.handle_put_idata_resp(idata_address, sender, result, message_id)
+            self.handle_put_idata_resp(idata_address, sender, &result, message_id)
         } else {
             self.handle_delete_unpub_idata_resp(idata_address, sender, result, message_id)
         }
@@ -240,7 +240,7 @@ impl IDataHandler {
         &mut self,
         idata_address: IDataAddress,
         sender: XorName,
-        _result: NdResult<()>,
+        _result: &NdResult<()>,
         message_id: MessageId,
     ) -> Option<Action> {
         // TODO -
@@ -364,7 +364,7 @@ impl IDataHandler {
     ) -> Option<Action> {
         let own_id = format!("{}", self);
         let action = self.idata_op_mut(&message_id).and_then(|idata_op| {
-            idata_op.handle_get_idata_resp(sender, result, own_id, message_id)
+            idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
         });
         let _ = self.remove_idata_op_if_concluded(&message_id);
         action

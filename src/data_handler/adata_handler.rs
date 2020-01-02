@@ -55,7 +55,7 @@ impl ADataHandler {
     pub(super) fn handle_put_adata_req(
         &mut self,
         requester: PublicId,
-        data: AData,
+        data: &AData,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
@@ -331,7 +331,7 @@ impl ADataHandler {
         &self,
         requester: PublicId,
         address: ADataAddress,
-        key: Vec<u8>,
+        key: &[u8],
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
@@ -367,7 +367,7 @@ impl ADataHandler {
 
     pub(super) fn handle_add_pub_adata_permissions_req(
         &mut self,
-        requester: PublicId,
+        requester: &PublicId,
         address: ADataAddress,
         permissions: ADataPubPermissions,
         permissions_idx: u64,
@@ -401,7 +401,7 @@ impl ADataHandler {
 
     pub(super) fn handle_add_unpub_adata_permissions_req(
         &mut self,
-        requester: PublicId,
+        requester: &PublicId,
         address: ADataAddress,
         permissions: ADataUnpubPermissions,
         permissions_idx: u64,
@@ -433,7 +433,7 @@ impl ADataHandler {
 
     pub(super) fn handle_set_adata_owner_req(
         &mut self,
-        requester: PublicId,
+        requester: &PublicId,
         address: ADataAddress,
         owner: ADataOwner,
         owners_idx: u64,
@@ -458,7 +458,7 @@ impl ADataHandler {
 
     pub(super) fn handle_append_seq_req(
         &mut self,
-        requester: PublicId,
+        requester: &PublicId,
         append: ADataAppendOperation,
         index: u64,
         message_id: MessageId,
@@ -486,7 +486,7 @@ impl ADataHandler {
 
     pub(super) fn handle_append_unseq_req(
         &mut self,
-        requester: PublicId,
+        requester: &PublicId,
         operation: ADataAppendOperation,
         message_id: MessageId,
     ) -> Option<Action> {

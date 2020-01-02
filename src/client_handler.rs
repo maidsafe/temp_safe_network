@@ -183,7 +183,7 @@ impl ClientHandler {
     pub fn handle_client_message<R: CryptoRng + Rng>(
         &mut self,
         peer_addr: SocketAddr,
-        bytes: Bytes,
+        bytes: &Bytes,
         rng: &mut R,
     ) -> Option<Action> {
         if let Some(client) = self.clients.get(&peer_addr).cloned() {
@@ -238,13 +238,13 @@ impl ClientHandler {
         } else {
             match bincode::deserialize(&bytes) {
                 Ok(HandshakeRequest::Bootstrap(client_id)) => {
-                    self.handle_bootstrap_request(peer_addr, client_id);
+                    self.handle_bootstrap_request(peer_addr, &client_id);
                 }
                 Ok(HandshakeRequest::Join(client_id)) => {
                     self.handle_join_request(peer_addr, client_id, rng);
                 }
                 Ok(HandshakeRequest::ChallengeResult(signature)) => {
-                    self.handle_challenge(peer_addr, signature);
+                    self.handle_challenge(peer_addr, &signature);
                 }
                 Err(err) => {
                     info!(
@@ -694,7 +694,7 @@ impl ClientHandler {
     ///
     /// Checks that the response contains a valid signature of the challenge we previously sent.
     /// If a client requests the section info, we also send it.
-    fn handle_challenge(&mut self, peer_addr: SocketAddr, signature: Signature) {
+    fn handle_challenge(&mut self, peer_addr: SocketAddr, signature: &Signature) {
         if let Some((challenge, public_id)) = self.client_candidates.remove(&peer_addr) {
             let public_key = match utils::own_key(&public_id) {
                 Some(pk) => pk,
@@ -759,7 +759,7 @@ impl ClientHandler {
                 requester,
                 message_id,
                 refund,
-            } => self.handle_response(src, requester, response, message_id, refund),
+            } => self.handle_response(src, &requester, response, message_id, refund),
         }
     }
 
@@ -821,7 +821,7 @@ impl ClientHandler {
             ),
             UpdateLoginPacket(updated_login_packet) => self.handle_update_login_packet_vault_req(
                 requester,
-                updated_login_packet,
+                &updated_login_packet,
                 message_id,
             ),
             InsAuthKey {
@@ -882,7 +882,7 @@ impl ClientHandler {
     fn handle_response(
         &mut self,
         data_handlers: XorName,
-        requester: PublicId,
+        requester: &PublicId,
         response: Response,
         message_id: MessageId,
         refund: Option<Coins>,
@@ -1072,7 +1072,7 @@ impl ClientHandler {
     fn handle_update_login_packet_vault_req(
         &mut self,
         requester: PublicId,
-        updated_login_packet: LoginPacket,
+        updated_login_packet: &LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
@@ -1102,7 +1102,7 @@ impl ClientHandler {
 
     fn notify_destination_owners(&mut self, destination: &XorName, transaction: Transaction) {
         for client_id in self.lookup_client_and_its_apps(destination) {
-            self.send_notification_to_client(client_id, Notification(transaction));
+            self.send_notification_to_client(&client_id, &Notification(transaction));
         }
     }
 
@@ -1145,7 +1145,7 @@ impl ClientHandler {
         }
     }
 
-    fn handle_bootstrap_request(&mut self, peer_addr: SocketAddr, client_id: PublicId) {
+    fn handle_bootstrap_request(&mut self, peer_addr: SocketAddr, client_id: &PublicId) {
         if !self
             .routing_node
             .borrow()
@@ -1216,7 +1216,7 @@ impl ClientHandler {
         }
     }
 
-    fn send_notification_to_client(&mut self, client_id: PublicId, notification: Notification) {
+    fn send_notification_to_client(&mut self, client_id: &PublicId, notification: &Notification) {
         let peer_addrs = self.lookup_client_peer_addrs(&client_id);
 
         if peer_addrs.is_empty() {

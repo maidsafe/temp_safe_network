@@ -101,7 +101,7 @@ impl DataHandler {
             //
             PutMData(data) => self
                 .mdata_handler
-                .handle_put_mdata_req(requester, data, message_id),
+                .handle_put_mdata_req(requester, &data, message_id),
             GetMData(address) => self
                 .mdata_handler
                 .handle_get_mdata_req(requester, address, message_id),
@@ -160,13 +160,13 @@ impl DataHandler {
             //
             PutAData(data) => self
                 .adata_handler
-                .handle_put_adata_req(requester, data, message_id),
+                .handle_put_adata_req(requester, &data, message_id),
             GetAData(address) => self
                 .adata_handler
                 .handle_get_adata_req(requester, address, message_id),
             GetADataValue { address, key } => self
                 .adata_handler
-                .handle_get_adata_value_req(requester, address, key, message_id),
+                .handle_get_adata_value_req(requester, address, &key, message_id),
             GetADataShell {
                 address,
                 data_index,
@@ -234,7 +234,7 @@ impl DataHandler {
                 permissions,
                 permissions_index,
             } => self.adata_handler.handle_add_pub_adata_permissions_req(
-                requester,
+                &requester,
                 address,
                 permissions,
                 permissions_index,
@@ -245,7 +245,7 @@ impl DataHandler {
                 permissions,
                 permissions_index,
             } => self.adata_handler.handle_add_unpub_adata_permissions_req(
-                requester,
+                &requester,
                 address,
                 permissions,
                 permissions_index,
@@ -256,7 +256,7 @@ impl DataHandler {
                 owner,
                 owners_index,
             } => self.adata_handler.handle_set_adata_owner_req(
-                requester,
+                &requester,
                 address,
                 owner,
                 owners_index,
@@ -264,10 +264,10 @@ impl DataHandler {
             ),
             AppendSeq { append, index } => self
                 .adata_handler
-                .handle_append_seq_req(requester, append, index, message_id),
+                .handle_append_seq_req(&requester, append, index, message_id),
             AppendUnseq(operation) => self
                 .adata_handler
-                .handle_append_unseq_req(requester, operation, message_id),
+                .handle_append_unseq_req(&requester, operation, message_id),
             //
             // ===== Invalid =====
             //
@@ -357,7 +357,7 @@ impl DataHandler {
             // Since the src is the chunk's name, this message was sent by the data handlers to us
             // as a single data handler, implying that we're a data handler chosen to store the
             // chunk.
-            self.idata_holder.store_idata(data, requester, message_id)
+            self.idata_holder.store_idata(&data, requester, message_id)
         } else {
             self.idata_handler
                 .handle_put_idata_req(requester, data, message_id)
@@ -377,7 +377,7 @@ impl DataHandler {
             // stored.
             let client = self.client_id(&message_id)?.clone();
             self.idata_holder
-                .delete_unpub_idata(address, client, message_id)
+                .delete_unpub_idata(address, &client, message_id)
         } else {
             // We're acting as data handler, received request from client handlers
             self.idata_handler
@@ -396,7 +396,7 @@ impl DataHandler {
             // The message was sent by the data handlers to us as the one who is supposed to store
             // the chunk. See the sent Get request below.
             let client = self.client_id(&message_id)?.clone();
-            self.idata_holder.get_idata(address, client, message_id)
+            self.idata_holder.get_idata(address, &client, message_id)
         } else {
             self.idata_handler
                 .handle_get_idata_req(requester, address, message_id)

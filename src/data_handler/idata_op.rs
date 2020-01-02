@@ -124,7 +124,7 @@ impl IDataOp {
         &mut self,
         sender: XorName,
         result: NdResult<()>,
-        own_id: String,
+        own_id: &str,
         message_id: MessageId,
     ) -> Option<IDataAddress> {
         if let IDataRequest::GetIData(_) = self.request {
@@ -135,7 +135,7 @@ impl IDataOp {
             return None;
         }
 
-        self.set_to_actioned(&sender, result.err(), own_id)?;
+        self.set_to_actioned(&sender, result.err(), &own_id)?;
 
         match self.request {
             IDataRequest::PutIData(ref data) => Some(*data.address()),
@@ -148,7 +148,7 @@ impl IDataOp {
         &mut self,
         sender: XorName,
         result: NdResult<IData>,
-        own_id: String,
+        own_id: &str,
         message_id: MessageId,
     ) -> Option<Action> {
         let is_already_actioned = self.is_any_actioned();
@@ -165,7 +165,7 @@ impl IDataOp {
         };
 
         let response = Response::GetIData(result.clone());
-        self.set_to_actioned(&sender, result.err(), own_id)?;
+        self.set_to_actioned(&sender, result.err(), &own_id)?;
         if is_already_actioned {
             None
         } else {
@@ -185,7 +185,7 @@ impl IDataOp {
         &mut self,
         sender: &XorName,
         got_error_response: Option<NdError>,
-        own_id: String,
+        own_id: &str,
     ) -> Option<()> {
         self.rpc_states
             .get_mut(sender)

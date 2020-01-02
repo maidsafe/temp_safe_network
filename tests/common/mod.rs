@@ -233,7 +233,7 @@ impl TestVault {
         let inner = unwrap!(Vault::new(
             routing_node,
             routing_rx,
-            config,
+            &config,
             command_rx,
             rng::new(network.new_rng()),
         ));
@@ -270,7 +270,7 @@ impl TestVault {
         let inner = unwrap!(Vault::new(
             routing_node,
             routing_rx,
-            config,
+            &config,
             command_rx,
             vault_rng
         ));

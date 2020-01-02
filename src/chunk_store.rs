@@ -167,7 +167,7 @@ impl<T: Chunk> ChunkStore<T> {
         fs::read_dir(&self.dir)
             .map(|entries| {
                 entries
-                    .filter_map(|entry| to_chunk_id(entry.ok()?))
+                    .filter_map(|entry| to_chunk_id(&entry.ok()?))
                     .collect()
             })
             .unwrap_or_else(|_| Vec::new())
@@ -215,7 +215,7 @@ impl Subdir for LoginPacketChunkStore {
     }
 }
 
-fn to_chunk_id<T: ChunkId>(entry: DirEntry) -> Option<T> {
+fn to_chunk_id<T: ChunkId>(entry: &DirEntry) -> Option<T> {
     let file_name = entry.file_name();
     let file_name = file_name.into_string().ok()?;
     let bytes = hex::decode(file_name).ok()?;

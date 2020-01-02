@@ -44,7 +44,7 @@ impl IDataHolder {
 
     pub(super) fn store_idata(
         &mut self,
-        data: IData,
+        data: &IData,
         requester: PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -75,10 +75,10 @@ impl IDataHolder {
     pub(super) fn get_idata(
         &self,
         address: IDataAddress,
-        client: PublicId,
+        client: &PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let client_pk = utils::own_key(&client)?;
+        let client_pk = utils::own_key(client)?;
         let result = self
             .chunks
             .get(&address)
@@ -108,7 +108,7 @@ impl IDataHolder {
     pub(super) fn delete_unpub_idata(
         &mut self,
         address: IDataAddress,
-        client: PublicId,
+        client: &PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
         let client_pk = utils::own_key(&client)?;

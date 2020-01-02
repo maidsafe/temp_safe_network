@@ -122,7 +122,7 @@ impl MDataHandler {
     pub(super) fn handle_put_mdata_req(
         &mut self,
         requester: PublicId,
-        data: MData,
+        data: &MData,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {

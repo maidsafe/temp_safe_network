@@ -77,7 +77,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     pub fn new(
         routing_node: Node,
         event_receiver: Receiver<RoutingEvent>,
-        config: Config,
+        config: &Config,
         command_receiver: Receiver<Command>,
         mut rng: R,
     ) -> Result<Self> {
@@ -302,7 +302,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 client_handler.handle_connection_failure(peer_addr);
             }
             NewMessageFromClient { peer_addr, msg } => {
-                return client_handler.handle_client_message(peer_addr, msg, &mut rng);
+                return client_handler.handle_client_message(peer_addr, &msg, &mut rng);
             }
             SentUserMsgToClient { peer_addr, .. } => {
                 trace!("{}: Succesfully sent message to: {}", self, peer_addr);
@@ -314,7 +314,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         None
     }
 
-    fn vote_for_action(&mut self, action: ConsensusAction) -> Option<Action> {
+    fn vote_for_action(&mut self, action: &ConsensusAction) -> Option<Action> {
         self.routing_node
             .borrow_mut()
             .vote_for(utils::serialise(&action));
@@ -325,7 +325,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         trace!("{} handle action {:?}", self, action);
         use Action::*;
         match action {
-            ConsensusVote(action) => self.vote_for_action(action),
+            ConsensusVote(action) => self.vote_for_action(&action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {
