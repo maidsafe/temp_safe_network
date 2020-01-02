@@ -9,13 +9,13 @@
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
-pub use routing::quic_p2p::Config as NetworkConfig;
-pub use routing::quic_p2p::NodeInfo as ConnectionInfo;
 use routing::{
     quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p},
     XorName,
 };
-pub use routing::{ClientEvent, Event, InterfaceError, P2pNode, RoutingError};
+pub use routing::{
+    ClientEvent, ConnectionInfo, Event, InterfaceError, NetworkConfig, P2pNode, RoutingError,
+};
 use std::{
     cell::RefCell,
     net::SocketAddr,
