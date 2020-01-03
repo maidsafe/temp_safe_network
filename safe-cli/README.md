@@ -33,6 +33,7 @@
     - [Put](#files-put)
     - [Sync](#files-sync)
     - [Add](#files-add)
+  - [Xorurl](#xorurl)
   - [Cat](#cat)
   - [NRS](#nrs-name-resolution-system)
     - [Create](#nrs-create)
@@ -711,6 +712,31 @@ If we have previously uploaded a file to the network, we can also add it to any 
 $ safe files add safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/files-added/same-file.txt
 FilesContainer updated (version 4): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=4"
 +  /files-added/same-file1.txt  safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n
+```
+
+### Xorurl
+
+As we've seen, when uploading files to the network, each file is uploaded as an `ImmutableData` using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
+
+The file's XOR-URL is deterministic based on its content, i.e. the location where its chunks are stored and located as determined based on the files's content, and performed at the client before uploading the chunks to the network. Therefore the XOR-URL is always the same if the content of a file doesn't change. All this means we could know what the file's XOR-URL will be without uploading it to the network.
+
+Obtaining local files' XOR-URLs without uploading them to the network can be obtained in two diffent ways. We can use the `--dry-run` flag in any of the files commands, e.g.:
+```shell
+$ safe files put ./to-upload/ --recursive --dry-run
+NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.
+FilesContainer not created since running in dry-run mode
++  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
++  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
++  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
+```
+
+There is also handy `safe xorurl` command which allows us to provide a local path and obtain the XOR-URLs of the files found in such path, without uploading them to the network:
+```shell
+$ safe xorurl ./to-upload/ --recursive
+3 file/s processed:
++  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
++  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
++  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
 ```
 
 ### Cat

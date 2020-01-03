@@ -16,7 +16,7 @@ use std::io::{self, stdin, stdout, Write};
 
 // Warn the user about a dry-run being performed
 pub fn notice_dry_run() {
-    println!("NOTE the operation is being performed in dry-run mode, therefore no changes will be committed to the network.");
+    println!("NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.");
 }
 
 // Converts the XOR name bytes into a hex encoded string

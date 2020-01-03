@@ -213,6 +213,7 @@ impl SafeApp for SafeAppScl {
     }
 
     fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+        // TODO: allow this operation to work without a connection when it's a dry run
         let safe_app: &App = self.get_safe_app()?;
 
         let data_vec = data.to_vec();

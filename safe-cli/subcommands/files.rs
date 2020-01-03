@@ -87,7 +87,11 @@ pub fn files_commander(
 
             // Now let's just print out a list of the files uploaded/processed
             if OutputFmt::Pretty == output_fmt {
-                println!("FilesContainer created at: \"{}\"", files_container_xorurl);
+                if dry_run {
+                    println!("FilesContainer not created since running in dry-run mode");
+                } else {
+                    println!("FilesContainer created at: \"{}\"", files_container_xorurl);
+                }
                 let mut table = Table::new();
                 let format = FormatBuilder::new()
                     .column_separator(' ')

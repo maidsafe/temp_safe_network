@@ -26,6 +26,7 @@ use unwrap::unwrap;
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "../testdata/test.md";
+const TEST_FILE_RANDOM_CONTENT: &str = "test_file_random_content.txt";
 const TEST_FOLDER: &str = "../testdata/";
 const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
 const TEST_FOLDER_SUBFOLDER: &str = "../testdata/subfolder/";
@@ -55,11 +56,14 @@ fn calling_safe_files_put() {
 
 #[test]
 fn calling_safe_files_put_dry_run() {
+    let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
+    unwrap!(fs::write(TEST_FILE_RANDOM_CONTENT, random_content));
+
     let content = cmd!(
         get_bin_location(),
         "files",
         "put",
-        TEST_FILE,
+        TEST_FILE_RANDOM_CONTENT,
         "--json",
         "--dry-run"
     )
@@ -68,7 +72,9 @@ fn calling_safe_files_put_dry_run() {
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &map[TEST_FILE].1]).assert().failure();
+    cmd.args(&vec!["cat", &map[TEST_FILE_RANDOM_CONTENT].1])
+        .assert()
+        .failure();
 }
 
 #[test]
@@ -280,18 +286,21 @@ fn calling_safe_files_sync() {
 
 #[test]
 fn calling_safe_files_sync_dry_run() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
+    let content = cmd!(get_bin_location(), "files", "put", TEST_FOLDER, "--json")
         .read()
         .unwrap();
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
     let mut target = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
     target.set_content_version(None);
+
+    let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
+    unwrap!(fs::write(TEST_FILE_RANDOM_CONTENT, random_content));
     let sync_content = cmd!(
         get_bin_location(),
         "files",
         "sync",
-        TEST_FOLDER_SUBFOLDER,
+        TEST_FILE_RANDOM_CONTENT,
         unwrap!(target.to_string()),
         "--json",
         "--dry-run"
@@ -301,12 +310,9 @@ fn calling_safe_files_sync_dry_run() {
 
     let (_, map) = parse_files_put_or_sync_output(&sync_content);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec![
-        "cat",
-        &map[&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER)].1,
-    ])
-    .assert()
-    .failure();
+    cmd.args(&vec!["cat", &map[TEST_FILE_RANDOM_CONTENT].1])
+        .assert()
+        .failure();
 }
 
 #[test]
