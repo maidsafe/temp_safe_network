@@ -192,13 +192,23 @@ mod detail {
         // get filename without preceding path as std::ffi::OsStr (C string)
         let exec_name_ffi = match exe_path.file_name() {
             Some(v) => v,
-            None => return Err(format!("Can't extract file_name of executable from path {}", exe_path.display())),
+            None => {
+                return Err(format!(
+                    "Can't extract file_name of executable from path {}",
+                    exe_path.display()
+                ))
+            }
         };
 
         // Convert OsStr to string.  Can fail if OsStr contains any invalid unicode.
         let exec_name = match exec_name_ffi.to_str() {
             Some(v) => v.to_string(),
-            None => return Err(format!("Can't decode unicode in executable name '{:?}'", exec_name_ffi)),
+            None => {
+                return Err(format!(
+                    "Can't decode unicode in executable name '{:?}'",
+                    exec_name_ffi
+                ))
+            }
         };
 
         // Generates shell completions for <shell> and prints to stdout
