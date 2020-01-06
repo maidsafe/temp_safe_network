@@ -134,10 +134,11 @@ dependencies = [
 
 [[package]]
 name = "atty"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1803c647a3ec87095e7ae7acfca019e98de5ec9a7d01343f611cf3152ed71a90"
+checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
 dependencies = [
+ "hermit-abi",
  "libc",
  "winapi 0.3.8",
 ]
@@ -226,9 +227,9 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "blake2b_simd"
-version = "0.5.9"
+version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b83b7baab1e671718d78204225800d6b170e648188ac7dc992e9d6bddf87d0c0"
+checksum = "d8fb2d74254a3a0b5cac33ac9f8ed0e44aa50378d9dbb2e5d83bd21ed1dc2c8a"
 dependencies = [
  "arrayref",
  "arrayvec",
@@ -375,9 +376,9 @@ checksum = "ee1f6a41bcc9d0aeff394d58275742a53beb62da685d8046c4756a8e4a507bbf"
 
 [[package]]
 name = "cc"
-version = "1.0.48"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f52a465a666ca3d838ebbf08b241383421412fe7ebb463527bba275526d89f76"
+checksum = "e450b8da92aa6f274e7c6437692f9f2ce6d701fb73bacfcf87897b3f89a4c20e"
 
 [[package]]
 name = "cesu8"
@@ -636,7 +637,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd8ce37ad4184ab2ce004c33bf6379185d3b1c95801cab51026bd271bf68eedc"
 dependencies = [
  "quote 1.0.2",
- "syn 1.0.11",
+ "syn 1.0.13",
 ]
 
 [[package]]
@@ -806,9 +807,9 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "encoding_rs"
-version = "0.8.21"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f730a5068736d360795b76e8c53ef51d052a4090d281412da851f5fd6204f36d"
+checksum = "cd8d03faa7fe0c1431609dfad7bbe827af30f82e1e2ae6f7ee4fca6bd764bc28"
 dependencies = [
  "cfg-if",
 ]
@@ -838,9 +839,9 @@ dependencies = [
 
 [[package]]
 name = "envy"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "261b836bcf13f42a01c70351f56bd7b66db6e6fb58352bd214cb77e9269a34b4"
+checksum = "f938a4abd5b75fe3737902dbc2e79ca142cc1526827a9e40b829a086758531a9"
 dependencies = [
  "serde",
 ]
@@ -852,10 +853,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b41487fadaa500d02a819eefcde5f713599a01dd51626ef25d2d72d87115667b"
 dependencies = [
  "proc-macro-error",
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
  "quote 1.0.2",
  "rustc_version",
- "syn 1.0.11",
+ "syn 1.0.13",
  "synstructure",
 ]
 
@@ -931,9 +932,9 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bc225b78e0391e4b8683440bf2e63c2deeeb2ce5189eab46e2b68c6d3725d08"
 dependencies = [
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
  "quote 1.0.2",
- "syn 1.0.11",
+ "syn 1.0.13",
  "synstructure",
 ]
 
@@ -1130,9 +1131,9 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f629dc602392d3ec14bfc8a09b5e644d7ffd725102b48b81e59f90f2633621d7"
+checksum = "eff2656d88f158ce120947499e971d743c05dbcbed62e5bd2f38f1698bbc3772"
 dependencies = [
  "libc",
 ]
@@ -1405,9 +1406,9 @@ checksum = "ae91b68aebc4ddb91978b11a1b02ddd8602a05ec19002801c5666000e05e0f83"
 
 [[package]]
 name = "lock_api"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e57b3997725d2b60dbec1297f6c2e2957cc383db1cebd6be812163f969c7d586"
+checksum = "79b2de95ecb4691949fea4716ca53cdbcfccb2c612e19644a8bad05edcf9f47b"
 dependencies = [
  "scopeguard",
 ]
@@ -1520,9 +1521,9 @@ dependencies = [
 
 [[package]]
 name = "memsec"
-version = "0.5.6"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccabb92f665f997bcb4f3ade019a8e07315148d8bcef3e65fbc5dbd65a22eb04"
+checksum = "0cb9280f8c37546661083aa45eb0318d8469253d31e87649faed25522428398e"
 dependencies = [
  "getrandom",
  "libc",
@@ -1532,9 +1533,9 @@ dependencies = [
 
 [[package]]
 name = "mime"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd1d63acd1b78403cc0c325605908475dd9b9a3acbf65ed8bcab97e27014afcf"
+checksum = "61ab7b690f26f7b22cc1e6a5306da408904b75a0c833b9b0f7b3dfab3c8405d1"
 
 [[package]]
 name = "mime_guess"
@@ -1991,9 +1992,9 @@ version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aeccfe4d5d8ea175d5f0e4a2ad0637e0f4121d63bd99d356fb1f39ab2e7c6097"
 dependencies = [
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
  "quote 1.0.2",
- "syn 1.0.11",
+ "syn 1.0.13",
 ]
 
 [[package]]
@@ -2007,9 +2008,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.6"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c9e470a8dc4aeae2dee2f335e8f533e2d4b347e1434e5671afc49b054592f27"
+checksum = "0319972dcae462681daf4da1adeeaa066e3ebd29c69be96c6abb1259d2ee2bcc"
 dependencies = [
  "unicode-xid 0.2.0",
 ]
@@ -2053,9 +2054,9 @@ dependencies = [
 
 [[package]]
 name = "quick-error"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9274b940887ce9addde99c4eee6b5c44cc494b182b97e73dc8ffdcb3397fd3f0"
+checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quinn"
@@ -2116,7 +2117,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053a8c8bcc71fcce321828dc897a98ab9760bef03a4fc36693c231e5b3216cfe"
 dependencies = [
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
 ]
 
 [[package]]
@@ -2562,10 +2563,10 @@ dependencies = [
  "rand_core 0.4.2",
  "rcgen",
  "relative-path",
- "safe-nd 0.6.1",
+ "safe-nd 0.6.2",
  "safe_app",
  "safe_authenticator",
- "safe_core 0.37.3 (git+https://github.com/bochaco/safe_client_libs.git?branch=self-encrypt-dry-run)",
+ "safe_core 0.37.3 (git+https://github.com/maidsafe/safe_client_libs.git)",
  "serde",
  "serde_json",
  "slog",
@@ -2652,7 +2653,7 @@ dependencies = [
  "log 0.4.8",
  "safe-api",
  "safe-nd 0.5.0",
- "safe-nd 0.6.1",
+ "safe-nd 0.6.2",
  "safe_bindgen",
  "safe_core 0.37.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
@@ -2680,9 +2681,9 @@ dependencies = [
 
 [[package]]
 name = "safe-nd"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eb2ae64ce6931028f8ba5ce3cd54a482ebda6ddd45d6584a3e78ce1e40cd9aa"
+checksum = "b9df7e282c3a46a64db93af36d419ddda09e94dc162e3dc6cddc7d954f019587"
 dependencies = [
  "bincode",
  "ed25519-dalek",
@@ -2699,7 +2700,7 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.12.0"
-source = "git+https://github.com/bochaco/safe_client_libs.git?branch=self-encrypt-dry-run#2bcd8cc1d57c2c11bb12a110409355a9473e89b1"
+source = "git+https://github.com/maidsafe/safe_client_libs.git#bef01a2c7522e93a1647392c3ed0928132e51776"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -2710,9 +2711,9 @@ dependencies = [
  "lru-cache",
  "miscreant",
  "rand 0.6.5",
- "safe-nd 0.6.1",
+ "safe-nd 0.6.2",
  "safe_authenticator",
- "safe_core 0.37.3 (git+https://github.com/bochaco/safe_client_libs.git?branch=self-encrypt-dry-run)",
+ "safe_core 0.37.3 (git+https://github.com/maidsafe/safe_client_libs.git)",
  "self_encryption",
  "serde",
  "serde_derive",
@@ -2725,7 +2726,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.12.0"
-source = "git+https://github.com/bochaco/safe_client_libs.git?branch=self-encrypt-dry-run#2bcd8cc1d57c2c11bb12a110409355a9473e89b1"
+source = "git+https://github.com/maidsafe/safe_client_libs.git#bef01a2c7522e93a1647392c3ed0928132e51776"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -2736,8 +2737,8 @@ dependencies = [
  "lru-cache",
  "quic-p2p",
  "rand 0.6.5",
- "safe-nd 0.6.1",
- "safe_core 0.37.3 (git+https://github.com/bochaco/safe_client_libs.git?branch=self-encrypt-dry-run)",
+ "safe-nd 0.6.2",
+ "safe_core 0.37.3 (git+https://github.com/maidsafe/safe_client_libs.git)",
  "serde",
  "threshold_crypto",
  "tiny-keccak",
@@ -2766,7 +2767,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.37.3"
-source = "git+https://github.com/bochaco/safe_client_libs.git?branch=self-encrypt-dry-run#2bcd8cc1d57c2c11bb12a110409355a9473e89b1"
+source = "git+https://github.com/maidsafe/safe_client_libs.git#bef01a2c7522e93a1647392c3ed0928132e51776"
 dependencies = [
  "bincode",
  "bytes",
@@ -2788,7 +2789,7 @@ dependencies = [
  "quic-p2p",
  "rand 0.6.5",
  "regex 1.3.1",
- "safe-nd 0.6.1",
+ "safe-nd 0.6.2",
  "self_encryption",
  "serde",
  "serde-value",
@@ -2828,7 +2829,7 @@ dependencies = [
  "quic-p2p",
  "rand 0.6.5",
  "regex 1.3.1",
- "safe-nd 0.6.1",
+ "safe-nd 0.6.2",
  "self_encryption",
  "serde",
  "serde-value",
@@ -2981,9 +2982,9 @@ version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "128f9e303a5a29922045a830221b8f78ec74a5f544944f3d5984f8ec3895ef64"
 dependencies = [
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
  "quote 1.0.2",
- "syn 1.0.11",
+ "syn 1.0.13",
 ]
 
 [[package]]
@@ -3023,9 +3024,9 @@ dependencies = [
 
 [[package]]
 name = "sha-1"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23962131a91661d643c98940b20fcaffe62d776a823247be80a48fcb8b6fce68"
+checksum = "f7d94d0bede923b3cea61f3f1ff57ff8cdfd77b400fb8f9998949e0cf04163df"
 dependencies = [
  "block-buffer",
  "digest",
@@ -3101,9 +3102,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ecf3b85f68e8abaa7555aa5abdb1153079387e60b718283d732f03897fcfc86"
+checksum = "44e59e0c9fa00817912ae6e4e6e3c4fe04455e75699d06eedc7d85917ed8e8f4"
 
 [[package]]
 name = "spin"
@@ -3191,11 +3192,11 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.11"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dff0acdb207ae2fe6d5976617f887eb1e35a2ba52c13c7234c790960cdad9238"
+checksum = "1e4ff033220a41d1a57d8125eab57bf5263783dfdcc18688b1dacc6ce9651ef8"
 dependencies = [
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
  "quote 1.0.2",
  "unicode-xid 0.2.0",
 ]
@@ -3206,9 +3207,9 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67656ea1dc1b41b1451851562ea232ec2e5a80242139f7e679ceccfb5d61f545"
 dependencies = [
- "proc-macro2 1.0.6",
+ "proc-macro2 1.0.7",
  "quote 1.0.2",
- "syn 1.0.11",
+ "syn 1.0.13",
  "unicode-xid 0.2.0",
 ]
 
@@ -3702,7 +3703,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b561e267b2326bb4cebfc0ef9e68355c7abe6c6f522aeac2f5bf95d56c59bdcf"
 dependencies = [
- "smallvec 1.0.0",
+ "smallvec 1.1.0",
 ]
 
 [[package]]

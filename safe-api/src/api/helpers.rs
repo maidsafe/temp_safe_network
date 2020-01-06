@@ -166,7 +166,7 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
     let msg = decode_msg(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
-        IpcMsg::Resp { resp, .. } => match resp {
+        IpcMsg::Resp { response, .. } => match response {
             IpcResp::Auth(res) => match res {
                 Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
                 Err(e) => Err(Error::AuthError(format!("{:?}", e))),

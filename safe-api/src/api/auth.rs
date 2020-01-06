@@ -31,7 +31,7 @@ impl Safe {
     ) -> Result<String> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
-        let req = IpcReq::Auth(AuthReq {
+        let request = IpcReq::Auth(AuthReq {
             app: AppExchangeInfo {
                 id: app_id.to_string(),
                 scope: None,
@@ -48,7 +48,7 @@ impl Safe {
         });
 
         let req_id: u32 = gen_req_id();
-        let auth_req_str = encode_msg(&IpcMsg::Req { req_id, req }).map_err(|err| {
+        let auth_req_str = encode_msg(&IpcMsg::Req { req_id, request }).map_err(|err| {
             Error::AuthError(format!(
                 "Failed encoding the authorisation request: {:?}",
                 err
@@ -60,7 +60,7 @@ impl Safe {
             auth_req_str
         );
 
-        // Send he auth req to authd and obtain the response
+        // Send the auth request to authd and obtain the response
         let auth_res = send_app_auth_req(&auth_req_str, endpoint)?;
 
         // Check if the app has been authorised

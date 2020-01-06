@@ -248,7 +248,7 @@ impl SafeAuthenticator {
 
         match ipc_req {
             Ok(IpcMsg::Req {
-                req: IpcReq::Auth(app_auth_req),
+                request: IpcReq::Auth(app_auth_req),
                 req_id,
             }) => Ok((req_id, SafeAuthReq::Auth(app_auth_req))),
             other => Err(Error::AuthError(format!(
@@ -328,7 +328,7 @@ impl SafeAuthenticator {
 
         match ipc_req {
             Ok(IpcMsg::Req {
-                req: IpcReq::Auth(app_auth_req),
+                request: IpcReq::Auth(app_auth_req),
                 req_id,
             }) => {
                 info!("Request was recognised as a general app auth request");
@@ -336,7 +336,7 @@ impl SafeAuthenticator {
                 gen_auth_response(safe_authenticator, req_id, app_auth_req)
             }
             Ok(IpcMsg::Req {
-                req: IpcReq::Containers(cont_req),
+                request: IpcReq::Containers(cont_req),
                 req_id,
             }) => {
                 info!("Request was recognised as a containers auth request");
@@ -344,7 +344,7 @@ impl SafeAuthenticator {
                 gen_cont_auth_response(safe_authenticator, req_id, cont_req)
             }
             Ok(IpcMsg::Req {
-                req: IpcReq::Unregistered(user_data),
+                request: IpcReq::Unregistered(user_data),
                 req_id,
             }) => {
                 info!("Request was recognised as an unregistered auth request");
@@ -352,7 +352,7 @@ impl SafeAuthenticator {
                 gen_unreg_auth_response(req_id)
             }
             Ok(IpcMsg::Req {
-                req: IpcReq::ShareMData(share_mdata_req),
+                request: IpcReq::ShareMData(share_mdata_req),
                 req_id,
             }) => {
                 info!("Request was recognised as a share MD auth request");
@@ -555,7 +555,7 @@ fn gen_auth_denied_response(req_id: SafeAuthReqId) -> Result<String> {
     debug!("Encoding auth denied response...");
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
-        resp: IpcResp::Auth(Err(IpcError::AuthDenied)),
+        response: IpcResp::Auth(Err(IpcError::AuthDenied)),
     })
     .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
 
@@ -581,7 +581,7 @@ fn gen_auth_response(
     debug!("Encoding response... {:?}", auth_granted);
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
-        resp: IpcResp::Auth(Ok(auth_granted)),
+        response: IpcResp::Auth(Ok(auth_granted)),
     })
     .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
 
@@ -642,7 +642,7 @@ fn gen_cont_auth_response(
                 debug!("Encoding response...");
                 let resp = encode_msg(&IpcMsg::Resp {
                     req_id,
-                    resp: IpcResp::Containers(Ok(())),
+                    response: IpcResp::Containers(Ok(())),
                 })?;
 
                 debug!("Returning containers auth response generated: {:?}", resp);
@@ -665,7 +665,7 @@ fn gen_unreg_auth_response(req_id: SafeAuthReqId) -> Result<String> {
     debug!("Encoding response... {:?}", bootstrap_cfg);
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
-        resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
+        response: IpcResp::Unregistered(Ok(bootstrap_cfg)),
     })
     .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
 
@@ -711,7 +711,7 @@ fn gen_shared_md_auth_response(
                     debug!("Encoding response...");
                     let resp = encode_msg(&IpcMsg::Resp {
                         req_id,
-                        resp: IpcResp::ShareMData(Ok(())),
+                        response: IpcResp::ShareMData(Ok(())),
                     })?;
 
                     debug!("Returning shared MD auth response generated: {:?}", resp);
