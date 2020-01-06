@@ -39,12 +39,29 @@ mod detail {
     use self_update::cargo_crate_version;
     use self_update::Status;
     use std::{io::Write, process};
-    use structopt::StructOpt;
+    use structopt::{clap, StructOpt};
     use unwrap::unwrap;
 
     /// Runs a SAFE Network vault.
     pub fn main() {
         let mut config = Config::new();
+
+        if let Some(c) = &config.completions() {
+            match c.parse::<clap::Shell>() {
+                Ok(shell) => match gen_completions_for_shell(shell) {
+                    Ok(buf) => {
+                        std::io::stdout().write_all(&buf).unwrap_or_else(|e| {
+                            println!("Failed to print shell completions. {}", e);
+                        });
+                    }
+                    Err(e) => println!("{}", e),
+                },
+                Err(e) => println!("Unknown completions option. {}", e),
+            }
+            // we exit program on both success and error.
+            return;
+        }
+
         if config.network_config().ip.is_none() {
             config.listen_on_loopback();
         }
@@ -167,6 +184,40 @@ mod detail {
         Ok(Status::UpToDate(
             "No releases are available for updates".to_string(),
         ))
+    }
+
+    fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>, String> {
+        // Get exe path
+        let exe_path =
+            std::env::current_exe().map_err(|err| format!("Can't get the exec path: {}", err))?;
+
+        // get filename without preceding path as std::ffi::OsStr (C string)
+        let exec_name_ffi = match exe_path.file_name() {
+            Some(v) => v,
+            None => {
+                return Err(format!(
+                    "Can't extract file_name of executable from path {}",
+                    exe_path.display()
+                ))
+            }
+        };
+
+        // Convert OsStr to string.  Can fail if OsStr contains any invalid unicode.
+        let exec_name = match exec_name_ffi.to_str() {
+            Some(v) => v.to_string(),
+            None => {
+                return Err(format!(
+                    "Can't decode unicode in executable name '{:?}'",
+                    exec_name_ffi
+                ))
+            }
+        };
+
+        // Generates shell completions for <shell> and prints to stdout
+        let mut buf: Vec<u8> = vec![];
+        Config::clap().gen_completions_to(exec_name, shell, &mut buf);
+
+        Ok(buf)
     }
 }
 

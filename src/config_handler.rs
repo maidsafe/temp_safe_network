@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 13] = [
+const ARGS: [&str; 14] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -50,6 +50,7 @@ const ARGS: [&str; 13] = [
     "our-complete-cert",
     "our-type",
     "first",
+    "completions",
 ];
 
 /// Vault configuration
@@ -81,6 +82,9 @@ pub struct Config {
     #[structopt(flatten)]
     #[allow(missing_docs)]
     network_config: NetworkConfig,
+    /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
+    #[structopt(long)]
+    completions: Option<String>,
 }
 
 impl Config {
@@ -94,6 +98,7 @@ impl Config {
             verbose: 0,
             network_config: Default::default(),
             first: false,
+            completions: None,
         });
 
         let command_line_args = Config::clap().get_matches();
@@ -162,6 +167,11 @@ impl Config {
         self.network_config = config;
     }
 
+    /// Get the completions option
+    pub fn completions(&self) -> &Option<String> {
+        &self.completions
+    }
+
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
@@ -184,6 +194,8 @@ impl Config {
             self.network_config.ip = Some(unwrap!(value.parse()));
         } else if arg == ARGS[11] {
             self.network_config.our_type = unwrap!(value.parse());
+        } else if arg == ARGS[13] {
+            self.completions = Some(unwrap!(value.parse()));
         } else {
             #[cfg(not(feature = "mock_base"))]
             {
@@ -292,7 +304,7 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            272
+            296
         } else {
             184
         };
@@ -327,6 +339,7 @@ mod test {
             ["our-complete-cert", &base64_certificate],
             ["our-type", "client"],
             ["first", "None"],
+            ["completions", "bash"],
         ];
 
         for arg in &ARGS {
@@ -347,6 +360,7 @@ mod test {
                 verbose: 0,
                 network_config: Default::default(),
                 first: false,
+                completions: None,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {
