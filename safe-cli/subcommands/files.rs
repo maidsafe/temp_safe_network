@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::helpers::{
-    gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, notice_dry_run, parse_stdin_arg,
-    serialise_output,
+    gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, notice_dry_run,
+    parse_stdin_arg, serialise_output,
 };
 use super::OutputFmt;
 use prettytable::{format::FormatBuilder, Table};

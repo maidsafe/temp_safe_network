@@ -24,20 +24,27 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
     xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-// Read the target location from the STDIN if is not an arg provided
-pub fn get_from_arg_or_stdin(
-    target_arg: Option<String>,
-    message: Option<&str>,
-) -> Result<String, String> {
-    match target_arg {
+// Read the argument string from the STDIN if is not an arg provided
+pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Result<String, String> {
+    match arg {
         Some(ref t) if t.is_empty() => {
             let val = get_from_stdin(message)?;
-            Ok(String::from_utf8_lossy(&val).to_string())
+            Ok(String::from_utf8(val).map_err(|err| {
+                format!(
+                    "String read from STDIN contains invalid UTF-8 characters: {}",
+                    err
+                )
+            })?)
         }
         Some(t) => Ok(t),
         None => {
             let val = get_from_stdin(message)?;
-            Ok(String::from_utf8_lossy(&val).to_string())
+            Ok(String::from_utf8(val).map_err(|err| {
+                format!(
+                    "String read from STDIN contains invalid UTF-8 characters: {}",
+                    err
+                )
+            })?)
         }
     }
 }
