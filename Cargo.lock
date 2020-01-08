@@ -1909,7 +1909,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#134c0e8f7aa3058120f795c2ca5d53f0ffd0a612"
+source = "git+https://github.com/maidsafe/routing.git?branch=fleming#05c01c46a55ee5601293e80c21b100d6aae911bc"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "config_file_handler 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
