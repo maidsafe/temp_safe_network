@@ -43,6 +43,7 @@ unwrap = "~1.2.1"
 [dev_dependencies]
 maplit = "~1.0.1"
 tempdir = "~0.3.7"
+pretty_env_logger = "~0.3.1"
 
 [[bin]]
 name = "safe_vault"

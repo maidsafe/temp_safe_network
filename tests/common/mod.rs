@@ -8,6 +8,7 @@
 
 //! Utilities for integration tests
 
+mod logging;
 mod rng;
 
 pub use self::rng::TestRng;
@@ -19,7 +20,7 @@ use fake_clock::FakeClock;
 use log::trace;
 use mock_quic_p2p::{self as quic_p2p, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
 #[cfg(feature = "mock_parsec")]
-use routing::{NetworkConfig, Node};
+use routing::{self, NetworkConfig, Node};
 use safe_nd::{
     AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, Error, HandshakeRequest,
     HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey, Request, Response,
@@ -64,6 +65,8 @@ impl Environment {
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 0);
 
+        logging::init();
+
         let mut rng = rng::new();
         let network = Network::new();
 
@@ -92,6 +95,9 @@ impl Environment {
     #[cfg(feature = "mock_parsec")]
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 1);
+
+        logging::init();
+        routing::init_mock();
 
         let mut env = Self {
             rng: rng::new(),
