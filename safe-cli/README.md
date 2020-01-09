@@ -718,9 +718,9 @@ FilesContainer updated (version 4): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyf
 
 As we've seen, when uploading files to the network, each file is uploaded as an `ImmutableData` using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
 
-The file's XOR-URL is deterministic based on its content, i.e. the location where its chunks are stored and located as determined based on the files's content, and performed at the client before uploading the chunks to the network. Therefore the XOR-URL is always the same if the content of a file doesn't change. All this means we could know what the file's XOR-URL will be without uploading it to the network.
+The file's XOR-URL is deterministic based on its content, i.e. the location where each of its chunks are stored is determined based on the files's content, and performed at the client before uploading the chunks to the network. Therefore the XOR-URL is always the same if the content of a file doesn't change. All this means is we can know what the file's XOR-URL will be without uploading it to the network.
 
-Obtaining local files' XOR-URLs without uploading them to the network can be obtained in two diffent ways. We can use the `--dry-run` flag in any of the files commands, e.g.:
+Obtaining local files' XOR-URLs without uploading them to the network can be done in two diffent ways. We can use the `--dry-run` flag in any of the files commands, e.g.:
 ```shell
 $ safe files put ./to-upload/ --recursive --dry-run
 NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.
@@ -730,7 +730,7 @@ FilesContainer not created since running in dry-run mode
 +  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
 ```
 
-There is also handy `safe xorurl` command which allows us to provide a local path and obtain the XOR-URLs of the files found in such path, without uploading them to the network:
+There is also a handy `safe xorurl` command which allows us to provide a local path and obtain the XOR-URLs of the files found in such path, without uploading them to the network:
 ```shell
 $ safe xorurl ./to-upload/ --recursive
 3 file/s processed:
