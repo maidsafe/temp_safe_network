@@ -6,8 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use rand::{rngs::OsRng, CryptoRng, Error, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
+use std::{env, thread};
+
+const SEED_ENV_NAME: &str = "SEED";
 
 pub struct TestRng(ChaChaRng);
 
@@ -52,16 +55,45 @@ impl routing_rand_core::RngCore for TestRng {
     }
 }
 
-// Create new random number generator using random seed.
-pub fn new() -> TestRng {
-    let mut rng = OsRng::new().expect("Failed to create OS RNG");
-    from_seed(rng.gen())
-}
-
 pub fn from_rng<R: RngCore>(rng: &mut R) -> TestRng {
     TestRng(ChaChaRng::from_seed(rng.gen()))
 }
 
 pub fn from_seed(seed: u64) -> TestRng {
     TestRng(ChaChaRng::seed_from_u64(seed))
+}
+
+pub fn get_seed() -> u64 {
+    if let Ok(value) = env::var(SEED_ENV_NAME) {
+        value
+            .parse()
+            .expect("Failed to parse seed - must be valid u64 value")
+    } else {
+        rand::thread_rng().gen()
+    }
+}
+
+/// Helper struct that prints the current seed on panic.
+pub struct SeedPrinter {
+    seed: u64,
+}
+
+impl SeedPrinter {
+    pub fn new(seed: u64) -> Self {
+        Self { seed }
+    }
+}
+
+impl Drop for SeedPrinter {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            print_seed(self.seed);
+        }
+    }
+}
+
+fn print_seed(seed: u64) {
+    let msg = format!("{}", seed);
+    let border = (0..msg.len()).map(|_| "=").collect::<String>();
+    println!("\n{}\n{}\n{}\n", border, msg, border);
 }

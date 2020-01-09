@@ -13,6 +13,7 @@ mod rng;
 
 pub use self::rng::TestRng;
 
+use self::rng::SeedPrinter;
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 #[cfg(feature = "mock_parsec")]
@@ -54,6 +55,7 @@ macro_rules! unexpected {
 
 pub struct Environment {
     rng: TestRng,
+    _seed_printer: SeedPrinter,
     network: Network,
     vaults: Vec<TestVault>,
     #[cfg(feature = "mock")]
@@ -67,7 +69,9 @@ impl Environment {
 
         logging::init();
 
-        let mut rng = rng::new();
+        let seed = rng::get_seed();
+        let mut rng = rng::from_seed(seed);
+
         let network = Network::new();
 
         let consensus_group = ConsensusGroup::new();
@@ -86,6 +90,7 @@ impl Environment {
 
         Self {
             rng,
+            _seed_printer: SeedPrinter::new(seed),
             network,
             vaults,
             _consensus_group: consensus_group,
@@ -99,8 +104,12 @@ impl Environment {
         logging::init();
         routing::init_mock();
 
+        let seed = rng::get_seed();
+        let rng = rng::from_seed(seed);
+
         let mut env = Self {
-            rng: rng::new(),
+            rng,
+            _seed_printer: SeedPrinter::new(seed),
             network: Network::new(),
             vaults: Default::default(),
         };
