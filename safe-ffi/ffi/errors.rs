@@ -9,8 +9,7 @@
 
 use ffi_utils::{ErrorCode, StringError};
 use safe_api::Error as NativeError;
-use std::ffi::NulError;
-use std::fmt;
+use std::{ffi::NulError, fmt};
 
 mod codes {
     // Auth Errors

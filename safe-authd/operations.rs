@@ -7,18 +7,16 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::authd::run as authd_run;
-use super::errors::{Error, Result};
+use super::{
+    authd::run as authd_run,
+    errors::{Error, Result},
+};
 use daemonize::{Daemonize, DaemonizeError};
 use log::debug;
-use std::env::temp_dir;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
-use std::process::Command;
-use std::str;
-use std::thread;
-use std::time::Duration;
+use std::{
+    env::temp_dir, fs::File, io::prelude::*, path::PathBuf, process::Command, str, thread,
+    time::Duration,
+};
 
 const SAFE_AUTHD_PID_FILE: &str = "safe-authd.pid";
 const SAFE_AUTHD_STDOUT_FILE: &str = "safe-authd.out";

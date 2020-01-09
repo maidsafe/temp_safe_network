@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{gen_processed_files_table, get_from_arg_or_stdin, serialise_output};
-use super::OutputFmt;
+use super::{
+    helpers::{gen_processed_files_table, get_from_arg_or_stdin, serialise_output},
+    OutputFmt,
+};
 use safe_api::Safe;
 use structopt::StructOpt;
 

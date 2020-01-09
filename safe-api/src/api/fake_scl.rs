@@ -7,9 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::create_random_xorname;
-use super::safe_net::AppendOnlyDataRawData;
-use super::{Error, Result, SafeApp};
+use super::{
+    helpers::create_random_xorname, safe_net::AppendOnlyDataRawData, Error, Result, SafeApp,
+};
 use crate::api::helpers::{
     parse_coins_amount, parse_hex, unwrap_or_gen_random, vec_to_hex, xorname_from_pk,
     xorname_to_hex,
@@ -20,9 +20,7 @@ use safe_nd::{
     XorName,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::io::Write;
-use std::{fs, str};
+use std::{collections::BTreeMap, fs, io::Write, str};
 use threshold_crypto::{PublicKey, SecretKey};
 
 const FAKE_VAULT_FILE: &str = "./fake_vault_data.json";

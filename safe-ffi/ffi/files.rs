@@ -7,9 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::Result;
-use super::ffi_structs::{processed_files_into_repr_c, ProcessedFiles};
-use super::helpers::from_c_str_to_str_option;
+use super::{
+    errors::Result,
+    ffi_structs::{processed_files_into_repr_c, ProcessedFiles},
+    helpers::from_c_str_to_str_option,
+};
 use ffi_utils::{
     catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };

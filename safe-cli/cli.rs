@@ -10,21 +10,16 @@
 use log::debug;
 use structopt::StructOpt;
 
-use crate::operations::safe_net::connect;
-use crate::shell;
-use crate::subcommands::auth::auth_commander;
-use crate::subcommands::cat::cat_commander;
-use crate::subcommands::config::config_commander;
-use crate::subcommands::dog::dog_commander;
-use crate::subcommands::files::files_commander;
-use crate::subcommands::keys::key_commander;
-use crate::subcommands::networks::networks_commander;
-use crate::subcommands::nrs::nrs_commander;
-use crate::subcommands::setup::setup_commander;
-use crate::subcommands::update::update_commander;
-use crate::subcommands::wallet::wallet_commander;
-use crate::subcommands::xorurl::xorurl_commander;
-use crate::subcommands::{OutputFmt, SubCommands};
+use crate::{
+    operations::safe_net::connect,
+    shell,
+    subcommands::{
+        auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
+        files::files_commander, keys::key_commander, networks::networks_commander,
+        nrs::nrs_commander, setup::setup_commander, update::update_commander,
+        wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt, SubCommands,
+    },
+};
 use safe_api::{Safe, XorUrlBase};
 
 #[derive(StructOpt, Debug)]

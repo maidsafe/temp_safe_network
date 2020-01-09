@@ -7,16 +7,20 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::Result;
-use super::ffi_structs::{
-    wallet_spendable_balance_into_repr_c, wallet_spendable_balances_into_repr_c,
-    WalletSpendableBalance, WalletSpendableBalances,
+use super::{
+    errors::Result,
+    ffi_structs::{
+        wallet_spendable_balance_into_repr_c, wallet_spendable_balances_into_repr_c,
+        WalletSpendableBalance, WalletSpendableBalances,
+    },
+    helpers::from_c_str_to_str_option,
 };
-use super::helpers::from_c_str_to_str_option;
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::Safe;
-use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
+use std::{
+    ffi::CString,
+    os::raw::{c_char, c_void},
+};
 
 #[no_mangle]
 pub unsafe extern "C" fn wallet_create(

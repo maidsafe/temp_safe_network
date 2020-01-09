@@ -9,9 +9,11 @@
 
 use super::errors::Result;
 use ffi_utils::ReprC;
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
-use std::slice;
+use std::{
+    ffi::{CStr, CString},
+    os::raw::c_char,
+    slice,
+};
 
 // NOTE: The returned &str is only valid as long as the data in `ptr` is valid.
 

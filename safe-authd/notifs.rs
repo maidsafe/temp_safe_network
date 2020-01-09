@@ -10,9 +10,7 @@
 use super::shared::*;
 use jsonrpc_quic::jsonrpc_send;
 use serde_json::json;
-use std::collections::BTreeMap;
-use std::thread;
-use std::time::Duration;
+use std::{collections::BTreeMap, thread, time::Duration};
 
 // Frequency for checking pending auth requests
 const AUTH_REQS_CHECK_FREQ: u64 = 1000;

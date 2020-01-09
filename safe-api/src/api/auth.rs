@@ -7,10 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
-use super::helpers::decode_ipc_msg;
-use super::helpers::send_authd_request;
-use super::{Error, Result, Safe, SafeApp};
+use super::{
+    constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
+    helpers::{decode_ipc_msg, send_authd_request},
+    Error, Result, Safe, SafeApp,
+};
 use log::{debug, info};
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;

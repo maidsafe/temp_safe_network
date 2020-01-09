@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::authd::run as authd_run;
-use super::errors::{Error, Result};
+use super::{
+    authd::run as authd_run,
+    errors::{Error, Result},
+};
 use std::{ffi::OsString, io, io::Write, process, time::Duration};
 use windows_service::{
     define_windows_service,

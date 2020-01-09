@@ -7,11 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{
-    parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, xorname_from_pk, KeyPair,
+use super::{
+    helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, xorname_from_pk, KeyPair},
+    xorurl::{SafeContentType, SafeDataType},
+    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
 };
-use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;

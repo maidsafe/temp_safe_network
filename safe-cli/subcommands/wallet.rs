@@ -9,9 +9,11 @@
 
 use structopt::StructOpt;
 
-use super::helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output};
-use super::keys::{create_new_key, print_new_key_output};
-use super::OutputFmt;
+use super::{
+    helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output},
+    keys::{create_new_key, print_new_key_output},
+    OutputFmt,
+};
 use log::debug;
 use safe_api::{BlsKeyPair, Safe};
 

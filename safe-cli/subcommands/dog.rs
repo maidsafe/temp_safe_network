@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{get_from_arg_or_stdin, serialise_output, xorname_to_hex};
-use super::OutputFmt;
+use super::{
+    helpers::{get_from_arg_or_stdin, serialise_output, xorname_to_hex},
+    OutputFmt,
+};
 use log::debug;
 use prettytable::Table;
 use safe_api::{NrsMapContainerInfo, Safe, SafeData};

@@ -7,20 +7,20 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::constants::{
-    CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,
-    FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
-    FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
+use super::{
+    constants::{
+        CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,
+        FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
+        FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
+    },
+    helpers::{gen_timestamp_nanos, gen_timestamp_secs},
+    xorurl::{SafeContentType, SafeDataType},
+    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
 };
-use super::helpers::{gen_timestamp_nanos, gen_timestamp_secs};
-use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
 use log::{debug, info, warn};
 use mime_guess;
 use relative_path::RelativePath;
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
+use std::{collections::BTreeMap, fs, path::Path};
 use walkdir::{DirEntry, WalkDir};
 
 // Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL

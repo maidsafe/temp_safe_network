@@ -12,8 +12,10 @@ use log::debug;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::XorName;
 use serde::ser::Serialize;
-use std::collections::BTreeMap;
-use std::io::{stdin, stdout, Read, Write};
+use std::{
+    collections::BTreeMap,
+    io::{stdin, stdout, Read, Write},
+};
 
 // Warn the user about a dry-run being performed
 pub fn notice_dry_run() {

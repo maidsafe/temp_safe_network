@@ -19,10 +19,11 @@ use common::{
 };
 use predicates::prelude::*;
 use safe_api::XorUrlEncoder;
-use std::fs;
-use std::fs::OpenOptions;
-use std::io::{prelude::*, Seek, SeekFrom};
-use std::process::Command;
+use std::{
+    fs::{self, OpenOptions},
+    io::{prelude::*, Seek, SeekFrom},
+    process::Command,
+};
 use unwrap::unwrap;
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";

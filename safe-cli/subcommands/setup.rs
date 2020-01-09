@@ -7,8 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::serialise_output;
-use super::OutputFmt;
+use super::{helpers::serialise_output, OutputFmt};
 use crate::cli::CmdArgs;
 use std::io::Write;
 use structopt::{clap, StructOpt};

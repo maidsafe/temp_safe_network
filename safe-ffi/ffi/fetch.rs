@@ -7,15 +7,16 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::{Error, Result};
-use super::ffi_structs::{
-    files_map_into_repr_c, nrs_map_container_info_into_repr_c,
-    wallet_spendable_balances_into_repr_c, FilesContainer, NrsMapContainerInfo,
-    PublishedImmutableData, SafeKey, Wallet,
+use super::{
+    errors::{Error, Result},
+    ffi_structs::{
+        files_map_into_repr_c, nrs_map_container_info_into_repr_c,
+        wallet_spendable_balances_into_repr_c, FilesContainer, NrsMapContainerInfo,
+        PublishedImmutableData, SafeKey, Wallet,
+    },
 };
 use ffi_utils::{catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC};
-use safe_api::fetch::SafeData;
-use safe_api::Safe;
+use safe_api::{fetch::SafeData, Safe};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 

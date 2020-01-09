@@ -7,16 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::constants::{
-    FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
+use super::{
+    constants::{FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED},
+    helpers::gen_timestamp_secs,
+    Error, Result, Safe, SafeContentType, XorUrl,
 };
-use super::helpers::gen_timestamp_secs;
-use super::{Error, Result, Safe, SafeContentType, XorUrl};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::fmt;
-use std::iter::FromIterator;
+use std::{collections::BTreeMap, fmt, iter::FromIterator};
 
 type SubName = String;
 type DefinitionData = BTreeMap<String, String>;

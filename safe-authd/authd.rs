@@ -7,18 +7,19 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::notifs::monitor_pending_auth_reqs;
-use super::requests::process_request;
-use super::shared::*;
-use super::{Error, Result};
+use super::{
+    notifs::monitor_pending_auth_reqs, requests::process_request, shared::*, Error, Result,
+};
 use futures::{Future, Stream};
 use safe_api::SafeAuthenticator;
 use slog::{Drain, Logger};
-use std::collections::BTreeMap;
-use std::io;
-use std::net::ToSocketAddrs;
-use std::sync::{Arc, Mutex};
-use std::{fs, str};
+use std::{
+    collections::BTreeMap,
+    fs, io,
+    net::ToSocketAddrs,
+    str,
+    sync::{Arc, Mutex},
+};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 

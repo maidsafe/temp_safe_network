@@ -11,15 +11,14 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use safe_api::{BlsKeyPair, WalletSpendableBalances};
 use safe_nd::Coins;
-use std::env;
-use std::str::FromStr;
+use std::collections::BTreeMap;
+use std::{env, str::FromStr};
 use unwrap::unwrap;
 
 #[allow(dead_code)]
 pub const CLI: &str = "safe";
 #[allow(dead_code)]
 pub const SAFE_PROTOCOL: &str = "safe://";
-use std::collections::BTreeMap;
 const TEST_FOLDER: &str = "../testdata/";
 
 #[allow(dead_code)]

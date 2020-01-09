@@ -24,8 +24,10 @@ use errors::Result;
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use helpers::from_c_str_to_str_option;
 use safe_api::Safe;
-use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
+use std::{
+    ffi::CString,
+    os::raw::{c_char, c_void},
+};
 
 #[no_mangle]
 pub unsafe extern "C" fn auth_app(

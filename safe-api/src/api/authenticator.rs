@@ -12,18 +12,24 @@ use super::{Error, Result};
 use bincode::deserialize;
 use futures::{stream, Future, Stream};
 use log::{debug, info};
-use safe_authenticator::ipc::{decode_ipc_msg, update_container_perms};
-use safe_authenticator::revocation::revoke_app as safe_authenticator_revoke_app;
 use safe_authenticator::{
-    access_container, app_auth::authenticate, config, errors::AuthError, run as auth_run_helper,
-    Authenticator,
+    access_container, access_container::update_container_perms, app_auth::authenticate, config,
+    errors::AuthError, ipc::decode_ipc_msg,
+    revocation::revoke_app as safe_authenticator_revoke_app, run as auth_run_helper, Authenticator,
 };
-use safe_core::client::Client;
-use safe_core::ipc::req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, ShareMDataReq};
-use safe_core::ipc::resp::{AccessContainerEntry, IpcResp};
-use safe_core::ipc::{access_container_enc_key, decode_msg, encode_msg, IpcError, IpcMsg};
-use safe_core::utils::symmetric_decrypt;
-use safe_core::{client as safe_core_client, CoreError};
+use safe_core::{
+    client as safe_core_client,
+    client::Client,
+    core_structs::{access_container_enc_key, AccessContainerEntry},
+    ipc::{
+        decode_msg, encode_msg,
+        req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, ShareMDataReq},
+        resp::IpcResp,
+        IpcError, IpcMsg,
+    },
+    utils::symmetric_decrypt,
+    CoreError,
+};
 use safe_nd::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

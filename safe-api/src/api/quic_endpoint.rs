@@ -14,13 +14,13 @@ use jsonrpc_quic::{jsonrpc_serialised_result, parse_jsonrpc_request};
 use log::debug;
 use serde_json::json;
 use slog::{Drain, Logger};
-use std::io;
-use std::net::SocketAddr;
-use std::net::ToSocketAddrs;
-use std::path::PathBuf;
-use std::sync::mpsc;
-use std::sync::Arc;
-use std::{fmt, fs, str};
+use std::{
+    fmt, fs, io,
+    net::{SocketAddr, ToSocketAddrs},
+    path::PathBuf,
+    str,
+    sync::{mpsc, Arc},
+};
 use tokio::runtime::current_thread::Runtime;
 use url::Url;
 

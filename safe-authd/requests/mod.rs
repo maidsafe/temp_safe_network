@@ -20,10 +20,12 @@ mod status;
 mod subscribe;
 mod unsubscribe;
 
-use crate::errors::Error;
-use crate::shared::{
-    lock_safe_authenticator, remove_auth_req_from_list, SharedAuthReqsHandle,
-    SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
+use crate::{
+    errors::Error,
+    shared::{
+        lock_safe_authenticator, remove_auth_req_from_list, SharedAuthReqsHandle,
+        SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
+    },
 };
 use futures::{Async, Future, Poll, Stream};
 use jsonrpc_quic::{

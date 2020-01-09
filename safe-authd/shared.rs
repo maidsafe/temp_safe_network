@@ -8,9 +8,11 @@
 // Software.
 
 use safe_api::{AuthReq, SafeAuthenticator};
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+    time::SystemTime,
+};
 use tokio::sync::mpsc;
 
 #[derive(Clone, Debug)]

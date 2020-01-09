@@ -7,9 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::auth_daemon::*;
-use crate::operations::safe_net::*;
-use crate::APP_ID;
+use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID};
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
 

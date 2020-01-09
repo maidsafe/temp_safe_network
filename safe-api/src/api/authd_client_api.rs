@@ -7,21 +7,25 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT};
-use super::helpers::send_authd_request;
-use super::quic_endpoint::quic_listen;
-use super::{AuthedAppsList, Error, Result, SafeAuthReqId};
+use super::{
+    constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
+    helpers::send_authd_request,
+    quic_endpoint::quic_listen,
+    AuthedAppsList, Error, Result, SafeAuthReqId,
+};
 use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::mpsc;
-use std::thread;
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+    path::{Path, PathBuf},
+    process::Command,
+    sync::mpsc,
+    thread,
+};
 
 const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
 const SAFE_AUTHD_WINDOWS_EXECUTABLE: &str = "safe-authd.exe";

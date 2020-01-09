@@ -7,17 +7,21 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::Result;
-use super::ffi_structs::{xorurl_encoder_into_repr_c, XorNameArray, XorUrlEncoder};
-use super::helpers::from_c_str_to_str_option;
+use super::{
+    errors::Result,
+    ffi_structs::{xorurl_encoder_into_repr_c, XorNameArray, XorUrlEncoder},
+    helpers::from_c_str_to_str_option,
+};
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::xorurl::{
     SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder as NativeXorUrlEncoder,
 };
 use safe_nd::XorName;
-use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
-use std::str::FromStr;
+use std::{
+    ffi::CString,
+    os::raw::{c_char, c_void},
+    str::FromStr,
+};
 
 // TODO: Can be convertered to a struct
 

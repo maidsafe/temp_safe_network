@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{get_from_arg_or_stdin, serialise_output};
-use super::OutputFmt;
+use super::{
+    helpers::{get_from_arg_or_stdin, serialise_output},
+    OutputFmt,
+};
 use log::debug;
 use pretty_hex;
 use prettytable::Table;

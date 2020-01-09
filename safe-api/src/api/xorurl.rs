@@ -7,10 +7,12 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::constants::DEFAULT_XORURL_BASE;
-use super::helpers::get_subnames_host_path_and_version;
-use super::xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
-use super::{Error, Result};
+use super::{
+    constants::DEFAULT_XORURL_BASE,
+    helpers::get_subnames_host_path_and_version,
+    xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR},
+    Error, Result,
+};
 use log::debug;
 use multibase::{decode, encode, Base};
 use safe_nd::{XorName, XOR_NAME_LEN};

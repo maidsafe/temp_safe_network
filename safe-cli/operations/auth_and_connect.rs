@@ -14,9 +14,11 @@ use crate::{
 use directories::ProjectDirs;
 use log::debug;
 use safe_api::Safe;
-use std::fs::{create_dir_all, File};
-use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::{
+    fs::{create_dir_all, File},
+    io::{Read, Write},
+    path::PathBuf,
+};
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 

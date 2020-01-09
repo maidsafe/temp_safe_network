@@ -14,9 +14,11 @@ use directories::ProjectDirs;
 use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::fs::{self, create_dir_all, remove_file};
-use std::path::PathBuf;
+use std::{
+    collections::BTreeMap,
+    fs::{self, create_dir_all, remove_file},
+    path::PathBuf,
+};
 
 const CONFIG_FILENAME: &str = "config.json";
 const CONFIG_NETWORKS_DIRNAME: &str = "networks";

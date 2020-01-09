@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output};
-use super::OutputFmt;
+use super::{
+    helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output},
+    OutputFmt,
+};
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{Safe, XorUrl};
 use std::collections::BTreeMap;

@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output};
-use super::OutputFmt;
+use super::{
+    helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output},
+    OutputFmt,
+};
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
 use safe_api::{BlsKeyPair, Safe};

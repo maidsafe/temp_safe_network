@@ -7,11 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::constants::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN};
-use super::helpers::{gen_timestamp_nanos, get_subnames_host_path_and_version};
-use super::nrs_map::NrsMap;
-use super::xorurl::{SafeContentType, SafeDataType};
-use super::{Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder};
+use super::{
+    constants::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
+    helpers::{gen_timestamp_nanos, get_subnames_host_path_and_version},
+    nrs_map::NrsMap,
+    xorurl::{SafeContentType, SafeDataType},
+    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
+};
 use log::{debug, info, warn};
 use safe_nd::XorName;
 use std::collections::BTreeMap;

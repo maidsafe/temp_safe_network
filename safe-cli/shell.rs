@@ -8,9 +8,13 @@
 // Software.
 
 use super::cli;
-use crate::operations::auth_daemon::*;
-use crate::subcommands::auth::{auth_commander, AuthSubCommands};
-use crate::subcommands::SubCommands;
+use crate::{
+    operations::auth_daemon::*,
+    subcommands::{
+        auth::{auth_commander, AuthSubCommands},
+        SubCommands,
+    },
+};
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
 use std::io::{stdout, Write};

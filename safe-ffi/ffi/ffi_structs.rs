@@ -7,19 +7,19 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::Result;
-use super::helpers::from_c_str_to_str_option;
+use super::{errors::Result, helpers::from_c_str_to_str_option};
 use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts, ReprC};
-use safe_api::files::{
-    FileItem as NativeFileItem, FilesMap as NativeFilesMap, ProcessedFiles as NativeProcessedFiles,
-};
-use safe_api::nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap};
-use safe_api::wallet::{
-    WalletSpendableBalance as NativeWalletSpendableBalance,
-    WalletSpendableBalances as NativeWalletSpendableBalances,
-};
-use safe_api::xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder};
 use safe_api::{
+    files::{
+        FileItem as NativeFileItem, FilesMap as NativeFilesMap,
+        ProcessedFiles as NativeProcessedFiles,
+    },
+    nrs_map::{NrsMap as NativeNrsMap, SubNamesMap as NativeSubNamesMap},
+    wallet::{
+        WalletSpendableBalance as NativeWalletSpendableBalance,
+        WalletSpendableBalances as NativeWalletSpendableBalances,
+    },
+    xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder},
     BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo,
     ProcessedEntries as NativeProcessedEntries,
 };

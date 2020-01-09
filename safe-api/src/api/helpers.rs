@@ -7,10 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{Error, Result};
+use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use chrono::{SecondsFormat, Utc};
-
-use super::constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT;
 use jsonrpc_quic::jsonrpc_send;
 use log::debug;
 use rand::rngs::OsRng;
@@ -20,9 +18,10 @@ use safe_nd::{
     Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName, MAX_COINS_VALUE,
 };
 use serde::de::DeserializeOwned;
-use std::iter::FromIterator;
-use std::str;
-use std::str::FromStr;
+use std::{
+    iter::FromIterator,
+    str::{self, FromStr},
+};
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use url::Url;
 

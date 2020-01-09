@@ -7,12 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::files::FilesMap;
-use super::helpers::get_subnames_host_path_and_version;
-use super::nrs_map::NrsMap;
-pub use super::wallet::WalletSpendableBalances;
-pub use super::xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder};
-use super::{Error, Result, Safe, XorName};
+use super::{
+    files::FilesMap, helpers::get_subnames_host_path_and_version, nrs_map::NrsMap, Error, Result,
+    Safe, XorName,
+};
+pub use super::{
+    wallet::WalletSpendableBalances,
+    xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder},
+};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
