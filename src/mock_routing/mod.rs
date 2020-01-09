@@ -13,10 +13,8 @@ pub use routing::{
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
-use routing::{
-    quic_p2p::{self, Error, Event as NetworkEvent, Peer, QuicP2p},
-    XorName,
-};
+use mock_quic_p2p::{self as quic_p2p, Error, Event as NetworkEvent, Peer, QuicP2p};
+use routing::XorName;
 use std::{
     cell::RefCell,
     net::SocketAddr,
