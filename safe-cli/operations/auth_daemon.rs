@@ -40,6 +40,10 @@ pub fn authd_uninstall(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     safe_authd.uninstall(None).map_err(|err| err.to_string())
 }
 
+pub fn authd_update(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+    safe_authd.update(None).map_err(|err| err.to_string())
+}
+
 pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
     safe_authd.start(None).map_err(|err| err.to_string())
 }

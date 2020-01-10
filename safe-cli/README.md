@@ -18,6 +18,7 @@
     - [Auth login](#auth-login)
     - [Auth reqs](#auth-reqs)
     - [Auth allow-deny](#auth-allowdeny)
+    - [Auth update](#auth-update)
   - [The interactive shell](#the-interactive-shell)
   - [SafeKeys](#safekeys)
     - [Create](#safekeys-creation)
@@ -305,6 +306,18 @@ Logged in successfully
 Authorising CLI application...
 SAFE CLI app was successfully authorised
 Credentials were stored in <home directory>/.local/share/safe-cli/credentials
+```
+
+#### Auth update
+
+The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the latest available version using the CLI. Running `safe auth update`, the application will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
+
+After the safe-authd was updated, you'll need to restart it to start using new version:
+```shell
+$ safe auth restart
+Stopping SAFE Authenticator daemon (safe-authd)...
+Success, safe-authd (PID: <pid>) stopped!
+Starting SAFE Authenticator daemon (safe-authd)...
 ```
 
 ### The interactive shell

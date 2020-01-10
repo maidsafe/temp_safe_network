@@ -87,6 +87,9 @@ pub enum AuthSubCommands {
     #[structopt(name = "uninstall")]
     /// Uninstall safe-authd service. Only for Windows platforms
     Uninstall {},
+    #[structopt(name = "update")]
+    /// Update safe-authd binary to a new available released version
+    Update {},
     #[structopt(name = "start")]
     /// Starts the Authenticator daemon if it's not running already
     Start {},
@@ -184,6 +187,10 @@ pub fn auth_commander(
         Some(AuthSubCommands::Uninstall {}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
             authd_uninstall(&safe_authd)
+        }
+        Some(AuthSubCommands::Update {}) => {
+            let safe_authd = SafeAuthdClient::new(endpoint);
+            authd_update(&safe_authd)
         }
         Some(AuthSubCommands::Start {}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);

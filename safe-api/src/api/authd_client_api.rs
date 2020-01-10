@@ -107,6 +107,9 @@ const SAFE_AUTHD_CMD_INSTALL: &str = "install";
 // authd subcommand to uninstall the daemon
 const SAFE_AUTHD_CMD_UNINSTALL: &str = "uninstall";
 
+// authd subcommand to update the binary to new available released version
+const SAFE_AUTHD_CMD_UPDATE: &str = "update";
+
 // authd subcommand to start the daemon
 const SAFE_AUTHD_CMD_START: &str = "start";
 
@@ -173,6 +176,11 @@ impl SafeAuthdClient {
     // Uninstall the Authenticator daemon/service
     pub fn uninstall(&self, authd_path: Option<&str>) -> Result<()> {
         authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_UNINSTALL])
+    }
+
+    // Update the Authenticator binary to a new released version
+    pub fn update(&self, authd_path: Option<&str>) -> Result<()> {
+        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_UPDATE])
     }
 
     // Start the Authenticator daemon
@@ -509,7 +517,11 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
     };
     debug!("Attempting to {} authd '{}' ...", args[0], path);
 
-    let output = Command::new(&path).args(args).output().map_err(|err| {
+    let child = Command::new(&path).args(args).spawn().map_err(|err| {
+        Error::AuthdClientError(format!("Failed to execute authd from '{}': {}", path, err))
+    })?;
+
+    let output = child.wait_with_output().map_err(|err| {
         Error::AuthdClientError(format!("Failed to execute authd from '{}': {}", path, err))
     })?;
 
@@ -528,7 +540,7 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
                    )))
             }
             Some(_) | None => Err(Error::AuthdError(format!(
-                "Failed when invoking safe-authd executable from '{}': {}",
+                "Failed when invoking safe-authd executable from '{}':\n{}",
                 path,
                 String::from_utf8_lossy(&output.stderr)
             ))),
