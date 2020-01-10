@@ -13,6 +13,7 @@ use super::{
     quic_endpoint::quic_listen,
     AuthedAppsList, Error, Result, SafeAuthReqId,
 };
+use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
@@ -170,7 +171,12 @@ impl SafeAuthdClient {
 
     // Install the Authenticator daemon/service
     pub fn install(&self, authd_path: Option<&str>) -> Result<()> {
-        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_INSTALL])
+        download_and_install_authd()?;
+        if cfg!(windows) {
+            // On Windows authd must be installed as a service
+            authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_INSTALL])?;
+        }
+        Ok(())
     }
 
     // Uninstall the Authenticator daemon/service
@@ -564,6 +570,8 @@ fn get_authd_bin_path() -> String {
     } else {
         // If there is no 'safe-authd' executable in PATH we then try to find in cargo target folder
         if !is_exec_in_path(authd_bin) {
+            // if user is running with cargo we check within target dir
+            //if
             match std::env::var(ENV_VAR_CARGO_TARGET_DIR) {
                 Ok(target_dir) => path.push(target_dir),
                 Err(_) => path.push("target"),
@@ -574,6 +582,9 @@ fn get_authd_bin_path() -> String {
             } else {
                 path.push("release");
             };
+            //} else {
+
+            //}
         }
     }
 
@@ -597,4 +608,91 @@ fn is_exec_in_path(exec: &Path) -> bool {
     } else {
         false
     }
+}
+
+fn download_and_install_authd() -> Result<()> {
+    let target = self_update::get_target();
+    let available_releases = self_update::backends::s3::Update::configure()
+        .bucket_name("safe-api")
+        .target(&target)
+        .asset_prefix("safe-authd")
+        .region("eu-west-2")
+        .bin_name("")
+        .current_version("")
+        .build()
+        .map_err(|err| {
+            Error::AuthdClientError(format!(
+                "Error when preparing to fetch the list of releases: {}",
+                err
+            ))
+        })?;
+
+    match available_releases.get_latest_release() {
+        Err(err) => {
+            println!("No release available perform an install: {}", err);
+        }
+        Ok(latest_release) => {
+            println!(
+                "Latest release found: {} v{}",
+                latest_release.name,
+                latest_release.version()
+            );
+            // get the corresponding asset from the release
+            let asset = latest_release.asset_for(&target).unwrap();
+            let tmp_dir = std::env::temp_dir();
+            let tmp_tarball_path = tmp_dir.join(&asset.name);
+            let tmp_tarball = ::std::fs::File::create(&tmp_tarball_path).map_err(|err| {
+                Error::AuthdClientError(format!(
+                    "Error creating temp file ('{}') for downloading the release: {}",
+                    tmp_tarball_path.display(),
+                    err
+                ))
+            })?;
+
+            println!("Downloading {}...", asset.download_url);
+            self_update::Download::from_url(&asset.download_url)
+                .show_progress(true)
+                .download_to(&tmp_tarball)
+                .map_err(|err| {
+                    Error::AuthdClientError(format!(
+                        "Error downloading release asset '{}': {}",
+                        asset.download_url, err
+                    ))
+                })?;
+
+            let bin_name = if target.contains("pc-windows") {
+                "safe-authd.exe"
+            } else {
+                "safe-authd"
+            };
+
+            let base_dirs = BaseDirs::new().ok_or(Error::AuthdClientError(
+                "Failed to obtain user's home path".to_string(),
+            ))?;
+
+            let target_path = match base_dirs.executable_dir() {
+                Some(bin_dir) => bin_dir,
+                None => Path::new("/tmp"),
+            }
+            .join("safe");
+
+            println!(
+                "Installing safe-authd binary at {}...",
+                target_path.join(&bin_name).display()
+            );
+            self_update::Extract::from_source(&tmp_tarball_path)
+                .extract_file(&target_path, bin_name)
+                .map_err(|err| {
+                    Error::AuthdClientError(format!(
+                        "Error extracting binary from downloaded asset '{}': {}",
+                        tmp_tarball_path.display(),
+                        err
+                    ))
+                })?;
+
+            println!("Done!");
+        }
+    }
+
+    Ok(())
 }

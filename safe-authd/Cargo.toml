@@ -13,7 +13,7 @@ name = "safe-authd"
 path = "main.rs"
 
 [dependencies]
-directories = "1.0.2"
+directories = "2.0.2"
 env_logger = "0.6.0"
 futures = "~0.1.21"
 human-panic = "1.0.1"

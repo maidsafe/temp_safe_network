@@ -25,7 +25,11 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         .with_target(&target)
         .build()?
         .fetch()?;
-    if !releases.is_empty() {
+
+    if releases.is_empty() {
+        println!("Current version is {}", cargo_crate_version!());
+        println!("No releases are available on GitHub to perform an update");
+    } else {
         debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
             "safe.exe"
@@ -42,9 +46,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
             .build()?
             .update()?;
         println!("Update status: `{}`!", status.version());
-    } else {
-        println!("Current version is {}", cargo_crate_version!());
-        println!("No releases are available on GitHub to perform an update");
     }
+
     Ok(())
 }

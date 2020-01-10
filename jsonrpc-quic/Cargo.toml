@@ -11,7 +11,7 @@ edition = "2018"
 path = "lib.rs"
 
 [dependencies]
-directories = "1.0.2"
+directories = "2.0.2"
 futures = "~0.1.21"
 log = "0.4.6"
 quinn = "~0.3.0"

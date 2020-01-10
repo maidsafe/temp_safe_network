@@ -11,8 +11,8 @@
 4. [Using the CLI](#using-the-cli)
   - [Auth](#auth)
     - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
-    - [Auth start (Linux/Mac)](#auth-start-linuxmac)
-    - [Auth start (Windows)](#auth-start-windows)
+    - [Auth install](#auth-install)
+    - [Auth start](#auth-start)
     - [Auth status](#auth-status)
     - [Auth create-acc](#auth-create-acc)
     - [Auth login](#auth-login)
@@ -121,38 +121,44 @@ This command simply sends an authorisation request to the Authenticator availabl
 
 In order to be able to allow any SAFE application to connect to the Network and have access to your data, we need to start the SAFE Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)](https://en.wikipedia.org/wiki/QUIC) endpoint, which SAFE applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the SAFE CLI as we'll see in this guide.
 
-The SAFE Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the SAFE CLI if the `safe-authd`/`safe-authd.exe` binary is in the system's PATH with execution permissions.
+The SAFE Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the SAFE CLI if the `safe-authd`/`safe-authd.exe` binary is properly installed in the system.
 
-First make sure you [download latest version of the SAFE Authenticator daemon](https://github.com/maidsafe/safe-api/releases/latest), unzipping the package and placing the `safe-authd`/`safe-authd.exe` binary in any folder of your preference.
+#### Auth install
 
-In order to have the CLI to be able to find the `safe-authd` binary we just need to set up the local PATH (`<safe-authd path>` shall be replaced with the actual path where you placed the `safe-authd`/`safe-authd.exe` binary in your local system):
+Downloading and installing the Authenticator daemon is very simple:
 ```shell
-$ export PATH=$PATH:<safe-authd path>
+$ safe auth install
+Latest release found: safe-authd v0.0.2
+Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.2-x86_64-unknown-linux-gnu.tar.gz...
+[00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
+Installing safe-authd binary at ~/.local/bin/safe/safe-authd...
+Done!
 ```
 
-If you are a Windows user then you can use the [System Settings GUI](https://www.computerhope.com/issues/ch000549.htm)(note you'll need to start a new console so the new PATH is properly setup). Alternatively, if you want to set it up only for the current console you plan to use authd you run this command:
+**If you on a Windows platform**, the CLI requires administrator permissions to install it, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the install command:
 ```shell
-> set PATH=%PATH%;<safe-authd.exe path>
+> safe auth install
+Latest release found: safe-authd v0.0.2
+Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.2-x86_64-pc-windows-gnu.zip...
+[00:00:19] [========================================] 4.3MB/4.3MB (0s) Done
+Installing safe-authd binary at ~/.local/bin/safe/safe-authd.exe...
+Done!
+Installing SAFE Authenticator (safe-authd) as a Windows service...
+The safe-authd service (<'safe-authd.exe' path>) was just installed successfully!
 ```
 
-Note the CLI and `safe-authd` are in active development, this process of downloading and installing the safe-authd binary will be simplified in the near future.
+Note that in the case of a Windows platform, the command not only downloads the binary to the system, but it also takes care of setting it up as a Windows service so it's ready to then be started.
 
-#### Auth start (Linux/Mac)
+#### Auth start
 
-In order to start the `SAFE Authenticator daemon (safe-authd)` we simply need to run the following command:
+In order to start the `SAFE Authenticator daemon (safe-authd)` so it can start receiving requests we simply need to run the following command:
 ```shell
 $ safe auth start
 Starting SAFE Authenticator daemon (safe-authd)...
 ```
 
-#### Auth start (Windows)
-
-Windows platform requires you to first install `authd` as a Windows service before being able to start it. It also requires administrator permissions to install and start a service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
+Again, **if you are on a Windows platform**, the CLI requires administrator permissions to be able to start the safe-authd service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
 ```shell
-> safe auth install
-Installing SAFE Authenticator (safe-authd) as a Windows service...
-The safe-authd service (<'safe-authd.exe' path>) was just installed successfully!
-
 > safe auth start
 Starting SAFE Authenticator service (safe-authd) from command line...
 safe-authd service started successfully!
@@ -185,7 +191,7 @@ Once you have made sure you have a vault running locally, or have the connection
 
 Since we now have our SAFE Authenticator running and ready to accept requests, we can start interacting with it by using others SAFE CLI `auth` subcommands.
 
-In order to create a SAFE Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a secret phrase and password for the new account to be created:
+In order to create a SAFE Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
 ```shell
 $ safe auth create-acc --test-coins
 Passphrase:

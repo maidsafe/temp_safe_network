@@ -27,7 +27,10 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         .build()?
         .fetch()?;
 
-    if !releases.is_empty() {
+    if releases.is_empty() {
+        println!("Current version is {}", cargo_crate_version!());
+        println!("No new releases are available on S3 to perform an update");
+    } else {
         debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
             "safe-authd.exe"
@@ -45,9 +48,6 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
             .build()?
             .update()?;
         println!("Update status: `{}`!", status.version());
-    } else {
-        println!("Current version is {}", cargo_crate_version!());
-        println!("No new releases are available on S3 to perform an update");
     }
 
     Ok(())

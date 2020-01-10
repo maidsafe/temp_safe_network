@@ -82,7 +82,7 @@ pub enum AuthSubCommands {
         notifs_endpoint: Option<String>,
     },
     #[structopt(name = "install")]
-    /// Install safe-authd as a service. Only for Windows platforms
+    /// Install latest safe-authd released version in the system. On Windows platforms it also installs it as a service
     Install {},
     #[structopt(name = "uninstall")]
     /// Uninstall safe-authd service. Only for Windows platforms
