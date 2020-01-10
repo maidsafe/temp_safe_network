@@ -18,13 +18,15 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
 
 #[cfg(not(feature = "mock-network"))]
 pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
-    let target = self_update::get_target()?;
-    let releases = self_update::backends::github::ReleaseList::configure()
-        .repo_owner("maidsafe")
-        .repo_name("safe-cli")
+    let target = self_update::get_target();
+    let releases = self_update::backends::s3::ReleaseList::configure()
+        .bucket_name("safe-api")
         .with_target(&target)
+        .asset_prefix("safe-authd")
+        .region("eu-west-2")
         .build()?
         .fetch()?;
+
     if !releases.is_empty() {
         debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
@@ -32,10 +34,11 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         } else {
             "safe-authd"
         };
-        let status = self_update::backends::github::Update::configure()?
-            .repo_owner("maidsafe")
-            .repo_name("safe-cli")
+        let status = self_update::backends::s3::Update::configure()
+            .bucket_name("safe-api")
             .target(&target)
+            .asset_prefix("safe-authd")
+            .region("eu-west-2")
             .bin_name(&bin_name)
             .show_download_progress(true)
             .current_version(cargo_crate_version!())
@@ -44,7 +47,8 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         println!("Update status: `{}`!", status.version());
     } else {
         println!("Current version is {}", cargo_crate_version!());
-        println!("No releases are available on GitHub to perform an update");
+        println!("No new releases are available on S3 to perform an update");
     }
+
     Ok(())
 }

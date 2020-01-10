@@ -25,7 +25,7 @@ relative-path = "0.4.0"
 reqwest = "0.9.22"
 rpassword = "4.0.1"
 safe-api = { path = "../safe-api" }
-self_update = "0.5.1"
+self_update = { path = "/home/bochaco/safe/bochaco-self-update" }
 serde = "1.0.91"
 serde_json = "1.0.39"
 serde_yaml = "0.8.11"

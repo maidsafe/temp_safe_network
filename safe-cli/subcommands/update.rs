@@ -18,7 +18,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
 
 #[cfg(not(feature = "mock-network"))]
 pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
-    let target = self_update::get_target()?;
+    let target = self_update::get_target();
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
         .repo_name("safe-cli")
@@ -32,7 +32,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         } else {
             "safe"
         };
-        let status = self_update::backends::github::Update::configure()?
+        let status = self_update::backends::github::Update::configure()
             .repo_owner("maidsafe")
             .repo_name("safe-cli")
             .target(&target)
