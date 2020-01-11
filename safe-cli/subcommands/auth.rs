@@ -83,22 +83,46 @@ pub enum AuthSubCommands {
     },
     #[structopt(name = "install")]
     /// Install latest safe-authd released version in the system. On Windows platforms it also installs it as a service
-    Install {},
+    Install {
+        #[structopt(long = "authd-path")]
+        /// Path where to install safe-authd executable
+        authd_path: Option<String>,
+    },
     #[structopt(name = "uninstall")]
     /// Uninstall safe-authd service. Only for Windows platforms
-    Uninstall {},
+    Uninstall {
+        #[structopt(long = "authd-path")]
+        /// Path where to uninstall safe-authd executable from
+        authd_path: Option<String>,
+    },
     #[structopt(name = "update")]
     /// Update safe-authd binary to a new available released version
-    Update {},
+    Update {
+        #[structopt(long = "authd-path")]
+        /// Path of safe-authd executable
+        authd_path: Option<String>,
+    },
     #[structopt(name = "start")]
     /// Starts the Authenticator daemon if it's not running already
-    Start {},
+    Start {
+        #[structopt(long = "authd-path")]
+        /// Path of safe-authd executable
+        authd_path: Option<String>,
+    },
     #[structopt(name = "stop")]
     /// Stops the Authenticator daemon if it's running
-    Stop {},
+    Stop {
+        #[structopt(long = "authd-path")]
+        /// Path of safe-authd executable
+        authd_path: Option<String>,
+    },
     #[structopt(name = "restart")]
     /// Restarts the Authenticator daemon if it's running already
-    Restart {},
+    Restart {
+        #[structopt(long = "authd-path")]
+        /// Path of safe-authd executable
+        authd_path: Option<String>,
+    },
 }
 
 pub fn auth_commander(
@@ -180,29 +204,29 @@ pub fn auth_commander(
             let mut safe_authd = SafeAuthdClient::new(endpoint);
             authd_unsubscribe(&mut safe_authd, notifs_endpoint)
         }
-        Some(AuthSubCommands::Install {}) => {
+        Some(AuthSubCommands::Install {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_install(&safe_authd)
+            authd_install(&safe_authd, authd_path)
         }
-        Some(AuthSubCommands::Uninstall {}) => {
+        Some(AuthSubCommands::Uninstall {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_uninstall(&safe_authd)
+            authd_uninstall(&safe_authd, authd_path)
         }
-        Some(AuthSubCommands::Update {}) => {
+        Some(AuthSubCommands::Update {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_update(&safe_authd)
+            authd_update(&safe_authd, authd_path)
         }
-        Some(AuthSubCommands::Start {}) => {
+        Some(AuthSubCommands::Start {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_start(&safe_authd)
+            authd_start(&safe_authd, authd_path)
         }
-        Some(AuthSubCommands::Stop {}) => {
+        Some(AuthSubCommands::Stop {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_stop(&safe_authd)
+            authd_stop(&safe_authd, authd_path)
         }
-        Some(AuthSubCommands::Restart {}) => {
+        Some(AuthSubCommands::Restart {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_restart(&safe_authd)
+            authd_restart(&safe_authd, authd_path)
         }
         None => authorise_cli(safe, endpoint, false),
     }

@@ -32,28 +32,52 @@ struct LoginDetails {
     pub password: String,
 }
 
-pub fn authd_install(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    safe_authd.install(None).map_err(|err| err.to_string())
+pub fn authd_install(
+    safe_authd: &SafeAuthdClient,
+    authd_path: Option<String>,
+) -> Result<(), String> {
+    safe_authd
+        .install(authd_path.as_ref().map(String::as_str))
+        .map_err(|err| err.to_string())
 }
 
-pub fn authd_uninstall(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    safe_authd.uninstall(None).map_err(|err| err.to_string())
+pub fn authd_uninstall(
+    safe_authd: &SafeAuthdClient,
+    authd_path: Option<String>,
+) -> Result<(), String> {
+    safe_authd
+        .uninstall(authd_path.as_ref().map(String::as_str))
+        .map_err(|err| err.to_string())
 }
 
-pub fn authd_update(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    safe_authd.update(None).map_err(|err| err.to_string())
+pub fn authd_update(
+    safe_authd: &SafeAuthdClient,
+    authd_path: Option<String>,
+) -> Result<(), String> {
+    safe_authd
+        .update(authd_path.as_ref().map(String::as_str))
+        .map_err(|err| err.to_string())
 }
 
-pub fn authd_start(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    safe_authd.start(None).map_err(|err| err.to_string())
+pub fn authd_start(safe_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+    safe_authd
+        .start(authd_path.as_ref().map(String::as_str))
+        .map_err(|err| err.to_string())
 }
 
-pub fn authd_stop(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    safe_authd.stop(None).map_err(|err| err.to_string())
+pub fn authd_stop(safe_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+    safe_authd
+        .stop(authd_path.as_ref().map(String::as_str))
+        .map_err(|err| err.to_string())
 }
 
-pub fn authd_restart(safe_authd: &SafeAuthdClient) -> Result<(), String> {
-    safe_authd.restart(None).map_err(|err| err.to_string())
+pub fn authd_restart(
+    safe_authd: &SafeAuthdClient,
+    authd_path: Option<String>,
+) -> Result<(), String> {
+    safe_authd
+        .restart(authd_path.as_ref().map(String::as_str))
+        .map_err(|err| err.to_string())
 }
 
 pub fn authd_create(
