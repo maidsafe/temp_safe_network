@@ -606,8 +606,7 @@ fn download_and_install_authd(authd_path: Option<&str>) -> Result<String> {
 
     println!(
         "Latest release found: {} v{}",
-        latest_release.name,
-        latest_release.version()
+        latest_release.name, latest_release.version
     );
     // get the corresponding asset from the release
     let asset = latest_release.asset_for(&target).ok_or_else(|| {
