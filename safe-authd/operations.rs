@@ -92,7 +92,13 @@ pub fn stop_authd() -> Result<()> {
 
     debug!("PID should be: {:?}", &pid_file);
     println!("Stopping SAFE Authenticator daemon (safe-authd)...");
-    let mut file = File::open(&pid_file)?;
+    let mut file = File::open(&pid_file).map_err(|err| {
+        Error::GeneralError(format!(
+            "Failed to open safe-authd daemon PID file ('{}') to stop daemon: {}",
+            pid_file.display(),
+            err
+        ))
+    })?;
     let mut pid = String::new();
     file.read_to_string(&mut pid)?;
     let output = Command::new("kill").arg("-9").arg(&pid).output()?;

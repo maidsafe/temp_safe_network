@@ -71,7 +71,7 @@ FFI is used to generate the native libraries which can be used by other high lev
 EOF
 
 s3_authd_linux_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-unknown-linux-gnu.zip"
-s3_authd_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-pc-windows-gnu.zip"
+s3_authd_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-pc-windows-msvc.zip"
 s3_authd_macos_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-apple-darwin.zip"
 
 zip_linux_checksum=$(sha256sum \
@@ -81,7 +81,7 @@ zip_macos_checksum=$(sha256sum \
     "./deploy/prod/safe-cli-$cli_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-gnu.zip" | \
+    "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
     "./deploy/prod/safe-cli-$cli_version-x86_64-unknown-linux-gnu.tar.gz" | \
@@ -90,7 +90,7 @@ tar_macos_checksum=$(sha256sum \
     "./deploy/prod/safe-cli-$cli_version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 tar_win_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-gnu.tar.gz" | \
+    "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 
 zip_linux_checksum_authd=$(sha256sum \
@@ -100,11 +100,11 @@ zip_macos_checksum_authd=$(sha256sum \
     "./deploy/prod/safe-authd-$authd_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum_authd=$(sha256sum \
-    "./deploy/prod/safe-authd-$authd_version-x86_64-pc-windows-gnu.zip" | \
+    "./deploy/prod/safe-authd-$authd_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 
 s3_ffi_linux_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-unknown-linux-gnu.zip"
-s3_ffi_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-pc-windows-gnu.zip"
+s3_ffi_win_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-pc-windows-msvc.zip"
 s3_ffi_macos_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-apple-darwin.zip"
 s3_ffi_android_x86_64_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-linux-android.zip"
 s3_ffi_android_armv7_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-ffi-$ffi_version-armv7-linux-androideabi.zip"
