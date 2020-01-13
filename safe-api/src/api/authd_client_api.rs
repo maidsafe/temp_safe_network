@@ -571,11 +571,9 @@ fn get_authd_bin_path(authd_path: Option<&str>) -> Result<PathBuf> {
                     Error::AuthdClientError("Failed to obtain user's home path".to_string())
                 })?;
 
-                let mut path = match base_dirs.executable_dir() {
-                    Some(bin_dir) => PathBuf::from(bin_dir),
-                    None => std::env::temp_dir(),
-                };
-                path.push("safe");
+                let mut path = PathBuf::from(base_dirs.home_dir());
+                path.push(".safe");
+                path.push("authd");
                 Ok(path)
             }
         }
