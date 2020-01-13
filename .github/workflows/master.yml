@@ -30,11 +30,11 @@ jobs:
           - os: windows-latest
             component: safe-cli
             target: safe.exe
-            output: safe-x86_64-pc-windows-gnu
+            output: safe-x86_64-pc-windows-msvc
           - os: windows-latest
             component: safe-authd
             target: safe-authd.exe
-            output: safe-authd-x86_64-pc-windows-gnu
+            output: safe-authd-x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -80,7 +80,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             output: libsafe_ffi.so
           - os: windows-latest
-            target: x86_64-pc-windows-gnu
+            target: x86_64-pc-windows-msvc
             output: safe_ffi.dll
           - os: macOS-latest
             target: x86_64-apple-darwin
@@ -366,8 +366,8 @@ jobs:
       # cli
       - uses: actions/download-artifact@master
         with:
-          name: safe-x86_64-pc-windows-gnu
-          path: artifacts/safe-cli/prod/x86_64-pc-windows-gnu/release
+          name: safe-x86_64-pc-windows-msvc
+          path: artifacts/safe-cli/prod/x86_64-pc-windows-msvc/release
       - uses: actions/download-artifact@master
         with:
           name: safe-x86_64-unknown-linux-gnu
@@ -380,8 +380,8 @@ jobs:
       # authd
       - uses: actions/download-artifact@master
         with:
-          name: safe-authd-x86_64-pc-windows-gnu
-          path: artifacts/safe-authd/prod/x86_64-pc-windows-gnu/release
+          name: safe-authd-x86_64-pc-windows-msvc
+          path: artifacts/safe-authd/prod/x86_64-pc-windows-msvc/release
       - uses: actions/download-artifact@master
         with:
           name: safe-authd-x86_64-unknown-linux-gnu
@@ -394,12 +394,12 @@ jobs:
       # ffi
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-pc-windows-gnu-prod
-          path: artifacts/safe-ffi/prod/x86_64-pc-windows-gnu/release
+          name: safe-ffi-x86_64-pc-windows-msvc-prod
+          path: artifacts/safe-ffi/prod/x86_64-pc-windows-msvc/release
       - uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-pc-windows-gnu-dev
-          path: artifacts/safe-ffi/dev/x86_64-pc-windows-gnu/release
+          name: safe-ffi-x86_64-pc-windows-msvc-dev
+          path: artifacts/safe-ffi/dev/x86_64-pc-windows-msvc/release
       - uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-unknown-linux-gnu-prod
@@ -509,8 +509,8 @@ jobs:
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-gnu.zip
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-gnu.zip
+          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.zip
+          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.zip
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
@@ -530,8 +530,8 @@ jobs:
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-gnu.tar.gz
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-gnu.tar.gz
+          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.tar.gz
+          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.tar.gz
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1

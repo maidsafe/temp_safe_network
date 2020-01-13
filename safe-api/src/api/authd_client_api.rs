@@ -567,9 +567,9 @@ fn get_authd_bin_path(authd_path: Option<&str>) -> Result<PathBuf> {
             if let Ok(authd_path) = std::env::var(ENV_VAR_SAFE_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
-                let base_dirs = BaseDirs::new().ok_or(Error::AuthdClientError(
-                    "Failed to obtain user's home path".to_string(),
-                ))?;
+                let base_dirs = BaseDirs::new().ok_or_else(|| {
+                    Error::AuthdClientError("Failed to obtain user's home path".to_string())
+                })?;
 
                 let mut path = match base_dirs.executable_dir() {
                     Some(bin_dir) => PathBuf::from(bin_dir),
@@ -610,12 +610,12 @@ fn download_and_install_authd(authd_path: Option<&str>) -> Result<String> {
         latest_release.version()
     );
     // get the corresponding asset from the release
-    let asset = latest_release
-        .asset_for(&target)
-        .ok_or(Error::AuthdClientError(format!(
+    let asset = latest_release.asset_for(&target).ok_or_else(|| {
+        Error::AuthdClientError(format!(
             "No asset found in latest release for the target platform {}",
             target
-        )))?;
+        ))
+    })?;
     let tmp_dir = std::env::temp_dir();
     let tmp_tarball_path = tmp_dir.join(&asset.name);
     let tmp_tarball = ::std::fs::File::create(&tmp_tarball_path).map_err(|err| {
