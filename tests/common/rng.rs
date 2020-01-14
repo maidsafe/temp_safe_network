@@ -6,20 +6,94 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(feature = "mock_parsec")]
-use rand::Rng;
-use rand::{RngCore, SeedableRng};
+use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
-use unwrap::unwrap;
+use std::{env, thread};
 
-pub type TestRng = ChaChaRng;
+const SEED_ENV_NAME: &str = "SEED";
 
-// Create new random number generator suitable for tests, from the given generator from routing.
-pub fn new<R: RngCore>(rng: R) -> TestRng {
-    unwrap!(TestRng::from_rng(rng))
+pub struct TestRng(ChaChaRng);
+
+impl RngCore for TestRng {
+    fn next_u32(&mut self) -> u32 {
+        self.0.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.0.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.0.fill_bytes(dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
+        self.0.try_fill_bytes(dest)
+    }
 }
 
-#[cfg(feature = "mock_parsec")]
-pub fn new_rng<R: Rng>(rng: &mut R) -> TestRng {
-    TestRng::from_seed(rng.gen())
+impl CryptoRng for TestRng {}
+
+// Compatibility with routing.
+// TODO: remove this when we update rand to the same version that routing uses.
+impl routing_rand_core::RngCore for TestRng {
+    fn next_u32(&mut self) -> u32 {
+        self.0.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.0.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.0.fill_bytes(dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), routing_rand_core::Error> {
+        self.0.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+pub fn from_rng<R: RngCore>(rng: &mut R) -> TestRng {
+    TestRng(ChaChaRng::from_seed(rng.gen()))
+}
+
+pub fn from_seed(seed: u64) -> TestRng {
+    TestRng(ChaChaRng::seed_from_u64(seed))
+}
+
+pub fn get_seed() -> u64 {
+    if let Ok(value) = env::var(SEED_ENV_NAME) {
+        value
+            .parse()
+            .expect("Failed to parse seed - must be valid u64 value")
+    } else {
+        rand::thread_rng().gen()
+    }
+}
+
+/// Helper struct that prints the current seed on panic.
+pub struct SeedPrinter {
+    seed: u64,
+}
+
+impl SeedPrinter {
+    pub fn new(seed: u64) -> Self {
+        Self { seed }
+    }
+}
+
+impl Drop for SeedPrinter {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            print_seed(self.seed);
+        }
+    }
+}
+
+fn print_seed(seed: u64) {
+    let msg = format!("{}", seed);
+    let border = (0..msg.len()).map(|_| "=").collect::<String>();
+    println!("\n{}\n{}\n{}\n", border, msg, border);
 }
