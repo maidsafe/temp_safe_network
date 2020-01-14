@@ -12,5 +12,5 @@ static INIT: Once = Once::new();
 
 // Initialize logging. Safe to call multiple times.
 pub fn init() {
-    INIT.call_once(pretty_env_logger::init)
+    INIT.call_once(env_logger::init)
 }
