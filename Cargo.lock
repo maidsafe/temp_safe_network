@@ -157,9 +157,9 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 
 [[package]]
 name = "backtrace"
-version = "0.3.40"
+version = "0.3.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "924c76597f0d9ca25d762c25a4d369d51267536465dc5064bdf0eb073ed477ea"
+checksum = "a4ed64ae6d9ebfd9893193c4b2532b1292ec97bd8271c9d7d0fa90cd78a34cba"
 dependencies = [
  "backtrace-sys",
  "cfg-if",
@@ -983,6 +983,21 @@ name = "ffi_utils"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1cf78079f62dd513a2717af2a9fd953b78f26b5effb3be2f64f2f661748be819"
+dependencies = [
+ "base64 0.9.3",
+ "log 0.4.8",
+ "regex 0.2.11",
+ "serde",
+ "serde_derive",
+ "unwrap",
+ "walkdir",
+]
+
+[[package]]
+name = "ffi_utils"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bf76a6a3cac03b8c083bc6b15b2f0539ed13f47561fe94ad4e521c388a94548"
 dependencies = [
  "base64 0.9.3",
  "log 0.4.8",
@@ -2666,7 +2681,6 @@ dependencies = [
  "safe_app",
  "safe_authenticator",
  "safe_core 0.37.3 (git+https://github.com/maidsafe/safe_client_libs.git)",
- "self_update",
  "serde",
  "serde_json",
  "slog",
@@ -2749,7 +2763,7 @@ dependencies = [
 name = "safe-ffi"
 version = "0.6.0"
 dependencies = [
- "ffi_utils",
+ "ffi_utils 0.14.0",
  "log 0.4.8",
  "safe-api",
  "safe-nd 0.5.0",
@@ -2800,11 +2814,11 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.12.0"
-source = "git+https://github.com/maidsafe/safe_client_libs.git#183939d29adb48310a9e85043ba53666c7336206"
+source = "git+https://github.com/maidsafe/safe_client_libs.git#810c17ad4d370edf33b51f43d8f9973b7751f239"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
- "ffi_utils",
+ "ffi_utils 0.15.0",
  "futures",
  "jni",
  "log 0.4.8",
@@ -2826,11 +2840,11 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.12.0"
-source = "git+https://github.com/maidsafe/safe_client_libs.git#183939d29adb48310a9e85043ba53666c7336206"
+source = "git+https://github.com/maidsafe/safe_client_libs.git#810c17ad4d370edf33b51f43d8f9973b7751f239"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
- "ffi_utils",
+ "ffi_utils 0.15.0",
  "futures",
  "jni",
  "log 0.4.8",
@@ -2867,7 +2881,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.37.3"
-source = "git+https://github.com/maidsafe/safe_client_libs.git#183939d29adb48310a9e85043ba53666c7336206"
+source = "git+https://github.com/maidsafe/safe_client_libs.git#810c17ad4d370edf33b51f43d8f9973b7751f239"
 dependencies = [
  "bincode",
  "bytes",
@@ -2876,7 +2890,7 @@ dependencies = [
  "data-encoding",
  "directories 2.0.2",
  "env_logger 0.6.2",
- "ffi_utils",
+ "ffi_utils 0.15.0",
  "fs2",
  "futures",
  "hmac",
@@ -2916,7 +2930,7 @@ dependencies = [
  "data-encoding",
  "directories 2.0.2",
  "env_logger 0.6.2",
- "ffi_utils",
+ "ffi_utils 0.14.0",
  "fs2",
  "futures",
  "hmac",
@@ -3027,7 +3041,7 @@ dependencies = [
 [[package]]
 name = "self_update"
 version = "0.8.0"
-source = "git+https://github.com/bochaco/self_update?branch=feat-s3-backend#ef1e8fa14505f28b3a98bb01d66e2c1488dd3e4f"
+source = "git+https://github.com/bochaco/self_update#63c682eaaa9035b58178390002ad1c8c39a6e14c"
 dependencies = [
  "either",
  "flate2",

@@ -8,6 +8,7 @@
 // Software.
 
 use crate::APP_ID;
+use directories::BaseDirs;
 use envy::from_env;
 use log::info;
 use prettytable::Table;
@@ -16,9 +17,16 @@ use safe_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
 use serde::Deserialize;
-use std::fs;
+use std::{fs, path::PathBuf};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
+const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
+
+#[cfg(not(target_os = "windows"))]
+const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
+
+#[cfg(target_os = "windows")]
+const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd.exe";
 
 #[derive(Deserialize, Debug)]
 struct Environment {
@@ -36,9 +44,14 @@ pub fn authd_install(
     safe_authd: &SafeAuthdClient,
     authd_path: Option<String>,
 ) -> Result<(), String> {
-    safe_authd
-        .install(authd_path.as_ref().map(String::as_str))
-        .map_err(|err| err.to_string())
+    let final_path = download_and_install_authd(authd_path)?;
+    if cfg!(windows) {
+        // On Windows authd must be installed as a service
+        safe_authd
+            .install(Some(&final_path))
+            .map_err(|err| err.to_string())?;
+    }
+    Ok(())
 }
 
 pub fn authd_uninstall(
@@ -388,4 +401,99 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
     };
 
     Ok(details)
+}
+
+#[inline]
+fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
+    match authd_path {
+        Some(p) => Ok(PathBuf::from(p)),
+        None => {
+            // if SAFE_AUTHD_PATH is set it then overrides default
+            if let Ok(authd_path) = std::env::var(ENV_VAR_SAFE_AUTHD_PATH) {
+                Ok(PathBuf::from(authd_path))
+            } else {
+                let base_dirs = BaseDirs::new()
+                    .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+
+                let mut path = PathBuf::from(base_dirs.home_dir());
+                path.push(".safe");
+                path.push("authd");
+                Ok(path)
+            }
+        }
+    }
+}
+
+#[inline]
+fn download_and_install_authd(authd_path: Option<String>) -> Result<String, String> {
+    let target = self_update::get_target();
+    let available_releases = self_update::backends::s3::Update::configure()
+        .bucket_name("safe-api")
+        .target(&target)
+        .asset_prefix("safe-authd")
+        .region("eu-west-2")
+        .bin_name("")
+        .current_version("")
+        .build()
+        .map_err(|err| {
+            format!(
+                "Error when preparing to fetch the list of releases: {}",
+                err
+            )
+        })?;
+
+    let latest_release = available_releases
+        .get_latest_release()
+        .map_err(|err| format!("Failed to find a release available to install: {}", err))?;
+
+    println!(
+        "Latest release found: {} v{}",
+        latest_release.name, latest_release.version
+    );
+    // get the corresponding asset from the release
+    let asset = latest_release.asset_for(&target).ok_or_else(|| {
+        format!(
+            "No asset found in latest release for the target platform {}",
+            target
+        )
+    })?;
+    let tmp_dir = std::env::temp_dir();
+    let tmp_tarball_path = tmp_dir.join(&asset.name);
+    let tmp_tarball = ::std::fs::File::create(&tmp_tarball_path).map_err(|err| {
+        format!(
+            "Error creating temp file ('{}') for downloading the release: {}",
+            tmp_tarball_path.display(),
+            err
+        )
+    })?;
+
+    println!("Downloading {}...", asset.download_url);
+    self_update::Download::from_url(&asset.download_url)
+        .show_progress(true)
+        .download_to(&tmp_tarball)
+        .map_err(|err| {
+            format!(
+                "Error downloading release asset '{}': {}",
+                asset.download_url, err
+            )
+        })?;
+
+    let target_path = get_authd_bin_path(authd_path)?;
+
+    println!(
+        "Installing safe-authd binary at {} ...",
+        target_path.display()
+    );
+    self_update::Extract::from_source(&tmp_tarball_path)
+        .extract_file(&target_path.as_path(), SAFE_AUTHD_EXECUTABLE)
+        .map_err(|err| {
+            format!(
+                "Error extracting binary from downloaded asset '{}': {}",
+                tmp_tarball_path.display(),
+                err
+            )
+        })?;
+
+    println!("Done!");
+    Ok(target_path.display().to_string())
 }

@@ -171,12 +171,7 @@ impl SafeAuthdClient {
 
     // Install the Authenticator daemon/service
     pub fn install(&self, authd_path: Option<&str>) -> Result<()> {
-        let final_path = download_and_install_authd(authd_path)?;
-        if cfg!(windows) {
-            // On Windows authd must be installed as a service
-            authd_run_cmd(Some(&final_path), &[SAFE_AUTHD_CMD_INSTALL])?;
-        }
-        Ok(())
+        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_INSTALL])
     }
 
     // Uninstall the Authenticator daemon/service
@@ -578,78 +573,4 @@ fn get_authd_bin_path(authd_path: Option<&str>) -> Result<PathBuf> {
             }
         }
     }
-}
-
-#[inline]
-fn download_and_install_authd(authd_path: Option<&str>) -> Result<String> {
-    let target = self_update::get_target();
-    let available_releases = self_update::backends::s3::Update::configure()
-        .bucket_name("safe-api")
-        .target(&target)
-        .asset_prefix("safe-authd")
-        .region("eu-west-2")
-        .bin_name("")
-        .current_version("")
-        .build()
-        .map_err(|err| {
-            Error::AuthdClientError(format!(
-                "Error when preparing to fetch the list of releases: {}",
-                err
-            ))
-        })?;
-
-    let latest_release = available_releases.get_latest_release().map_err(|err| {
-        Error::AuthdClientError(format!("No release available perform an install: {}", err))
-    })?;
-
-    println!(
-        "Latest release found: {} v{}",
-        latest_release.name, latest_release.version
-    );
-    // get the corresponding asset from the release
-    let asset = latest_release.asset_for(&target).ok_or_else(|| {
-        Error::AuthdClientError(format!(
-            "No asset found in latest release for the target platform {}",
-            target
-        ))
-    })?;
-    let tmp_dir = std::env::temp_dir();
-    let tmp_tarball_path = tmp_dir.join(&asset.name);
-    let tmp_tarball = ::std::fs::File::create(&tmp_tarball_path).map_err(|err| {
-        Error::AuthdClientError(format!(
-            "Error creating temp file ('{}') for downloading the release: {}",
-            tmp_tarball_path.display(),
-            err
-        ))
-    })?;
-
-    println!("Downloading {}...", asset.download_url);
-    self_update::Download::from_url(&asset.download_url)
-        .show_progress(true)
-        .download_to(&tmp_tarball)
-        .map_err(|err| {
-            Error::AuthdClientError(format!(
-                "Error downloading release asset '{}': {}",
-                asset.download_url, err
-            ))
-        })?;
-
-    let target_path = get_authd_bin_path(authd_path)?;
-
-    println!(
-        "Installing safe-authd binary at {} ...",
-        target_path.display()
-    );
-    self_update::Extract::from_source(&tmp_tarball_path)
-        .extract_file(&target_path.as_path(), SAFE_AUTHD_EXECUTABLE)
-        .map_err(|err| {
-            Error::AuthdClientError(format!(
-                "Error extracting binary from downloaded asset '{}': {}",
-                tmp_tarball_path.display(),
-                err
-            ))
-        })?;
-
-    println!("Done!");
-    Ok(target_path.display().to_string())
 }
