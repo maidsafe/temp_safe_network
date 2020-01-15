@@ -20,7 +20,10 @@ use serde::{Deserialize, Serialize};
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+// Maximum number of indirections allowed when resolving a safe:// URL following links
+const INDIRECTION_LIMIT: u8 = 5;
+
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct NrsMapContainerInfo {
     pub public_name: String,
     pub xorurl: String,
@@ -31,7 +34,7 @@ pub struct NrsMapContainerInfo {
     pub data_type: SafeDataType,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub enum SafeData {
     SafeKey {
         xorurl: String,
@@ -62,6 +65,12 @@ pub enum SafeData {
         resolved_from: Option<NrsMapContainerInfo>,
         media_type: Option<String>,
     },
+}
+
+enum ResolutionStep {
+    NrsMap(NrsMapContainerInfo),
+    Container(SafeData),
+    Data(SafeData),
 }
 
 impl Safe {
@@ -97,7 +106,7 @@ impl Safe {
     /// });
     /// ```
     pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
-        fetch_from_url(self, url, true, None).await
+        retrieve_from_url(self, url, true, None).await
     }
 
     /// # Inspect a safe:// URL and retrieve metadata information but the actual target content
@@ -133,29 +142,76 @@ impl Safe {
     /// });
     /// ```
     pub async fn inspect(&self, url: &str) -> Result<SafeData> {
-        fetch_from_url(self, url, false, None).await
+        retrieve_from_url(self, url, false, None).await
     }
 }
 
-async fn fetch_from_url(
+async fn retrieve_from_url(safe: &Safe, url: &str, retrieve_data: bool, range: Range) -> Result<SafeData> {
+    let current_xorurl_encoder = Safe::parse_url(url)?;
+    info!(
+        "URL parsed successfully, fetching: {}",
+        current_xorurl_encoder
+    );
+    debug!(
+        "Fetching content of type: {:?}",
+        current_xorurl_encoder.content_type()
+    );
+
+    // Let's create a list keeping track each of the resolution hops we go through
+    // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
+    let mut resolved_content = Vec::<ResolutionStep>::default();
+    let mut next_to_resolve = Some(current_xorurl_encoder);
+    let mut indirections_count = 0;
+    while let Some(next_xorurl_encoder) = next_to_resolve {
+        if indirections_count == INDIRECTION_LIMIT {
+            break;
+        }
+
+        let (step, next) =
+            resolve_one_indirection(safe, url, next_xorurl_encoder, retrieve_data, range).await?;
+
+        resolved_content.push(step);
+        next_to_resolve = next;
+        indirections_count += 1;
+    }
+
+    // Contruct return data using the last and first items in the steps list
+    // TODO: return the complete resolution list from the 'inspect' API
+    if let Some(ResolutionStep::Data(safe_data)) = resolved_content.pop() {
+        if resolved_content.is_empty() {
+            Ok(safe_data)
+        } else {
+            match &resolved_content[0] {
+                ResolutionStep::NrsMap(nrs_map_container) => {
+                    // original URL was an NRS-URL
+                    // TODO: find a simpler way to change the 'resolved_from' field of the enum
+                    embed_resolved_from(safe_data, nrs_map_container.clone())
+                }
+                ResolutionStep::Container(_) => Ok(safe_data),
+                ResolutionStep::Data(_) => {
+                    Err(Error::Unexpected(format!("Failed to resolve {}", url)))
+                }
+            }
+        }
+    } else {
+        // weird...last element should always be a ResolutionStep::Data type
+        Err(Error::Unexpected(format!("Failed to resolve {}", url)))
+    }
+}
+
+async fn resolve_one_indirection(
     safe: &Safe,
-    url: &str,
+    original_url: &str,
+    mut the_xor: XorUrlEncoder,
     retrieve_data: bool,
     range: Range,
-) -> Result<SafeData> {
-    let mut the_xor = Safe::parse_url(url)?;
+) -> Result<(ResolutionStep, Option<XorUrlEncoder>)> {
     let xorurl = the_xor.to_string()?;
-    info!("URL parsed successfully, fetching: {:?}", xorurl);
-    info!("URL pars----------->>>: {:?}", the_xor);
-    debug!("Fetching content of type: {:?}", the_xor.content_type());
-
-    // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
     match the_xor.content_type() {
         SafeContentType::FilesContainer => {
             let (version, files_map) = safe.files_container_get(&xorurl).await?;
-
             debug!(
-                "Files container found w/ v:{}, on data type: {}, containing: {:?}",
+                "Files container found with v:{}, on data type: {}, containing: {:?}",
                 version,
                 the_xor.data_type(),
                 files_map
@@ -163,23 +219,28 @@ async fn fetch_from_url(
 
             let path = the_xor.path();
             if path != "/" && !path.is_empty() {
-                // TODO: Count how many redirects we've done... prevent looping forever
                 // TODO: Move this logic (resolver) to the FilesMap struct
-                match files_map.get(path) {
+                match &files_map.get(path) {
                     Some(file_item) => {
                         let new_target_xorurl = match file_item.get("link") {
-                            Some(path_data) => path_data,
+                            Some(path_data) => XorUrlEncoder::from_url(path_data)?,
                             None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
                         };
 
-                        fetch_non_resolvable_from_url(
-                            safe,
-                            url,
-                            new_target_xorurl.to_string(),
-                            XorUrlEncoder::from_url(new_target_xorurl)?,
-                            retrieve_data,
-                        )
-                        .await
+                        let safe_data = SafeData::FilesContainer {
+                            xorurl,
+                            xorname: the_xor.xorname(),
+                            type_tag: the_xor.type_tag(),
+                            version,
+                            files_map,
+                            data_type: the_xor.data_type(),
+                            resolved_from: None,
+                        };
+
+                        Ok((
+                            ResolutionStep::Container(safe_data),
+                            Some(new_target_xorurl),
+                        ))
                     }
                     None => {
                         let mut filtered_filesmap = FilesMap::default();
@@ -202,7 +263,7 @@ async fn fetch_from_url(
                                 folder_path, xorurl
                             )))
                         } else {
-                            Ok(SafeData::FilesContainer {
+                            let safe_data = SafeData::FilesContainer {
                                 xorurl,
                                 xorname: the_xor.xorname(),
                                 type_tag: the_xor.type_tag(),
@@ -210,12 +271,14 @@ async fn fetch_from_url(
                                 files_map: filtered_filesmap,
                                 data_type: the_xor.data_type(),
                                 resolved_from: None,
-                            })
+                            };
+
+                            Ok((ResolutionStep::Data(safe_data), None))
                         }
                     }
                 }
             } else {
-                Ok(SafeData::FilesContainer {
+                let safe_data = SafeData::FilesContainer {
                     xorurl,
                     xorname: the_xor.xorname(),
                     type_tag: the_xor.type_tag(),
@@ -223,14 +286,15 @@ async fn fetch_from_url(
                     files_map,
                     data_type: the_xor.data_type(),
                     resolved_from: None,
-                })
+                };
+
+                Ok((ResolutionStep::Data(safe_data), None))
             }
         }
         SafeContentType::NrsMapContainer => {
-            let (version, nrs_map) = safe
-                .nrs_map_container_get(&xorurl)
-                .await
-                .map_err(|_| Error::ContentNotFound(format!("Content not found at {}", url)))?;
+            let (version, nrs_map) = safe.nrs_map_container_get(&xorurl).await.map_err(|_| {
+                Error::ContentNotFound(format!("Content not found at {}", original_url))
+            })?;
 
             debug!(
                 "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
@@ -251,16 +315,7 @@ async fn fetch_from_url(
             let url_with_path = xorurl_encoder.to_string()?;
             debug!("Resolving target from resolvable map: {}", url_with_path);
 
-            let content = fetch_non_resolvable_from_url(
-                safe,
-                url,
-                url_with_path,
-                xorurl_encoder,
-                retrieve_data,
-            )
-            .await?;
-
-            let (_, public_name, _, _) = get_subnames_host_path_and_version(url)?;
+            let (_, public_name, _, _) = get_subnames_host_path_and_version(original_url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = NrsMapContainerInfo {
                 public_name,
@@ -272,127 +327,36 @@ async fn fetch_from_url(
                 data_type: the_xor.data_type(),
             };
 
-            // TODO: find a simpler way to change the 'resolved_from' field of the enum
-            embed_resolved_from(content, nrs_map_container)
+            Ok((
+                ResolutionStep::NrsMap(nrs_map_container),
+                Some(xorurl_encoder),
+            ))
         }
-        _non_resolvable => {
-            fetch_non_resolvable_from_url(safe, url, xorurl, the_xor, retrieve_data).await
-        }
-    }
-}
-
-async fn fetch_non_resolvable_from_url(
-    safe: &Safe,
-    url: &str,
-    xorurl: String,
-    the_xor: XorUrlEncoder,
-    retrieve_data: bool,
-) -> Result<SafeData> {
-    match the_xor.content_type() {
-        SafeContentType::NrsMapContainer | SafeContentType::FilesContainer => Err(
-            Error::Unexpected(format!("Unexpected error when trying to resolve {}", url)),
-        ),
         SafeContentType::Raw => match the_xor.data_type() {
-            SafeDataType::SafeKey => Ok(SafeData::SafeKey {
-                xorurl,
-                xorname: the_xor.xorname(),
-                resolved_from: None,
-            }),
+            SafeDataType::SafeKey => {
+                let safe_data = SafeData::SafeKey {
+                    xorurl,
+                    xorname: the_xor.xorname(),
+                    resolved_from: None,
+                };
+                Ok((ResolutionStep::Data(safe_data), None))
+            }
             SafeDataType::PublishedImmutableData => {
                 let data = if retrieve_data {
-                    safe.files_get_published_immutable(&url, range).await?
+                    safe.files_get_published_immutable(&xorurl, range).await?
                 } else {
                     vec![]
                 };
 
-                Ok(SafeData::PublishedImmutableData {
+                let safe_data = SafeData::PublishedImmutableData {
                     xorurl,
                     xorname: the_xor.xorname(),
                     resolved_from: None,
                     data,
                     media_type: None,
-                })
-            }
-            other => Err(Error::ContentError(format!(
-                "Data type '{:?}' not supported yet",
-                other
-            ))),
-        },
-        SafeContentType::MediaType(media_type_str) => match the_xor.data_type() {
-            SafeDataType::PublishedImmutableData => {
-                if !the_xor.path().is_empty() {
-                    return Err(Error::ContentError(format!(
-                        "Cannot get relative path of Immutable Data {:?}'",
-                        the_xor.path()
-                    )));
                 };
 
-                let data = if retrieve_data {
-                    safe.files_get_published_immutable(&url, range).await?
-                } else {
-                    vec![]
-                };
-
-                Ok(SafeData::PublishedImmutableData {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    resolved_from: None,
-                    data,
-                    media_type: Some(media_type_str),
-                })
-            }
-            other => Err(Error::ContentError(format!(
-                "Data type '{:?}' not supported yet",
-                other
-            ))),
-        },
-        SafeContentType::Wallet => {
-            let balances = if retrieve_data {
-                safe.wallet_get(&url).await?
-            } else {
-                WalletSpendableBalances::new()
-            };
-
-            Ok(SafeData::Wallet {
-                xorurl,
-                xorname: the_xor.xorname(),
-                type_tag: the_xor.type_tag(),
-                balances,
-                data_type: the_xor.data_type(),
-                resolved_from: None,
-            })
-        }
-    }
-}
-
-/*async fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> Result<SafeData> {
-    let mut the_xor = Safe::parse_url(url)?;
-    let xorurl = the_xor.to_string()?;
-    info!("URL parsed successfully, fetching: {}", xorurl);
-    debug!("Fetching content of type: {:?}", the_xor.content_type());
-
-    // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
-    match the_xor.content_type() {
-        SafeContentType::Raw => match the_xor.data_type() {
-            SafeDataType::SafeKey => Ok(SafeData::SafeKey {
-                xorurl,
-                xorname: the_xor.xorname(),
-                resolved_from: None,
-            }),
-            SafeDataType::PublishedImmutableData => {
-                let data = if retrieve_data {
-                    safe.files_get_published_immutable(&url).await?
-                } else {
-                    vec![]
-                };
-
-                Ok(SafeData::PublishedImmutableData {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    resolved_from: None,
-                    data,
-                    media_type: None,
-                })
+                Ok((ResolutionStep::Data(safe_data), None))
             }
             other => Err(Error::ContentError(format!(
                 "Data type '{:?}' not supported yet",
@@ -402,18 +366,20 @@ async fn fetch_non_resolvable_from_url(
         SafeContentType::MediaType(media_type_str) => match the_xor.data_type() {
             SafeDataType::PublishedImmutableData => {
                 let data = if retrieve_data {
-                    safe.files_get_published_immutable(&url).await?
+                    safe.files_get_published_immutable(&xorurl, range).await?
                 } else {
                     vec![]
                 };
 
-                Ok(SafeData::PublishedImmutableData {
+                let safe_data = SafeData::PublishedImmutableData {
                     xorurl,
                     xorname: the_xor.xorname(),
                     resolved_from: None,
                     data,
                     media_type: Some(media_type_str),
-                })
+                };
+
+                Ok((ResolutionStep::Data(safe_data), None))
             }
             other => Err(Error::ContentError(format!(
                 "Data type '{:?}' not supported yet",
@@ -422,108 +388,24 @@ async fn fetch_non_resolvable_from_url(
         },
         SafeContentType::Wallet => {
             let balances = if retrieve_data {
-                safe.wallet_get(&url).await?
+                safe.wallet_get(&original_url).await?
             } else {
                 WalletSpendableBalances::new()
             };
 
-            Ok(SafeData::Wallet {
+            let safe_data = SafeData::Wallet {
                 xorurl,
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
                 balances,
                 data_type: the_xor.data_type(),
                 resolved_from: None,
-            })
-        }
-        SafeContentType::FilesContainer => {
-            let (version, files_map) = safe.files_container_get(&xorurl).await?;
-
-            debug!(
-                "Files container found w/ v:{}, on data type: {}, containing: {:?}",
-                version,
-                the_xor.data_type(),
-                files_map
-            );
-
-            let path = the_xor.path();
-            if path != "/" && !path.is_empty() {
-                // TODO: Count how many redirects we've done... prevent looping forever
-                // TODO: Move this logic (resolver) to the FilesMap struct
-                match files_map.get(path) {
-                    Some(file_item) => {
-                        let new_target_xorurl = file_item.get("link")
-                            .ok_or_else(|| Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl)))?;
-
-                        // TODO: use await and Box::pin
-                        async_std::task::block_on(fetch_from_url(
-                            safe,
-                            new_target_xorurl,
-                            retrieve_data,
-                            None
-                        ))
-                    }
-                    None => Err(Error::ContentError(format!(
-                        "No content found matching the \"{}\" path on the FilesContainer at: {} ",
-                        path, xorurl
-                    ))),
-                }
-            } else {
-                Ok(SafeData::FilesContainer {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    files_map,
-                    data_type: the_xor.data_type(),
-                    resolved_from: None,
-                })
-            }
-        }
-        SafeContentType::NrsMapContainer => {
-            let (version, nrs_map) = safe
-                .nrs_map_container_get(&xorurl)
-                .await
-                .map_err(|_| Error::ContentNotFound(format!("Content not found at {}", url)))?;
-
-            debug!(
-                "Nrs map container found w/ v:{}, of type: {}, containing: {:?}",
-                version,
-                the_xor.data_type(),
-                nrs_map
-            );
-
-            let new_target_xorurl = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
-            debug!("Resolved target: {}", new_target_xorurl);
-
-            let mut xorurl_encoder = XorUrlEncoder::from_url(&new_target_xorurl)?;
-            if xorurl_encoder.path().is_empty() {
-                xorurl_encoder.set_path(the_xor.path());
-            } else if !the_xor.path().is_empty() {
-                xorurl_encoder.set_path(&format!("{}{}", xorurl_encoder.path(), the_xor.path()));
-            }
-            let url_with_path = xorurl_encoder.to_string()?;
-            debug!("Resolving target from resolvable map: {}", url_with_path);
-
-            let (_, public_name, _, _) = get_subnames_host_path_and_version(url)?;
-            let content = // TODO: use await and Box::pin
-            async_std::task::block_on(fetch_from_url(safe, &url_with_path, retrieve_data, None))?;
-            the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
-            let nrs_map_container = NrsMapContainerInfo {
-                public_name,
-                xorurl: the_xor.to_string()?,
-                xorname: the_xor.xorname(),
-                type_tag: the_xor.type_tag(),
-                version,
-                nrs_map,
-                data_type: the_xor.data_type(),
             };
 
-            // TODO: find a simpler way to change the 'resolved_from' field of the enum
-            embed_resolved_from(content, nrs_map_container)
+            Ok((ResolutionStep::Data(safe_data), None))
         }
     }
-}*/
+}
 
 fn embed_resolved_from(
     content: SafeData,

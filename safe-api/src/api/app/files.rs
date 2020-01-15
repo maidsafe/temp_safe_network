@@ -1090,9 +1090,12 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
     })?;
 
     let mime_type = mime_guess::from_path(&path);
-    safe.files_put_published_immutable(&data, mime_type.first_raw(), dry_run)
+    match safe
+        .files_put_published_immutable(&data, mime_type.first_raw(), dry_run)
         .await
-        .or_else(|err| {
+    {
+        Ok(xorurl) => Ok(xorurl),
+        Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
                 safe.files_put_published_immutable(&data, None, dry_run)
@@ -1100,7 +1103,8 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
             } else {
                 Err(err)
             }
-        })
+        }
+    }
 }
 
 // Get file metadata from local filesystem
@@ -1140,39 +1144,47 @@ async fn file_system_dir_walk(
             .follow_links(true)
             .into_iter()
             .filter_entry(|e| not_hidden_and_valid_depth(e, max_depth))
-            .filter_map(|v| v.ok())
-            .for_each(|child| {
-                let current_file_path = child.path();
-                let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
-                info!("Processing {}...", current_path_str);
-                let normalised_path = normalise_path_separator(&current_path_str);
-                match fs::metadata(&current_file_path) {
-                    Ok(metadata) => {
-                        if metadata.is_dir() {
-                            // Everything is in the iter. We dont need to recurse.
-                            // so what do we do with dirs? decide if we want to support empty dirs also
-                        } else {
-                            match upload_file_to_net(safe, &current_file_path, dry_run).await {
-                                Ok(xorurl) => {
-                                    processed_files.insert(normalised_path, (CONTENT_ADDED_SIGN.to_string(), xorurl));
-                                }
-                                Err(err) => {
-                                    processed_files.insert(normalised_path.clone(), (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)));
-                                    info!(
-                                    "Skipping file \"{}\". {}",
-                                    normalised_path, err);
-                                },
-                            };
+            .filter_map(|v| v.ok());
+
+        for child in children_to_process {
+            let current_file_path = child.path();
+            let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
+            info!("Processing {}...", current_path_str);
+            let normalised_path = normalise_path_separator(&current_path_str);
+            match fs::metadata(&current_file_path) {
+                Ok(metadata) => {
+                    if metadata.is_dir() {
+                        // Everything is in the iter. We dont need to recurse.
+                        // so what do we do with dirs? decide if we want to support empty dirs also
+                    } else {
+                        match upload_file_to_net(safe, &current_file_path, dry_run).await {
+                            Ok(xorurl) => {
+                                processed_files.insert(
+                                    normalised_path,
+                                    (CONTENT_ADDED_SIGN.to_string(), xorurl),
+                                );
+                            }
+                            Err(err) => {
+                                processed_files.insert(
+                                    normalised_path.clone(),
+                                    (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                                );
+                                info!("Skipping file \"{}\". {}", normalised_path, err);
+                            }
                         }
-                    },
-                    Err(err) => {
-                        processed_files.insert(normalised_path.clone(), (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)));
-                        info!(
-                        "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
-                        normalised_path, err);
                     }
                 }
-            });
+                Err(err) => {
+                    processed_files.insert(
+                        normalised_path.clone(),
+                        (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+                    );
+                    info!(
+                        "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
+                        normalised_path, err);
+                }
+            }
+        }
 
         Ok(processed_files)
     } else {

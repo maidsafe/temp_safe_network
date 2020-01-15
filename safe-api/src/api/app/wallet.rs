@@ -29,7 +29,7 @@ const WALLET_TYPE_TAG: u64 = 1_000;
 const WALLET_DEFAULT_BYTES: &[u8] = b"_default";
 
 // Struct which is serialised and stored in Wallet MD for linking to a spendable balance (Key)
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct WalletSpendableBalance {
     pub xorurl: XorUrl,
     pub sk: String,

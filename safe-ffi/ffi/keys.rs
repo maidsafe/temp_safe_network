@@ -54,7 +54,9 @@ pub unsafe extern "C" fn keys_create(
         let from_option = from_c_str_to_str_option(from);
         let preload_option = from_c_str_to_str_option(preload);
         let pk_option = from_c_str_to_str_option(pk);
-        let (xorurl, keypair) = (*app).keys_create(from_option, preload_option, pk_option)?;
+        let (xorurl, keypair) = (*app)
+            .keys_create(from_option, preload_option, pk_option)
+            .await?;
         let xorurl_c_str = CString::new(xorurl)?;
         let keypair = match keypair {
             Some(keypair) => keypair,
@@ -88,7 +90,9 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let preload_option = String::clone_from_repr_c(preload)?;
-        let (xorurl, keypair) = (*app).keys_create_preload_test_coins(&preload_option)?;
+        let (xorurl, keypair) = (*app)
+            .keys_create_preload_test_coins(&preload_option)
+            .await?;
         let xorurl_c_str = CString::new(xorurl)?;
         o_cb(
             user_data.0,
@@ -110,7 +114,7 @@ pub unsafe extern "C" fn keys_balance_from_sk(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let secret_key = String::clone_from_repr_c(sk)?;
-        let balance = (*app).keys_balance_from_sk(&secret_key)?;
+        let balance = (*app).keys_balance_from_sk(&secret_key).await?;
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -129,7 +133,7 @@ pub unsafe extern "C" fn keys_balance_from_url(
         let user_data = OpaqueCtx(user_data);
         let key_url = String::clone_from_repr_c(url)?;
         let secret_key = String::clone_from_repr_c(sk)?;
-        let balance = (*app).keys_balance_from_url(&key_url, &secret_key)?;
+        let balance = (*app).keys_balance_from_url(&key_url, &secret_key).await?;
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -148,7 +152,7 @@ pub unsafe extern "C" fn validate_sk_for_url(
         let user_data = OpaqueCtx(user_data);
         let key_url = String::clone_from_repr_c(url)?;
         let secret_key = String::clone_from_repr_c(sk)?;
-        let balance = (*app).validate_sk_for_url(&secret_key, &key_url)?;
+        let balance = (*app).validate_sk_for_url(&secret_key, &key_url).await?;
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -170,7 +174,9 @@ pub unsafe extern "C" fn keys_transfer(
         let from_key = from_c_str_to_str_option(from);
         let to_key = String::clone_from_repr_c(to)?;
         let amount_tranfer = String::clone_from_repr_c(amount)?;
-        let tx_id = (*app).keys_transfer(&amount_tranfer, from_key, &to_key, Some(id))?;
+        let tx_id = (*app)
+            .keys_transfer(&amount_tranfer, from_key, &to_key, Some(id))
+            .await?;
         o_cb(user_data.0, FFI_RESULT_OK, tx_id);
         Ok(())
     })
