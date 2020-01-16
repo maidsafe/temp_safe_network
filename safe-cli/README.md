@@ -131,7 +131,7 @@ $ safe auth install
 Latest release found: safe-authd v0.0.2
 Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.2-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
-Installing safe-authd binary at ~/.local/bin/safe/safe-authd...
+Installing safe-authd binary at ~/.safe/authd ...
 Done!
 ```
 
@@ -141,7 +141,7 @@ Done!
 Latest release found: safe-authd v0.0.2
 Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.2-x86_64-pc-windows-msvc.zip...
 [00:00:19] [========================================] 4.3MB/4.3MB (0s) Done
-Installing safe-authd binary at ~/.local/bin/safe/safe-authd.exe...
+Installing safe-authd binary at ~/.safe/authd ...
 Done!
 Installing SAFE Authenticator (safe-authd) as a Windows service...
 The safe-authd service (<'safe-authd.exe' path>) was just installed successfully!
@@ -177,7 +177,7 @@ Sending request to authd to obtain an status report...
 +------------------------------------------+-------+
 | Number of pending authorisation requests | 0     |
 +------------------------------------------+-------+
-| Number of notifications subscribers     | 0     |
+| Number of notifications subscribers      | 0     |
 +------------------------------------------+-------+
 ```
 
