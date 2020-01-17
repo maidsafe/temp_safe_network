@@ -19,8 +19,7 @@ ffi_utils = "~0.14.0"
 # Required by ffi_utils macros.
 log = "~0.4.8"
 safe-api = { path = "../safe-api" }
-safe_core = "0.37.3"
-safe-nd = "~0.6.1"
+safe-nd = "^0.7.2"
 serde = "1.0.91"
 serde_json = "1.0.39"
 
@@ -29,7 +28,7 @@ unwrap = "~1.2.1"
 
 [build-dependencies]
 safe_bindgen = { version = "~0.13.2", optional = true }
-safe-nd = "~0.5.0"
+safe-nd = "^0.7.2"
 unwrap = "~1.2.1"
 
 [features]

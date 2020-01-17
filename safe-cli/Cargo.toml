@@ -25,7 +25,7 @@ relative-path = "0.4.0"
 reqwest = "0.9.22"
 rpassword = "4.0.1"
 safe-api = { path = "../safe-api" }
-self_update = { git = "https://github.com/bochaco/self_update", branch = "master" }
+self_update = "0.9.0"
 serde = "1.0.91"
 serde_json = "1.0.39"
 serde_yaml = "0.8.11"
@@ -43,7 +43,7 @@ assert_cmd = "0.11.1"
 duct = "0.12.0"
 predicates = "1.0.0"
 pretty_assertions = "0.6.1"
-safe-nd = "~0.5.0"
+safe-nd = "^0.7.2"
 unwrap = "~1.2.1"
 
 [dev-dependencies.cargo-husky]
