@@ -13,6 +13,13 @@
 - Make returned error codes to be positive numbers
 - Remove pedantic warnings
 
+## [0.38.0]
+- Update to safe-nd 0.7.2
+- Update to lazy_static 1.4.0
+- Update ffi_utils to 0.15.0
+- Use GHA for Android libs build
+- Expose `gen_data_map` API which generates a file's data map without putting the chunks on the network
+
 ## [0.37.3]
 - Make another fix to automatic publishing
 
