@@ -1,6 +1,6 @@
 [package]
 name = "jsonrpc-quic"
-version = "0.0.1"
+version = "0.0.2"
 description = "JSON-RPC over QUIC for safe-authd comm"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 license = "MIT OR BSD-3-Clause"

@@ -1,6 +1,6 @@
 [package]
 name = "safe-cli"
-version = "0.6.0"
+version = "0.7.0"
 description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 publish = false
@@ -43,7 +43,7 @@ assert_cmd = "0.11.1"
 duct = "0.12.0"
 predicates = "1.0.0"
 pretty_assertions = "0.6.1"
-safe-nd = "^0.7.2"
+safe-nd = "^0.6.2"
 unwrap = "~1.2.1"
 
 [dev-dependencies.cargo-husky]

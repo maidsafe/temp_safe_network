@@ -1,6 +1,6 @@
 [package]
 name = "safe-api"
-version = "0.6.0"
+version = "0.7.0"
 description = "SAFE API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 license = "MIT OR BSD-3-Clause"
@@ -15,7 +15,7 @@ directories = "2.0.2"
 env_logger = "0.6.0"
 failure = "0.1"
 futures = "~0.1.29"
-jsonrpc-quic = { path = "../jsonrpc-quic", version = "~0.0.1" }
+jsonrpc-quic = { path = "../jsonrpc-quic", version = "~0.0.2" }
 lazy_static = "1.2.0"
 log = "0.4.6"
 mime_guess = "2.0.1"
@@ -25,10 +25,10 @@ rand = "0.6.5"
 rand_core = "0.4.0"
 rcgen = "0.2"
 relative-path = "0.4.0"
-safe_app = { git = "https://github.com/maidsafe/safe_client_libs.git", branch = "master" }
-safe_authenticator = { git = "https://github.com/maidsafe/safe_client_libs.git", branch = "master" }
-safe_core = { git = "https://github.com/maidsafe/safe_client_libs.git", branch = "master" }
-safe-nd = "^0.7.2"
+safe_app = "^0.13.0"
+safe_authenticator = "^0.13.0"
+safe_core = "^0.38.1"
+safe-nd = "^0.6.2"
 serde = "1.0.91"
 serde_json = "1.0.41"
 slog = "2.1"

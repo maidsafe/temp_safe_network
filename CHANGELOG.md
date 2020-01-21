@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 0.7.0 (2020-01-20)
+
+
+### Features
+
+* **cli:** add 'setup completions [shell]' for dumping shell completions ([217abed](https://github.com/bochaco/safe-api/commit/217abed1393d5eab1333d28fcb177cd380589c6d))
+* **cli:** allow to pass authd executable path in auth commands ([d5e4260](https://github.com/bochaco/safe-api/commit/d5e42601334cb0102c0be2cd0ff0328314f5443d))
+* **cli:** command to install safe-authd from safe-cli ([7387074](https://github.com/bochaco/safe-api/commit/738707493fa4a337ae835fb1c46a77ed43a8ab8c))
+* **cli:** command to update safe-authd from safe-cli ([71e6be8](https://github.com/bochaco/safe-api/commit/71e6be8ea7d6a932084def858161385d2ff1a197))
+* **cli:** connect with read-only access when no credentials were found ([298a621](https://github.com/bochaco/safe-api/commit/298a62114cf929ca2d5634e2f92daaee93114df6))
+* **cli:** enable reading file data from stdin for 'safe files add' ([d36cb54](https://github.com/bochaco/safe-api/commit/d36cb54dd889bbaf2d98f3d35ac06bb7fa27986a))
+* **connect:** use connect API for unregistered client using unregistered auth response ([adb6fba](https://github.com/bochaco/safe-api/commit/adb6fba5ba28b5df58bca2be569bad881bdf6f3f))
+* **ffi:** add auth_app function for app authentication ([bbd233d](https://github.com/bochaco/safe-api/commit/bbd233d3b4d564a432ebef70338190f2b1b52217))
+* **files:** expand dry-run to files xorurl and expose top lovel command for convenience ([2484cca](https://github.com/bochaco/safe-api/commit/2484cca324fc1fffe359e871a457bcc7d0505037))
+
+
+### Bug Fixes
+
+* **authd:** minor change to adapt to self_update api change ([b7bf05b](https://github.com/bochaco/safe-api/commit/b7bf05b138c706600481c7e1225f58cc9c01047d))
+* **authd:** use S3 as backend server instead of GitHub for updating to new releases ([19af3e8](https://github.com/bochaco/safe-api/commit/19af3e8c022fe0baae95aeda73944c93d8d7c3c8))
+* **ci:** minor corrections to test and release notes scripts ([8af6384](https://github.com/bochaco/safe-api/commit/8af6384f5fcd294b5a138ed708e1848353a5fe38))
+* **ci:** update deploy file name ([aadcecb](https://github.com/bochaco/safe-api/commit/aadcecbfe6e10f6bc967b92a86a333aa0064a407))
+* **cli:** remove cached network connection information when it's removed from config ([034e71f](https://github.com/bochaco/safe-api/commit/034e71fc9ef900de97f2722b8c284aab61e789b9))
+* **cli:** throw error if arg read from stdin is not a valid utf8 string ([e608a0a](https://github.com/bochaco/safe-api/commit/e608a0a2a5df1f13742fb87a818726cdd4d8b53c))
+* **clippy:** fix clippy issues ([60f227c](https://github.com/bochaco/safe-api/commit/60f227cfb70d568144beef206397f9129fce1584))
+* **UserGuide:** minor enhancements and corrections ([052105b](https://github.com/bochaco/safe-api/commit/052105bf73ab8f554df094e426529c7b1a5b0094))
+
 ## 0.6.0 (2019-12-03)
 
 
