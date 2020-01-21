@@ -110,21 +110,34 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      # Build.
+      # Build prod FFI lib
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
+      # Notarize FFI lib
+      - name: Sign & Notarize
+        shell: bash
+        run: ./resources/notarize.sh ${{ matrix.output }}
+        if: matrix.target == 'macOS-latest'
+      # Upload prod FFI lib
       - uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.component }}-${{ matrix.target }}-prod
           path: target/release/${{ matrix.output }}
+      # Build dev FFI lib
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args:  >
             --release --manifest-path=${{ matrix.component }}/Cargo.toml
             --features=mock-network
+      # Notarize FFI lib
+      - name: Sign & Notarize
+        shell: bash
+        run: ./resources/notarize.sh ${{ matrix.output }}
+        if: matrix.target == 'macOS-latest'
+      # Upload dev FFI lib
       - uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.component }}-${{ matrix.target }}-dev
