@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.7.1 (2020-01-22)
+
+
+### Bug Fixes
+
+* **cli:** make sure target installation path exists before installing authd ([4886ef0](https://github.com/bochaco/safe-api/commit/4886ef00ad07e5baca76db28bfd9772f04b23a90))
+
 ## 0.7.0 (2020-01-20)
 
 

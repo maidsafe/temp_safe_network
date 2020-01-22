@@ -467,12 +467,12 @@ jobs:
           cli_version=$(grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           authd_version=$(grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           ffi_version=$(grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          jsonrpc-quic_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          jsonrpc_quic_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=cli_version::$cli_version"
           echo "::set-output name=authd_version::$authd_version"
           echo "::set-output name=ffi_version::$ffi_version"
-          echo "::set-output name=jsonrpc-quic_version::$jsonrpc-quic_version"
+          echo "::set-output name=jsonrpc_quic_version::$jsonrpc_quic_version"
 
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
       - name: chmod
@@ -508,8 +508,8 @@ jobs:
       - uses: csexton/create-release@add-body
         id: create_release
         with:
-          tag_name: api_v${{ steps.versioning.outputs.api_version }}-cli_v${{ steps.versioning.outputs.cli_version }}-authd_v${{ steps.versioning.outputs.authd_version }}-ffi_v${{ steps.versioning.outputs.ffi_version }}-jsonrpc-quic_v${{ steps.versioning.outputs.jsonrpc-quic_version }}
-          release_name: safe-api-v${{ steps.versioning.outputs.api_version }} & safe-cli-v${{ steps.versioning.outputs.cli_version }} & safe-authd-v${{ steps.versioning.outputs.authd_version }} & safe-ffi-v${{ steps.versioning.outputs.ffi_version }} & jsonrpc-quic-v${{ steps.versioning.outputs.jsonrpc-quic_version }}
+          tag_name: api_v${{ steps.versioning.outputs.api_version }}-cli_v${{ steps.versioning.outputs.cli_version }}-authd_v${{ steps.versioning.outputs.authd_version }}-ffi_v${{ steps.versioning.outputs.ffi_version }}-jsonrpc-quic_v${{ steps.versioning.outputs.jsonrpc_quic_version }}
+          release_name: safe-api-v${{ steps.versioning.outputs.api_version }} & safe-cli-v${{ steps.versioning.outputs.cli_version }} & safe-authd-v${{ steps.versioning.outputs.authd_version }} & safe-ffi-v${{ steps.versioning.outputs.ffi_version }} & jsonrpc-quic-v${{ steps.versioning.outputs.jsonrpc_quic_version }}
           draft: false
           prerelease: false
           body: ${{ steps.release_description.outputs.description }}

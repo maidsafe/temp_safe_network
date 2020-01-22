@@ -317,9 +317,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ede750122d9d1f87919570cb2cccee38c84fbc8c5599b25c289af40625b7030"
+checksum = "fe8a65814ca90dfc9705af76bb6ba3c6e2534489a72270e797e603783bb4990b"
 dependencies = [
  "lazy_static",
  "memchr",
@@ -2736,7 +2736,7 @@ dependencies = [
 
 [[package]]
 name = "safe-cli"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "assert_cmd",
  "cargo-husky",
