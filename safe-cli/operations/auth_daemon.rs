@@ -17,7 +17,10 @@ use safe_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
 use serde::Deserialize;
-use std::{fs, path::PathBuf};
+use std::{
+    fs::{create_dir_all, File},
+    path::PathBuf,
+};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
@@ -353,7 +356,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
 
     if the_passphrase.is_empty() || the_password.is_empty() {
         if let Some(config_file_str) = config_file {
-            let file = match fs::File::open(&config_file_str) {
+            let file = match File::open(&config_file_str) {
                 Ok(file) => file,
                 Err(error) => {
                     return Err(format!("Error reading config file: {}", error));
@@ -459,7 +462,7 @@ fn download_and_install_authd(authd_path: Option<String>) -> Result<String, Stri
     })?;
     let tmp_dir = std::env::temp_dir();
     let tmp_tarball_path = tmp_dir.join(&asset.name);
-    let tmp_tarball = ::std::fs::File::create(&tmp_tarball_path).map_err(|err| {
+    let tmp_tarball = File::create(&tmp_tarball_path).map_err(|err| {
         format!(
             "Error creating temp file ('{}') for downloading the release: {}",
             tmp_tarball_path.display(),
@@ -479,6 +482,12 @@ fn download_and_install_authd(authd_path: Option<String>) -> Result<String, Stri
         })?;
 
     let target_path = get_authd_bin_path(authd_path)?;
+
+    if !target_path.exists() {
+        println!("Creating '{}' folder", target_path.display());
+        create_dir_all(target_path.clone())
+            .map_err(|err| format!("Couldn't create target path to install binary: {}", err))?;
+    }
 
     println!(
         "Installing safe-authd binary at {} ...",
