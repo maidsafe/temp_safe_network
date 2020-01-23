@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.7.2 (2020-01-23)
+
+
+### Bug Fixes
+
+* **ci:** set release tag to be the cli version ([e467084](https://github.com/bochaco/safe-api/commit/e467084f949eed10c2ebb27c3cb873cc252e228e))
+* **ci:** upload same release assets to S3 only if their size changed ([aa236c2](https://github.com/bochaco/safe-api/commit/aa236c2100bf8a0a865010cd2af39bfad109cfe1))
+
 ### 0.7.1 (2020-01-22)
 
 
