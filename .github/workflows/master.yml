@@ -506,8 +506,8 @@ jobs:
       - uses: csexton/create-release@add-body
         id: create_release
         with:
-          tag_name: api_v${{ steps.versioning.outputs.api_version }}-cli_v${{ steps.versioning.outputs.cli_version }}-authd_v${{ steps.versioning.outputs.authd_version }}-ffi_v${{ steps.versioning.outputs.ffi_version }}-jsonrpc-quic_v${{ steps.versioning.outputs.jsonrpc_quic_version }}
-          release_name: safe-api-v${{ steps.versioning.outputs.api_version }} & safe-cli-v${{ steps.versioning.outputs.cli_version }} & safe-authd-v${{ steps.versioning.outputs.authd_version }} & safe-ffi-v${{ steps.versioning.outputs.ffi_version }} & jsonrpc-quic-v${{ steps.versioning.outputs.jsonrpc_quic_version }}
+          tag_name: ${{ steps.versioning.outputs.cli_version }}
+          release_name: safe-cli
           draft: false
           prerelease: false
           body: ${{ steps.release_description.outputs.description }}
