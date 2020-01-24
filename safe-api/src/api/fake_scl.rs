@@ -7,12 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    helpers::create_random_xorname, safe_net::AppendOnlyDataRawData, Error, Result, SafeApp,
-};
+use super::{safe_net::AppendOnlyDataRawData, Error, Result, SafeApp};
 use crate::api::helpers::{
-    parse_coins_amount, parse_hex, unwrap_or_gen_random, vec_to_hex, xorname_from_pk,
-    xorname_to_hex,
+    parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
 use log::{debug, trace};
 use safe_nd::{
@@ -239,7 +236,7 @@ impl SafeApp for SafeAppFake {
     }
 
     fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
-        let xorname = create_random_xorname()?;
+        let xorname = rand::random();
         if !dry_run {
             // TODO: hash to get xorname.
             self.fake_vault
@@ -274,7 +271,7 @@ impl SafeApp for SafeAppFake {
         _tag: u64,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let xorname = unwrap_or_gen_random(name)?;
+        let xorname = name.unwrap_or_else(rand::random);
 
         self.fake_vault
             .published_seq_append_only
@@ -394,7 +391,7 @@ impl SafeApp for SafeAppFake {
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let xorname = unwrap_or_gen_random(name)?;
+        let xorname = name.unwrap_or_else(rand::random);
         let seq_md = match self.fake_vault.mutable_data.get(&xorname_to_hex(&xorname)) {
             Some(uao) => uao.clone(),
             None => BTreeMap::new(),

@@ -10,7 +10,7 @@
 #[cfg(not(feature = "fake-auth"))]
 use super::helpers::{decode_ipc_msg, AuthResponseType};
 use super::{
-    helpers::{unwrap_or_gen_random, xorname_from_pk, xorname_to_hex},
+    helpers::{xorname_from_pk, xorname_to_hex},
     safe_net::AppendOnlyDataRawData,
     Error, Result, SafeApp,
 };
@@ -289,7 +289,7 @@ impl SafeApp for SafeAppScl {
         );
 
         let safe_app: &App = self.get_safe_app()?;
-        let xorname = unwrap_or_gen_random(name)?;
+        let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
         let append_only_data_address = ADataAddress::PubSeq { name: xorname, tag };
@@ -493,7 +493,7 @@ impl SafeApp for SafeAppScl {
             ));
         };
 
-        let xorname = unwrap_or_gen_random(name)?;
+        let xorname = name.unwrap_or_else(rand::random);
 
         let permission_set = MDataPermissionSet::new()
             .allow(MDataAction::Read)

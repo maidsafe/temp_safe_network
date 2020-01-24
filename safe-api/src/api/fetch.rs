@@ -381,7 +381,6 @@ fn embed_resolved_from(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::helpers::create_random_xorname;
     use crate::api::xorurl::XorUrlEncoder;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
@@ -616,7 +615,7 @@ mod tests {
     fn test_fetch_unsupported() {
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let xorname = create_random_xorname().unwrap();
+        let xorname = rand::random();
         let type_tag = 575_756_443;
         let xorurl = unwrap!(XorUrlEncoder::encode(
             xorname,
@@ -652,7 +651,7 @@ mod tests {
     fn test_fetch_unsupported_with_media_type() {
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let xorname = create_random_xorname().unwrap();
+        let xorname = rand::random();
         let type_tag = 575_756_443;
         let xorurl = unwrap!(XorUrlEncoder::encode(
             xorname,
