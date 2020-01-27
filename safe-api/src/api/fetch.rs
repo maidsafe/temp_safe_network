@@ -138,7 +138,8 @@ impl Safe {
 pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> Result<SafeData> {
     let mut the_xor = Safe::parse_url(url)?;
     let xorurl = the_xor.to_string()?;
-    info!("URL parsed successfully, fetching: {}", xorurl);
+    info!("URL parsed successfully, fetching: {:?}", xorurl);
+    info!("URL pars----------->>>: {:?}", the_xor);
     debug!("Fetching content of type: {:?}", the_xor.content_type());
 
     // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
@@ -171,6 +172,13 @@ pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> Result<Saf
         },
         SafeContentType::MediaType(media_type_str) => match the_xor.data_type() {
             SafeDataType::PublishedImmutableData => {
+                if !the_xor.path().is_empty() {
+                    return Err(Error::ContentError(format!(
+                        "Cannot get relative path of Immutable Data {:?}'",
+                        the_xor.path()
+                    )));
+                };
+
                 let data = if retrieve_data {
                     safe.files_get_published_immutable(&url)?
                 } else {
