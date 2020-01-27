@@ -33,12 +33,12 @@ const SERVICE_LAUNCH_ARGUMENT: &str = "sc-start";
 define_windows_service!(ffi_authd_service, authd_service);
 
 pub fn install_authd() -> Result<()> {
-    println!("Installing SAFE Authenticator (safe-authd) as a Windows service...");
+    println!("Registering SAFE Authenticator (safe-authd) as a Windows service...");
     install_authd_service()
 }
 
 pub fn uninstall_authd() -> Result<()> {
-    println!("Uninstalling SAFE Authenticator (safe-authd) service...");
+    println!("Unregistering SAFE Authenticator (safe-authd) service...");
     uninstall_authd_service()
 }
 
@@ -242,17 +242,24 @@ fn install_authd_service() -> Result<()> {
     let service_manager =
         ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
             Error::GeneralError(format!(
-                "Eror when checking if safe-authd service is installed: {:?}",
+                "Error when checking if safe-authd is already registered as a service: {:?}",
                 err
             ))
         })?;
 
+    // Check there if there is an authd service already registered
+    if service_manager
+        .open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)
+        .is_ok()
+    {
+        return Err(Error::GeneralError(
+            "A safe-authd service is already registered, please uninstall it first".to_string(),
+        ));
+    }
+
     let service_binary_path = ::std::env::current_exe()
         .map_err(|err| {
-            Error::GeneralError(format!(
-                "Failed to get safe-authd service binary path: {:?}",
-                err
-            ))
+            Error::GeneralError(format!("Failed to get safe-authd binary path: {:?}", err))
         })?
         .with_file_name(SERVICE_BINARY_FILE_NAME);
 
@@ -280,27 +287,27 @@ fn install_authd_service() -> Result<()> {
         Err(windows_service::Error::Winapi(err)) => {
             if let Some(os_err) = err.raw_os_error() {
                 if os_err == 1073 {
-                    // service already exists
+                    // Unexpected as we deleted it beforehand, service already exists
                     println!(
-                        "Detected safe-authd service ('{}') is already installed",
+                        "Detected safe-authd ('{}') is already registered as a service",
                         service_binary_path.display()
                     );
                     Ok(())
                 } else {
                     Err(Error::GeneralError(format!(
-                        "Failed to install safe-authd service: {:?}",
+                        "Failed to register safe-authd as a service: {:?}",
                         err
                     )))
                 }
             } else {
                 Err(Error::GeneralError(format!(
-                    "Failed to install safe-authd service: {:?}",
+                    "Failed to register safe-authd as a service: {:?}",
                     err
                 )))
             }
         }
         Err(err) => Err(Error::GeneralError(format!(
-            "Failed to install safe-authd service: {:?}",
+            "Failed to register safe-authd as a service: {:?}",
             err
         ))),
     }
@@ -311,12 +318,12 @@ fn uninstall_authd_service() -> Result<()> {
     let service_manager =
         ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
             Error::GeneralError(format!(
-                "Eror when connecting to service manager: {:?}",
+                "Eror when connecting to Windows service manager: {:?}",
                 err
             ))
         })?;
 
-    let service_access = ServiceAccess::DELETE;
+    let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::DELETE;
     let service = service_manager
         .open_service(SERVICE_NAME, service_access)
         .map_err(|err| {
@@ -326,14 +333,27 @@ fn uninstall_authd_service() -> Result<()> {
             ))
         })?;
 
-    service.delete().map_err(|err| {
+    let service_status = service.query_status().map_err(|err| {
         Error::GeneralError(format!(
-            "Failed when attempting to delete safe-authd service: {:?}",
+            "Failed when attempting to query status of safe-authd service: {:?}",
             err
         ))
     })?;
 
-    println!("safe-authd sucessfully uninstalled!");
+    service.delete().map_err(|err| {
+        Error::GeneralError(format!(
+            "Failed when attempting to unregister safe-authd service: {:?}",
+            err
+        ))
+    })?;
+
+    println!("safe-authd service sucessfully unregistered!");
+
+    if service_status.current_state != ServiceState::Stopped {
+        println!("An existing safe-authd service is currently running, let's stop it...");
+        stop_authd()?;
+    }
+
     Ok(())
 }
 
@@ -343,7 +363,7 @@ fn invoke_stop_on_service_manager() -> Result<()> {
     let service_manager =
         ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
             Error::GeneralError(format!(
-                "Eror when connecting to service manager: {:?}",
+                "Eror when connecting to Windows service manager: {:?}",
                 err
             ))
         })?;
