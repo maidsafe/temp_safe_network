@@ -129,8 +129,8 @@ The SAFE Authenticator, which runs as a daemon or as a service in Windows platfo
 Downloading and installing the Authenticator daemon is very simple:
 ```shell
 $ safe auth install
-Latest release found: safe-authd v0.0.2
-Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.2-x86_64-unknown-linux-gnu.tar.gz...
+Latest release found: safe-authd v0.0.3
+Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
 Installing safe-authd binary at ~/.safe/authd ...
 Done!
@@ -139,8 +139,8 @@ Done!
 **If you on a Windows platform**, the CLI requires administrator permissions to install it, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the install command:
 ```shell
 > safe auth install
-Latest release found: safe-authd v0.0.2
-Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.2-x86_64-pc-windows-msvc.zip...
+Latest release found: safe-authd v0.0.3
+Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-pc-windows-msvc.zip...
 [00:00:19] [========================================] 4.3MB/4.3MB (0s) Done
 Installing safe-authd binary at ~/.safe/authd ...
 Done!
@@ -174,7 +174,9 @@ Sending request to authd to obtain an status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
 +------------------------------------------+-------+
-| Logged in to a SAFE account?             | false |
+| Authenticator daemon version             | 0.0.3 |
++------------------------------------------+-------+
+| Logged in to a SAFE account?             | No    |
 +------------------------------------------+-------+
 | Number of pending authorisation requests | 0     |
 +------------------------------------------+-------+
@@ -230,15 +232,17 @@ If we again send an status report request to `authd`, it should now show that it
 ```shell
 $ safe auth status
 Sending request to authd to obtain an status report...
-+------------------------------------------+------+
-| SAFE Authenticator status                |      |
-+------------------------------------------+------+
-| Logged in to a SAFE account?             | true |
-+------------------------------------------+------+
-| Number of pending authorisation requests | 0    |
-+------------------------------------------+------+
-| Number of notifications subscribers     | 0    |
-+------------------------------------------+------+
++------------------------------------------+-------+
+| SAFE Authenticator status                |       |
++------------------------------------------+-------+
+| Authenticator daemon version             | 0.0.3 |
++------------------------------------------+-------+
+| Logged in to a SAFE account?             | Yes   |
++------------------------------------------+-------+
+| Number of pending authorisation requests | 0     |
++------------------------------------------+-------+
+| Number of notifications subscribers      | 0     |
++------------------------------------------+-------+
 ```
 
 The SAFE Authenticator is now ready to receive authorisation requests from any SAFE application, including the SAFE CLI which needs to also get permissions to perform any data operations on behalf of our account.
@@ -348,7 +352,9 @@ Sending request to authd to obtain an status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
 +------------------------------------------+-------+
-| Logged in to a SAFE account?             | false |
+| Authenticator daemon version             | 0.0.3 |
++------------------------------------------+-------+
+| Logged in to a SAFE account?             | No    |
 +------------------------------------------+-------+
 | Number of pending authorisation requests | 0     |
 +------------------------------------------+-------+
@@ -1130,7 +1136,7 @@ $ safe networks switch shared-vault
 Switching to 'shared-vault' network...
 Fetching 'shared-vault' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
 Successfully switched to 'shared-vault' network in your system!
-You'll need to login again, and re-authorise the CLI, if you need write access to the 'shared-vault' network
+If you need write access to the '{}' network, you'll need to restart authd, login and re-authorise the CLI again
 ```
 
 Remember that every time you run a local vault the connection configuration in your system is automatically overwritten by the local vault with new connection information. Also if the shared vault was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your currently setup network matches any of those set up in the CLI config, you can use the `check` subcommand:

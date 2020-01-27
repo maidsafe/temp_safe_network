@@ -309,7 +309,7 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
     ]);
     table.add_row(row![
         "Logged in to a SAFE account?",
-        status_report.logged_in,
+        if status_report.logged_in { "Yes" } else { "No" },
     ]);
     table.add_row(row![
         "Number of pending authorisation requests",
