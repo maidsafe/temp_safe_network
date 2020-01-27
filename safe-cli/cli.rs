@@ -102,6 +102,11 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
         }
         Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, &mut safe),
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
+        Some(SubCommands::Xorurl {
+            cmd,
+            location,
+            recursive,
+        }) => xorurl_commander(cmd, location, recursive, output_fmt, &mut safe),
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to
             // connect to the network with them, otherwise the connection created will be with
@@ -113,7 +118,6 @@ pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
                 SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &mut safe),
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, &mut safe),
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, &mut safe),
-                SubCommands::Xorurl(cmd) => xorurl_commander(cmd, output_fmt, &mut safe),
                 _ => Err("Unknown safe subcommand".to_string()),
             }
         }

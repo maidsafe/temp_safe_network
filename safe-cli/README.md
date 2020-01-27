@@ -35,6 +35,7 @@
     - [Sync](#files-sync)
     - [Add](#files-add)
   - [Xorurl](#xorurl)
+    - [Decode](#xorurl-decode)
   - [Cat](#cat)
   - [NRS](#nrs-name-resolution-system)
     - [Create](#nrs-create)
@@ -756,6 +757,22 @@ $ safe xorurl ./to-upload/ --recursive
 +  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
 +  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
 +  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
+```
+
+#### Xorurl decode
+
+XOR-URLs encode not only information about the location of the content, but also about the content type, native data type the data is being held on, etc.
+
+In some particular cases it may be useful for the user to be able to decode this type of information from a given XOR-URL:
+```shell
+$ safe xorurl decode safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
+Information decoded from XOR-URL: safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
+Xorname: e02b282430f7d544ec93441969c63c387a261d7d553d2f9a8b3dda270fcb37ab
+Type tag: 1100
+Native data type: PublishedSeqAppendOnlyData
+Path: none
+Sub names: []
+Content version: latest
 ```
 
 ### Cat

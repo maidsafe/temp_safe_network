@@ -23,7 +23,6 @@ pub mod update;
 pub mod wallet;
 pub mod xorurl;
 
-use auth::AuthSubCommands;
 use structopt::StructOpt;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -72,7 +71,7 @@ pub enum SubCommands {
     Auth {
         /// subcommands
         #[structopt(subcommand)]
-        cmd: Option<AuthSubCommands>,
+        cmd: Option<auth::AuthSubCommands>,
     },
     // [structopt(name = "container")]
     // /// Create a new SAFE Network account with the credentials provided
@@ -103,7 +102,16 @@ pub enum SubCommands {
     Wallet(wallet::WalletSubCommands),
     #[structopt(name = "xorurl")]
     /// Obtain the XOR-URL of data without uploading it to the network
-    Xorurl(xorurl::XorurlSubCommands),
+    Xorurl {
+        /// subcommands
+        #[structopt(subcommand)]
+        cmd: Option<xorurl::XorurlSubCommands>,
+        /// The source file/folder local path
+        location: Option<String>,
+        /// Recursively crawl folders and files found in the location
+        #[structopt(short = "r", long = "recursive")]
+        recursive: bool,
+    },
     // #[structopt(name = "safe-id")]
     // /// Manage identities on the SAFE Network
     // SafeId(safe_id::SafeIdSubCommands),

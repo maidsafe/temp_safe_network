@@ -104,9 +104,9 @@ checksum = "bc4662175ead9cd84451d5c35070517777949a2ed84551764129cedb88384841"
 
 [[package]]
 name = "arrayref"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d382e583f07208808f6b1249e60848879ba3543f57c32277bf52d69c2f0f0ee"
+checksum = "a4c527152e37cf757a3f78aae5a06fbeefdb07ccc535c980a3208ee3060dd544"
 
 [[package]]
 name = "arrayvec"
@@ -487,9 +487,9 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5d540c2d34ac9dd0deb5f3b5f54c36c79efa78f6b3ad19106a554d07a7b5d9f"
+checksum = "45e0f3986890b3acbc782009e2629dfe2baa430ac091519ce3be26164a2ae6c0"
 dependencies = [
  "clicolors-control",
  "encode_unicode",
@@ -1385,9 +1385,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501266b7edd0174f8530248f87f99c88fbe60ca4ef3dd486835b8d8d53136f7f"
+checksum = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
 
 [[package]]
 name = "jni"
@@ -2647,9 +2647,9 @@ dependencies = [
 
 [[package]]
 name = "rustversion"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a0538bd897e17257b0128d2fd95c2ed6df939374073a36166051a79e2eb7986"
+checksum = "b3bba175698996010c4f6dce5e7f173b6eb781fce25d2cfc45e27091ce0b79f6"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",

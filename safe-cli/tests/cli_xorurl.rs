@@ -13,9 +13,11 @@ mod common;
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{CLI, SAFE_PROTOCOL};
+use common::{get_bin_location, parse_xorurl_output, CLI, SAFE_PROTOCOL};
 use predicates::prelude::*;
+use safe_api::XorUrlEncoder;
 use std::process::Command;
+use unwrap::unwrap;
 
 const TEST_FILE: &str = "../testdata/test.md";
 const TEST_FOLDER: &str = "../testdata/";
@@ -40,4 +42,30 @@ fn calling_safe_xorurl_recursive() {
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(5))
         .stdout(predicate::str::contains(TEST_FOLDER).count(5))
         .success();
+}
+
+#[test]
+fn calling_safe_xorurl_decode() {
+    let content = cmd!(get_bin_location(), "xorurl", TEST_FILE, "--json",)
+        .read()
+        .unwrap();
+
+    let xorurls = parse_xorurl_output(&content);
+    let file_xorurl = &xorurls[0].1;
+    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(file_xorurl));
+
+    let xorurl_decoded = cmd!(
+        get_bin_location(),
+        "xorurl",
+        "decode",
+        &file_xorurl,
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let decoded_obj: XorUrlEncoder = serde_json::from_str(&xorurl_decoded)
+        .expect("Failed to parse output of `safe xorurl decode`");
+
+    assert_eq!(xorurl_encoder, decoded_obj);
 }

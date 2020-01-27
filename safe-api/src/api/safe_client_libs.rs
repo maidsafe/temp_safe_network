@@ -394,7 +394,6 @@ impl SafeApp for SafeAppScl {
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         debug!("Address for a_data : {:?}", append_only_data_address);
-
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
             .map_err(|e| {
@@ -588,15 +587,28 @@ impl SafeApp for SafeAppScl {
                 .list_seq_mdata_entries(name, tag)
                 .map_err(SafeAppError)
         })
-        .map_err(|err| {
-            if let SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::AccessDenied,
-            ))) = err
-            {
-                Error::AccessDenied(format!("Failed to get MD at: {:?}", name))
-            } else {
-                Error::NetDataError(format!("Failed to get MD. {:?}", err))
+        .map_err(|err| match err {
+            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied))) => {
+                Error::AccessDenied(format!(
+                    "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
+                    name, tag
+                ))
             }
+            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData))) => {
+                Error::ContentNotFound(format!(
+                    "Sequenced MutableData not found at Xor name: {} (type tag: {})",
+                    xorname_to_hex(&name),
+                    tag
+                ))
+            }
+            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry))) => {
+                Error::EntryNotFound(format!(
+                    "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
+                    xorname_to_hex(&name),
+                    tag
+                ))
+            }
+            err => Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err)),
         })
     }
 

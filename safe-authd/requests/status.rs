@@ -41,10 +41,13 @@ pub fn process_req(
                 Ok(notif_endpoints_list.len() as u32)
             })?;
 
+        let authd_version = cargo_crate_version!().to_string();
+
         let status_report = AuthdStatus {
             logged_in,
             num_auth_reqs,
             num_notif_subs,
+            authd_version: Some(authd_version),
         };
 
         println!("Status report sent: {:?}", status_report);

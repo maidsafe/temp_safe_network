@@ -302,6 +302,12 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
     let mut table = Table::new();
     table.add_row(row![bFg->"SAFE Authenticator status"]);
     table.add_row(row![
+        "Authenticator daemon version",
+        status_report
+            .authd_version
+            .unwrap_or_else(|| "<not reported>".to_string()),
+    ]);
+    table.add_row(row![
         "Logged in to a SAFE account?",
         status_report.logged_in,
     ]);

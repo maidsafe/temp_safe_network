@@ -34,7 +34,6 @@ extern crate human_panic;
 #[macro_use]
 extern crate slog;
 
-#[cfg(not(feature = "mock-network"))]
 #[macro_use]
 extern crate self_update;
 

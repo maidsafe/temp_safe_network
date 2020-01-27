@@ -152,7 +152,7 @@ impl SafeDataType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct XorUrlEncoder {
     encoding_version: u64, // currently only v1 supported
     xorname: XorName,

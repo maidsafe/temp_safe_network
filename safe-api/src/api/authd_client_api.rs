@@ -60,6 +60,7 @@ pub struct AuthdStatus {
     pub logged_in: bool,
     pub num_auth_reqs: u32,
     pub num_notif_subs: u32,
+    pub authd_version: Option<String>,
 }
 
 // Type of the list of pending authorisation requests

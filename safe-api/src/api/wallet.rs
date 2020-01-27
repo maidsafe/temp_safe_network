@@ -156,7 +156,12 @@ impl Safe {
 
         let balances = if url_path.is_empty() {
             debug!("We'll check the total balance of the Wallet");
-            gen_wallet_spendable_balances_list(&self, xorurl_encoder.xorname(), url)?
+            gen_wallet_spendable_balances_list(
+                &self,
+                xorurl_encoder.xorname(),
+                xorurl_encoder.type_tag(),
+                url,
+            )?
         } else {
             let balance_name = &url_path[1..]; // we get rid of starting '/'
             debug!(
@@ -166,6 +171,7 @@ impl Safe {
             let (spendable_balance, _) = wallet_get_spendable_balance(
                 &self,
                 xorurl_encoder.xorname(),
+                xorurl_encoder.type_tag(),
                 balance_name.as_bytes(),
             )
             .map_err(|_| {
@@ -210,7 +216,7 @@ impl Safe {
             .safe_app
             .seq_mutable_data_get_value(
                 xorurl_encoder.xorname(),
-                WALLET_TYPE_TAG,
+                xorurl_encoder.type_tag(),
                 WALLET_DEFAULT_BYTES,
             )
             .map_err(|err| match err {
@@ -226,7 +232,12 @@ impl Safe {
                 }
             })?;
 
-        wallet_get_spendable_balance(&self, xorurl_encoder.xorname(), &default.data)
+        wallet_get_spendable_balance(
+            &self,
+            xorurl_encoder.xorname(),
+            xorurl_encoder.type_tag(),
+            &default.data,
+        )
     }
 
     /// # Transfer safecoins from one Wallet to another
@@ -358,7 +369,12 @@ impl Safe {
 
     pub fn wallet_get(&self, url: &str) -> Result<WalletSpendableBalances> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
-        gen_wallet_spendable_balances_list(&self, xorurl_encoder.xorname(), url)
+        gen_wallet_spendable_balances_list(
+            &self,
+            xorurl_encoder.xorname(),
+            xorurl_encoder.type_tag(),
+            url,
+        )
     }
 }
 
@@ -366,12 +382,10 @@ impl Safe {
 fn gen_wallet_spendable_balances_list(
     safe: &Safe,
     xorname: XorName,
+    type_tag: u64,
     url: &str,
 ) -> Result<WalletSpendableBalances> {
-    let entries = match safe
-        .safe_app
-        .list_seq_mdata_entries(xorname, WALLET_TYPE_TAG)
-    {
+    let entries = match safe.safe_app.list_seq_mdata_entries(xorname, type_tag) {
         Ok(entries) => entries,
         Err(Error::AccessDenied(_)) => {
             return Err(Error::AccessDenied(format!(
@@ -428,12 +442,13 @@ fn gen_wallet_spendable_balances_list(
 fn wallet_get_spendable_balance(
     safe: &Safe,
     xorname: XorName,
+    type_tag: u64,
     balance_name: &[u8],
 ) -> Result<(WalletSpendableBalance, u64)> {
     let the_balance: (WalletSpendableBalance, u64) = {
         let default_balance_vec = safe
             .safe_app
-            .seq_mutable_data_get_value(xorname, WALLET_TYPE_TAG, balance_name)
+            .seq_mutable_data_get_value(xorname, type_tag, balance_name)
             .map_err(|_| {
                 Error::ContentError(format!(
                     "Default balance set but not found at Wallet \"{}\"",
@@ -473,6 +488,7 @@ fn resolve_wallet_url(
         wallet_get_spendable_balance(
             safe,
             xorurl_encoder.xorname(),
+            xorurl_encoder.type_tag(),
             url_path[1..].as_bytes(), // we get rid of starting '/' from the URL path
         )
         .map_err(|_| {

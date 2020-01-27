@@ -136,3 +136,8 @@ pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<BlsKe
 pub fn parse_cat_wallet_output(output: &str) -> (String, WalletSpendableBalances) {
     serde_json::from_str(output).expect("Failed to parse output of `safe cat wallet`")
 }
+
+#[allow(dead_code)]
+pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
+    serde_json::from_str(output).expect("Failed to parse output of `safe xorurl`")
+}
