@@ -15,7 +15,7 @@ use super::{
     OutputFmt,
 };
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::{Safe, XorUrl, XorUrlEncoder};
+use safe_api::{FilesMap, Safe, XorUrl, XorUrlEncoder};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 
@@ -68,6 +68,12 @@ pub enum FilesSubCommands {
         /// Overwrite the file on the FilesContainer if there already exists a file with the same name
         #[structopt(short = "f", long = "force")]
         force: bool,
+    },
+    #[structopt(name = "ls")]
+    /// List files found in an existing FilesContainer on the network
+    Ls {
+        /// The target FilesContainer to list files from, optionally including a path (default is '/')
+        target: Option<String>,
     },
 }
 
@@ -179,6 +185,7 @@ pub fn files_commander(
 
             let target_url =
                 get_from_arg_or_stdin(Some(target_url), Some("...awaiting target URl from STDIN"))?;
+
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
@@ -226,6 +233,63 @@ pub fn files_commander(
             }
             Ok(())
         }
+        FilesSubCommands::Ls { target } => {
+            let target_url =
+                get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
+
+            let (version, files_map) = safe
+                .files_container_get(&target_url)
+                .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
+
+            let (total, filtered_filesmap) = filter_files_map(&files_map, &target_url)?;
+
+            // Render FilesContainer
+            if OutputFmt::Pretty == output_fmt {
+                println!(
+                    "Files of FilesContainer (version {}) at \"{}\":",
+                    version, target_url
+                );
+                println!("Total: {}", total);
+                let mut table = Table::new();
+                let format = FormatBuilder::new()
+                    .column_separator(' ')
+                    .padding(0, 1)
+                    .build();
+                table.set_format(format);
+
+                // Columns in output:
+                // 1. file/directory size,
+                // 2. created timestamp,
+                // 3. modified timestamp,
+                // 4. file/directory name
+                table.add_row(row!["SIZE", "CREATED", "MODIFIED", "NAME"]);
+                filtered_filesmap.iter().for_each(|(name, file_item)| {
+                    if name.ends_with('/') {
+                        table.add_row(row![
+                            &file_item["size"],
+                            file_item["created"],
+                            file_item["modified"],
+                            Fbb->name
+                        ]);
+                    } else {
+                        table.add_row(row![
+                            &file_item["size"],
+                            file_item["created"],
+                            file_item["modified"],
+                            name
+                        ]);
+                    }
+                });
+                table.printstd();
+            } else {
+                println!(
+                    "{}",
+                    serialise_output(&(target_url, filtered_filesmap), output_fmt)
+                );
+            }
+
+            Ok(())
+        }
     }
 }
 
@@ -245,4 +309,82 @@ fn print_serialized_output(
     println!("{}", serialise_output(&(url, processed_files), output_fmt));
 
     Ok(())
+}
+
+fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap), String> {
+    let mut filtered_filesmap = FilesMap::default();
+    let mut xorurl_encoder = Safe::parse_url(target_url)?;
+    let path = xorurl_encoder.path();
+
+    let folder_path = if !path.ends_with('/') {
+        format!("{}/", path)
+    } else {
+        path.to_string()
+    };
+
+    let mut total = 0;
+    files_map.iter().for_each(|(filepath, fileitem)| {
+        // let's first filter out file items not belonging to the provided path
+        if filepath.starts_with(&folder_path) {
+            total += 1;
+            let mut relative_path = filepath.clone();
+            relative_path.replace_range(..folder_path.len(), "");
+            let subdirs = relative_path.split('/').collect::<Vec<&str>>();
+            if !subdirs.is_empty() {
+                // let's get base path of current file item
+                let mut is_folder = false;
+                let base_path = if subdirs.len() > 1 {
+                    is_folder = true;
+                    format!("{}/", subdirs[0])
+                } else {
+                    subdirs[0].to_string()
+                };
+
+                // insert or merge current file item into the filtered list
+                match filtered_filesmap.get_mut(&base_path) {
+                    None => {
+                        let mut fileitem = fileitem.clone();
+                        if is_folder {
+                            // then set link to xorurl with path current subfolder
+                            let subfolder_path = format!("{}{}", folder_path, base_path);
+                            xorurl_encoder.set_path(&subfolder_path);
+                            let link = xorurl_encoder
+                                .to_string()
+                                .unwrap_or_else(|_| subfolder_path);
+                            fileitem.insert("link".to_string(), link);
+                            fileitem.insert("type".to_string(), "".to_string());
+                        }
+
+                        filtered_filesmap.insert(base_path.to_string(), fileitem);
+                    }
+                    Some(item) => {
+                        // current file item belongs to same base path as other files,
+                        // we need to merge them together into the filtered list
+
+                        // Add up files sizes
+                        let current_dir_size = (*item["size"]).parse::<u32>().unwrap();
+                        let additional_dir_size = fileitem["size"].parse::<u32>().unwrap();
+                        (*item).insert(
+                            "size".to_string(),
+                            format!("{}", current_dir_size + additional_dir_size),
+                        );
+
+                        // If current file item's modified date is more recent
+                        // set it as the folder's modififed date
+                        if fileitem["modified"] > item["modified"] {
+                            (*item).insert("modified".to_string(), fileitem["modified"].clone());
+                        }
+
+                        // If current file item's creation date is older than others
+                        // set it as the folder's created date
+                        if fileitem["created"] > item["created"] {
+                            (*item).insert("created".to_string(), fileitem["created"].clone());
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    Ok((total, filtered_filesmap))
 }

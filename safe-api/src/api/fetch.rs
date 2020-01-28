@@ -237,38 +237,10 @@ pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> Result<Saf
 
                         safe.fetch(new_target_xorurl)
                     }
-                    None => {
-                        let mut filtered_filesmap = FilesMap::default();
-                        let folder_path = if !path.ends_with('/') {
-                            format!("{}/", path)
-                        } else {
-                            path.to_string()
-                        };
-                        files_map.iter().for_each(|(filepath, fileitem)| {
-                            if filepath.starts_with(&folder_path) {
-                                let mut new_path = filepath.clone();
-                                new_path.replace_range(..folder_path.len(), "");
-                                filtered_filesmap.insert(new_path, fileitem.clone());
-                            }
-                        });
-
-                        if filtered_filesmap.is_empty() {
-                            Err(Error::ContentError(format!(
-                                "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-                                folder_path, xorurl
-                            )))
-                        } else {
-                            Ok(SafeData::FilesContainer {
-                                xorurl,
-                                xorname: the_xor.xorname(),
-                                type_tag: the_xor.type_tag(),
-                                version,
-                                files_map: filtered_filesmap,
-                                data_type: the_xor.data_type(),
-                                resolved_from: None,
-                            })
-                        }
-                    }
+                    None => Err(Error::ContentError(format!(
+                        "No content found matching the \"{}\" path on the FilesContainer at: {} ",
+                        path, xorurl
+                    ))),
                 }
             } else {
                 Ok(SafeData::FilesContainer {

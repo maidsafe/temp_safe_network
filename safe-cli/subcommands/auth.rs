@@ -85,42 +85,42 @@ pub enum AuthSubCommands {
     /// Install latest safe-authd released version in the system. On Windows platforms it also installs it as a service
     Install {
         #[structopt(long = "authd-path")]
-        /// Path where to install safe-authd executable
+        /// Path where to install safe-authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "uninstall")]
     /// Uninstall safe-authd service. Only for Windows platforms
     Uninstall {
         #[structopt(long = "authd-path")]
-        /// Path where to uninstall safe-authd executable from
+        /// Path where to uninstall safe-authd executable from (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "update")]
     /// Update safe-authd binary to a new available released version
     Update {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable
+        /// Path of safe-authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "start")]
     /// Starts the Authenticator daemon if it's not running already
     Start {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable
+        /// Path of safe-authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "stop")]
     /// Stops the Authenticator daemon if it's running
     Stop {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable
+        /// Path of safe-authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "restart")]
     /// Restarts the Authenticator daemon if it's running already
     Restart {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable
+        /// Path of safe-authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
 }

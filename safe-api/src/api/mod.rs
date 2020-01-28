@@ -37,7 +37,7 @@ pub use errors::{Error, Result};
 pub use fetch::{
     NrsMapContainerInfo, SafeContentType, SafeData, SafeDataType, WalletSpendableBalances,
 };
-pub use files::ProcessedFiles;
+pub use files::{FileItem, FilesMap, ProcessedFiles};
 pub use keys::BlsKeyPair;
 pub use nrs::ProcessedEntries;
 pub use nrs_map::{NrsMap, SubNamesMap};
