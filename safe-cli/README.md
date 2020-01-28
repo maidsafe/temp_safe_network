@@ -219,7 +219,7 @@ Account was created successfully!
 
 #### Auth login
 
-Once you have a SAFE account created, we can login:
+When a new account is created with CLI, as we've seen above, the `authd` will stay logged into that same account. However if we want to log in to a different account, or to the same account after the PC or `authd` was restarted, we can login using the following command:
 ```shell
 $ safe auth login
 Passphrase:
@@ -228,7 +228,7 @@ Sending login action request to authd...
 Logged in successfully
 ```
 
-If we again send an status report request to `authd`, it should now show that it's logged in to a SAFE account:
+If we now send an status report request to `authd`, it should now show that it's logged in to a SAFE account:
 ```shell
 $ safe auth status
 Sending request to authd to obtain an status report...

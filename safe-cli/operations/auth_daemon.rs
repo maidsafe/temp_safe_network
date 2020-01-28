@@ -22,6 +22,9 @@ use std::{
     path::PathBuf,
 };
 
+#[cfg(not(target_os = "windows"))]
+use std::os::unix::fs::PermissionsExt;
+
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
 
@@ -509,6 +512,54 @@ fn download_and_install_authd(authd_path: Option<String>) -> Result<String, Stri
             )
         })?;
 
+    set_exec_perms(target_path.join(SAFE_AUTHD_EXECUTABLE))?;
+
     println!("Done!");
     Ok(target_path.display().to_string())
+}
+
+#[cfg(target_os = "windows")]
+#[inline]
+fn set_exec_perms(_file_path: PathBuf) -> Result<(), String> {
+    // no need to set execution permissions on Windows
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+#[inline]
+fn set_exec_perms(file_path: PathBuf) -> Result<(), String> {
+    println!(
+        "Setting execution permissions to installed binary '{}'...",
+        file_path.display()
+    );
+    let file = File::open(&file_path).map_err(|err| {
+        format!(
+            "Error when preparing to set execution permissions to installed binary '{}': {}",
+            file_path.display(),
+            err
+        )
+    })?;
+
+    let mut perms = file
+        .metadata()
+        .map_err(|err| {
+            format!(
+                "Error when reading metadata from installed binary '{}': {}",
+                file_path.display(),
+                err
+            )
+        })?
+        .permissions();
+
+    // set execution permissions bits for owner, group and others
+    perms.set_mode(perms.mode() | 0b0_001_001_001);
+    file.set_permissions(perms).map_err(|err| {
+        format!(
+            "Failed to set execution permissions to installed binary '{}': {}",
+            file_path.display(),
+            err
+        )
+    })?;
+
+    Ok(())
 }

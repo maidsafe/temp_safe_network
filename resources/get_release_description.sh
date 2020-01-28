@@ -43,7 +43,7 @@ tar.gz: TAR_WIN_CHECKSUM
 ### SAFE Authenticator daemon
 
 The Authenticator daemon exposes services which allow applications and users to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
-The SAFE Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the SAFE CLI if the `safe-authd`/`safe-authd.exe` binary is in the system's PATH with execution permissions (please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/safe-api/blob/master/safe-cli/README.md#the-authenticator-daemon-authd) for detailed instructions).
+The SAFE Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the SAFE CLI if the `safe-authd`/`safe-authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/safe-api/blob/master/safe-cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
 
 | OS | Download link | SHA-256 checksum |
 | --- | --- | --- |

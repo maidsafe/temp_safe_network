@@ -8,6 +8,10 @@
 // Software.
 
 use log::debug;
+#[cfg(not(feature = "mock-network"))]
+use std::path::PathBuf;
+#[cfg(all(not(windows), not(feature = "mock-network")))]
+use std::{fs::File, os::unix::fs::PermissionsExt};
 
 #[cfg(feature = "mock-network")]
 pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
@@ -37,7 +41,8 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         } else {
             "safe-authd"
         };
-        let status = self_update::backends::s3::Update::configure()
+
+        let release_updater = self_update::backends::s3::Update::configure()
             .bucket_name("safe-api")
             .target(&target)
             .asset_prefix("safe-authd")
@@ -45,10 +50,60 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
             .bin_name(&bin_name)
             .show_download_progress(true)
             .current_version(cargo_crate_version!())
-            .build()?
-            .update()?;
+            .build()?;
+
+        let status = release_updater.update()?;
+
+        set_exec_perms(release_updater.bin_install_path())?;
+
         println!("Update status: `{}`!", status.version());
     }
+
+    Ok(())
+}
+
+#[cfg(all(windows, not(feature = "mock-network")))]
+#[inline]
+fn set_exec_perms(_file_path: PathBuf) -> Result<(), String> {
+    // no need to set execution permissions on Windows
+    Ok(())
+}
+
+#[cfg(all(not(windows), not(feature = "mock-network")))]
+#[inline]
+fn set_exec_perms(file_path: PathBuf) -> Result<(), String> {
+    println!(
+        "Setting execution permissions to installed binary '{}'...",
+        file_path.display()
+    );
+    let file = File::open(&file_path).map_err(|err| {
+        format!(
+            "Error when preparing to set execution permissions to installed binary '{}': {}",
+            file_path.display(),
+            err
+        )
+    })?;
+
+    let mut perms = file
+        .metadata()
+        .map_err(|err| {
+            format!(
+                "Error when reading metadata from installed binary '{}': {}",
+                file_path.display(),
+                err
+            )
+        })?
+        .permissions();
+
+    // set execution permissions bits for owner, group and others
+    perms.set_mode(perms.mode() | 0b0_001_001_001);
+    file.set_permissions(perms).map_err(|err| {
+        format!(
+            "Failed to set execution permissions to installed binary '{}': {}",
+            file_path.display(),
+            err
+        )
+    })?;
 
     Ok(())
 }
