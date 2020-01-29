@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 0.8.0 (2020-01-29)
+
+
+### Features
+
+* **authd:** don't try to register authd service if there is one already registered ([15753ef](https://github.com/bochaco/safe-api/commit/15753efe2866a284553ff69f80397b8adcc7e649))
+* **cli:** add files ls command ([3ec8143](https://github.com/bochaco/safe-api/commit/3ec81437bfbd8e946038b7c872a565971de04839))
+* **cli:** show login status in authd status report as Yes/No instead of true/false ([6b080e9](https://github.com/bochaco/safe-api/commit/6b080e941b326735b6a73ff05088eb129f9ee994))
+* **cli:** xorurl decode command ([#399](https://github.com/bochaco/safe-api/issues/399)) ([7e396b5](https://github.com/bochaco/safe-api/commit/7e396b54ed58de64cfcc378789420da2ff4af817)), closes [#396](https://github.com/bochaco/safe-api/issues/396)
+
+
+### Bug Fixes
+
+* **fetch:** Attempting to fetch felative asset from ID now fails. ([b49ec5d](https://github.com/bochaco/safe-api/commit/b49ec5dcf3d37c346cacb945124219bf6689db2f)), closes [#403](https://github.com/bochaco/safe-api/issues/403)
+* **update:** set execution permissions to binary after installed/updated ([d4bc7bb](https://github.com/bochaco/safe-api/commit/d4bc7bbfcccabbcf51c0fd33bfb6e89b81567f03))
+
 ### 0.7.2 (2020-01-23)
 
 
