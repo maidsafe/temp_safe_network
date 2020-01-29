@@ -487,6 +487,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26778518a7f6cffa1d25a44b602b62b979bd88adb9e99ffec546998cf3404839"
+dependencies = [
+ "byteorder",
+ "digest",
+ "rand_core 0.5.1",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -551,7 +564,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d07e8b8a8386c3b89a7a4b329fdfa4cb545de2545e9e2ebbc3dd3929253e426"
 dependencies = [
  "clear_on_drop",
- "curve25519-dalek",
+ "curve25519-dalek 1.2.3",
  "failure",
  "rand 0.6.5",
  "serde",
@@ -2158,8 +2171,9 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#9e6c2301352ad5be6b76f277188e3cbd2fda866a"
+source = "git+https://github.com/maidsafe/routing.git?branch=fleming#b93eff98e8921bfb06e10bd1dc7dd4bc2d802db6"
 dependencies = [
+ "bincode 1.1.4",
  "bytes",
  "config_file_handler",
  "crossbeam-channel",
@@ -2774,14 +2788,13 @@ dependencies = [
 
 [[package]]
 name = "tmp-ed25519"
-version = "1.0.0-pre.2"
+version = "1.0.0-pre.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4fe3232f4b44725c9130e3d2db6268b2df3c03e96a2fea09eb1a80f7b753b85"
+checksum = "b35e75aa9554e28ec3553f2ed8f8ce534df06c5a998683f42091d2c883ab9022"
 dependencies = [
  "clear_on_drop",
- "curve25519-dalek",
- "failure",
- "rand 0.6.5",
+ "curve25519-dalek 2.0.0",
+ "rand 0.7.3",
  "serde",
  "sha2",
 ]
@@ -3313,6 +3326,12 @@ dependencies = [
  "bit-vec",
  "chrono 0.4.10",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cbac2ed2ba24cc90f5e06485ac8c7c1e5449fe8911aef4d8877218af021a5b8"
 
 [[package]]
 name = "zip"
