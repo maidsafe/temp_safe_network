@@ -14,7 +14,7 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use common::{
-    get_bin_location, get_random_nrs_string, parse_cat_files_container_output,
+    get_bin_location, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, CLI, SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
@@ -361,7 +361,7 @@ fn calling_safe_files_removed_sync() {
     let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&synced_file_cat);
+    let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), 5);
 
@@ -393,7 +393,7 @@ fn calling_safe_files_removed_sync() {
     )
     .read()
     .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&synced_file_cat);
+    let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
     assert_eq!(xorurl, unwrap!(xorurl_encoder.to_string()));
     assert_eq!(files_map.len(), 0);
 }
@@ -484,7 +484,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
 }
 
 #[test]
-fn files_sync_and_fetch_with_version() {
+fn calling_files_sync_and_fetch_with_version() {
     let files_container_output = cmd!(
         get_bin_location(),
         "files",
@@ -526,7 +526,7 @@ fn files_sync_and_fetch_with_version() {
     let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&cat_container_v1);
+    let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
 
@@ -536,13 +536,13 @@ fn files_sync_and_fetch_with_version() {
     let cat_container_v0 = cmd!(get_bin_location(), "cat", &files_container_v0, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&cat_container_v0);
+    let (xorurl, files_map) = parse_files_container_output(&cat_container_v0);
     assert_eq!(xorurl, files_container_v0);
     assert_eq!(files_map.len(), 5);
 }
 
 #[test]
-fn files_sync_and_fetch_with_nrsurl_and_nrs_update() {
+fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     let files_container_output = cmd!(
         get_bin_location(),
         "files",
@@ -596,7 +596,7 @@ fn files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     let cat_nrsurl_v1 = cmd!(get_bin_location(), "cat", &nrsurl, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&cat_nrsurl_v1);
+    let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v1);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), 0);
 
@@ -606,13 +606,13 @@ fn files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     let cat_nrsurl_v0 = cmd!(get_bin_location(), "cat", &nrsurl_v0, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&cat_nrsurl_v0);
+    let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v0);
     assert_eq!(xorurl, nrsurl_v0);
     assert_eq!(files_map.len(), 5);
 }
 
 #[test]
-fn files_sync_and_fetch_without_nrs_update() {
+fn calling_files_sync_and_fetch_without_nrs_update() {
     let files_container_output = cmd!(
         get_bin_location(),
         "files",
@@ -667,7 +667,7 @@ fn files_sync_and_fetch_without_nrs_update() {
     let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&cat_container_v1);
+    let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
 
@@ -676,7 +676,7 @@ fn files_sync_and_fetch_without_nrs_update() {
     let cat_nrsurl = cmd!(get_bin_location(), "cat", &nrsurl, "--json")
         .read()
         .unwrap();
-    let (xorurl, files_map) = parse_cat_files_container_output(&cat_nrsurl);
+    let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), 5);
 }
@@ -793,4 +793,75 @@ fn calling_safe_files_add_a_url() {
     .read()
     .unwrap();
     assert_eq!(synced_file_cat, "hello tests!");
+}
+
+#[test]
+fn calling_files_ls() {
+    let files_container_output = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (files_container_xor, processed_files) =
+        parse_files_put_or_sync_output(&files_container_output);
+
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
+    xorurl_encoder.set_content_version(None);
+    let container_xorurl_no_version = unwrap!(xorurl_encoder.to_string());
+
+    let files_ls_output = cmd!(
+        get_bin_location(),
+        "files",
+        "ls",
+        &container_xorurl_no_version,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(xorurl, container_xorurl_no_version);
+    assert_eq!(files_map.len(), 4);
+    assert_eq!(
+        files_map["another.md"]["link"],
+        processed_files[&format!("{}another.md", TEST_FOLDER)].1
+    );
+    assert_eq!(
+        files_map["noextension"]["link"],
+        processed_files[&format!("{}noextension", TEST_FOLDER)].1
+    );
+    assert_eq!(
+        files_map["test.md"]["link"],
+        processed_files[&format!("{}test.md", TEST_FOLDER)].1
+    );
+
+    assert_eq!(files_map["subfolder/"]["size"], "27");
+    xorurl_encoder.set_path("subfolder");
+    let subfolder_path = unwrap!(xorurl_encoder.to_string());
+    assert_eq!(files_map["subfolder/"]["link"], subfolder_path);
+
+    // now listing subfolder should show less files
+    let files_ls_output = cmd!(get_bin_location(), "files", "ls", &subfolder_path, "--json")
+        .read()
+        .unwrap();
+
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(xorurl, subfolder_path);
+    assert_eq!(files_map.len(), 2);
+    assert_eq!(
+        files_map["sub2.md"]["link"],
+        processed_files[&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER)].1
+    );
+    assert_eq!(files_map["sub2.md"]["size"], "4");
+    assert_eq!(
+        files_map["subexists.md"]["link"],
+        processed_files[&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER)].1
+    );
+    assert_eq!(files_map["subexists.md"]["size"], "23");
 }

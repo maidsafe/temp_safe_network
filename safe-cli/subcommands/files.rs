@@ -346,7 +346,7 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
                         let mut fileitem = fileitem.clone();
                         if is_folder {
                             // then set link to xorurl with path current subfolder
-                            let subfolder_path = format!("{}{}", folder_path, base_path);
+                            let subfolder_path = format!("{}{}", folder_path, subdirs[0]);
                             xorurl_encoder.set_path(&subfolder_path);
                             let link = xorurl_encoder
                                 .to_string()

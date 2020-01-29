@@ -109,7 +109,7 @@ pub fn get_random_nrs_string() -> String {
 }
 
 #[allow(dead_code)]
-pub fn parse_cat_files_container_output(
+pub fn parse_files_container_output(
     output: &str,
 ) -> (String, BTreeMap<String, BTreeMap<String, String>>) {
     serde_json::from_str(output).expect("Failed to parse output of `safe cat` on FilesContainer")
