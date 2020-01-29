@@ -47,9 +47,9 @@ The SAFE Authenticator, which runs as a daemon or as a service in Windows platfo
 
 | OS | Download link | SHA-256 checksum |
 | --- | --- | --- |
-| Linux | [Download](S3_AUTHD_LINUX_DEPLOY_URL) | ZIP_LINUX_CHECKSUM_AUTHD |
-| macOS | [Download](S3_AUTHD_MACOS_DEPLOY_URL) | ZIP_MACOS_CHECKSUM_AUTHD |
-| Windows | [Download](S3_AUTHD_WIN_DEPLOY_URL) | ZIP_WIN_CHECKSUM_AUTHD |
+| Linux | [Download](S3_AUTHD_LINUX_DEPLOY_URL) | ZIP_AUTHD_LINUX_CHECKSUM |
+| macOS | [Download](S3_AUTHD_MACOS_DEPLOY_URL) | ZIP_AUTHD_MACOS_CHECKSUM |
+| Windows | [Download](S3_AUTHD_WIN_DEPLOY_URL) | ZIP_AUTHD_WIN_CHECKSUM |
 
 ### FFI
 
@@ -93,13 +93,13 @@ tar_win_checksum=$(sha256sum \
     "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 
-zip_linux_checksum_authd=$(sha256sum \
+zip_authd_linux_checksum=$(sha256sum \
     "./deploy/prod/safe-authd-$authd_version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
-zip_macos_checksum_authd=$(sha256sum \
+zip_authd_macos_checksum=$(sha256sum \
     "./deploy/prod/safe-authd-$authd_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
-zip_win_checksum_authd=$(sha256sum \
+zip_authd_win_checksum=$(sha256sum \
     "./deploy/prod/safe-authd-$authd_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 
@@ -121,9 +121,9 @@ release_description=$(sed "s/TAR_LINUX_CHECKSUM/$tar_linux_checksum/g" <<< "$rel
 release_description=$(sed "s/TAR_MACOS_CHECKSUM/$tar_macos_checksum/g" <<< "$release_description")
 release_description=$(sed "s/TAR_WIN_CHECKSUM/$tar_win_checksum/g" <<< "$release_description")
 
-release_description=$(sed "s/ZIP_LINUX_CHECKSUM_AUTHD/$zip_linux_checksum_authd/g" <<< "$release_description")
-release_description=$(sed "s/ZIP_MACOS_CHECKSUM_AUTHD/$zip_macos_checksum_authd/g" <<< "$release_description")
-release_description=$(sed "s/ZIP_WIN_CHECKSUM_AUTHD/$zip_win_checksum_authd/g" <<< "$release_description")
+release_description=$(sed "s/ZIP_AUTHD_LINUX_CHECKSUM/$zip_authd_linux_checksum/g" <<< "$release_description")
+release_description=$(sed "s/ZIP_AUTHD_MACOS_CHECKSUM/$zip_authd_macos_checksum/g" <<< "$release_description")
+releauthd_ase_descriptsed "s/ZIP_AUTHD_WIN_CHECKSUM/$zip_win_checksum_authd/g" <<< "$release_description")
 
 release_description=$(sed "s/S3_FFI_LINUX_DEPLOY_URL/$s3_ffi_linux_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/S3_FFI_WIN_DEPLOY_URL/$s3_ffi_win_deploy_url/g" <<< "$release_description")
