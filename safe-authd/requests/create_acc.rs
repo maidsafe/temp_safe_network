@@ -15,24 +15,35 @@ pub fn process_req(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
     if let Value::Array(args) = &params {
-        if args.len() > 3 || !args[0].is_string() || !args[1].is_string() || !args[2].is_string() {
+        if args.len() > 3 {
             Err(format!(
                 "Incorrect params for 'create-acc' method: {:?}",
                 params
             ))
         } else {
             println!("Creating an account in SAFE...");
-            let passphrase = args[0].to_string();
-            let password = args[1].to_string();
-            let sk = args[2].to_string();
+            let passphrase = args[0].as_str().ok_or_else(|| {
+                format!(
+                    "Invalid type for passphrase param for 'create-acc' method: {:?}",
+                    args[0]
+                )
+            })?;
+            let password = args[1].as_str().ok_or_else(|| {
+                format!(
+                    "Invalid type for password param for 'create-acc' method: {:?}",
+                    args[1]
+                )
+            })?;
+            let sk = args[2].as_str().ok_or_else(|| {
+                format!(
+                    "Invalid type for secret key param for 'create-acc' method: {:?}",
+                    args[2]
+                )
+            })?;
 
             lock_safe_authenticator(
                 safe_auth_handle,
-                |safe_authenticator| match safe_authenticator.create_acc(
-                    &sk,
-                    &passphrase,
-                    &password,
-                ) {
+                |safe_authenticator| match safe_authenticator.create_acc(sk, passphrase, password) {
                     Ok(_) => {
                         let msg = "Account created successfully";
                         println!("{}", msg);

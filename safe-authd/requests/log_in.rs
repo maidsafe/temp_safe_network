@@ -15,16 +15,26 @@ pub fn process_req(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
     if let Value::Array(args) = &params {
-        if args.len() > 2 || !args[0].is_string() || !args[1].is_string() {
+        if args.len() > 2 {
             Err(format!("Incorrect params for 'login' method: {:?}", params))
         } else {
             println!("Logging in to SAFE account...");
-            let passphrase = args[0].to_string();
-            let password = args[1].to_string();
+            let passphrase = args[0].as_str().ok_or_else(|| {
+                format!(
+                    "Invalid type for passphrase param for 'login' method: {:?}",
+                    args[0]
+                )
+            })?;
+            let password = args[1].as_str().ok_or_else(|| {
+                format!(
+                    "Invalid type for password param for 'login' method: {:?}",
+                    args[1]
+                )
+            })?;
 
             lock_safe_authenticator(
                 safe_auth_handle,
-                |safe_authenticator| match safe_authenticator.log_in(&passphrase, &password) {
+                |safe_authenticator| match safe_authenticator.log_in(passphrase, password) {
                     Ok(_) => {
                         let msg = "Logged in successfully!";
                         println!("{}", msg);
