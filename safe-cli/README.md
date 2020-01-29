@@ -34,6 +34,7 @@
     - [Put](#files-put)
     - [Sync](#files-sync)
     - [Add](#files-add)
+    - [Ls](#files-ls)
   - [Xorurl](#xorurl)
     - [Decode](#xorurl-decode)
   - [Cat](#cat)
@@ -681,10 +682,10 @@ The `files sync` command follows a very similar logic to the well known `rsync` 
 As an example, let's suppose we upload all files and subfolders found within the `./to-upload/` local directory, recursively, using `files put` command:
 ```shell
 $ safe files put ./to-upload/ --recursive
-FilesContainer created at: "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w"
-+  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
-+  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
-+  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
+FilesContainer created at: "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc"
++  ./to-upload/another.md              safe://hbhyrydt5b95dmumcm8yig4u1keuuh8hgsr5yx39xn4mqikp91sbdhbpwp
++  ./to-upload/subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
++  ./to-upload/test.md                 safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 ```
 
 All the content of the `./to-upload/` local directory is now stored and published on the SAFE Network. Now, let's say we make the following changes to our local files within the `./to-upload/` folder:
@@ -694,11 +695,11 @@ All the content of the `./to-upload/` local directory is now stored and publishe
 
 We can now sync up all the changes we just made, recursively, with the `FilesContainer` we previously created:
 ```shell
-$ safe files sync ./to-upload/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w --recursive --delete
-FilesContainer synced up (version 1): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=1"
-*  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
-+  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
--  /test.md                   safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
+$ safe files sync ./to-upload/ safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc --recursive --delete
+FilesContainer synced up (version 1): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=1"
+*  ./to-upload/another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
++  ./to-upload/new.md      safe://hbhyrydky3ga3xgkneiy1y5o6513rq6wdipqthkhd3ujqci9qmy8weihom
+-  /test.md                safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 ```
 
 The `*`, `+` and `-` signs mean that the files were updated, added, and removed respectively.
@@ -707,9 +708,9 @@ Also, please note we provided the optional `--delete` flag to the command above 
 
 The `files sync` command also supports to be passed a destination path as the `files put` command, but in this case the destination path needs to be provided as part of the target XOR-URL. E.g., we can sync a `FilesContainer` using the local path and provide a specific destination path `new-files` in the target XOR-URL:
 ```shell
-$ safe files sync ./other-folder/ safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/new-files
-FilesContainer synced up (version 2): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=2"
-+  ./other-folder/file1.txt  safe://hoqi7papyp7c6riyxiez6y5fh5ugj4xc7syqhmex774ws4g4b1z1xq
+$ safe files sync ./other-folder/ safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/new-files
+FilesContainer synced up (version 2): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=2"
++  ./other-folder/file1.txt  safe://hbhydyn6b5x9nqxt5escpuzy3axrcqb9dgs7p74izmpfkmmquwrdgjig4k
 ```
 
 The `./other-folder/file1.txt` file will be uploaded and published in the `FilesContainer` with path `/new-files/file1.txt`.
@@ -718,8 +719,8 @@ One more thing to note about `files sync` command is the use of the `--update-nr
 ```shell
 $ safe files sync ./to-upload/ safe://mywebsite --update-nrs
 FilesContainer synced up (version 1): "safe://mywebsite"
-*  ./to-upload/another.md     safe://hox6jstso13b7wzfkw1wbs3kwn9gpssudqunk6sw5yt3d6pnmaec53
-+  ./to-upload/new.md         safe://hoxpdc8ywz18twkg7wboarj45hem3pq6ou6sati9i3dud68tzutw34
+*  ./to-upload/another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
++  ./to-upload/new.md      safe://hbhyrydky3ga3xgkneiy1y5o6513rq6wdipqthkhd3ujqci9qmy8weihom
 ```
 
 #### Files Add
@@ -728,16 +729,42 @@ It could be desirable in some scenarios to simply add a file to a `FilesContaine
 
 We can add a single file from a local path, let's say `./some-other-folder/file.txt`, to our existing `FilesContainer` on the SAFE Network with the following command:
 ```shell
-$ safe files add ./some-other-folder/file.txt safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/files-added/just-a-file.txt
-FilesContainer updated (version 3): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=3"
-+  ./some-other-folder/file1.txt  safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n
+$ safe files add ./some-other-folder/file.txt safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/just-a-file.txt
+FilesContainer updated (version 3): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=3"
++  ./some-other-folder/file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
 ```
 
 If we have previously uploaded a file to the network, we can also add it to any existing `FilesContainer` by providing its XOR-URL as the `<location>` argument to the `files add` command. Let's add a file (same file we uploaded in previous command) to our `FilesContainer` again, but choosing a new destination filename, e.g. `/files-added/same-file.txt`:
 ```shell
-$ safe files add safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w/files-added/same-file.txt
-FilesContainer updated (version 4): "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=4"
-+  /files-added/same-file1.txt  safe://hbhydydbhgmo7rxdgqyr98b5ojqwwjx4abnp4go6iw69gg4e7naigibr1n
+$ safe files add safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9 safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/same-file.txt
+FilesContainer updated (version 4): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=4"
++  /files-added/same-file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
+```
+
+#### Files Ls
+
+We can list the files from a `FilesContainer` using the `files ls` command:
+```shell
+$ safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc
+Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc":
+Total: 6
+SIZE  CREATED               MODIFIED              NAME
+11    2020-01-28T20:26:05Z  2020-01-28T20:29:04Z  another.md
+38    2020-01-28T20:35:43Z  2020-01-28T20:35:43Z  files-added/
+30    2020-01-28T20:31:01Z  2020-01-28T20:31:01Z  new-files/
+10    2020-01-28T20:29:04Z  2020-01-28T20:29:04Z  new.md
+23    2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  subfolder/
+```
+
+Note the size displayed for a subfolder is its total size taking into account all files contained within it.
+
+If we provide a path to a subfolder of the `FilesContainer`, this command will resolve the path and list only those files which paths are a child of the provided path:
+```shell
+$ safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder
+Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder":
+Total: 1
+SIZE  CREATED               MODIFIED              NAME
+23    2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  subexists.md
 ```
 
 ### Xorurl
@@ -793,48 +820,37 @@ If the URL targets a published `FilesContainer`, the `cat` command will fetch it
 Let's see this in action, if we upload some folder using the `files put` command, e.g.:
 ```shell
 $ safe files put ./to-upload/ --recursive
-FilesContainer created at: "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc"
-+  ./to-upload/another.md              safe://hbyyyynhci18zwrjmiwqgpf5ofukf3dtryrkeizk1yxda3a5zoew6mgeox
-+  ./to-upload/subfolder/subexists.md  safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb
-+  ./to-upload/test.md                 safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6
+FilesContainer created at: "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc"
++  ./to-upload/another.md              safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
++  ./to-upload/subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
++  ./to-upload/test.md                 safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 ```
 
 We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
 ```shell
-$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc
-Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc":
+$ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc
+Files of FilesContainer (version 0) at "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /another.md             | 6    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyynhci18zwrjmiwqgpf5ofukf3dtryrkeizk1yxda3a5zoew6mgeox |
+| /another.md             | 11   | 2020-01-28T20:51:05Z | 2020-01-28T20:51:05Z | safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /subfolder/subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb |
+| /test.md                | 12   | 2020-01-28T20:51:05Z | 2020-01-28T20:51:05Z | safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /test.md                | 12   | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6 |
+| /subfolder/subexists.md | 23   | 2020-01-28T20:51:05Z | 2020-01-28T20:51:05Z | safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
 We could also take any of the XOR-URLs of the individual files and have the `cat` command fetch the content of the file and show it in the output, e.g. let's use the XOR-URL of the `/test.md` file to fetch its content:
 ```shell
-$ safe cat safe://hbyyyydx1c168rwuqi6hcctwfbf1ihf9dfhr4bkmb6kzacs96uyj7bp4n6
+$ safe cat safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 hello tests!
 ```
 
 Alternatively, we could use the XOR-URL of the `FilesContainer` and provide the path of the file we are trying to fetch, in this case the `cat` command will resolve the path and follow the corresponding link to read the file's content directly for us. E.g. we can also read the content of the `/test.md` file with the following command:
 ```shell
-$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/test.md
+$ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc/test.md
 hello tests!
-```
-
-And if we provide a path to a subfolder of the `FilesContainer`, the `cat` command will resolve the path and list only those files which path is a child of the provided path:
-```shell
-$ safe cat safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder
-Files of FilesContainer (version 0) at "safe://hnyynyw4gsy3i6ixu5xkpt8smxrihq3dy65qcoau5gznnuee71ogmns1jrbnc/subfolder":
-+--------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| Name         | Size | Created              | Modified             | Link                                                              |
-+--------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hbyyyydo4dhazjnj4i1sb4gpz94m19u31asrjaq3d8rzzc8s648w6xkzpb |
-+--------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 ```
 
 A `Wallet` can be also fetched with `cat` to inspect its content, the list of spendable balances it holds will be listed, and we can see which of them is currently the default to be used in a transaction operation:
@@ -880,10 +896,10 @@ Length: 1406 (0x57e) bytes
 
 As we've seen above, we can use `cat` command to retrieve the latest/current version of any type of content from the Network using their URL. But every change made to content that is uploaded to the Network as Published data is perpetual, and therefore a new version is generated when performing any amendments to it, keeping older versions also available forever.
 
-We can use the `cat` command to also retrieve any version of content that was uploaded as Published data by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w`), which reached version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
+We can use the `cat` command to also retrieve any version of content that was uploaded as Published data by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc`), which reached version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
 ```shell
-$ safe cat "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0"
-Files of FilesContainer (version 0) at "safe://hbyw8kkqr3tcwfqiiqh4qeaehzr1e9boiuyfw5bqqx1adyh9sawdhboj5w?v=0":
+$ safe cat "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0"
+Files of FilesContainer (version 0) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+

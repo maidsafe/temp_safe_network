@@ -230,10 +230,8 @@ pub fn fetch_from_url(safe: &Safe, url: &str, retrieve_data: bool) -> Result<Saf
                 // TODO: Move this logic (resolver) to the FilesMap struct
                 match files_map.get(path) {
                     Some(file_item) => {
-                        let new_target_xorurl = match file_item.get("link") {
-                            Some(path_data) => path_data,
-                            None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
-                        };
+                        let new_target_xorurl = file_item.get("link")
+                            .ok_or_else(|| Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl)))?;
 
                         safe.fetch(new_target_xorurl)
                     }

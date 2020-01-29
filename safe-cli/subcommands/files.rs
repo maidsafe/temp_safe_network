@@ -362,8 +362,9 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
                         // we need to merge them together into the filtered list
 
                         // Add up files sizes
-                        let current_dir_size = (*item["size"]).parse::<u32>().unwrap();
-                        let additional_dir_size = fileitem["size"].parse::<u32>().unwrap();
+                        let current_dir_size = (*item["size"]).parse::<u32>().unwrap_or_else(|_| 0);
+                        let additional_dir_size =
+                            fileitem["size"].parse::<u32>().unwrap_or_else(|_| 0);
                         (*item).insert(
                             "size".to_string(),
                             format!("{}", current_dir_size + additional_dir_size),
