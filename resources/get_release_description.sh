@@ -123,7 +123,7 @@ release_description=$(sed "s/TAR_WIN_CHECKSUM/$tar_win_checksum/g" <<< "$release
 
 release_description=$(sed "s/ZIP_AUTHD_LINUX_CHECKSUM/$zip_authd_linux_checksum/g" <<< "$release_description")
 release_description=$(sed "s/ZIP_AUTHD_MACOS_CHECKSUM/$zip_authd_macos_checksum/g" <<< "$release_description")
-releauthd_ase_descriptsed "s/ZIP_AUTHD_WIN_CHECKSUM/$zip_win_checksum_authd/g" <<< "$release_description")
+release_descriptsed=$(sed "s/ZIP_AUTHD_WIN_CHECKSUM/$zip_authd_win_checksum/g" <<< "$release_description")
 
 release_description=$(sed "s/S3_FFI_LINUX_DEPLOY_URL/$s3_ffi_linux_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/S3_FFI_WIN_DEPLOY_URL/$s3_ffi_win_deploy_url/g" <<< "$release_description")

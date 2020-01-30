@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.8.1 (2020-01-29)
+
+
+### Bug Fixes
+
+* **authd:** properly parse account credentials removing enclosing string quotes ([da8c593](https://github.com/bochaco/safe-api/commit/da8c593ff12c325d377dfd7a6678dd85306df003))
+* **release:** authd zip files checksums were incorrectly set in release description ([b885c8e](https://github.com/bochaco/safe-api/commit/b885c8e0c4fadaec6b7671e3d70c23aeb904ae3a))
+
 ## 0.8.0 (2020-01-29)
 
 

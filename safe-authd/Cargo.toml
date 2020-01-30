@@ -1,6 +1,6 @@
 [package]
 name = "safe-authd"
-version = "0.0.3"
+version = "0.0.4"
 description = "SAFE Authenticator (daemon)"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 publish = false

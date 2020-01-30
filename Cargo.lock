@@ -804,9 +804,9 @@ dependencies = [
 
 [[package]]
 name = "dtoa"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea57b42383d091c85abcc2706240b94ab2a8fa1fc81c10ff23c4de06e2a90b5e"
+checksum = "4358a9e11b9a09cf52383b451b49a169e8d797b68aa02301ff586d70d9661ea3"
 
 [[package]]
 name = "duct"
@@ -2706,7 +2706,7 @@ dependencies = [
 
 [[package]]
 name = "safe-authd"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "cargo-husky",
  "daemonize",
@@ -2736,7 +2736,7 @@ dependencies = [
 
 [[package]]
 name = "safe-cli"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "assert_cmd",
  "cargo-husky",
@@ -3145,15 +3145,15 @@ checksum = "1cc9c640a4adbfbcc11ffb95efe5aa7af7309e002adab54b185507dbf2377b99"
 
 [[package]]
 name = "slog-term"
-version = "2.4.2"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b50e85b73c2bd42ceb97b6ded235576d405bd1e974242ccfe634fa269f6da7"
+checksum = "124501187c410b6a46fe8a47a48435ae462fae4e02d03c558d358f40b17308cb"
 dependencies = [
  "atty",
  "chrono",
  "slog",
  "term 0.6.1",
- "thread_local 0.3.6",
+ "thread_local 1.0.1",
 ]
 
 [[package]]
