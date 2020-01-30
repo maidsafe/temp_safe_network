@@ -168,10 +168,10 @@ safe-authd service started successfully!
 
 #### Auth status
 
-Once we started the `authd`, it should be running in the background and ready to receive requests, we can send an status request to check it's up and running:
+Once we started the `authd`, it should be running in the background and ready to receive requests, we can send a status request to check it's up and running:
 ```shell
 $ safe auth status
-Sending request to authd to obtain an status report...
+Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
 +------------------------------------------+-------+
@@ -229,10 +229,10 @@ Sending login action request to authd...
 Logged in successfully
 ```
 
-If we now send an status report request to `authd`, it should now show that it's logged in to a SAFE account:
+If we now send a status report request to `authd`, it should now show that it's logged in to a SAFE account:
 ```shell
 $ safe auth status
-Sending request to authd to obtain an status report...
+Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
 +------------------------------------------+-------+
@@ -346,10 +346,10 @@ Type 'quit' to exit this shell. Enjoy it!
 >
 ```
 
-The interactive shell supports all the same commands and operations that can be performed in the command line. E.g., we can use the `auth status` command to retrieve an status report from the `authd`:
+The interactive shell supports all the same commands and operations that can be performed in the command line. E.g., we can use the `auth status` command to retrieve a status report from the `authd`:
 ```shell
 > auth status
-Sending request to authd to obtain an status report...
+Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
 +------------------------------------------+-------+

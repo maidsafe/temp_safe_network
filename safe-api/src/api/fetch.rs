@@ -79,16 +79,16 @@ impl Safe {
     ///
     /// let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ) ) );
     /// let data_string = match safe_data {
-    /// 	SafeData::PublishedImmutableData { data, .. } => {
-    /// 		match String::from_utf8(data) {
-    /// 			Ok(string) => string,
-    /// 			Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-    /// 		}
-    /// 	}
-    /// 	other => panic!(
-    /// 		"Content type '{:?}' should not have been found. This should be immutable data.",
-    /// 		other
-    /// 	)
+    ///     SafeData::PublishedImmutableData { data, .. } => {
+    ///         match String::from_utf8(data) {
+    ///             Ok(string) => string,
+    ///             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    ///         }
+    ///     }
+    ///     other => panic!(
+    ///         "Content type '{:?}' should not have been found. This should be immutable data.",
+    ///         other
+    ///     )
     /// };
     ///
     /// assert!(data_string.starts_with("hello tests!"));
@@ -116,16 +116,16 @@ impl Safe {
     ///
     /// let safe_data = unwrap!( safe.inspect( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ) ) );
     /// let data_string = match safe_data {
-    /// 	SafeData::PublishedImmutableData { data, .. } => {
-    /// 		match String::from_utf8(data) {
-    /// 			Ok(string) => string,
-    /// 			Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-    /// 		}
-    /// 	}
-    /// 	other => panic!(
-    /// 		"Content type '{:?}' should not have been found. This should be immutable data.",
-    /// 		other
-    /// 	)
+    ///     SafeData::PublishedImmutableData { data, .. } => {
+    ///         match String::from_utf8(data) {
+    ///             Ok(string) => string,
+    ///             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    ///         }
+    ///     }
+    ///     other => panic!(
+    ///         "Content type '{:?}' should not have been found. This should be immutable data.",
+    ///         other
+    ///     )
     /// };
     ///
     /// assert!(data_string.starts_with("hello tests!"));

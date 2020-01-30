@@ -30,7 +30,7 @@ pub enum AuthSubCommands {
     /// Send request to a remote Authenticator daemon to logout from currently logged in SAFE account
     Logout {},
     #[structopt(name = "status")]
-    /// Send request to a remote Authenticator daemon to obtain an status report
+    /// Send request to a remote Authenticator daemon to obtain a status report
     Status {},
     #[structopt(name = "create-acc")]
     /// Send request to a remote Authenticator daemon to create a new SAFE account

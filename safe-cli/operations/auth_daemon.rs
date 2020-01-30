@@ -146,7 +146,7 @@ pub fn authd_logout(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
 }
 
 pub fn authd_status(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
-    println!("Sending request to authd to obtain an status report...");
+    println!("Sending request to authd to obtain a status report...");
     let status_report = safe_authd.status()?;
     pretty_print_status_report(status_report);
 

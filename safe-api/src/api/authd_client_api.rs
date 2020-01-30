@@ -70,7 +70,7 @@ pub type PendingAuthReqs = Vec<AuthReq>;
 // shall be allowed. All the relevant information about the authorisation request is passed as args to the callback.
 pub type AuthAllowPrompt = dyn Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync;
 
-// Path of authenticator endpoint for getting an status report of the safe-authd
+// Path of authenticator endpoint for getting a status report of the safe-authd
 const SAFE_AUTHD_METHOD_STATUS: &str = "status";
 
 // Path of authenticator endpoint for login into a SAFE account
@@ -206,7 +206,7 @@ impl SafeAuthdClient {
         )
     }
 
-    // Send a request to remote authd endpoint to obtain an status report
+    // Send a request to remote authd endpoint to obtain a status report
     pub fn status(&mut self) -> Result<AuthdStatus> {
         debug!("Attempting to retrieve status report from remote authd...");
         info!("Sending status report request to SAFE Authenticator...");
