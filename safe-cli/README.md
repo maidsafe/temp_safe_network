@@ -450,7 +450,7 @@ Other optional args that can be used with `keys create` sub-command are:
 
 We can retrieve a given `SafeKey`'s balance simply using its secret key, which we can pass to `keys balance` subcommand with `--sk <secret key>` argument, or we can enter it when the CLI prompts us.
 
-We can optionally also pass the `SafeKey`'s XorUrl to have the CLI to verify they correspond to each other, i.e. if the `SafeKey`'s XorUrl is provided, the CLI will check if it corresponds to the public key derived from the passed secret key, and throw an error in it doesn't.
+We can optionally also pass the `SafeKey`'s XorUrl to have the CLI to verify they correspond to each other, i.e. if the `SafeKey`'s XorUrl is provided, the CLI will check if it corresponds to the public key derived from the passed secret key, and throw an error if it doesn't.
 
 The target `SafeKey`'s secret key can be passed as an argument (or it will be retrieved from `stdin`), let's check the balance of the `SafeKey` we created in previous section:
 ```bash
@@ -943,7 +943,7 @@ New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgor
 +  mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
 
-Note that we provided a versioned URL to the `--link` argument in the command above, i.e. a URL which targets a specific version of the content with `?v=<version number>`. Any type of content which can have different versions (like the case of a `FilesContainer` in our example) can be mapped/linked from an NRS name/subname only if a specific version is provided in the link URL.
+Note that we provided a versioned URL to the `--link` argument in the command above, i.e. a URL which targets a specific version of the content with `?v=<version number>`. Any type of content which can have different versions (like the case of a `FilesContainer` in our example) can be mapped/linked from an NRS name/subname only if a specific version is provided in the link URL. If you are using a bash based system and want to provide a version (or any other command containing a question mark), the URL must be wrapped in double quotes or bash will interpret the link as a file path and throw an error, e.g. use `"safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"`, not `safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobncv=0`.
 
 We can now share the NRS-URL `safe://mywebsite` to anyone who wants to visit our website. Using this NRS-URL we can now fetch the same content we would do when using the `FilesContainer` XOR-URL we linked to it, thus we can fetch it using the following command:
 ```shell

@@ -23,7 +23,7 @@ pub enum NrsSubCommands {
     Add {
         /// The name to add (or update if it already exists)
         name: String,
-        /// The safe:// URL to map this to. Usually a FilesContainer for a website
+        /// The safe:// URL to map this to. Usually a FilesContainer for a website. This should be wrapped in double quotes on bash based systems.
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
         /// Set the sub name as default for this public name
@@ -38,7 +38,7 @@ pub enum NrsSubCommands {
     Create {
         /// The name to give site, eg 'safenetwork'
         name: String,
-        /// The safe:// URL to map this to. Usually a FilesContainer for a website
+        /// The safe:// URL to map this to. Usually a FilesContainer for a website. This should be wrapped in double quotes on bash based systems.
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
         /// The default name is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being created (which is the default behaviour if this flag is not passed)
