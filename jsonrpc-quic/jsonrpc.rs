@@ -7,8 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::quic_client::quic_send;
-use super::Error;
+use super::{quic_client::quic_send, Error};
 use rand::{self, Rng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -173,7 +172,7 @@ where
         }
         Ok(JsonRpcRes {
             error: Some(err), ..
-        }) => Err(Error::ServerError(err.message.to_string())),
+        }) => Err(Error::RemoteEndpointError(err.message.to_string())),
         Ok(JsonRpcRes {
             result: None,
             error: None,

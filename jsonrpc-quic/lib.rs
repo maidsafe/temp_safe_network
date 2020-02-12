@@ -7,13 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod errors;
 mod jsonrpc;
 mod quic_client;
 
-pub enum Error {
-    ClientError(String),
-    ServerError(String),
-}
+const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-24"];
+
+pub use errors::{Error, Result};
 
 pub use jsonrpc::{
     jsonrpc_send, jsonrpc_serialised_error, jsonrpc_serialised_result, parse_jsonrpc_request,

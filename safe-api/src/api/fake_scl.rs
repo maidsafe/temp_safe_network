@@ -126,12 +126,7 @@ impl SafeApp for SafeAppFake {
         amount: Coins,
     ) -> Result<XorName> {
         if let Some(sk) = from_sk {
-            let amount_with_cost = Coins::from_nano(amount.as_nano() + 1).map_err(|err| {
-                Error::Unexpected(format!(
-                    "Unexpected error when trying to instantiate a safe_nd::Coins object: {}",
-                    err
-                ))
-            })?; // 1 nano is the creation cost
+            let amount_with_cost = Coins::from_nano(amount.as_nano() + 1); // 1 nano is the creation cost
             self.substract_coins(sk, amount_with_cost)?;
         };
 

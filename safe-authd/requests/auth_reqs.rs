@@ -7,11 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::shared::{lock_auth_reqs_list, SharedAuthReqsHandle};
+use crate::shared::SharedAuthReqsHandle;
 use safe_api::PendingAuthReqs;
 use serde_json::{json, Value};
 
-pub fn process_req(params: Value, auth_reqs_handle: SharedAuthReqsHandle) -> Result<Value, String> {
+pub async fn process_req(
+    params: Value,
+    auth_reqs_handle: SharedAuthReqsHandle,
+) -> Result<Value, String> {
     if Value::Null != params {
         Err(format!(
             "Unexpected param for 'auth-reqs' method: {:?}",
@@ -19,13 +22,11 @@ pub fn process_req(params: Value, auth_reqs_handle: SharedAuthReqsHandle) -> Res
         ))
     } else {
         println!("Obtaining list of pending authorisation requests...");
-        let pending_auth_reqs: PendingAuthReqs =
-            lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
-                Ok(auth_reqs_list
-                    .iter()
-                    .map(|(_req_id, pending_req)| pending_req.auth_req.clone())
-                    .collect())
-            })?;
+        let auth_reqs_list = auth_reqs_handle.lock().await;
+        let pending_auth_reqs: PendingAuthReqs = auth_reqs_list
+            .iter()
+            .map(|(_req_id, pending_req)| pending_req.auth_req.clone())
+            .collect();
 
         println!(
             "List of pending authorisation requests sent: {:?}",

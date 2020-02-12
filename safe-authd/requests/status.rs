@@ -8,13 +8,12 @@
 // Software.
 
 use crate::shared::{
-    lock_auth_reqs_list, lock_notif_endpoints_list, lock_safe_authenticator, SharedAuthReqsHandle,
-    SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
+    SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
 use safe_api::AuthdStatus;
 use serde_json::{json, Value};
 
-pub fn process_req(
+pub async fn process_req(
     params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
@@ -28,18 +27,20 @@ pub fn process_req(
     } else {
         println!("Preparing authd status report...");
 
-        let logged_in = lock_safe_authenticator(safe_auth_handle, |safe_authenticator| {
-            Ok(safe_authenticator.is_logged_in())
-        })?;
+        let logged_in = {
+            let safe_authenticator = safe_auth_handle.lock().await;
+            safe_authenticator.is_logged_in()
+        };
 
-        let num_auth_reqs = lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
-            Ok(auth_reqs_list.len() as u32)
-        })?;
+        let num_auth_reqs = {
+            let auth_reqs_list = auth_reqs_handle.lock().await;
+            auth_reqs_list.len() as u32
+        };
 
-        let num_notif_subs =
-            lock_notif_endpoints_list(notif_endpoints_handle, |notif_endpoints_list| {
-                Ok(notif_endpoints_list.len() as u32)
-            })?;
+        let num_notif_subs = {
+            let notif_endpoints_list = notif_endpoints_handle.lock().await;
+            notif_endpoints_list.len() as u32
+        };
 
         let authd_version = cargo_crate_version!().to_string();
 

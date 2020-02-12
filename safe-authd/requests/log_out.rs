@@ -7,13 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::shared::{
-    lock_auth_reqs_list, lock_safe_authenticator, SharedAuthReqsHandle,
-    SharedSafeAuthenticatorHandle,
-};
+use crate::shared::{SharedAuthReqsHandle, SharedSafeAuthenticatorHandle};
 use serde_json::{json, Value};
 
-pub fn process_req(
+pub async fn process_req(
     params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
@@ -25,27 +22,20 @@ pub fn process_req(
         ))
     } else {
         println!("Logging out...");
-        lock_safe_authenticator(
-            safe_auth_handle,
-            |safe_authenticator| match safe_authenticator.log_out() {
-                Ok(()) => {
-                    let msg = "Logged out successfully";
-                    println!("{}", msg);
-                    Ok(json!(msg))
-                }
-                Err(err) => {
-                    let msg = format!("Failed to log out: {}", err);
-                    println!("{}", msg);
-                    Err(msg)
-                }
-            },
-        )
-        .and_then(|msg| {
-            let _ = lock_auth_reqs_list(auth_reqs_handle, |auth_reqs_list| {
+        let mut safe_authenticator = safe_auth_handle.lock().await;
+        match safe_authenticator.log_out() {
+            Ok(()) => {
+                let msg = "Logged out successfully";
+                println!("{}", msg);
+                let mut auth_reqs_list = auth_reqs_handle.lock().await;
                 auth_reqs_list.clear();
-                Ok(())
-            });
-            Ok(msg)
-        })
+                Ok(json!(msg))
+            }
+            Err(err) => {
+                let msg = format!("Failed to log out: {}", err);
+                println!("{}", msg);
+                Err(msg)
+            }
+        }
     }
 }

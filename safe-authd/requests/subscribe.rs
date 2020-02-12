@@ -7,13 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::shared::{lock_notif_endpoints_list, SharedNotifEndpointsHandle};
+use crate::shared::SharedNotifEndpointsHandle;
 use serde_json::{json, Value};
 
 // Maximum number of allowed auth reqs notifs subscribers
 const MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS: usize = 3;
 
-pub fn process_req(
+pub async fn process_req(
     params: Value,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<Value, String> {
@@ -49,34 +49,33 @@ pub fn process_req(
                 None
             };
 
-            lock_notif_endpoints_list(notif_endpoints_handle, move |notif_endpoints_list| {
-                // let's normailse the endpoint URL
-                if notif_endpoint.ends_with('/') {
-                    notif_endpoint.pop();
-                }
+            let mut notif_endpoints_list = notif_endpoints_handle.lock().await;
+            // let's normailse the endpoint URL
+            if notif_endpoint.ends_with('/') {
+                notif_endpoint.pop();
+            }
 
-                if notif_endpoints_list.get(&notif_endpoint).is_some() {
-                    let msg = format!(
-                        "Subscription rejected. Endpoint '{}' is already subscribed",
-                        notif_endpoint
-                    );
-                    println!("{}", msg);
-                    Err(msg)
-                } else if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
-                    let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
-                    println!("{}", msg);
-                    Err(msg)
-                } else {
-                    notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
+            if notif_endpoints_list.get(&notif_endpoint).is_some() {
+                let msg = format!(
+                    "Subscription rejected. Endpoint '{}' is already subscribed",
+                    notif_endpoint
+                );
+                println!("{}", msg);
+                Err(msg)
+            } else if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
+                let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
+                println!("{}", msg);
+                Err(msg)
+            } else {
+                notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
 
-                    let msg = format!(
+                let msg = format!(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications (cert base path: {:?})",
                         notif_endpoint, cert_base_path
                     );
-                    println!("{}", msg);
-                    Ok(json!(msg))
-                }
-            })
+                println!("{}", msg);
+                Ok(json!(msg))
+            }
         }
     } else {
         Err(format!(

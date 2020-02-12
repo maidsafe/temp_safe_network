@@ -32,9 +32,6 @@ use update::update_commander;
 extern crate human_panic;
 
 #[macro_use]
-extern crate slog;
-
-#[macro_use]
 extern crate self_update;
 
 #[cfg(not(target_os = "windows"))]

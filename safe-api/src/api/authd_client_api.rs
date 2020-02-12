@@ -10,11 +10,10 @@
 use super::{
     constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
     helpers::send_authd_request,
-    quic_endpoint::quic_listen,
     AuthedAppsList, Error, Result, SafeAuthReqId,
 };
 use directories::BaseDirs;
-use log::{debug, error, info, trace};
+use log::{debug, /*error,*/ info, trace};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
@@ -406,15 +405,14 @@ impl SafeAuthdClient {
 
         // Start listening first
         // We need a channel to receive auth req notifications from the thread running the QUIC endpoint
-        let (tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
+        let (_tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
 
-        let listen = endpoint_url.to_string();
-
+        let _listen = endpoint_url.to_string();
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
         // TODO: if there was a previous subscription, make sure we kill the previously created threads
-        let endpoint_thread_join_handle =
-            thread::spawn(move || match quic_listen(&listen, tx, cert_base_path) {
-                Ok(_) => {
+        let endpoint_thread_join_handle = thread::spawn(move || {
+            /*match jsonrpc_listen(&listen, &cert_base_path.display().to_string(), None, None) {
+                Ok(()) => {
                     info!("Endpoint successfully launched for receiving auth req notifications");
                 }
                 Err(err) => {
@@ -423,7 +421,8 @@ impl SafeAuthdClient {
                         err
                     );
                 }
-            });
+            }*/
+        });
 
         let cb = Box::new(allow_cb);
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks

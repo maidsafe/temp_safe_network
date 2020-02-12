@@ -7,10 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::shared::{lock_safe_authenticator, SharedSafeAuthenticatorHandle};
+use crate::shared::SharedSafeAuthenticatorHandle;
 use serde_json::{json, Value};
 
-pub fn process_req(
+pub async fn process_req(
     params: Value,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
@@ -32,20 +32,18 @@ pub fn process_req(
                 )
             })?;
 
-            lock_safe_authenticator(
-                safe_auth_handle,
-                |safe_authenticator| match safe_authenticator.log_in(passphrase, password) {
-                    Ok(_) => {
-                        let msg = "Logged in successfully!";
-                        println!("{}", msg);
-                        Ok(json!(msg))
-                    }
-                    Err(err) => {
-                        println!("Error occurred when trying to log in: {}", err);
-                        Err(err.to_string())
-                    }
-                },
-            )
+            let mut safe_authenticator = safe_auth_handle.lock().await;
+            match safe_authenticator.log_in(passphrase, password) {
+                Ok(_) => {
+                    let msg = "Logged in successfully!";
+                    println!("{}", msg);
+                    Ok(json!(msg))
+                }
+                Err(err) => {
+                    println!("Error occurred when trying to log in: {}", err);
+                    Err(err.to_string())
+                }
+            }
         }
     } else {
         Err(format!("Incorrect params for 'login' method: {:?}", params))

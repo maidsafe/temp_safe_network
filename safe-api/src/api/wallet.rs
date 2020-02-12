@@ -135,12 +135,7 @@ impl Safe {
     // Check the total balance of a Wallet found at a given XOR-URL
     pub fn wallet_balance(&mut self, url: &str) -> Result<String> {
         debug!("Finding total wallet balance for: {:?}", url);
-        let mut total_balance = Coins::from_nano(0).map_err(|err| {
-            Error::Unexpected(format!(
-                "Unexpected error when trying to instantiate a safe_nd::Coins object: {}",
-                err
-            ))
-        })?;
+        let mut total_balance = Coins::from_nano(0);
 
         // Let's get the list of balances from the Wallet
         let (xorurl_encoder, nrs_xorurl_encoder) = self.parse_and_resolve_url(url)?;

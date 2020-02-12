@@ -12,9 +12,7 @@ use chrono::{SecondsFormat, Utc};
 use jsonrpc_quic::jsonrpc_send;
 use log::debug;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
-use safe_nd::{
-    Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName, MAX_COINS_VALUE,
-};
+use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName};
 use serde::de::DeserializeOwned;
 use std::{
     iter::FromIterator,
@@ -125,7 +123,7 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Coins> {
         match err {
             SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
                 "Invalid safecoins amount '{}', it exceeds the maximum possible value '{}'",
-                amount_str, MAX_COINS_VALUE
+                amount_str, Coins::from_nano(4_294_967_295_999_999_999)
             )),
             SafeNdError::LossOfPrecision => {
                 Error::InvalidAmount(format!("Invalid safecoins amount '{}', the minimum possible amount is one nano coin (0.000000001)", amount_str))
@@ -243,8 +241,8 @@ where
                 Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
             )
             .map_err(|err| match err {
-                jsonrpc_quic::Error::ClientError(msg) => Error::AuthdClientError(msg),
-                jsonrpc_quic::Error::ServerError(msg) => Error::AuthdError(msg),
+                jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
+                other => Error::AuthdClientError(other.to_string()),
             })
         }
     }
