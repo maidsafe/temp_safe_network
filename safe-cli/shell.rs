@@ -143,6 +143,12 @@ pub fn shell_run() -> Result<(), String> {
         |io, (safe, _safe_authd_client), args| call_cli("update", args, safe, io),
     );
     shell.new_command(
+        "vault",
+        "Commands to manage SAFE vaults",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("vault", args, safe, io),
+    );
+    shell.new_command(
         "wallet",
         "Manage wallets on the SAFE Network",
         0,

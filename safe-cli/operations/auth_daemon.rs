@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
 use directories::BaseDirs;
 use envy::from_env;
@@ -17,13 +18,7 @@ use safe_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
 use serde::Deserialize;
-use std::{
-    fs::{create_dir_all, File},
-    path::PathBuf,
-};
-
-#[cfg(not(target_os = "windows"))]
-use std::os::unix::fs::PermissionsExt;
+use std::{fs::File, path::PathBuf};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
@@ -50,7 +45,13 @@ pub fn authd_install(
     safe_authd: &SafeAuthdClient,
     authd_path: Option<String>,
 ) -> Result<(), String> {
-    let final_path = download_and_install_authd(authd_path)?;
+    let target_path = get_authd_bin_path(authd_path)?;
+    let final_path = download_from_s3_and_install_bin(
+        target_path,
+        "safe-api",
+        "safe-authd",
+        SAFE_AUTHD_EXECUTABLE,
+    )?;
     if cfg!(windows) {
         // On Windows authd must be installed as a service
         safe_authd
@@ -444,132 +445,4 @@ fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
             }
         }
     }
-}
-
-#[inline]
-fn download_and_install_authd(authd_path: Option<String>) -> Result<String, String> {
-    let target = self_update::get_target();
-    let available_releases = self_update::backends::s3::Update::configure()
-        .bucket_name("safe-api")
-        .target(&target)
-        .asset_prefix("safe-authd")
-        .region("eu-west-2")
-        .bin_name("")
-        .current_version("")
-        .build()
-        .map_err(|err| {
-            format!(
-                "Error when preparing to fetch the list of releases: {}",
-                err
-            )
-        })?;
-
-    let latest_release = available_releases
-        .get_latest_release()
-        .map_err(|err| format!("Failed to find a release available to install: {}", err))?;
-
-    println!(
-        "Latest release found: {} v{}",
-        latest_release.name, latest_release.version
-    );
-    // get the corresponding asset from the release
-    let asset = latest_release.asset_for(&target).ok_or_else(|| {
-        format!(
-            "No asset found in latest release for the target platform {}",
-            target
-        )
-    })?;
-    let tmp_dir = std::env::temp_dir();
-    let tmp_tarball_path = tmp_dir.join(&asset.name);
-    let tmp_tarball = File::create(&tmp_tarball_path).map_err(|err| {
-        format!(
-            "Error creating temp file ('{}') for downloading the release: {}",
-            tmp_tarball_path.display(),
-            err
-        )
-    })?;
-
-    println!("Downloading {}...", asset.download_url);
-    self_update::Download::from_url(&asset.download_url)
-        .show_progress(true)
-        .download_to(&tmp_tarball)
-        .map_err(|err| {
-            format!(
-                "Error downloading release asset '{}': {}",
-                asset.download_url, err
-            )
-        })?;
-
-    let target_path = get_authd_bin_path(authd_path)?;
-
-    if !target_path.exists() {
-        println!("Creating '{}' folder", target_path.display());
-        create_dir_all(target_path.clone())
-            .map_err(|err| format!("Couldn't create target path to install binary: {}", err))?;
-    }
-
-    println!(
-        "Installing safe-authd binary at {} ...",
-        target_path.display()
-    );
-    self_update::Extract::from_source(&tmp_tarball_path)
-        .extract_file(&target_path.as_path(), SAFE_AUTHD_EXECUTABLE)
-        .map_err(|err| {
-            format!(
-                "Error extracting binary from downloaded asset '{}': {}",
-                tmp_tarball_path.display(),
-                err
-            )
-        })?;
-
-    set_exec_perms(target_path.join(SAFE_AUTHD_EXECUTABLE))?;
-
-    println!("Done!");
-    Ok(target_path.display().to_string())
-}
-
-#[cfg(target_os = "windows")]
-#[inline]
-fn set_exec_perms(_file_path: PathBuf) -> Result<(), String> {
-    // no need to set execution permissions on Windows
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-#[inline]
-fn set_exec_perms(file_path: PathBuf) -> Result<(), String> {
-    println!(
-        "Setting execution permissions to installed binary '{}'...",
-        file_path.display()
-    );
-    let file = File::open(&file_path).map_err(|err| {
-        format!(
-            "Error when preparing to set execution permissions to installed binary '{}': {}",
-            file_path.display(),
-            err
-        )
-    })?;
-
-    let mut perms = file
-        .metadata()
-        .map_err(|err| {
-            format!(
-                "Error when reading metadata from installed binary '{}': {}",
-                file_path.display(),
-                err
-            )
-        })?
-        .permissions();
-
-    // set execution permissions bits for owner, group and others
-    perms.set_mode(perms.mode() | 0b0_001_001_001);
-    file.set_permissions(perms).map_err(|err| {
-        format!(
-            "Failed to set execution permissions to installed binary '{}': {}",
-            file_path.display(),
-            err
-        )
-    })?;
-
-    Ok(())
 }

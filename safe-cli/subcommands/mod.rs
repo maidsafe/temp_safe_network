@@ -20,6 +20,7 @@ pub mod nrs;
 pub mod safe_id;
 pub mod setup;
 pub mod update;
+pub mod vault;
 pub mod wallet;
 pub mod xorurl;
 
@@ -73,9 +74,6 @@ pub enum SubCommands {
         #[structopt(subcommand)]
         cmd: Option<auth::AuthSubCommands>,
     },
-    // [structopt(name = "container")]
-    // /// Create a new SAFE Network account with the credentials provided
-    // Container(container::ContainerSubCommands),
     #[structopt(name = "cat")]
     /// Read data on the SAFE Network
     Cat(cat::CatCommands),
@@ -118,4 +116,11 @@ pub enum SubCommands {
     #[structopt(name = "update")]
     /// Update the application to the latest available version
     Update {},
+    #[structopt(name = "vault")]
+    /// Commands to manage SAFE vaults
+    Vault {
+        /// subcommands
+        #[structopt(subcommand)]
+        cmd: Option<vault::VaultSubCommands>,
+    },
 }

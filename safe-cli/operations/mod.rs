@@ -13,6 +13,8 @@ pub mod auth_daemon;
 pub mod config;
 #[cfg(any(feature = "fake-auth", feature = "scl-mock"))]
 mod fake_auth;
+mod helpers;
+pub mod vault;
 
 #[cfg(not(any(feature = "fake-auth", feature = "scl-mock")))]
 pub mod safe_net {
