@@ -239,7 +239,7 @@ impl TestVault {
 
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
-        let (routing_node, routing_rx) = if let Some(group) = consensus_group {
+        let (routing_node, routing_rx, client_rx) = if let Some(group) = consensus_group {
             Node::builder().create_within_group(group)
         } else {
             Node::builder().create()
@@ -247,6 +247,7 @@ impl TestVault {
         let inner = unwrap!(Vault::new(
             routing_node,
             routing_rx,
+            client_rx,
             &config,
             command_rx,
             rng::from_rng(rng),
@@ -269,7 +270,7 @@ impl TestVault {
 
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
-        let (routing_node, routing_rx) = if let Some(network_config) = network_config {
+        let (routing_node, routing_rx, client_rx) = if let Some(network_config) = network_config {
             Node::builder()
                 .network_config(network_config)
                 .rng(rng)
@@ -281,6 +282,7 @@ impl TestVault {
         let inner = unwrap!(Vault::new(
             routing_node,
             routing_rx,
+            client_rx,
             &config,
             command_rx,
             rng::from_rng(rng),
@@ -573,7 +575,8 @@ pub trait TestClientTrait {
 
 pub struct TestClient {
     quic_p2p: QuicP2p,
-    rx: Receiver<Event>,
+    node_rx: Receiver<Event>,
+    _client_rx: Receiver<Event>,
     full_id: FullId,
     public_id: ClientPublicId,
     connected_vaults: Vec<SocketAddr>,
@@ -581,7 +584,16 @@ pub struct TestClient {
 
 impl TestClient {
     fn new_disconnected(rng: &mut TestRng) -> Self {
-        let (tx, rx) = crossbeam_channel::unbounded();
+        let (tx, node_rx, client_rx) = {
+            let (node_tx, node_rx) = crossbeam_channel::unbounded();
+            let (client_tx, client_rx) = crossbeam_channel::unbounded();
+            (
+                quic_p2p::EventSenders { node_tx, client_tx },
+                node_rx,
+                client_rx,
+            )
+        };
+
         let config = quic_p2p::Config {
             our_type: OurType::Client,
             ..Default::default()
@@ -591,7 +603,8 @@ impl TestClient {
 
         Self {
             quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
-            rx,
+            node_rx,
+            _client_rx: client_rx,
             full_id: FullId::Client(client_full_id),
             public_id,
             connected_vaults: Default::default(),
@@ -609,7 +622,7 @@ impl TestClientTrait for TestClient {
     }
 
     fn rx(&self) -> &Receiver<Event> {
-        &self.rx
+        &self.node_rx
     }
 
     fn full_id(&self) -> &FullId {
@@ -641,7 +654,8 @@ impl DerefMut for TestClient {
 
 pub struct TestApp {
     quic_p2p: QuicP2p,
-    rx: Receiver<Event>,
+    node_rx: Receiver<Event>,
+    _client_rx: Receiver<Event>,
     full_id: FullId,
     public_id: AppPublicId,
     connected_vaults: Vec<SocketAddr>,
@@ -649,7 +663,15 @@ pub struct TestApp {
 
 impl TestApp {
     fn new_disconnected(rng: &mut TestRng, owner: ClientPublicId) -> Self {
-        let (tx, rx) = crossbeam_channel::unbounded();
+        let (tx, node_rx, client_rx) = {
+            let (node_tx, node_rx) = crossbeam_channel::unbounded();
+            let (client_tx, client_rx) = crossbeam_channel::unbounded();
+            (
+                quic_p2p::EventSenders { node_tx, client_tx },
+                node_rx,
+                client_rx,
+            )
+        };
         let config = quic_p2p::Config {
             our_type: OurType::Client,
             ..Default::default()
@@ -659,7 +681,8 @@ impl TestApp {
 
         Self {
             quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
-            rx,
+            node_rx,
+            _client_rx: client_rx,
             full_id: FullId::App(app_full_id),
             public_id,
             connected_vaults: Default::default(),
@@ -677,7 +700,7 @@ impl TestClientTrait for TestApp {
     }
 
     fn rx(&self) -> &Receiver<Event> {
-        &self.rx
+        &self.node_rx
     }
 
     fn full_id(&self) -> &FullId {

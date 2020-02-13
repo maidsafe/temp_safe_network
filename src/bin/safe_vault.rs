@@ -115,7 +115,7 @@ mod detail {
             log::error!("Failed to set interrupt handler: {:?}", error)
         }
 
-        let (routing_node, routing_rx) = Node::builder()
+        let (routing_node, routing_rx, client_rx) = Node::builder()
             .first(config.is_first())
             .network_config(config.network_config().clone())
             .create();
@@ -124,7 +124,14 @@ mod detail {
 
         let mut rng = rand::thread_rng();
 
-        match Vault::new(routing_node, routing_rx, &config, command_rx, &mut rng) {
+        match Vault::new(
+            routing_node,
+            routing_rx,
+            client_rx,
+            &config,
+            command_rx,
+            &mut rng,
+        ) {
             Ok(mut vault) => {
                 let our_conn_info = unwrap!(vault.our_connection_info());
                 println!(

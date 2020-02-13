@@ -12,7 +12,7 @@ use crate::{
     client_handler::ClientHandler,
     coins_handler::CoinsHandler,
     data_handler::DataHandler,
-    routing::{event::Client as ClientEvent, event::Event as RoutingEvent, Node},
+    routing::{event::Event as RoutingEvent, NetworkEvent as ClientEvent, Node},
     rpc::Rpc,
     utils, Config, Result,
 };
@@ -66,6 +66,7 @@ pub struct Vault<R: CryptoRng + Rng> {
     root_dir: PathBuf,
     state: State,
     event_receiver: Receiver<RoutingEvent>,
+    client_receiver: Receiver<ClientEvent>,
     command_receiver: Receiver<Command>,
     routing_node: Rc<RefCell<Node>>,
     rng: R,
@@ -76,6 +77,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     pub fn new(
         routing_node: Node,
         event_receiver: Receiver<RoutingEvent>,
+        client_receiver: Receiver<ClientEvent>,
         config: &Config,
         command_receiver: Receiver<Command>,
         mut rng: R,
@@ -138,6 +140,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             root_dir: root_dir.to_path_buf(),
             state,
             event_receiver,
+            client_receiver,
             command_receiver,
             routing_node,
             rng,
@@ -170,12 +173,20 @@ impl<R: CryptoRng + Rng> Vault<R> {
             let mut r_node = self.routing_node.borrow_mut();
             r_node.register(&mut sel);
             let routing_event_rx_idx = sel.recv(&self.event_receiver);
+            let client_network_rx_idx = sel.recv(&self.client_receiver);
             let command_rx_idx = sel.recv(&self.command_receiver);
 
             let selected_operation = sel.ready();
             drop(r_node);
 
             match selected_operation {
+                idx if idx == client_network_rx_idx => {
+                    let event = match self.client_receiver.recv() {
+                        Ok(ev) => ev,
+                        Err(e) => panic!("FIXME: {:?}", e),
+                    };
+                    self.step_client(event);
+                }
                 idx if idx == routing_event_rx_idx => {
                     let event = match self.event_receiver.recv() {
                         Ok(ev) => ev,
@@ -214,12 +225,21 @@ impl<R: CryptoRng + Rng> Vault<R> {
             let mut r_node = self.routing_node.borrow_mut();
             r_node.register(&mut sel);
             let routing_event_rx_idx = sel.recv(&self.event_receiver);
+            let client_network_rx_idx = sel.recv(&self.client_receiver);
             let command_rx_idx = sel.recv(&self.command_receiver);
 
             if let Ok(selected_operation) = sel.try_ready() {
                 drop(r_node);
 
                 match selected_operation {
+                    idx if idx == client_network_rx_idx => {
+                        let event = match self.client_receiver.recv() {
+                            Ok(ev) => ev,
+                            Err(e) => panic!("FIXME: {:?}", e),
+                        };
+                        self.step_client(event);
+                        _processed = true;
+                    }
                     idx if idx == routing_event_rx_idx => {
                         let event = match self.event_receiver.recv() {
                             Ok(ev) => ev,
@@ -264,9 +284,15 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
+    fn step_client(&mut self, event: ClientEvent) {
+        let mut maybe_action = self.handle_client_event(event);
+        while let Some(action) = maybe_action {
+            maybe_action = self.handle_action(action);
+        }
+    }
+
     fn handle_routing_event(&mut self, event: RoutingEvent) -> Option<Action> {
         match event {
-            RoutingEvent::Client(ev) => self.handle_client_event(ev),
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<ConsensusAction>(&custom_event) {
                     Ok(consensus_action) => {
@@ -291,18 +317,28 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
         let client_handler = self.client_handler_mut()?;
         match event {
-            Connected { peer_addr } => client_handler.handle_new_connection(peer_addr),
-            ConnectionFailure { peer_addr } => {
-                client_handler.handle_connection_failure(peer_addr);
+            ConnectedTo { peer } => client_handler.handle_new_connection(peer.peer_addr()),
+            ConnectionFailure { peer, .. } => {
+                client_handler.handle_connection_failure(peer.peer_addr());
             }
-            NewMessage { peer_addr, msg } => {
-                return client_handler.handle_client_message(peer_addr, &msg, &mut rng);
+            NewMessage { peer, msg } => {
+                return client_handler.handle_client_message(peer.peer_addr(), &msg, &mut rng);
             }
-            SentUserMsg { peer_addr, .. } => {
-                trace!("{}: Succesfully sent message to: {}", self, peer_addr);
+            SentUserMessage { peer, .. } => {
+                trace!(
+                    "{}: Succesfully sent message to: {}",
+                    self,
+                    peer.peer_addr()
+                );
             }
-            UnsentUserMsg { peer_addr, .. } => {
-                info!("{}: Not sent message to: {}", self, peer_addr);
+            UnsentUserMessage { peer, .. } => {
+                info!("{}: Not sent message to: {}", self, peer.peer_addr());
+            }
+            BootstrapFailure | BootstrappedTo { .. } => {
+                error!("unexpected bootstrapping client event")
+            }
+            Finish => {
+                info!("{}: Received Finish event", self);
             }
         }
         None
