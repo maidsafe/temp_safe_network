@@ -1427,7 +1427,7 @@ dependencies = [
 [[package]]
 name = "mock-quic-p2p"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p?rev=f1991746a8#f1991746a82ef21ac69b26e17ba8c6a6b4c15653"
+source = "git+https://github.com/maidsafe/quic-p2p?rev=b50a029#b50a029600f36b0f98f0c665ccc71e200de41168"
 dependencies = [
  "bytes 0.4.12",
  "crossbeam-channel",
@@ -1839,7 +1839,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.3.0"
-source = "git+https://github.com/maidsafe/quic-p2p?rev=f1991746a8#f1991746a82ef21ac69b26e17ba8c6a6b4c15653"
+source = "git+https://github.com/maidsafe/quic-p2p?rev=b50a029#b50a029600f36b0f98f0c665ccc71e200de41168"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
@@ -2281,7 +2281,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#9a28bcb208c1347acd91b7b0bd6545a5875f6ae2"
+source = "git+https://github.com/maidsafe/routing.git?branch=fleming#13b1ffecfbf61407c18ed8b65ed76b6c576962a4"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.4.12",

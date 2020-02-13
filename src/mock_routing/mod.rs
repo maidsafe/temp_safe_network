@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use routing::{event, NetworkConfig, P2pNode, RoutingError};
+pub use routing::{event, NetworkConfig, NetworkEvent, P2pNode, RoutingError};
 
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
-use mock_quic_p2p::{self as quic_p2p, Event as NetworkEvent, Peer, QuicP2p, QuicP2pError};
-use routing::event::Client as ClientEvent;
+use mock_quic_p2p::{self as quic_p2p, Peer, QuicP2p, QuicP2pError};
 use routing::{event::Event, XorName};
 use std::{
     cell::RefCell,
+    collections::HashSet,
     net::SocketAddr,
     rc::{Rc, Weak},
 };
@@ -31,6 +31,7 @@ pub type Token = u64;
 
 /// Consensus
 pub struct ConsensusGroup {
+    consensused: HashSet<Vec<u8>>,
     event_channels: Vec<Sender<Event>>,
 }
 
@@ -38,13 +39,16 @@ impl ConsensusGroup {
     /// Creates a new consensus group.
     pub fn new() -> ConsensusGroupRef {
         Rc::new(RefCell::new(Self {
+            consensused: Default::default(),
             event_channels: Vec::new(),
         }))
     }
 
-    fn vote_for(&self, event: Vec<u8>) {
-        for channel in &self.event_channels {
-            unwrap!(channel.send(Event::Consensus(event.clone())));
+    fn vote_for(&mut self, event: Vec<u8>) {
+        if self.consensused.insert(event.clone()) {
+            for channel in &self.event_channels {
+                unwrap!(channel.send(Event::Consensus(event.clone())));
+            }
         }
     }
 }
@@ -53,8 +57,8 @@ impl ConsensusGroup {
 pub struct Node {
     events_tx: Sender<Event>,
     quic_p2p: QuicP2p,
-    network_rx: Receiver<NetworkEvent>,
-    network_rx_idx: usize,
+    network_node_rx: Receiver<NetworkEvent>,
+    network_node_rx_idx: usize,
     consensus_group: Option<Weak<RefCell<ConsensusGroup>>>,
 }
 
@@ -69,7 +73,7 @@ impl Node {
     /// Registering of interests with the event loop will happen here. Without this routing will
     /// not be able to take part in the event loop triggers.
     pub fn register<'a>(&'a mut self, sel: &mut Select<'a>) {
-        self.network_rx_idx = sel.recv(&self.network_rx);
+        self.network_node_rx_idx = sel.recv(&self.network_node_rx);
     }
 
     /// Returns the connection information of all the current section elders.
@@ -91,9 +95,8 @@ impl Node {
     /// Handle an event loop trigger with the mentioned operation
     pub fn handle_selected_operation(&mut self, op_index: usize) -> Result<(), RecvError> {
         match op_index {
-            idx if idx == self.network_rx_idx => {
-                let event = self.network_rx.recv()?;
-                self.handle_network_event(event);
+            idx if idx == self.network_node_rx_idx => {
+                let _event = self.network_node_rx.recv()?;
             }
             idx => panic!("Unknown operation selected: {}", idx),
         }
@@ -141,46 +144,6 @@ impl Node {
         self.quic_p2p.disconnect_from(peer_addr);
         Ok(())
     }
-
-    fn handle_network_event(&mut self, event: NetworkEvent) {
-        if let Ok(client_event) = into_client_event(event) {
-            unwrap!(self.events_tx.send(Event::Client(client_event)));
-        }
-    }
-}
-
-/// Map a Network event into a ClientEvent if applies.
-pub fn into_client_event(network_event: NetworkEvent) -> Result<ClientEvent, ()> {
-    use NetworkEvent::*;
-
-    let client_event = match network_event {
-        ConnectedTo { peer } => ClientEvent::Connected {
-            peer_addr: peer.peer_addr(),
-        },
-        NewMessage { peer, msg } => ClientEvent::NewMessage {
-            peer_addr: peer.peer_addr(),
-            msg,
-        },
-        ConnectionFailure { peer, err: _err } => ClientEvent::ConnectionFailure {
-            peer_addr: peer.peer_addr(),
-        },
-        UnsentUserMessage { peer, msg, token } => ClientEvent::UnsentUserMsg {
-            peer_addr: peer.peer_addr(),
-            msg,
-            token,
-        },
-        SentUserMessage { peer, msg, token } => ClientEvent::SentUserMsg {
-            peer_addr: peer.peer_addr(),
-            msg,
-            token,
-        },
-        _event => {
-            // There's no equivalent `ClientEvent`
-            return Err(());
-        }
-    };
-
-    Ok(client_event)
 }
 
 /// A builder to configure and create a new `Node`.
@@ -188,19 +151,21 @@ pub struct NodeBuilder {}
 
 impl NodeBuilder {
     /// Creates new `Node`.
-    pub fn create(self) -> (Node, Receiver<Event>) {
-        let (quic_p2p, network_rx) = unwrap!(setup_quic_p2p(&Default::default()));
+    pub fn create(self) -> (Node, Receiver<Event>, Receiver<NetworkEvent>) {
+        let (quic_p2p, network_node_rx, network_client_rx) =
+            unwrap!(setup_quic_p2p(&Default::default()));
         let (events_tx, events_rx) = mpmc::unbounded();
 
         (
             Node {
-                network_rx,
+                network_node_rx,
                 quic_p2p,
                 events_tx,
-                network_rx_idx: 0,
+                network_node_rx_idx: 0,
                 consensus_group: None,
             },
             events_rx,
+            network_client_rx,
         )
     }
 
@@ -208,8 +173,9 @@ impl NodeBuilder {
     pub fn create_within_group(
         self,
         consensus_group: ConsensusGroupRef,
-    ) -> (Node, Receiver<Event>) {
-        let (quic_p2p, network_rx) = unwrap!(setup_quic_p2p(&Default::default()));
+    ) -> (Node, Receiver<Event>, Receiver<NetworkEvent>) {
+        let (quic_p2p, network_node_rx, network_client_rx) =
+            unwrap!(setup_quic_p2p(&Default::default()));
         let (events_tx, events_rx) = mpmc::unbounded();
 
         consensus_group
@@ -219,23 +185,32 @@ impl NodeBuilder {
 
         (
             Node {
-                network_rx,
+                network_node_rx,
                 quic_p2p,
                 events_tx,
-                network_rx_idx: 0,
+                network_node_rx_idx: 0,
                 consensus_group: Some(Rc::downgrade(&consensus_group)),
             },
             events_rx,
+            network_client_rx,
         )
     }
 }
 
 fn setup_quic_p2p(
     config: &NetworkConfig,
-) -> Result<(QuicP2p, Receiver<NetworkEvent>), QuicP2pError> {
-    let (event_sender, event_receiver) = crossbeam_channel::unbounded();
-    let quic_p2p = quic_p2p::Builder::new(event_sender)
+) -> Result<(QuicP2p, Receiver<NetworkEvent>, Receiver<NetworkEvent>), QuicP2pError> {
+    let (event_senders, node_receiver, client_receiver) = {
+        let (node_tx, node_rx) = crossbeam_channel::unbounded();
+        let (client_tx, client_rx) = crossbeam_channel::unbounded();
+        (
+            quic_p2p::EventSenders { node_tx, client_tx },
+            node_rx,
+            client_rx,
+        )
+    };
+    let quic_p2p = quic_p2p::Builder::new(event_senders)
         .with_config(config.clone())
         .build()?;
-    Ok((quic_p2p, event_receiver))
+    Ok((quic_p2p, node_receiver, client_receiver))
 }
