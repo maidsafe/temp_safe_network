@@ -16,6 +16,7 @@ use routing::event::Client as ClientEvent;
 use routing::{event::Event, XorName};
 use std::{
     cell::RefCell,
+    collections::HashSet,
     net::SocketAddr,
     rc::{Rc, Weak},
 };
@@ -31,6 +32,7 @@ pub type Token = u64;
 
 /// Consensus
 pub struct ConsensusGroup {
+    consensused: HashSet<Vec<u8>>,
     event_channels: Vec<Sender<Event>>,
 }
 
@@ -38,13 +40,16 @@ impl ConsensusGroup {
     /// Creates a new consensus group.
     pub fn new() -> ConsensusGroupRef {
         Rc::new(RefCell::new(Self {
+            consensused: Default::default(),
             event_channels: Vec::new(),
         }))
     }
 
-    fn vote_for(&self, event: Vec<u8>) {
-        for channel in &self.event_channels {
-            unwrap!(channel.send(Event::Consensus(event.clone())));
+    fn vote_for(&mut self, event: Vec<u8>) {
+        if self.consensused.insert(event.clone()) {
+            for channel in &self.event_channels {
+                unwrap!(channel.send(Event::Consensus(event.clone())));
+            }
         }
     }
 }

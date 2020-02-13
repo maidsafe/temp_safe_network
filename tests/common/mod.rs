@@ -486,7 +486,7 @@ pub trait TestClientTrait {
         let mut expected_recivers = self.connected_vaults().len();
 
         loop {
-            let bytes = self.expect_new_message(env).1;
+            let (peer, bytes) = self.expect_new_message(env);
             let message: Message = unwrap!(bincode::deserialize(&bytes));
 
             match message {
@@ -504,8 +504,8 @@ pub trait TestClientTrait {
                         return response;
                     }
                 }
-                Message::Request { request, .. } => unexpected!(request),
-                Message::Notification { notification } => unexpected!(notification),
+                Message::Request { request, .. } => unexpected!((peer, request)),
+                Message::Notification { notification } => unexpected!((peer, notification)),
             }
         }
     }
@@ -516,16 +516,18 @@ pub trait TestClientTrait {
         let mut received_notifications = Vec::new();
 
         while received_notifications.len() < connected_vaults {
-            let bytes = self.expect_new_message(env).1;
+            let (peer, bytes) = self.expect_new_message(env);
             let message: Message = unwrap!(bincode::deserialize(&bytes));
 
             match message {
-                Message::Notification { notification } => received_notifications.push(notification),
-                Message::Request { request, .. } => unexpected!(request),
-                Message::Response { response, .. } => unexpected!(response),
+                Message::Notification { notification } => {
+                    received_notifications.push((peer, notification))
+                }
+                Message::Request { request, .. } => unexpected!((peer, request)),
+                Message::Response { response, .. } => unexpected!((peer, response)),
             }
         }
-        received_notifications[0].clone()
+        received_notifications[0].1.clone()
     }
 
     fn expect_notification_and_response(
@@ -541,12 +543,14 @@ pub trait TestClientTrait {
         while received_notifications.len() < connected_vaults
             || received_responses.len() < connected_vaults
         {
-            let bytes = self.expect_new_message(env).1;
+            let (peer, bytes) = self.expect_new_message(env);
             let message: Message = unwrap!(bincode::deserialize(&bytes));
 
             match message {
-                Message::Notification { notification } => received_notifications.push(notification),
-                Message::Request { request, .. } => unexpected!(request),
+                Message::Notification { notification } => {
+                    received_notifications.push((peer, notification))
+                }
+                Message::Request { request, .. } => unexpected!((peer, request)),
                 Message::Response {
                     message_id,
                     response,
@@ -556,13 +560,13 @@ pub trait TestClientTrait {
                         "Received Response with unexpected MessageId and response {:?}",
                         response
                     );
-                    received_responses.push(response);
+                    received_responses.push((peer, response));
                 }
             }
         }
         (
-            received_notifications[0].clone(),
-            received_responses[0].clone(),
+            received_notifications[0].1.clone(),
+            received_responses[0].1.clone(),
         )
     }
 }
