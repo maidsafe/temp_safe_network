@@ -14,7 +14,6 @@ path = "lib.rs"
 directories = "2.0.2"
 futures = "^0.3.1"
 log = "^0.4.8"
-quinn = "^0.5.2"
 rand = "^0.7.3"
 rcgen = "^0.7.0"
 serde = { version = "~1.0.104", features = ["derive"] }
@@ -23,3 +22,7 @@ tokio = { version = "^0.2.9", features = ["rt-threaded"] }
 tracing = "^0.1.12"
 tracing-futures = { version = "^0.2.1", default-features = false, features = ["std-future"] }
 url = "~2.1.1"
+
+[dependencies.quinn]
+version = "^0.5.3"
+default-features = false

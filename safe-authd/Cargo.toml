@@ -19,7 +19,6 @@ futures = "^0.3.1"
 human-panic = "1.0.1"
 jsonrpc-quic = { path = "../jsonrpc-quic" }
 log = "0.4.6"
-quinn = "^0.5.3"
 rcgen = "^0.7.0"
 safe-api = { path = "../safe-api" }
 serde = "1.0.91"
@@ -39,6 +38,10 @@ windows-service = "^0.2.0"
 
 [features]
 mock-network = ["safe-api/mock-network"]
+
+[dependencies.quinn]
+version = "^0.5.3"
+default-features = false
 
 [dependencies.self_update]
 version = "^0.12.0"

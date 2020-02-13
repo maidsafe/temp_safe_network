@@ -89,6 +89,12 @@ pub fn shell_run() -> Result<(), String> {
         |io, (safe, _safe_authd_client), args| call_cli("cat", args, safe, io),
     );
     shell.new_command(
+        "config",
+        "CLI config settings",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("config", args, safe, io),
+    );
+    shell.new_command(
         "dog",
         "Inspect data on the SAFE Network providing only metadata information about the content",
         0,
@@ -107,16 +113,34 @@ pub fn shell_run() -> Result<(), String> {
         |io, (safe, _safe_authd_client), args| call_cli("keypair", args, safe, io),
     );
     shell.new_command(
+        "keys",
+        "Manage keys on the SAFE Network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("keys", args, safe, io),
+    );
+    shell.new_command(
+        "networks",
+        "Switch between SAFE networks",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("networks", args, safe, io),
+    );
+    shell.new_command(
         "nrs",
         "Manage public names on the SAFE Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("nrs", args, safe, io),
     );
     shell.new_command(
-        "keys",
-        "Manage keys on the SAFE Network",
+        "setup",
+        "Perform setup tasks",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("keys", args, safe, io),
+        |io, (safe, _safe_authd_client), args| call_cli("setup", args, safe, io),
+    );
+    shell.new_command(
+        "update",
+        "Update the application to the latest available version",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("update", args, safe, io),
     );
     shell.new_command(
         "wallet",
@@ -125,10 +149,10 @@ pub fn shell_run() -> Result<(), String> {
         |io, (safe, _safe_authd_client), args| call_cli("wallet", args, safe, io),
     );
     shell.new_command(
-        "update",
-        "Update the application to the latest available version",
+        "xorurl",
+        "Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("update", args, safe, io),
+        |io, (safe, _safe_authd_client), args| call_cli("xorurl", args, safe, io),
     );
 
     println!();

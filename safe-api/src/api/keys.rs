@@ -280,7 +280,7 @@ mod tests {
     fn test_keys_create_preload_test_coins() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+        unwrap!(safe.connect("", None));
         let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12.23"));
         assert!(xorurl.starts_with("safe://"));
         assert!(key_pair.is_some());

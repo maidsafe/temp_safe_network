@@ -101,7 +101,7 @@ pub enum SubCommands {
     /// Manage wallets on the SAFE Network
     Wallet(wallet::WalletSubCommands),
     #[structopt(name = "xorurl")]
-    /// Obtain the XOR-URL of data without uploading it to the network
+    /// Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs
     Xorurl {
         /// subcommands
         #[structopt(subcommand)]
