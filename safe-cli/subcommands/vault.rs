@@ -19,11 +19,19 @@ pub enum VaultSubCommands {
         /// Path where to install safe-vault executable (default ~/.safe/vault/)
         vault_path: Option<String>,
     },
+    #[structopt(name = "run-baby-fleming")]
+    /// Run vaults to form a local single-section SAFE network
+    Run {
+        #[structopt(long = "vault-path")]
+        /// Path where to run safe-vault executable from (default ~/.safe/vault/)
+        vault_path: Option<String>,
+    },
 }
 
 pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
     match cmd {
         Some(VaultSubCommands::Install { vault_path }) => vault_install(vault_path),
+        Some(VaultSubCommands::Run { vault_path }) => vault_run(vault_path, "baby-fleming-vaults"),
         None => Err("Missing vault subcommand".to_string()),
     }
 }

@@ -9,7 +9,9 @@
 
 use super::helpers::download_from_github_and_install_bin;
 use directories::BaseDirs;
-use std::path::PathBuf;
+use log::debug;
+use safe_nlt::run_with;
+use std::{fs::create_dir_all, path::PathBuf};
 
 const ENV_VAR_SAFE_VAULT_PATH: &str = "SAFE_VAULT_PATH";
 
@@ -23,6 +25,41 @@ pub fn vault_install(vault_path: Option<String>) -> Result<(), String> {
     let target_path = get_vault_bin_path(vault_path)?;
     let _ = download_from_github_and_install_bin(target_path, "safe_vault", SAFE_VAULT_EXECUTABLE)?;
     Ok(())
+}
+
+pub fn vault_run(vault_path: Option<String>, vaults_dir: &str) -> Result<(), String> {
+    let vault_path = get_vault_bin_path(vault_path)?;
+
+    let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
+    debug!("Running vault from {}", arg_vault_path);
+
+    let vaults_dir = vault_path.join(vaults_dir);
+    if !vaults_dir.exists() {
+        println!("Creating '{}' folder", vaults_dir.display());
+        create_dir_all(vaults_dir.clone()).map_err(|err| {
+            format!(
+                "Couldn't create target path to store vaults' generated data: {}",
+                err
+            )
+        })?;
+    }
+    let arg_vaults_dir = vaults_dir.display().to_string();
+    println!("Storing vaults' generated data at {}", arg_vaults_dir);
+
+    // Let's create an args array to pass to the network launcher tool
+    let nlt_args = vec![
+        "safe-nlt",
+        "-v",
+        "--vault-path",
+        &arg_vault_path,
+        "--vaults-dir",
+        &arg_vaults_dir,
+    ];
+    debug!("Running network launch tool with args: {:?}", nlt_args);
+
+    // We can now call the tool with the args
+    println!("Launching local SAFE network...");
+    run_with(Some(&nlt_args))
 }
 
 #[inline]
