@@ -2356,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.3.0"
-source = "git+https://github.com/lionel1704/quic-p2p?branch=test#610df2a616c08aca89c1677fd4d4afdeacff2d8e"
+source = "git+https://github.com/maidsafe/quic-p2p?rev=52f8ae2a#52f8ae2a44f41a4a2c36063b7c70276a7fdd1aa1"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -2400,12 +2400,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a550f3a1c4c2f8e7156d62b423d029a5a82d0973adc603be02693c106c70b754"
 dependencies = [
  "bytes 0.5.4",
+ "ct-logs",
  "err-derive 0.2.2",
  "futures 0.3.4",
  "libc",
  "mio",
  "quinn-proto",
  "rustls",
+ "rustls-native-certs",
  "tokio 0.2.11",
  "tracing",
  "webpki",
@@ -3044,7 +3046,7 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.12.0"
-source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=mobile-fix#8fc67a2fa4ec0e730128152568a17884e2c11193"
+source = "git+https://github.com/maidsafe/safe_client_libs.git?rev=4e3cce0#4e3cce0962aade0253446b707c6d2e5979822ff5"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3070,7 +3072,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.12.0"
-source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=mobile-fix#8fc67a2fa4ec0e730128152568a17884e2c11193"
+source = "git+https://github.com/maidsafe/safe_client_libs.git?rev=4e3cce0#4e3cce0962aade0253446b707c6d2e5979822ff5"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3110,7 +3112,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.37.3"
-source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=mobile-fix#8fc67a2fa4ec0e730128152568a17884e2c11193"
+source = "git+https://github.com/maidsafe/safe_client_libs.git?rev=4e3cce0#4e3cce0962aade0253446b707c6d2e5979822ff5"
 dependencies = [
  "bincode",
  "bytes 0.4.12",
