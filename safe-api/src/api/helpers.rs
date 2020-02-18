@@ -24,6 +24,11 @@ use url::Url;
 
 const URL_VERSION_QUERY_NAME: &str = "v=";
 
+/// The conversion from coin to raw value
+const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
+// The maximum amount of safecoin that can be represented by a single `Coins`
+const MAX_COINS_VALUE: u64 = (u32::max_value() as u64 + 1) * COIN_TO_RAW_CONVERSION - 1;
+
 // Out internal key pair structure to manage BLS keys
 #[derive(Debug)]
 pub struct KeyPair {
@@ -124,7 +129,7 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Coins> {
         match err {
             SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
                 "Invalid safecoins amount '{}', it exceeds the maximum possible value '{}'",
-                amount_str, Coins::from_nano(4_294_967_295_999_999_999)
+                amount_str, Coins::from_nano(MAX_COINS_VALUE)
             )),
             SafeNdError::LossOfPrecision => {
                 Error::InvalidAmount(format!("Invalid safecoins amount '{}', the minimum possible amount is one nano coin (0.000000001)", amount_str))
