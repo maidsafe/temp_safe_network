@@ -18,6 +18,7 @@ pub mod fetch;
 pub mod files;
 mod helpers;
 pub mod keys;
+mod notifs_endpoint;
 pub mod nrs;
 pub mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]

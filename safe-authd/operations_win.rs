@@ -42,13 +42,15 @@ pub fn uninstall_authd() -> Result<()> {
     uninstall_authd_service()
 }
 
-pub fn start_authd(listen: &str) -> Result<()> {
+pub fn start_authd(listen: &str, foreground: bool) -> Result<()> {
     println!("Starting SAFE Authenticator service (safe-authd) from command line...");
-
-    // Since the authd service runs as a system process, we need to provide
-    // the user's local project directory path which is where certificates are shared through
-    let cert_base_path =
-        match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
+    if foreground {
+        println!("Initialising SAFE Authenticator services...");
+        authd_run(listen, None, None)
+    } else {
+        // Since the authd service runs as a system process, we need to provide
+        // the user's local project directory path which is where certificates are shared through
+        let cert_base_path = match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
             Some(dirs) => dirs.config_dir().display().to_string(),
             None => return Err(Error::GeneralError(
                 "Failed to obtain local project directory path where to write authd certificate to"
@@ -56,52 +58,53 @@ pub fn start_authd(listen: &str) -> Result<()> {
             )),
         };
 
-    // The safe_vault also stores the certificate in the user's local project directory, thus let's
-    // get the path so we pass it down to the SafeAuthenticator API so it can connect to vault
-    let config_dir_path = match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
-        Some(dirs) => {
-            // FIXME: safe_core is appending '\config' to the path provided,
-            // so we remove it from the path. It seems to be a bug in safe_core lib:
-            // https://github.com/maidsafe/safe_client_libs/issues/1054
-            let components = dirs.config_dir().components().collect::<Vec<_>>();
-            let path: std::path::PathBuf = components[..components.len()-1].iter().collect();
-            path.display().to_string()
-        },
-        None => return Err(Error::GeneralError("Failed to obtain local project directory path where to read safe_vault certificate from".to_string()))
-    };
+        // The safe_vault also stores the certificate in the user's local project directory, thus let's
+        // get the path so we pass it down to the SafeAuthenticator API so it can connect to vault
+        let config_dir_path = match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
+            Some(dirs) => {
+                // FIXME: safe_core is appending '\config' to the path provided,
+                // so we remove it from the path. It seems to be a bug in safe_core lib:
+                // https://github.com/maidsafe/safe_client_libs/issues/1054
+                let components = dirs.config_dir().components().collect::<Vec<_>>();
+                let path: std::path::PathBuf = components[..components.len()-1].iter().collect();
+                path.display().to_string()
+            },
+            None => return Err(Error::GeneralError("Failed to obtain local project directory path where to read safe_vault certificate from".to_string()))
+        };
 
-    let output = process::Command::new("sc")
-        .args(&[
-            "start",
-            SERVICE_NAME,
-            listen,
-            &cert_base_path,
-            &config_dir_path,
-        ])
-        .output()
-        .map_err(|err| {
-            Error::GeneralError(format!(
-                "Failed to execute service control manager: {}",
-                err
-            ))
-        })?;
+        let output = process::Command::new("sc")
+            .args(&[
+                "start",
+                SERVICE_NAME,
+                listen,
+                &cert_base_path,
+                &config_dir_path,
+            ])
+            .output()
+            .map_err(|err| {
+                Error::GeneralError(format!(
+                    "Failed to execute service control manager: {}",
+                    err
+                ))
+            })?;
 
-    if output.status.success() {
-        println!("safe-authd service started successfully!");
-        Ok(())
-    } else {
-        match output.status.code() {
-            Some(1056) => {
-                // serice control manager exit code 1056 is: An instance of the service is already running
-                Err(Error::AuthdAlreadyStarted(format!(
+        if output.status.success() {
+            println!("safe-authd service started successfully!");
+            Ok(())
+        } else {
+            match output.status.code() {
+                Some(1056) => {
+                    // serice control manager exit code 1056 is: An instance of the service is already running
+                    Err(Error::AuthdAlreadyStarted(format!(
+                        "Failed to start safe-authd service: {}",
+                        String::from_utf8_lossy(&output.stdout)
+                    )))
+                }
+                Some(_) | None => Err(Error::GeneralError(format!(
                     "Failed to start safe-authd service: {}",
                     String::from_utf8_lossy(&output.stdout)
-                )))
+                ))),
             }
-            Some(_) | None => Err(Error::GeneralError(format!(
-                "Failed to start safe-authd service: {}",
-                String::from_utf8_lossy(&output.stdout)
-            ))),
         }
     }
 }
@@ -140,9 +143,9 @@ pub fn stop_authd() -> Result<()> {
     }
 }
 
-pub fn restart_authd(listen: &str) -> Result<()> {
+pub fn restart_authd(listen: &str, foreground: bool) -> Result<()> {
     stop_authd()?;
-    start_authd(listen)?;
+    start_authd(listen, foreground)?;
     println!("Success, safe-authd restarted!");
     Ok(())
 }

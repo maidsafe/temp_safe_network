@@ -15,9 +15,9 @@ pub async fn process_req(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
     if let Value::Array(args) = &params {
-        if args.len() > 3 {
+        if args.is_empty() || args.len() > 3 {
             Err(format!(
-                "Incorrect params for 'create-acc' method: {:?}",
+                "Incorrect number of params for 'create-acc' method: {:?}",
                 params
             ))
         } else {

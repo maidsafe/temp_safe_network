@@ -31,4 +31,4 @@ pub type SharedSafeAuthenticatorHandle = Arc<Mutex<SafeAuthenticator>>;
 
 // A thread-safe handle to keep the list of notifications subscribers' endpoints,
 // we also keep the certificates' base path which is needed to create the communication channel
-pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeMap<String, Option<String>>>>;
+pub type SharedNotifEndpointsHandle = Arc<Mutex<BTreeMap<String, String>>>;

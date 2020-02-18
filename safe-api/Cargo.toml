@@ -13,7 +13,6 @@ bincode = "~1.1.4"
 chrono = "0.4.6"
 directories = "2.0.2"
 env_logger = "0.6.0"
-failure = "0.1"
 futures = "^0.1.29"
 jsonrpc-quic = { path = "../jsonrpc-quic", version = "~0.0.2" }
 lazy_static = "~1.4.0"
@@ -23,15 +22,16 @@ multibase = "0.6.0"
 rand = "0.6.5"
 rand_core = "0.4.0"
 relative-path = "0.4.0"
-safe_app = { git = "https://github.com/lionel1704/safe_client_libs.git", branch = "update-everything" }
-safe_authenticator = { git = "https://github.com/lionel1704/safe_client_libs.git", branch = "update-everything" }
-safe_core = { git = "https://github.com/lionel1704/safe_client_libs.git", branch = "update-everything" }
+safe_app = { git = "https://github.com/lionel1704/safe_client_libs.git", branch = "mobile-fix" }
+safe_authenticator = { git = "https://github.com/lionel1704/safe_client_libs.git", branch = "mobile-fix" }
+safe_core = { git = "https://github.com/lionel1704/safe_client_libs.git", branch = "mobile-fix" }
 safe-nd = "^0.8.0"
 serde = "1.0.91"
 serde_json = "1.0.41"
 threshold_crypto = "~0.3.2"
 tiny-keccak = "~1.5.0"
-url = "1.7.2"
+tokio = { version = "^0.2.11", features = ["rt-threaded"] }
+url = "~2.1.1"
 urlencoding = "1.0.0"
 validator = "0.8.0"
 validator_derive = "0.8.0"

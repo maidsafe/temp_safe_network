@@ -7,15 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod client_endpoint;
 mod errors;
 mod jsonrpc;
-mod quic_client;
+mod server_endpoint;
 
 const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-24"];
 
+pub use client_endpoint::ClientEndpoint;
 pub use errors::{Error, Result};
-
-pub use jsonrpc::{
-    jsonrpc_send, jsonrpc_serialised_error, jsonrpc_serialised_result, parse_jsonrpc_request,
-    JsonRpcReq,
+pub use server_endpoint::{
+    ConnectionDriver, Endpoint, IncomingConn, IncomingJsonRpcRequest, JsonRpcResponseStream,
 };
+
+pub use jsonrpc::{JsonRpcRequest, JsonRpcResponse};

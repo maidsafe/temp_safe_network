@@ -10,10 +10,11 @@
 use super::{
     constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
     helpers::send_authd_request,
+    notifs_endpoint::jsonrpc_listen,
     AuthedAppsList, Error, Result, SafeAuthReqId,
 };
 use directories::BaseDirs;
-use log::{debug, /*error,*/ info, trace};
+use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
@@ -59,7 +60,7 @@ pub struct AuthdStatus {
     pub logged_in: bool,
     pub num_auth_reqs: u32,
     pub num_notif_subs: u32,
-    pub authd_version: Option<String>,
+    pub authd_version: String,
 }
 
 // Type of the list of pending authorisation requests
@@ -396,7 +397,7 @@ impl SafeAuthdClient {
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url, &cert_base_path.display().to_string()]),
-        )?;
+        ).map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({}) to receive authorisation request for self-auth: {}", endpoint_url, err)))?;
 
         debug!(
             "Successfully subscribed to receive authorisation requests notifications: {}",
@@ -405,13 +406,13 @@ impl SafeAuthdClient {
 
         // Start listening first
         // We need a channel to receive auth req notifications from the thread running the QUIC endpoint
-        let (_tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
+        let (tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
 
-        let _listen = endpoint_url.to_string();
+        let listen = endpoint_url.to_string();
         // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
         // TODO: if there was a previous subscription, make sure we kill the previously created threads
         let endpoint_thread_join_handle = thread::spawn(move || {
-            /*match jsonrpc_listen(&listen, &cert_base_path.display().to_string(), None, None) {
+            match jsonrpc_listen(&listen, &cert_base_path.display().to_string(), tx) {
                 Ok(()) => {
                     info!("Endpoint successfully launched for receiving auth req notifications");
                 }
@@ -421,7 +422,7 @@ impl SafeAuthdClient {
                         err
                     );
                 }
-            }*/
+            }
         });
 
         let cb = Box::new(allow_cb);
@@ -467,8 +468,8 @@ impl SafeAuthdClient {
         debug!("Sending subscribe action request to SAFE Authenticator...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_UNSUBSCRIBE,
-            json!(endpoint_url),
+            SAFE_AUTHD_METHOD_SUBSCRIBE,
+            json!(vec![endpoint_url]),
         )?;
 
         debug!(

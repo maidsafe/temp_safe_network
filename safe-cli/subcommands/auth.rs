@@ -195,9 +195,9 @@ pub fn auth_commander(
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => match notifs_endpoint {
             None => Err("The endpoint URL needs to be provided. If you subscribe within the interactive shell the URL is then optional".to_string()),
-            Some(endpoint) => {
-                let safe_authd = SafeAuthdClient::new(Some(endpoint.clone()));
-                authd_subscribe_url(&safe_authd, endpoint)
+            Some(notif_endpoint) => {
+                let safe_authd = SafeAuthdClient::new(endpoint);
+                authd_subscribe_url(&safe_authd, notif_endpoint)
             }
         },
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {

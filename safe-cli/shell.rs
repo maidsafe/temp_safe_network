@@ -179,7 +179,7 @@ fn call_cli(
     mimic_cli_args.extend(args.iter());
 
     // We can now pass this args array to the CLI
-    match cli::run_with(&mimic_cli_args, safe) {
+    match cli::run_with(Some(&mimic_cli_args), safe) {
         Ok(()) => Ok(()),
         Err(err) => {
             writeln!(io, "{}", err)?;

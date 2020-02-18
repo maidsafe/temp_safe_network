@@ -1,6 +1,2 @@
 [workspace]
 members = ["safe-cli", "safe-api", "safe-ffi", "safe-authd", "jsonrpc-quic"]
-
-
-[patch.crates-io]
-self_update = { git = "https://github.com/joshuef/self_update", rev = "997f569" }

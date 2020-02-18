@@ -239,13 +239,15 @@ pub fn pretty_print_authed_apps(authed_apps: AuthedAppsList) {
 
         let app_permissions = format!(
             "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-            authed_app.app_permissions.transfer_coins,
-            authed_app.app_permissions.perform_mutations,
-            authed_app.app_permissions.get_balance
+            boolean_to_string(authed_app.app_permissions.transfer_coins),
+            boolean_to_string(authed_app.app_permissions.perform_mutations),
+            boolean_to_string(authed_app.app_permissions.get_balance)
         );
         let permissions_report = format!(
             "Own container: {}\n{}\nContainers: {}",
-            authed_app.own_container, app_permissions, containers_perms
+            boolean_to_string(authed_app.own_container),
+            app_permissions,
+            containers_perms
         );
 
         table.add_row(row![
@@ -280,13 +282,15 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: Option<&str
 
             let app_permissions = format!(
                 "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-                auth_req.app_permissions.transfer_coins,
-                auth_req.app_permissions.perform_mutations,
-                auth_req.app_permissions.get_balance
+                boolean_to_string(auth_req.app_permissions.transfer_coins),
+                boolean_to_string(auth_req.app_permissions.perform_mutations),
+                boolean_to_string(auth_req.app_permissions.get_balance)
             );
             let permissions_report = format!(
                 "Own container: {}\n{}\nContainers: {}",
-                auth_req.own_container, app_permissions, containers_perms
+                boolean_to_string(auth_req.own_container),
+                app_permissions,
+                containers_perms
             );
 
             table.add_row(row![
@@ -306,13 +310,11 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
     table.add_row(row![bFg->"SAFE Authenticator status"]);
     table.add_row(row![
         "Authenticator daemon version",
-        status_report
-            .authd_version
-            .unwrap_or_else(|| "<not reported>".to_string()),
+        status_report.authd_version
     ]);
     table.add_row(row![
         "Logged in to a SAFE account?",
-        if status_report.logged_in { "Yes" } else { "No" },
+        boolean_to_string(status_report.logged_in),
     ]);
     table.add_row(row![
         "Number of pending authorisation requests",
@@ -327,7 +329,15 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
 
 // Private helpers
 
-// TODO: use a different crate than rpassword as it has problems with some Windows shells including PowerShell
+#[inline]
+fn boolean_to_string(boolean: bool) -> &'static str {
+    if boolean {
+        "Yes"
+    } else {
+        "No"
+    }
+}
+
 fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
     if let Some(str) = arg {
         Ok(str)

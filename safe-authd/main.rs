@@ -71,6 +71,9 @@ enum CmdArgs {
         /// Address to listen on
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
+        /// Run in foreground instead of daemon mode
+        #[structopt(long = "foreground")]
+        fg: bool,
     },
     /// To be invoked by Windows Service Control Manager to start the authd service. Only for Windows platforms
     #[structopt(name = "sc-start")]
@@ -84,6 +87,9 @@ enum CmdArgs {
         /// Address to listen on
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
+        /// Run in foreground instead of daemon mode
+        #[structopt(long = "foreground")]
+        fg: bool,
     },
     /// Update the application to the latest available version
     #[structopt(name = "update")]
@@ -110,9 +116,9 @@ fn process_command(opt: CmdArgs) -> Result<()> {
             .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err))),
         CmdArgs::Install {} => install_authd(),
         CmdArgs::Uninstall {} => uninstall_authd(),
-        CmdArgs::Start { listen, .. } => start_authd(&listen),
+        CmdArgs::Start { listen, fg, .. } => start_authd(&listen, fg),
         CmdArgs::ScStart {} => start_authd_from_sc(),
         CmdArgs::Stop {} => stop_authd(),
-        CmdArgs::Restart { listen } => restart_authd(&listen),
+        CmdArgs::Restart { listen, fg } => restart_authd(&listen, fg),
     }
 }

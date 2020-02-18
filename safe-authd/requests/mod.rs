@@ -24,19 +24,21 @@ use crate::{
     errors::Error,
     shared::{SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle},
 };
-use jsonrpc_quic::{jsonrpc_serialised_error, jsonrpc_serialised_result, JsonRpcReq};
-
-type AuthdResponse = Box<[u8]>;
+use jsonrpc_quic::{JsonRpcRequest, JsonRpcResponse};
 
 const JSONRPC_AUTH_ERROR: isize = -1;
 
+// Process the JSON-RPC request based on the method
 pub async fn process_jsonrpc_request(
-    jsonrpc_req: JsonRpcReq,
+    jsonrpc_req: JsonRpcRequest,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
-) -> Result<AuthdResponse, Error> {
-    println!("Processing new incoming request: '{}'", jsonrpc_req.method);
+) -> Result<JsonRpcResponse, Error> {
+    println!(
+        "Processing new incoming request ({}): '{}'",
+        jsonrpc_req.id, jsonrpc_req.method
+    );
 
     let params = jsonrpc_req.params;
     let outcome = match jsonrpc_req.method.as_str() {
@@ -72,17 +74,19 @@ pub async fn process_jsonrpc_request(
         }
     };
 
+    // Return a JsonRpcResponse containing either a result or an error according to the outcome
     match outcome {
-        Ok(result) => {
-            let serialised_res =
-                jsonrpc_serialised_result(result, jsonrpc_req.id).map_err(Error::Unexpected)?;
-            Ok(serialised_res.into_bytes().into())
-        }
+        Ok(result) => Ok(JsonRpcResponse::result(result, jsonrpc_req.id)),
         Err(err_msg) => {
-            let serialised_err_res =
-                jsonrpc_serialised_error(&err_msg, "", JSONRPC_AUTH_ERROR, Some(jsonrpc_req.id))
-                    .map_err(Error::Unexpected)?;
-            Ok(serialised_err_res.into_bytes().into())
+            println!(
+                "Failed processing incoming request {}: {}",
+                jsonrpc_req.id, err_msg
+            );
+            Ok(JsonRpcResponse::error(
+                err_msg,
+                JSONRPC_AUTH_ERROR,
+                Some(jsonrpc_req.id),
+            ))
         }
     }
 }

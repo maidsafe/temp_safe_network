@@ -9,7 +9,7 @@
 
 use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use chrono::{SecondsFormat, Utc};
-use jsonrpc_quic::jsonrpc_send;
+use jsonrpc_quic::ClientEndpoint;
 use log::debug;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName};
@@ -19,6 +19,7 @@ use std::{
     str::{self, FromStr},
 };
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
+use tokio::runtime::Builder;
 use url::Url;
 
 const URL_VERSION_QUERY_NAME: &str = "v=";
@@ -223,7 +224,11 @@ pub fn gen_timestamp_nanos() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
 }
 
-pub fn send_authd_request<T>(endpoint: &str, method: &str, params: serde_json::Value) -> Result<T>
+pub fn send_authd_request<T>(
+    dest_endpoint: &str,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<T>
 where
     T: DeserializeOwned,
 {
@@ -233,16 +238,62 @@ where
         )),
         Some(dirs) => {
             let cert_base_path = dirs.config_dir().display().to_string();
-            jsonrpc_send::<T>(
-                endpoint,
-                method,
-                params,
-                Some(&cert_base_path),
+
+            let jsonrpc_quic_client = ClientEndpoint::new(
+                &cert_base_path,
                 Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
+                false,
             )
-            .map_err(|err| match err {
-                jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
-                other => Error::AuthdClientError(other.to_string()),
+            .map_err(|err| {
+                Error::AuthdClientError(format!("Failed to create client endpoint: {}", err))
+            })?;
+
+            let mut runtime = Builder::new()
+                .threaded_scheduler()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    Error::AuthdClientError(format!("Failed to create runtime: {}", err))
+                })?;
+
+            let (endpoint_driver, mut outgoing_conn) = {
+                runtime
+                    .enter(|| jsonrpc_quic_client.bind())
+                    .map_err(|err| {
+                        Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
+                    })?
+            };
+
+            let _handle = runtime.spawn(endpoint_driver);
+
+            runtime.block_on(async {
+                let (driver, mut new_conn) = outgoing_conn
+                    .connect(dest_endpoint, None)
+                    .await
+                    .map_err(|err| {
+                        Error::AuthdClientError(format!(
+                            "Failed to establish connection with authd: {}",
+                            err
+                        ))
+                    })?;
+
+                tokio::spawn(driver);
+
+                let res = new_conn
+                    .send(method, params)
+                    .await
+                    .map_err(|err| match err {
+                        jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
+                        other => Error::AuthdClientError(other.to_string()),
+                    });
+
+                // Allow the endpoint driver to automatically shut down
+                drop(outgoing_conn);
+
+                // Let the connection finish closing gracefully
+                //runtime.block_on(handle).unwrap();
+
+                res
             })
         }
     }

@@ -647,9 +647,9 @@ dependencies = [
 
 [[package]]
 name = "csv-core"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca2be23073829399f39689074cca6997d929a634f73e5d08e24323c30c01832e"
+checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
 dependencies = [
  "memchr",
 ]
@@ -900,7 +900,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14ce82f12540e448ece75759f36d341dcca4148bb76fb393b087c24e00b15d07"
 dependencies = [
- "proc-macro-error 0.4.8",
+ "proc-macro-error 0.4.9",
  "proc-macro2 1.0.8",
  "quote 1.0.2",
  "rustversion",
@@ -1304,9 +1304,9 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eff2656d88f158ce120947499e971d743c05dbcbed62e5bd2f38f1698bbc3772"
+checksum = "e2c55f143919fbc0bc77e427fe2d74cf23786d7c1875666f2fde3ac3c659bb67"
 dependencies = [
  "libc",
 ]
@@ -1610,8 +1610,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio 0.2.11",
- "tracing",
- "tracing-futures",
  "url 2.1.1",
 ]
 
@@ -2283,9 +2281,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-error"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "875077759af22fa20b610ad4471d8155b321c89c3f2785526c9839b099be4e0a"
+checksum = "052b3c9af39c7e5e94245f820530487d19eb285faedcb40e0c3275132293f242"
 dependencies = [
  "proc-macro-error-attr",
  "proc-macro2 1.0.8",
@@ -2296,9 +2294,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-error-attr"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5717d9fa2664351a01ed73ba5ef6df09c01a521cb42cb65a061432a826f3c7a"
+checksum = "d175bef481c7902e63e3165627123fff3502f06ac043d3ef42d08c1246da9253"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
@@ -2358,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.3.0"
-source = "git+https://github.com/lionel1704/quic-p2p?branch=test#b7a3acb98706281eaad790f88e1bbafbe14eedf6"
+source = "git+https://github.com/lionel1704/quic-p2p?branch=test#610df2a616c08aca89c1677fd4d4afdeacff2d8e"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -2928,7 +2926,6 @@ dependencies = [
  "chrono",
  "directories 2.0.2",
  "env_logger 0.6.2",
- "failure",
  "futures 0.1.29",
  "jsonrpc-quic",
  "lazy_static",
@@ -2938,7 +2935,7 @@ dependencies = [
  "rand 0.6.5",
  "rand_core 0.4.2",
  "relative-path",
- "safe-nd 0.8.0",
+ "safe-nd",
  "safe_app",
  "safe_authenticator",
  "safe_core",
@@ -2946,8 +2943,9 @@ dependencies = [
  "serde_json",
  "threshold_crypto",
  "tiny-keccak",
+ "tokio 0.2.11",
  "unwrap",
- "url 1.7.2",
+ "url 2.1.1",
  "urlencoding",
  "validator",
  "validator_derive",
@@ -2974,8 +2972,6 @@ dependencies = [
  "serde_json",
  "structopt 0.2.18",
  "tokio 0.2.11",
- "tracing",
- "tracing-futures",
  "unwrap",
  "url 2.1.1",
  "urlencoding",
@@ -3003,7 +2999,7 @@ dependencies = [
  "reqwest 0.9.24",
  "rpassword",
  "safe-api",
- "safe-nd 0.6.2",
+ "safe-nd",
  "self_update",
  "serde",
  "serde_json",
@@ -3020,28 +3016,10 @@ dependencies = [
  "ffi_utils 0.14.0",
  "log 0.4.8",
  "safe-api",
- "safe-nd 0.8.0",
+ "safe-nd",
  "safe_bindgen",
  "serde",
  "serde_json",
- "unwrap",
-]
-
-[[package]]
-name = "safe-nd"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9df7e282c3a46a64db93af36d419ddda09e94dc162e3dc6cddc7d954f019587"
-dependencies = [
- "bincode",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.6.5",
- "serde",
- "sha3",
- "threshold_crypto",
- "tiny-keccak",
  "unwrap",
 ]
 
@@ -3066,7 +3044,7 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.12.0"
-source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=update-everything#76355cb0f57e34ae1613d3d27d3333ec8b288111"
+source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=mobile-fix#8fc67a2fa4ec0e730128152568a17884e2c11193"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3077,7 +3055,7 @@ dependencies = [
  "lru-cache",
  "miscreant",
  "rand 0.6.5",
- "safe-nd 0.8.0",
+ "safe-nd",
  "safe_authenticator",
  "safe_core",
  "self_encryption",
@@ -3092,7 +3070,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.12.0"
-source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=update-everything#76355cb0f57e34ae1613d3d27d3333ec8b288111"
+source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=mobile-fix#8fc67a2fa4ec0e730128152568a17884e2c11193"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3102,7 +3080,7 @@ dependencies = [
  "log 0.4.8",
  "lru-cache",
  "rand 0.6.5",
- "safe-nd 0.8.0",
+ "safe-nd",
  "safe_core",
  "serde",
  "threshold_crypto",
@@ -3132,7 +3110,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.37.3"
-source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=update-everything#76355cb0f57e34ae1613d3d27d3333ec8b288111"
+source = "git+https://github.com/lionel1704/safe_client_libs.git?branch=mobile-fix#8fc67a2fa4ec0e730128152568a17884e2c11193"
 dependencies = [
  "bincode",
  "bytes 0.4.12",
@@ -3154,7 +3132,7 @@ dependencies = [
  "quic-p2p",
  "rand 0.6.5",
  "regex 1.3.4",
- "safe-nd 0.8.0",
+ "safe-nd",
  "self_encryption",
  "serde",
  "serde-value",
@@ -3195,9 +3173,9 @@ dependencies = [
 
 [[package]]
 name = "scopeguard"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b42e15e59b18a828bbf5c58ea01debb36b9b096346de35d941dcb89009f24a0d"
+checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "sct"
@@ -3251,8 +3229,9 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.12.0"
-source = "git+https://github.com/joshuef/self_update?rev=997f569#997f569ae5b1b5423535cca2a3e9a5e783a7c749"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c505727b982d8c85ea1b3345a3a3c2712ba3d8417708ebacc960e4f8f84e3dbc"
 dependencies = [
  "either",
  "flate2",
@@ -3510,7 +3489,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "095064aa1f5b94d14e635d0a5684cf140c43ae40a0fd990708d38f5d669e5f64"
 dependencies = [
  "heck",
- "proc-macro-error 0.4.8",
+ "proc-macro-error 0.4.9",
  "proc-macro2 1.0.8",
  "quote 1.0.2",
  "syn 1.0.14",
@@ -4064,16 +4043,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13a46f11e372b8bd4b4398ea54353412fdd7fd42a8370c7e543e218cf7661978"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "tracing-futures"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33848db47a7c848ab48b66aab3293cb9c61ea879a3586ecfcd17302fcea0baf1"
-dependencies = [
- "pin-project",
- "tracing",
 ]
 
 [[package]]

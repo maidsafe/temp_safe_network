@@ -15,8 +15,11 @@ pub async fn process_req(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
     if let Value::Array(args) = &params {
-        if args.len() > 2 {
-            Err(format!("Incorrect params for 'login' method: {:?}", params))
+        if args.is_empty() || args.len() > 2 {
+            Err(format!(
+                "Incorrect number of params for 'login' method: {:?}",
+                params
+            ))
         } else {
             println!("Logging in to SAFE account...");
             let passphrase = args[0].as_str().ok_or_else(|| {

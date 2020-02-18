@@ -9,6 +9,7 @@
 
 use std::fmt;
 
+#[derive(Debug)]
 pub enum Error {
     ClientError(String),
     RemoteEndpointError(String),

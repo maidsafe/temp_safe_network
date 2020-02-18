@@ -57,15 +57,14 @@ pub struct CmdArgs {
 
 pub fn run() -> Result<(), String> {
     let mut safe = Safe::default();
-    run_with(&[], &mut safe)
+    run_with(None, &mut safe)
 }
 
-pub fn run_with(cmd_args: &[&str], mut safe: &mut Safe) -> Result<(), String> {
+pub fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<(), String> {
     // Let's first get all the arguments passed in, either as function's args, or CLI args
-    let args = if cmd_args.is_empty() {
-        CmdArgs::from_args()
-    } else {
-        CmdArgs::from_iter_safe(cmd_args).map_err(|err| err.to_string())?
+    let args = match cmd_args {
+        None => CmdArgs::from_args(),
+        Some(cmd_args) => CmdArgs::from_iter_safe(cmd_args).map_err(|err| err.to_string())?,
     };
 
     let prev_base = safe.xorurl_base;

@@ -18,9 +18,9 @@ pub async fn process_req(
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<Value, String> {
     if let Value::Array(args) = &params {
-        if args.len() > 2 || !args[0].is_string() || !args[1].is_string() {
+        if args.is_empty() || args.len() > 2 {
             Err(format!(
-                "Incorrect params for 'subscribe' method: {:?}",
+                "Incorrect number of params for 'subscribe' method: {:?}",
                 params
             ))
         } else {
@@ -42,11 +42,11 @@ pub async fn process_req(
                         params
                     )),
                     Some(str) => {
-                        Some(str.to_string())
+                        str.to_string()
                     }
                 }
             } else {
-                None
+                "".to_string()
             };
 
             let mut notif_endpoints_list = notif_endpoints_handle.lock().await;

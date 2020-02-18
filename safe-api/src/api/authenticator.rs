@@ -585,14 +585,14 @@ fn gen_auth_response(
             ))
         })?;
 
-    debug!("Encoding response... {:?}", auth_granted);
+    debug!("Encoding response with auth credentials auth granted...");
     let resp = encode_msg(&IpcMsg::Resp {
         req_id,
         response: IpcResp::Auth(Ok(auth_granted)),
     })
     .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
 
-    debug!("Returning auth response generated: {:?}", resp);
+    debug!("Returning auth response generated");
 
     Ok(resp)
 }

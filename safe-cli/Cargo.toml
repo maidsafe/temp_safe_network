@@ -38,7 +38,7 @@ fake-auth = ["safe-api/fake-auth"]
 scl-mock = ["safe-api/scl-mock"]
 
 [dependencies.self_update]
-version = "^0.12.0"
+version = "^0.13.0"
 default-features = false
 features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"]
 
@@ -47,10 +47,10 @@ assert_cmd = "0.11.1"
 duct = "0.12.0"
 predicates = "1.0.0"
 pretty_assertions = "0.6.1"
-safe-nd = "^0.6.2"
+safe-nd = "^0.8.0"
 unwrap = "~1.2.1"
 
 [dev-dependencies.cargo-husky]
 version = "1"
-default-features = false # Disable features which are enabled by default
+default-features = false
 features = ["precommit-hook","user-hooks"]

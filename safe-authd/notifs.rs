@@ -8,7 +8,7 @@
 // Software.
 
 use super::shared::*;
-use jsonrpc_quic::jsonrpc_send;
+use jsonrpc_quic::ClientEndpoint;
 use serde_json::json;
 use std::{collections::BTreeMap, time::Duration};
 use tokio::time::delay_for;
@@ -82,11 +82,7 @@ pub async fn monitor_pending_auth_reqs(
             let mut response = None;
             let mut current_req_notified = false;
             for (url, cert_base_path) in notif_endpoints_list.iter() {
-                match send_notification(
-                    url,
-                    incoming_auth_req,
-                    cert_base_path.as_ref().map(String::as_str),
-                ) {
+                match send_notification(url, incoming_auth_req, cert_base_path).await {
                     None => {
                         let mut notif_endpoints_list = notif_endpoints_handle.lock().await;
                         notif_endpoints_list.remove(url);
@@ -136,19 +132,21 @@ pub async fn monitor_pending_auth_reqs(
     }
 }
 
-fn send_notification(
+async fn send_notification(
     url: &str,
     auth_req: &IncomingAuthReq,
-    cert_base_path: Option<&str>,
+    cert_base_path: &str,
 ) -> Option<NotifResponse> {
     println!("Notifying subscriber: {}", url);
-    match jsonrpc_send::<String>(
+    match jsonrpc_send(
         url,
         JSONRPC_METHOD_AUTH_REQ_NOTIF,
         json!(auth_req.auth_req),
         cert_base_path,
         None,
-    ) {
+    )
+    .await
+    {
         Ok(notif_result) => {
             let response = if notif_result == "true" {
                 Some(true)
@@ -161,26 +159,58 @@ fn send_notification(
             Some(response)
         }
         Err(err) => {
-            match err {
-                jsonrpc_quic::Error::RemoteEndpointError(msg) => {
-                    // Subscriber responded but with an error, we won't unsubscribe it, but will
-                    // consider this response as a "no decision" for the auth req
-                    println!(
-                        "Subscriber '{}' responded to the notification with an error: {:?}",
-                        url, msg
-                    );
-                    Some(None)
-                }
-                other => {
-                    // Let's unsubscribe it immediately, ... we could be more laxed
-                    // in the future allowing some unresponsiveness
-                    println!(
-                        "Subscriber '{}' is being automatically unsubscribed since response to notification couldn't be obtained: {:?}",
-                        url, other.to_string()
-                    );
-                    None
-                }
-            }
+            // Let's unsubscribe it immediately, ... we could be more laxed
+            // in the future allowing some unresponsiveness
+            println!(
+                "Subscriber '{}' is being automatically unsubscribed since response to notification couldn't be obtained: {:?}",
+                url, err
+            );
+            None
         }
+    }
+}
+
+async fn jsonrpc_send(
+    url: &str,
+    method: &str,
+    params: serde_json::Value,
+    cert_base_path: &str,
+    idle_timeout: Option<u64>,
+) -> Result<String, String> {
+    let jsonrpc_quic_client = ClientEndpoint::new(cert_base_path, idle_timeout, false)
+        .map_err(|err| format!("Failed to create client endpoint: {}", err))?;
+
+    let (endpoint_driver, mut outgoing_conn) = {
+        jsonrpc_quic_client
+            .bind()
+            .map_err(|err| format!("Failed to bind endpoint: {}", err))?
+    };
+
+    let _handle = tokio::spawn(endpoint_driver);
+    let url2 = url.to_string();
+    let method2 = method.to_string();
+    let (driver, mut new_conn) = outgoing_conn.connect(&url2, None).await?;
+
+    tokio::spawn(driver);
+
+    let response = new_conn.send::<String>(&method2, params).await;
+
+    // Allow the endpoint driver to automatically shut down
+    drop(outgoing_conn);
+
+    match response {
+        Ok(r) => Ok(r),
+        Err(err) => match err {
+            jsonrpc_quic::Error::RemoteEndpointError(msg) => {
+                // Subscriber responded but with an error, we won't unsubscribe it, but will
+                // consider this response as a "no decision" for the auth req
+                println!(
+                    "Subscriber '{}' responded to the notification with an error: {:?}",
+                    url, msg
+                );
+                Ok(msg)
+            }
+            other => Err(format!("{}", other)),
+        },
     }
 }

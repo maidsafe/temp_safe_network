@@ -60,14 +60,17 @@ async fn handle_authorisation(
                 // let's now treat it according to its type
                 match request {
                     SafeAuthReq::Auth(app_auth_req) => {
-                        println!("The following application authorisation request was received:");
+                        println!(
+                            "The following application authorisation request ({}) was received:",
+                            req_id
+                        );
                         println!("{:?}", app_auth_req);
 
                         let mut auth_reqs_list = auth_reqs_handle.lock().await;
 
                         // Reject if there are too many pending auth reqs
                         if auth_reqs_list.len() >= MAX_NUMBER_QUEUED_AUTH_REQS {
-                            Err(format!("Authorisation request is rejected by authd since it reached its maximum number ({}) of pending auth requests", MAX_NUMBER_QUEUED_AUTH_REQS))
+                            Err(format!("Authorisation request ({}) is rejected by authd since it reached its maximum number ({}) of pending auth requests", req_id, MAX_NUMBER_QUEUED_AUTH_REQS))
                         } else {
                             // We need a channel to communicate with the thread which will be
                             // sending the notification to a subcribed endpoint. Once it got a response
@@ -183,9 +186,7 @@ async fn await_authorisation_decision(
             // even that the notifs thread may have removed it already
             let mut auth_reqs_list = auth_reqs_handle.lock().await;
             auth_reqs_list.remove(&req_id);
-            let msg = "Failed to get authorisation response";
-            println!("{}", msg);
-            Err(msg.to_string())
+            Err("Failed to get authorisation response".to_string())
         }
     }
 }

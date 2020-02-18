@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{quic_client::quic_send, Error};
+use super::Error;
 use rand::{self, Rng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -21,37 +21,74 @@ const JSONRPC_PARSE_ERROR: isize = -32700;
 const JSONRPC_INVALID_REQUEST: isize = -32600;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct JsonRpcReq {
+pub struct JsonRpcRequest {
     jsonrpc: String,
     pub method: String,
     pub params: serde_json::Value,
     pub id: u32,
 }
 
+impl JsonRpcRequest {
+    pub fn new(method: &str, params: serde_json::Value) -> Self {
+        Self {
+            jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+            method: method.to_string(),
+            params,
+            id: rand::thread_rng().gen_range(0, std::u32::MAX) + 1,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
-struct JsonRpcRes<'a> {
-    jsonrpc: &'a str,
+pub struct JsonRpcResponse {
+    jsonrpc: String,
     result: Option<serde_json::Value>,
-    error: Option<JsonRpcError<'a>>,
+    error: Option<JsonRpcError>,
     id: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct JsonRpcError<'a> {
+struct JsonRpcError {
     code: isize,
-    message: &'a str,
-    data: &'a str,
+    message: String,
+    data: String,
 }
 
-// It parses the request bytes an returns a JsonRpcReq, or a
+impl JsonRpcResponse {
+    // Construct a JsonRpcResponse containing a successfull response
+    pub fn result(result: serde_json::Value, id: u32) -> Self {
+        Self {
+            jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+            result: Some(result),
+            error: None,
+            id: Some(id),
+        }
+    }
+
+    // Construct a JsonRpcResponse containing an error response
+    pub fn error(message: String, code: isize, id: Option<u32>) -> Self {
+        Self {
+            jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+            result: None,
+            error: Some(JsonRpcError {
+                code,
+                message,
+                data: "".to_string(),
+            }),
+            id,
+        }
+    }
+}
+
+// It parses the request bytes an returns a JsonRpcRequest, or a
 // serialised JSON-RPC error response ready to send back to the origin
-pub fn parse_jsonrpc_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, String> {
+pub(crate) fn parse_jsonrpc_request(req: Vec<u8>) -> std::result::Result<JsonRpcRequest, String> {
     let req_payload = match String::from_utf8(req) {
         Ok(payload) => payload,
         Err(err) => {
-            let err_str = jsonrpc_serialised_error(
-                "Request payload is a malformed UTF-8 string",
-                &err.to_string(),
+            let err_str = serialised_jsonrpc_error(
+                "Request payload is a malformed UTF-8 string".to_string(),
+                err.to_string(),
                 JSONRPC_PARSE_ERROR,
                 None,
             )?;
@@ -59,12 +96,12 @@ pub fn parse_jsonrpc_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, St
         }
     };
 
-    let jsonrpc_req: JsonRpcReq = match serde_json::from_str(&req_payload) {
+    let jsonrpc_req: JsonRpcRequest = match serde_json::from_str(&req_payload) {
         Ok(jsonrpc) => jsonrpc,
         Err(err) => {
-            let err_str = jsonrpc_serialised_error(
-                "Failed to deserialise request payload as a JSON-RPC message",
-                &err.to_string(),
+            let err_str = serialised_jsonrpc_error(
+                "Failed to deserialise request payload as a JSON-RPC message".to_string(),
+                err.to_string(),
                 JSONRPC_INVALID_REQUEST,
                 None,
             )?;
@@ -75,84 +112,16 @@ pub fn parse_jsonrpc_request(req: Vec<u8>) -> std::result::Result<JsonRpcReq, St
     Ok(jsonrpc_req)
 }
 
-// Generates a serialised JSON-RPC error response
-pub fn jsonrpc_serialised_error(
-    message: &str,
-    data: &str,
-    code: isize,
-    id: Option<u32>,
-) -> std::result::Result<String, String> {
-    let jsonrpc_err = JsonRpcRes {
-        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION,
-        result: None,
-        error: Some(JsonRpcError {
-            code,
-            message,
-            data,
-        }),
-        id,
-    };
-    let serialised_err_res = serde_json::to_string(&jsonrpc_err)
-        .map_err(|err| format!("Failed to serialise authd error response: {:?}", err))?;
-
-    Ok(serialised_err_res)
-}
-
-// Generates a serialised JSON-RPC response containing the result, ready to be send back to the origin
-pub fn jsonrpc_serialised_result(
-    result: serde_json::Value,
-    id: u32,
-) -> std::result::Result<String, String> {
-    let jsonrpc_res = JsonRpcRes {
-        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION,
-        result: Some(result),
-        error: None,
-        id: Some(id),
-    };
-    let serialised_res = serde_json::to_string(&jsonrpc_res)
-        .map_err(|err| format!("Failed to serialise authd response: {:?}", err))?;
-
-    Ok(serialised_res)
-}
-
-// Generates a JSON-RPC request and sends it to the provided endpoint URL using QUIC
-pub fn jsonrpc_send<T>(
-    endpoint: &str,
-    method: &str,
-    params: serde_json::Value,
-    cert_base_path: Option<&str>,
-    timeout: Option<u64>,
-) -> Result<T>
+// Parse bytes to construct a JsonRpcResponse expected to contain a result of type T
+pub(crate) fn parse_jsonrpc_response<T>(response_bytes: &[u8]) -> Result<T>
 where
     T: DeserializeOwned,
 {
-    let jsonrpc_req = JsonRpcReq {
-        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
-        method: method.to_string(),
-        params,
-        id: rand::thread_rng().gen_range(0, std::u32::MAX) + 1,
-    };
-
-    let serialised_req = serde_json::to_string(&jsonrpc_req)
-        .map_err(|err| Error::ClientError(format!("Failed to serialise authd request: {}", err)))?;
-
-    // Send request over QUIC, and await for JSON-RPC response
-    let received_bytes = quic_send(
-        &endpoint,
-        &serialised_req,
-        false,
-        None,
-        cert_base_path,
-        false,
-        timeout,
-    )
-    .map_err(Error::ClientError)?;
-
-    let res_payload = std::str::from_utf8(received_bytes.as_slice())
+    let res_payload = std::str::from_utf8(response_bytes)
         .map_err(|err| Error::ClientError(format!("Failed to decode response data: {}", err)))?;
 
     match serde_json::from_str(&res_payload) {
-        Ok(JsonRpcRes {
+        Ok(JsonRpcResponse {
             jsonrpc,
             result: Some(r),
             ..
@@ -170,10 +139,10 @@ where
                 Ok(result)
             }
         }
-        Ok(JsonRpcRes {
+        Ok(JsonRpcResponse {
             error: Some(err), ..
-        }) => Err(Error::RemoteEndpointError(err.message.to_string())),
-        Ok(JsonRpcRes {
+        }) => Err(Error::RemoteEndpointError(err.message)),
+        Ok(JsonRpcResponse {
             result: None,
             error: None,
             ..
@@ -185,4 +154,27 @@ where
             err
         ))),
     }
+}
+
+// Generates a serialised JSON-RPC error response
+fn serialised_jsonrpc_error(
+    message: String,
+    data: String,
+    code: isize,
+    id: Option<u32>,
+) -> std::result::Result<String, String> {
+    let jsonrpc_err = JsonRpcResponse {
+        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+        result: None,
+        error: Some(JsonRpcError {
+            code,
+            message,
+            data,
+        }),
+        id,
+    };
+    let serialised_err_res = serde_json::to_string(&jsonrpc_err)
+        .map_err(|err| format!("Failed to serialise authd error response: {:?}", err))?;
+
+    Ok(serialised_err_res)
 }
