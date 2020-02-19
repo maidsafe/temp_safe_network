@@ -29,6 +29,9 @@ pub enum VaultSubCommands {
         /// Path where to run safe-vault executable from (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can be also used to set the path
         #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
         vault_path: Option<PathBuf>,
+        /// Vebosity level for vaults logs
+        #[structopt(short = "y", parse(from_occurrences))]
+        verbosity: u8,
     },
     /// Shutdown all running vaults processes
     #[structopt(name = "killall")]
@@ -42,7 +45,10 @@ pub enum VaultSubCommands {
 pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
     match cmd {
         Some(VaultSubCommands::Install { vault_path }) => vault_install(vault_path),
-        Some(VaultSubCommands::Run { vault_path }) => vault_run(vault_path, VAULTS_DATA_FOLDER),
+        Some(VaultSubCommands::Run {
+            vault_path,
+            verbosity,
+        }) => vault_run(vault_path, VAULTS_DATA_FOLDER, verbosity),
         Some(VaultSubCommands::Killall { vault_path }) => vault_shutdown(vault_path),
         None => Err("Missing vault subcommand".to_string()),
     }

@@ -35,7 +35,11 @@ pub fn vault_install(vault_path: Option<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
-pub fn vault_run(vault_path: Option<PathBuf>, vaults_dir: &str) -> Result<(), String> {
+pub fn vault_run(
+    vault_path: Option<PathBuf>,
+    vaults_dir: &str,
+    verbosity: u8,
+) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
     let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
@@ -55,6 +59,13 @@ pub fn vault_run(vault_path: Option<PathBuf>, vaults_dir: &str) -> Result<(), St
     println!("Storing vaults' generated data at {}", arg_vaults_dir);
 
     // Let's create an args array to pass to the network launcher tool
+    // We need a minimum of INFO level for vaults verbosity
+    let mut verbosity_arg = String::from("-yy");
+    if verbosity > 0 {
+        for _ in 0..verbosity {
+            verbosity_arg.push('y');
+        }
+    }
     let nlt_args = vec![
         "safe-nlt",
         "-v",
@@ -62,8 +73,9 @@ pub fn vault_run(vault_path: Option<PathBuf>, vaults_dir: &str) -> Result<(), St
         &arg_vault_path,
         "--vaults-dir",
         &arg_vaults_dir,
-        "-yyyy",
+        &verbosity_arg,
     ];
+
     debug!("Running network launch tool with args: {:?}", nlt_args);
 
     // We can now call the tool with the args
