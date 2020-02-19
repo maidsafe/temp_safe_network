@@ -11,9 +11,7 @@ use super::helpers::download_from_s3_and_install_bin;
 use directories::BaseDirs;
 use log::debug;
 use safe_nlt::run_with;
-use std::{fs::create_dir_all, path::PathBuf};
-
-const ENV_VAR_SAFE_VAULT_PATH: &str = "SAFE_VAULT_PATH";
+use std::{fs::create_dir_all, path::PathBuf, process::Command};
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
@@ -21,7 +19,7 @@ const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
 #[cfg(target_os = "windows")]
 const SAFE_VAULT_EXECUTABLE: &str = "safe_vault.exe";
 
-pub fn vault_install(vault_path: Option<String>) -> Result<(), String> {
+pub fn vault_install(vault_path: Option<PathBuf>) -> Result<(), String> {
     let target_path = get_vault_bin_path(vault_path)?;
     let _ = download_from_s3_and_install_bin(
         target_path,
@@ -37,7 +35,7 @@ pub fn vault_install(vault_path: Option<String>) -> Result<(), String> {
     Ok(())
 }
 
-pub fn vault_run(vault_path: Option<String>, vaults_dir: &str) -> Result<(), String> {
+pub fn vault_run(vault_path: Option<PathBuf>, vaults_dir: &str) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
     let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
@@ -73,22 +71,97 @@ pub fn vault_run(vault_path: Option<String>, vaults_dir: &str) -> Result<(), Str
     run_with(Some(&nlt_args))
 }
 
-fn get_vault_bin_path(vault_path: Option<String>) -> Result<PathBuf, String> {
-    match vault_path {
-        Some(p) => Ok(PathBuf::from(p)),
-        None => {
-            // if SAFE_VAULT_PATH is set it then overrides default
-            if let Ok(vault_path) = std::env::var(ENV_VAR_SAFE_VAULT_PATH) {
-                Ok(PathBuf::from(vault_path))
+pub fn vault_shutdown(vault_path: Option<PathBuf>) -> Result<(), String> {
+    let vault_exec_name = match vault_path {
+        Some(ref path) => {
+            let filepath = path.as_path();
+            if filepath.is_file() {
+                match filepath.file_name() {
+                    Some(filename) => match filename.to_str() {
+                        Some(name) => Ok(name),
+                        None => Err(format!("Vault path provided ({}) contains invalid unicode chars", filepath.display())),
+                    }
+                    None => Err(format!("Vault path provided ({}) is invalid as it doens't include the executable filename", filepath.display())),
+                }
             } else {
-                let base_dirs = BaseDirs::new()
-                    .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
-
-                let mut path = PathBuf::from(base_dirs.home_dir());
-                path.push(".safe");
-                path.push("vault");
-                Ok(path)
+                Err(format!("Vault path provided ({}) is invalid as it doens't include the executable filename", filepath.display()))
             }
         }
+        None => Ok(SAFE_VAULT_EXECUTABLE),
+    }?;
+
+    debug!(
+        "Killing all running vaults launched with {}...",
+        vault_exec_name
+    );
+    kill_vaults(vault_exec_name)
+}
+
+fn get_vault_bin_path(vault_path: Option<PathBuf>) -> Result<PathBuf, String> {
+    match vault_path {
+        Some(p) => Ok(p),
+        None => {
+            let base_dirs =
+                BaseDirs::new().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+
+            let mut path = PathBuf::from(base_dirs.home_dir());
+            path.push(".safe");
+            path.push("vault");
+            Ok(path)
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_vaults(exec_name: &str) -> Result<(), String> {
+    let output = Command::new("killall")
+        .arg(exec_name)
+        .output()
+        .map_err(|err| {
+            format!(
+                "Error when atempting to stop vaults ({}) processes: {}",
+                exec_name, err
+            )
+        })?;
+
+    if output.status.success() {
+        println!(
+            "Success, all processes instances of {} were stopped!",
+            exec_name
+        );
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to stop vaults ({}) processes: {}",
+            exec_name,
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn kill_vaults(exec_name: &str) -> Result<(), String> {
+    let output = Command::new("taskkill")
+        .args(&["/F", "/IM", exec_name])
+        .output()
+        .map_err(|err| {
+            format!(
+                "Error when atempting to stop vaults ({}) processes: {}",
+                exec_name, err
+            )
+        })?;
+
+    if output.status.success() {
+        println!(
+            "Success, all processes instances of {} were stopped!",
+            exec_name
+        );
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to stop vaults ({}) processes: {}",
+            exec_name,
+            String::from_utf8_lossy(&output.stderr)
+        ))
     }
 }

@@ -8,7 +8,10 @@
 // Software.
 
 use crate::operations::vault::*;
+use std::path::PathBuf;
 use structopt::StructOpt;
+
+const VAULTS_DATA_FOLDER: &str = "baby-fleming-vaults";
 
 #[derive(StructOpt, Debug)]
 pub enum VaultSubCommands {
@@ -16,22 +19,31 @@ pub enum VaultSubCommands {
     /// Install latest safe-vault released version in the system.
     Install {
         #[structopt(long = "vault-path")]
-        /// Path where to install safe-vault executable (default ~/.safe/vault/)
-        vault_path: Option<String>,
+        /// Path where to install safe-vault executable (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can be also used to set the path
+        #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
+        vault_path: Option<PathBuf>,
     },
     #[structopt(name = "run-baby-fleming")]
     /// Run vaults to form a local single-section SAFE network
     Run {
-        #[structopt(long = "vault-path")]
-        /// Path where to run safe-vault executable from (default ~/.safe/vault/)
-        vault_path: Option<String>,
+        /// Path where to run safe-vault executable from (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can be also used to set the path
+        #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
+        vault_path: Option<PathBuf>,
+    },
+    /// Shutdown all running vaults processes
+    #[structopt(name = "killall")]
+    Killall {
+        /// Path of the safe-vault executable used to launch the processes with (default ~/.safe/vault/safe_vault). The SAFE_VAULT_PATH env var can be also used to set this path
+        #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
+        vault_path: Option<PathBuf>,
     },
 }
 
 pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
     match cmd {
         Some(VaultSubCommands::Install { vault_path }) => vault_install(vault_path),
-        Some(VaultSubCommands::Run { vault_path }) => vault_run(vault_path, "baby-fleming-vaults"),
+        Some(VaultSubCommands::Run { vault_path }) => vault_run(vault_path, VAULTS_DATA_FOLDER),
+        Some(VaultSubCommands::Killall { vault_path }) => vault_shutdown(vault_path),
         None => Err("Missing vault subcommand".to_string()),
     }
 }

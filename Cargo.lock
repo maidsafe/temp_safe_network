@@ -723,9 +723,9 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "0.99.2"
+version = "0.99.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2159be042979966de68315bce7034bb000c775f22e3e834e1c52ff78f041cae8"
+checksum = "a806e96c59a76a5ba6e18735b6cf833344671e61e7863f2edb5c518ea2cac95c"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
@@ -3060,7 +3060,7 @@ dependencies = [
 [[package]]
 name = "safe-nlt"
 version = "0.0.1"
-source = "git+https://github.com/bochaco/safe-network-launch-tool.git?branch=first-draft-impl#2a3d087c1e024a5253f77e1d9f6dbaf6ef89749b"
+source = "git+https://github.com/bochaco/safe-network-launch-tool.git?branch=first-draft-impl#2e4b099b36183007f490ad58aa137c6c573a28ec"
 dependencies = [
  "directories 2.0.2",
  "env_logger 0.7.1",
