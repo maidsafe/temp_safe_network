@@ -51,6 +51,7 @@ pub fn authd_install(
         "safe-api",
         "safe-authd",
         SAFE_AUTHD_EXECUTABLE,
+        None,
     )?;
     if cfg!(windows) {
         // On Windows authd must be installed as a service

@@ -1139,7 +1139,7 @@ mod tests {
             &account1_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &unwrap!(key_pair1.clone()).sk,
+            &unwrap!(key_pair1).sk,
         ));
 
         let mut another_safe = Safe::default();

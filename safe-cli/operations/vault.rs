@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::download_from_github_and_install_bin;
+use super::helpers::download_from_s3_and_install_bin;
 use directories::BaseDirs;
 use log::debug;
 use safe_nlt::run_with;
@@ -23,7 +23,17 @@ const SAFE_VAULT_EXECUTABLE: &str = "safe_vault.exe";
 
 pub fn vault_install(vault_path: Option<String>) -> Result<(), String> {
     let target_path = get_vault_bin_path(vault_path)?;
-    let _ = download_from_github_and_install_bin(target_path, "safe_vault", SAFE_VAULT_EXECUTABLE)?;
+    let _ = download_from_s3_and_install_bin(
+        target_path,
+        "safe-vault",
+        "safe_vault",
+        SAFE_VAULT_EXECUTABLE,
+        if cfg!(target_os = "linux") {
+            Some("x86_64-unknown-linux-musl")
+        } else {
+            None
+        },
+    )?;
     Ok(())
 }
 
@@ -54,6 +64,7 @@ pub fn vault_run(vault_path: Option<String>, vaults_dir: &str) -> Result<(), Str
         &arg_vault_path,
         "--vaults-dir",
         &arg_vaults_dir,
+        "-yyyy",
     ];
     debug!("Running network launch tool with args: {:?}", nlt_args);
 
@@ -62,7 +73,6 @@ pub fn vault_run(vault_path: Option<String>, vaults_dir: &str) -> Result<(), Str
     run_with(Some(&nlt_args))
 }
 
-#[inline]
 fn get_vault_bin_path(vault_path: Option<String>) -> Result<PathBuf, String> {
     match vault_path {
         Some(p) => Ok(PathBuf::from(p)),

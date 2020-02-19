@@ -19,8 +19,9 @@ pub fn download_from_s3_and_install_bin(
     bucket: &str,
     asset_prefix: &str,
     exec_file_name: &str,
+    target_platform: Option<&str>,
 ) -> Result<String, String> {
-    let target = self_update::get_target();
+    let target = target_platform.unwrap_or_else(|| self_update::get_target());
     let available_releases = self_update::backends::s3::Update::configure()
         .bucket_name(bucket)
         .target(&target)
@@ -39,29 +40,7 @@ pub fn download_from_s3_and_install_bin(
     download_and_install_bin(target_path, target, available_releases, exec_file_name)
 }
 
-pub fn download_from_github_and_install_bin(
-    target_path: PathBuf,
-    repo_name: &str,
-    exec_file_name: &str,
-) -> Result<String, String> {
-    //let target = self_update::get_target();
-    let target = "x86_64-unknown-linux-musl";
-    let available_releases = self_update::backends::github::Update::configure()
-        .repo_owner("maidsafe")
-        .repo_name(repo_name)
-        .target(&target)
-        .bin_name("")
-        .current_version("")
-        .build()
-        .map_err(|err| {
-            format!(
-                "Error when preparing to fetch the list of releases: {}",
-                err
-            )
-        })?;
-
-    download_and_install_bin(target_path, target, available_releases, exec_file_name)
-}
+// Private helpers
 
 fn download_and_install_bin(
     target_path: PathBuf,
