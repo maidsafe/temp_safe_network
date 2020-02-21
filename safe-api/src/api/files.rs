@@ -751,8 +751,7 @@ fn files_map_sync(
             Some(file_item) => {
                 if force
                     || (compare_file_content
-                        && (file_item[FAKE_RDF_PREDICATE_SIZE] != file_size
-                            || file_item[FAKE_RDF_PREDICATE_TYPE] != file_type))
+                        && is_file_modified(safe, &Path::new(local_file_name), file_item))
                 {
                     // We need to update the current FileItem
                     if add_or_update_file_item(
@@ -814,6 +813,13 @@ fn files_map_sync(
     });
 
     Ok((processed_files, updated_files_map, success_count))
+}
+
+fn is_file_modified(safe: &mut Safe, local_filename: &Path, file_item: &FileItem) -> bool {
+    match upload_file_to_net(safe, local_filename, true /* dry-run */) {
+        Ok(local_xorurl) => file_item[FAKE_RDF_PREDICATE_LINK] != local_xorurl,
+        Err(_err) => false,
+    }
 }
 
 fn files_map_add_link(
@@ -1504,6 +1510,54 @@ mod tests {
     }
 
     #[test]
+    fn test_files_container_sync_same_size() {
+        use unwrap::unwrap;
+        let mut safe = Safe::default();
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
+
+        assert_eq!(processed_files.len(), 1);
+        assert_eq!(files_map.len(), 1);
+
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
+            "../testdata/.subhidden/test.md",
+            &xorurl,
+            false,
+            false,
+            false,
+            false
+        ));
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 1);
+
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+        let filename2 = "../testdata/.subhidden/test.md";
+        assert_eq!(new_processed_files[filename2].0, CONTENT_UPDATED_SIGN);
+        assert_eq!(
+            new_processed_files[filename2].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // check sizes are the same but links are different
+        assert_eq!(
+            files_map["/test.md"][FAKE_RDF_PREDICATE_SIZE],
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_SIZE]
+        );
+        assert_ne!(
+            files_map["/test.md"][FAKE_RDF_PREDICATE_LINK],
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
     fn test_files_container_sync_with_versioned_target() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
@@ -2140,9 +2194,9 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 2);
         assert_eq!(
-        new_processed_files["../testdata/test.md"].1,
-        "File named \"/sub2.md\" already exists on target. Use the \'force\' flag to replace it"
-    );
+            new_processed_files["../testdata/test.md"].1,
+            "File named \"/sub2.md\" already exists on target. Use the \'force\' flag to replace it"
+        );
         assert_eq!(files_map, new_files_map);
 
         // let's now force it
