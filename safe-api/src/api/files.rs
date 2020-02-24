@@ -749,10 +749,8 @@ fn files_map_sync(
                 }
             }
             Some(file_item) => {
-                if force
-                    || (compare_file_content
-                        && is_file_modified(safe, &Path::new(local_file_name), file_item))
-                {
+                let is_modified = is_file_modified(safe, &Path::new(local_file_name), file_item);
+                if force || (compare_file_content && is_modified) {
                     // We need to update the current FileItem
                     if add_or_update_file_item(
                         safe,
@@ -775,17 +773,18 @@ fn files_map_sync(
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
 
                     if !force && !compare_file_content {
+                        let comp_str = if is_modified { "different" } else { "same" };
                         processed_files.insert(
                             local_file_name.to_string(),
                             (
                                 CONTENT_ERROR_SIGN.to_string(),
                                 format!(
-                                    "File named \"{}\" already exists on target. Use the 'force' flag to replace it",
-                                    normalised_file_name
+                                    "File named \"{}\" with {} content already exists on target. Use the 'force' flag to replace it",
+                                    normalised_file_name, comp_str
                                 ),
                             ),
                         );
-                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name, normalised_file_name);
+                        info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name, normalised_file_name, comp_str);
                     }
                 }
 
@@ -2182,6 +2181,25 @@ mod tests {
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
+        // let's try to add a file with same target name and same content, it should fail
+        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
+            "../testdata/subfolder/sub2.md",
+            &format!("{}/sub2.md", xorurl),
+            false,
+            false,
+            false
+        ));
+
+        assert_eq!(version, 0);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_processed_files["../testdata/subfolder/sub2.md"].1,
+            "File named \"/sub2.md\" with same content already exists on target. Use the \'force\' flag to replace it"
+        );
+        assert_eq!(files_map, new_files_map);
+
+        // let's try to add a file with same target name but with different content, it should still fail
         let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
             "../testdata/test.md",
             &format!("{}/sub2.md", xorurl),
@@ -2195,7 +2213,7 @@ mod tests {
         assert_eq!(new_files_map.len(), 2);
         assert_eq!(
             new_processed_files["../testdata/test.md"].1,
-            "File named \"/sub2.md\" already exists on target. Use the \'force\' flag to replace it"
+            "File named \"/sub2.md\" with different content already exists on target. Use the \'force\' flag to replace it"
         );
         assert_eq!(files_map, new_files_map);
 

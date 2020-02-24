@@ -17,6 +17,8 @@ use safe_nd::{
     XorName,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::{collections::BTreeMap, fs, io::Write, str};
 use threshold_crypto::{PublicKey, SecretKey};
 
@@ -231,9 +233,20 @@ impl SafeApp for SafeAppFake {
     }
 
     fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
-        let xorname = rand::random();
+        // We create a XorName based on a hash of the content, not a real 256 hash/xorname,
+        // but hopefully good and unique enough for our fake SCL
+
+        // Build a hash of the data bytes
+        let mut hasher = DefaultHasher::new();
+        Hash::hash_slice(data, &mut hasher);
+        let hash = hasher.finish();
+
+        // Let's use that hash number to create a fake (but hopefully unique) 32 bytes long XorName
+        let mut xorname = XorName::default();
+        let fake_hash = &format!("{}{}", hash, hash);
+        xorname.0.copy_from_slice(&fake_hash[0..32].as_bytes());
+
         if !dry_run {
-            // TODO: hash to get xorname.
             self.fake_vault
                 .published_immutable_data
                 .insert(xorname_to_hex(&xorname), data.to_vec());
