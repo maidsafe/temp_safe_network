@@ -59,22 +59,22 @@ pub fn vault_run(
     println!("Storing vaults' generated data at {}", arg_vaults_dir);
 
     // Let's create an args array to pass to the network launcher tool
-    // We need a minimum of INFO level for vaults verbosity
-    let mut verbosity_arg = String::from("-yy");
-    if verbosity > 0 {
-        for _ in 0..verbosity {
-            verbosity_arg.push('y');
-        }
-    }
-    let nlt_args = vec![
+    let mut nlt_args = vec![
         "safe-nlt",
         "-v",
         "--vault-path",
         &arg_vault_path,
         "--vaults-dir",
         &arg_vaults_dir,
-        &verbosity_arg,
     ];
+
+    let mut verbosity_arg = String::from("-");
+    if verbosity > 0 {
+        let v = "y".repeat(verbosity as usize);
+        println!("V: {}", v);
+        verbosity_arg.push_str(&v);
+        nlt_args.push(&verbosity_arg);
+    }
 
     debug!("Running network launch tool with args: {:?}", nlt_args);
 

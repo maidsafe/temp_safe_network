@@ -14,7 +14,7 @@ use crate::api::helpers::{
 use log::{debug, trace};
 use safe_nd::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
-    XorName,
+    XorName, XOR_NAME_LEN,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -244,7 +244,9 @@ impl SafeApp for SafeAppFake {
         // Let's use that hash number to create a fake (but hopefully unique) 32 bytes long XorName
         let mut xorname = XorName::default();
         let fake_hash = &format!("{}{}", hash, hash);
-        xorname.0.copy_from_slice(&fake_hash[0..32].as_bytes());
+        xorname
+            .0
+            .copy_from_slice(&fake_hash[0..XOR_NAME_LEN].as_bytes());
 
         if !dry_run {
             self.fake_vault

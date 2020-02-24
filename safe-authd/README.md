@@ -95,7 +95,7 @@ If otherwise you prefer to build the SAFE Authenticator daemon from source code,
 
 ## Build
 
-In order to build this application from source code you need to make sure you have `rustc v1.38.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this application from source code you need to make sure you have `rustc v1.41.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-authd` (the build process may take several minutes the first time you run it on this crate):
 ```shell
@@ -110,6 +110,7 @@ Once it's built you can find the `safe-authd` executable at `target/debug/`.
 
 By default, the `safe-authd` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
 ```
+$ cd safe-authd
 $ cargo build --features mock-network
 ```
 
@@ -117,6 +118,8 @@ Keep in mind that if you run the `safe-authd` with `cargo run`, you also need to
 ```
 $ cargo run --features mock-network -- start
 ```
+
+Also note you need to be within the `safe-authd` folder to be able to pass the `--features` argument to `cargo`.
 
 ## Launching the safe-authd
 

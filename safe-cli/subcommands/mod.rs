@@ -10,7 +10,6 @@
 pub mod auth;
 pub mod cat;
 pub mod config;
-pub mod container;
 pub mod dog;
 pub mod files;
 mod helpers;

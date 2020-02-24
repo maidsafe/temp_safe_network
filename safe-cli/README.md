@@ -9,6 +9,10 @@
 2. [Download](#download)
 3. [Build](#build)
 4. [Using the CLI](#using-the-cli)
+  - [Networks](#networks)
+    - [Vault install](#vault-install)
+    - [Run a local network](#run-a-local-network)
+    - [Switch networks](#switch-networks)
   - [Auth](#auth)
     - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
     - [Auth install](#auth-install)
@@ -44,9 +48,6 @@
     - [Remove](#nrs-remove)
   - [SAFE-URLs](#safe-urls)
   - [Dog](#dog)
-  - [Networks](#networks)
-    - [Run a local vault](#run-a-local-vault)
-    - [Switch networks](#switch-networks)
   - [Shell Completions](#shell-completions)
     - [Bash Completions](#bash-completions)
     - [Windows Powershell Completions](#windows-powershell-completions)
@@ -68,7 +69,7 @@ If otherwise you prefer to build the SAFE CLI from source code, please follow th
 
 ## Build
 
-In order to build this CLI from source code you need to make sure you have `rustc v1.38.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this CLI from source code you need to make sure you have `rustc v1.41.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-cli` (the build process may take several minutes the first time you run it on this crate):
 ```shell
@@ -77,12 +78,13 @@ $ cd safe-api
 $ cargo build
 ```
 
-Since this project has a cargo workspace with the `safe-cli` as the default crate, when building from the root location will build the SAFE CLI. Once it's built you can find the `safe` executable at `target/debug/`.
+Since this project has a cargo workspace with the `safe-cli` as the default crate, when building from the root location it will build the SAFE CLI. Once it's built, you can find the `safe` executable at `target/debug/` or `target/release` if you built it with `--release` flag.
 
 ### Using the Mock or Non-Mock SAFE Network
 
 By default, the `safe-cli` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
 ```
+$ cd safe-cli
 $ cargo build --features mock-network
 ```
 
@@ -90,6 +92,8 @@ Keep in mind that if you run the `safe-cli` with `cargo run`, you also need to m
 ```
 $ cargo run --features mock-network -- keys create --test-coins
 ```
+
+Also note you need to be within the `safe-cli` folder to be able to pass the `--features` argument to `cargo`.
 
 ## Using the CLI
 
@@ -100,18 +104,123 @@ The base command, if built is `$ safe`, or all commands can be run via `$ cargo 
 Various global flags are available:
 
 ```
---dry-run                  Dry run of command. No data will be written. No coins spent.
+-n, --dry-run              Dry run of command. No data will be written. No coins spent.
 -h, --help                 Prints help information
---json                     Sets JSON as output serialisation format (alias of '--output json')
+    --json                 Sets JSON as output serialisation format (alias of '--output json')
 -V, --version              Prints version information
 -o, --output <output_fmt>  Output data serialisation: [json, jsoncompact, yaml]
---xorurl <xorurl_base>     Base encoding to be used for XOR-URLs generated. Currently supported: base32z
+    --xorurl <xorurl_base> Base encoding to be used for XOR-URLs generated. Currently supported: base32z
                            (default), base32 and base64
 ```
 
 #### `--help`
 
 All commands have a `--help` function which lists args, options and subcommands.
+
+### Networks
+
+The CLI, like any other SAFE application, can connect to different SAFE networks that may be available. As the project advances several networks may coexist with the main SAFE Network, there could be SAFE networks available for testing upcoming features, or networks that are local to the user in their own computer or WAN/LAN.
+
+The way SAFE applications currently connect to a SAFE network is by reading the connection information from a specific location in the system:
+- Linux: from `~/.config/safe_vault/`
+- macOS: from `/Users/<USERNAME>/Library/Preferences/net.MaidSafe.safe_vault/`
+- Windows: from `C:\Users\<USERNAME>\AppData\Roaming\MaidSafe\safe_vault\config\`
+
+Currently, there is a public test network accessible to anyone. Users may also have local vaults running in their own environment creating a local network. The CLI allows users to easily create a list of different SAFE networks in its config settings, to then be able to switch between them with just a simple command.
+
+#### Vault install
+
+Let's first look at how to run a local SAFE network using the CLI. A local network is bootstrapped by running several SAFE vaults which automatically interconnect forming a network. We therefore first need to install the SAFE vault in our system:
+```shell
+$ safe vault install
+Latest release found: safe_vault v0.21.0
+Downloading https://safe-vault.s3.eu-west-2.amazonaws.com/safe_vault-0.21.0-x86_64-unknown-linux-musl.zip...
+[00:00:36] [========================================] 6.28MB/6.28MB (0s) Done
+Installing safe_vault binary at ~/.safe/vault ...
+Setting execution permissions to installed binary '~/.safe/vault/safe_vault'...
+Done!
+```
+
+#### Run a local network
+
+At current state of the SAFE project, a single-section SAFE network can be launched locally in our system. If the SAFE vault was installed in the system using the CLI as described in previous section we can then launch it with a simple command:
+```shell
+$ safe vault run-baby-fleming
+Storing vaults' generated data at ~/.safe/vault/baby-fleming-vaults
+Launching local SAFE network...
+Launching with vault executable from: ~/.safe/vault/safe_vault
+Network size: 8 vaults
+Launching genesis vault (#1)...
+Genesis vault contact info: ["127.0.0.1:55851"]
+Launching vault #2...
+Launching vault #3...
+Launching vault #4...
+Launching vault #5...
+Launching vault #6...
+Launching vault #7...
+Launching vault #8...
+Done!
+```
+
+Once the local network is running, the connection configuration file will be already in the correct place for your applications (including the CLI) to connect to it. Thus from this point on, you can simply use the CLI or any application to connect to your local network. Note that depending on the application, you may need to restart it so it uses the new connection information for your local network.
+
+In order to shutdown a running local network, the following CLI command can be invoked to kill all running safe_vault processes:
+```shell
+$ safe vault killall
+Success, all processes instances of safe_vault were stopped!
+```
+
+#### Switch networks
+
+MaidSafe currently hosts a single-section network for those who don't want to run a local network but still have a go at using the CLI and client applications. It's very common for users testing and experimenting with CLI and SAFE applications to have a local network running, but switching to use the MaidSafe hosted network, back and forth, is also quite common.
+
+The CLI allows you to set up a list of networks in its config settings for easily switching to connect to them. If you just launched a local network, you can keep current connection information as a configured network on CLI with the following command:
+```shell
+$ safe networks add my-network
+Caching current network connection information into: ~/.config/safe-cli/networks/my-network_vault_connection_info.config
+Network 'my-network' was added to the list. Connection information is located at '~/.config/safe-cli/networks/my-network_vault_connection_info.config'
+```
+
+If you also would like to connect to the MaidSafe hosted test network, you'd need to set it up in CLI settings as another network too, specifying the URL where to fetch latest connection information from:
+```shell
+$ safe networks add shared-network https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config
+Network 'shared-network' was added to the list
+```
+
+We can also retrieve the list of the different networks that were set up in the CLI config:
+```shell
+$ safe networks
++----------------+------------------------------------------------------------------------------------------------+
+| Networks       |                                                                                                |
++----------------+------------------------------------------------------------------------------------------------+
+| Network name   | Connection info location                                                                       |
++----------------+------------------------------------------------------------------------------------------------+
+| my-network     | ~/.config/safe-cli/networks/my-network_vault_connection_info.config                            |
++----------------+------------------------------------------------------------------------------------------------+
+| shared-network | https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config |
++----------------+------------------------------------------------------------------------------------------------+
+```
+
+Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it at the right location in the system for SAFE applications to connect to the selected network. E.g. let's switch to the 'shared-network' network we previously configured:
+```shell
+$ safe networks switch shared-network
+Switching to 'shared-network' network...
+Fetching 'shared-network' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
+Successfully switched to 'shared-network' network in your system!
+If you need write access to the 'shared-network' network, you'll need to restart authd, login and re-authorise the CLI again
+```
+
+Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your currently setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
+```shell
+$ safe networks check
+Checking current setup network connection information...
+Fetching 'my-network' network connection information from '~/.config/safe-cli/networks/my-network_vault_connection_info.config' ...
+Fetching 'shared-network' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
+
+'shared-network' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-network' network as per current config
+```
+
+Note that in the scenario that your current network is set to be the MaidSafe shared network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
 
 ### Auth
 
@@ -184,12 +293,6 @@ Sending request to authd to obtain a status report...
 | Number of notifications subscribers      | 0     |
 +------------------------------------------+-------+
 ```
-
-##### Vault must be running
-
-Before we can create an account (or login) we need either a `SAFE Vault` running locally, or the configuration file to connect to a remote vault/network in the right place. Please refer to the [Networks section](#networks) in this guide if you need help to set this up.
-
-Once you have made sure you have a vault running locally, or have the connection file for a remote vault/network in place, you can proceed with the next steps.
 
 #### Auth create-acc
 
@@ -275,10 +378,10 @@ Requesting list of pending authorisation requests from authd...
 +--------------------------------+------------------+----------+------------------+-------------------------+
 | Request Id                     | App Id           | Name     | Vendor           | Permissions requested   |
 +--------------------------------+------------------+----------+------------------+-------------------------+
-| 584798987                      | net.maidsafe.cli | SAFE CLI | MaidSafe.net Ltd | Own container: false    |
-|                                |                  |          |                  | Transfer coins: true    |
-|                                |                  |          |                  | Mutations: true         |
-|                                |                  |          |                  | Read coin balance: true |
+| 584798987                      | net.maidsafe.cli | SAFE CLI | MaidSafe.net Ltd | Own container: No       |
+|                                |                  |          |                  | Transfer coins: Yes     |
+|                                |                  |          |                  | Mutations: Yes          |
+|                                |                  |          |                  | Read coin balance: Yes  |
 |                                |                  |          |                  | Containers: None        |
 +--------------------------------+------------------+----------+------------------+-------------------------+
 ```
@@ -380,10 +483,10 @@ A new application authorisation request was received:
 +------------+------------------+---------+---------+-------------------------+
 | Request Id | App Id           | Name    | Vendor  | Permissions requested   |
 +------------+------------------+---------+---------+-------------------------+
-| 754801191  | net.maidsafe.cli | Unknown | Unknown | Own container: false    |
-|            |                  |         |         | Transfer coins: true    |
-|            |                  |         |         | Mutations: true         |
-|            |                  |         |         | Read coin balance: true |
+| 754801191  | net.maidsafe.cli | Unknown | Unknown | Own container: Noe      |
+|            |                  |         |         | Transfer coins: Yes     |
+|            |                  |         |         | Mutations: Yes          |
+|            |                  |         |         | Read coin balance: Yes  |
 |            |                  |         |         | Containers: None        |
 +------------+------------------+---------+---------+-------------------------+
 You can use "auth allow"/"auth deny" commands to allow/deny the request respectively, e.g.: auth allow 754801191
@@ -1085,87 +1188,6 @@ Version: 3
 ```
 
 In this case we don't only get information about the content that the URL resolves to, but also about the NRS Map Container this NRS-URL was resolved with. E.g. we see the XOR-URL of the NRS Map Container, its version, and among other data we also see the list of all NRS names defined by it with their corresponding XOR-URL links.
-
-### Networks
-
-The CLI, like any other SAFE application, can connect to different SAFE networks that may be available. As the project advances several networks may coexist apart from the main SAFE Network, there could be SAFE Networks available for testing upcoming features, or networks that are local to the user in their own computer or WAN/LAN.
-
-Currently, there is a shared Vault which acts as public test network accessible to anyone. And also users may have local vaults running in their own environment. The CLI allows users to easily create a list of different SAFE networks in its config settings, to then be able to switch between them with just a simple command. Let's see some examples.
-
-The way SAFE applications currently connect to a SAFE Vault is by reading the vault's connection information from a specific location in the system:
-- Linux: from `~/.config/safe_vault/`
-- macOS: from `/Users/<USERNAME>/Library/Preferences/net.MaidSafe.safe_vault/`
-- Windows: from `C:\Users\<USERNAME>\AppData\Roaming\MaidSafe\safe_vault\config\`
-
-#### Run a local vault
-
-If you wish to run you own local vault you need to follow these steps:
-1. download latest release from [safe_vault releases](https://github.com/maidsafe/safe_vault/releases/latest)
-2. untar/unzip the downloaded file into a directory of your choice
-3. execute the safe_vault
-
-Example command to perform this on Linux or Mac:
-```shell
-$ mkdir ~/safe_vault
-$ cd ~/safe_vault
-$ wget https://github.com/maidsafe/safe_vault/releases/download/0.19.2/safe_vault-0.19.2-x86_64-unknown-linux-musl.tar.gz
-$ tar -xzvf safe_vault-0.19.2-x86_64-unknown-linux-musl.tar.gz
-$ ./safe_vault
-```
-
-Once the local vault is running, the connection configuration file will already be in the correct place for your applications (including the CLI) to connect to this vault, so you can simply use the CLI or any application from now on to connect to your local vault. Note that depending on the application, you may need to restart it so it uses the new connection information for your local vault rather than a previously existing one.
-
-#### Switch networks
-
-MaidSafe hosts a vault for those who don't want to run a local vault but still have a go at using the CLI and client applications. It's very common for users testing and experimenting with CLI and SAFE applications to have a local vault running, but switching to use the MaidSafe shared vault, back and forth, is also quite common.
-
-The CLI allows you to set up a list of networks/vaults in its config settings for easily switching to connect to them. If you just started a local vault, you can keep current connection information as a configured network on CLI:
-```shell
-$ safe networks add my-vault
-Caching current network connection information into: ~/.config/safe-cli/networks/my-vault_vault_connection_info.config
-Network 'my-vault' was added to the list. Connection information is located at '~/.config/safe-cli/networks/my-vault_vault_connection_info.config'
-```
-
-If you also would like to connect to the MaidSafe shared vault, you'd need to set it up in CLI settings as another network too, specifying the URL where to fetch latest connection information from, e.g.:
-```shell
-$ safe networks add shared-vault https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config
-Network 'shared-vault' was added to the list
-```
-
-We can retrieve the list of the different networks set up in the CLI config:
-```shell
-$ safe networks
-+--------------+------------------------------------------------------------------------------------------------+
-| Networks     |                                                                                                |
-+--------------+------------------------------------------------------------------------------------------------+
-| Network name | Connection info location                                                                       |
-+--------------+------------------------------------------------------------------------------------------------+
-| my-vault     | ~/.config/safe-cli/networks/my-vault_vault_connection_info.config                              |
-+--------------+------------------------------------------------------------------------------------------------+
-| shared-vault | https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config |
-+--------------+------------------------------------------------------------------------------------------------+
-```
-
-Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it in the right place in the system for SAFE applications to connect to the selected network. E.g. let's switch to the 'shared-vault' network we previously configured:
-```shell
-$ safe networks switch shared-vault
-Switching to 'shared-vault' network...
-Fetching 'shared-vault' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
-Successfully switched to 'shared-vault' network in your system!
-If you need write access to the '{}' network, you'll need to restart authd, login and re-authorise the CLI again
-```
-
-Remember that every time you run a local vault the connection configuration in your system is automatically overwritten by the local vault with new connection information. Also if the shared vault was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your currently setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
-```shell
-$ safe networks check
-Checking current setup network connection information...
-Fetching 'my-vault' network connection information from '~/.config/safe-cli/networks/my-vault_vault_connection_info.config' ...
-Fetching 'shared-vault' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
-
-'shared-vault' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-vault' network as per current config
-```
-
-Note that in the scenario that your current network is set to be the MaidSafe shared vault, and the shared vault is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
 
 ### Shell Completions
 

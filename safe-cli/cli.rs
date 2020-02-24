@@ -30,9 +30,6 @@ pub struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
     pub cmd: Option<SubCommands>,
-    // /// The account's Root Container address
-    // #[structopt(long = "root", global(true))]
-    // root: bool,
     /// Output data serialisation: [json, jsoncompact, yaml]
     #[structopt(short = "o", long = "output", global(true))]
     output_fmt: Option<OutputFmt>,

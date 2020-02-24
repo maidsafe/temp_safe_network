@@ -91,7 +91,8 @@ fn download_and_install_bin(
     }
 
     println!(
-        "Installing safe-authd binary at {} ...",
+        "Installing {} binary at {} ...",
+        exec_file_name,
         target_path.display()
     );
     self_update::Extract::from_source(&tmp_tarball_path)
