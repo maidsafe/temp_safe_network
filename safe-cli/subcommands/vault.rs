@@ -32,6 +32,9 @@ pub enum VaultSubCommands {
         /// Vebosity level for vaults logs
         #[structopt(short = "y", parse(from_occurrences))]
         verbosity: u8,
+        /// Interval in seconds between launching each of the vaults
+        #[structopt(short = "i", long, default_value = "3")]
+        interval: u64,
     },
     /// Shutdown all running vaults processes
     #[structopt(name = "killall")]
@@ -48,7 +51,13 @@ pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
         Some(VaultSubCommands::Run {
             vault_path,
             verbosity,
-        }) => vault_run(vault_path, VAULTS_DATA_FOLDER, verbosity),
+            interval,
+        }) => vault_run(
+            vault_path,
+            VAULTS_DATA_FOLDER,
+            verbosity,
+            &interval.to_string(),
+        ),
         Some(VaultSubCommands::Killall { vault_path }) => vault_shutdown(vault_path),
         None => Err("Missing vault subcommand".to_string()),
     }

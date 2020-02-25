@@ -483,7 +483,7 @@ A new application authorisation request was received:
 +------------+------------------+---------+---------+-------------------------+
 | Request Id | App Id           | Name    | Vendor  | Permissions requested   |
 +------------+------------------+---------+---------+-------------------------+
-| 754801191  | net.maidsafe.cli | Unknown | Unknown | Own container: Noe      |
+| 754801191  | net.maidsafe.cli | Unknown | Unknown | Own container: No       |
 |            |                  |         |         | Transfer coins: Yes     |
 |            |                  |         |         | Mutations: Yes          |
 |            |                  |         |         | Read coin balance: Yes  |

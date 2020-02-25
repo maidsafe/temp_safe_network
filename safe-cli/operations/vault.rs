@@ -39,6 +39,7 @@ pub fn vault_run(
     vault_path: Option<PathBuf>,
     vaults_dir: &str,
     verbosity: u8,
+    interval: &str,
 ) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
@@ -66,6 +67,8 @@ pub fn vault_run(
         &arg_vault_path,
         "--vaults-dir",
         &arg_vaults_dir,
+        "--interval",
+        interval,
     ];
 
     let mut verbosity_arg = String::from("-");
