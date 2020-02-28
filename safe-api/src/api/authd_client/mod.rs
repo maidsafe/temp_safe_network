@@ -7,6 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod api;
+mod authd_client_api;
+mod notifs_endpoint;
 
-pub use api::*;
+use super::common;
+use super::constants;
+
+// Expose what's meant to be the public API
+pub use authd_client_api::{
+    AuthAllowPrompt, AuthReq, AuthdStatus, PendingAuthReqs, SafeAuthdClient,
+};

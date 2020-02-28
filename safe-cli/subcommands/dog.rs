@@ -13,7 +13,7 @@ use super::{
 };
 use log::debug;
 use prettytable::Table;
-use safe_api::{NrsMapContainerInfo, Safe, SafeData};
+use safe_api::{fetch::NrsMapContainerInfo, fetch::SafeData, Safe};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]

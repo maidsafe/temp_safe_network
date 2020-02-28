@@ -33,14 +33,16 @@ tiny-keccak = "~1.5.0"
 tokio = { version = "^0.2.11", features = ["rt-threaded"] }
 url = "~2.1.1"
 urlencoding = "1.0.0"
-validator = "0.8.0"
-validator_derive = "0.8.0"
 walkdir = "~2.0.1" #ffi utils needs this version
 
 [features]
 mock-network = ["safe_app/mock-network", "safe_authenticator/mock-network"]
 fake-auth = ["safe_app/testing"]
 scl-mock = ["fake-auth"]
+authenticator = []
+authd_client = []
+app = []
+default = ["authenticator", "authd_client", "app"]
 
 [dev-dependencies]
 unwrap = "~1.2.1"

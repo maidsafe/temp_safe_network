@@ -8,14 +8,18 @@
 // Software.
 
 use super::{
-    constants::{
+    consts::{
         CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,
         FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
         FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
     },
     helpers::{gen_timestamp_nanos, gen_timestamp_secs},
     xorurl::{SafeContentType, SafeDataType},
-    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
+    Safe, SafeApp,
+};
+use crate::{
+    xorurl::{XorUrl, XorUrlEncoder},
+    Error, Result,
 };
 use log::{debug, info, warn};
 use mime_guess;

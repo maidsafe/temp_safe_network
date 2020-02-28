@@ -9,7 +9,7 @@
 
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_api::{BlsKeyPair, WalletSpendableBalances};
+use safe_api::{wallet::WalletSpendableBalances, BlsKeyPair};
 use safe_nd::Coins;
 use std::collections::BTreeMap;
 use std::{env, str::FromStr};

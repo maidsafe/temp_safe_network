@@ -12,8 +12,9 @@ use super::helpers::{decode_ipc_msg, AuthResponseType};
 use super::{
     helpers::{xorname_from_pk, xorname_to_hex},
     safe_net::AppendOnlyDataRawData,
-    Error, Result, SafeApp,
+    SafeApp,
 };
+use crate::{Error, Result};
 use futures::future::Future;
 use log::{debug, info, warn};
 #[cfg(feature = "fake-auth")]
@@ -21,8 +22,7 @@ use safe_app::test_utils::create_app;
 use safe_app::{
     ffi::errors::Error as SafeAppFfiError, run, App, AppError::CoreError as SafeAppError,
 };
-use safe_core::client::Client;
-use safe_core::{client::test_create_balance, immutable_data, CoreError as SafeCoreError};
+use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
     ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, ClientFullId, Coins,

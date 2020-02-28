@@ -7,6 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod api;
+mod auth;
 
-pub use api::*;
+use super::common;
+
+// Expose what's meant to be the public API
+pub use auth::{AuthedApp, AuthedAppsList, SafeAuthReq, SafeAuthReqId, SafeAuthenticator};

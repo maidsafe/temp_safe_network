@@ -8,55 +8,25 @@
 // Software.
 
 use super::{
-    helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, sk_from_hex, xorname_from_pk, KeyPair},
+    common::sk_from_hex,
+    helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, xorname_from_pk, KeyPair},
     xorurl::{SafeContentType, SafeDataType},
-    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
+    Safe, SafeApp,
+};
+use crate::{
+    xorurl::{XorUrl, XorUrlEncoder},
+    Error, Result,
 };
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::SecretKey;
 
-// A trait that the Validate derive will impl
-use validator::{Validate, ValidationErrors};
-
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>
-#[derive(Clone, Validate, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BlsKeyPair {
-    #[validate(length(equal = "96"))]
     pub pk: String,
-    #[validate(length(equal = "64"))]
     pub sk: String,
-}
-
-#[allow(dead_code)]
-pub fn validate_key_pair(key_pair: &BlsKeyPair) -> Result<()> {
-    let validation = key_pair.validate();
-
-    if ValidationErrors::has_error(&validation, "sk") {
-        return Err(Error::InvalidInput(
-            "The secret key must be 64 characters long".to_string(),
-        ));
-    }
-    if ValidationErrors::has_error(&validation, "pk") {
-        return Err(Error::InvalidInput(
-            "The secret key must be 96 characters long".to_string(),
-        ));
-    }
-
-    let secret_key = sk_from_hex(&key_pair.sk)?;
-
-    let real_pk = secret_key.public_key();
-
-    let real_pk_hex = pk_to_hex(&real_pk);
-
-    if real_pk_hex != key_pair.pk {
-        return Err(Error::InvalidInput(
-            "The secret key provided does not match the public key.".to_string(),
-        ));
-    }
-
-    Ok(())
 }
 
 #[allow(dead_code)]

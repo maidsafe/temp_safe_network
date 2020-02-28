@@ -18,7 +18,10 @@ use common::{
     parse_files_put_or_sync_output, CLI,
 };
 use predicates::prelude::*;
-use safe_api::{BlsKeyPair, SafeContentType, SafeDataType, XorUrlEncoder};
+use safe_api::{
+    fetch::{SafeContentType, SafeDataType, XorUrlEncoder},
+    BlsKeyPair,
+};
 use std::process::Command;
 use unwrap::unwrap;
 

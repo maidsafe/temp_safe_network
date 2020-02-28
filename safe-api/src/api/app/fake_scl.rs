@@ -7,10 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{safe_net::AppendOnlyDataRawData, Error, Result, SafeApp};
-use crate::api::helpers::{
-    parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
+use super::{
+    common::parse_hex,
+    helpers::{parse_coins_amount, vec_to_hex, xorname_from_pk, xorname_to_hex},
+    safe_net::AppendOnlyDataRawData,
+    SafeApp,
 };
+use crate::{Error, Result};
 use log::{debug, trace};
 use safe_nd::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,

@@ -8,10 +8,12 @@
 // Software.
 
 use super::{
+    common::send_authd_request,
     constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
-    helpers::{decode_ipc_msg, send_authd_request},
-    Error, Result, Safe, SafeApp,
+    helpers::decode_ipc_msg,
+    Safe, SafeApp,
 };
+use crate::{Error, Result};
 use log::{debug, info};
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;

@@ -8,13 +8,13 @@
 // Software.
 
 use super::{
-    files::FilesMap, helpers::get_subnames_host_path_and_version, nrs_map::NrsMap, Error, Result,
-    Safe, XorName,
+    files::FilesMap, helpers::get_subnames_host_path_and_version, nrs_map::NrsMap, Safe, XorName,
 };
 pub use super::{
     wallet::WalletSpendableBalances,
     xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder},
 };
+use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
@@ -62,7 +62,6 @@ pub enum SafeData {
     },
 }
 
-#[allow(dead_code)]
 impl Safe {
     /// # Retrieve data from a safe:// URL
     ///
@@ -70,7 +69,7 @@ impl Safe {
     ///
     /// ### Fetch FilesContainer relative path file
     /// ```rust
-    /// # use safe_api::{Safe, SafeData};
+    /// # use safe_api::{Safe, fetch::SafeData};
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
@@ -107,7 +106,7 @@ impl Safe {
     ///
     /// ### Inspect FilesContainer relative path file
     /// ```rust
-    /// # use safe_api::{Safe, SafeData};
+    /// # use safe_api::{Safe, fetch::SafeData};
     /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();

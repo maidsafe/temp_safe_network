@@ -16,7 +16,7 @@ use common::{
     create_preload_and_get_keys, get_bin_location, get_random_nrs_string,
     parse_files_put_or_sync_output,
 };
-use safe_api::{SafeData, SafeDataType};
+use safe_api::fetch::{SafeData, SafeDataType};
 
 const TEST_FILE: &str = "../testdata/test.md";
 

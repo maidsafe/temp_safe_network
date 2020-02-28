@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::Result;
+use crate::Result;
 use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId, XorName};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};

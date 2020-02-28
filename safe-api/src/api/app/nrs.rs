@@ -8,11 +8,15 @@
 // Software.
 
 use super::{
-    constants::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
+    consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
     helpers::{gen_timestamp_nanos, get_subnames_host_path_and_version},
     nrs_map::NrsMap,
     xorurl::{SafeContentType, SafeDataType},
-    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
+    Safe, SafeApp,
+};
+use crate::{
+    xorurl::{XorUrl, XorUrlEncoder},
+    Error, Result,
 };
 use log::{debug, info, warn};
 use safe_nd::XorName;
@@ -343,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_nrs_map_container_create() {
-        use crate::api::constants::FAKE_RDF_PREDICATE_LINK;
+        use crate::api::app::consts::FAKE_RDF_PREDICATE_LINK;
         use crate::nrs_map::DefaultRdf;
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};

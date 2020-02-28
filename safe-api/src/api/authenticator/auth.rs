@@ -7,8 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::sk_from_hex;
-use super::{Error, Result};
+use super::common::sk_from_hex;
+use crate::{Error, Result};
 use bincode::deserialize;
 use futures::{stream, Future, Stream};
 use log::{debug, info};

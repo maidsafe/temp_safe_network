@@ -8,9 +8,14 @@
 // Software.
 
 use super::{
-    helpers::{parse_coins_amount, sk_from_hex, xorname_from_pk, xorname_to_hex, KeyPair},
+    common::sk_from_hex,
+    helpers::{parse_coins_amount, xorname_from_pk, xorname_to_hex, KeyPair},
     xorurl::{SafeContentType, SafeDataType},
-    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
+    Safe, SafeApp,
+};
+use crate::{
+    xorurl::{XorUrl, XorUrlEncoder},
+    Error, Result,
 };
 use log::debug;
 use rand_core::RngCore;

@@ -8,11 +8,11 @@
 // Software.
 
 use super::{
+    common::send_authd_request,
     constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
-    helpers::send_authd_request,
     notifs_endpoint::jsonrpc_listen,
-    AuthedAppsList, Error, Result, SafeAuthReqId,
 };
+use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;

@@ -18,7 +18,7 @@ use common::{
     parse_files_put_or_sync_output, CLI, SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
-use safe_api::XorUrlEncoder;
+use safe_api::xorurl::XorUrlEncoder;
 use std::{
     fs::{self, OpenOptions},
     io::{prelude::*, Seek, SeekFrom},

@@ -15,7 +15,11 @@ use super::{
     OutputFmt,
 };
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::{FilesMap, Safe, XorUrl, XorUrlEncoder};
+use safe_api::{
+    files::FilesMap,
+    xorurl::{XorUrl, XorUrlEncoder},
+    Safe,
+};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 

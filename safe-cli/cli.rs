@@ -21,7 +21,7 @@ use crate::{
         SubCommands,
     },
 };
-use safe_api::{Safe, XorUrlBase};
+use safe_api::{xorurl::XorUrlBase, Safe};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the SAFE Network

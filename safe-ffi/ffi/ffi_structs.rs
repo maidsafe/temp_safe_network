@@ -10,6 +10,7 @@
 use super::{errors::Result, helpers::from_c_str_to_str_option};
 use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts, ReprC};
 use safe_api::{
+    fetch::NrsMapContainerInfo as NativeNrsMapContainerInfo,
     files::{
         FileItem as NativeFileItem, FilesMap as NativeFilesMap,
         ProcessedFiles as NativeProcessedFiles,
@@ -20,8 +21,7 @@ use safe_api::{
         WalletSpendableBalances as NativeWalletSpendableBalances,
     },
     xorurl::{SafeContentType, SafeDataType, XorUrlEncoder as NativeXorUrlEncoder},
-    BlsKeyPair as NativeBlsKeyPair, NrsMapContainerInfo as NativeNrsMapContainerInfo,
-    ProcessedEntries as NativeProcessedEntries,
+    BlsKeyPair as NativeBlsKeyPair, ProcessedEntries as NativeProcessedEntries,
 };
 use safe_nd::{XorName, XOR_NAME_LEN};
 use std::ffi::CString;

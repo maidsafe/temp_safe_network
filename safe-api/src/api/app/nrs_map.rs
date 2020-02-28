@@ -8,10 +8,11 @@
 // Software.
 
 use super::{
-    constants::{FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED},
+    consts::{FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED},
     helpers::gen_timestamp_secs,
-    Error, Result, Safe, SafeContentType, XorUrl,
+    Safe,
 };
+use crate::{fetch::SafeContentType, xorurl::XorUrl, Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, iter::FromIterator};

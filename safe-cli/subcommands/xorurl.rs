@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
-use safe_api::{Safe, XorUrlEncoder};
+use safe_api::{xorurl::XorUrlEncoder, Safe};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'

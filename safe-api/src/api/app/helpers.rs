@@ -7,19 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
+use super::common::{parse_hex, sk_from_hex};
+use crate::{Error, Result};
 use chrono::{SecondsFormat, Utc};
-use jsonrpc_quic::ClientEndpoint;
 use log::debug;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName};
-use serde::de::DeserializeOwned;
 use std::{
     iter::FromIterator,
     str::{self, FromStr},
 };
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
-use tokio::runtime::Builder;
 use url::Url;
 
 const URL_VERSION_QUERY_NAME: &str = "v=";
@@ -86,25 +84,6 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
     xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-pub fn parse_hex(hex_str: &str) -> Vec<u8> {
-    let mut hex_bytes = hex_str
-        .as_bytes()
-        .iter()
-        .filter_map(|b| match b {
-            b'0'..=b'9' => Some(b - b'0'),
-            b'a'..=b'f' => Some(b - b'a' + 10),
-            b'A'..=b'F' => Some(b - b'A' + 10),
-            _ => None,
-        })
-        .fuse();
-
-    let mut bytes = Vec::new();
-    while let (Some(h), Some(l)) = (hex_bytes.next(), hex_bytes.next()) {
-        bytes.push(h << 4 | l)
-    }
-    bytes
-}
-
 pub fn pk_to_hex(pk: &PublicKey) -> String {
     let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
     vec_to_hex(pk_as_bytes.to_vec())
@@ -116,12 +95,6 @@ pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
     PublicKey::from_bytes(pk_bytes_array)
         .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
-}
-
-pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey> {
-    let sk_bytes = parse_hex(&hex_str);
-    bincode::deserialize(&sk_bytes)
-        .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))
 }
 
 pub fn parse_coins_amount(amount_str: &str) -> Result<Coins> {
@@ -227,79 +200,4 @@ pub fn gen_timestamp_secs() -> String {
 
 pub fn gen_timestamp_nanos() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
-}
-
-pub fn send_authd_request<T>(
-    dest_endpoint: &str,
-    method: &str,
-    params: serde_json::Value,
-) -> Result<T>
-where
-    T: DeserializeOwned,
-{
-    match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
-        None => Err(Error::AuthdClientError(
-            "Failed to obtain local project directory where to read certificate from".to_string(),
-        )),
-        Some(dirs) => {
-            let cert_base_path = dirs.config_dir().display().to_string();
-
-            let jsonrpc_quic_client = ClientEndpoint::new(
-                &cert_base_path,
-                Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
-                false,
-            )
-            .map_err(|err| {
-                Error::AuthdClientError(format!("Failed to create client endpoint: {}", err))
-            })?;
-
-            let mut runtime = Builder::new()
-                .threaded_scheduler()
-                .enable_all()
-                .build()
-                .map_err(|err| {
-                    Error::AuthdClientError(format!("Failed to create runtime: {}", err))
-                })?;
-
-            let (endpoint_driver, mut outgoing_conn) = {
-                runtime
-                    .enter(|| jsonrpc_quic_client.bind())
-                    .map_err(|err| {
-                        Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
-                    })?
-            };
-
-            let _handle = runtime.spawn(endpoint_driver);
-
-            runtime.block_on(async {
-                let (driver, mut new_conn) = outgoing_conn
-                    .connect(dest_endpoint, None)
-                    .await
-                    .map_err(|err| {
-                        Error::AuthdClientError(format!(
-                            "Failed to establish connection with authd: {}",
-                            err
-                        ))
-                    })?;
-
-                tokio::spawn(driver);
-
-                let res = new_conn
-                    .send(method, params)
-                    .await
-                    .map_err(|err| match err {
-                        jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
-                        other => Error::AuthdClientError(other.to_string()),
-                    });
-
-                // Allow the endpoint driver to automatically shut down
-                drop(outgoing_conn);
-
-                // Let the connection finish closing gracefully
-                //runtime.block_on(handle).unwrap();
-
-                res
-            })
-        }
-    }
 }
