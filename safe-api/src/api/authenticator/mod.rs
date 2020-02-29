@@ -12,4 +12,4 @@ mod auth;
 use super::common;
 
 // Expose what's meant to be the public API
-pub use auth::{AuthedApp, AuthedAppsList, SafeAuthReq, SafeAuthReqId, SafeAuthenticator};
+pub use auth::SafeAuthenticator;

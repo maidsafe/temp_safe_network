@@ -41,19 +41,6 @@ impl KeyPair {
         KeyPair { pk, sk }
     }
 
-    #[allow(dead_code)]
-    pub fn from_hex_keys(pk_hex_str: &str, sk_hex_str: &str) -> Result<Self> {
-        let pk = pk_from_hex(pk_hex_str)?;
-        let sk = sk_from_hex(sk_hex_str)?;
-        if pk != sk.public_key() {
-            Err(Error::InvalidInput(
-                "Secret key doesn't correspond to public key provided".to_string(),
-            ))
-        } else {
-            Ok(KeyPair { pk, sk })
-        }
-    }
-
     pub fn from_hex_sk(sk_hex_str: &str) -> Result<Self> {
         let sk = sk_from_hex(sk_hex_str)?;
         let pk = sk.public_key();
@@ -79,7 +66,6 @@ pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-#[allow(dead_code)]
 pub fn xorname_to_hex(xorname: &XorName) -> String {
     xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
 }

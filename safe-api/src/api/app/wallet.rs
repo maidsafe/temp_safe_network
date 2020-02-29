@@ -37,7 +37,6 @@ pub struct WalletSpendableBalance {
 
 pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalance)>;
 
-#[allow(dead_code)]
 impl Safe {
     // Create an empty Wallet and return its XOR-URL
     pub fn wallet_create(&mut self) -> Result<XorUrl> {

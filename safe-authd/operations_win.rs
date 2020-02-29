@@ -359,32 +359,3 @@ fn uninstall_authd_service() -> Result<()> {
 
     Ok(())
 }
-
-#[allow(dead_code)]
-fn invoke_stop_on_service_manager() -> Result<()> {
-    let manager_access = ServiceManagerAccess::CONNECT;
-    let service_manager =
-        ServiceManager::local_computer(None::<&str>, manager_access).map_err(|err| {
-            Error::GeneralError(format!(
-                "Eror when connecting to Windows service manager: {:?}",
-                err
-            ))
-        })?;
-
-    let service = service_manager
-        .open_service(SERVICE_NAME, ServiceAccess::STOP)
-        .map_err(|err| {
-            Error::GeneralError(format!(
-                "Failed when attempting to stop safe-authd service: {:?}",
-                err
-            ))
-        })?;
-
-    let _ = service.stop().map_err(|err| {
-        Error::GeneralError(format!(
-            "Failed when attempting to stop safe-authd service: {:?}",
-            err
-        ))
-    })?;
-    Ok(())
-}

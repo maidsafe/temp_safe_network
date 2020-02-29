@@ -13,6 +13,35 @@ use serde::de::DeserializeOwned;
 use threshold_crypto::SecretKey;
 use tokio::runtime::Builder;
 
+pub mod auth_types {
+    use safe_core::ipc::req::{ContainerPermissions, IpcReq};
+    use safe_nd::AppPermissions;
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+    pub type SafeAuthReq = IpcReq;
+    pub type SafeAuthReqId = u32;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct AuthedApp {
+        /// The App ID. It must be unique.
+        pub id: String,
+        /// The application friendly-name.
+        pub name: String,
+        /// The application provider/vendor (e.g. MaidSafe)
+        pub vendor: String,
+        /// Permissions granted, e.g. allowing to work with the user's coin balance.
+        pub app_permissions: AppPermissions,
+        /// Permissions granted to the app for named containers
+        // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
+        pub containers: HashMap<String, ContainerPermissions>,
+        /// If the app was given a dedicated named container for itself
+        pub own_container: bool,
+    }
+
+    // Type of the list of authorised applications in a SAFE account
+    pub type AuthedAppsList = Vec<AuthedApp>;
+}
+
 pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     let mut hex_bytes = hex_str
         .as_bytes()

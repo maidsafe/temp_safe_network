@@ -83,7 +83,6 @@ impl SafeApp for SafeAppScl {
         Self { safe_conn: None }
     }
 
-    #[allow(dead_code)]
     #[cfg(feature = "fake-auth")]
     fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
         warn!("Using fake authorisation for testing...");

@@ -43,7 +43,6 @@ const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at thi
 
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
-#[allow(dead_code)]
 impl Safe {
     /// # Create a FilesContainer.
     ///

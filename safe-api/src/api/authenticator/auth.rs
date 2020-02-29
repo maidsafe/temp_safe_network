@@ -8,7 +8,7 @@
 // Software.
 
 use super::common::sk_from_hex;
-use crate::{Error, Result};
+use crate::{AuthedApp, AuthedAppsList, Error, Result, SafeAuthReq, SafeAuthReqId};
 use bincode::deserialize;
 use futures::{stream, Future, Stream};
 use log::{debug, info};
@@ -23,43 +23,15 @@ use safe_core::{
     core_structs::{access_container_enc_key, AccessContainerEntry},
     ipc::{
         decode_msg, encode_msg,
-        req::{AuthReq, ContainerPermissions, ContainersReq, IpcReq, ShareMDataReq},
+        req::{AuthReq, ContainersReq, IpcReq, ShareMDataReq},
         resp::IpcResp,
-        IpcError, IpcMsg,
+        IpcMsg,
     },
     utils::symmetric_decrypt,
     CoreError,
 };
 use safe_nd::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-// Type of the function/callback invoked for querying if an authorisation request shall be allowed.
-// All the relevant information about the authorisation request is passed as args to the callback.
-// type AuthAllowPrompt = dyn Fn(SafeAuthReqId, IpcReq) -> bool + std::marker::Send + std::marker::Sync;
-
-pub type SafeAuthReq = IpcReq;
-pub type SafeAuthReqId = u32;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AuthedApp {
-    /// The App ID. It must be unique.
-    pub id: String,
-    /// The application friendly-name.
-    pub name: String,
-    /// The application provider/vendor (e.g. MaidSafe)
-    pub vendor: String,
-    /// Permissions granted, e.g. allowing to work with the user's coin balance.
-    pub app_permissions: AppPermissions,
-    /// Permissions granted to the app for named containers
-    // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
-    pub containers: HashMap<String, ContainerPermissions>,
-    /// If the app was given a dedicated named container for itself
-    pub own_container: bool,
-}
-
-// Type of the list of authorised applications in a SAFE account
-pub type AuthedAppsList = Vec<AuthedApp>;
 
 // Authenticator API
 #[derive(Default)]
@@ -67,7 +39,6 @@ pub struct SafeAuthenticator {
     safe_authenticator: Option<Authenticator>,
 }
 
-#[allow(dead_code)]
 impl SafeAuthenticator {
     pub fn new(config_dir_path: Option<&str>) -> Self {
         if let Some(path) = config_dir_path {
@@ -554,21 +525,6 @@ fn get_safe_authenticator(safe_authenticator: &Option<Authenticator>) -> Result<
     safe_authenticator.as_ref().ok_or_else(|| {
         Error::AuthError("You need to log in to a SAFE Network account first".to_string())
     })
-}
-
-// Helper function to generate an app authorisation response
-#[allow(dead_code)]
-fn gen_auth_denied_response(req_id: SafeAuthReqId) -> Result<String> {
-    debug!("Encoding auth denied response...");
-    let resp = encode_msg(&IpcMsg::Resp {
-        req_id,
-        response: IpcResp::Auth(Err(IpcError::AuthDenied)),
-    })
-    .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
-
-    debug!("Returning auth response generated: {:?}", resp);
-
-    Ok(resp)
 }
 
 // Helper function to generate an app authorisation response

@@ -57,7 +57,6 @@ impl fmt::Display for XorUrlBase {
 }
 
 impl XorUrlBase {
-    #[allow(dead_code)]
     pub fn from_u8(value: u8) -> Result<Self> {
         match value {
             0 => Ok(Self::Base32z),
@@ -86,7 +85,6 @@ impl std::fmt::Display for SafeContentType {
 }
 
 impl SafeContentType {
-    #[allow(dead_code)]
     pub fn from_u16(value: u16) -> Result<Self> {
         match value {
             0 => Ok(Self::Raw),
@@ -97,7 +95,6 @@ impl SafeContentType {
         }
     }
 
-    #[allow(dead_code)]
     pub fn value(&self) -> Result<u16> {
         match &*self {
             Self::Raw => Ok(0),
@@ -135,7 +132,6 @@ impl std::fmt::Display for SafeDataType {
 }
 
 impl SafeDataType {
-    #[allow(dead_code)]
     pub fn from_u64(value: u64) -> Result<Self> {
         match value {
             0 => Ok(Self::SafeKey),
@@ -315,7 +311,6 @@ impl XorUrlEncoder {
         })
     }
 
-    #[allow(dead_code)]
     pub fn encoding_version(&self) -> u64 {
         self.encoding_version
     }
@@ -340,7 +335,6 @@ impl XorUrlEncoder {
         &self.path
     }
 
-    #[allow(dead_code)]
     pub fn set_path(&mut self, path: &str) {
         if path.is_empty() || path.starts_with('/') {
             self.path = path.to_string();

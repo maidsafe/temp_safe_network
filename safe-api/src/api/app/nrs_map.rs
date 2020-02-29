@@ -152,7 +152,6 @@ impl NrsMap {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get_default_link(&self) -> Result<XorUrl> {
         debug!("Attempting to get default link vis NRS....");
         let dereferenced_link: String;
@@ -230,7 +229,6 @@ impl NrsMap {
         Ok(link.to_string())
     }
 
-    #[allow(dead_code)]
     pub fn get_link_for(&self, sub_name: &str) -> Result<XorUrl> {
         let the_entry = self.sub_names_map.get(sub_name);
 
@@ -252,7 +250,6 @@ impl NrsMap {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get_map_summary(&self) -> BTreeMap<String, BTreeMap<String, String>> {
         let mut nrs_map_summary = BTreeMap::new();
         gen_nrs_map_summary(&self, "", &mut nrs_map_summary);

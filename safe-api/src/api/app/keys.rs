@@ -29,7 +29,6 @@ pub struct BlsKeyPair {
     pub sk: String,
 }
 
-#[allow(dead_code)]
 impl Safe {
     // Generate a key pair without creating and/or storing a SafeKey on the network
     pub fn keypair(&self) -> Result<BlsKeyPair> {

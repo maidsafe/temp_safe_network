@@ -11,7 +11,7 @@
 mod app;
 #[cfg(feature = "authd_client")]
 mod authd_client;
-#[cfg(any(feature = "authenticator", feature = "authd_client"))]
+#[cfg(feature = "authenticator")]
 mod authenticator;
 mod common;
 mod constants;
@@ -27,7 +27,8 @@ pub use authenticator::*;
 
 #[cfg(feature = "authd_client")]
 pub use authd_client::*;
-#[cfg(feature = "authd_client")]
-pub use authenticator::{AuthedAppsList, SafeAuthReqId};
+
+#[cfg(any(feature = "authenticator", feature = "authd_client"))]
+pub use common::auth_types::*;
 
 pub use errors::{Error, Result};

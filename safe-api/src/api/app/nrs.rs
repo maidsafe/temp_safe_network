@@ -34,7 +34,6 @@ type NrsMapRawData = Vec<(Vec<u8>, Vec<u8>)>;
 // List of public names uploaded with details if they were added, updated or deleted from NrsMaps
 pub type ProcessedEntries = BTreeMap<String, (String, String)>;
 
-#[allow(dead_code)]
 impl Safe {
     pub fn parse_url(url: &str) -> Result<XorUrlEncoder> {
         let sanitised_url = sanitised_url(url);

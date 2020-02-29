@@ -23,7 +23,6 @@ use std::collections::HashMap;
 // Path of authenticator endpoint for authorising applications
 const SAFE_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 
-#[allow(dead_code)]
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
     // It returns the credentials necessary to connect to the network, encoded in a single string.

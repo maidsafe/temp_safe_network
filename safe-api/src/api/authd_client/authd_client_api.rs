@@ -156,7 +156,6 @@ impl Drop for SafeAuthdClient {
     }
 }
 
-#[allow(dead_code)]
 impl SafeAuthdClient {
     pub fn new(endpoint: Option<String>) -> Self {
         let endpoint = match endpoint {
