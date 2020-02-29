@@ -39,6 +39,7 @@
     - [Sync](#files-sync)
     - [Add](#files-add)
     - [Ls](#files-ls)
+    - [Rm](#files-rm)
   - [Xorurl](#xorurl)
     - [Decode](#xorurl-decode)
   - [Cat](#cat)
@@ -788,6 +789,7 @@ $ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc"
 +  ./to-upload/another.md              safe://hbhyrydt5b95dmumcm8yig4u1keuuh8hgsr5yx39xn4mqikp91sbdhbpwp
 +  ./to-upload/subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
++  ./to-upload/subfolder/note.md       safe://hbhyryncjzga5uqp3ogeadqctigyaurpju8yauqptzgh5uyctogh3dkcbt
 +  ./to-upload/test.md                 safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 ```
 
@@ -868,6 +870,26 @@ Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sb
 Total: 1
 SIZE  CREATED               MODIFIED              NAME
 23    2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  subexists.md
+8     2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  note.md
+```
+
+#### Files Rm
+
+Removing files from a `FilesContainer` which is is sync with a folder in the local file system can be done by simply removing them locally followed by a call to `files sync` command. If we otherwise are not in such a scenario and would like to remove files directly from a `FilesContainer` we can achieve it with the `file rm` command.
+
+As an example, we can remove single file to our existing `FilesContainer` on the SAFE Network with the following command:
+```shell
+$ safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/another.md
+FilesContainer updated (version 5): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=5"
+-  /another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
+```
+
+Removing an entire subfolder from a `FilesContainer` rather than a single file is also possible, we just need to pass the `--recursive` flag and the path to the subfolder we would like to remove:
+```shell
+$ safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder --recursive
+FilesContainer updated (version 6): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=6"
+-  /subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
+-  /subfolder/note.md       safe://hbhyryncjzga5uqp3ogeadqctigyaurpju8yauqptzgh5uyctogh3dkcbt
 ```
 
 ### Xorurl

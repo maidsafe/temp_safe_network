@@ -73,6 +73,18 @@ pub enum FilesSubCommands {
         #[structopt(short = "f", long = "force")]
         force: bool,
     },
+    #[structopt(name = "rm")]
+    /// Remove a file from an existing FilesContainer on the network
+    Rm {
+        /// The full URL of the file to remove from its FilesContainer
+        target: String,
+        /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
+        #[structopt(short = "u", long = "update-nrs")]
+        update_nrs: bool,
+        /// Recursively remove files found in the target path
+        #[structopt(short = "r", long = "recursive")]
+        recursive: bool,
+    },
     #[structopt(name = "ls")]
     /// List files found in an existing FilesContainer on the network
     Ls {
@@ -206,6 +218,54 @@ pub fn files_commander(
                 };
 
             // Now let's just print out a list of the files synced/processed
+            if OutputFmt::Pretty == output_fmt {
+                let (table, success_count) = gen_processed_files_table(&processed_files, true);
+                if success_count > 0 {
+                    let url = match XorUrlEncoder::from_url(&target_url) {
+                        Ok(mut xorurl_encoder) => {
+                            xorurl_encoder.set_content_version(Some(version));
+                            xorurl_encoder.set_path("");
+                            xorurl_encoder.to_string()?
+                        }
+                        Err(_) => target_url,
+                    };
+
+                    println!("FilesContainer updated (version {}): \"{}\"", version, url);
+                    table.printstd();
+                } else if !processed_files.is_empty() {
+                    println!(
+                        "No changes were made to FilesContainer (version {}) at \"{}\"",
+                        version, target_url
+                    );
+                    table.printstd();
+                } else {
+                    println!(
+                        "No changes were made to the FilesContainer (version {}) at: \"{}\"",
+                        version, target_url
+                    );
+                }
+            } else {
+                print_serialized_output(target_url, version, processed_files, output_fmt)?;
+            }
+            Ok(())
+        }
+        FilesSubCommands::Rm {
+            target,
+            update_nrs,
+            recursive,
+        } => {
+            let target_url =
+                get_from_arg_or_stdin(Some(target), Some("...awaiting target URl from STDIN"))?;
+
+            if dry_run && OutputFmt::Pretty == output_fmt {
+                notice_dry_run();
+            }
+
+            // Update the FilesContainer on the Network
+            let (version, processed_files, _files_map) =
+                safe.files_container_remove_path(&target_url, recursive, update_nrs, dry_run)?;
+
+            // Now let's just print out a list of the files removed
             if OutputFmt::Pretty == output_fmt {
                 let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {

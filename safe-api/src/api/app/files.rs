@@ -212,7 +212,7 @@ impl Safe {
     ) -> Result<(u64, ProcessedFiles, FilesMap)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
-                "'delete' is not allowed if --recursive is not set".to_string(),
+                "'delete' is not allowed if 'recursive' is not set".to_string(),
             ));
         }
 
@@ -365,6 +365,75 @@ impl Safe {
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
             files_map_add_link(self, current_files_map, &new_file_xorurl, dest_path, force)?;
+        let version = self.append_version_to_nrs_map_container(
+            success_count,
+            current_version,
+            &new_files_map,
+            url,
+            xorurl_encoder,
+            dry_run,
+            update_nrs,
+        )?;
+
+        Ok((version, processed_files, new_files_map))
+    }
+
+    /// # Remove a file from an existing FilesContainer.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// # use safe_api::Safe;
+    /// # let mut safe = Safe::default();
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// let (xorurl, processed_files, files_map) = safe.files_container_create("../testdata/", None, true, false).unwrap();
+    /// let remote_file_path = format!("{}/test.md", xorurl);
+    /// let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).unwrap();
+    /// println!("FilesContainer is now at version: {}", version);
+    /// println!("The files that were removed: {:?}", new_processed_files);
+    /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    /// ```
+    pub fn files_container_remove_path(
+        &mut self,
+        url: &str,
+        recursive: bool,
+        update_nrs: bool,
+        dry_run: bool,
+    ) -> Result<(u64, ProcessedFiles, FilesMap)> {
+        let xorurl_encoder = Safe::parse_url(url)?;
+        if xorurl_encoder.content_version().is_some() {
+            return Err(Error::InvalidInput(format!(
+                "The target URL cannot cannot contain a version: {}",
+                url
+            )));
+        };
+
+        let dest_path = xorurl_encoder.path();
+        if dest_path.is_empty() {
+            return Err(Error::InvalidInput(
+                "The destination URL should include a target file path".to_string(),
+            ));
+        }
+
+        // If NRS name shall be updated then the URL has to be an NRS-URL
+        if update_nrs && xorurl_encoder.content_type() != SafeContentType::NrsMapContainer {
+            return Err(Error::InvalidInput(
+                "'update-nrs' is not allowed since the URL provided is not an NRS URL".to_string(),
+            ));
+        }
+
+        let (mut xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
+
+        // If the FilesContainer URL was resolved from an NRS name we need to remove
+        // the version from it so we can fetch latest version of it
+        xorurl_encoder.set_content_version(None);
+
+        let (current_version, files_map): (u64, FilesMap) =
+            self.files_container_get(&xorurl_encoder.to_string()?)?;
+
+        let (processed_files, new_files_map, success_count) =
+            files_map_remove_path(dest_path, files_map, recursive)?;
+
         let version = self.append_version_to_nrs_map_container(
             success_count,
             current_version,
@@ -914,6 +983,58 @@ fn files_map_add_link(
     }
 }
 
+// Remove a path from the FilesMap provided
+fn files_map_remove_path(
+    dest_path: &str,
+    mut files_map: FilesMap,
+    recursive: bool,
+) -> Result<(ProcessedFiles, FilesMap, u64)> {
+    let mut processed_files = ProcessedFiles::default();
+    let (success_count, new_files_map) = if recursive {
+        let mut success_count = 0;
+        let mut new_files_map = FilesMap::default();
+        let folder_path = if !dest_path.ends_with('/') {
+            format!("{}/", dest_path)
+        } else {
+            dest_path.to_string()
+        };
+
+        files_map.iter().for_each(|(file_path, file_item)| {
+            // if the current file_path is a subfolder we remove it
+            if file_path.starts_with(&folder_path) {
+                processed_files.insert(
+                    file_path.to_string(),
+                    (
+                        CONTENT_DELETED_SIGN.to_string(),
+                        file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+                    ),
+                );
+                success_count += 1;
+            } else {
+                new_files_map.insert(file_path.to_string(), file_item.clone());
+            }
+        });
+        (success_count, new_files_map)
+    } else {
+        let file_item = files_map
+            .remove(dest_path)
+            .ok_or_else(|| Error::ContentError(format!(
+                "No content found matching the \"{}\" path on the target FilesContainer. If you are trying to remove a folder rather than a file, you need to pass the 'recursive' flag",
+                dest_path
+            )))?;
+        processed_files.insert(
+            dest_path.to_string(),
+            (
+                CONTENT_DELETED_SIGN.to_string(),
+                file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+            ),
+        );
+        (1, files_map)
+    };
+
+    Ok((processed_files, new_files_map, success_count))
+}
+
 // Upload a files to the Network as a Published-ImmutableData
 fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
@@ -1007,9 +1128,9 @@ fn file_system_dir_walk(
     } else {
         // Recursive only works on a dir path. Let's error as the user may be making a mistake
         // so it's better for the user to double check and either provide the correct path
-        // or remove the `--recursive` from the args
+        // or remove the 'recursive' flag from the args
         Err(Error::InvalidInput(format!(
-            "'{}' is not a directory. The \"--recursive\" arg is only supported for folders.",
+            "'{}' is not a directory. The \"recursive\" arg is only supported for folders.",
             location
         )))
     }
@@ -1667,7 +1788,7 @@ mod tests {
             Err(err) => assert_eq!(
                 err,
                 Error::InvalidInput(
-                    "'delete' is not allowed if --recursive is not set".to_string()
+                    "'delete' is not allowed if 'recursive' is not set".to_string()
                 )
             ),
         };
@@ -2407,6 +2528,56 @@ mod tests {
         assert_eq!(
             new_processed_files[new_filename].1,
             new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[test]
+    fn test_files_container_remove_path() {
+        use unwrap::unwrap;
+        let mut safe = Safe::default();
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) =
+            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+
+        // let's remove a file first
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false,)
+        );
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 4);
+
+        let filepath = "/test.md";
+        assert_eq!(new_processed_files[filepath].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[filepath].1,
+            files_map[filepath][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // let's remove an entire folder now with recursive flag
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false,)
+        );
+
+        assert_eq!(version, 2);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 2);
+
+        let filename1 = "/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename1].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[filename1].1,
+            files_map[filename1][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "/subfolder/sub2.md";
+        assert_eq!(new_processed_files[filename2].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[filename2].1,
+            files_map[filename2][FAKE_RDF_PREDICATE_LINK]
         );
     }
 }
