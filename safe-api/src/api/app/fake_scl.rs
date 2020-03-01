@@ -17,13 +17,12 @@ use crate::{Error, Result};
 use log::{debug, trace};
 use safe_nd::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
-    XorName, XOR_NAME_LEN,
+    XorName,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::{collections::BTreeMap, fs, io::Write, str};
 use threshold_crypto::{PublicKey, SecretKey};
+use tiny_keccak::sha3_256;
 
 const FAKE_VAULT_FILE: &str = "./fake_vault_data.json";
 
@@ -236,20 +235,10 @@ impl SafeApp for SafeAppFake {
     }
 
     fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
-        // We create a XorName based on a hash of the content, not a real 256 hash/xorname,
-        // but hopefully good and unique enough for our fake SCL
-
-        // Build a hash of the data bytes
-        let mut hasher = DefaultHasher::new();
-        Hash::hash_slice(data, &mut hasher);
-        let hash = hasher.finish();
-
-        // Let's use that hash number to create a fake (but hopefully unique) 32 bytes long XorName
-        let mut xorname = XorName::default();
-        let fake_hash = &format!("{}{}", hash, hash);
-        xorname
-            .0
-            .copy_from_slice(&fake_hash[0..XOR_NAME_LEN].as_bytes());
+        // We create a XorName based on a hash of the content, not a real one as
+        // it doesn't apply self-encryption, but a unique one for our fake SCL
+        let vec_hash = sha3_256(&data);
+        let xorname = XorName(vec_hash);
 
         if !dry_run {
             self.fake_vault
