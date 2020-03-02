@@ -71,6 +71,9 @@ enum CmdArgs {
         /// Address to listen on
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
+        /// Path where to store authd log files (default ~/.safe/authd/logs/)
+        #[structopt(long)]
+        log_dir: Option<PathBuf>,
         /// Run in foreground instead of daemon mode
         #[structopt(long = "foreground")]
         fg: bool,
@@ -80,13 +83,20 @@ enum CmdArgs {
     ScStart {},
     /// Stop a running safe-authd
     #[structopt(name = "stop")]
-    Stop {},
+    Stop {
+        /// Path where to store authd log files (default ~/.safe/authd/logs/)
+        #[structopt(long)]
+        log_dir: Option<PathBuf>,
+    },
     /// Restart a running safe-authd
     #[structopt(name = "restart")]
     Restart {
         /// Address to listen on
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
+        /// Path where to store authd log files (default ~/.safe/authd/logs/)
+        #[structopt(long)]
+        log_dir: Option<PathBuf>,
         /// Run in foreground instead of daemon mode
         #[structopt(long = "foreground")]
         fg: bool,
@@ -116,9 +126,18 @@ fn process_command(opt: CmdArgs) -> Result<()> {
             .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err))),
         CmdArgs::Install {} => install_authd(),
         CmdArgs::Uninstall {} => uninstall_authd(),
-        CmdArgs::Start { listen, fg, .. } => start_authd(&listen, fg),
+        CmdArgs::Start {
+            listen,
+            log_dir,
+            fg,
+            ..
+        } => start_authd(&listen, log_dir, fg),
         CmdArgs::ScStart {} => start_authd_from_sc(),
-        CmdArgs::Stop {} => stop_authd(),
-        CmdArgs::Restart { listen, fg } => restart_authd(&listen, fg),
+        CmdArgs::Stop { log_dir } => stop_authd(log_dir),
+        CmdArgs::Restart {
+            listen,
+            log_dir,
+            fg,
+        } => restart_authd(&listen, log_dir, fg),
     }
 }

@@ -11,7 +11,7 @@ use super::{
     authd::run as authd_run,
     errors::{Error, Result},
 };
-use std::{ffi::OsString, io, io::Write, process, time::Duration};
+use std::{ffi::OsString, io, io::Write, path::PathBuf, process, time::Duration};
 use windows_service::{
     define_windows_service,
     service::{
@@ -42,7 +42,7 @@ pub fn uninstall_authd() -> Result<()> {
     uninstall_authd_service()
 }
 
-pub fn start_authd(listen: &str, foreground: bool) -> Result<()> {
+pub fn start_authd(listen: &str, _log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
     println!("Starting SAFE Authenticator service (safe-authd) from command line...");
     if foreground {
         println!("Initialising SAFE Authenticator services...");
@@ -118,7 +118,7 @@ pub fn start_authd_from_sc() -> Result<()> {
     })
 }
 
-pub fn stop_authd() -> Result<()> {
+pub fn stop_authd(_log_dir: Option<PathBuf>) -> Result<()> {
     println!("Stopping SAFE Authenticator service (safe-authd)...");
 
     // TODO: support for stopping gracefully with invoke_stop_on_service_manager()
@@ -143,9 +143,9 @@ pub fn stop_authd() -> Result<()> {
     }
 }
 
-pub fn restart_authd(listen: &str, foreground: bool) -> Result<()> {
-    stop_authd()?;
-    start_authd(listen, foreground)?;
+pub fn restart_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
+    stop_authd(log_dir.clone())?;
+    start_authd(listen, log_dir, foreground)?;
     println!("Success, safe-authd restarted!");
     Ok(())
 }
@@ -171,7 +171,7 @@ fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
             // Handle stop
             ServiceControl::Stop => {
                 // TODO: send signal to process to stop gracefully
-                match stop_authd() {
+                match stop_authd(None) {
                     Ok(()) => ServiceControlHandlerResult::NoError,
                     Err(_) => ServiceControlHandlerResult::NoError,
                 }
@@ -354,7 +354,7 @@ fn uninstall_authd_service() -> Result<()> {
 
     if service_status.current_state != ServiceState::Stopped {
         println!("An existing safe-authd service is currently running, let's stop it...");
-        stop_authd()?;
+        stop_authd(None)?;
     }
 
     Ok(())
