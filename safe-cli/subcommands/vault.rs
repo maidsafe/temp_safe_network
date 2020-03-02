@@ -33,7 +33,7 @@ pub enum VaultSubCommands {
         #[structopt(short = "y", parse(from_occurrences))]
         verbosity: u8,
         /// Interval in seconds between launching each of the vaults
-        #[structopt(short = "i", long, default_value = "3")]
+        #[structopt(short = "i", long, default_value = "1")]
         interval: u64,
     },
     /// Shutdown all running vaults processes
