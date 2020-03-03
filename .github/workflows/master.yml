@@ -368,7 +368,7 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: [build-cli-authd, build-ffi, build-mac-cli-authd, build-ffi-android, build-ffi-ios]
+    needs: [build-cli-authd, build-ffi, build-mac-cli-authd] #, build-ffi-android, build-ffi-ios]
     env:
       AWS_ACCESS_KEY_ID: AKIAVVODCRMSJ5MV63VB
       AWS_SECRET_ACCESS_KEY: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
@@ -431,30 +431,30 @@ jobs:
         with:
           name: safe-ffi-x86_64-apple-darwin-dev
           path: artifacts/safe-ffi/dev/x86_64-apple-darwin/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-armv7-linux-androideabi-prod
-          path: artifacts/safe-ffi/prod/armv7-linux-androideabi/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-armv7-linux-androideabi-dev
-          path: artifacts/safe-ffi/dev/armv7-linux-androideabi/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-x86_64-linux-android-prod
-          path: artifacts/safe-ffi/prod/x86_64-linux-android/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-x86_64-linux-android-dev
-          path: artifacts/safe-ffi/dev/x86_64-linux-android/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-apple-ios-prod
-          path: artifacts/safe-ffi/prod/apple-ios/release
-      - uses: actions/download-artifact@master
-        with:
-          name: safe-ffi-apple-ios-dev
-          path: artifacts/safe-ffi/dev/apple-ios/release
+      # - uses: actions/download-artifact@master
+      #   with:
+      #     name: safe-ffi-armv7-linux-androideabi-prod
+      #     path: artifacts/safe-ffi/prod/armv7-linux-androideabi/release
+      # - uses: actions/download-artifact@master
+      #   with:
+      #     name: safe-ffi-armv7-linux-androideabi-dev
+      #     path: artifacts/safe-ffi/dev/armv7-linux-androideabi/release
+      # - uses: actions/download-artifact@master
+      #   with:
+      #     name: safe-ffi-x86_64-linux-android-prod
+      #     path: artifacts/safe-ffi/prod/x86_64-linux-android/release
+      # - uses: actions/download-artifact@master
+      #   with:
+      #     name: safe-ffi-x86_64-linux-android-dev
+      #     path: artifacts/safe-ffi/dev/x86_64-linux-android/release
+      # - uses: actions/download-artifact@master
+      #   with:
+      #     name: safe-ffi-apple-ios-prod
+      #     path: artifacts/safe-ffi/prod/apple-ios/release
+      # - uses: actions/download-artifact@master
+      #   with:
+      #     name: safe-ffi-apple-ios-dev
+      #     path: artifacts/safe-ffi/dev/apple-ios/release
 
       # Get information for the release.
       - shell: bash

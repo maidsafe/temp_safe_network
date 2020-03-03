@@ -261,8 +261,14 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
         let immd_data_addr = IDataAddress::Pub(xorname);
         let data = run(safe_app, move |client, _app_context| {
-            immutable_data::get_value(client, immd_data_addr, /*decryption_key:*/ None)
-                .map_err(SafeAppError)
+            immutable_data::get_value(
+                client,
+                immd_data_addr,
+                /*decryption_key:*/ None,
+                None,
+                None,
+            )
+            .map_err(SafeAppError)
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))

@@ -1,6 +1,6 @@
 [package]
 name = "safe-ffi"
-version = "0.8.0"
+version = "0.9.0"
 description = "SAFE API FFI"
 authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
 publish = false
@@ -15,7 +15,7 @@ crate_type = ["staticlib", "rlib", "cdylib"]
 path = "lib.rs"
 
 [dependencies]
-ffi_utils = "~0.14.0"
+ffi_utils = "~0.15.0"
 # Required by ffi_utils macros.
 log = "~0.4.8"
 safe-nd = "^0.8.0"
