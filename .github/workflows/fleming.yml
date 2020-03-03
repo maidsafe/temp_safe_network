@@ -129,9 +129,8 @@ jobs:
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 
       # Upload all the release archives to S3
-      - uses: actions/aws/cli@master
-        with:
-          args: s3 sync deploy/prod s3://safe-vault --acl public-read
+      - name: Upload archives to S3
+        run: aws s3 sync deploy/prod s3://safe-vault --acl public-read
 
       # Create the release and attach safe_vault archives as assets.
       - uses: csexton/create-release@add-body
