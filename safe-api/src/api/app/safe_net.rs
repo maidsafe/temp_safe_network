@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use crate::api::fetch::Range;
 use crate::Result;
 use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId, XorName};
 use std::collections::BTreeMap;
@@ -50,7 +51,7 @@ pub trait SafeApp {
 
     fn files_put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
 
-    fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>>;
+    fn files_get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>>;
 
     fn put_seq_append_only_data(
         &mut self,

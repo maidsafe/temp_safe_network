@@ -13,6 +13,7 @@ use super::{
         FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
         FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
     },
+    fetch::Range,
     helpers::{gen_timestamp_nanos, gen_timestamp_secs},
     xorurl::{SafeContentType, SafeDataType},
     Safe, SafeApp,
@@ -512,7 +513,7 @@ impl Safe {
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data, Some("text/plain"), false).unwrap();
-    /// # let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
+    /// # let received_data = safe.files_get_published_immutable(&xorurl, None).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
     pub fn files_put_published_immutable(
@@ -562,14 +563,14 @@ impl Safe {
     /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # let data = b"Something super good";
     /// let xorurl = safe.files_put_published_immutable(data, None, false).unwrap();
-    /// let received_data = safe.files_get_published_immutable(&xorurl).unwrap();
+    /// let received_data = safe.files_get_published_immutable(&xorurl, None).unwrap();
     /// # assert_eq!(received_data, data);
     /// ```
-    pub fn files_get_published_immutable(&self, url: &str) -> Result<Vec<u8>> {
+    pub fn files_get_published_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
         self.safe_app
-            .files_get_published_immutable(xorurl_encoder.xorname())
+            .files_get_published_immutable(xorurl_encoder.xorname(), range)
     }
 }
 
@@ -1257,12 +1258,12 @@ mod tests {
         assert_eq!(files_map.len(), 2);
         let file_item1 = &files_map["/testdata/test.md"];
         assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
-        assert_eq!(file_item1[FAKE_RDF_PREDICATE_TYPE], "text/x-markdown");
+        assert_eq!(file_item1[FAKE_RDF_PREDICATE_TYPE], "text/markdown");
         assert_eq!(file_item1[FAKE_RDF_PREDICATE_SIZE], "12");
 
         let file_item2 = &files_map["/testdata/subfolder/subexists.md"];
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
-        assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "text/x-markdown");
+        assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "text/markdown");
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
     }
 

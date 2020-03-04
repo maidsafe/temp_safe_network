@@ -9,6 +9,7 @@
 
 use super::{
     common::parse_hex,
+    fetch::Range,
     helpers::{parse_coins_amount, vec_to_hex, xorname_from_pk, xorname_to_hex},
     safe_net::AppendOnlyDataRawData,
     SafeApp,
@@ -249,7 +250,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>> {
+    fn files_get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         let data = match self
             .fake_vault
             .published_immutable_data
@@ -261,6 +262,13 @@ impl SafeApp for SafeAppFake {
                     "No ImmutableData found at this address".to_string(),
                 ))
             }
+        };
+
+        let data = match range {
+            Some((start, end)) => data
+                [start.unwrap_or_default() as usize..end.unwrap_or(data.len() as u64) as usize]
+                .to_vec(),
+            None => data.to_vec(),
         };
 
         Ok(data)

@@ -35,7 +35,7 @@ pub fn cat_commander(
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &url);
 
-    let content = safe.fetch(&url)?;
+    let content = safe.fetch(&url, None)?;
     match &content {
         SafeData::FilesContainer {
             version, files_map, ..

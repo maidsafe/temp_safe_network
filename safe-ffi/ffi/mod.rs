@@ -9,8 +9,9 @@
 
 #![allow(clippy::missing_safety_doc)]
 
-/// Fetch API
+mod constants;
 mod errors;
+/// Fetch API
 pub mod fetch;
 pub mod ffi_structs;
 pub mod files;

@@ -8,6 +8,7 @@
 // Software.
 
 use super::{
+    constants::{FILE_READ_FROM_START, FILE_READ_TO_END},
     errors::Result,
     ffi_structs::{processed_files_into_repr_c, ProcessedFiles},
     helpers::from_c_str_to_str_option,
@@ -218,6 +219,8 @@ pub unsafe extern "C" fn files_put_published_immutable(
 pub unsafe extern "C" fn files_get_published_immutable(
     app: *mut Safe,
     url: *const c_char,
+    start: u64,
+    end: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -229,7 +232,19 @@ pub unsafe extern "C" fn files_get_published_immutable(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
-        let data = (*app).files_get_published_immutable(&url_str)?;
+        let start = if start == FILE_READ_FROM_START {
+            None
+        } else {
+            Some(start)
+        };
+
+        let end = if end == FILE_READ_TO_END {
+            None
+        } else {
+            Some(end)
+        };
+
+        let data = (*app).files_get_published_immutable(&url_str, Some((start, end)))?;
         o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
         Ok(())
     })

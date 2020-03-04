@@ -10,6 +10,7 @@
 #[cfg(not(feature = "fake-auth"))]
 use super::helpers::{decode_ipc_msg, AuthResponseType};
 use super::{
+    fetch::Range,
     helpers::{xorname_from_pk, xorname_to_hex},
     safe_net::AppendOnlyDataRawData,
     SafeApp,
@@ -255,20 +256,37 @@ impl SafeApp for SafeAppScl {
         Ok(*idata.name())
     }
 
-    fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>> {
+    fn files_get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let safe_app: &App = self.get_safe_app()?;
         let immd_data_addr = IDataAddress::Pub(xorname);
         let data = run(safe_app, move |client, _app_context| {
-            immutable_data::get_value(
-                client,
-                immd_data_addr,
-                /*decryption_key:*/ None,
-                None,
-                None,
-            )
-            .map_err(SafeAppError)
+            if let Some((start, end)) = range {
+                let len = if let Some(end_index) = end {
+                    Some(end_index - start.unwrap_or_else(|| 0))
+                } else {
+                    None
+                };
+
+                immutable_data::get_value(
+                    client,
+                    immd_data_addr,
+                    start,
+                    len,
+                    /*decryption_key:*/ None,
+                )
+                .map_err(SafeAppError)
+            } else {
+                immutable_data::get_value(
+                    client,
+                    immd_data_addr,
+                    None,
+                    None,
+                    /*decryption_key:*/ None,
+                )
+                .map_err(SafeAppError)
+            }
         })
         .map_err(|e| {
             Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
@@ -673,7 +691,7 @@ mod tests {
             .unwrap();
         let data = safe
             .safe_app
-            .files_get_published_immutable(xorname)
+            .files_get_published_immutable(xorname, None)
             .unwrap();
         let text = std::str::from_utf8(data.as_slice()).unwrap();
         assert_eq!(text.to_string(), "HELLLOOOOOOO");

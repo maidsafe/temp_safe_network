@@ -8,6 +8,7 @@
 // Software.
 
 use super::{
+    constants::{FILE_READ_FROM_START, FILE_READ_TO_END},
     errors::{Error, Result},
     ffi_structs::{
         files_map_into_repr_c, nrs_map_container_info_into_repr_c,
@@ -25,6 +26,8 @@ pub unsafe extern "C" fn fetch(
     app: *mut Safe,
     url: *const c_char,
     user_data: *mut c_void,
+    start: u64,
+    end: u64,
     o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
     o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
     o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
@@ -33,7 +36,18 @@ pub unsafe extern "C" fn fetch(
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<()> {
         let url = String::clone_from_repr_c(url)?;
-        let content = (*app).fetch(&url);
+        let start = if start == FILE_READ_FROM_START {
+            None
+        } else {
+            Some(start)
+        };
+
+        let end = if end == FILE_READ_TO_END {
+            None
+        } else {
+            Some(end)
+        };
+        let content = (*app).fetch(&url, Some((start, end)));
         invoke_callback(
             content,
             user_data,

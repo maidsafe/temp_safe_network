@@ -48,7 +48,7 @@ fn calling_safe_cat() {
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
     assert_eq!(
         xorurl_encoder.content_type(),
-        SafeContentType::MediaType("text/x-markdown".to_string())
+        SafeContentType::MediaType("text/markdown".to_string())
     );
     assert_eq!(
         xorurl_encoder.data_type(),
@@ -89,7 +89,7 @@ fn calling_safe_cat_hexdump() {
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
     assert_eq!(
         xorurl_encoder.content_type(),
-        SafeContentType::MediaType("text/x-markdown".to_string())
+        SafeContentType::MediaType("text/markdown".to_string())
     );
     assert_eq!(
         xorurl_encoder.data_type(),
