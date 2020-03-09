@@ -355,6 +355,41 @@ Sending request to authd to obtain a status report...
 
 The SAFE Authenticator is now ready to receive authorisation requests from any SAFE application, including the SAFE CLI which needs to also get permissions to perform any data operations on behalf of our account.
 
+##### Passing credentials from a config file
+
+It's possible (though not secure) to use a simple json file to pass the passphrase and password to the auth commands, and so avoid having to manually input both, either when creating an account or when logging in.
+```
+// my-config.json
+{
+  "passphrase": "mypassphrase"
+  "password": "mypassword",
+}
+```
+And so you can log in with:
+```shell
+$ ./safe auth login --config ./my-config.json
+Sending login action request to authd...
+Logged in successfully
+```
+
+##### Using environment variables
+
+Another method for passing passphrase/password involves using the environment variables `SAFE_AUTH_PASSPHRASE` and `SAFE_AUTH_PASSWORD`.
+
+With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then login without needing to enter login details, or pass a config file:
+```shell
+$ ./safe auth login
+Sending login action request to authd...
+Logged in successfully
+```
+Or, you can choose to pass the environment variables to the command directly (though this can be insecure):
+```shell
+$ SAFE_AUTH_PASSPHRASE="<passphrase>" SAFE_AUTH_PASSWORD="<password>" ./safe auth login
+Sending login action request to authd...
+Logged in successfully
+```
+Please note, that both the passphrase and password environment variables must be set to use this method. If only one is set, an error will be thrown.
+
 #### Auth reqs
 
 Now that the Authenticator is running and ready to authorise applications, we can try to authorise the CLI application.
