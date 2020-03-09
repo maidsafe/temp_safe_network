@@ -103,7 +103,7 @@ Right now the CLI is under active development. Here we're listing commands ready
 
 In this guide we will assume from now on that you have navigated your terminal to the directory where the `safe` executable file you downloaded or built for your platform is located.
 
-The base command, once built, is `$ ./safe`, or all commands can be run via `$ cargo run -- <command>`.
+The base command, once built, is `$ safe`, or all commands can be run via `$ cargo run -- <command>`.
 
 Various global flags are available:
 
@@ -136,7 +136,7 @@ Currently, there is a public test network accessible to anyone. Users may also h
 
 Let's first look at how to run a local SAFE network using the CLI. A local network is bootstrapped by running several SAFE vaults which automatically interconnect forming a network. We therefore first need to install the SAFE vault in our system:
 ```shell
-$ ./safe vault install
+$ safe vault install
 Latest release found: safe_vault v0.21.0
 Downloading https://safe-vault.s3.eu-west-2.amazonaws.com/safe_vault-0.21.0-x86_64-unknown-linux-musl.zip...
 [00:00:36] [========================================] 6.28MB/6.28MB (0s) Done
@@ -149,7 +149,7 @@ Done!
 
 At current state of the SAFE project, a single-section SAFE network can be launched locally in our system. If the SAFE vault was installed in the system using the CLI as described in previous section we can then launch it with a simple command:
 ```shell
-$ ./safe vault run-baby-fleming
+$ safe vault run-baby-fleming
 Storing vaults' generated data at ~/.safe/vault/baby-fleming-vaults
 Launching local SAFE network...
 Launching with vault executable from: ~/.safe/vault/safe_vault
@@ -170,7 +170,7 @@ Once the local network is running, the connection configuration file will be alr
 
 In order to shutdown a running local network, the following CLI command can be invoked to kill all running safe_vault processes:
 ```shell
-$ ./safe vault killall
+$ safe vault killall
 Success, all processes instances of safe_vault were stopped!
 ```
 
@@ -180,20 +180,20 @@ MaidSafe currently hosts a single-section network for those who don't want to ru
 
 The CLI allows you to set up a list of networks in its config settings for easily switching to connect to them. If you just launched a local network, you can keep current connection information as a configured network on CLI with the following command:
 ```shell
-$ ./safe networks add my-network
+$ safe networks add my-network
 Caching current network connection information into: ~/.config/safe-cli/networks/my-network_vault_connection_info.config
 Network 'my-network' was added to the list. Connection information is located at '~/.config/safe-cli/networks/my-network_vault_connection_info.config'
 ```
 
 If you also would like to connect to the MaidSafe hosted test network, you'd need to set it up in CLI settings as another network too, specifying the URL where to fetch latest connection information from:
 ```shell
-$ ./safe networks add shared-network https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config
+$ safe networks add shared-network https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config
 Network 'shared-network' was added to the list
 ```
 
 We can also retrieve the list of the different networks that were set up in the CLI config:
 ```shell
-$ ./safe networks
+$ safe networks
 +----------------+------------------------------------------------------------------------------------------------+
 | Networks       |                                                                                                |
 +----------------+------------------------------------------------------------------------------------------------+
@@ -207,7 +207,7 @@ $ ./safe networks
 
 Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it at the right location in the system for SAFE applications to connect to the selected network. E.g. let's switch to the 'shared-network' network we previously configured:
 ```shell
-$ ./safe networks switch shared-network
+$ safe networks switch shared-network
 Switching to 'shared-network' network...
 Fetching 'shared-network' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
 Successfully switched to 'shared-network' network in your system!
@@ -216,7 +216,7 @@ If you need write access to the 'shared-network' network, you'll need to restart
 
 Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your currently setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
 ```shell
-$ ./safe networks check
+$ safe networks check
 Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/safe-cli/networks/my-network_vault_connection_info.config' ...
 Fetching 'shared-network' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
@@ -242,7 +242,7 @@ The SAFE Authenticator, which runs as a daemon or as a service in Windows platfo
 
 Downloading and installing the Authenticator daemon is very simple:
 ```shell
-$ ./safe auth install
+$ safe auth install
 Latest release found: safe-authd v0.0.3
 Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
@@ -252,7 +252,7 @@ Done!
 
 **If you on a Windows platform**, the CLI requires administrator permissions to install it, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the install command:
 ```shell
-> ./safe auth install
+> safe auth install
 Latest release found: safe-authd v0.0.3
 Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-pc-windows-msvc.zip...
 [00:00:19] [========================================] 4.3MB/4.3MB (0s) Done
@@ -268,13 +268,13 @@ Note that in the case of a Windows platform, the command not only downloads the 
 
 In order to start the `SAFE Authenticator daemon (safe-authd)` so it can start receiving requests we simply need to run the following command:
 ```shell
-$ ./safe auth start
+$ safe auth start
 Starting SAFE Authenticator daemon (safe-authd)...
 ```
 
 Again, **if you are on a Windows platform**, the CLI requires administrator permissions to be able to start the safe-authd service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
 ```shell
-> ./safe auth start
+> safe auth start
 Starting SAFE Authenticator service (safe-authd) from command line...
 safe-authd service started successfully!
 ```
@@ -283,7 +283,7 @@ safe-authd service started successfully!
 
 Once we started the `authd`, it should be running in the background and ready to receive requests, we can send a status request to check it's up and running:
 ```shell
-$ ./safe auth status
+$ safe auth status
 Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
@@ -304,7 +304,7 @@ Since we now have our SAFE Authenticator running and ready to accept requests, w
 
 In order to create a SAFE Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
 ```shell
-$ ./safe auth create-acc --test-coins
+$ safe auth create-acc --test-coins
 Passphrase:
 Password:
 Creating a SafeKey with test-coins...
@@ -317,7 +317,7 @@ Secret Key = 5cc0951bb95be85dec3f0358ddb40570d0e045b3ff0007562af9b5c9162f2518
 
 Alternatively, if we own some safecoins on a `SafeKey` already (see [`SafeKeys` section](#safekeys) for details about `SafeKey`s), we can provide the corresponding secret key to the safe CLI to use it for paying the cost of creating the account, as well as setting it as the default `SafeKey` for the account being created:
 ```shell
-$ ./safe auth create-acc
+$ safe auth create-acc
 Passphrase:
 Password:
 Enter SafeKey's secret key to pay with:
@@ -329,7 +329,7 @@ Account was created successfully!
 
 When a new account is created with CLI, as we've seen above, the `authd` will stay logged into that same account. However if we want to log in to a different account, or to the same account after the PC or `authd` was restarted, we can login using the following command:
 ```shell
-$ ./safe auth login
+$ safe auth login
 Passphrase:
 Password:
 Sending login action request to authd...
@@ -338,7 +338,7 @@ Logged in successfully
 
 If we now send a status report request to `authd`, it should now show that it's logged in to a SAFE account:
 ```shell
-$ ./safe auth status
+$ safe auth status
 Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | SAFE Authenticator status                |       |
@@ -367,7 +367,7 @@ It's possible (though not secure) to use a simple json file to pass the passphra
 ```
 And so you can log in with:
 ```shell
-$ ./safe auth login --config ./my-config.json
+$ safe auth login --config ./my-config.json
 Sending login action request to authd...
 Logged in successfully
 ```
@@ -378,13 +378,13 @@ Another method for passing passphrase/password involves using the environment va
 
 With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then login without needing to enter login details, or pass a config file:
 ```shell
-$ ./safe auth login
+$ safe auth login
 Sending login action request to authd...
 Logged in successfully
 ```
 Or, you can choose to pass the environment variables to the command directly (though this can be insecure):
 ```shell
-$ SAFE_AUTH_PASSPHRASE="<passphrase>" SAFE_AUTH_PASSWORD="<password>" ./safe auth login
+$ SAFE_AUTH_PASSPHRASE="<passphrase>" SAFE_AUTH_PASSWORD="<password>" safe auth login
 Sending login action request to authd...
 Logged in successfully
 ```
@@ -400,7 +400,7 @@ For the purpose of making this guide self contained with the SAFE CLI applicatio
 
 Let's first send an authorisation request from current console by simply invoking the `auth` command with no subcommands:
 ```shell
-$ ./safe auth
+$ safe auth
 Authorising CLI application...
 ```
 
@@ -410,7 +410,7 @@ We can now open a second console which we'll use to query `authd` for pending au
 
 Once we have a second console, we can start by fetching from `authd` the list of authorisation requests pending for approval/denial:
 ```shell
-$ ./safe auth reqs
+$ safe auth reqs
 Requesting list of pending authorisation requests from authd...
 +--------------------------------+------------------+----------+------------------+-------------------------+
 | Pending Authorisation requests |                  |          |                  |                         |
@@ -431,14 +431,14 @@ We see there is one authorisation request pending for approval/denial, which is 
 
 In order to allow any pending authorisation request we use its request ID (e.g. '584798987' from above), the `authd` will then proceed to send a response back to the CLI with the corresponding credentials it can use to connect directly with the Network:
 ```shell
-$ ./safe auth allow 584798987
+$ safe auth allow 584798987
 Sending request to authd to allow an authorisation request...
 Authorisation request was allowed successfully
 ```
 
-Note we could have otherwise decided to deny this authorisation request and invoke `$ ./safe auth deny 584798987` instead, but let's allow it so we can continue with the next steps of this guide.
+Note we could have otherwise decided to deny this authorisation request and invoke `$ safe auth deny 584798987` instead, but let's allow it so we can continue with the next steps of this guide.
 
-If we now switch back to our previous console, the one where we sent the authorisation request with `$ ./safe auth` command from, we will see the SAFE CLI receiving the response from `authd`. You should see in that console a message like the following:
+If we now switch back to our previous console, the one where we sent the authorisation request with `$ safe auth` command from, we will see the SAFE CLI receiving the response from `authd`. You should see in that console a message like the following:
 ```shell
 SAFE CLI app was successfully authorised
 Credentials were stored in <home directory>/.local/share/safe-cli/credentials
@@ -452,7 +452,7 @@ It could be the case the SAFE CLI is the only SAFE application that the user is 
 
 Therefore there is an option which allows the SAFE CLI to automatically self authorise when the user logs in using the CLI, which is as simply as:
 ```shell
-$ ./safe auth login --self-auth
+$ safe auth login --self-auth
 Passphrase:
 Password:
 Sending login action request to authd...
@@ -464,11 +464,11 @@ Credentials were stored in <home directory>/.local/share/safe-cli/credentials
 
 #### Auth update
 
-The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the latest available version using the CLI. Running `./safe auth update`, the application will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
+The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the latest available version using the CLI. Running `safe auth update`, the application will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
 
 After the safe-authd was updated, you'll need to restart it to start using new version:
 ```shell
-$ ./safe auth restart
+$ safe auth restart
 Stopping SAFE Authenticator daemon (safe-authd)...
 Success, safe-authd (PID: <pid>) stopped!
 Starting SAFE Authenticator daemon (safe-authd)...
@@ -478,7 +478,7 @@ Starting SAFE Authenticator daemon (safe-authd)...
 
 When the CLI is invoked without any command, it enters into an interactive shell, which allows the user to run commands within a shell:
 ```shell
-$ ./safe
+$ safe
 
 Welcome to SAFE CLI interactive shell!
 Type 'help' for a list of supported commands
@@ -507,7 +507,7 @@ Sending request to authd to obtain a status report...
 
 As you can see, the commands operate in an analogous way as when they are invoked outside of the interactive shell. Although there are some operations which are only possible when they are executed from the interactive shell, one nice example is the possibility to subscribe to receive authorisation request notifications, let's see how that works.
 
-In the previous section we've used the `./safe auth reqs` command to obtain a list of the authorisation requests which are awaiting for approval/denial. We could instead use the interactive shell to subscribe it as an endpoint to receive notifications when this authorisation requests are sent to the `authd`:
+In the previous section we've used the `safe auth reqs` command to obtain a list of the authorisation requests which are awaiting for approval/denial. We could instead use the interactive shell to subscribe it as an endpoint to receive notifications when this authorisation requests are sent to the `authd`:
 ```shell
 > auth subscribe
 Sending request to subscribe...
@@ -515,7 +515,7 @@ Subscribed successfully
 Keep this shell session open to receive the notifications
 ```
 
-This is telling us that as long as we keep this session of the interactive shell open, we will be notified of any new authorisation request, such notifications are being sent by the `authd` to our interactive shell session. Thus if we have any other SAFE app which is sending an authorisation request to `authd`, e.g. the SAFE Browser, a `./safe auth` command invoked from another instance of the CLI, etc., we will be notified by the interactive shell:
+This is telling us that as long as we keep this session of the interactive shell open, we will be notified of any new authorisation request, such notifications are being sent by the `authd` to our interactive shell session. Thus if we have any other SAFE app which is sending an authorisation request to `authd`, e.g. the SAFE Browser, a `safe auth` command invoked from another instance of the CLI, etc., we will be notified by the interactive shell:
 ```shell
 >
 A new application authorisation request was received:
@@ -532,7 +532,7 @@ You can use "auth allow"/"auth deny" commands to allow/deny the request respecti
 Press Enter to continue
 ```
 
-The notification message contains the same information we can obtain with `./safe auth reqs` command. We can now do the same as before and allow/deny such a request using its ID, in this case '754801191':
+The notification message contains the same information we can obtain with `safe auth reqs` command. We can now do the same as before and allow/deny such a request using its ID, in this case '754801191':
 ```shell
 > auth allow 754801191
 Sending request to authd to allow an authorisation request...
@@ -555,12 +555,12 @@ Note that even though the key pair is automatically generated by the CLI, `SafeK
 
 To generate a key pair and create a new `SafeKey` on the network, the secret key of another `SafeKey` is needed to pay for storage costs:
 ```shell
-$ ./safe keys create --pay-with <secret key>
+$ safe keys create --pay-with <secret key>
 ```
 
 But we can also create a `SafeKey` with test-coins to begin with (this is temporary and only for testing until farming is available):
 ```shell
-$ ./safe keys create --test-coins --preload 15.342
+$ safe keys create --test-coins --preload 15.342
 New SafeKey created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
 Preloaded with 15.342 coins
 Key pair generated:
@@ -570,7 +570,7 @@ Secret Key = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 
 Once we have some `SafeKey`s with some test-coins we can use them to pay for the creation of a SAFE Account (using the [SAFE Authenticator](https://github.com/maidsafe/safe-authenticator-cli)), or to pay for the creation of new `SafeKey`s. Thus if we use the `SafeKey` we just created with test-coins we can create a second `SafeKey`:
 ```shell
-$ ./safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
+$ safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 New SafeKey created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
 Preloaded with 8.15 coins
 Key pair generated:
@@ -596,7 +596,7 @@ We can optionally also pass the `SafeKey`'s XorUrl to have the CLI to verify the
 
 The target `SafeKey`'s secret key can be passed as an argument (or it will be retrieved from `stdin`), let's check the balance of the `SafeKey` we created in previous section:
 ```bash
-$ ./safe keys balance
+$ safe keys balance
 Enter secret key corresponding to the SafeKey to query the balance from: c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 SafeKey's current balance: 15.342000000
 ```
@@ -606,11 +606,11 @@ SafeKey's current balance: 15.342000000
 We now have a `SafeKey` with a positive balance, we can transfer `--from` a `SafeKey` (using its secret key), an `<amount>` of safecoins, `--to` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` can be passed as an argument with `--to`, or it will be read from `stdin`. If we omit the `--from` argument, the Account's default `SafeKey` will be used as the source of funds for the transaction.
 
 ```shell
-$ ./safe keys transfer <amount> --from <source SafeKey secret key> --to <destination Wallet/SafeKey URL>
+$ safe keys transfer <amount> --from <source SafeKey secret key> --to <destination Wallet/SafeKey URL>
 ```
 E.g.:
 ```shell
-$ ./safe keys transfer 1.519 --from c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965 --to safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum
+$ safe keys transfer 1.519 --from c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965 --to safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum
 Success. TX_ID: 12584479662656231449
 ```
 
@@ -622,7 +622,7 @@ As an example, if we want to have a friend to create a `SafeKey` for us, and pre
 
 Thus, let's see how this use case would work. First we create a key-pair:
 ```shell
-$ ./safe keypair
+$ safe keypair
 Key pair generated:
 Public Key = b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
 Secret Key = 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
@@ -630,7 +630,7 @@ Secret Key = 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a
 
 We now take note of both the public key, and the secret key. Now, we only share the public key with our friend, who can use it to generate a `SafeKey` to be owned by it and preload it with some test-coins:
 ```shell
-$ ./safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
+$ safe keys create --test-coins --preload 64.24 --pk b2371df48684dc9456988f45b56d7640df63895fea3d7cee45c79b26ba268d259b864330b83fa28669ab910a1725b833
 New SafeKey created at: "safe://hodby8y3qgina9nqzxmsoi8ytjfh6gwnia7hdupo49ibt8yy3ytgdq"
 Preloaded with 64.24 coins
 ```
@@ -645,7 +645,7 @@ A `Wallet` effectively contains links to `SafeKey`s which have safecoin balances
 
 Each of these links to `SafeKey`s (the spendable balances) can have a friendly name provided by the user, and these friendly names can then be used in different types of operations. E.g. one spendable balance in a `Wallet` can be named 'for-night-outs', while another one is named 'to-pay-the-rent', so when using the `Wallet` you could provide those names to the command in order to choose which spendable balance to use for the operation.
 
-There are several sub-commands that can be used to manage the `Wallet`s with the `./safe wallet` command (those commented out are not yet implemented):
+There are several sub-commands that can be used to manage the `Wallet`s with the `safe wallet` command (those commented out are not yet implemented):
 
 ```
 SUBCOMMANDS:
@@ -691,7 +691,7 @@ Right now, only a secret key (of a `SafeKey` with coins) can be used to pay for 
 For example, if we use the secret key we obtained when creating a `SafeKey` in our example in previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
 
 ```shell
-$ ./safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a --name first-spendable-balance
+$ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a --name first-spendable-balance
 Wallet created at: "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e"
 New SafeKey created at: "safe://hbyyyybqk69tpm67ecnzjg66tcrja3ugq81oh6gfaffwaty614rmttmyeu"
 Key pair generated:
@@ -703,13 +703,13 @@ Secret Key = b9b2edffa8ef103dc98ba2160e295f98fdf981eb572bc2f8b018a12574ce435e
 
 The balance of a given `Wallet` can be queried using its XorUrl. This returns the balance of the whole `Wallet`, i.e. the sum of the contained spendable balances. The target `Wallet` can be passed as an argument (or it will be retrieved from `stdin`):
 ```shell
-$ ./safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
+$ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
 Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e" has a total balance of 0 safecoins
 ```
 
 The coin balance of an individual spendable balance can also be queried by providing its friendly name as part of the `Wallet` URL, e.g. the `Wallet` we created above contains an spendable balance named 'first-spendable-balance', so we can check the balance of it (instead of the total balance of the `Wallet`) with the following command:
 ```shell
-$ ./safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance
+$ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance
 Wallet's spendable balance at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance" has a balance of 0 safecoins
 ```
 
@@ -755,7 +755,7 @@ With the above options, the user will be prompted to input the secret key corres
 The `--sk` argument can also be combined with `--keyurl` to pass the `SafeKey`'s XorUrl as part of the command line instruction itself, e.g.:
 
 ```shell
-$ ./safe wallet insert safe://<wallet-xorurl> --keyurl safe://<key-xor-url> --name my-default-balance --default
+$ safe wallet insert safe://<wallet-xorurl> --keyurl safe://<key-xor-url> --name my-default-balance --default
 Enter secret key corresponding to public key at safe://<key-xor-url>:
 b493a84e3b35239cbffdf10b8ebfa49c0013a5d1b59e5ef3c000320e2d303311
 Spendable balance inserted with name 'my-default-balance' in Wallet located at "safe://<wallet-xorurl>"
@@ -766,18 +766,18 @@ Spendable balance inserted with name 'my-default-balance' in Wallet located at "
 Once a `Wallet` contains some spendable balance/s, we can transfer `--from` a `Wallet` an `<amount>` of safecoins `--to` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` can be passed as an argument with `--to`, or it will be read from `stdin`.
 
 ```shell
-$ ./safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL>
+$ safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL>
 ```
 
 If the `Wallet` being provided either as the source or destination of a transfer has a _default_ spendable balance, we then only need to provide its URL, e.g.:
 ```shell
-$ ./safe wallet transfer 323.23 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao
+$ safe wallet transfer 323.23 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao
 Success. TX_ID: 6183829450183485238
 ```
 
 If on the contrary a `Wallet` being used (either as the source or destination of a transfer) doesn't have a _default_ spendable balance set, we can specify which spendable balance the operation should be applied to by passing its friendly name as the path of the `Wallet` URL. Or even if it has a _default_ spendable balance set, we can still choose which spendable balance to use in the operation. E.g. we can transfer from 'for-night-outs' spendable balance of the source `Wallet` with the following command:
 ```shell
-$ ./safe wallet transfer 0.053 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/for-night-outs --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao
+$ safe wallet transfer 0.053 --from safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/for-night-outs --to safe://hbyek1io7m6we5ges83fcn16xd51bqrrjjea4yyhu4hbu9yunyc5mucjao
 Success. TX_ID: 277748716389078887
 ```
 
@@ -791,7 +791,7 @@ Files are uploaded on the Network and stored as `Published ImmutableData` files,
 
 The most simple scenario is to upload all files and subfolders found within a local `./to-upload/` directory, recursively, onto a `FilesContainer` on the Network, obtaining the XOR-URL of the newly created container, as well as the XOR-URL of each of the files uploaded:
 ```shell
-$ ./safe files put ./to-upload/ --recursive
+$ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://bbkulcb5hsl2zbsia4af5i7myv2ujbet7di4gx5bstduikwgobru67esqu"
 +  ./to-upload/index.html          safe://bbkulcax6ulw7ovqhpsindkybsum4tusmvuc7ovtr2bu5gj6m4ugtu7euh
 +  ./to-upload/myfolder/notes.txt  safe://bbkulcan3may5gmqxqonwaoz2cjlkuc4cflrhwitmzy7ur4paof4u57yxz
@@ -802,7 +802,7 @@ Note that the `+` sign means the files were all added to the `FilesContainer`, w
 
 A single file can also be uploaded using the `files put` command, which will create a `FilesContainer` as well but this time only a single file will be added to the map:
 ```shell
-$ ./safe files put ./to-upload/myfile.txt
+$ safe files put ./to-upload/myfile.txt
 FilesContainer created at: "safe://bbkulca25xhzwo6mcxlji7ocf5tm5hgn2x3mxtg62qzycculur4aixeywm"
 +  ./to-upload/myfile.txt  safe://bbkulcbxk23cfnj7gz3r4y7624kpb5spwf4b7jogu2rofhuj5xiqa5huh7
 ```
@@ -813,7 +813,7 @@ When uploading files onto a `FilesContainer` with the CLI, the base path for the
 
 As an example, if we upload three files, which at source are located at `/to-upload/file1.txt`, `/to-upload/myfolder/file2.txt`, and `/to-upload/myotherfolder/subfolder/file3.txt`, the files will be published on the `FilesContainer` with paths `/file1.txt`, `/myfolder/file2.txt`, and `/myotherfolder/subfolder/file3.txt` respectively.
 
-We can additionally pass a destination path argument to set a base path for each of the paths in the `FilesContainer`, e.g. if we provide `/mychosenroot/` destination path argument to the `files put` command when uploading the above files, they will be published on the `FilesContainer` with paths `/mychosenroot/file1.txt`, `/mychosenroot/myfolder/file2.txt`, and `/mychosenroot/myotherfolder/subfolder/file3.txt` respectively. This can be verified by querying the `FilesContainer` content with the `./safe cat` command, please see further below for details of how this command works.
+We can additionally pass a destination path argument to set a base path for each of the paths in the `FilesContainer`, e.g. if we provide `/mychosenroot/` destination path argument to the `files put` command when uploading the above files, they will be published on the `FilesContainer` with paths `/mychosenroot/file1.txt`, `/mychosenroot/myfolder/file2.txt`, and `/mychosenroot/myotherfolder/subfolder/file3.txt` respectively. This can be verified by querying the `FilesContainer` content with the `safe cat` command, please see further below for details of how this command works.
 
 #### Files Sync
 
@@ -823,7 +823,7 @@ The `files sync` command follows a very similar logic to the well known `rsync` 
 
 As an example, let's suppose we upload all files and subfolders found within the `./to-upload/` local directory, recursively, using `files put` command:
 ```shell
-$ ./safe files put ./to-upload/ --recursive
+$ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc"
 +  ./to-upload/another.md              safe://hbhyrydt5b95dmumcm8yig4u1keuuh8hgsr5yx39xn4mqikp91sbdhbpwp
 +  ./to-upload/subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
@@ -838,7 +838,7 @@ All the content of the `./to-upload/` local directory is now stored and publishe
 
 We can now sync up all the changes we just made, recursively, with the `FilesContainer` we previously created:
 ```shell
-$ ./safe files sync ./to-upload/ safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc --recursive --delete
+$ safe files sync ./to-upload/ safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc --recursive --delete
 FilesContainer synced up (version 1): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=1"
 *  ./to-upload/another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
 +  ./to-upload/new.md      safe://hbhyrydky3ga3xgkneiy1y5o6513rq6wdipqthkhd3ujqci9qmy8weihom
@@ -851,7 +851,7 @@ Also, please note we provided the optional `--delete` flag to the command above 
 
 The `files sync` command also supports to be passed a destination path as the `files put` command, but in this case the destination path needs to be provided as part of the target XOR-URL. E.g., we can sync a `FilesContainer` using the local path and provide a specific destination path `new-files` in the target XOR-URL:
 ```shell
-$ ./safe files sync ./other-folder/ safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/new-files
+$ safe files sync ./other-folder/ safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/new-files
 FilesContainer synced up (version 2): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=2"
 +  ./other-folder/file1.txt  safe://hbhydyn6b5x9nqxt5escpuzy3axrcqb9dgs7p74izmpfkmmquwrdgjig4k
 ```
@@ -860,7 +860,7 @@ The `./other-folder/file1.txt` file will be uploaded and published in the `Files
 
 One more thing to note about `files sync` command is the use of the `--update-nrs` flag. When syncing content using an NRS-URL (see [NRS section](#nrs-name-resolution-system) below for more information about NRS names and commands), if you want to update the NRS name to the new version generated after syncing the target `FilesContainer`, then it can be specified using the `--update-nrs` flag:
 ```shell
-$ ./safe files sync ./to-upload/ safe://mywebsite --update-nrs
+$ safe files sync ./to-upload/ safe://mywebsite --update-nrs
 FilesContainer synced up (version 1): "safe://mywebsite"
 *  ./to-upload/another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
 +  ./to-upload/new.md      safe://hbhyrydky3ga3xgkneiy1y5o6513rq6wdipqthkhd3ujqci9qmy8weihom
@@ -872,14 +872,14 @@ It could be desirable in some scenarios to simply add a file to a `FilesContaine
 
 We can add a single file from a local path, let's say `./some-other-folder/file.txt`, to our existing `FilesContainer` on the SAFE Network with the following command:
 ```shell
-$ ./safe files add ./some-other-folder/file.txt safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/just-a-file.txt
+$ safe files add ./some-other-folder/file.txt safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/just-a-file.txt
 FilesContainer updated (version 3): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=3"
 +  ./some-other-folder/file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
 ```
 
 If we have previously uploaded a file to the network, we can also add it to any existing `FilesContainer` by providing its XOR-URL as the `<location>` argument to the `files add` command. Let's add a file (same file we uploaded in previous command) to our `FilesContainer` again, but choosing a new destination filename, e.g. `/files-added/same-file.txt`:
 ```shell
-$ ./safe files add safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9 safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/same-file.txt
+$ safe files add safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9 safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/same-file.txt
 FilesContainer updated (version 4): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=4"
 +  /files-added/same-file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
 ```
@@ -888,7 +888,7 @@ FilesContainer updated (version 4): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7
 
 We can list the files from a `FilesContainer` using the `files ls` command:
 ```shell
-$ ./safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc
+$ safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc
 Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc":
 Total: 6
 SIZE  CREATED               MODIFIED              NAME
@@ -903,7 +903,7 @@ Note the size displayed for a subfolder is its total size taking into account al
 
 If we provide a path to a subfolder of the `FilesContainer`, this command will resolve the path and list only those files which paths are a child of the provided path:
 ```shell
-$ ./safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder
+$ safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder
 Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder":
 Total: 1
 SIZE  CREATED               MODIFIED              NAME
@@ -962,14 +962,14 @@ Removing files from a `FilesContainer` which is in sync with a folder in the loc
 
 As an example, we can remove single file to our existing `FilesContainer` on the SAFE Network with the following command:
 ```shell
-$ ./safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/another.md
+$ safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/another.md
 FilesContainer updated (version 5): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=5"
 -  /another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
 ```
 
 Removing an entire subfolder from a `FilesContainer` rather than a single file is also possible, we just need to pass the `--recursive` flag and the path to the subfolder we would like to remove:
 ```shell
-$ ./safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder --recursive
+$ safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder --recursive
 FilesContainer updated (version 6): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=6"
 -  /subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
 -  /subfolder/note.md       safe://hbhyryncjzga5uqp3ogeadqctigyaurpju8yauqptzgh5uyctogh3dkcbt
@@ -983,7 +983,7 @@ The file's XOR-URL is deterministic based on its content, i.e. the location wher
 
 Obtaining local files' XOR-URLs without uploading them to the network can be done in two different ways. We can use the `--dry-run` flag in any of the files commands, e.g.:
 ```shell
-$ ./safe files put ./to-upload/ --recursive --dry-run
+$ safe files put ./to-upload/ --recursive --dry-run
 NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.
 FilesContainer not created since running in dry-run mode
 +  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
@@ -991,9 +991,9 @@ FilesContainer not created since running in dry-run mode
 +  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
 ```
 
-There is also a handy `./safe xorurl` command which allows us to provide a local path and obtain the XOR-URLs of the files found in such path, without uploading them to the network:
+There is also a handy `safe xorurl` command which allows us to provide a local path and obtain the XOR-URLs of the files found in such path, without uploading them to the network:
 ```shell
-$ ./safe xorurl ./to-upload/ --recursive
+$ safe xorurl ./to-upload/ --recursive
 3 file/s processed:
 +  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
 +  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
@@ -1006,7 +1006,7 @@ XOR-URLs encode not only information about the location of the content, but also
 
 In some particular cases it may be useful for the user to be able to decode this type of information from a given XOR-URL:
 ```shell
-$ ./safe xorurl decode safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
+$ safe xorurl decode safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
 Information decoded from XOR-URL: safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
 Xorname: e02b282430f7d544ec93441969c63c387a261d7d553d2f9a8b3dda270fcb37ab
 Type tag: 1100
@@ -1020,23 +1020,23 @@ Content version: latest
 
 The `cat` command is probably the most straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
 ```shell
-$ ./safe cat safe://<NRS-URL or XOR-URL>
+$ safe cat safe://<NRS-URL or XOR-URL>
 ```
 
 If the URL targets a published `FilesContainer`, the `cat` command will fetch its content, and render it showing the list of files contained (linked) in it, along with the corresponding XOR-URLs for each of the linked files.
 
 Let's see this in action, if we upload some folder using the `files put` command, e.g.:
 ```shell
-$ ./safe files put ./to-upload/ --recursive
+$ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc"
 +  ./to-upload/another.md              safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
 +  ./to-upload/subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
 +  ./to-upload/test.md                 safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 ```
 
-We can then use `./safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
+We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
 ```shell
-$ ./safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc
+$ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc
 Files of FilesContainer (version 0) at "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
@@ -1051,19 +1051,19 @@ Files of FilesContainer (version 0) at "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc
 
 We could also take any of the XOR-URLs of the individual files and have the `cat` command fetch the content of the file and show it in the output, e.g. let's use the XOR-URL of the `/test.md` file to fetch its content:
 ```shell
-$ ./safe cat safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
+$ safe cat safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
 hello tests!
 ```
 
 Alternatively, we could use the XOR-URL of the `FilesContainer` and provide the path of the file we are trying to fetch, in this case the `cat` command will resolve the path and follow the corresponding link to read the file's content directly for us. E.g. we can also read the content of the `/test.md` file with the following command:
 ```shell
-$ ./safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc/test.md
+$ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc/test.md
 hello tests!
 ```
 
 A `Wallet` can be also fetched with `cat` to inspect its content, the list of spendable balances it holds will be listed, and we can see which of them is currently the default to be used in a transaction operation:
 ```shell
-$ ./safe cat safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
+$ safe cat safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e
 Spendable balances of Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e":
 +---------+-------------------------+-------------------------------------------------------------------+
 | Default | Friendly Name           | SafeKey URL                                                       |
@@ -1074,20 +1074,20 @@ Spendable balances of Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsji
 +---------+-------------------------+-------------------------------------------------------------------+
 ```
 
-As seen above, the `./safe cat` command can be used to fetch any type of content from the SAFE Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
+As seen above, the `safe cat` command can be used to fetch any type of content from the SAFE Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
 #### Retrieving binary files with --hexdump
 
 By default, binary files are treated just like a plaintext file and will typically display unreadable garbage on the screen unless output is redirected to a file, eg:
 
 ```shell
-$ ./safe cat safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky > /tmp/favicon.ico
+$ safe cat safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky > /tmp/favicon.ico
 ```
 
 However, the flag --hexdump is available which provides a more human friendly hexadecimal dump, similar to that of the standard *xxd* unix tool.  Here's an example.
 
 ```shell
-$ ./safe cat --hexdump safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky | head
+$ safe cat --hexdump safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky | head
 Length: 1406 (0x57e) bytes
 0000:   00 00 01 00  01 00 10 10  00 00 01 00  08 00 68 05   ..............h.
 0010:   00 00 16 00  00 00 28 00  00 00 10 00  00 00 20 00   ......(....... .
@@ -1106,7 +1106,7 @@ As we've seen above, we can use `cat` command to retrieve the latest/current ver
 
 We can use the `cat` command to also retrieve any version of content that was uploaded as Published data by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc`), which reached version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
 ```shell
-$ ./safe cat "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0"
+$ safe cat "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0"
 Files of FilesContainer (version 0) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
@@ -1137,16 +1137,16 @@ Creating a friendly name on the Network can be achieved with the `nrs create` su
 
 Let's imagine we have uploaded the files and folders of a website we want to publish on the SAFE Network with `files put` command:
 ```shell
-$ ./safe files put ./website-to-publish/ --recursive`
+$ safe files put ./website-to-publish/ --recursive`
 FilesContainer created at: "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc"
 +  ./website-to-publish/index.html              safe://hbyyyydhp7y3mb6zcj4herpqm53ywnbycstamb54yhniud1cij7frjfe8c
 +  ./website-to-publish/image.jpg               safe://hbyyyynkt8ak5mxmbqkdt81hqceota8fu83e49gi3weszddujfc8fxcugp
 +  ./website-to-publish/contact/form.html       safe://hbyyyyd1sw4dd57k1xeeijukansatia6mthaz1h6htnb8pjoh9naskoaks
 ```
 
-As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ ./safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human friendly NRS-URL:
+As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human friendly NRS-URL:
 ```shell
-$ ./safe nrs create mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
+$ safe nrs create mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
 New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
@@ -1155,7 +1155,7 @@ Note that we provided a versioned URL to the `--link` argument in the command ab
 
 We can now share the NRS-URL `safe://mywebsite` to anyone who wants to visit our website. Using this NRS-URL we can now fetch the same content we would do when using the `FilesContainer` XOR-URL we linked to it, thus we can fetch it using the following command:
 ```shell
-$ ./safe cat safe://mywebsite
+$ safe cat safe://mywebsite
 Files of FilesContainer (version 0) at "safe://mywebsite":
 +-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
 | Name                    | Size | Created              | Modified             | Link                                                              |
@@ -1172,7 +1172,7 @@ In this example the `cat` simply prints out the content of the top level folder 
 
 We can obviously fetch the content of any of the files published at this NRS-URL using the corresponding path:
 ```shell
-$ ./safe cat safe://mywebsite/contact/form.html
+$ safe cat safe://mywebsite/contact/form.html
 <!DOCTYPE html>
 <html>
 <body>
@@ -1192,7 +1192,7 @@ For example, you may wish to have `safe://mywebsite` to be about you in general,
 
 To create a public name with subnames, you need only to pass the full string with `.` separators, just like any traditional URL, to the CLI:
 ```shell
-$ ./safe nrs create blog.mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
+$ safe nrs create blog.mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
 New NRS Map for "safe://blog.mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  blog.mywebsite  safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0
 ```
@@ -1205,7 +1205,7 @@ Once a public name has been created with `nrs create` command, more sub names ca
 
 Let's add `profile` sub name to the `mywebsite` NRS name we created before:
 ```shell
-$ ./safe nrs add profile.mywebsite --link "safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc?v=0"
+$ safe nrs add profile.mywebsite --link "safe://hnyynyipybem7ihnzqya3w31seezj4i6u8ckg9d7s39exz37z3nxue3cnkbnc?v=0"
 NRS Map updated (version 1): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyz8m4pkok41qrn9gkrwz35fu8zxfkwrc9xrt595wjtodacx9n8u3wbnc
 ```
@@ -1213,7 +1213,7 @@ NRS Map updated (version 1): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4ns
 The safe nrs add command can also be used to update subnames after they have been added to a public name.
 For example, if we have made changes to files mapped to the `profile.mywebsite` NRS subname we created before, we can use `nrs add` to update its link:
 ```shell
-$ ./safe nrs add profile.mywebsite --link safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
+$ safe nrs add profile.mywebsite --link safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
 NRS Map updated (version 2): "safe://profile.hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 +  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
 ```
@@ -1224,7 +1224,7 @@ Removing sub names from an NRS Map Container is very simple and straightforward,
 
 Let's remove the `profile` sub name from the `mywebsite` NRS name we added before:
 ```shell
-$ ./safe nrs remove profile.mywebsite
+$ safe nrs remove profile.mywebsite
 NRS Map updated (version 3): "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
 -  profile.mywebsite  safe://hnyynyw9ru4afkbfee5m4ca4jbho4f5bj6ynep5k1pioyge6dihfqyjfrnbnc?v=0
 ```
@@ -1236,8 +1236,8 @@ In previous sections of this guide we explained how we can create two types of s
 All these types of safe:// URLs can be used in any of the supported CLI commands interchangeably as the argument of any command which expects safe:// URL.
 
 E.g. we can retrieve the content of a website with the `cat` command using either its XOR-URL or its NRS-URL, and either fetching the latest version of it or supplying the query param to get a specific version of it. Thus, if we wanted to fetch `version #1` of the site we published at `safe://mywebsite` (which NRS Map Container XOR-URL is `safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh`), the following two commands would be equivalent:
-- `$ ./safe cat "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1"`
-- `$ ./safe cat "safe://mywebsite?v=1"`
+- `$ safe cat "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1"`
+- `$ safe cat "safe://mywebsite?v=1"`
 
 In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `dog` command.
 
@@ -1249,7 +1249,7 @@ Using the `cat` command is a very straightforward way of retrieving any type of 
 
 The most basic case for the `dog` command is to get information about the native data type holding a content found with a XOR-URL:
 ```shell
-$ ./safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
+$ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
 Native data type: PublishedSeqAppendOnlyData
 Version: 0
 Type tag: 1100
@@ -1259,9 +1259,9 @@ XOR-URL: safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
 
 In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (`PublishedSeqAppendOnlyData`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
 
-Of course the `./safe dog` command can be used also with other type of content like files (`ImmutableData`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
+Of course the `safe dog` command can be used also with other type of content like files (`ImmutableData`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
 ```shell
-$ ./safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc/subfolder/index.html
+$ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc/subfolder/index.html
 Native data type: ImmutableData (published)
 XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
 XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
@@ -1270,7 +1270,7 @@ Media type: text/html
 
 But how about using the `dog` command with an NRS URL, as we now know it's resolved using the NRS rules and following the links found in the NRS Map Container:
 ```shell
-$ ./safe dog safe://mywebsite/contact/form.html
+$ safe dog safe://mywebsite/contact/form.html
 Native data type: ImmutableData (published)
 XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
 XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
@@ -1317,14 +1317,14 @@ SC=~/.bash_safe_cli CL="source $SC" RC=~/.bashrc; safe setup completions bash > 
 To enable completions in the current PowerShell session, use the following commands:
 ```shell
 safe setup completions bash > safe_cli.ps1
-./safe_cli.ps1
+safe_cli.ps1
 ```
 
 To enable PowerShell completions permanently, generate the safe_cli.ps1 file as per above and then see this [stackoverflow answer](<https://stackoverflow.com/questions/20575257/how-do-i-run-a-powershell-script-when-the-computer-starts#32189430>).
 
 ### Update
 
-The CLI can update itself to the latest available version. If you run `./safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/safe-api/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
+The CLI can update itself to the latest available version. If you run `safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/safe-api/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
 
 ## Further Help
 
