@@ -20,7 +20,7 @@ pub enum AuthSubCommands {
     #[structopt(name = "login")]
     /// Send request to a remote Authenticator daemon to login to a SAFE account
     Login {
-        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure)
+        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]
         config_file_str: Option<String>,
         /// Automatically self authorise the CLI application using the account is being logged in with
@@ -36,7 +36,7 @@ pub enum AuthSubCommands {
     #[structopt(name = "create-acc")]
     /// Send request to a remote Authenticator daemon to create a new SAFE account
     Create {
-        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure)
+        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]
         config_file_str: Option<String>,
         /// The SafeKey's secret key to pay for the account creation, and to be set as the default spendable balance in the newly created SAFE account
