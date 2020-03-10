@@ -65,7 +65,35 @@ The SAFE CLI provides all the tools necessary to interact with the SAFE Network,
 
 ## Download
 
-The latest version of the SAFE CLI can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
+The latest version of the SAFE CLI can be downloaded and installed using the [install script](https://safe-api.s3.amazonaws.com/install.sh).
+
+The [install script](https://safe-api.s3.amazonaws.com/install.sh) will not only download latest SAFE CLI, but it will also unpack CLI binary onto `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
+
+### Linux and Mac
+
+Open a new console and run any of the following `curl` or `wget` commands:
+```
+$ curl -so- https://safe-api.s3.amazonaws.com/install.sh | bash
+```
+or
+```
+$ wget -qO- https://safe-api.s3.amazonaws.com/install.sh | bash
+```
+
+### Windows
+
+If you are a Windows user, you'll need to open a [Git BASH](https://gitforwindows.org) console with admin permissions.
+
+Click the "Start" button and type "git-bash" in the search bar, then press the **Shift+Ctrl+Enter** keys to reach Git-Bash console. The Git-Bash icon may also be in the Start Menu. You can [download Git Bash from here](https://gitforwindows.org/) if you don't have in your PC.
+
+Once you have a Git Bash console just run the above `curl` command:
+```
+$ curl -so- https://safe-api.s3.amazonaws.com/install.sh | bash
+```
+
+Once SAFE CLI is downloaded and installed in your system, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
+
+You can alternatively download the latest version of the SAFE CLI from the [releases page](https://github.com/maidsafe/safe-api/releases/latest) and install it manually on your system.
 
 If otherwise you prefer to build the SAFE CLI from source code, please follow the instructions in the next two sections below.
 
