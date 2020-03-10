@@ -8,6 +8,7 @@
 // Software.
 
 use super::OutputFmt;
+use ansi_term::Style;
 use log::debug;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::XorName;
@@ -159,5 +160,25 @@ where
         OutputFmt::Pretty => {
             "OutputFmt::Pretty' not handled by caller, in serialise_output()".to_string()
         }
+    }
+}
+
+// returns singular or plural version of string, based on count.
+pub fn pluralize<'a>(singular: &'a str, plural: &'a str, count: u64) -> &'a str {
+    // pub fn pluralize(singular: &str, plural: &str, count: u64) -> String {
+    if count == 1 {
+        singular
+    } else {
+        plural
+    }
+}
+
+// if stdout is a TTY, then it returns a string with ansi codes according to
+// style.  Otherwise, it returns the original string.
+pub fn if_tty(s: &str, style: Style) -> String {
+    if isatty::stdout_isatty() {
+        style.paint(s).to_string()
+    } else {
+        s.to_string()
     }
 }

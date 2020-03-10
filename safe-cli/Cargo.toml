@@ -31,6 +31,8 @@ serde_yaml = "0.8.11"
 shrust = "0.0.7"
 structopt = "~0.3.5"
 pretty-hex = "0.1.1"
+ansi_term = "0.9.0"
+isatty = "0.1"
 
 [features]
 mock-network = ["safe-api/mock-network"]

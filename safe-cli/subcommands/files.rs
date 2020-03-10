@@ -9,19 +9,84 @@
 
 use super::{
     helpers::{
-        gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, notice_dry_run,
-        parse_stdin_arg, serialise_output,
+        gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, if_tty, notice_dry_run,
+        parse_stdin_arg, pluralize, serialise_output,
     },
     OutputFmt,
 };
+use ansi_term::Colour;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{
     files::FilesMap,
     xorurl::{XorUrl, XorUrlEncoder},
     Safe,
 };
+use serde::Serialize;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use structopt::StructOpt;
+
+type FileDetails = BTreeMap<String, String>;
+
+// Differentiates between nodes in a file system.
+#[derive(Debug, Serialize, PartialEq)]
+enum FileTreeNodeType {
+    File,
+    Directory,
+}
+
+// A recursive type to represent a directory tree.
+// used by `safe files tree`
+#[derive(Debug, Serialize)]
+struct FileTreeNode {
+    name: String,
+
+    // This field could be useful in json output, because presently json
+    // consumer cannot differentiate between an empty sub-directory and
+    // a file. Though also at present, SAFE does not appear to store and
+    // retrieve empty subdirectories.
+    #[serde(skip)]
+    fs_type: FileTreeNodeType,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<FileDetails>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    //    #[allow(clippy::vec_box)]
+    sub: Vec<FileTreeNode>,
+}
+
+impl FileTreeNode {
+    // create a new FileTreeNode (either a Directory or File)
+    fn new(name: &str, fs_type: FileTreeNodeType, details: Option<FileDetails>) -> FileTreeNode {
+        Self {
+            name: name.to_string(),
+            fs_type,
+            details,
+            sub: Vec::<FileTreeNode>::new(),
+        }
+    }
+
+    // find's a (mutable) child node matching `name`
+    fn find_child(&mut self, name: &str) -> Option<&mut FileTreeNode> {
+        for c in self.sub.iter_mut() {
+            if c.name == name {
+                return Some(c);
+            }
+        }
+        None
+    }
+
+    // adds a child node
+    // warning: does not enforce unique `name` between child nodes.
+    fn add_child<T>(&mut self, leaf: T) -> &mut Self
+    where
+        T: Into<FileTreeNode>,
+    {
+        self.sub.push(leaf.into());
+        self
+    }
+}
 
 #[derive(StructOpt, Debug)]
 pub enum FilesSubCommands {
@@ -90,6 +155,15 @@ pub enum FilesSubCommands {
     Ls {
         /// The target FilesContainer to list files from, optionally including a path (default is '/')
         target: Option<String>,
+    },
+    #[structopt(name = "tree")]
+    /// Recursively list files found in an existing FilesContainer on the network
+    Tree {
+        /// The target FilesContainer to list files from, optionally including a path (default is '/')
+        target: Option<String>,
+        /// Include file details
+        #[structopt(short = "d", long = "details")]
+        details: bool,
     },
 }
 
@@ -304,47 +378,10 @@ pub fn files_commander(
             let (version, files_map) = safe
                 .files_container_get(&target_url)
                 .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
-
             let (total, filtered_filesmap) = filter_files_map(&files_map, &target_url)?;
 
-            // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
-                println!(
-                    "Files of FilesContainer (version {}) at \"{}\":",
-                    version, target_url
-                );
-                println!("Total: {}", total);
-                let mut table = Table::new();
-                let format = FormatBuilder::new()
-                    .column_separator(' ')
-                    .padding(0, 1)
-                    .build();
-                table.set_format(format);
-
-                // Columns in output:
-                // 1. file/directory size,
-                // 2. created timestamp,
-                // 3. modified timestamp,
-                // 4. file/directory name
-                table.add_row(row!["SIZE", "CREATED", "MODIFIED", "NAME"]);
-                filtered_filesmap.iter().for_each(|(name, file_item)| {
-                    if name.ends_with('/') {
-                        table.add_row(row![
-                            &file_item["size"],
-                            file_item["created"],
-                            file_item["modified"],
-                            Fbb->name
-                        ]);
-                    } else {
-                        table.add_row(row![
-                            &file_item["size"],
-                            file_item["created"],
-                            file_item["modified"],
-                            name
-                        ]);
-                    }
-                });
-                table.printstd();
+                print_files_map(&filtered_filesmap, total, version, &target_url);
             } else {
                 println!(
                     "{}",
@@ -354,7 +391,55 @@ pub fn files_commander(
 
             Ok(())
         }
+        FilesSubCommands::Tree { target, details } => {
+            process_tree_command(safe, target, details, output_fmt)
+        }
     }
+}
+
+// processes the `safe files tree` command.
+fn process_tree_command(
+    safe: &mut Safe,
+    target: Option<XorUrl>,
+    details: bool,
+    output_fmt: OutputFmt,
+) -> Result<(), String> {
+    let target_url = get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
+
+    let (_version, files_map) = safe
+        .files_container_get(&target_url)
+        .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
+
+    let filtered_filesmap = filter_files_map_by_xorurl_path(&files_map, &target_url)?;
+
+    // Create a top/root node representing `target_url`.
+    let mut top = FileTreeNode::new(&target_url, FileTreeNodeType::Directory, Option::None);
+    // Transform flat list in `files_map` to a hierarchy in `top`
+    let mut files: u64 = 0;
+    let mut dirs: u64 = 0;
+    for (name, file_details) in filtered_filesmap.iter() {
+        let path_parts: Vec<String> = name
+            .to_string()
+            .trim_matches('/')
+            .split('/')
+            .map(|s| s.to_string())
+            .collect();
+        let (d, f) = build_tree(&mut top, &path_parts, file_details, details, 0);
+        files += f;
+        dirs += d;
+    }
+    // Display.  with or without details.
+    if OutputFmt::Pretty == output_fmt {
+        if details {
+            print_file_system_node_details(&top, dirs, files);
+        } else {
+            print_file_system_node(&top, dirs, files);
+        }
+    } else {
+        println!("{}", serialise_output(&top, output_fmt));
+    }
+
+    Ok(())
 }
 
 fn print_serialized_output(
@@ -375,6 +460,262 @@ fn print_serialized_output(
     Ok(())
 }
 
+// Builds a file-system tree (hierarchy) from a single file path, split into its parts.
+// May be called multiple times to expand the tree.
+fn build_tree(
+    node: &mut FileTreeNode,
+    path_parts: &[String],
+    details: &FileDetails,
+    show_details: bool,
+    depth: usize,
+) -> (u64, u64) {
+    let mut dirs: u64 = 0;
+    let mut files: u64 = 0;
+    if depth < path_parts.len() {
+        let item = &path_parts[depth];
+
+        let mut node = match node.find_child(&item) {
+            Some(n) => n,
+            None => {
+                // Note: fs_type assignment relies on the fact that input
+                // is a path to a file, not a directory.
+                let (fs_type, d, di, fi) = if depth == path_parts.len() - 1 {
+                    (
+                        FileTreeNodeType::File,
+                        if show_details {
+                            Some(details.clone())
+                        } else {
+                            None
+                        },
+                        0, // dirs increment
+                        1, // files increment
+                    )
+                } else {
+                    (FileTreeNodeType::Directory, None, 1, 0)
+                };
+                dirs += di;
+                files += fi;
+                let n = FileTreeNode::new(&item, fs_type, d);
+                node.add_child(n);
+                // Very gross, but it works.
+                // if this can be done in a better way,
+                // please show me. We just need to return the node
+                // that was added via add_child().  I tried modifying
+                // add_child() to return it instead of &self, but couldn't
+                // get it to work.  Also, using `n` does not work.
+
+                match node.find_child(&item) {
+                    Some(n2) => n2,
+                    None => panic!("But that's impossible!"),
+                }
+            }
+        };
+        let (di, fi) = build_tree(&mut node, path_parts, details, show_details, depth + 1);
+        dirs += di;
+        files += fi;
+    }
+    (dirs, files)
+}
+
+// A function to print a FileTreeNode in format similar to unix `tree` command.
+// prints a summary row below the main tree body.
+fn print_file_system_node(dir: &FileTreeNode, dirs: u64, files: u64) {
+    let mut siblings = HashMap::new();
+    print_file_system_node_body(dir, 0, &mut siblings);
+
+    // print summary row
+    println!(
+        "\n{} {}, {} {}",
+        dirs,
+        pluralize("directory", "directories", dirs),
+        files,
+        pluralize("file", "files", files),
+    );
+}
+
+// generates tree body for print_file_system_node()
+// operates recursively on `dir`
+fn print_file_system_node_body(dir: &FileTreeNode, depth: u32, siblings: &mut HashMap<u32, bool>) {
+    println!("{}", format_file_system_node_line(dir, depth, siblings));
+
+    // And now, for some recursion...
+    for (idx, child) in dir.sub.iter().enumerate() {
+        let is_last = idx == dir.sub.len() - 1;
+        siblings.insert(depth, !is_last);
+        print_file_system_node_body(child, depth + 1, siblings);
+    }
+}
+
+// A function to print a FileTreeNode in format similar to unix `tree` command.
+// File details are displayed in a table to the left of the tree.
+// prints a summary row below the main body.
+fn print_file_system_node_details(dir: &FileTreeNode, dirs: u64, files: u64) {
+    let mut siblings = HashMap::new();
+    let mut table = Table::new();
+    let format = FormatBuilder::new()
+        .column_separator(' ')
+        .padding(0, 1)
+        .build();
+    table.set_format(format);
+    table.add_row(row!["SIZE", "CREATED", "MODIFIED", "NAME"]);
+
+    print_file_system_node_details_body(dir, 0, &mut siblings, &mut table);
+
+    table.printstd();
+
+    // print summary row
+    println!(
+        "\n{} {}, {} {}",
+        dirs,
+        pluralize("directory", "directories", dirs),
+        files,
+        pluralize("file", "files", files),
+    );
+}
+
+// generates table body for print_file_system_node_details()
+// operates recursively on `dir`
+fn print_file_system_node_details_body(
+    dir: &FileTreeNode,
+    depth: u32,
+    siblings: &mut HashMap<u32, bool>,
+    table: &mut Table,
+) {
+    let name = format_file_system_node_line(dir, depth, siblings);
+
+    match dir.fs_type {
+        FileTreeNodeType::File => {
+            if let Some(d) = &dir.details {
+                table.add_row(row![d["size"], d["created"], d["modified"], name]);
+            }
+        }
+        FileTreeNodeType::Directory => {
+            table.add_row(row!["", "", "", name]);
+        }
+    }
+
+    // And now, for some recursion...
+    for (idx, child) in dir.sub.iter().enumerate() {
+        let is_last = idx == dir.sub.len() - 1;
+        siblings.insert(depth, !is_last);
+        print_file_system_node_details_body(child, depth + 1, siblings, table);
+    }
+}
+
+// Generates a single line when printing a FileTreeNode
+// in unix `tree` format.
+fn format_file_system_node_line(
+    dir: &FileTreeNode,
+    depth: u32,
+    siblings: &mut HashMap<u32, bool>,
+) -> String {
+    if depth == 0 {
+        siblings.insert(depth, false);
+        if_tty(&dir.name, Colour::Blue.bold())
+    } else {
+        let is_last = !siblings[&(depth - 1)];
+        let conn = if is_last { "└──" } else { "├──" };
+
+        let mut buf: String = "".to_owned();
+        for x in 0..depth - 1 {
+            if siblings[&(x)] {
+                buf.push_str("│   ");
+            } else {
+                buf.push_str("    ");
+            }
+        }
+        let name = if dir.fs_type == FileTreeNodeType::Directory {
+            if_tty(&dir.name, Colour::Blue.bold())
+        } else {
+            dir.name.clone()
+        };
+        format!("{}{} {}", buf, conn, name)
+    }
+}
+
+// A function to print a FilesMap in human-friendly table format.
+fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_url: &str) {
+    println!(
+        "Files of FilesContainer (version {}) at \"{}\":",
+        version, target_url
+    );
+    let mut table = Table::new();
+    let format = FormatBuilder::new()
+        .column_separator(' ')
+        .padding(0, 1)
+        .build();
+    table.set_format(format);
+    let mut total_bytes = 0;
+    let mut cwd_files = 0;
+    let mut cwd_size = 0;
+
+    // Columns in output:
+    // 1. file/directory size,
+    // 2. created timestamp,
+    // 3. modified timestamp,
+    // 4. file/directory name
+    table.add_row(row!["SIZE", "CREATED", "MODIFIED", "NAME"]);
+    files_map.iter().for_each(|(name, file_item)| {
+        total_bytes += file_item["size"].parse().unwrap_or(0);
+        if name.ends_with('/') {
+            table.add_row(row![
+                &file_item["size"],
+                file_item["created"],
+                file_item["modified"],
+                Fbb->name
+            ]);
+        } else {
+            if None == name.trim_matches('/').find('/') {
+                cwd_size += file_item["size"].parse().unwrap_or(0);
+                cwd_files += 1;
+            }
+            table.add_row(row![
+                &file_item["size"],
+                file_item["created"],
+                file_item["modified"],
+                name
+            ]);
+        }
+    });
+    println!(
+        "Files: {}   Size: {}   Total Files: {}   Total Size: {}",
+        cwd_files, cwd_size, total_files, total_bytes
+    );
+    table.printstd();
+}
+
+// filters out file items not belonging to the xorurl path
+// note: maybe should be moved into api/app/files.rs
+//       and optionally called by files_container_get()
+//       or make a files_container_get_matching() API.
+fn filter_files_map_by_xorurl_path(
+    files_map: &FilesMap,
+    target_url: &str,
+) -> Result<FilesMap, String> {
+    let xorurl_encoder = Safe::parse_url(target_url)?;
+    let path = xorurl_encoder.path();
+
+    Ok(filter_files_map_by_path(files_map, path))
+}
+
+// filters out file items not belonging to the path
+// note: maybe should be moved into api/app/files.rs
+fn filter_files_map_by_path(files_map: &FilesMap, path: &str) -> FilesMap {
+    let mut filtered_filesmap = FilesMap::default();
+
+    files_map.iter().for_each(|(filepath, fileitem)| {
+        if filepath
+            .trim_matches('/')
+            .starts_with(&path.trim_matches('/'))
+        {
+            let mut relative_path = filepath.clone();
+            relative_path.replace_range(..path.len(), "");
+            filtered_filesmap.insert(relative_path, fileitem.clone());
+        }
+    });
+    filtered_filesmap
+}
+
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap), String> {
     let mut filtered_filesmap = FilesMap::default();
     let mut xorurl_encoder = Safe::parse_url(target_url)?;
@@ -389,7 +730,10 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
     let mut total = 0;
     files_map.iter().for_each(|(filepath, fileitem)| {
         // let's first filter out file items not belonging to the provided path
-        if filepath.starts_with(&folder_path) {
+        if filepath
+            .trim_matches('/')
+            .starts_with(&folder_path.trim_matches('/'))
+        {
             total += 1;
             let mut relative_path = filepath.clone();
             relative_path.replace_range(..folder_path.len(), "");

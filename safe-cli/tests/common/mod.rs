@@ -116,6 +116,11 @@ pub fn parse_files_container_output(
 }
 
 #[allow(dead_code)]
+pub fn parse_files_tree_output(output: &str) -> serde_json::Value {
+    serde_json::from_str(output).expect("Failed to parse output of `safe tree`")
+}
+
+#[allow(dead_code)]
 pub fn parse_files_put_or_sync_output(
     output: &str,
 ) -> (String, BTreeMap<String, (String, String)>) {
