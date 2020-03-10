@@ -40,9 +40,9 @@ pub unsafe extern "C" fn files_container_create(
         let user_data = OpaqueCtx(user_data);
         let location_str = String::clone_from_repr_c(location)?;
         let destination = from_c_str_to_str_option(dest);
-        let (xorurl, processed_files, files_map) = (*app)
-            .files_container_create(&location_str, destination, recursive, dry_run)
-            .await?;
+        let (xorurl, processed_files, files_map) = async_std::task::block_on(
+            (*app).files_container_create(&location_str, destination, recursive, dry_run),
+        )?;
         let xorurl_string = CString::new(xorurl)?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn files_container_get(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
-        let (version, files_map) = (*app).files_container_get(&url_str).await?;
+        let (version, files_map) = async_std::task::block_on((*app).files_container_get(&url_str))?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         o_cb(user_data.0, FFI_RESULT_OK, version, files_map_json.as_ptr());
         Ok(())
@@ -101,16 +101,15 @@ pub unsafe extern "C" fn files_container_sync(
         let user_data = OpaqueCtx(user_data);
         let location_str = String::clone_from_repr_c(location)?;
         let url_str = String::clone_from_repr_c(url)?;
-        let (version, processed_files, files_map) = (*app)
-            .files_container_sync(
+        let (version, processed_files, files_map) =
+            async_std::task::block_on((*app).files_container_sync(
                 &location_str,
                 &url_str,
                 recursive,
                 delete,
                 update_nrs,
                 dry_run,
-            )
-            .await?;
+            ))?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -145,9 +144,9 @@ pub unsafe extern "C" fn files_container_add(
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
         let source_str = String::clone_from_repr_c(source_file)?;
-        let (version, processed_files, files_map) = (*app)
-            .files_container_add(&source_str, &url_str, force, update_nrs, dry_run)
-            .await?;
+        let (version, processed_files, files_map) = async_std::task::block_on(
+            (*app).files_container_add(&source_str, &url_str, force, update_nrs, dry_run),
+        )?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -183,9 +182,9 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         let user_data = OpaqueCtx(user_data);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
         let url_str = String::clone_from_repr_c(url)?;
-        let (version, processed_files, files_map) = (*app)
-            .files_container_add_from_raw(&data_vec, &url_str, force, update_nrs, dry_run)
-            .await?;
+        let (version, processed_files, files_map) = async_std::task::block_on(
+            (*app).files_container_add_from_raw(&data_vec, &url_str, force, update_nrs, dry_run),
+        )?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -213,9 +212,11 @@ pub unsafe extern "C" fn files_put_published_immutable(
         let user_data = OpaqueCtx(user_data);
         let media_type_str = from_c_str_to_str_option(media_type);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        let xorurl = (*app)
-            .files_put_published_immutable(&data_vec, media_type_str, dry_run)
-            .await?;
+        let xorurl = async_std::task::block_on((*app).files_put_published_immutable(
+            &data_vec,
+            media_type_str,
+            dry_run,
+        ))?;
         let xorurl_string = CString::new(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, xorurl_string.as_ptr());
         Ok(())
@@ -251,7 +252,9 @@ pub unsafe extern "C" fn files_get_published_immutable(
             Some(end)
         };
 
-        let data = (*app).files_get_published_immutable(&url_str, Some((start, end))).await?;
+        let data = async_std::task::block_on(
+            (*app).files_get_published_immutable(&url_str, Some((start, end))),
+        )?;
         o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
         Ok(())
     })

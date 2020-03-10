@@ -26,7 +26,7 @@ const SAFE_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
     // It returns the credentials necessary to connect to the network, encoded in a single string.
-    pub fn auth_app(
+    pub async fn auth_app(
         app_id: &str,
         app_name: &str,
         app_vendor: &str,
@@ -64,7 +64,7 @@ impl Safe {
         );
 
         // Send the auth request to authd and obtain the response
-        let auth_res = send_app_auth_req(&auth_req_str, endpoint)?;
+        let auth_res = send_app_auth_req(&auth_req_str, endpoint).await?;
 
         // Check if the app has been authorised
         match decode_ipc_msg(&auth_res) {
@@ -90,7 +90,7 @@ impl Safe {
 
 // Sends an authorisation request string to the SAFE Authenticator daemon endpoint.
 // It returns the credentials necessary to connect to the network, encoded in a single string.
-fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<String> {
+async fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<String> {
     let authd_service_url = match endpoint {
         None => format!("{}:{}", SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT,),
         Some(endpoint) => endpoint.to_string(),
@@ -101,7 +101,8 @@ fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<Strin
         &authd_service_url,
         SAFE_AUTHD_METHOD_AUTHORISE,
         json!(auth_req_str),
-    )?;
+    )
+    .await?;
 
     info!("SAFE authorisation response received!");
     Ok(authd_response)

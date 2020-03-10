@@ -22,7 +22,7 @@ use std::{
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
-pub fn authorise_cli(
+pub async fn authorise_cli(
     _safe: &mut Safe,
     endpoint: Option<String>,
     is_self_authing: bool,
@@ -39,6 +39,7 @@ pub fn authorise_cli(
         APP_VENDOR,
         endpoint.as_ref().map(String::as_str),
     )
+    .await
     .map_err(|err| format!("Application authorisation failed: {}", err))?;
 
     file.write_all(auth_credentials.as_bytes()).map_err(|err| {

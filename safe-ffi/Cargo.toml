@@ -15,6 +15,7 @@ crate_type = ["staticlib", "rlib", "cdylib"]
 path = "lib.rs"
 
 [dependencies]
+async-std = "1.4.0"
 ffi_utils = "~0.15.0"
 # Required by ffi_utils macros.
 log = "~0.4.8"

@@ -11,7 +11,6 @@ use super::{
     helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output},
     OutputFmt,
 };
-use async_std::task;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{xorurl::XorUrl, Safe};
 use std::collections::BTreeMap;
@@ -54,7 +53,7 @@ pub enum NrsSubCommands {
     },
 }
 
-pub fn nrs_commander(
+pub async fn nrs_commander(
     cmd: NrsSubCommands,
     output_fmt: OutputFmt,
     dry_run: bool,
@@ -77,9 +76,9 @@ pub fn nrs_commander(
             // Set it as default too, so the top level NRS name is resolvable to same link
             let default = true;
 
-            let (nrs_map_container_xorurl, processed_entries, _nrs_map) = task::block_on(
-                safe.nrs_map_container_create(&name, &link, default, direct_link, dry_run),
-            )?;
+            let (nrs_map_container_xorurl, processed_entries, _nrs_map) = safe
+                .nrs_map_container_create(&name, &link, default, direct_link, dry_run)
+                .await?;
 
             // Now let's just print out a summary
             print_summary(
@@ -106,9 +105,9 @@ pub fn nrs_commander(
                 notice_dry_run();
             }
 
-            let (version, xorurl, processed_entries, _nrs_map) = task::block_on(
-                safe.nrs_map_container_add(&name, &link, default, direct_link, dry_run),
-            )?;
+            let (version, xorurl, processed_entries, _nrs_map) = safe
+                .nrs_map_container_add(&name, &link, default, direct_link, dry_run)
+                .await?;
 
             // Now let's just print out the summary
             print_summary(
@@ -126,7 +125,7 @@ pub fn nrs_commander(
             }
 
             let (version, xorurl, processed_entries, _nrs_map) =
-                task::block_on(safe.nrs_map_container_remove(&name, dry_run))?;
+                safe.nrs_map_container_remove(&name, dry_run).await?;
 
             // Now let's just print out the summary
             print_summary(

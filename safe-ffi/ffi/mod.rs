@@ -49,7 +49,8 @@ pub unsafe extern "C" fn auth_app(
         let app_name = String::clone_from_repr_c(app_name)?;
         let app_vendor = String::clone_from_repr_c(app_vendor)?;
         let endpoint = from_c_str_to_str_option(endpoint);
-        let auth_response = Safe::auth_app(&app_id, &app_name, &app_vendor, endpoint)?;
+        let auth_response =
+            async_std::task::block_on(Safe::auth_app(&app_id, &app_name, &app_vendor, endpoint))?;
         let auth_response = CString::new(auth_response)?;
         o_cb(user_data.0, FFI_RESULT_OK, auth_response.as_ptr());
         Ok(())

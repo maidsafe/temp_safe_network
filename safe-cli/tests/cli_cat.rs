@@ -66,7 +66,6 @@ fn calling_safe_cat_on_relative_file_from_id_fails() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     let relative_url = format!("{}/something_relative.wasm", &map[TEST_FILE].1);
-    println!("Gettting xorurlll: {:?}", &relative_url);
     cmd.args(&vec!["cat", &relative_url])
         .assert()
         .stderr(predicate::str::contains(ID_RELATIVE_FILE_ERROR))

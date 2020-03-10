@@ -14,7 +14,6 @@ use super::{
     keys::{create_new_key, print_new_key_output},
     OutputFmt,
 };
-use async_std::task;
 use log::debug;
 use safe_api::{BlsKeyPair, Safe};
 
@@ -102,7 +101,7 @@ pub enum WalletSubCommands {
     },*/
 }
 
-pub fn wallet_commander(
+pub async fn wallet_commander(
     cmd: WalletSubCommands,
     output_fmt: OutputFmt,
     safe: &mut Safe,
@@ -118,7 +117,7 @@ pub fn wallet_commander(
             secret_key,
         } => {
             // create wallet
-            let wallet_xorurl = task::block_on(safe.wallet_create())?;
+            let wallet_xorurl = safe.wallet_create().await?;
             let mut key_generated_output: (String, Option<BlsKeyPair>, Option<String>) =
                 Default::default();
             if !no_balance {
@@ -126,14 +125,14 @@ pub fn wallet_commander(
                 let sk = match keyurl {
                     Some(linked_key) => {
                         let sk = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
-                        let _pk = task::block_on(safe.validate_sk_for_url(&sk, &linked_key))?;
+                        let _pk = safe.validate_sk_for_url(&sk, &linked_key).await?;
                         sk
                     }
                     None => match secret_key {
                         Some(sk) => sk,
                         None => {
                             key_generated_output =
-                                create_new_key(safe, test_coins, pay_with, preload, None)?;
+                                create_new_key(safe, test_coins, pay_with, preload, None).await?;
                             let unwrapped_key_pair = key_generated_output
                                 .1
                                 .clone()
@@ -144,12 +143,8 @@ pub fn wallet_commander(
                 };
 
                 // insert and set as default
-                task::block_on(safe.wallet_insert(
-                    &wallet_xorurl,
-                    name.as_ref().map(String::as_str),
-                    true,
-                    &sk,
-                ))?;
+                safe.wallet_insert(&wallet_xorurl, name.as_ref().map(String::as_str), true, &sk)
+                    .await?;
             }
 
             if OutputFmt::Pretty == output_fmt {
@@ -183,7 +178,7 @@ pub fn wallet_commander(
             )?;
 
             debug!("Got target location {:?}", target);
-            let balance = task::block_on(safe.wallet_balance(&target))?;
+            let balance = safe.wallet_balance(&target).await?;
 
             if OutputFmt::Pretty == output_fmt {
                 let xorurl_encoder = Safe::parse_url(&target)?;
@@ -219,18 +214,15 @@ pub fn wallet_commander(
             let sk = match keyurl {
                 Some(linked_key) => {
                     let sk = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
-                    let _pk = task::block_on(safe.validate_sk_for_url(&sk, &linked_key))?;
+                    let _pk = safe.validate_sk_for_url(&sk, &linked_key).await?;
                     sk
                 }
                 None => get_secret_key("", secret_key, "the SafeKey to insert")?,
             };
 
-            let the_name = task::block_on(safe.wallet_insert(
-                &target,
-                name.as_ref().map(String::as_str),
-                default,
-                &sk,
-            ))?;
+            let the_name = safe
+                .wallet_insert(&target, name.as_ref().map(String::as_str), default, &sk)
+                .await?;
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",
@@ -253,12 +245,14 @@ pub fn wallet_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = task::block_on(safe.wallet_transfer(
-                &amount,
-                from.as_ref().map(String::as_str),
-                &destination,
-                tx_id,
-            ))?;
+            let tx_id = safe
+                .wallet_transfer(
+                    &amount,
+                    from.as_ref().map(String::as_str),
+                    &destination,
+                    tx_id,
+                )
+                .await?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", &tx_id);

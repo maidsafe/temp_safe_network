@@ -8,6 +8,7 @@
 // Software.
 
 use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID};
+use crossbeam::crossbeam_channel;
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
 
@@ -125,7 +126,7 @@ pub enum AuthSubCommands {
     },
 }
 
-pub fn auth_commander(
+pub async fn auth_commander(
     cmd: Option<AuthSubCommands>,
     endpoint: Option<String>,
     safe: &mut Safe,
@@ -137,72 +138,58 @@ pub fn auth_commander(
             test_coins,
         }) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_create(safe, &safe_authd, config_file_str, sk, test_coins)
+            authd_create(safe, &safe_authd, config_file_str, sk, test_coins).await
         }
         Some(AuthSubCommands::Login {
             config_file_str,
             self_auth,
         }) => {
             let mut safe_authd = SafeAuthdClient::new(endpoint.clone());
-            authd_login(&mut safe_authd, config_file_str)?;
+            authd_login(&mut safe_authd, config_file_str).await?;
             if self_auth {
-                // Let's subscribe so we can automatically allow our own auth request
-                safe_authd.subscribe(
-                    "https://localhost:33002",
-                    APP_ID,
-                    &move |auth_req: AuthReq| {
-                        // TODO: pass the endpoint
-                        let safe_authd = SafeAuthdClient::new(None);
-                        match safe_authd.allow(auth_req.req_id) {
-                            Ok(()) => {}
-                            Err(err) => println!("Failed to self authorise: {}", err),
-                        }
-                        None
-                    },
-                )?;
-                authorise_cli(safe, endpoint, true)?;
+                self_authorise(endpoint, safe, safe_authd).await?;
             }
             Ok(())
         }
         Some(AuthSubCommands::Logout {}) => {
             let mut safe_authd = SafeAuthdClient::new(endpoint);
-            authd_logout(&mut safe_authd)
+            authd_logout(&mut safe_authd).await
         }
         Some(AuthSubCommands::Status {}) => {
             let mut safe_authd = SafeAuthdClient::new(endpoint);
-            authd_status(&mut safe_authd)
+            authd_status(&mut safe_authd).await
         }
         Some(AuthSubCommands::Apps {}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_apps(&safe_authd)
+            authd_apps(&safe_authd).await
         }
         Some(AuthSubCommands::Clear {}) => clear_credentials(),
         Some(AuthSubCommands::Revoke { app_id }) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_revoke(&safe_authd, app_id)
+            authd_revoke(&safe_authd, app_id).await
         }
         Some(AuthSubCommands::Reqs {}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_auth_reqs(&safe_authd)
+            authd_auth_reqs(&safe_authd).await
         }
         Some(AuthSubCommands::Allow { req_id }) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_allow(&safe_authd, req_id)
+            authd_allow(&safe_authd, req_id).await
         }
         Some(AuthSubCommands::Deny { req_id }) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_deny(&safe_authd, req_id)
+            authd_deny(&safe_authd, req_id).await
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => match notifs_endpoint {
             None => Err("The endpoint URL needs to be provided. If you subscribe within the interactive shell the URL is then optional".to_string()),
             Some(notif_endpoint) => {
                 let safe_authd = SafeAuthdClient::new(endpoint);
-                authd_subscribe_url(&safe_authd, notif_endpoint)
+                authd_subscribe_url(&safe_authd, notif_endpoint).await
             }
         },
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
             let mut safe_authd = SafeAuthdClient::new(endpoint);
-            authd_unsubscribe(&mut safe_authd, notifs_endpoint)
+            authd_unsubscribe(&mut safe_authd, notifs_endpoint).await
         }
         Some(AuthSubCommands::Install {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);
@@ -228,6 +215,49 @@ pub fn auth_commander(
             let safe_authd = SafeAuthdClient::new(endpoint);
             authd_restart(&safe_authd, authd_path)
         }
-        None => authorise_cli(safe, endpoint, false),
+        None => authorise_cli(safe, endpoint, false).await,
     }
+}
+
+async fn self_authorise(
+    endpoint: Option<String>,
+    safe: &mut Safe,
+    mut safe_authd: SafeAuthdClient,
+) -> Result<(), String> {
+    // Channel to share auth req info when received from notifications
+    let (tx, rx) = crossbeam_channel::unbounded::<AuthReq>();
+
+    // Spawn a task to receive the auth req info and automatically allow the req
+    let endpoint_clone = endpoint.clone();
+    tokio::spawn(async move {
+        match rx.recv() {
+            Ok(auth_req) => {
+                let safe_authd = SafeAuthdClient::new(endpoint_clone);
+                match safe_authd.allow(auth_req.req_id).await {
+                    Ok(()) => {}
+                    Err(err) => println!("Failed to self authorise: {}", err),
+                }
+            }
+            Err(err) => println!(
+                "Failed to obtain auth req details to self authorise: {}",
+                err
+            ),
+        };
+    });
+
+    // Let's subscribe so we can automatically allow our own auth request
+    let callback = move |auth_req: AuthReq| {
+        match tx.send(auth_req) {
+            Ok(()) => {}
+            Err(err) => println!("Failed when processing auth req to self authorise: {}", err),
+        }
+        None
+    };
+
+    safe_authd
+        .subscribe("https://localhost:33002", APP_ID, callback)
+        .await?;
+
+    // We now simply send the authorisation request for the CLI app
+    authorise_cli(safe, endpoint, true).await
 }

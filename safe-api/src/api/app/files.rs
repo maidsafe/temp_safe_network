@@ -412,14 +412,16 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// let (xorurl, processed_files, files_map) = safe.files_container_create("../testdata/", None, true, false).unwrap();
-    /// let remote_file_path = format!("{}/test.md", xorurl);
-    /// let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).unwrap();
-    /// println!("FilesContainer is now at version: {}", version);
-    /// println!("The files that were removed: {:?}", new_processed_files);
-    /// println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    /// async_std::task::block_on(async {
+    ///     let (xorurl, processed_files, files_map) = safe.files_container_create("../testdata/", None, true, false).await.unwrap();
+    ///     let remote_file_path = format!("{}/test.md", xorurl);
+    ///     let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).await.unwrap();
+    ///     println!("FilesContainer is now at version: {}", version);
+    ///     println!("The files that were removed: {:?}", new_processed_files);
+    ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    /// });
     /// ```
-    pub fn files_container_remove_path(
+    pub async fn files_container_remove_path(
         &mut self,
         url: &str,
         recursive: bool,
@@ -448,27 +450,30 @@ impl Safe {
             ));
         }
 
-        let (mut xorurl_encoder, _) = self.parse_and_resolve_url(url)?;
+        let (mut xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it
         xorurl_encoder.set_content_version(None);
 
-        let (current_version, files_map): (u64, FilesMap) =
-            self.files_container_get(&xorurl_encoder.to_string()?)?;
+        let (current_version, files_map): (u64, FilesMap) = self
+            .files_container_get(&xorurl_encoder.to_string()?)
+            .await?;
 
         let (processed_files, new_files_map, success_count) =
             files_map_remove_path(dest_path, files_map, recursive)?;
 
-        let version = self.append_version_to_nrs_map_container(
-            success_count,
-            current_version,
-            &new_files_map,
-            url,
-            xorurl_encoder,
-            dry_run,
-            update_nrs,
-        )?;
+        let version = self
+            .append_version_to_nrs_map_container(
+                success_count,
+                current_version,
+                &new_files_map,
+                url,
+                xorurl_encoder,
+                dry_run,
+                update_nrs,
+            )
+            .await?;
 
         Ok((version, processed_files, new_files_map))
     }
@@ -863,7 +868,8 @@ async fn files_map_sync(
                 }
             }
             Some(file_item) => {
-                let is_modified = is_file_modified(safe, &Path::new(local_file_name), file_item);
+                let is_modified =
+                    is_file_modified(safe, &Path::new(local_file_name), file_item).await;
                 if force || (compare_file_content && is_modified) {
                     // We need to update the current FileItem
                     if add_or_update_file_item(
@@ -930,8 +936,8 @@ async fn files_map_sync(
     Ok((processed_files, updated_files_map, success_count))
 }
 
-fn is_file_modified(safe: &mut Safe, local_filename: &Path, file_item: &FileItem) -> bool {
-    match upload_file_to_net(safe, local_filename, true /* dry-run */) {
+async fn is_file_modified(safe: &mut Safe, local_filename: &Path, file_item: &FileItem) -> bool {
+    match upload_file_to_net(safe, local_filename, true /* dry-run */).await {
         Ok(local_xorurl) => file_item[FAKE_RDF_PREDICATE_LINK] != local_xorurl,
         Err(_err) => false,
     }
@@ -1297,8 +1303,8 @@ fn files_map_create(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_files_map_create() {
+    #[tokio::test]
+    async fn test_files_map_create() {
         use unwrap::unwrap;
         let mut processed_files = ProcessedFiles::new();
         processed_files.insert(
@@ -1328,16 +1334,16 @@ mod tests {
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
     }
 
-    #[test]
-    fn test_files_container_create_file() {
+    #[tokio::test]
+    async fn test_files_container_create_file() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let filename = "../testdata/test.md";
-        let (xorurl, processed_files, files_map) = unwrap!(async_std::task::block_on(async {
+        let (xorurl, processed_files, files_map) = unwrap!(
             safe.files_container_create(filename, None, false, false)
                 .await
-        }));
+        );
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 1);
@@ -1350,16 +1356,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_create_dry_run() {
+    #[tokio::test]
+    async fn test_files_container_create_dry_run() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
         let filename = "../testdata/";
-        let (xorurl, processed_files, files_map) = unwrap!(async_std::task::block_on(async {
+        let (xorurl, processed_files, files_map) = unwrap!(
             safe.files_container_create(filename, None, true, true)
                 .await
-        }));
+        );
 
         assert!(xorurl.is_empty());
         assert_eq!(processed_files.len(), 5);
@@ -1398,15 +1404,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_create_folder_without_trailing_slash() {
+    #[tokio::test]
+    async fn test_files_container_create_folder_without_trailing_slash() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(async_std::task::block_on(async {
+        let (xorurl, processed_files, files_map) = unwrap!(
             safe.files_container_create("../testdata", None, true, false)
                 .await
-        }));
+        );
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1441,15 +1447,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_create_folder_with_trailing_slash() {
+    #[tokio::test]
+    async fn test_files_container_create_folder_with_trailing_slash() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(async_std::task::block_on(async {
+        let (xorurl, processed_files, files_map) = unwrap!(
             safe.files_container_create("../testdata/", None, true, false)
                 .await
-        }));
+        );
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1484,15 +1490,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_create_dest_path_without_trailing_slash() {
+    #[tokio::test]
+    async fn test_files_container_create_dest_path_without_trailing_slash() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(async_std::task::block_on(async {
+        let (xorurl, processed_files, files_map) = unwrap!(
             safe.files_container_create("../testdata", Some("/myroot"), true, false)
                 .await
-        }));
+        );
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1527,15 +1533,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_create_dest_path_with_trailing_slash() {
+    #[tokio::test]
+    async fn test_files_container_create_dest_path_with_trailing_slash() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(async_std::task::block_on(async {
+        let (xorurl, processed_files, files_map) = unwrap!(
             safe.files_container_create("../testdata", Some("/myroot/"), true, false)
                 .await
-        }));
+        );
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1570,175 +1576,169 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_sync() {
+    #[tokio::test]
+    async fn test_files_container_sync() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            assert_eq!(processed_files.len(), 5);
-            assert_eq!(files_map.len(), 5);
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    true,
-                    false,
-                    false,
-                    false
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
+        );
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 2);
-            assert_eq!(new_files_map.len(), 7);
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
 
-            let filename1 = "../testdata/test.md";
-            assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename1].1,
-                new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync("../testdata/subfolder/", &xorurl, true, false, false, false)
+                .await
+        );
 
-            let filename2 = "../testdata/another.md";
-            assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename2].1,
-                new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
 
-            let filename3 = "../testdata/subfolder/subexists.md";
-            assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename3].1,
-                new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename4 = "../testdata/noextension";
-            assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename4].1,
-                new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename5 = "../testdata/subfolder/subexists.md";
-            assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[filename5].1,
-                new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename6 = "../testdata/subfolder/sub2.md";
-            assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[filename6].1,
-                new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename6 = "../testdata/subfolder/sub2.md";
+        assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename6].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
     }
 
-    #[test]
-    fn test_files_container_sync_dry_run() {
+    #[tokio::test]
+    async fn test_files_container_sync_dry_run() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            assert_eq!(processed_files.len(), 5);
-            assert_eq!(files_map.len(), 5);
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    true,
-                    false,
-                    false,
-                    true // set dry_run flag on
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
+        );
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 2);
-            assert_eq!(new_files_map.len(), 7);
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
 
-            let filename1 = "../testdata/test.md";
-            assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename1].1,
-                new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder/",
+                &xorurl,
+                true,
+                false,
+                false,
+                true // set dry_run flag on
+            )
+            .await
+        );
 
-            let filename2 = "../testdata/another.md";
-            assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename2].1,
-                new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
 
-            let filename3 = "../testdata/subfolder/subexists.md";
-            assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename3].1,
-                new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename4 = "../testdata/noextension";
-            assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename4].1,
-                new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename5 = "../testdata/subfolder/subexists.md";
-            assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-            assert!(!new_processed_files[filename5].1.is_empty());
-            assert_eq!(
-                new_processed_files[filename5].1,
-                new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename6 = "../testdata/subfolder/sub2.md";
-            assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
-            assert!(!new_processed_files[filename6].1.is_empty());
-            assert_eq!(
-                new_processed_files[filename6].1,
-                new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert!(!new_processed_files[filename5].1.is_empty());
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename6 = "../testdata/subfolder/sub2.md";
+        assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
+        assert!(!new_processed_files[filename6].1.is_empty());
+        assert_eq!(
+            new_processed_files[filename6].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
     }
 
-    #[test]
-    fn test_files_container_sync_same_size() {
+    #[tokio::test]
+    async fn test_files_container_sync_same_size() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) =
-            unwrap!(safe.files_container_create("../testdata/test.md", None, false, false));
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/test.md", None, false, false)
+                .await
+        );
 
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_sync(
-            "../testdata/.subhidden/test.md",
-            &xorurl,
-            false,
-            false,
-            false,
-            false
-        ));
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/.subhidden/test.md",
+                &xorurl,
+                false,
+                false,
+                false,
+                false
+            )
+            .await
+        );
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -1768,156 +1768,149 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_sync_with_versioned_target() {
+    #[tokio::test]
+    async fn test_files_container_sync_with_versioned_target() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _, _) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            let versioned_xorurl = format!("{}?v=5", xorurl);
-            match safe
-                .files_container_sync(
-                    "../testdata/subfolder/",
-                    &versioned_xorurl,
-                    false,
-                    false,
-                    true, // this flag requests the update-nrs
-                    false,
-                )
+        let (xorurl, _, _) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            {
-                Ok(_) => panic!("Sync was unexpectdly successful"),
-                Err(err) => assert_eq!(
-                    err,
-                    Error::InvalidInput(format!(
-                        "The target URL cannot cannot contain a version: {}",
-                        versioned_xorurl
-                    ))
-                ),
-            };
-        });
+        );
+
+        let versioned_xorurl = format!("{}?v=5", xorurl);
+        match safe
+            .files_container_sync(
+                "../testdata/subfolder/",
+                &versioned_xorurl,
+                false,
+                false,
+                true, // this flag requests the update-nrs
+                false,
+            )
+            .await
+        {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(format!(
+                    "The target URL cannot cannot contain a version: {}",
+                    versioned_xorurl
+                ))
+            ),
+        };
     }
 
-    #[test]
-    fn test_files_container_sync_with_delete() {
+    #[tokio::test]
+    async fn test_files_container_sync_with_delete() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            assert_eq!(processed_files.len(), 5);
-            assert_eq!(files_map.len(), 5);
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    true,
-                    true, // this sets the delete flag
-                    false,
-                    false
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
+        );
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 7);
-            assert_eq!(new_files_map.len(), 2);
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
 
-            // first check all previous files were removed
-            let file_path1 = "/test.md";
-            assert_eq!(new_processed_files[file_path1].0, CONTENT_DELETED_SIGN);
-            assert_eq!(
-                new_processed_files[file_path1].1,
-                files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
-            );
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder/",
+                &xorurl,
+                true,
+                true, // this sets the delete flag
+                false,
+                false
+            )
+            .await
+        );
 
-            let file_path2 = "/another.md";
-            assert_eq!(new_processed_files[file_path2].0, CONTENT_DELETED_SIGN);
-            assert_eq!(
-                new_processed_files[file_path2].1,
-                files_map[file_path2][FAKE_RDF_PREDICATE_LINK]
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 7);
+        assert_eq!(new_files_map.len(), 2);
 
-            let file_path3 = "/subfolder/subexists.md";
-            assert_eq!(new_processed_files[file_path3].0, CONTENT_DELETED_SIGN);
-            assert_eq!(
-                new_processed_files[file_path3].1,
-                files_map[file_path3][FAKE_RDF_PREDICATE_LINK]
-            );
+        // first check all previous files were removed
+        let file_path1 = "/test.md";
+        assert_eq!(new_processed_files[file_path1].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path1].1,
+            files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let file_path4 = "/noextension";
-            assert_eq!(new_processed_files[file_path4].0, CONTENT_DELETED_SIGN);
-            assert_eq!(
-                new_processed_files[file_path4].1,
-                files_map[file_path4][FAKE_RDF_PREDICATE_LINK]
-            );
+        let file_path2 = "/another.md";
+        assert_eq!(new_processed_files[file_path2].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path2].1,
+            files_map[file_path2][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            // and finally check the synced file was added
-            let filename5 = "../testdata/subfolder/subexists.md";
-            assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[filename5].1,
-                new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
+        let file_path3 = "/subfolder/subexists.md";
+        assert_eq!(new_processed_files[file_path3].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path3].1,
+            files_map[file_path3][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let file_path4 = "/noextension";
+        assert_eq!(new_processed_files[file_path4].0, CONTENT_DELETED_SIGN);
+        assert_eq!(
+            new_processed_files[file_path4].1,
+            files_map[file_path4][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // and finally check the synced file was added
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
     }
 
-    #[test]
-    fn test_files_container_sync_delete_without_recursive() {
+    #[tokio::test]
+    async fn test_files_container_sync_delete_without_recursive() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            match safe
-                .files_container_sync(
-                    "../testdata/subfolder/",
-                    "some-url",
-                    false, // this sets the recursive flag to off
-                    true,  // this sets the delete flag
-                    false,
-                    false,
+        match safe
+            .files_container_sync(
+                "../testdata/subfolder/",
+                "some-url",
+                false, // this sets the recursive flag to off
+                true,  // this sets the delete flag
+                false,
+                false,
+            )
+            .await
+        {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(
+                    "'delete' is not allowed if 'recursive' is not set".to_string()
                 )
-                .await
-            {
-                Ok(_) => panic!("Sync was unexpectdly successful"),
-                Err(err) => assert_eq!(
-                    err,
-                    Error::InvalidInput(
-                        "'delete' is not allowed if --recursive is not set".to_string()
-                    )
-                ),
-            };
-        });
+            ),
+        };
     }
 
-    #[test]
-    fn test_files_container_sync_update_nrs_unversioned_link() {
+    #[tokio::test]
+    async fn test_files_container_sync_update_nrs_unversioned_link() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _, _) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
+        let (xorurl, _, _) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
+                .await
+        );
 
-            let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_content_version(None);
-            let unversioned_link = unwrap!(xorurl_encoder.to_string());
-            match safe.nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false).await {
+        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(None);
+        let unversioned_link = unwrap!(xorurl_encoder.to_string());
+        match safe.nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false).await {
             Ok(_) => panic!("NRS create was unexpectdly successful"),
             Err(err) => assert_eq!(
                 err,
@@ -1927,514 +1920,503 @@ mod tests {
                 ))
             ),
         };
-        });
     }
 
-    #[test]
-    fn test_files_container_sync_update_nrs_with_xorurl() {
+    #[tokio::test]
+    async fn test_files_container_sync_update_nrs_with_xorurl() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _, _) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            match safe
-                .files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    false,
-                    false,
-                    true, // this flag requests the update-nrs
-                    false,
-                )
+        let (xorurl, _, _) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            {
-                Ok(_) => panic!("Sync was unexpectdly successful"),
-                Err(err) => assert_eq!(
-                    err,
-                    Error::InvalidInput(
-                        "'update-nrs' is not allowed since the URL provided is not an NRS URL"
-                            .to_string()
-                    )
-                ),
-            };
-        });
+        );
+
+        match safe
+            .files_container_sync(
+                "../testdata/subfolder/",
+                &xorurl,
+                false,
+                false,
+                true, // this flag requests the update-nrs
+                false,
+            )
+            .await
+        {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(
+                    "'update-nrs' is not allowed since the URL provided is not an NRS URL"
+                        .to_string()
+                )
+            ),
+        };
     }
 
-    #[test]
-    fn test_files_container_sync_update_nrs_versioned_link() {
+    #[tokio::test]
+    async fn test_files_container_sync_update_nrs_versioned_link() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _, _) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_content_version(Some(0));
-            let _ = unwrap!(
-                safe.nrs_map_container_create(
-                    &nrsurl,
-                    &unwrap!(xorurl_encoder.to_string()),
-                    false,
-                    true,
-                    false
-                )
+        let (xorurl, _, _) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
+        );
 
-            let _ = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &nrsurl,
-                    false,
-                    false,
-                    true, // this flag requests the update-nrs
-                    false,
-                )
-                .await
-            );
+        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_content_version(Some(1));
-            let (new_link, _) = unwrap!(safe.parse_and_resolve_url(&nrsurl).await);
-            assert_eq!(
-                unwrap!(new_link.to_string()),
-                unwrap!(xorurl_encoder.to_string())
-            );
-        });
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let _ = unwrap!(
+            safe.nrs_map_container_create(
+                &nrsurl,
+                &unwrap!(xorurl_encoder.to_string()),
+                false,
+                true,
+                false
+            )
+            .await
+        );
+
+        let _ = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder/",
+                &nrsurl,
+                false,
+                false,
+                true, // this flag requests the update-nrs
+                false,
+            )
+            .await
+        );
+
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(1));
+        let (new_link, _) = unwrap!(safe.parse_and_resolve_url(&nrsurl).await);
+        assert_eq!(
+            unwrap!(new_link.to_string()),
+            unwrap!(xorurl_encoder.to_string())
+        );
     }
 
-    #[test]
-    fn test_files_container_sync_target_path_without_trailing_slash() {
+    #[tokio::test]
+    async fn test_files_container_sync_target_path_without_trailing_slash() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            assert_eq!(processed_files.len(), 5);
-            assert_eq!(files_map.len(), 5);
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_path("path/when/sync");
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder",
-                    &unwrap!(xorurl_encoder.to_string()),
-                    true,
-                    false,
-                    false,
-                    false
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
+        );
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 2);
-            assert_eq!(new_files_map.len(), 7);
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_path("path/when/sync");
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder",
+                &unwrap!(xorurl_encoder.to_string()),
+                true,
+                false,
+                false,
+                false
+            )
+            .await
+        );
 
-            let filename1 = "../testdata/test.md";
-            assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename1].1,
-                new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
 
-            let filename2 = "../testdata/another.md";
-            assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename2].1,
-                new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename3 = "../testdata/subfolder/subexists.md";
-            assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename3].1,
-                new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename4 = "../testdata/noextension";
-            assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename4].1,
-                new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            // and finally check the synced file is there
-            let filename5 = "../testdata/subfolder/subexists.md";
-            assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[filename5].1,
-                new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // and finally check the synced file is there
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
     }
 
-    #[test]
-    fn test_files_container_sync_target_path_with_trailing_slash() {
+    #[tokio::test]
+    async fn test_files_container_sync_target_path_with_trailing_slash() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            assert_eq!(processed_files.len(), 5);
-            assert_eq!(files_map.len(), 5);
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_path("/path/when/sync/");
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder",
-                    &unwrap!(xorurl_encoder.to_string()),
-                    true,
-                    false,
-                    false,
-                    false,
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
+        );
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 2);
-            assert_eq!(new_files_map.len(), 7);
+        assert_eq!(processed_files.len(), 5);
+        assert_eq!(files_map.len(), 5);
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_path("/path/when/sync/");
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder",
+                &unwrap!(xorurl_encoder.to_string()),
+                true,
+                false,
+                false,
+                false,
+            )
+            .await
+        );
 
-            let filename1 = "../testdata/test.md";
-            assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename1].1,
-                new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 2);
+        assert_eq!(new_files_map.len(), 7);
 
-            let filename2 = "../testdata/another.md";
-            assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename2].1,
-                new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename1 = "../testdata/test.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename3 = "../testdata/subfolder/subexists.md";
-            assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename3].1,
-                new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename2 = "../testdata/another.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/another.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            let filename4 = "../testdata/noextension";
-            assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename4].1,
-                new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename3 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename3].1,
+            new_files_map["/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            // and finally check the synced file is there
-            let filename5 = "../testdata/subfolder/subexists.md";
-            assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[filename5].1,
-                new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
+        let filename4 = "../testdata/noextension";
+        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename4].1,
+            new_files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // and finally check the synced file is there
+        let filename5 = "../testdata/subfolder/subexists.md";
+        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename5].1,
+            new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
     }
 
-    #[test]
-    fn test_files_container_get() {
+    #[tokio::test]
+    async fn test_files_container_get() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
+        let (xorurl, _processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
+                .await
+        );
 
-            let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl).await);
+        let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl).await);
 
-            assert_eq!(version, 0);
-            assert_eq!(fetched_files_map.len(), 5);
-            assert_eq!(files_map.len(), fetched_files_map.len());
-            assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
-            assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
-            assert_eq!(
-                files_map["/subfolder/subexists.md"],
-                fetched_files_map["/subfolder/subexists.md"]
-            );
-            assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
-        });
+        assert_eq!(version, 0);
+        assert_eq!(fetched_files_map.len(), 5);
+        assert_eq!(files_map.len(), fetched_files_map.len());
+        assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
+        assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
+        assert_eq!(
+            files_map["/subfolder/subexists.md"],
+            fetched_files_map["/subfolder/subexists.md"]
+        );
+        assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
     }
 
-    #[test]
-    fn test_files_container_version() {
+    #[tokio::test]
+    async fn test_files_container_version() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _, _) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
-
-            let (version, _) = unwrap!(safe.files_container_get(&xorurl).await);
-            assert_eq!(version, 0);
-
-            let (version, _, _) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    true,
-                    true, // this sets the delete flag,
-                    false,
-                    false,
-                )
+        let (xorurl, _, _) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
                 .await
-            );
-            assert_eq!(version, 1);
+        );
 
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_content_version(None);
-            let (version, _) = unwrap!(
-                safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                    .await
-            );
-            assert_eq!(version, 1);
-        });
+        let (version, _) = unwrap!(safe.files_container_get(&xorurl).await);
+        assert_eq!(version, 0);
+
+        let (version, _, _) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder/",
+                &xorurl,
+                true,
+                true, // this sets the delete flag,
+                false,
+                false,
+            )
+            .await
+        );
+        assert_eq!(version, 1);
+
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(None);
+        let (version, _) = unwrap!(
+            safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
+                .await
+        );
+        assert_eq!(version, 1);
     }
 
-    #[test]
-    fn test_files_container_get_with_version() {
+    #[tokio::test]
+    async fn test_files_container_get_with_version() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/", None, true, false)
-                    .await
-            );
+        let (xorurl, _processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
+                .await
+        );
 
-            // let's create a new version of the files container
-            let (_version, _new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    true,
-                    true, // this sets the delete flag
-                    false,
-                    false
+        // let's create a new version of the files container
+        let (_version, _new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder/",
+                &xorurl,
+                true,
+                true, // this sets the delete flag
+                false,
+                false
+            )
+            .await
+        );
+
+        // let's fetch version 0
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let (version, v0_files_map) = unwrap!(
+            safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
+                .await
+        );
+
+        assert_eq!(version, 0);
+        assert_eq!(files_map, v0_files_map);
+        // let's check that one of the files in v1 is still there
+        let file_path1 = "/test.md";
+        assert_eq!(
+            files_map[file_path1][FAKE_RDF_PREDICATE_LINK],
+            v0_files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // let's fetch version 1
+        xorurl_encoder.set_content_version(Some(1));
+        let (version, v1_files_map) = unwrap!(
+            safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
+                .await
+        );
+
+        assert_eq!(version, 1);
+        assert_eq!(new_files_map, v1_files_map);
+        // let's check that some of the files are no in v2 anymore
+        let file_path2 = "/another.md";
+        let file_path3 = "/subfolder/subexists.md";
+        let file_path4 = "/noextension";
+        assert!(v1_files_map.get(file_path1).is_none());
+        assert!(v1_files_map.get(file_path2).is_none());
+        assert!(v1_files_map.get(file_path3).is_none());
+        assert!(v1_files_map.get(file_path4).is_none());
+
+        // let's fetch version 2 (invalid)
+        xorurl_encoder.set_content_version(Some(2));
+        match safe
+            .files_container_get(&unwrap!(xorurl_encoder.to_string()))
+            .await
+        {
+            Ok(_) => panic!("unexpectdly retrieved verion 3 of container"),
+            Err(Error::VersionNotFound(msg)) => assert_eq!(
+                msg,
+                format!(
+                    "Version '2' is invalid for FilesContainer found at \"{}\"",
+                    xorurl_encoder
                 )
-                .await
-            );
-
-            // let's fetch version 0
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_content_version(Some(0));
-            let (version, v0_files_map) = unwrap!(
-                safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                    .await
-            );
-
-            assert_eq!(version, 0);
-            assert_eq!(files_map, v0_files_map);
-            // let's check that one of the files in v1 is still there
-            let file_path1 = "/test.md";
-            assert_eq!(
-                files_map[file_path1][FAKE_RDF_PREDICATE_LINK],
-                v0_files_map[file_path1][FAKE_RDF_PREDICATE_LINK]
-            );
-
-            // let's fetch version 1
-            xorurl_encoder.set_content_version(Some(1));
-            let (version, v1_files_map) = unwrap!(
-                safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                    .await
-            );
-
-            assert_eq!(version, 1);
-            assert_eq!(new_files_map, v1_files_map);
-            // let's check that some of the files are no in v2 anymore
-            let file_path2 = "/another.md";
-            let file_path3 = "/subfolder/subexists.md";
-            let file_path4 = "/noextension";
-            assert!(v1_files_map.get(file_path1).is_none());
-            assert!(v1_files_map.get(file_path2).is_none());
-            assert!(v1_files_map.get(file_path3).is_none());
-            assert!(v1_files_map.get(file_path4).is_none());
-
-            // let's fetch version 2 (invalid)
-            xorurl_encoder.set_content_version(Some(2));
-            match safe
-                .files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                .await
-            {
-                Ok(_) => panic!("unexpectdly retrieved verion 3 of container"),
-                Err(Error::VersionNotFound(msg)) => assert_eq!(
-                    msg,
-                    format!(
-                        "Version '2' is invalid for FilesContainer found at \"{}\"",
-                        xorurl_encoder
-                    )
-                ),
-                other => panic!(format!(
-                    "error returned is not the expected one: {:?}",
-                    other
-                )),
-            };
-        });
+            ),
+            other => panic!(format!(
+                "error returned is not the expected one: {:?}",
+                other
+            )),
+        };
     }
 
-    #[test]
-    fn test_files_container_sync_with_nrs_url() {
+    #[tokio::test]
+    async fn test_files_container_sync_with_nrs_url() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, _, _) = unwrap!(
-                safe.files_container_create("../testdata/test.md", None, false, false)
-                    .await
-            );
-
-            let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-
-            let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-            xorurl_encoder.set_content_version(Some(0));
-            let _ = unwrap!(
-                safe.nrs_map_container_create(
-                    &nrsurl,
-                    &unwrap!(xorurl_encoder.to_string()),
-                    false,
-                    true,
-                    false
-                )
+        let (xorurl, _, _) = unwrap!(
+            safe.files_container_create("../testdata/test.md", None, false, false)
                 .await
-            );
+        );
 
-            let _ = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/subfolder/",
-                    &xorurl,
-                    false,
-                    false,
-                    false,
-                    false,
-                )
-                .await
-            );
+        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-            let _ = unwrap!(
-                safe.files_container_sync(
-                    "../testdata/",
-                    &nrsurl,
-                    false,
-                    false,
-                    true, // this flag requests the update-nrs
-                    false,
-                )
-                .await
-            );
+        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        xorurl_encoder.set_content_version(Some(0));
+        let _ = unwrap!(
+            safe.nrs_map_container_create(
+                &nrsurl,
+                &unwrap!(xorurl_encoder.to_string()),
+                false,
+                true,
+                false
+            )
+            .await
+        );
 
-            let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl).await);
-            assert_eq!(version, 2);
-            assert_eq!(fetched_files_map.len(), 5);
-        });
+        let _ = unwrap!(
+            safe.files_container_sync(
+                "../testdata/subfolder/",
+                &xorurl,
+                false,
+                false,
+                false,
+                false,
+            )
+            .await
+        );
+
+        let _ = unwrap!(
+            safe.files_container_sync(
+                "../testdata/",
+                &nrsurl,
+                false,
+                false,
+                true, // this flag requests the update-nrs
+                false,
+            )
+            .await
+        );
+
+        let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl).await);
+        assert_eq!(version, 2);
+        assert_eq!(fetched_files_map.len(), 5);
     }
 
-    #[test]
-    fn test_files_container_add() {
+    #[tokio::test]
+    async fn test_files_container_add() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/subfolder/", None, false, false)
-                    .await
-            );
-            assert_eq!(processed_files.len(), 2);
-            assert_eq!(files_map.len(), 2);
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add(
-                    "../testdata/test.md",
-                    &format!("{}/new_filename_test.md", xorurl),
-                    false,
-                    false,
-                    false,
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/subfolder/", None, false, false)
                 .await
-            );
-
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 3);
-
-            let filename1 = "../testdata/subfolder/subexists.md";
-            assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename1].1,
-                new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-
-            let filename2 = "../testdata/subfolder/sub2.md";
-            assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename2].1,
-                new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-
-            let filename3 = "../testdata/test.md";
-            assert_eq!(new_processed_files[filename3].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[filename3].1,
-                new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
-    }
-
-    #[test]
-    fn test_files_container_add_dry_run() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) =
-            unwrap!(safe.files_container_create("../testdata/subfolder/", None, false, false));
+        );
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(safe.files_container_add(
-            "../testdata/test.md",
-            &format!("{}/new_filename_test.md", xorurl),
-            false,
-            false,
-            true, // dry run
-        ));
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                "../testdata/test.md",
+                &format!("{}/new_filename_test.md", xorurl),
+                false,
+                false,
+                false,
+            )
+            .await
+        );
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
+
+        let filename1 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename2 = "../testdata/subfolder/sub2.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        let filename3 = "../testdata/test.md";
+        assert_eq!(new_processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[filename3].1,
+            new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_files_container_add_dry_run() {
+        use unwrap::unwrap;
+        let mut safe = Safe::default();
+        unwrap!(safe.connect("", Some("fake-credentials")));
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/subfolder/", None, false, false)
+                .await
+        );
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
+
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                "../testdata/test.md",
+                &format!("{}/new_filename_test.md", xorurl),
+                false,
+                false,
+                true, // dry run
+            )
+            .await
+        );
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 3);
 
         // a dry run again should give the exact same results
-        let (version2, new_processed_files2, new_files_map2) = unwrap!(safe.files_container_add(
-            "../testdata/test.md",
-            &format!("{}/new_filename_test.md", xorurl),
-            false,
-            false,
-            true, // dry run
-        ));
+        let (version2, new_processed_files2, new_files_map2) = unwrap!(
+            safe.files_container_add(
+                "../testdata/test.md",
+                &format!("{}/new_filename_test.md", xorurl),
+                false,
+                false,
+                true, // dry run
+            )
+            .await
+        );
 
         assert_eq!(version, version2);
         assert_eq!(new_processed_files.len(), new_processed_files2.len());
@@ -2453,20 +2435,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_files_container_add_dir() {
+    #[tokio::test]
+    async fn test_files_container_add_dir() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/subfolder/", None, false, false)
-                    .await
-            );
-            assert_eq!(processed_files.len(), 2);
-            assert_eq!(files_map.len(), 2);
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/subfolder/", None, false, false)
+                .await
+        );
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-            match safe.files_container_add(
+        match safe.files_container_add(
                 "../testdata",
                 &xorurl,
                 false,
@@ -2483,266 +2464,294 @@ mod tests {
                     other
                 )),
             }
-        });
     }
 
-    #[test]
-    fn test_files_container_add_existing_name() {
+    #[tokio::test]
+    async fn test_files_container_add_existing_name() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/subfolder/", None, false, false)
-                    .await
-            );
-            assert_eq!(processed_files.len(), 2);
-            assert_eq!(files_map.len(), 2);
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add(
-                    "../testdata/test.md",
-                    &format!("{}/sub2.md", xorurl),
-                    false,
-                    false,
-                    false
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/subfolder/", None, false, false)
                 .await
-            );
-
-            assert_eq!(version, 0);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 2);
-            assert_eq!(
-            new_processed_files["../testdata/test.md"].1,
-            "File named \"/sub2.md\" already exists on target. Use the \'force\' flag to replace it"
         );
-            assert_eq!(files_map, new_files_map);
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-            // let's now force it
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add(
-                    "../testdata/test.md",
-                    &format!("{}/sub2.md", xorurl),
-                    true, //force it
-                    false,
-                    false
-                )
-                .await
-            );
+        // let's try to add a file with same target name and same content, it should fail
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                "../testdata/subfolder/sub2.md",
+                &format!("{}/sub2.md", xorurl),
+                false,
+                false,
+                false
+            )
+            .await
+        );
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 2);
-            assert_eq!(
-                new_processed_files["../testdata/test.md"].0,
-                CONTENT_UPDATED_SIGN
-            );
-            assert_eq!(
-                new_processed_files["../testdata/test.md"].1,
-                new_files_map["/sub2.md"]["link"]
-            );
-        });
+        assert_eq!(version, 0);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_processed_files["../testdata/subfolder/sub2.md"].1,
+            "File named \"/sub2.md\" with same content already exists on target. Use the \'force\' flag to replace it"
+        );
+        assert_eq!(files_map, new_files_map);
+
+        // let's try to add a file with same target name but with different content, it should still fail
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                "../testdata/test.md",
+                &format!("{}/sub2.md", xorurl),
+                false,
+                false,
+                false
+            )
+            .await
+        );
+
+        assert_eq!(version, 0);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_processed_files["../testdata/test.md"].1,
+            "File named \"/sub2.md\" with different content already exists on target. Use the \'force\' flag to replace it"
+        );
+        assert_eq!(files_map, new_files_map);
+
+        // let's now force it
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                "../testdata/test.md",
+                &format!("{}/sub2.md", xorurl),
+                true, //force it
+                false,
+                false
+            )
+            .await
+        );
+
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_processed_files["../testdata/test.md"].0,
+            CONTENT_UPDATED_SIGN
+        );
+        assert_eq!(
+            new_processed_files["../testdata/test.md"].1,
+            new_files_map["/sub2.md"]["link"]
+        );
     }
 
-    #[test]
-    fn test_files_container_fail_add_or_sync_invalid_path() {
+    #[tokio::test]
+    async fn test_files_container_fail_add_or_sync_invalid_path() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/test.md", None, false, false)
-                    .await
-            );
-            assert_eq!(processed_files.len(), 1);
-            assert_eq!(files_map.len(), 1);
-
-            match safe
-                .files_container_sync("/non-existing-path", &xorurl, false, false, false, false)
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/test.md", None, false, false)
                 .await
-            {
-                Ok(_) => panic!("unexpectdly added a folder to files container"),
-                Err(Error::FileSystemError(msg)) => assert!(msg
-                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')")),
+        );
+        assert_eq!(processed_files.len(), 1);
+        assert_eq!(files_map.len(), 1);
+
+        match safe
+            .files_container_sync("/non-existing-path", &xorurl, false, false, false, false)
+            .await
+        {
+            Ok(_) => panic!("unexpectdly added a folder to files container"),
+            Err(Error::FileSystemError(msg)) => {
+                assert!(msg
+                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
             }
+            other => panic!(format!(
+                "error returned is not the expected one: {:?}",
+                other
+            )),
+        }
 
-            match safe
-                .files_container_add(
-                    "/non-existing-path",
-                    &format!("{}/test.md", xorurl),
-                    true, // force it
-                    false,
-                    false,
-                )
-                .await
-            {
-                Ok(_) => panic!("unexpectdly added a folder to files container"),
-                Err(Error::FileSystemError(msg)) => assert!(msg
-                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')")),
+        match safe
+            .files_container_add(
+                "/non-existing-path",
+                &format!("{}/test.md", xorurl),
+                true, // force it
+                false,
+                false,
+            )
+            .await
+        {
+            Ok(_) => panic!("unexpectdly added a folder to files container"),
+            Err(Error::FileSystemError(msg)) => {
+                assert!(msg
+                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
             }
-        });
+            other => panic!(format!(
+                "error returned is not the expected one: {:?}",
+                other
+            )),
+        }
     }
 
-    #[test]
-    fn test_files_container_add_a_url() {
+    #[tokio::test]
+    async fn test_files_container_add_a_url() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/subfolder/", None, false, false)
-                    .await
-            );
-            assert_eq!(processed_files.len(), 2);
-            assert_eq!(files_map.len(), 2);
-            let data = b"0123456789";
-            let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None, false).await);
-            let new_filename = "/new_filename_test.md";
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add(
-                    &file_xorurl,
-                    &format!("{}{}", xorurl, new_filename),
-                    false,
-                    false,
-                    false
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/subfolder/", None, false, false)
                 .await
-            );
+        );
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
+        let data = b"0123456789";
+        let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None, false).await);
+        let new_filename = "/new_filename_test.md";
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 3);
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                &file_xorurl,
+                &format!("{}{}", xorurl, new_filename),
+                false,
+                false,
+                false
+            )
+            .await
+        );
 
-            let filename1 = "../testdata/subfolder/subexists.md";
-            assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename1].1,
-                new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
 
-            let filename2 = "../testdata/subfolder/sub2.md";
-            assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                processed_files[filename2].1,
-                new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
-            );
+        let filename1 = "../testdata/subfolder/subexists.md";
+        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename1].1,
+            new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[new_filename].1,
-                new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-            );
-            assert_eq!(
-                new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
-                file_xorurl
-            );
+        let filename2 = "../testdata/subfolder/sub2.md";
+        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            processed_files[filename2].1,
+            new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
+        );
 
-            // let's add another file but with the same name
-            let data = b"9876543210";
-            let other_file_xorurl =
-                unwrap!(safe.files_put_published_immutable(data, None, false).await);
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add(
-                    &other_file_xorurl,
-                    &format!("{}{}", xorurl, new_filename),
-                    true, // force to overwrite it with new link
-                    false,
-                    false
-                )
-                .await
-            );
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+        assert_eq!(
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
+            file_xorurl
+        );
 
-            assert_eq!(version, 2);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 3);
-            assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
-            assert_eq!(
-                new_processed_files[new_filename].1,
-                new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-            );
-            assert_eq!(
-                new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
-                other_file_xorurl
-            );
-        });
+        // let's add another file but with the same name
+        let data = b"9876543210";
+        let other_file_xorurl =
+            unwrap!(safe.files_put_published_immutable(data, None, false).await);
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add(
+                &other_file_xorurl,
+                &format!("{}{}", xorurl, new_filename),
+                true, // force to overwrite it with new link
+                false,
+                false
+            )
+            .await
+        );
+
+        assert_eq!(version, 2);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+        assert_eq!(
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
+            other_file_xorurl
+        );
     }
 
-    #[test]
-    fn test_files_container_add_from_raw() {
+    #[tokio::test]
+    async fn test_files_container_add_from_raw() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        async_std::task::block_on(async {
-            let (xorurl, processed_files, files_map) = unwrap!(
-                safe.files_container_create("../testdata/subfolder/", None, false, false)
-                    .await
-            );
-            assert_eq!(processed_files.len(), 2);
-            assert_eq!(files_map.len(), 2);
-
-            let data = b"0123456789";
-            let new_filename = "/new_filename_test.md";
-
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add_from_raw(
-                    data,
-                    &format!("{}{}", xorurl, new_filename),
-                    false,
-                    false,
-                    false
-                )
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/subfolder/", None, false, false)
                 .await
-            );
+        );
+        assert_eq!(processed_files.len(), 2);
+        assert_eq!(files_map.len(), 2);
 
-            assert_eq!(version, 1);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 3);
+        let data = b"0123456789";
+        let new_filename = "/new_filename_test.md";
 
-            assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
-            assert_eq!(
-                new_processed_files[new_filename].1,
-                new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-            );
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add_from_raw(
+                data,
+                &format!("{}{}", xorurl, new_filename),
+                false,
+                false,
+                false
+            )
+            .await
+        );
 
-            // let's add another file but with the same name
-            let data = b"9876543210";
-            let (version, new_processed_files, new_files_map) = unwrap!(
-                safe.files_container_add_from_raw(
-                    data,
-                    &format!("{}{}", xorurl, new_filename),
-                    true, // force to overwrite it with new link
-                    false,
-                    false
-                )
-                .await
-            );
+        assert_eq!(version, 1);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
 
-            assert_eq!(version, 2);
-            assert_eq!(new_processed_files.len(), 1);
-            assert_eq!(new_files_map.len(), 3);
-            assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
-            assert_eq!(
-                new_processed_files[new_filename].1,
-                new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
-            );
-        });
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
+
+        // let's add another file but with the same name
+        let data = b"9876543210";
+        let (version, new_processed_files, new_files_map) = unwrap!(
+            safe.files_container_add_from_raw(
+                data,
+                &format!("{}{}", xorurl, new_filename),
+                true, // force to overwrite it with new link
+                false,
+                false
+            )
+            .await
+        );
+
+        assert_eq!(version, 2);
+        assert_eq!(new_processed_files.len(), 1);
+        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+        assert_eq!(
+            new_processed_files[new_filename].1,
+            new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
+        );
     }
 
-    #[test]
-    fn test_files_container_remove_path() {
+    #[tokio::test]
+    async fn test_files_container_remove_path() {
         use unwrap::unwrap;
         let mut safe = Safe::default();
         unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) =
-            unwrap!(safe.files_container_create("../testdata/", None, true, false));
+        let (xorurl, processed_files, files_map) = unwrap!(
+            safe.files_container_create("../testdata/", None, true, false)
+                .await
+        );
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
 
         // let's remove a file first
         let (version, new_processed_files, new_files_map) = unwrap!(
             safe.files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false,)
+                .await
         );
 
         assert_eq!(version, 1);
@@ -2759,6 +2768,7 @@ mod tests {
         // let's remove an entire folder now with recursive flag
         let (version, new_processed_files, new_files_map) = unwrap!(
             safe.files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false,)
+                .await
         );
 
         assert_eq!(version, 2);

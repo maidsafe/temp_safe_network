@@ -357,8 +357,8 @@ fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<NrsMapRawData> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_nrs_map_container_create() {
+    #[tokio::test]
+    async fn test_nrs_map_container_create() {
         use crate::api::app::consts::FAKE_RDF_PREDICATE_LINK;
         use crate::nrs_map::DefaultRdf;
         use rand::distributions::Alphanumeric;
@@ -370,46 +370,44 @@ mod tests {
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
 
-        async_std::task::block_on(async {
-            let nrs_xorname = xorname_from_nrs_string(&site_name).unwrap();
+        let nrs_xorname = xorname_from_nrs_string(&site_name).unwrap();
 
-            let (xor_url, _entries, nrs_map) = unwrap!(
-                safe.nrs_map_container_create(
-                    &site_name,
-                    "safe://linked-from-<site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
+        let (xor_url, _entries, nrs_map) = unwrap!(
+            safe.nrs_map_container_create(
+                &site_name,
+                "safe://linked-from-<site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
 
-            assert_eq!(nrs_map.sub_names_map.len(), 0);
+        assert_eq!(nrs_map.sub_names_map.len(), 0);
+        assert_eq!(
+            unwrap!(nrs_map.get_default_link()),
+            "safe://linked-from-<site_name>?v=0"
+        );
+
+        if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
             assert_eq!(
-                unwrap!(nrs_map.get_default_link()),
-                "safe://linked-from-<site_name>?v=0"
+                *def_data.get(FAKE_RDF_PREDICATE_LINK).unwrap(),
+                "safe://linked-from-<site_name>?v=0".to_string()
             );
+            assert_eq!(
+                nrs_map.get_default().unwrap(),
+                &DefaultRdf::OtherRdf(def_data.clone())
+            );
+        } else {
+            panic!("No default definition map found...")
+        }
 
-            if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
-                assert_eq!(
-                    *def_data.get(FAKE_RDF_PREDICATE_LINK).unwrap(),
-                    "safe://linked-from-<site_name>?v=0".to_string()
-                );
-                assert_eq!(
-                    nrs_map.get_default().unwrap(),
-                    &DefaultRdf::OtherRdf(def_data.clone())
-                );
-            } else {
-                panic!("No default definition map found...")
-            }
-
-            let decoder = XorUrlEncoder::from_url(&xor_url).unwrap();
-            assert_eq!(nrs_xorname, decoder.xorname());
-        });
+        let decoder = XorUrlEncoder::from_url(&xor_url).unwrap();
+        assert_eq!(nrs_xorname, decoder.xorname());
     }
 
-    #[test]
-    fn test_nrs_map_container_add() {
+    #[tokio::test]
+    async fn test_nrs_map_container_add() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
@@ -418,45 +416,43 @@ mod tests {
 
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
-        async_std::task::block_on(async {
-            let (_xor_url, _entries, nrs_map) = unwrap!(
-                safe.nrs_map_container_create(
-                    &format!("b.{}", site_name),
-                    "safe://linked-from-<b.site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
-            assert_eq!(nrs_map.sub_names_map.len(), 1);
-            assert_eq!(
-                unwrap!(nrs_map.get_default_link()),
-                "safe://linked-from-<b.site_name>?v=0"
-            );
+        let (_xor_url, _entries, nrs_map) = unwrap!(
+            safe.nrs_map_container_create(
+                &format!("b.{}", site_name),
+                "safe://linked-from-<b.site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
+        assert_eq!(nrs_map.sub_names_map.len(), 1);
+        assert_eq!(
+            unwrap!(nrs_map.get_default_link()),
+            "safe://linked-from-<b.site_name>?v=0"
+        );
 
-            // add subname and set it as the new default too
-            let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
-                safe.nrs_map_container_add(
-                    &format!("a.b.{}", site_name),
-                    "safe://linked-from-<a.b.site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
-            assert_eq!(version, 1);
-            assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
-            assert_eq!(
-                unwrap!(updated_nrs_map.get_default_link()),
-                "safe://linked-from-<a.b.site_name>?v=0"
-            );
-        });
+        // add subname and set it as the new default too
+        let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
+            safe.nrs_map_container_add(
+                &format!("a.b.{}", site_name),
+                "safe://linked-from-<a.b.site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
+        assert_eq!(version, 1);
+        assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
+        assert_eq!(
+            unwrap!(updated_nrs_map.get_default_link()),
+            "safe://linked-from-<a.b.site_name>?v=0"
+        );
     }
 
-    #[test]
-    fn test_nrs_map_container_add_or_remove_with_versioned_target() {
+    #[tokio::test]
+    async fn test_nrs_map_container_add_or_remove_with_versioned_target() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
@@ -465,57 +461,55 @@ mod tests {
 
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
-        async_std::task::block_on(async {
-            let _ = unwrap!(
-                safe.nrs_map_container_create(
-                    &format!("b.{}", site_name),
-                    "safe://linked-from-<b.site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
+        let _ = unwrap!(
+            safe.nrs_map_container_create(
+                &format!("b.{}", site_name),
+                "safe://linked-from-<b.site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
 
-            let versioned_sitename = format!("safe://a.b.{}?v=6", site_name);
-            match safe
-                .nrs_map_container_add(
-                    &versioned_sitename,
-                    "safe://linked-from-<a.b.site_name>?v=0",
-                    true,
-                    false,
-                    false,
-                )
-                .await
-            {
-                Ok(_) => panic!("Sync was unexpectdly successful"),
-                Err(err) => assert_eq!(
-                    err,
-                    Error::InvalidInput(format!(
-                        "The NRS name/subname URL cannot cannot contain a version: {}",
-                        versioned_sitename
-                    ))
-                ),
-            };
+        let versioned_sitename = format!("safe://a.b.{}?v=6", site_name);
+        match safe
+            .nrs_map_container_add(
+                &versioned_sitename,
+                "safe://linked-from-<a.b.site_name>?v=0",
+                true,
+                false,
+                false,
+            )
+            .await
+        {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(format!(
+                    "The NRS name/subname URL cannot cannot contain a version: {}",
+                    versioned_sitename
+                ))
+            ),
+        };
 
-            match safe
-                .nrs_map_container_remove(&versioned_sitename, false)
-                .await
-            {
-                Ok(_) => panic!("Sync was unexpectdly successful"),
-                Err(err) => assert_eq!(
-                    err,
-                    Error::InvalidInput(format!(
-                        "The NRS name/subname URL cannot cannot contain a version: {}",
-                        versioned_sitename
-                    ))
-                ),
-            };
-        });
+        match safe
+            .nrs_map_container_remove(&versioned_sitename, false)
+            .await
+        {
+            Ok(_) => panic!("Sync was unexpectdly successful"),
+            Err(err) => assert_eq!(
+                err,
+                Error::InvalidInput(format!(
+                    "The NRS name/subname URL cannot cannot contain a version: {}",
+                    versioned_sitename
+                ))
+            ),
+        };
     }
 
-    #[test]
-    fn test_nrs_map_container_remove_one_of_two() {
+    #[tokio::test]
+    async fn test_nrs_map_container_remove_one_of_two() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
@@ -524,46 +518,44 @@ mod tests {
 
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
-        async_std::task::block_on(async {
-            let (_xor_url, _entries, nrs_map) = unwrap!(
-                safe.nrs_map_container_create(
-                    &format!("a.b.{}", site_name),
-                    "safe://linked-from-<a.b.site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
-            assert_eq!(nrs_map.sub_names_map.len(), 1);
+        let (_xor_url, _entries, nrs_map) = unwrap!(
+            safe.nrs_map_container_create(
+                &format!("a.b.{}", site_name),
+                "safe://linked-from-<a.b.site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
+        assert_eq!(nrs_map.sub_names_map.len(), 1);
 
-            let (_version, _xorurl, _entries, _updated_nrs_map) = unwrap!(
-                safe.nrs_map_container_add(
-                    &format!("a2.b.{}", site_name),
-                    "safe://linked-from-<a2.b.site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
+        let (_version, _xorurl, _entries, _updated_nrs_map) = unwrap!(
+            safe.nrs_map_container_add(
+                &format!("a2.b.{}", site_name),
+                "safe://linked-from-<a2.b.site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
 
-            // remove subname
-            let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
-                safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false)
-                    .await
-            );
-            assert_eq!(version, 2);
-            assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
-            assert_eq!(
-                unwrap!(updated_nrs_map.get_default_link()),
-                "safe://linked-from-<a2.b.site_name>?v=0"
-            );
-        });
+        // remove subname
+        let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
+            safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false)
+                .await
+        );
+        assert_eq!(version, 2);
+        assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
+        assert_eq!(
+            unwrap!(updated_nrs_map.get_default_link()),
+            "safe://linked-from-<a2.b.site_name>?v=0"
+        );
     }
 
-    #[test]
-    fn test_nrs_map_container_remove_default_soft_link() {
+    #[tokio::test]
+    async fn test_nrs_map_container_remove_default_soft_link() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
@@ -572,40 +564,38 @@ mod tests {
 
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
-        async_std::task::block_on(async {
-            let (_xor_url, _entries, nrs_map) = unwrap!(
-                safe.nrs_map_container_create(
-                    &format!("a.b.{}", site_name),
-                    "safe://linked-from-<a.b.site_name>?v=0",
-                    true,
-                    false,
-                    false
-                )
-                .await
-            );
-            assert_eq!(nrs_map.sub_names_map.len(), 1);
+        let (_xor_url, _entries, nrs_map) = unwrap!(
+            safe.nrs_map_container_create(
+                &format!("a.b.{}", site_name),
+                "safe://linked-from-<a.b.site_name>?v=0",
+                true,
+                false,
+                false
+            )
+            .await
+        );
+        assert_eq!(nrs_map.sub_names_map.len(), 1);
 
-            // remove subname
-            let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
-                safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false)
-                    .await
-            );
-            assert_eq!(version, 1);
-            assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
-            match updated_nrs_map.get_default_link() {
-                Ok(_) => panic!("unexpectedly retrieved a default link"),
-                Err(Error::ContentError(msg)) => assert_eq!(
-                    msg,
-                    "Default found for resolvable map (set to sub names 'a.b') cannot be resolved."
-                        .to_string()
-                ),
-                Err(err) => panic!(format!("error returned is not the expected one: {}", err)),
-            };
-        });
+        // remove subname
+        let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
+            safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false)
+                .await
+        );
+        assert_eq!(version, 1);
+        assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
+        match updated_nrs_map.get_default_link() {
+            Ok(_) => panic!("unexpectedly retrieved a default link"),
+            Err(Error::ContentError(msg)) => assert_eq!(
+                msg,
+                "Default found for resolvable map (set to sub names 'a.b') cannot be resolved."
+                    .to_string()
+            ),
+            Err(err) => panic!(format!("error returned is not the expected one: {}", err)),
+        };
     }
 
-    #[test]
-    fn test_nrs_map_container_remove_default_hard_link() {
+    #[tokio::test]
+    async fn test_nrs_map_container_remove_default_hard_link() {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
         use unwrap::unwrap;
@@ -614,30 +604,28 @@ mod tests {
 
         let mut safe = Safe::default();
         safe.connect("", Some("fake-credentials")).unwrap();
-        async_std::task::block_on(async {
-            let (_xor_url, _entries, nrs_map) = unwrap!(
-                safe.nrs_map_container_create(
-                    &format!("a.b.{}", site_name),
-                    "safe://linked-from-<a.b.site_name>?v=0",
-                    true,
-                    true, // this sets the default to be a hard-link
-                    false
-                )
-                .await
-            );
-            assert_eq!(nrs_map.sub_names_map.len(), 1);
+        let (_xor_url, _entries, nrs_map) = unwrap!(
+            safe.nrs_map_container_create(
+                &format!("a.b.{}", site_name),
+                "safe://linked-from-<a.b.site_name>?v=0",
+                true,
+                true, // this sets the default to be a hard-link
+                false
+            )
+            .await
+        );
+        assert_eq!(nrs_map.sub_names_map.len(), 1);
 
-            // remove subname
-            let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
-                safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false)
-                    .await
-            );
-            assert_eq!(version, 1);
-            assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
-            assert_eq!(
-                unwrap!(updated_nrs_map.get_default_link()),
-                "safe://linked-from-<a.b.site_name>?v=0"
-            );
-        });
+        // remove subname
+        let (version, _xorurl, _entries, updated_nrs_map) = unwrap!(
+            safe.nrs_map_container_remove(&format!("a.b.{}", site_name), false)
+                .await
+        );
+        assert_eq!(version, 1);
+        assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
+        assert_eq!(
+            unwrap!(updated_nrs_map.get_default_link()),
+            "safe://linked-from-<a.b.site_name>?v=0"
+        );
     }
 }

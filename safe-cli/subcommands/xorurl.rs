@@ -12,7 +12,6 @@ use super::{
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
-use async_std::task;
 use safe_api::{xorurl::XorUrlEncoder, Safe};
 use structopt::StructOpt;
 
@@ -27,7 +26,7 @@ pub enum XorurlSubCommands {
     },
 }
 
-pub fn xorurl_commander(
+pub async fn xorurl_commander(
     cmd: Option<XorurlSubCommands>,
     location: Option<String>,
     recursive: bool,
@@ -67,8 +66,9 @@ pub fn xorurl_commander(
                 get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
 
             // Do a dry-run on the location
-            let (_version, processed_files, _files_map) =
-                task::block_on(safe.files_container_create(&location, None, recursive, true))?;
+            let (_version, processed_files, _files_map) = safe
+                .files_container_create(&location, None, recursive, true)
+                .await?;
 
             // Now let's just print out a list of the xorurls
             if OutputFmt::Pretty == output_fmt {

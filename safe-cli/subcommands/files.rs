@@ -15,10 +15,9 @@ use super::{
     OutputFmt,
 };
 use ansi_term::Colour;
-use async_std::task;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{
-    files::FilesMap,
+    files::{FilesMap, ProcessedFiles},
     xorurl::{XorUrl, XorUrlEncoder},
     Safe,
 };
@@ -168,7 +167,7 @@ pub enum FilesSubCommands {
     },
 }
 
-pub fn files_commander(
+pub async fn files_commander(
     cmd: FilesSubCommands,
     output_fmt: OutputFmt,
     dry_run: bool,
@@ -184,13 +183,14 @@ pub fn files_commander(
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
-            let (files_container_xorurl, processed_files, _files_map) =
-                task::block_on(safe.files_container_create(
+            let (files_container_xorurl, processed_files, _files_map) = safe
+                .files_container_create(
                     &location,
                     dest.as_ref().map(String::as_str),
                     recursive,
                     dry_run,
-                ))?;
+                )
+                .await?;
 
             // Now let's just print out a list of the files uploaded/processed
             if OutputFmt::Pretty == output_fmt {
@@ -227,10 +227,9 @@ pub fn files_commander(
                 notice_dry_run();
             }
             // Update the FilesContainer on the Network
-            let (version, processed_files, _files_map) =
-                task::block_on(safe.files_container_sync(
-                    &location, &target, recursive, delete, update_nrs, dry_run,
-                ))?;
+            let (version, processed_files, _files_map) = safe
+                .files_container_sync(&location, &target, recursive, delete, update_nrs, dry_run)
+                .await?;
 
             // Now let's just print out a list of the files synced/processed
             if OutputFmt::Pretty == output_fmt {
@@ -288,42 +287,14 @@ pub fn files_commander(
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
                     // Update the FilesContainer on the Network
-                    task::block_on(safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run))?
+                    safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run).await?
                 } else {
                     // Update the FilesContainer on the Network
-                    task::block_on(safe.files_container_add(&location, &target_url, force, update_nrs, dry_run))?
+                    safe.files_container_add(&location, &target_url, force, update_nrs, dry_run).await?
                 };
 
             // Now let's just print out a list of the files synced/processed
-            if OutputFmt::Pretty == output_fmt {
-                let (table, success_count) = gen_processed_files_table(&processed_files, true);
-                if success_count > 0 {
-                    let url = match XorUrlEncoder::from_url(&target_url) {
-                        Ok(mut xorurl_encoder) => {
-                            xorurl_encoder.set_content_version(Some(version));
-                            xorurl_encoder.set_path("");
-                            xorurl_encoder.to_string()?
-                        }
-                        Err(_) => target_url,
-                    };
-
-                    println!("FilesContainer updated (version {}): \"{}\"", version, url);
-                    table.printstd();
-                } else if !processed_files.is_empty() {
-                    println!(
-                        "No changes were made to FilesContainer (version {}) at \"{}\"",
-                        version, target_url
-                    );
-                    table.printstd();
-                } else {
-                    println!(
-                        "No changes were made to the FilesContainer (version {}) at: \"{}\"",
-                        version, target_url
-                    );
-                }
-            } else {
-                print_serialized_output(target_url, version, processed_files, output_fmt)?;
-            }
+            output_processed_files_list(output_fmt, processed_files, version, target_url)?;
             Ok(())
         }
         FilesSubCommands::Rm {
@@ -339,39 +310,12 @@ pub fn files_commander(
             }
 
             // Update the FilesContainer on the Network
-            let (version, processed_files, _files_map) =
-                safe.files_container_remove_path(&target_url, recursive, update_nrs, dry_run)?;
+            let (version, processed_files, _files_map) = safe
+                .files_container_remove_path(&target_url, recursive, update_nrs, dry_run)
+                .await?;
 
             // Now let's just print out a list of the files removed
-            if OutputFmt::Pretty == output_fmt {
-                let (table, success_count) = gen_processed_files_table(&processed_files, true);
-                if success_count > 0 {
-                    let url = match XorUrlEncoder::from_url(&target_url) {
-                        Ok(mut xorurl_encoder) => {
-                            xorurl_encoder.set_content_version(Some(version));
-                            xorurl_encoder.set_path("");
-                            xorurl_encoder.to_string()?
-                        }
-                        Err(_) => target_url,
-                    };
-
-                    println!("FilesContainer updated (version {}): \"{}\"", version, url);
-                    table.printstd();
-                } else if !processed_files.is_empty() {
-                    println!(
-                        "No changes were made to FilesContainer (version {}) at \"{}\"",
-                        version, target_url
-                    );
-                    table.printstd();
-                } else {
-                    println!(
-                        "No changes were made to the FilesContainer (version {}) at: \"{}\"",
-                        version, target_url
-                    );
-                }
-            } else {
-                print_serialized_output(target_url, version, processed_files, output_fmt)?;
-            }
+            output_processed_files_list(output_fmt, processed_files, version, target_url)?;
             Ok(())
         }
         FilesSubCommands::Ls { target } => {
@@ -380,6 +324,7 @@ pub fn files_commander(
 
             let (version, files_map) = safe
                 .files_container_get(&target_url)
+                .await
                 .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
             let (total, filtered_filesmap) = filter_files_map(&files_map, &target_url)?;
 
@@ -395,13 +340,13 @@ pub fn files_commander(
             Ok(())
         }
         FilesSubCommands::Tree { target, details } => {
-            process_tree_command(safe, target, details, output_fmt)
+            process_tree_command(safe, target, details, output_fmt).await
         }
     }
 }
 
 // processes the `safe files tree` command.
-fn process_tree_command(
+async fn process_tree_command(
     safe: &mut Safe,
     target: Option<XorUrl>,
     details: bool,
@@ -411,6 +356,7 @@ fn process_tree_command(
 
     let (_version, files_map) = safe
         .files_container_get(&target_url)
+        .await
         .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
 
     let filtered_filesmap = filter_files_map_by_xorurl_path(&files_map, &target_url)?;
@@ -459,6 +405,45 @@ fn print_serialized_output(
         Err(_) => xorurl,
     };
     println!("{}", serialise_output(&(url, processed_files), output_fmt));
+
+    Ok(())
+}
+
+fn output_processed_files_list(
+    output_fmt: OutputFmt,
+    processed_files: ProcessedFiles,
+    version: u64,
+    target_url: String,
+) -> Result<(), String> {
+    if OutputFmt::Pretty == output_fmt {
+        let (table, success_count) = gen_processed_files_table(&processed_files, true);
+        if success_count > 0 {
+            let url = match XorUrlEncoder::from_url(&target_url) {
+                Ok(mut xorurl_encoder) => {
+                    xorurl_encoder.set_content_version(Some(version));
+                    xorurl_encoder.set_path("");
+                    xorurl_encoder.to_string()?
+                }
+                Err(_) => target_url,
+            };
+
+            println!("FilesContainer updated (version {}): \"{}\"", version, url);
+            table.printstd();
+        } else if !processed_files.is_empty() {
+            println!(
+                "No changes were made to FilesContainer (version {}) at \"{}\"",
+                version, target_url
+            );
+            table.printstd();
+        } else {
+            println!(
+                "No changes were made to the FilesContainer (version {}) at: \"{}\"",
+                version, target_url
+            );
+        }
+    } else {
+        print_serialized_output(target_url, version, processed_files, output_fmt)?;
+    }
 
     Ok(())
 }

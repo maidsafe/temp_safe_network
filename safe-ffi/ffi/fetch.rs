@@ -47,7 +47,7 @@ pub unsafe extern "C" fn fetch(
         } else {
             Some(end)
         };
-        let content = (*app).fetch(&url, Some((start, end))).await;
+        let content = async_std::task::block_on((*app).fetch(&url, Some((start, end))));
         invoke_callback(
             content,
             user_data,
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn inspect(
 ) {
     catch_unwind_cb(user_data, o_err, || -> Result<()> {
         let url = String::clone_from_repr_c(url)?;
-        let content = (*app).inspect(&url).await;
+        let content = async_std::task::block_on((*app).inspect(&url));
         invoke_callback(
             content,
             user_data,

@@ -15,6 +15,7 @@ use crate::{
         SubCommands,
     },
 };
+use async_std::task;
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
 use std::io::{stdout, Write};
@@ -49,7 +50,7 @@ pub fn shell_run() -> Result<(), String> {
                     match cmd_args.cmd {
                         Some(SubCommands::Auth { cmd }) => {
                             if let Some(AuthSubCommands::Subscribe { notifs_endpoint }) = cmd {
-                                match authd_subscribe(safe_authd_client, notifs_endpoint, &prompt_to_allow_auth) {
+                                match task::block_on(authd_subscribe(safe_authd_client, notifs_endpoint, &prompt_to_allow_auth)) {
                                     Ok(()) => {
                                         writeln!(io, "Keep this shell session open to receive the notifications")?;
                                         Ok(())
@@ -60,7 +61,7 @@ pub fn shell_run() -> Result<(), String> {
                                     }
                                 }
                             } else {
-                                match auth_commander(cmd, cmd_args.endpoint, safe) {
+                                match task::block_on(auth_commander(cmd, cmd_args.endpoint, safe)) {
                                     Ok(()) => Ok(()),
                                     Err(err) => {
                                         writeln!(io, "{}", err)?;
@@ -185,7 +186,7 @@ fn call_cli(
     mimic_cli_args.extend(args.iter());
 
     // We can now pass this args array to the CLI
-    match cli::run_with(Some(&mimic_cli_args), safe) {
+    match task::block_on(cli::run_with(Some(&mimic_cli_args), safe)) {
         Ok(()) => Ok(()),
         Err(err) => {
             writeln!(io, "{}", err)?;

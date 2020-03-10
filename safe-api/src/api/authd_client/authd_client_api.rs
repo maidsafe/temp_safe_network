@@ -13,6 +13,7 @@ use super::{
     notifs_endpoint::jsonrpc_listen,
 };
 use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
+use async_std::task;
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
@@ -139,7 +140,7 @@ impl Drop for SafeAuthdClient {
         match &self.subscribed_endpoint {
             None => {}
             Some((url, _, _)) => {
-                match send_unsubscribe(url, &self.authd_endpoint) {
+                match task::block_on(send_unsubscribe(url, &self.authd_endpoint)) {
                     Ok(msg) => {
                         debug!("{}", msg);
                     }
@@ -206,14 +207,15 @@ impl SafeAuthdClient {
     }
 
     // Send a request to remote authd endpoint to obtain a status report
-    pub fn status(&mut self) -> Result<AuthdStatus> {
+    pub async fn status(&mut self) -> Result<AuthdStatus> {
         debug!("Attempting to retrieve status report from remote authd...");
         info!("Sending status report request to SAFE Authenticator...");
         let status_report = send_authd_request::<AuthdStatus>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_STATUS,
             serde_json::Value::Null,
-        )?;
+        )
+        .await?;
 
         info!(
             "SAFE status report retrieved successfully: {:?}",
@@ -223,7 +225,7 @@ impl SafeAuthdClient {
     }
 
     // Send a login action request to remote authd endpoint
-    pub fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
+    pub async fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to log in on remote authd...");
         info!(
             "Sending login action to SAFE Authenticator ({})...",
@@ -233,7 +235,8 @@ impl SafeAuthdClient {
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_LOGIN,
             json!(vec![passphrase, password]),
-        )?;
+        )
+        .await?;
 
         info!("SAFE login action was successful: {}", authd_response);
         // TODO: store the authd session token, replacing an existing one
@@ -243,14 +246,15 @@ impl SafeAuthdClient {
     }
 
     // Sends a logout action request to the SAFE Authenticator
-    pub fn log_out(&mut self) -> Result<()> {
+    pub async fn log_out(&mut self) -> Result<()> {
         debug!("Dropping logged in session and logging out in remote authd...");
         info!("Sending logout action to SAFE Authenticator...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_LOGOUT,
             serde_json::Value::Null,
-        )?;
+        )
+        .await?;
 
         info!("SAFE logout action was successful: {}", authd_response);
 
@@ -261,14 +265,15 @@ impl SafeAuthdClient {
     }
 
     // Sends an account creation request to the SAFE Authenticator
-    pub fn create_acc(&self, sk: &str, passphrase: &str, password: &str) -> Result<()> {
+    pub async fn create_acc(&self, sk: &str, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a SAFE account on remote authd...");
         debug!("Sending account creation request to SAFE Authenticator...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_CREATE,
             json!(vec![passphrase, password, sk]),
-        )?;
+        )
+        .await?;
 
         debug!(
             "SAFE account creation action was successful: {}",
@@ -278,14 +283,15 @@ impl SafeAuthdClient {
     }
 
     // Get the list of applications authorised from remote authd
-    pub fn authed_apps(&self) -> Result<AuthedAppsList> {
+    pub async fn authed_apps(&self) -> Result<AuthedAppsList> {
         debug!("Attempting to fetch list of authorised apps from remote authd...");
         debug!("Sending request request to SAFE Authenticator...");
         let authed_apps_list = send_authd_request::<AuthedAppsList>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_AUTHED_APPS,
             serde_json::Value::Null,
-        )?;
+        )
+        .await?;
 
         debug!(
             "List of applications authorised successfully received: {:?}",
@@ -295,7 +301,7 @@ impl SafeAuthdClient {
     }
 
     // Revoke all permissions from an application
-    pub fn revoke_app(&self, app_id: &str) -> Result<()> {
+    pub async fn revoke_app(&self, app_id: &str) -> Result<()> {
         debug!(
             "Requesting to revoke permissions from application: {}",
             app_id
@@ -305,7 +311,8 @@ impl SafeAuthdClient {
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_REVOKE,
             json!(app_id),
-        )?;
+        )
+        .await?;
 
         debug!(
             "Application revocation action successful: {}",
@@ -315,14 +322,15 @@ impl SafeAuthdClient {
     }
 
     // Get the list of pending authorisation requests from remote authd
-    pub fn auth_reqs(&self) -> Result<PendingAuthReqs> {
+    pub async fn auth_reqs(&self) -> Result<PendingAuthReqs> {
         debug!("Attempting to fetch list of pending authorisation requests from remote authd...");
         debug!("Sending request request to SAFE Authenticator...");
         let auth_reqs_list = send_authd_request::<PendingAuthReqs>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_AUTH_REQS,
             serde_json::Value::Null,
-        )?;
+        )
+        .await?;
 
         debug!(
             "List of pending authorisation requests successfully received: {:?}",
@@ -332,14 +340,15 @@ impl SafeAuthdClient {
     }
 
     // Allow an authorisation request
-    pub fn allow(&self, req_id: SafeAuthReqId) -> Result<()> {
+    pub async fn allow(&self, req_id: SafeAuthReqId) -> Result<()> {
         debug!("Requesting to allow authorisation request: {}", req_id);
         debug!("Sending allow action request to SAFE Authenticator...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_ALLOW,
             json!(req_id.to_string()),
-        )?;
+        )
+        .await?;
 
         debug!(
             "Action to allow authorisation request was successful: {}",
@@ -349,14 +358,15 @@ impl SafeAuthdClient {
     }
 
     // Deny an authorisation request
-    pub fn deny(&self, req_id: SafeAuthReqId) -> Result<()> {
+    pub async fn deny(&self, req_id: SafeAuthReqId) -> Result<()> {
         debug!("Requesting to deny authorisation request: {}", req_id);
         debug!("Sending deny action request to SAFE Authenticator...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_DENY,
             json!(req_id.to_string()),
-        )?;
+        )
+        .await?;
 
         debug!(
             "Action to deny authorisation request was successful: {}",
@@ -367,7 +377,7 @@ impl SafeAuthdClient {
 
     // Subscribe a callback to receive notifications to allow/deny authorisation requests
     // We support having only one subscripton at a time, a previous subscription will be dropped
-    pub fn subscribe<
+    pub async fn subscribe<
         CB: 'static + Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync,
     >(
         &mut self,
@@ -396,7 +406,7 @@ impl SafeAuthdClient {
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url, &cert_base_path.display().to_string()]),
-        ).map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({}) to receive authorisation request for self-auth: {}", endpoint_url, err)))?;
+        ).await.map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({}) to receive authorisation request for self-auth: {}", endpoint_url, err)))?;
 
         debug!(
             "Successfully subscribed to receive authorisation requests notifications: {}",
@@ -458,7 +468,7 @@ impl SafeAuthdClient {
     }
 
     // Subscribe an endpoint URL where notifications to allow/deny authorisation requests shall be sent
-    pub fn subscribe_url(&self, endpoint_url: &str) -> Result<()> {
+    pub async fn subscribe_url(&self, endpoint_url: &str) -> Result<()> {
         debug!(
             "Subscribing '{}' as endpoint for authorisation requests notifications...",
             endpoint_url
@@ -469,7 +479,8 @@ impl SafeAuthdClient {
             &self.authd_endpoint,
             SAFE_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url]),
-        )?;
+        )
+        .await?;
 
         debug!(
             "Successfully subscribed a URL for authorisation requests notifications: {}",
@@ -479,9 +490,9 @@ impl SafeAuthdClient {
     }
 
     // Unsubscribe from notifications to allow/deny authorisation requests
-    pub fn unsubscribe(&mut self, endpoint_url: &str) -> Result<()> {
+    pub async fn unsubscribe(&mut self, endpoint_url: &str) -> Result<()> {
         debug!("Unsubscribing from authorisation requests notifications...",);
-        let authd_response = send_unsubscribe(endpoint_url, &self.authd_endpoint)?;
+        let authd_response = send_unsubscribe(endpoint_url, &self.authd_endpoint).await?;
         debug!(
             "Successfully unsubscribed from authorisation requests notifications: {}",
             authd_response
@@ -499,7 +510,7 @@ impl SafeAuthdClient {
     }
 }
 
-fn send_unsubscribe(endpoint_url: &str, authd_endpoint: &str) -> Result<String> {
+async fn send_unsubscribe(endpoint_url: &str, authd_endpoint: &str) -> Result<String> {
     debug!(
         "Sending unsubscribe action request to SAFE Authenticator on {}...",
         authd_endpoint
@@ -509,6 +520,7 @@ fn send_unsubscribe(endpoint_url: &str, authd_endpoint: &str) -> Result<String> 
         SAFE_AUTHD_METHOD_UNSUBSCRIBE,
         json!(endpoint_url),
     )
+    .await
 }
 
 fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
