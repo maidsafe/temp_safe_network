@@ -39,6 +39,7 @@
     - [Sync](#files-sync)
     - [Add](#files-add)
     - [Ls](#files-ls)
+    - [Tree](#files-tree)
     - [Rm](#files-rm)
   - [Xorurl](#xorurl)
     - [Decode](#xorurl-decode)
@@ -873,9 +874,54 @@ SIZE  CREATED               MODIFIED              NAME
 8     2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  note.md
 ```
 
+# Files Tree
+
+The `files tree` command displays a visual representation of an entire directory tree.
+
+```shell
+$ safe files tree safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc
+safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc
+└── testdata
+    ├── another.md
+    ├── noextension
+    ├── subfolder
+    │   ├── sub2.md
+    │   └── subexists.md
+    └── test.md
+
+2 directories, 5 files
+```
+
+If we provide a path to a subfolder of the `FilesContainer`, this command will resolve the path and list only those files which paths are a child of the provided path:
+
+```shell
+$ safe files tree safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata/subfolder
+safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata/subfolder
+├── sub2.md
+└── subexists.md
+
+0 directories, 2 files
+```
+
+File details can be displayed with the `--details` flag:
+
+```shell
+$ safe files tree --details safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata
+SIZE  CREATED               MODIFIED              NAME
+                                                  safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata
+6     2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  ├── another.md
+0     2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  ├── noextension
+                                                  ├── subfolder
+4     2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  │   ├── sub2.md
+23    2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  │   └── subexists.md
+12    2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  └── test.md
+
+1 directory, 5 files
+```
+
 #### Files Rm
 
-Removing files from a `FilesContainer` which is is sync with a folder in the local file system can be done by simply removing them locally followed by a call to `files sync` command. If we otherwise are not in such a scenario and would like to remove files directly from a `FilesContainer` we can achieve it with the `file rm` command.
+Removing files from a `FilesContainer` which is in sync with a folder in the local file system can be done by simply removing them locally followed by a call to `files sync` command. If we otherwise are not in such a scenario and would like to remove files directly from a `FilesContainer` we can achieve it with the `file rm` command.
 
 As an example, we can remove single file to our existing `FilesContainer` on the SAFE Network with the following command:
 ```shell
@@ -1226,7 +1272,7 @@ SC=/tmp/safe.rc && safe setup completions bash > $SC && source $SC
 
 To enable bash completions always for the current user:
 ```shell
-SC=~/.bash_safe_cli && safe setup completions bash > $SC && echo "source $SC" >> ~/.bashrc
+SC=~/.bash_safe_cli CL="source $SC" RC=~/.bashrc; safe setup completions bash > $SC && grep -qxF "$CL" $RC || echo $CL >> $RC
 ```
 
 #### Windows PowerShell Completions
