@@ -1,15 +1,59 @@
 name: PR
 
-on: [pull_request]
+on: [pull_request, push]
 
 env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
+  SAFE_VAULT_VERSION: "0.23.0"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  e2e:
+    name: E2E against real baby
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: mkdir -p ~/.safe/vault
+      - name: dl vault
+        run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
+      - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: Setup SAFE Cli and PATH etc
+        run: |
+          mkdir -p ~/.safe/safe-cli
+          mkdir -p ~/.safe/authd
+          cp ./target/release/safe $HOME/.safe/safe-cli/
+          cp ./target/release/safe-authd $HOME/.safe/authd/
+          ls $HOME/.safe/safe-cli
+          ls $HOME/.safe/authd
+          echo "::add-path::$HOME/.safe/safe-cli"
+          echo "::add-path::$HOME/.safe/authd"
+          echo $PATH
+          chmod +x $HOME/.safe/authd/safe-authd
+          chmod +x $HOME/.safe/safe-cli/safe
+          chmod +x $HOME/.safe/vault/safe_vault
+      - name: Setup The Baby
+        run : safe vault run-baby-fleming -t
+      - name: Benchmark 
+        run: cargo bench
+        shell: bash
+      
+      - name: Failure logs.
+        if: failure()
+        run: tail -f $HOME/.safe/vault/baby-fleming-vaults/*/*.log
+
+
   clippy:
     name: Rustfmt-Clippy
     runs-on: ubuntu-latest

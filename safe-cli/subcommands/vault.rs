@@ -38,6 +38,9 @@ pub enum VaultSubCommands {
         /// IP to be used to launch the local vaults.
         #[structopt(long = "ip")]
         ip: Option<String>,
+        /// Start authd and login with
+        #[structopt(short = "t", long = "testing")]
+        test: bool,
     },
     /// Shutdown all running vaults processes
     #[structopt(name = "killall")]
@@ -64,12 +67,14 @@ pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
             verbosity,
             interval,
             ip,
+            test,
         }) => vault_run(
             vault_path,
             VAULTS_DATA_FOLDER,
             verbosity,
             &interval.to_string(),
             ip,
+            test,
         ),
         Some(VaultSubCommands::Killall { vault_path }) => vault_shutdown(vault_path),
         Some(VaultSubCommands::Update { vault_path }) => vault_update(vault_path),

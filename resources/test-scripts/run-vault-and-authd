@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e -x
+source ./resources/test-scripts/install-vault-and-authd
 
 [[ -z $SAFE_AUTHD_PATH ]] && export SAFE_AUTHD_PATH=~/safe-authd
 [[ -z $SAFE_VAULT_PATH ]] && export SAFE_VAULT_PATH=~/safe-vault
@@ -17,38 +18,8 @@ case $uname_output in
 esac
 
 function download_and_run_safe_vault() {
-    rm -rf $SAFE_VAULT_PATH
-    mkdir $SAFE_VAULT_PATH
-    cwd=$(pwd)
-    cd $SAFE_VAULT_PATH
-
-    vault_bin_name="safe_vault"
-    case $uname_output in
-        Linux*)
-            curl -L -O https://github.com/maidsafe/safe_vault/releases/download/0.20.1/safe_vault-0.20.1-x86_64-unknown-linux-musl.tar.gz
-            tar xvf safe_vault-0.20.1-x86_64-unknown-linux-musl.tar.gz
-            rm safe_vault-0.20.1-x86_64-unknown-linux-musl.tar.gz
-            ;;
-        Darwin*)
-            curl -L -O https://github.com/maidsafe/safe_vault/releases/download/0.20.1/safe_vault-0.20.1-x86_64-apple-darwin.tar.gz
-            tar xvf safe_vault-0.20.1-x86_64-apple-darwin.tar.gz
-            rm safe_vault-0.20.1-x86_64-apple-darwin.tar.gz
-            ;;
-        MSYS_NT* | MINGW*)  # Windows in Jenkins and in GH Actions respectively
-            curl -L -O https://github.com/maidsafe/safe_vault/releases/download/0.20.1/safe_vault-0.20.1-x86_64-pc-windows-gnu.tar.gz
-            tar xvf safe_vault-0.20.1-x86_64-pc-windows-gnu.tar.gz
-            rm safe_vault-0.20.1-x86_64-pc-windows-gnu.tar.gz
-            vault_bin_name="safe_vault.exe"
-            ;;
-        *)
-            echo "Platform not supported. Please extend to support this platform."
-            exit 1
-    esac
-
-    echo "Launching local safe_vault..."
-    ./$vault_bin_name &
-
-    cd $cwd
+  download_safe_vault
+  run_safe_vault
 }
 
 function build_safe_authd() {

@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Run a baby-fleming network
+set -e -x
+
+[[ -z $SAFE_AUTHD_PATH_FOR_INSTALL ]] && export SAFE_AUTHD_PATH_FOR_INSTALL=~/.safe/authd
+[[ -z $SAFE_VAULT_PATH_FOR_INSTALL ]] && export SAFE_VAULT_PATH_FOR_INSTALL=~/.safe/vault
+[[ -z $SAFE_CLI_PATH ]] && export SAFE_CLI_PATH=~/.safe/safe-cli
+
+while getopts ":skip-dl:vault-v" arg; do
+  case $arg in
+    skip-dl) Skip_vault_dl=$OPTARG;;
+    vault-v) Vault_dl_version=$OPTARG;;
+  esac
+done
+
+if [ -n "$1" ]; then
+    vault_version=$Vault_dl_version
+else
+    vault_version="0.21.0"
+fi
+
+
+uname_output=$(uname -a)
+authd_bin_name="safe-authd"
+cli_bin_name="safe"
+case $uname_output in
+    MSYS_NT*)   # Windows in Jenkins
+        authd_bin_name="safe-authd.exe"
+        cli_bin_name="safe.exe"
+        ;;
+    MINGW*)     # Windows in GH Actions
+        authd_bin_name="safe-authd.exe"
+        cli_bin_name="safe.exe"
+        ;;
+esac
+
+function download_safe_vault() {
+    echo "Downloading and installing SAFE Vault $vault_version"
+
+    rm -rf $SAFE_VAULT_PATH_FOR_INSTALL
+    mkdir $SAFE_VAULT_PATH_FOR_INSTALL
+    cwd=$(pwd)
+    cd $SAFE_VAULT_PATH_FOR_INSTALL
+
+    # TODO: If no version specified just use that installed by "safe vault install"
+
+    vault_bin_name="safe_vault"
+    case $uname_output in
+        Linux*)
+            curl -L -O "https://github.com/maidsafe/safe_vault/releases/download/$vault_version/safe_vault-$vault_version-x86_64-unknown-linux-musl.tar.gz"
+            tar xvf "safe_vault-$vault_version-x86_64-unknown-linux-musl.tar.gz"
+            rm "safe_vault-$vault_version-x86_64-unknown-linux-musl.tar.gz"
+            ;;
+        Darwin*)
+            curl -L -O "https://github.com/maidsafe/safe_vault/releases/download/$vault_version/safe_vault-$vault_version-x86_64-apple-darwin.tar.gz"
+            tar xvf "safe_vault-$vault_version-x86_64-apple-darwin.tar.gz"
+            rm "safe_vault-$vault_version-x86_64-apple-darwin.tar.gz"
+            ;;
+        MSYS_NT* | MINGW*)  # Windows in Jenkins and in GH Actions respectively
+            curl -L -O "https://github.com/maidsafe/safe_vault/releases/download/$vault_version/safe_vault-$vault_version-x86_64-pc-windows-gnu.tar.gz"
+            tar xvf "safe_vault-$vault_version-x86_64-pc-windows-gnu.tar.gz"
+            rm "safe_vault-$vault_version-x86_64-pc-windows-gnu.tar.gz"
+            vault_bin_name="safe_vault.exe"
+            ;;
+        *)
+            echo "Platform not supported. Please extend to support this platform."
+            exit 1
+    esac
+
+    cd $cwd
+}
+
+
+function run_safe_vault() {
+    cwd=$(pwd)
+    cd $SAFE_VAULT_PATH_FOR_INSTALL
+
+    vault_bin_name="safe_vault"
+
+    echo "Launching local safe_vault..."
+    ./$vault_bin_name &
+
+    cd $cwd
+}
+
+function build_and_place_cli() {
+    cd safe-cli
+    cargo build --release
+    rm -rf $SAFE_CLI_PATH
+    mkdir $SAFE_CLI_PATH
+    mv ../target/release/$cli_bin_name $SAFE_CLI_PATH
+    pwd
+    cd -
+}
+
+function build_safe_authd() {
+    cd safe-authd
+    cargo build --release
+
+    rm -rf $SAFE_AUTHD_PATH_FOR_INSTALL
+    mkdir $SAFE_AUTHD_PATH_FOR_INSTALL
+    mv ../target/release/$authd_bin_name $SAFE_AUTHD_PATH_FOR_INSTALL
+    pwd
+    cd -
+}
+
+function run_safe_authd() {
+    cd $SAFE_AUTHD_PATH_FOR_INSTALL
+
+    # this won't have any effect on Linux/Mac, but it's required for Windows
+    ./$authd_bin_name install || true
+
+    echo "Stopping safe-authd daemon.."
+    ./$authd_bin_name stop || true
+
+    echo "Launching safe-authd daemon..."
+    ./$authd_bin_name start
+    sleep 5
+    cd -
+}

@@ -10,12 +10,17 @@
 use super::helpers::download_from_s3_and_install_bin;
 use directories::BaseDirs;
 use log::debug;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use safe_nlt::run_with;
 use std::{
+    collections::HashMap,
     fs::create_dir_all,
     io::{self, Write},
     path::PathBuf,
-    process::Command,
+    process::{Command, Stdio},
+    thread,
+    time::Duration,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -23,6 +28,35 @@ const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
 
 #[cfg(target_os = "windows")]
 const SAFE_VAULT_EXECUTABLE: &str = "safe_vault.exe";
+
+fn run_safe_cmd(
+    args: &[&str],
+    envs: Option<HashMap<String, String>>,
+    ignore_errors: bool,
+    verbosity: u8,
+) -> Result<(), String> {
+    let env: HashMap<String, String> = envs.unwrap_or_else(HashMap::default);
+
+    let msg = format!("Running 'safe' with args {:?} ...", args);
+    if verbosity > 1 {
+        println!("{}", msg);
+    }
+    debug!("{}", msg);
+
+    let _child = Command::new("safe")
+        .args(args)
+        .envs(&env)
+        .stdout(Stdio::inherit())
+        .stderr(if ignore_errors {
+            Stdio::null()
+        } else {
+            Stdio::inherit()
+        })
+        .spawn()
+        .map_err(|err| format!("Failed to run 'safe' with args '{:?}': {}", args, err))?;
+
+    Ok(())
+}
 
 pub fn vault_install(vault_path: Option<PathBuf>) -> Result<(), String> {
     let target_path = get_vault_bin_path(vault_path)?;
@@ -46,6 +80,7 @@ pub fn vault_run(
     verbosity: u8,
     interval: &str,
     ip: Option<String>,
+    test: bool,
 ) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
@@ -74,8 +109,10 @@ pub fn vault_run(
         "--vaults-dir",
         &arg_vaults_dir,
         "--interval",
-        interval,
+        &interval,
     ];
+
+    let interval_as_int = &interval.parse::<u64>().unwrap();
 
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {
@@ -94,7 +131,56 @@ pub fn vault_run(
 
     // We can now call the tool with the args
     println!("Launching local SAFE network...");
-    run_with(Some(&nlt_args))
+    run_with(Some(&nlt_args))?;
+
+    let interval_duration = Duration::from_secs(interval_as_int * 15);
+    thread::sleep(interval_duration);
+
+    let ignore_errors = true;
+    let report_errors = false;
+
+    if test {
+        println!("Setting up authenticator against local SAFE network...");
+
+        if cfg!(windows) {
+            // On Windows authd must be installed as a service
+            let auth_install_win_args = vec!["auth", "install"];
+            run_safe_cmd(&auth_install_win_args, None, report_errors, verbosity)?;
+        }
+
+        //stop
+        let stop_auth_args = vec!["auth", "stop"];
+        run_safe_cmd(&stop_auth_args, None, ignore_errors, verbosity)?;
+
+        let between_command_interval = Duration::from_secs(interval_as_int * 5);
+        thread::sleep(between_command_interval);
+        //stop
+        let start_auth_args = vec!["auth", "start"];
+        run_safe_cmd(&start_auth_args, None, report_errors, verbosity)?;
+
+        thread::sleep(between_command_interval);
+
+        // // Q: can we assume network is correct here? Or do we need to do networks switch?
+        let pass: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let phrase: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+
+        // setup env for create acc / login
+        let mut env = HashMap::new();
+        env.insert("SAFE_AUTH_PASSPHRASE".to_string(), pass);
+        env.insert("SAFE_AUTH_PASSWORD".to_string(), phrase);
+
+        // create-acc
+        let create_account = vec!["auth", "create-acc", "--test-coins"];
+
+        run_safe_cmd(&create_account, Some(env.clone()), report_errors, verbosity)?;
+        thread::sleep(between_command_interval);
+
+        // login
+        let login = vec!["auth", "login", "--self-auth"];
+        run_safe_cmd(&login, Some(env), report_errors, verbosity)?;
+    }
+
+    Ok(())
 }
 
 pub fn vault_shutdown(vault_path: Option<PathBuf>) -> Result<(), String> {

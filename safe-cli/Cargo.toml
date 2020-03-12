@@ -59,8 +59,18 @@ predicates = "1.0.0"
 pretty_assertions = "0.6.1"
 safe-nd = "^0.8.0"
 unwrap = "~1.2.1"
+criterion = "0.3"
 
 [dev-dependencies.cargo-husky]
 version = "1"
 default-features = false
 features = ["precommit-hook","user-hooks"]
+
+# Our various benchmakrs. 
+# Harness=false disables rust baked in bench to use criterion instead.
+[[bench]]
+name = "small-put"
+harness = false
+[[bench]]
+name = "keys"
+harness = false

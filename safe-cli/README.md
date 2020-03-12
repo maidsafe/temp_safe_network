@@ -204,6 +204,10 @@ $ safe vault killall
 Success, all processes instances of safe_vault were stopped!
 ```
 
+##### Run a local network for testing: `--test`
+
+The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new and account and log in the CLI for test purposes. This requires that the `vault`, `authd` and `cli` themselves be installed in the correct locations on the system
+
 #### Switch networks
 
 MaidSafe currently hosts a single-section network for those who don't want to run a local network but still have a go at using the CLI and client applications. It's very common for users testing and experimenting with CLI and SAFE applications to have a local network running, but switching to use the MaidSafe hosted network, back and forth, is also quite common.
