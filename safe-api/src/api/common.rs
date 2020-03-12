@@ -12,6 +12,7 @@ use jsonrpc_quic::ClientEndpoint;
 use log::error;
 use serde::de::DeserializeOwned;
 use threshold_crypto::SecretKey;
+use tokio::runtime::Builder;
 
 pub mod auth_types {
     use safe_core::ipc::req::{ContainerPermissions, IpcReq};
@@ -91,15 +92,26 @@ where
                 Error::AuthdClientError(format!("Failed to create client endpoint: {}", err))
             })?;
 
-            let (endpoint_driver, mut outgoing_conn) =
-                jsonrpc_quic_client.bind().map_err(|err| {
-                    Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
+            let mut runtime = Builder::new()
+                .threaded_scheduler()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    Error::AuthdClientError(format!("Failed to create runtime: {}", err))
                 })?;
 
-            let handle = tokio::spawn(endpoint_driver);
+            let (endpoint_driver, mut outgoing_conn) = {
+                runtime
+                    .enter(|| jsonrpc_quic_client.bind())
+                    .map_err(|err| {
+                        Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
+                    })?
+            };
 
-            let (driver, mut new_conn) =
-                outgoing_conn
+            let handle = runtime.spawn(endpoint_driver);
+
+            runtime.block_on(async {
+                let (driver, mut new_conn) = outgoing_conn
                     .connect(dest_endpoint, None)
                     .await
                     .map_err(|err| {
@@ -109,29 +121,30 @@ where
                         ))
                     })?;
 
-            tokio::spawn(driver);
+                tokio::spawn(driver);
 
-            let res = new_conn
-                .send(method, params)
-                .await
-                .map_err(|err| match err {
-                    jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
-                    other => Error::AuthdClientError(other.to_string()),
-                });
+                let res = new_conn
+                    .send(method, params)
+                    .await
+                    .map_err(|err| match err {
+                        jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
+                        other => Error::AuthdClientError(other.to_string()),
+                    });
 
-            // Allow the endpoint driver to automatically shut down
-            drop(outgoing_conn);
+                // Allow the endpoint driver to automatically shut down
+                drop(outgoing_conn);
 
-            // Let the connection finish closing gracefully
-            match handle.await {
-                Ok(_) => {}
-                Err(err) => error!(
-                    "Failed to close the connection with authd gracefully: {}",
-                    err
-                ),
-            }
+                // Let the connection finish closing gracefully
+                match handle.await {
+                    Ok(_) => {}
+                    Err(err) => error!(
+                        "Failed to close the connection with authd gracefully: {}",
+                        err
+                    ),
+                }
 
-            res
+                res
+            })
         }
     }
 }

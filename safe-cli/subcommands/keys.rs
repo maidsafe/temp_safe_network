@@ -122,12 +122,7 @@ pub async fn key_commander(
             )?;
 
             let tx_id = safe
-                .keys_transfer(
-                    &amount,
-                    from.as_ref().map(String::as_str),
-                    &destination,
-                    tx_id,
-                )
+                .keys_transfer(&amount, from.as_deref(), &destination, tx_id)
                 .await?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -168,11 +163,7 @@ pub async fn create_new_key(
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
         }
         let (xorurl, key_pair) = safe
-            .keys_create(
-                pay_with.as_ref().map(String::as_str),
-                preload.as_ref().map(String::as_str),
-                pk.as_ref().map(String::as_str),
-            )
+            .keys_create(pay_with.as_deref(), preload.as_deref(), pk.as_deref())
             .await?;
         (xorurl, key_pair, preload)
     };

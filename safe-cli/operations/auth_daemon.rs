@@ -67,7 +67,7 @@ pub fn authd_uninstall(
     authd_path: Option<String>,
 ) -> Result<(), String> {
     safe_authd
-        .uninstall(authd_path.as_ref().map(String::as_str))
+        .uninstall(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
@@ -76,19 +76,19 @@ pub fn authd_update(
     authd_path: Option<String>,
 ) -> Result<(), String> {
     safe_authd
-        .update(authd_path.as_ref().map(String::as_str))
+        .update(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
 pub fn authd_start(safe_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
     safe_authd
-        .start(authd_path.as_ref().map(String::as_str))
+        .start(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
 pub fn authd_stop(safe_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
     safe_authd
-        .stop(authd_path.as_ref().map(String::as_str))
+        .stop(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
@@ -97,7 +97,7 @@ pub fn authd_restart(
     authd_path: Option<String>,
 ) -> Result<(), String> {
     safe_authd
-        .restart(authd_path.as_ref().map(String::as_str))
+        .restart(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 

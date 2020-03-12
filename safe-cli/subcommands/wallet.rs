@@ -143,7 +143,7 @@ pub async fn wallet_commander(
                 };
 
                 // insert and set as default
-                safe.wallet_insert(&wallet_xorurl, name.as_ref().map(String::as_str), true, &sk)
+                safe.wallet_insert(&wallet_xorurl, name.as_deref(), true, &sk)
                     .await?;
             }
 
@@ -221,7 +221,7 @@ pub async fn wallet_commander(
             };
 
             let the_name = safe
-                .wallet_insert(&target, name.as_ref().map(String::as_str), default, &sk)
+                .wallet_insert(&target, name.as_deref(), default, &sk)
                 .await?;
             if OutputFmt::Pretty == output_fmt {
                 println!(
@@ -246,12 +246,7 @@ pub async fn wallet_commander(
             )?;
 
             let tx_id = safe
-                .wallet_transfer(
-                    &amount,
-                    from.as_ref().map(String::as_str),
-                    &destination,
-                    tx_id,
-                )
+                .wallet_transfer(&amount, from.as_deref(), &destination, tx_id)
                 .await?;
 
             if OutputFmt::Pretty == output_fmt {

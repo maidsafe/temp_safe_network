@@ -8,7 +8,6 @@
 // Software.
 
 use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID};
-use crossbeam::crossbeam_channel;
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
 
@@ -224,40 +223,22 @@ async fn self_authorise(
     safe: &mut Safe,
     mut safe_authd: SafeAuthdClient,
 ) -> Result<(), String> {
-    // Channel to share auth req info when received from notifications
-    let (tx, rx) = crossbeam_channel::unbounded::<AuthReq>();
-
-    // Spawn a task to receive the auth req info and automatically allow the req
-    let endpoint_clone = endpoint.clone();
-    tokio::spawn(async move {
-        match rx.recv() {
-            Ok(auth_req) => {
-                let safe_authd = SafeAuthdClient::new(endpoint_clone);
-                match safe_authd.allow(auth_req.req_id).await {
+    // Let's subscribe so we can automatically allow our own auth request
+    safe_authd
+        .subscribe(
+            "https://localhost:33002",
+            APP_ID,
+            &move |auth_req: AuthReq| {
+                // TODO: pass the endpoint
+                let safe_authd = SafeAuthdClient::new(None);
+                match async_std::task::block_on(safe_authd.allow(auth_req.req_id)) {
                     Ok(()) => {}
                     Err(err) => println!("Failed to self authorise: {}", err),
                 }
-            }
-            Err(err) => println!(
-                "Failed to obtain auth req details to self authorise: {}",
-                err
-            ),
-        };
-    });
-
-    // Let's subscribe so we can automatically allow our own auth request
-    let callback = move |auth_req: AuthReq| {
-        match tx.send(auth_req) {
-            Ok(()) => {}
-            Err(err) => println!("Failed when processing auth req to self authorise: {}", err),
-        }
-        None
-    };
-
-    safe_authd
-        .subscribe("https://localhost:33002", APP_ID, callback)
+                None
+            },
+        )
         .await?;
-
-    // We now simply send the authorisation request for the CLI app
-    authorise_cli(safe, endpoint, true).await
+    authorise_cli(safe, endpoint, true).await?;
+    Ok(())
 }
