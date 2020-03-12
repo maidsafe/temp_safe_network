@@ -214,8 +214,8 @@ fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
 
                 match authd_run(
                     &listen,
-                    cert_base_path.as_ref().map(String::as_str),
-                    config_dir_path.as_ref().map(String::as_str),
+                    cert_base_path.as_deref(),
+                    config_dir_path.as_deref(),
                 ) {
                     Ok(()) => ServiceExitCode::Win32(0),
                     Err(err) => {
