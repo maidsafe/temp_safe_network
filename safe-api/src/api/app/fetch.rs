@@ -86,7 +86,7 @@ impl Safe {
     /// # let mut safe = Safe::default();
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// async_std::task::block_on(async {
-    ///     let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false).await);
+    ///     let (xorurl, _, _) = unwrap!(safe.files_container_create(Some("../testdata/"), None, true, false).await);
     ///
     ///     let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await );
     ///     let data_string = match safe_data {
@@ -125,7 +125,7 @@ impl Safe {
     /// # let mut safe = Safe::default();
     /// # unwrap!(safe.connect("", Some("fake-credentials")));
     /// async_std::task::block_on(async {
-    ///     let (xorurl, _, _) = unwrap!(safe.files_container_create("../testdata/", None, true, false).await);
+    ///     let (xorurl, _, _) = unwrap!(safe.files_container_create(Some("../testdata/"), None, true, false).await);
     ///
     ///     let safe_data = unwrap!( safe.inspect( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ) ).await );
     ///     let data_string = match safe_data {
@@ -548,7 +548,7 @@ mod tests {
         unwrap!(safe.connect("", Some("fake-credentials")));
         safe.connect("", Some("")).unwrap();
         let (xorurl, _, files_map) = unwrap!(
-            safe.files_container_create("../testdata/", None, true, false)
+            safe.files_container_create(Some("../testdata/"), None, true, false)
                 .await
         );
 
@@ -594,7 +594,7 @@ mod tests {
         safe.connect("", Some("")).unwrap();
 
         let (xorurl, _, the_files_map) = unwrap!(
-            safe.files_container_create("../testdata/", None, true, false)
+            safe.files_container_create(Some("../testdata/"), None, true, false)
                 .await
         );
 
@@ -647,7 +647,7 @@ mod tests {
         let mut safe = Safe::default();
         safe.connect("", Some("")).unwrap();
         let (xorurl, _, _the_files_map) = unwrap!(
-            safe.files_container_create("../testdata/", None, true, false)
+            safe.files_container_create(Some("../testdata/"), None, true, false)
                 .await
         );
 
@@ -772,7 +772,7 @@ mod tests {
         unwrap!(safe.connect("", Some("fake-credentials")));
 
         let (xorurl, _, _files_map) = unwrap!(
-            safe.files_container_create("../testdata/", None, true, false)
+            safe.files_container_create(Some("../testdata/"), None, true, false)
                 .await
         );
 

@@ -38,10 +38,10 @@ pub unsafe extern "C" fn files_container_create(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let location_str = String::clone_from_repr_c(location)?;
+        let location_opt = from_c_str_to_str_option(location);
         let destination = from_c_str_to_str_option(dest);
         let (xorurl, processed_files, files_map) = async_std::task::block_on(
-            (*app).files_container_create(&location_str, destination, recursive, dry_run),
+            (*app).files_container_create(location_opt, destination, recursive, dry_run),
         )?;
         let xorurl_string = CString::new(xorurl)?;
         let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
