@@ -799,9 +799,9 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
 name = "ffi_utils"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bf76a6a3cac03b8c083bc6b15b2f0539ed13f47561fe94ad4e521c388a94548"
+checksum = "429a449983b4ef2cae75c920146cd9f86566b9dd1a310c012907fed222d0f6a9"
 dependencies = [
  "base64 0.9.3",
  "jni",
@@ -3078,11 +3078,13 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "walkdir"
-version = "2.0.1"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b6d201f4f8998a837196b6de9c73e35af14c992cbb92c4ab641d2c2dce52de"
+checksum = "777182bc735b6424e1a57516d35ed72cb8019d85c8c9bf536dccb3445c1a2f7d"
 dependencies = [
  "same-file",
+ "winapi 0.3.8",
+ "winapi-util",
 ]
 
 [[package]]
