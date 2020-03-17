@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.10.0 (2020-03-17)
+
+
+### Features
+
+* ***api:*** add range based request for the immutable data ([469f47f](https://github.com/maidsafe/safe-api/commit/469f47f5703538716066723faf3c06bf8f170c41))
+* ***cli:*** implements 'safe files tree' subcommand ([4d0acb8](https://github.com/maidsafe/safe-api/commit/4d0acb89f3b64f1bae3417d8e7faba6d0a249fdc))
+* ***api:*** make the APIs which need to operate with the network to be async ([ad3c655](https://github.com/maidsafe/safe-api/commit/ad3c655cf3932f25093716355837296dab6e030a))
+* ***cli:*** create an installation script, and add install instructions to UserGuide ([5eb893a](https://github.com/maidsafe/safe-api/commit/5eb893a8ec5010ed394f0fe6a449992e8e4d050d))
+* ***api:*** support for creation of empty FilesContainers with files_container_create API ([3684c22](https://github.com/maidsafe/safe-api/commit/3684c223d6826f99d1860f11ce367cae6ef94539))
+* ***ffi:*** adapt bindings to support change in api for creation of empty FilesContainers with files_container_create API ([3684c22](https://github.com/maidsafe/safe-api/commit/3684c223d6826f99d1860f11ce367cae6ef94539))
+* ***cli:*** implement a vault update command ([2bab68a](https://github.com/maidsafe/safe-api/commit/2bab68a51decb097ba9697ea7c3e84aa504562da))
+
+
+### Bug Fixes
+
+* ***cli:*** document 'files tree' subcommand, improve bash setup one liner ([94ff08b](https://github.com/maidsafe/safe-api/commit/94ff08b5954c56cdfd685e50fdf1e1c1746f66c5))
+* ***api:*** refactor fetch api to be non-recursive to support native Rust async ([872549d](https://github.com/maidsafe/safe-api/commit/872549dcfa8c40c6d7fbbb8793e6d86afeee26f1))
+* ***cli:*** use tokio macros for async tests (tokio::test) and for cli main function (tokio::main) ([cbe39b3](https://github.com/maidsafe/safe-api/commit/cbe39b30f6382bbc19b03d3dac7213ec8e5dcf24))
+* ***cli:*** clarify CLI readme commands and fix typos ([649cfc3](https://github.com/maidsafe/safe-api/commit/649cfc3593cd202c4065bdc9eb2a82e07c55f3db))
+* ***cli:*** add config file and env variable auth login details ([0a50300](https://github.com/maidsafe/safe-api/commit/0a5030089155c4336f52c486de887dbb7a683cd8))
+* ***cli:*** Update auth login --help text to include format ([a40c42f](https://github.com/maidsafe/safe-api/commit/a40c42faedfe856d322e854624aa5ba2c3edd790))
+* ***cli:*** remove addition of ./ ([92df716](https://github.com/maidsafe/safe-api/commit/92df716b71d9e1fab8dd633fb5f575f97d507048))
+* ***cli:*** use async_std to block main instead of tokio::main as it conflicts with self-update when it creates a runtime ([1a7bc5c](https://github.com/maidsafe/safe-api/commit/1a7bc5ca7d1ac9c6094b6916ecdd8d952c35c670))
+
+
 ### 0.9.0 (2020-03-03)
 
 
