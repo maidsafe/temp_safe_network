@@ -11,7 +11,12 @@ use super::helpers::download_from_s3_and_install_bin;
 use directories::BaseDirs;
 use log::debug;
 use safe_nlt::run_with;
-use std::{fs::create_dir_all, path::PathBuf, process::Command};
+use std::{
+    fs::create_dir_all,
+    io::{self, Write},
+    path::PathBuf,
+    process::Command,
+};
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
@@ -176,6 +181,35 @@ fn kill_vaults(exec_name: &str) -> Result<(), String> {
         Err(format!(
             "Failed to stop vaults ({}) processes: {}",
             exec_name,
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
+pub fn vault_update(vault_path: Option<PathBuf>) -> Result<(), String> {
+    let vault_path = get_vault_bin_path(vault_path)?;
+
+    let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
+    debug!("Updating vault at {}", arg_vault_path);
+
+    let child = Command::new(&arg_vault_path)
+        .args(vec!["--update-only"])
+        .spawn()
+        .map_err(|err| format!("Failed to update vault at '{}': {}", arg_vault_path, err))?;
+
+    let output = child
+        .wait_with_output()
+        .map_err(|err| format!("Failed to update vault at '{}': {}", arg_vault_path, err))?;
+
+    if output.status.success() {
+        io::stdout()
+            .write_all(&output.stdout)
+            .map_err(|err| format!("Failed to output stdout: {}", err))?;
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed when invoking vault executable from '{}':\n{}",
+            arg_vault_path,
             String::from_utf8_lossy(&output.stderr)
         ))
     }

@@ -13,6 +13,7 @@
     - [Vault install](#vault-install)
     - [Run a local network](#run-a-local-network)
     - [Switch networks](#switch-networks)
+    - [Vault update](#vault-update)
   - [Auth](#auth)
     - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
     - [Auth install](#auth-install)
@@ -253,6 +254,15 @@ Fetching 'shared-network' network connection information from 'https://safe-vaul
 ```
 
 Note that in the scenario that your current network is set to be the MaidSafe shared network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
+
+#### Vault update
+
+The vault binary can be updated to the latest available version:
+```shell
+$ safe vault update
+```
+
+This command will check if a newer safe-vault release is available on [GitHub](https://github.com/maidsafe/safe_vault/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated. By default it will assume the safe-vault binary is at `~/.safe/vault/`, but you can override that path by providing `--vault-path <path>` argument to the above command.
 
 ### Auth
 

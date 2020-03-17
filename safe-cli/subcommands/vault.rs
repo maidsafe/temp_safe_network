@@ -16,7 +16,7 @@ const VAULTS_DATA_FOLDER: &str = "baby-fleming-vaults";
 #[derive(StructOpt, Debug)]
 pub enum VaultSubCommands {
     #[structopt(name = "install")]
-    /// Install latest safe-vault released version in the system.
+    /// Install latest safe-vault released version in the system
     Install {
         #[structopt(long = "vault-path")]
         /// Path where to install safe-vault executable (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can be also used to set the path
@@ -43,6 +43,14 @@ pub enum VaultSubCommands {
         #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
         vault_path: Option<PathBuf>,
     },
+    #[structopt(name = "update")]
+    /// Update to latest safe-vault released version
+    Update {
+        #[structopt(long = "vault-path")]
+        /// Path of the safe-vault executable to update (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can be also used to set the path
+        #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
+        vault_path: Option<PathBuf>,
+    },
 }
 
 pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
@@ -59,6 +67,7 @@ pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
             &interval.to_string(),
         ),
         Some(VaultSubCommands::Killall { vault_path }) => vault_shutdown(vault_path),
+        Some(VaultSubCommands::Update { vault_path }) => vault_update(vault_path),
         None => Err("Missing vault subcommand".to_string()),
     }
 }
