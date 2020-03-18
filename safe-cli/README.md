@@ -57,6 +57,7 @@
   - [Update](#update)
 5. [Further Help](#further-help)
 6. [License](#license)
+7. [Contributing](#contributing)
 
 ## Description
 
@@ -1375,5 +1376,10 @@ If you find any issues, or have ideas for improvements and/or new features for t
 ## License
 This SAFE Network library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
 
-## Contribute
-Copyrights in the SAFE Network are retained by their contributors. No copyright assignment is required to contribute to this project.
+## Contributing
+
+Want to contribute? Great :tada:
+
+There are many ways to give back to the project, whether it be writing new code, fixing bugs, or just reporting errors. All forms of contributions are encouraged!
+
+For instructions on how to contribute, see our [Guide to contributing](https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md).

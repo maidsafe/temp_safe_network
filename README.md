@@ -11,14 +11,9 @@
 4. [The SAFE CLI](#the-safe-cli)
 5. [The Authenticator daemon](#the-authenticator-daemon)
 6. [JSON-RPC and QUIC](#json-rpc-and-quic)
-7. [Contributing](#contributing)
-    * [Project board](#project-board)
-    * [Issues](#issues)
-    * [Commits and Pull Requests](#commits-and-pull-requests)
-    * [Releases](#releases)
-    * [Copyrights](#copyrights)
-8. [Further Help](#further-help)
-9. [License](#license)
+7. [Further Help](#further-help)
+8. [License](#license)
+9. [Contributing](#contributing)
 
 ## Description
 
@@ -68,60 +63,6 @@ One last crate found in this repository is the [jsonrpc-quic](jsonrpc-quic). Thi
 
 This crate exposes a minimised set of functions which are used by other crates to implement the Authenticator daemon communication protocol. On one hand the `safe-api` makes use of it to be able to send JSON-RPC messages to the `authd` over QUIC, and on the other hand the `safe-authd` makes use of it to accept those requests from clients, generating and sending back a JSON-RPC response over QUIC. Please refer to the [safe-authd README](safe-authd/README.md) to see some examples of these type of requests/responses.
 
-## Contributing
-
-As an open source project we're excited to accept contributions to the code from outside of MaidSafe, and are striving to make that as easy and clean as possible.
-
-This project adheres to the [Contributor Covenant](https://www.contributor-covenant.org/). By participating, you are expected to honor this code.
-
-### Project board
-
-GitHub project boards are used by the maintainers of this repository to keep track and organise development priorities: https://github.com/maidsafe/safe-api/projects
-
-There could be one or more active project boards for a repository. One main project will be used to manage all tasks corresponding to the main development stream (`master` branch). A separate project may be used to manage each PoC and/or prototyping development, and each of them will track a dedicated development branch.
-
-New features which imply big number of changes will be developed in a separate branch but tracked in the same main project board, re-basing it with `master` branch regularly, and fully testing the feature on its branch before it's merged onto the master branch after it was fully approved.
-
-The main project contains the following Kanban columns to track the status of each development task:
-- (optional) `Needs Triage`: new issues which need to be reviewed and evaluated to decide priority
-- `To do`: task is has been scheduled to be done as part of current project plan
-- `In Progress`: task is assigned to a person and it's in progress
-- `Ready for QA`: the PR sent was approved by reviewer/s, merged, and ready for QA verification
-- `Done`: PR associated to the issue was verified/tested (or task was completed by any other means)
-
-### Issues
-
-Issues should clearly lay out the problem, platforms experienced on, as well as steps to reproduce the issue.
-
-This aids in fixing the issues but also quality assurance, to check that the issue has indeed been fixed.
-
-Issues are labeled in the following way depending on its type:
-- `bug`: the issue is a bug in the product
-- `feature`: the issue is a new and inexistent feature to be implemented in the product
-- `enhancement`: the issue is an enhancement to either an existing feature in the product, or to the infrastructure around the development process of the product
-- `blocked`: the issue cannot be resolved as it depends on a fix in any of its dependencies
-- `good first issue`: an issue considered more accessible for any developer trying to start contributing
-
-### Commits and Pull Requests
-
-We use [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0-beta.3/) style messages. (More usually [with a scope](https://www.conventionalcommits.org/en/v1.0.0-beta.3/#commit-message-with-scope)) for commits.
-
-Commits should therefore strive to tackle one issue/feature, and code should be pre-linted before commit.
-
-PRs should clearly link to an issue to be tracked on the project board. A PR that implements/fixes an issue is linked using one of the [GitHub keywords](https://help.github.com/articles/closing-issues-using-keywords). Although these type of PRs will not be added themselves to a project board (just to avoid redundancy with the linked issue). However, PRs which were sent spontaneously and not linked to any existing issue will be added to the project board and should go through the same process as any other tasks/issues.
-
-Where appropriate, commits should contain tests for the code in question.
-
-### Releases
-
-The release process is triggered by the maintainers of the package, by bumping the package version according to the [SemVer](https://semver.org/) spec, and pushing a tag to have our CI scripts to automatically create the new version of `safe-api` crate and publish it at [https://crates.io/crates/safe-api](https://crates.io/crates/safe-api).
-
-A new versions of the `safe-cli` application is also published for every new version of the `safe-api`. The `safe-cli` releases can be found at [https://github.com/maidsafe/safe-api/releases](https://github.com/maidsafe/safe-api/releases)
-
-### Copyrights
-
-Copyrights in the SAFE Network are retained by their contributors. No copyright assignment is required to contribute to this project.
-
 ## Further Help
 
 You can discuss development-related questions on the [SAFE Dev Forum](https://forum.safedev.org/).
@@ -130,3 +71,11 @@ If you are just starting to develop an application for the SAFE Network, it's ve
 ## License
 
 This SAFE Network library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
+
+## Contributing
+
+Want to contribute? Great :tada:
+
+There are many ways to give back to the project, whether it be writing new code, fixing bugs, or just reporting errors. All forms of contributions are encouraged!
+
+For instructions on how to contribute, see our [Guide to contributing](https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md).
