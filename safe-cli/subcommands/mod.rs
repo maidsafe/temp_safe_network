@@ -12,6 +12,7 @@ pub mod cat;
 pub mod config;
 pub mod dog;
 pub mod files;
+mod files_get;
 mod helpers;
 pub mod keys;
 pub mod networks;

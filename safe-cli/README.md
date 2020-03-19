@@ -41,6 +41,7 @@
     - [Add](#files-add)
     - [Ls](#files-ls)
     - [Tree](#files-tree)
+    - [Get](#files-get)
     - [Rm](#files-rm)
   - [Xorurl](#xorurl)
     - [Decode](#xorurl-decode)
@@ -941,7 +942,114 @@ SIZE  CREATED               MODIFIED              NAME
 8     2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  note.md
 ```
 
-# Files Tree
+#### Files Get
+
+The `files get` command copies file(s) from the network to the local filesystem.
+
+This command works similarly to unix `cp` or `scp` or the windows `copy` command.  It accepts two arguments:
+
+```shell
+<source>  The target FilesContainer to retrieve from, optionally including path to directory or file within 
+<dest>    The local destination path for the retrieved files and folders (default is '.')
+```
+
+note: Wildcards (eg, *.txt) and set/range expansion (eg photo{1-3}.jpg, photo{1,3,5}.jpg ) in
+the source URL path are not supported at this time, but are planned for a future release.
+
+
+It also accepts some unique flags/options:
+
+```shell
+-e, --exists <exists>         How to handle pre-existing files [default: ask]  [possible values: ask, preserve, overwrite]
+-i, --progress <progress>     How to display progress [default: bars]  [possible values: bars, text, none]
+```
+
+##### Example: retrieving contents of a file container to local working directory
+```shell
+$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc
+[00:00:00] [########################################] 45B/45B (329B/s, 0s) Transfer
+Done. Retrieved 5 files to .
+```
+
+##### Example: retrieving subfolder in a file container to an existing local directory.
+
+```shell
+$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder existing_dir
+[00:00:00] [########################################] 27B/27B (425B/s, 0s) Transfer
+Done. Retrieved 2 files to existing_dir
+```
+
+We see that `subfolder` has been placed inside `existing_dir`.
+
+```shell
+$ tree existing_dir
+existing_dir
+└── subfolder
+    ├── sub2.md
+    └── subexists.md
+```
+
+##### Example: retrieving subfolder in a file container to a non-existent local directory (rename)
+
+```shell
+$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder nonexistent_dir
+[00:00:00] [########################################] 27B/27B (425B/s, 0s) Transfer
+Done. Retrieved 2 files to nonexistent_dir
+```
+
+We see that `subfolder` has been renamed to `nonexistent_dir`.
+
+```shell
+$ tree nonexistent_dir
+nonexistent_dir
+├── sub2.md
+└── subexists.md
+```
+
+##### Example: Retrieving individual file to an existing directory
+
+```shell
+$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder/sub2.md existing_dir/
+[00:00:00] [########################################] 4B/4B (378B/s, 0s) Transfer
+Done. Retrieved 1 files to existing_dir/
+```
+
+We see that the file is now inside `existing_dir`.
+
+```shell
+$ tree existing_dir
+existing_dir
+└── sub2.md
+```
+
+##### Example: Retrieving individual file to a new filename
+
+```shell
+$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder/sub2.md existing_dir/new_filename
+[00:00:00] [########################################] 4B/4B (374B/s, 0s) Transfer
+Done. Retrieved 1 files to existing_dir/new_filename
+```
+
+We see that `new_filename` is now inside `existing_dir`.
+
+```shell
+$ tree existing_dir
+existing_dir
+└── new_filename
+```
+
+##### A performance note about very large FileContainers
+
+Subfolder or single-file downloads from a FileContainer with thousands of files
+may be slower than expected.
+
+This is because the entire FileContainer is fetched and locally filtered to
+obtain the XorUrl for each file that matches the source URL path.
+
+Future releases may operate differently.
+
+
+#### Files Tree
 
 The `files tree` command displays a visual representation of an entire directory tree.
 

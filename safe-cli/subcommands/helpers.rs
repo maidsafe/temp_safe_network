@@ -10,6 +10,7 @@
 use super::OutputFmt;
 use ansi_term::Style;
 use log::debug;
+use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::XorName;
 use serde::ser::Serialize;
@@ -53,6 +54,20 @@ pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Resu
     }
 }
 
+pub fn read_stdin_response() -> Result<String, String> {
+    let mut user_input = String::new();
+    stdin()
+        .read_line(&mut user_input)
+        .map_err(|_| "".to_string())?;
+    if let Some('\n') = user_input.chars().next_back() {
+        user_input.pop();
+    }
+    if let Some('\r') = user_input.chars().next_back() {
+        user_input.pop();
+    }
+    Ok(user_input)
+}
+
 // Outputs a message and then reads from stdin
 pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>, String> {
     let the_message = message.unwrap_or_else(|| "...awaiting data from STDIN stream...");
@@ -69,21 +84,13 @@ pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>, String> {
 
 // Prompt the user with the message provided
 pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String, String> {
-    let mut user_input = String::new();
     print!("{}", prompt_msg);
     let _ = stdout().flush();
-    stdin().read_line(&mut user_input).map_err(|_| error_msg)?;
-    if let Some('\n') = user_input.chars().next_back() {
-        user_input.pop();
-    }
-    if let Some('\r') = user_input.chars().next_back() {
-        user_input.pop();
-    }
-
-    if user_input.is_empty() {
+    let buf = read_stdin_response()?;
+    if buf.is_empty() {
         Err(error_msg.to_string())
     } else {
-        Ok(user_input)
+        Ok(buf)
     }
 }
 
@@ -165,7 +172,6 @@ where
 
 // returns singular or plural version of string, based on count.
 pub fn pluralize<'a>(singular: &'a str, plural: &'a str, count: u64) -> &'a str {
-    // pub fn pluralize(singular: &str, plural: &str, count: u64) -> String {
     if count == 1 {
         singular
     } else {
@@ -180,5 +186,13 @@ pub fn if_tty(s: &str, style: Style) -> String {
         style.paint(s).to_string()
     } else {
         s.to_string()
+    }
+}
+
+pub fn div_or<X: Float>(num: X, den: X, default: X) -> X {
+    if (!num.is_normal() && !num.is_zero()) || !den.is_normal() {
+        default
+    } else {
+        num / den
     }
 }

@@ -15,7 +15,8 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use common::{
     get_bin_location, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_files_tree_output, CLI, SAFE_PROTOCOL,
+    parse_files_put_or_sync_output, parse_files_tree_output, read_cmd,
+    upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use predicates::prelude::*;
 use safe_api::xorurl::XorUrlEncoder;
@@ -867,34 +868,20 @@ fn calling_files_ls() {
 }
 
 #[test]
-fn calling_files_tree() {
-    let files_container_output = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        TEST_FOLDER,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .unwrap();
-
-    let (files_container_xor, _processed_files) =
-        parse_files_put_or_sync_output(&files_container_output);
+fn calling_files_tree() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
     let container_xorurl_no_version = unwrap!(xorurl_encoder.to_string());
 
-    let files_tree_output = cmd!(
+    let files_tree_output = read_cmd(cmd!(
         get_bin_location(),
         "files",
         "tree",
         &container_xorurl_no_version,
         "--json"
-    )
-    .read()
-    .unwrap();
+    ))?;
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
@@ -906,14 +893,12 @@ fn calling_files_tree() {
     assert_eq!(root["sub"][2]["sub"][1]["name"], "subexists.md");
     assert_eq!(root["sub"][3]["name"], "test.md");
 
-    let files_tree_output = cmd!(
+    let files_tree_output = read_cmd(cmd!(
         get_bin_location(),
         "files",
         "tree",
         &container_xorurl_no_version
-    )
-    .read()
-    .unwrap();
+    ))?;
 
     let should_match = format!(
         "{}\n{}",
@@ -930,16 +915,15 @@ fn calling_files_tree() {
     );
     assert_eq!(files_tree_output, should_match);
 
-    let files_tree_output = cmd!(
+    let files_tree_output = read_cmd(cmd!(
         get_bin_location(),
         "files",
         "tree",
         &container_xorurl_no_version,
         "--details",
         "--json",
-    )
-    .read()
-    .unwrap();
+    ))?;
+
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
     assert_eq!(root["sub"].as_array().unwrap().len(), 4);
@@ -953,4 +937,5 @@ fn calling_files_tree() {
     assert_eq!(root["sub"][2]["sub"][0]["name"], "sub2.md");
     assert_eq!(root["sub"][2]["sub"][1]["name"], "subexists.md");
     assert_eq!(root["sub"][3]["name"], "test.md");
+    Ok(())
 }

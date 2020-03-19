@@ -21,7 +21,6 @@ directories = "~2.0.1"
 env_logger = "0.6.0"
 envy = "0.4.0"
 human-panic = "1.0.1"
-isatty = "0.1"
 log = "0.4.6"
 pretty-hex = "0.1.1"
 prettytable-rs = "^0.8"
@@ -36,6 +35,10 @@ serde_yaml = "0.8.11"
 shrust = "0.0.7"
 structopt = "~0.3.5"
 tokio = { version = "^0.2.13", features = ["macros"] }
+isatty = "0.1"
+num-traits = "0.2"
+indicatif = { git="https://github.com/mibac138/indicatif", branch="mpb-tick" }
+console = "0.10.0"
 
 [features]
 mock-network = ["safe-api/mock-network"]
@@ -60,6 +63,9 @@ pretty_assertions = "0.6.1"
 safe-nd = "^0.8.0"
 unwrap = "~1.2.1"
 criterion = "0.3"
+walkdir = "~2.3.1"
+tiny-keccak = "~1.5.0"
+multibase = "0.6.0"
 
 [dev-dependencies.cargo-husky]
 version = "1"

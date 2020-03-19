@@ -8,6 +8,9 @@
 // Software.
 
 use super::{
+    files_get::{
+        filter_files_map_by_xorurl_path, process_get_command, FileExistsAction, ProgressIndicator,
+    },
     helpers::{
         gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, if_tty, notice_dry_run,
         parse_stdin_arg, pluralize, serialise_output,
@@ -100,6 +103,22 @@ pub enum FilesSubCommands {
         /// Recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
+    },
+    /// Get a file or folder from the SAFE Network
+    Get {
+        /// The target FilesContainer to retrieve from, optionally including path to directory or file within
+        source: String,
+        /// The local destination path for the retrieved files and folders (default is '.')
+        dest: Option<String>,
+        /// How to handle pre-existing files.
+        #[structopt(short = "e", long = "exists", possible_values = &["ask", "preserve", "overwrite"], default_value="ask")]
+        exists: FileExistsAction,
+        /// How to display progress.
+        #[structopt(short = "i", long = "progress", possible_values = &["bars", "text", "none"], default_value="bars")]
+        progress: ProgressIndicator,
+        /// Preserves modification times, access times, and modes from the original file
+        #[structopt(short = "p", long = "preserve")]
+        preserve: bool,
     },
     #[structopt(name = "sync")]
     /// Sync files to the SAFE Network
@@ -337,6 +356,13 @@ pub async fn files_commander(
         FilesSubCommands::Tree { target, details } => {
             process_tree_command(safe, target, details, output_fmt).await
         }
+        FilesSubCommands::Get {
+            source,
+            dest,
+            exists,
+            progress,
+            preserve,
+        } => process_get_command(safe, source, dest, exists, progress, preserve, output_fmt).await,
     }
 }
 
@@ -354,7 +380,20 @@ async fn process_tree_command(
         .await
         .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
 
-    let filtered_filesmap = filter_files_map_by_xorurl_path(&files_map, &target_url)?;
+    let filtered_filesmap =
+        filter_files_map_by_xorurl_path(&files_map, &target_url, |urlpath, fmpath| {
+            // remove urlpath from translated path
+            // eg, urlpath:  /project/src/module
+            //      fmpath:  /project/src/module/submod/foo.rs
+            //  translated:  /submod/foo.rs
+            if !urlpath.is_empty() {
+                let mut newpath = fmpath.to_string();
+                newpath.replace_range(..urlpath.len(), "");
+                Some(newpath)
+            } else {
+                None
+            }
+        })?;
 
     // Create a top/root node representing `target_url`.
     let mut top = FileTreeNode::new(&target_url, FileTreeNodeType::Directory, Option::None);
@@ -407,6 +446,7 @@ fn print_serialized_output(
 fn output_processed_files_list(
     output_fmt: OutputFmt,
     processed_files: ProcessedFiles,
+
     version: u64,
     target_url: String,
 ) -> Result<(), String> {
@@ -665,38 +705,6 @@ fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_
         cwd_files, cwd_size, total_files, total_bytes
     );
     table.printstd();
-}
-
-// filters out file items not belonging to the xorurl path
-// note: maybe should be moved into api/app/files.rs
-//       and optionally called by files_container_get()
-//       or make a files_container_get_matching() API.
-fn filter_files_map_by_xorurl_path(
-    files_map: &FilesMap,
-    target_url: &str,
-) -> Result<FilesMap, String> {
-    let xorurl_encoder = Safe::parse_url(target_url)?;
-    let path = xorurl_encoder.path();
-
-    Ok(filter_files_map_by_path(files_map, path))
-}
-
-// filters out file items not belonging to the path
-// note: maybe should be moved into api/app/files.rs
-fn filter_files_map_by_path(files_map: &FilesMap, path: &str) -> FilesMap {
-    let mut filtered_filesmap = FilesMap::default();
-
-    files_map.iter().for_each(|(filepath, fileitem)| {
-        if filepath
-            .trim_matches('/')
-            .starts_with(&path.trim_matches('/'))
-        {
-            let mut relative_path = filepath.clone();
-            relative_path.replace_range(..path.len(), "");
-            filtered_filesmap.insert(relative_path, fileitem.clone());
-        }
-    });
-    filtered_filesmap
 }
 
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap), String> {

@@ -9,7 +9,7 @@
 
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_api::{wallet::WalletSpendableBalances, BlsKeyPair};
+use safe_api::{files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
 use safe_nd::Coins;
 use std::collections::BTreeMap;
 use std::{env, str::FromStr};
@@ -19,7 +19,9 @@ use unwrap::unwrap;
 pub const CLI: &str = "safe";
 #[allow(dead_code)]
 pub const SAFE_PROTOCOL: &str = "safe://";
-const TEST_FOLDER: &str = "../testdata/";
+
+pub const TEST_FOLDER: &str = "../testdata/";
+pub const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
 
 #[allow(dead_code)]
 pub fn get_bin_location() -> String {
@@ -33,6 +35,11 @@ pub fn get_bin_location() -> String {
     } else {
         format!("{}{}", target_dir, "/release/safe")
     }
+}
+
+#[allow(dead_code)]
+pub fn read_cmd(e: duct::Expression) -> Result<String, String> {
+    e.read().map_err(|e| format!("{:#?}", e))
 }
 
 #[allow(dead_code)]
@@ -86,21 +93,44 @@ pub fn create_wallet_with_balance(
 }
 
 #[allow(dead_code)]
-pub fn upload_test_folder() -> (String, BTreeMap<String, (String, String)>) {
+pub fn upload_test_folder_with_result(
+    trailing_slash: bool,
+) -> Result<(String, ProcessedFiles), String> {
+    let path = if trailing_slash {
+        TEST_FOLDER
+    } else {
+        TEST_FOLDER_NO_TRAILING_SLASH
+    };
     let files_container = cmd!(
         get_bin_location(),
         "files",
         "put",
-        TEST_FOLDER,
+        path,
         "--recursive",
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| format!("{:#?}", e))?;
 
     let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container);
 
-    (container_xorurl, file_map)
+    Ok((container_xorurl, file_map))
+}
+
+#[allow(dead_code)]
+pub fn upload_testfolder_trailing_slash() -> Result<(String, ProcessedFiles), String> {
+    upload_test_folder_with_result(true)
+}
+
+#[allow(dead_code)]
+pub fn upload_testfolder_no_trailing_slash() -> Result<(String, ProcessedFiles), String> {
+    upload_test_folder_with_result(false)
+}
+
+// keeping for compat with older tests
+#[allow(dead_code)]
+pub fn upload_test_folder() -> (String, ProcessedFiles) {
+    upload_test_folder_with_result(true).unwrap()
 }
 
 #[allow(dead_code)]
@@ -121,14 +151,12 @@ pub fn parse_files_tree_output(output: &str) -> serde_json::Value {
 }
 
 #[allow(dead_code)]
-pub fn parse_files_put_or_sync_output(
-    output: &str,
-) -> (String, BTreeMap<String, (String, String)>) {
+pub fn parse_files_put_or_sync_output(output: &str) -> (String, ProcessedFiles) {
     serde_json::from_str(output).expect("Failed to parse output of `safe files sync`")
 }
 
 #[allow(dead_code)]
-pub fn parse_nrs_create_output(output: &str) -> (String, BTreeMap<String, (String, String)>) {
+pub fn parse_nrs_create_output(output: &str) -> (String, ProcessedFiles) {
     serde_json::from_str(output).expect("Failed to parse output of `safe nrs create`")
 }
 
